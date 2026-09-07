@@ -441,7 +441,7 @@ public final class EGraph {
     private Expr nodeToExpr(ENode node, Map<EClassId, ENode> bestNode) {
         String symbol = node.symbol();
         if (symbol.startsWith("num:")) {
-            return new NumberExpr(Double.parseDouble(symbol.substring(4)));
+            return NumberExpr.exact(symbol.substring(4));
         }
         if (symbol.startsWith("var:")) {
             return new VariableExpr(symbol.substring(4));
@@ -463,11 +463,8 @@ public final class EGraph {
         throw new IllegalStateException("Unknown e-node symbol: " + symbol);
     }
 
-    private static String format(double value) {
-        if (value == Math.floor(value) && !Double.isInfinite(value)) {
-            return Long.toString((long) value);
-        }
-        return Double.toString(value);
+    private static String format(de.regelsuche.scalar.ExactRational value) {
+        return value.canonicalText();
     }
 
     /** Diagnostic dump — useful in tests. */

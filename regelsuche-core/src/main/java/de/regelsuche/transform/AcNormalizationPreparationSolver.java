@@ -433,8 +433,7 @@ public final class AcNormalizationPreparationSolver {
     ) {
         if (expression instanceof NumberExpr number) {
             appendField(target, "number");
-            appendField(target, Long.toHexString(
-                Double.doubleToLongBits(number.value())));
+            appendField(target, number.value().canonicalText());
             return;
         }
         if (expression instanceof VariableExpr variable) {
@@ -476,7 +475,7 @@ public final class AcNormalizationPreparationSolver {
 
     private static boolean isExplicitZero(Expr expression) {
         return expression instanceof NumberExpr number
-            && number.value() == 0;
+            && number.value().equalsInteger(0);
     }
 
     public enum Status {

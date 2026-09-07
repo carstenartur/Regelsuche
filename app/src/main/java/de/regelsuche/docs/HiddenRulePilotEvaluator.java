@@ -321,9 +321,7 @@ public final class HiddenRulePilotEvaluator {
             return placeholder.name();
         }
         if (pattern instanceof PatternExpr.LiteralNumber number) {
-            return number.value() == Math.rint(number.value())
-                ? Long.toString((long) number.value())
-                : Double.toString(number.value());
+            return de.regelsuche.parse.ExpressionFormatter.format(new de.regelsuche.ast.NumberExpr(number.value()));
         }
         if (pattern instanceof PatternExpr.LiteralVariable variable) {
             return variable.name();

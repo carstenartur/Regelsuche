@@ -908,7 +908,7 @@ public final class ExactNestedFactorizationTransformationPipeline {
                     digest,
                     work,
                     stage,
-                    Double.toHexString(number.value()));
+                    number.value().canonicalText());
             } else {
                 throw invariant("UNSUPPORTED_AST_NODE_IN_STRUCTURAL_HASH");
             }

@@ -135,7 +135,7 @@ public final class RationalFunctionNormalFormEquivalenceService {
     private RationalFunction convert(Expr expression) {
         if (expression instanceof NumberExpr number) {
             return RationalFunction.polynomial(
-                Polynomial.constant(Rational.fromDouble(number.value())));
+                Polynomial.constant(Rational.fromExact(number.value())));
         }
         if (expression instanceof VariableExpr variable) {
             return RationalFunction.polynomial(
@@ -193,7 +193,7 @@ public final class RationalFunctionNormalFormEquivalenceService {
     private List<Polynomial> nonZeroValueFactors(Expr expression) {
         if (expression instanceof NumberExpr number) {
             Polynomial value = Polynomial.constant(
-                Rational.fromDouble(number.value()));
+                Rational.fromExact(number.value()));
             return value.isZero() ? List.of(value) : List.of();
         }
         if (expression instanceof BinaryExpr binary) {
@@ -233,12 +233,12 @@ public final class RationalFunctionNormalFormEquivalenceService {
             throw new UnsupportedExpression(
                 "rational powers require an explicit non-negative integer");
         }
-        double raw = exponentNumber.value();
-        if (raw != Math.rint(raw) || raw < 0 || raw > MAX_POWER) {
+        var raw = exponentNumber.value();
+        if (!raw.isInteger() || raw.signum() < 0 || raw.numerator().compareTo(java.math.BigInteger.valueOf(MAX_POWER)) > 0) {
             throw new UnsupportedExpression(
                 "rational power exponent is outside 0.." + MAX_POWER);
         }
-        return (int) raw;
+        return raw.intValueExact();
     }
 
     private List<String> requiredFactorKeys(

@@ -149,14 +149,14 @@ public final class MisconceptionDetector {
         if (expression instanceof BinaryExpr sub
             && sub.operator() == BinaryOperator.SUB
             && sub.left() instanceof NumberExpr zero
-            && zero.value() == 0.0) {
+            && zero.value().equalsInteger(0)) {
             return sub.right();
         }
         // Pattern: (-1) * X
         if (expression instanceof BinaryExpr mul
             && mul.operator() == BinaryOperator.MUL
             && mul.left() instanceof NumberExpr minusOne
-            && minusOne.value() == -1.0) {
+            && minusOne.value().equalsInteger(-1)) {
             return mul.right();
         }
         return null;
@@ -180,7 +180,7 @@ public final class MisconceptionDetector {
             return false;
         }
         if (a instanceof NumberExpr na && b instanceof NumberExpr nb) {
-            return Double.compare(na.value(), nb.value()) == 0;
+            return na.value().equals(nb.value());
         }
         if (a instanceof VariableExpr va && b instanceof VariableExpr vb) {
             return va.name().equals(vb.name());

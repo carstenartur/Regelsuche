@@ -1,5 +1,6 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -121,41 +122,41 @@ public final class FactorCandidateOperator implements HypothesisOperator {
     }
 
     private int integerCoefficient(Expr expression) {
-        if (expression instanceof NumberExpr number && Math.rint(number.value()) == number.value()) {
-            return (int) number.value();
+        if (expression instanceof NumberExpr number && (number.value().isInteger() && number.value().numerator().abs().bitLength() < 31)) {
+            return number.value().intValueExact();
         }
         if (expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.MUL) {
-            if (binary.left() instanceof NumberExpr left && Math.rint(left.value()) == left.value()) {
-                return (int) left.value();
+            if (binary.left() instanceof NumberExpr left && (left.value().isInteger() && left.value().numerator().abs().bitLength() < 31)) {
+                return left.value().intValueExact();
             }
-            if (binary.right() instanceof NumberExpr right && Math.rint(right.value()) == right.value()) {
-                return (int) right.value();
+            if (binary.right() instanceof NumberExpr right && (right.value().isInteger() && right.value().numerator().abs().bitLength() < 31)) {
+                return right.value().intValueExact();
             }
         }
         return 1;
     }
 
     private Expr divideBy(Expr expression, int divisor) {
-        if (expression instanceof NumberExpr number && Math.rint(number.value()) == number.value()) {
-            return new NumberExpr(number.value() / divisor);
+        if (expression instanceof NumberExpr number && (number.value().isInteger() && number.value().numerator().abs().bitLength() < 31)) {
+            return new NumberExpr(number.value().divide(ExactRational.integer(divisor)));
         }
         if (expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.MUL) {
-            if (binary.left() instanceof NumberExpr left && Math.rint(left.value()) == left.value()) {
-                double scaled = left.value() / divisor;
-                if (Double.compare(scaled, 1.0) == 0) {
+            if (binary.left() instanceof NumberExpr left && (left.value().isInteger() && left.value().numerator().abs().bitLength() < 31)) {
+                ExactRational scaled = left.value().divide(ExactRational.integer(divisor));
+                if (scaled.isOne()) {
                     return binary.right();
                 }
                 return new BinaryExpr(new NumberExpr(scaled), BinaryOperator.MUL, binary.right());
             }
-            if (binary.right() instanceof NumberExpr right && Math.rint(right.value()) == right.value()) {
-                double scaled = right.value() / divisor;
-                if (Double.compare(scaled, 1.0) == 0) {
+            if (binary.right() instanceof NumberExpr right && (right.value().isInteger() && right.value().numerator().abs().bitLength() < 31)) {
+                ExactRational scaled = right.value().divide(ExactRational.integer(divisor));
+                if (scaled.isOne()) {
                     return binary.left();
                 }
                 return new BinaryExpr(binary.left(), BinaryOperator.MUL, new NumberExpr(scaled));
             }
         }
-        return new BinaryExpr(new NumberExpr(1.0 / divisor), BinaryOperator.MUL, expression);
+        return new BinaryExpr(new NumberExpr(ExactRational.integer(divisor).reciprocal()), BinaryOperator.MUL, expression);
     }
 
     private int gcd(int left, int right) {

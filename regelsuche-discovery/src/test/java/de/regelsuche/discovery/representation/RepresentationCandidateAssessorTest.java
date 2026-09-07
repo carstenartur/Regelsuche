@@ -227,7 +227,7 @@ class RepresentationCandidateAssessorTest {
         assertEquals(3,
             measurer.measure("veryLongIdentifier + x").tokenCount());
         var scientific = new BinaryExpr(
-            new NumberExpr(0.0001),
+            NumberExpr.exact("0.0001"),
             ADD,
             new VariableExpr("x")
         );

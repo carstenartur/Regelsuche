@@ -25,7 +25,7 @@ class UnivariatePolynomialTest {
 
         assertNotNull(quotient);
         assertEquals(
-            new NumberExpr(1_000_000_000_000d),
+            NumberExpr.exact("1000000000000"),
             quotient.toExpression());
     }
 

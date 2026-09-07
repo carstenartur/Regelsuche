@@ -1,5 +1,6 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -53,7 +54,7 @@ public class RationalizationHypothesisOperator implements HypothesisOperator {
         Expr rationalizedDenominator = new BinaryExpr(
             denominator.radicand(),
             BinaryOperator.SUB,
-            new NumberExpr(denominator.constant() * denominator.constant())
+            new NumberExpr(denominator.constant().multiply(denominator.constant()))
         );
         Expr transformed = new BinaryExpr(conjugateNumerator, BinaryOperator.DIV, rationalizedDenominator);
         String formattedInput = ExpressionFormatter.format(root);
@@ -82,14 +83,14 @@ public class RationalizationHypothesisOperator implements HypothesisOperator {
             return null;
         }
         Radical left = radical(binary.left());
-        if (left != null && binary.right() instanceof NumberExpr constant && constant.value() > 0) {
+        if (left != null && binary.right() instanceof NumberExpr constant && constant.value().signum() > 0) {
             return new RadicalDenominator(left.sqrt(), left.radicand(), constant.value(), binary.operator());
         }
         Radical right = radical(binary.right());
         if (right != null
             && binary.operator() == BinaryOperator.ADD
             && binary.left() instanceof NumberExpr constant
-            && constant.value() > 0) {
+            && constant.value().signum() > 0) {
             return new RadicalDenominator(right.sqrt(), right.radicand(), constant.value(), BinaryOperator.ADD);
         }
         return null;
@@ -106,20 +107,17 @@ public class RationalizationHypothesisOperator implements HypothesisOperator {
 
     private String assumption(RadicalDenominator denominator) {
         String radicand = ExpressionFormatter.format(denominator.radicand());
-        double square = denominator.constant() * denominator.constant();
-        if (Math.rint(square) == square) {
-            return radicand + " != " + (long) square;
-        }
-        return radicand + " != " + square;
+        return radicand + " != " + ExpressionFormatter.format(
+            new NumberExpr(denominator.constant().multiply(denominator.constant())));
     }
 
     private boolean isOne(Expr expression) {
-        return expression instanceof NumberExpr number && Double.compare(number.value(), 1.0) == 0;
+        return expression instanceof NumberExpr number && number.value().equalsInteger(1);
     }
 
     private record Radical(Expr sqrt, Expr radicand) {
     }
 
-    private record RadicalDenominator(Expr sqrt, Expr radicand, double constant, BinaryOperator sign) {
+    private record RadicalDenominator(Expr sqrt, Expr radicand, ExactRational constant, BinaryOperator sign) {
     }
 }

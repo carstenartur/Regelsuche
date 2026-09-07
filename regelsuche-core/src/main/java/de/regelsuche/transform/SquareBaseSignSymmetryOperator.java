@@ -75,14 +75,14 @@ public final class SquareBaseSignSymmetryOperator
 
     private static boolean isTwo(Expr expression) {
         return expression instanceof NumberExpr number
-            && Double.compare(number.value(), 2.0) == 0;
+            && number.value().equalsInteger(2);
     }
 
     private static boolean isExplicitNegation(Expr expression) {
         return expression instanceof BinaryExpr subtraction
             && subtraction.operator() == BinaryOperator.SUB
             && subtraction.left() instanceof NumberExpr zero
-            && Double.compare(zero.value(), 0.0) == 0;
+            && zero.value().equalsInteger(0);
     }
 
     private static String syntaxHash(String expression) {

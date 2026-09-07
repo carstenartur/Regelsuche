@@ -270,6 +270,7 @@ Details und Produktionsgrenzen stehen in
 | Lokale Regelanwendung | positionsbezogene Kandidaten, Bindungen, Annahmen, Vorschau und Suchstatus | [AST-Regelradar](docs/ast-rule-radar.md) |
 | Regelvorbereitung | direkte Anwendung, typisierte Guards, native Exact-Spezialisten und begrenzte lokale Bridges | [Safe Rule Preparation Coordinator](docs/safe-rule-preparation-coordinator.md) |
 | Lernen und Wiederverwendung | Kandidatenbildung, Counterexamples, Holdouts, Generationsbarrieren und Schatteninventare | [Generational Rule Mining](docs/generational-rule-mining.md) |
+| Zahlen | exakte Ganzzahlen, Dezimalwerte und Brüche in AST, Matching und numerischen Umformungen | [Exakte Zahlensemantik](docs/exact-numeric-ast.md) |
 | Polynome | exakte `Z[x]`-/`Q[x]`-Repräsentation, native univariate Faktorisierung, Vorschlagsadapter und unabhängige Produktprüfung | [Polynomfaktorisierung](docs/domain-aware-polynomial-factorization.md) |
 | Gleichungssysteme | exaktes `A*x=b`, Blockzerlegung, RREF, Lösungsklassifikation und explizite Eigenproblemrollen | [Representation Bridges](docs/equation-system-matrix-representation.md) |
 | Proof | versionierte Obligationen, Z3/cvc5, optional Lean sowie getrennte Job- und mathematische Status | [Proof Workbench](docs/proof-workbench.md) |

@@ -148,7 +148,7 @@ public class RationalNormalizationHypothesisOperator implements HypothesisOperat
 
     private List<String> nonZeroAssumptions(Expr expression) {
         if (expression instanceof NumberExpr number) {
-            return number.value() == 0
+            return number.value().equalsInteger(0)
                 ? List.of("0 != 0")
                 : List.of();
         }
@@ -156,7 +156,7 @@ public class RationalNormalizationHypothesisOperator implements HypothesisOperat
     }
 
     private boolean isExplicitZero(Expr expression) {
-        return expression instanceof NumberExpr number && number.value() == 0;
+        return expression instanceof NumberExpr number && number.value().equalsInteger(0);
     }
 
     private boolean same(Expr left, Expr right) {

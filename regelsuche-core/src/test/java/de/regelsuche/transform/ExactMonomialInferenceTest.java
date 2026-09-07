@@ -43,7 +43,7 @@ class ExactMonomialInferenceTest {
     @Test
     void rationalRootsRemainRationalInTheActualBinding() {
         assertEquals("2 / 3", binding(power(2), "4 / 9"));
-        assertEquals("2 / 3 * x", binding(power(2), "(4 / 9) * x^2"));
+        assertEquals("(2 / 3) * x", binding(power(2), "(4 / 9) * x^2"));
         assertEquals("1.5", binding(power(2), "9 / 4"));
         assertEquals("0.1", binding(power(2), "0.01"));
     }
@@ -72,14 +72,14 @@ class ExactMonomialInferenceTest {
 
     @Test
     void decimalProductsUseExactRationalArithmeticInsteadOfBinaryRounding() {
-        assertTrue(match(PatternExpr.num(0.02), "0.1 * 0.2").matched());
-        assertFalse(match(PatternExpr.num(Math.nextUp(0.02)), "0.1 * 0.2").matched());
-        assertTrue(match(PatternExpr.num(0.5), "1 / 2").matched());
+        assertTrue(match(PatternExpr.num("0.02"), "0.1 * 0.2").matched());
+        assertFalse(match(PatternExpr.num(de.regelsuche.scalar.ExactRationalDomain.legacyDecimalValue(Math.nextUp(0.02)).orElseThrow()), "0.1 * 0.2").matched());
+        assertTrue(match(PatternExpr.num("0.5"), "1 / 2").matched());
     }
 
     @Test
     void nonzeroTinyDivisorsAreNotTreatedAsZero() {
-        assertTrue(match(PatternExpr.num(10000000000.0), "1 / 0.0000000001").matched());
+        assertTrue(match(PatternExpr.num("10000000000.0"), "1 / 0.0000000001").matched());
         assertFalse(match(PatternExpr.num(0), "1 / 0").matched());
     }
 
@@ -108,7 +108,7 @@ class ExactMonomialInferenceTest {
                 "x^2 + 2*x*sin(a) + sin(a)^2")) {
             assertTrue(rule.matches(parser.parseTerm(source)));
         }
-        assertEquals("(x + 2 / 3 * y) ^ 2", ExpressionFormatter.format(
+        assertEquals("(x + (2 / 3) * y) ^ 2", ExpressionFormatter.format(
             rule.apply(parser.parseTerm("x^2 + (4/3)*x*y + (4/9)*y^2"))));
     }
 
@@ -132,11 +132,9 @@ class ExactMonomialInferenceTest {
     }
 
     @Test
-    void nonFiniteCoefficientExpressionsDoNotBecomeBindings() {
-        for (double value : new double[] {Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY}) {
-            var source = new BinaryExpr(new NumberExpr(value), BinaryOperator.MUL, new NumberExpr(1));
-            assertFalse(EquivalenceAwarePatternMatcher.matchDetailed(power(2), source,
-                Map.of(), RecognitionProfile.algebraicAc()).matched());
+    void nonFiniteCoefficientExpressionsCannotBeConstructed() {
+        for (String value : List.of("NaN", "Infinity", "-Infinity")) {
+            assertThrows(IllegalArgumentException.class, () -> NumberExpr.exact(value));
         }
     }
 
@@ -171,9 +169,9 @@ class ExactMonomialInferenceTest {
     }
 
     @Test
-    void unrepresentableExactRootIsNotRoundedBackIntoTheLegacyAst() {
-        assertLimit("(3*3002399751580331) * (3*3002399751580331)",
-            "ALGEBRAIC_BINDING_NOT_REPRESENTABLE");
+    void largeExactRootIsRetainedWithoutRounding() {
+        assertEquals("9007199254740993", binding(power(2),
+            "(3*3002399751580331) * (3*3002399751580331)"));
     }
 
     @Test

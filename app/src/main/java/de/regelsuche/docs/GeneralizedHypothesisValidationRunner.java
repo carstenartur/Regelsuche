@@ -1674,11 +1674,8 @@ final class GeneralizedHypothesisValidationRunner {
             return expression == null ? "" : expression.replaceAll("\\s+", "");
         }
 
-        private static String formatNumber(double value) {
-            if (Double.isFinite(value) && Math.rint(value) == value) {
-                return Long.toString((long) value);
-            }
-            return Double.toString(value);
+        private static String formatNumber(de.regelsuche.scalar.ExactRational value) {
+            return value.canonicalText();
         }
     }
 }

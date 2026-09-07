@@ -73,7 +73,7 @@ public final class SumOfSquaresCompletionOperator
         if (expression instanceof BinaryExpr power
                 && power.operator() == BinaryOperator.POW
                 && power.right() instanceof NumberExpr exponent
-                && Double.compare(exponent.value(), 2.0) == 0) {
+                && exponent.value().equalsInteger(2)) {
             return power.left();
         }
         return null;

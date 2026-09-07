@@ -187,11 +187,11 @@ public final class DidacticCostModel implements CostModel {
 
     private static int largeCoefficientPenalty(Expr expression) {
         if (expression instanceof NumberExpr number) {
-            double abs = Math.abs(number.value());
-            if (abs > 1000) {
+            var abs = number.value().abs();
+            if (abs.compareTo(de.regelsuche.scalar.ExactRational.integer(1000)) > 0) {
                 return 4;
             }
-            if (abs > 100) {
+            if (abs.compareTo(de.regelsuche.scalar.ExactRational.integer(100)) > 0) {
                 return 2;
             }
             return 0;

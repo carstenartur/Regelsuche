@@ -1,5 +1,6 @@
 package de.regelsuche.moves.hypothesis;
 
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.Equation;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
@@ -54,9 +55,9 @@ public final class EquationIsolationHypothesisGenerator implements ParameterHypo
             Expr expr = term.expr();
             String value;
             if (expr instanceof NumberExpr number) {
-                double signed = term.positive() ? number.value() : -number.value();
-                double inverse = -signed;
-                value = (inverse > 0 ? "+" : "") + HypothesisExpressions.formatNumber(inverse);
+                ExactRational signed = term.positive() ? number.value() : number.value().negate();
+                ExactRational inverse = signed.negate();
+                value = (inverse.signum() > 0 ? "+" : "") + HypothesisExpressions.formatNumber(inverse);
             } else {
                 String canonical = HypothesisExpressions.format(expr);
                 String body = HypothesisExpressions.isComposite(expr) ? "(" + canonical + ")" : canonical;

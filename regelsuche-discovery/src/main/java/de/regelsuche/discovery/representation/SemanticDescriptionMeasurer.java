@@ -79,17 +79,9 @@ public final class SemanticDescriptionMeasurer {
         }
     }
 
-    private static int numericBitLength(double value) {
-        if (!Double.isFinite(value)) {
-            throw new IllegalArgumentException("non-finite numbers are not measurable");
-        }
-        BigDecimal decimal = BigDecimal.valueOf(value).stripTrailingZeros();
-        int bits = Math.max(1, decimal.unscaledValue().abs().bitLength());
-        return decimal.scale() == 0
-            ? bits
-            : Math.addExact(
-                bits,
-                BigInteger.TEN.pow(Math.abs(decimal.scale())).bitLength());
+    private static int numericBitLength(de.regelsuche.scalar.ExactRational value) {
+        int bits = Math.max(1, value.numerator().abs().bitLength());
+        return value.isInteger() ? bits : Math.addExact(bits, value.denominator().bitLength());
     }
 
     private static int tokenCount(String expression) {

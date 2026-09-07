@@ -9,6 +9,7 @@ import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scalar.ExactRational;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -113,15 +114,15 @@ public class DifferenceOfSquaresPreparationOperator implements HypothesisOperato
 
     private SquareRoot squareRoot(Expr expression) {
         if (expression instanceof NumberExpr numberExpr) {
-            Double root = perfectSquareRoot(numberExpr.value());
+            ExactRational root = perfectSquareRoot(numberExpr.value());
             return root == null ? null : new SquareRoot(new NumberExpr(root));
         }
         if (expression instanceof BinaryExpr binaryExpr && binaryExpr.operator() == BinaryOperator.POW
             && binaryExpr.right() instanceof NumberExpr exponent) {
-            double value = exponent.value();
-            if (isPositiveInteger(value) && ((long) value) % 2 == 0) {
-                long half = ((long) value) / 2;
-                Expr root = half == 1
+            ExactRational value = exponent.value();
+            if (value.isInteger() && value.signum() > 0 && !value.numerator().testBit(0)) {
+                ExactRational half = value.divide(ExactRational.integer(2));
+                Expr root = half.isOne()
                     ? binaryExpr.left()
                     : new BinaryExpr(binaryExpr.left(), BinaryOperator.POW, new NumberExpr(half));
                 return new SquareRoot(root);
@@ -135,12 +136,12 @@ public class DifferenceOfSquaresPreparationOperator implements HypothesisOperato
     }
 
     private Expr squareRootOfProduct(List<Expr> factors) {
-        double coefficient = 1;
+        ExactRational coefficient = ExactRational.ONE;
         List<Expr> symbolicFactors = new ArrayList<>();
         Map<String, Expr> pendingUnpairedFactors = new LinkedHashMap<>();
         for (Expr factor : flattenMultiplication(buildProduct(factors))) {
             if (factor instanceof NumberExpr numberExpr) {
-                coefficient *= numberExpr.value();
+                coefficient = coefficient.multiply(numberExpr.value());
                 continue;
             }
             SquareRoot root = squareRoot(factor);
@@ -156,7 +157,7 @@ public class DifferenceOfSquaresPreparationOperator implements HypothesisOperato
                 symbolicFactors.add(root.root());
             }
         }
-        Double numericRoot = perfectSquareRoot(coefficient);
+        ExactRational numericRoot = perfectSquareRoot(coefficient);
         if (numericRoot == null) {
             return null;
         }
@@ -164,7 +165,7 @@ public class DifferenceOfSquaresPreparationOperator implements HypothesisOperato
             return null;
         }
         List<Expr> rootedFactors = new ArrayList<>();
-        if (numericRoot != 1 || symbolicFactors.isEmpty()) {
+        if (!numericRoot.isOne() || symbolicFactors.isEmpty()) {
             rootedFactors.add(new NumberExpr(numericRoot));
         }
         rootedFactors.addAll(symbolicFactors);
@@ -200,30 +201,8 @@ public class DifferenceOfSquaresPreparationOperator implements HypothesisOperato
         return new BinaryExpr(expression, BinaryOperator.POW, new NumberExpr(2));
     }
 
-    private Double perfectSquareRoot(double value) {
-        if (value < 0) {
-            return null;
-        }
-        if (Math.rint(value) == value) {
-            long rounded = (long) value;
-            long root = Math.round(Math.sqrt(rounded));
-            if (root * root == rounded) {
-                return (double) root;
-            }
-        }
-        double scaled = value * 4;
-        if (Math.rint(scaled) == scaled && scaled > 0) {
-            long rounded = (long) scaled;
-            long root = Math.round(Math.sqrt(rounded));
-            if (root * root == rounded) {
-                return root / 2.0;
-            }
-        }
-        return null;
-    }
-
-    private boolean isPositiveInteger(double value) {
-        return value > 0 && Math.rint(value) == value;
+    private ExactRational perfectSquareRoot(ExactRational value) {
+        return value.sqrtExact().orElse(null);
     }
 
     private int repeatedStructureBonus(Expr expression) {

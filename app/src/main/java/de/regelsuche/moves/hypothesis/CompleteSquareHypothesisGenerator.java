@@ -7,6 +7,7 @@ import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.moves.RewriteMoveKind;
 import java.util.ArrayList;
+import de.regelsuche.scalar.ExactRational;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -52,8 +53,8 @@ public final class CompleteSquareHypothesisGenerator implements ParameterHypothe
             if (quadratic == null) {
                 continue;
             }
-            double shift = quadratic.b() / 2.0;
-            double residue = quadratic.c() - shift * shift;
+            ExactRational shift = quadratic.b().divide(ExactRational.integer(2));
+            ExactRational residue = quadratic.c().subtract(shift.multiply(shift));
             String atom = skeleton.atomCanonical();
             List<String> evidence = List.of(
                     "atom=" + atom,
@@ -97,22 +98,22 @@ public final class CompleteSquareHypothesisGenerator implements ParameterHypothe
         if (variables.size() != 1 || !variables.contains(placeholder)) {
             return null;
         }
-        Map<Integer, Double> polynomial = toPolynomial(skeleton);
+        Map<Integer, ExactRational> polynomial = toPolynomial(skeleton);
         if (polynomial == null) {
             return null;
         }
-        double leading = polynomial.getOrDefault(2, 0.0);
-        if (leading == 0.0) {
+        ExactRational leading = polynomial.getOrDefault(2, ExactRational.ZERO);
+        if (leading.isZero()) {
             return null;
         }
         // Reject anything of degree higher than 2.
         for (Integer degree : polynomial.keySet()) {
-            if (degree > 2 && polynomial.get(degree) != 0.0) {
+            if (degree > 2 && !polynomial.get(degree).isZero()) {
                 return null;
             }
         }
-        double b = polynomial.getOrDefault(1, 0.0) / leading;
-        double c = polynomial.getOrDefault(0, 0.0) / leading;
+        ExactRational b = polynomial.getOrDefault(1, ExactRational.ZERO).divide(leading);
+        ExactRational c = polynomial.getOrDefault(0, ExactRational.ZERO).divide(leading);
         return new Quadratic(b, c);
     }
 
@@ -127,22 +128,22 @@ public final class CompleteSquareHypothesisGenerator implements ParameterHypothe
         }
     }
 
-    private Map<Integer, Double> toPolynomial(Expr expr) {
+    private Map<Integer, ExactRational> toPolynomial(Expr expr) {
         if (expr instanceof NumberExpr number) {
             return Map.of(0, number.value());
         }
         if (expr instanceof VariableExpr) {
-            return Map.of(1, 1.0);
+            return Map.of(1, ExactRational.ONE);
         }
         if (expr instanceof BinaryExpr binary) {
-            Map<Integer, Double> left = toPolynomial(binary.left());
-            Map<Integer, Double> right = toPolynomial(binary.right());
+            Map<Integer, ExactRational> left = toPolynomial(binary.left());
+            Map<Integer, ExactRational> right = toPolynomial(binary.right());
             if (left == null || right == null) {
                 return null;
             }
             return switch (binary.operator()) {
-                case ADD -> add(left, right, 1.0);
-                case SUB -> add(left, right, -1.0);
+                case ADD -> add(left, right, ExactRational.ONE);
+                case SUB -> add(left, right, ExactRational.NEGATIVE_ONE);
                 case MUL -> multiply(left, right);
                 case DIV -> divide(left, right);
                 case POW -> power(left, right);
@@ -151,49 +152,49 @@ public final class CompleteSquareHypothesisGenerator implements ParameterHypothe
         return null;
     }
 
-    private Map<Integer, Double> add(Map<Integer, Double> left, Map<Integer, Double> right, double sign) {
-        Map<Integer, Double> result = new HashMap<>(left);
-        right.forEach((degree, coefficient) -> result.merge(degree, sign * coefficient, Double::sum));
+    private Map<Integer, ExactRational> add(Map<Integer, ExactRational> left, Map<Integer, ExactRational> right, ExactRational sign) {
+        Map<Integer, ExactRational> result = new HashMap<>(left);
+        right.forEach((degree, coefficient) -> result.merge(degree, sign.multiply(coefficient), ExactRational::add));
         return result;
     }
 
-    private Map<Integer, Double> multiply(Map<Integer, Double> left, Map<Integer, Double> right) {
-        Map<Integer, Double> result = new HashMap<>();
-        for (Map.Entry<Integer, Double> leftEntry : left.entrySet()) {
-            for (Map.Entry<Integer, Double> rightEntry : right.entrySet()) {
+    private Map<Integer, ExactRational> multiply(Map<Integer, ExactRational> left, Map<Integer, ExactRational> right) {
+        Map<Integer, ExactRational> result = new HashMap<>();
+        for (Map.Entry<Integer, ExactRational> leftEntry : left.entrySet()) {
+            for (Map.Entry<Integer, ExactRational> rightEntry : right.entrySet()) {
                 int degree = leftEntry.getKey() + rightEntry.getKey();
                 if (degree > MAX_DEGREE) {
                     return null;
                 }
-                result.merge(degree, leftEntry.getValue() * rightEntry.getValue(), Double::sum);
+                result.merge(degree, leftEntry.getValue().multiply(rightEntry.getValue()), ExactRational::add);
             }
         }
         return result;
     }
 
-    private Map<Integer, Double> divide(Map<Integer, Double> left, Map<Integer, Double> right) {
+    private Map<Integer, ExactRational> divide(Map<Integer, ExactRational> left, Map<Integer, ExactRational> right) {
         if (right.size() != 1 || !right.containsKey(0)) {
             return null;
         }
-        double divisor = right.get(0);
-        if (divisor == 0.0) {
+        ExactRational divisor = right.get(0);
+        if (divisor.isZero()) {
             return null;
         }
-        Map<Integer, Double> result = new HashMap<>();
-        left.forEach((degree, coefficient) -> result.put(degree, coefficient / divisor));
+        Map<Integer, ExactRational> result = new HashMap<>();
+        left.forEach((degree, coefficient) -> result.put(degree, coefficient.divide(divisor)));
         return result;
     }
 
-    private Map<Integer, Double> power(Map<Integer, Double> base, Map<Integer, Double> exponent) {
+    private Map<Integer, ExactRational> power(Map<Integer, ExactRational> base, Map<Integer, ExactRational> exponent) {
         if (exponent.size() != 1 || !exponent.containsKey(0)) {
             return null;
         }
-        double raw = exponent.get(0);
-        if (raw != Math.rint(raw) || raw < 0 || raw > MAX_DEGREE) {
+        ExactRational raw = exponent.get(0);
+        if (!raw.isInteger() || raw.signum() < 0 || raw.numerator().compareTo(java.math.BigInteger.valueOf(MAX_DEGREE)) > 0) {
             return null;
         }
-        int power = (int) raw;
-        Map<Integer, Double> result = new HashMap<>(Map.of(0, 1.0));
+        int power = raw.intValueExact();
+        Map<Integer, ExactRational> result = new HashMap<>(Map.of(0, ExactRational.ONE));
         for (int i = 0; i < power; i++) {
             result = multiply(result, base);
             if (result == null) {
@@ -203,6 +204,6 @@ public final class CompleteSquareHypothesisGenerator implements ParameterHypothe
         return result;
     }
 
-    private record Quadratic(double b, double c) {
+    private record Quadratic(ExactRational b, ExactRational c) {
     }
 }

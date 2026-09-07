@@ -72,7 +72,7 @@ public final class InequalityRewriteEngine {
             throw new IllegalArgumentException(
                 "multiplyBothSides requires a numeric literal factor");
         }
-        if (factor instanceof NumberExpr number && number.value() == 0.0) {
+        if (factor instanceof NumberExpr number && number.value().equalsInteger(0)) {
             throw new IllegalArgumentException("Cannot multiply an inequality by zero");
         }
         Sign sign = signOf(factor);
@@ -107,7 +107,7 @@ public final class InequalityRewriteEngine {
             throw new IllegalArgumentException(
                 "divideBothSides requires a numeric literal divisor");
         }
-        if (divisor instanceof NumberExpr number && number.value() == 0.0) {
+        if (divisor instanceof NumberExpr number && number.value().equalsInteger(0)) {
             throw new IllegalArgumentException("Cannot divide an inequality by zero");
         }
         Sign sign = signOf(divisor);
@@ -154,10 +154,10 @@ public final class InequalityRewriteEngine {
 
     private static Sign signOf(Expr expr) {
         if (expr instanceof NumberExpr number) {
-            if (number.value() > 0) {
+            if (number.value().signum() > 0) {
                 return Sign.POSITIVE;
             }
-            if (number.value() < 0) {
+            if (number.value().signum() < 0) {
                 return Sign.NEGATIVE;
             }
             return Sign.UNKNOWN;
@@ -166,10 +166,10 @@ public final class InequalityRewriteEngine {
         if (expr instanceof BinaryExpr binary
             && binary.operator() == BinaryOperator.SUB
             && binary.left() instanceof NumberExpr zero
-            && zero.value() == 0.0) {
+            && zero.value().equalsInteger(0)) {
             // Inner is treated as positive if it is a positive literal,
             // otherwise unknown.
-            if (binary.right() instanceof NumberExpr inner && inner.value() > 0) {
+            if (binary.right() instanceof NumberExpr inner && inner.value().signum() > 0) {
                 return Sign.NEGATIVE;
             }
         }

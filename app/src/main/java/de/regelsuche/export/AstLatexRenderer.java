@@ -189,11 +189,11 @@ public class AstLatexRenderer implements MathRenderer {
         return sb.append("\\end{cases}").toString();
     }
 
-    private static String formatNumber(double value) {
-        if (value == (long) value) {
-            return Long.toString((long) value);
-        }
-        return Double.toString(value);
+    private static String formatNumber(de.regelsuche.scalar.ExactRational value) {
+        String formatted = de.regelsuche.parse.ExpressionFormatter.format(new NumberExpr(value));
+        return formatted.contains("/")
+            ? "\\frac{" + value.numerator() + "}{" + value.denominator() + "}"
+            : formatted;
     }
 
     private static String escapeText(String value) {

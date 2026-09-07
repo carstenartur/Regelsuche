@@ -177,15 +177,11 @@ public final class ExactPolynomialPatternIdentityVerifier {
         return integer.intValueExact();
     }
 
-    private static BigInteger exactInteger(double value) {
-        if (!Double.isFinite(value) || value != Math.rint(value)) {
+    private static BigInteger exactInteger(de.regelsuche.scalar.ExactRational value) {
+        if (!value.isInteger()) {
             throw unsupported("COEFFICIENT_MUST_BE_EXACT_INTEGER");
         }
-        try {
-            return BigDecimal.valueOf(value).toBigIntegerExact();
-        } catch (ArithmeticException exception) {
-            throw unsupported("COEFFICIENT_OUTSIDE_EXACT_INTEGER_RANGE");
-        }
+        return value.numerator();
     }
 
     private static UnsupportedPattern unsupported(String detailCode) {

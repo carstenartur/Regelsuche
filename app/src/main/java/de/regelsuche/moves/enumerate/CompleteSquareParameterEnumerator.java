@@ -8,6 +8,7 @@ import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.moves.MoveParameter;
 import de.regelsuche.moves.MoveParameterKind;
+import de.regelsuche.scalar.ExactRational;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -48,18 +49,18 @@ public final class CompleteSquareParameterEnumerator implements ParameterEnumera
         if (variables.size() != 1) {
             return Optional.empty();
         }
-        Map<Integer, Double> polynomial = toPolynomial(root);
+        Map<Integer, ExactRational> polynomial = toPolynomial(root);
         if (polynomial == null) {
             return Optional.empty();
         }
-        double leading = polynomial.getOrDefault(2, 0.0);
-        if (leading == 0.0) {
+        ExactRational leading = polynomial.getOrDefault(2, ExactRational.ZERO);
+        if (leading.isZero()) {
             return Optional.empty();
         }
-        double b = polynomial.getOrDefault(1, 0.0) / leading;
-        double c = polynomial.getOrDefault(0, 0.0) / leading;
-        double shift = b / 2.0;
-        double residue = c - shift * shift;
+        ExactRational b = polynomial.getOrDefault(1, ExactRational.ZERO).divide(leading);
+        ExactRational c = polynomial.getOrDefault(0, ExactRational.ZERO).divide(leading);
+        ExactRational shift = b.divide(ExactRational.integer(2));
+        ExactRational residue = c.subtract(shift.multiply(shift));
         return Optional.of(List.of(
                 new MoveParameter("shift", MoveParameterKind.GENERATED, format(shift), format(shift), 0, id()),
                 new MoveParameter("residue", MoveParameterKind.GENERATED, format(residue), format(residue), 1, id())));
@@ -77,22 +78,22 @@ public final class CompleteSquareParameterEnumerator implements ParameterEnumera
     }
 
     /** @return the polynomial as degree -> coefficient, or {@code null} when not a univariate polynomial. */
-    private Map<Integer, Double> toPolynomial(Expr expr) {
+    private Map<Integer, ExactRational> toPolynomial(Expr expr) {
         if (expr instanceof NumberExpr number) {
             return Map.of(0, number.value());
         }
         if (expr instanceof VariableExpr) {
-            return Map.of(1, 1.0);
+            return Map.of(1, ExactRational.ONE);
         }
         if (expr instanceof BinaryExpr binary) {
-            Map<Integer, Double> left = toPolynomial(binary.left());
-            Map<Integer, Double> right = toPolynomial(binary.right());
+            Map<Integer, ExactRational> left = toPolynomial(binary.left());
+            Map<Integer, ExactRational> right = toPolynomial(binary.right());
             if (left == null || right == null) {
                 return null;
             }
             return switch (binary.operator()) {
-                case ADD -> add(left, right, 1.0);
-                case SUB -> add(left, right, -1.0);
+                case ADD -> add(left, right, ExactRational.ONE);
+                case SUB -> add(left, right, ExactRational.NEGATIVE_ONE);
                 case MUL -> multiply(left, right);
                 case DIV -> divide(left, right);
                 case POW -> power(left, right);
@@ -101,49 +102,49 @@ public final class CompleteSquareParameterEnumerator implements ParameterEnumera
         return null;
     }
 
-    private Map<Integer, Double> add(Map<Integer, Double> left, Map<Integer, Double> right, double sign) {
-        Map<Integer, Double> result = new HashMap<>(left);
-        right.forEach((degree, coefficient) -> result.merge(degree, sign * coefficient, Double::sum));
+    private Map<Integer, ExactRational> add(Map<Integer, ExactRational> left, Map<Integer, ExactRational> right, ExactRational sign) {
+        Map<Integer, ExactRational> result = new HashMap<>(left);
+        right.forEach((degree, coefficient) -> result.merge(degree, sign.multiply(coefficient), ExactRational::add));
         return result;
     }
 
-    private Map<Integer, Double> multiply(Map<Integer, Double> left, Map<Integer, Double> right) {
-        Map<Integer, Double> result = new HashMap<>();
-        for (Map.Entry<Integer, Double> leftEntry : left.entrySet()) {
-            for (Map.Entry<Integer, Double> rightEntry : right.entrySet()) {
+    private Map<Integer, ExactRational> multiply(Map<Integer, ExactRational> left, Map<Integer, ExactRational> right) {
+        Map<Integer, ExactRational> result = new HashMap<>();
+        for (Map.Entry<Integer, ExactRational> leftEntry : left.entrySet()) {
+            for (Map.Entry<Integer, ExactRational> rightEntry : right.entrySet()) {
                 int degree = leftEntry.getKey() + rightEntry.getKey();
                 if (degree > 8) {
                     return null;
                 }
-                result.merge(degree, leftEntry.getValue() * rightEntry.getValue(), Double::sum);
+                result.merge(degree, leftEntry.getValue().multiply(rightEntry.getValue()), ExactRational::add);
             }
         }
         return result;
     }
 
-    private Map<Integer, Double> divide(Map<Integer, Double> left, Map<Integer, Double> right) {
+    private Map<Integer, ExactRational> divide(Map<Integer, ExactRational> left, Map<Integer, ExactRational> right) {
         if (right.size() != 1 || !right.containsKey(0)) {
             return null;
         }
-        double divisor = right.get(0);
-        if (divisor == 0.0) {
+        ExactRational divisor = right.get(0);
+        if (divisor.isZero()) {
             return null;
         }
-        Map<Integer, Double> result = new HashMap<>();
-        left.forEach((degree, coefficient) -> result.put(degree, coefficient / divisor));
+        Map<Integer, ExactRational> result = new HashMap<>();
+        left.forEach((degree, coefficient) -> result.put(degree, coefficient.divide(divisor)));
         return result;
     }
 
-    private Map<Integer, Double> power(Map<Integer, Double> base, Map<Integer, Double> exponent) {
+    private Map<Integer, ExactRational> power(Map<Integer, ExactRational> base, Map<Integer, ExactRational> exponent) {
         if (exponent.size() != 1 || !exponent.containsKey(0)) {
             return null;
         }
-        double raw = exponent.get(0);
-        if (raw != Math.rint(raw) || raw < 0 || raw > 8) {
+        ExactRational raw = exponent.get(0);
+        if (!raw.isInteger() || raw.signum() < 0 || raw.numerator().compareTo(java.math.BigInteger.valueOf(8)) > 0) {
             return null;
         }
-        int power = (int) raw;
-        Map<Integer, Double> result = Map.of(0, 1.0);
+        int power = raw.intValueExact();
+        Map<Integer, ExactRational> result = Map.of(0, ExactRational.ONE);
         for (int i = 0; i < power; i++) {
             result = multiply(result, base);
             if (result == null) {
@@ -153,10 +154,7 @@ public final class CompleteSquareParameterEnumerator implements ParameterEnumera
         return result;
     }
 
-    private String format(double value) {
-        if (value == Math.rint(value) && !Double.isInfinite(value)) {
-            return Long.toString((long) value);
-        }
-        return Double.toString(value);
+    private String format(ExactRational value) {
+        return de.regelsuche.parse.ExpressionFormatter.format(new NumberExpr(value));
     }
 }

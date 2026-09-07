@@ -41,7 +41,7 @@ public final class EquivalenceAwareAntiUnifier {
     ) {
         if (pattern instanceof PatternExpr.LiteralNumber number
             && expression instanceof NumberExpr other
-            && Double.compare(number.value(), other.value()) == 0) {
+            && number.value().equals(other.value())) {
             return pattern;
         }
         if (pattern instanceof PatternExpr.LiteralVariable variable

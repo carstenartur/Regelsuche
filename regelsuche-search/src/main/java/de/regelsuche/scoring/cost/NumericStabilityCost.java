@@ -63,7 +63,7 @@ public final class NumericStabilityCost implements CostModel {
                 }
                 case DIV -> {
                     // division by a small or potentially zero denominator
-                    if (binary.right() instanceof NumberExpr number && Math.abs(number.value()) < 1) {
+                    if (binary.right() instanceof NumberExpr number && number.value().abs().compareTo(de.regelsuche.scalar.ExactRational.ONE) < 0) {
                         penalty += 5;
                     } else if (!(binary.right() instanceof NumberExpr)) {
                         penalty += 2;
@@ -71,8 +71,8 @@ public final class NumericStabilityCost implements CostModel {
                 }
                 case POW -> {
                     // High constant powers expanded raise instability vs. Horner
-                    if (binary.right() instanceof NumberExpr number && number.value() > 3) {
-                        penalty += (int) (number.value() - 3);
+                    if (binary.right() instanceof NumberExpr number && number.value().compareTo(de.regelsuche.scalar.ExactRational.integer(3)) > 0) {
+                        penalty += (int) (number.value().toBigDecimal(java.math.MathContext.DECIMAL128).doubleValue() - 3);
                     }
                 }
                 default -> {

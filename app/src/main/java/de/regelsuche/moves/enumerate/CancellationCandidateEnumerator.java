@@ -1,5 +1,6 @@
 package de.regelsuche.moves.enumerate;
 
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Equation;
@@ -64,13 +65,13 @@ public final class CancellationCandidateEnumerator implements ParameterEnumerato
             if (!(term.expr() instanceof NumberExpr number)) {
                 continue;
             }
-            double signedValue = term.positive() ? number.value() : -number.value();
-            if (signedValue == 0.0) {
+            ExactRational signedValue = term.positive() ? number.value() : number.value().negate();
+            if (signedValue.isZero()) {
                 continue;
             }
-            double cancellation = -signedValue;
+            ExactRational cancellation = signedValue.negate();
             String canonical = formatNumber(cancellation);
-            String signed = (cancellation > 0 ? "+" : "") + canonical;
+            String signed = (cancellation.signum() > 0 ? "+" : "") + canonical;
             distinct.putIfAbsent(signed, new MoveParameter(
                     "cancel",
                     MoveParameterKind.GENERATED,
@@ -96,11 +97,8 @@ public final class CancellationCandidateEnumerator implements ParameterEnumerato
         }
     }
 
-    private String formatNumber(double value) {
-        if (value == Math.rint(value) && !Double.isInfinite(value)) {
-            return Long.toString((long) value);
-        }
-        return Double.toString(value);
+    private String formatNumber(ExactRational value) {
+        return de.regelsuche.parse.ExpressionFormatter.format(new NumberExpr(value));
     }
 
     private record SignedTerm(boolean positive, Expr expr) {

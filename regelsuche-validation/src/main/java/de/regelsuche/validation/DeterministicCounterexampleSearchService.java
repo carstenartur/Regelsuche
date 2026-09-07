@@ -305,7 +305,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
 
     private Evaluation evaluate(Expr expression, Map<String, RuntimeValue> variables) {
         if (expression instanceof NumberExpr numberExpr) {
-            return Evaluation.defined(RuntimeValue.scalar(numberExpr.value()));
+            return Evaluation.defined(RuntimeValue.scalar(numberExpr.value().toBigDecimal(java.math.MathContext.DECIMAL128).doubleValue()));
         }
         if (expression instanceof VariableExpr variableExpr) {
             RuntimeValue value = variables.get(variableExpr.name());
@@ -602,7 +602,10 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
 
     private String toSmt(Expr expression) {
         if (expression instanceof NumberExpr numberExpr) {
-            return trimDouble(numberExpr.value());
+            var value = numberExpr.value();
+            String numerator = value.signum() < 0 ? "(- " + value.numerator().abs() + ")"
+                : value.numerator().toString();
+            return value.isInteger() ? numerator : "(/ " + numerator + " " + value.denominator() + ")";
         }
         if (expression instanceof VariableExpr variableExpr) {
             return variableExpr.name();

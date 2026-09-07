@@ -8,6 +8,7 @@ import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.equation.LinearEquationSolver;
 import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.scalar.ExactRational;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -37,10 +38,10 @@ public final class LinearInequalitySolver {
         if (leftForm.isEmpty() || rightForm.isEmpty()) {
             return Optional.empty();
         }
-        double aCoeff = leftForm.get().coefficient() - rightForm.get().coefficient();
-        double bConst = rightForm.get().constant() - leftForm.get().constant();
+        ExactRational aCoeff = leftForm.get().coefficient().subtract(rightForm.get().coefficient());
+        ExactRational bConst = rightForm.get().constant().subtract(leftForm.get().constant());
 
-        if (aCoeff == 0.0) {
+        if (aCoeff.isZero()) {
             // The variable cancels: comparator depends purely on the
             // constants. We do not produce a bound — caller may inspect
             // status to discover the trivial outcome.
@@ -59,11 +60,11 @@ public final class LinearInequalitySolver {
         List<Assumption> assumptions = new ArrayList<>();
 
         Comparator comparator = inequality.comparator();
-        if (aCoeff < 0) {
+        if (aCoeff.signum() < 0) {
             comparator = comparator.flip();
         }
         // Final isolated inequality x ⋈ value.
-        double value = bConst / aCoeff;
+        ExactRational value = bConst.divide(aCoeff);
         Inequality solved = new Inequality(
             new VariableExpr(variable),
             comparator,
@@ -73,7 +74,7 @@ public final class LinearInequalitySolver {
         Expr divisor = new NumberExpr(aCoeff);
         Assumption nonZero = Assumption.nonZero(ExpressionFormatter.format(divisor));
         assumptions.add(nonZero);
-        String description = aCoeff < 0
+        String description = aCoeff.signum() < 0
             ? "Dividiere beide Seiten durch " + ExpressionFormatter.format(divisor)
                 + " — Vergleichszeichen wird gedreht"
             : "Dividiere beide Seiten durch " + ExpressionFormatter.format(divisor);
@@ -94,12 +95,12 @@ public final class LinearInequalitySolver {
         ));
     }
 
-    private static boolean evaluateTrivial(Comparator comparator, double bConst) {
+    private static boolean evaluateTrivial(Comparator comparator, ExactRational bConst) {
         return switch (comparator) {
-            case LT -> 0.0 < bConst;
-            case LE -> 0.0 <= bConst;
-            case GT -> 0.0 > bConst;
-            case GE -> 0.0 >= bConst;
+            case LT -> 0 < bConst.signum();
+            case LE -> 0 <= bConst.signum();
+            case GT -> 0 > bConst.signum();
+            case GE -> 0 >= bConst.signum();
         };
     }
 
@@ -108,17 +109,11 @@ public final class LinearInequalitySolver {
         return engine;
     }
 
-    /** Suppress warning for the literal builder helper. */
-    @SuppressWarnings("unused")
-    private static Expr literal(double v) {
-        return new BinaryExpr(new NumberExpr(0), BinaryOperator.ADD, new NumberExpr(v));
-    }
-
     public record Solution(
         Status status,
         Inequality original,
         Inequality solved,
-        Double value,
+        ExactRational value,
         List<InequalityStep> steps,
         List<Assumption> assumptions
     ) {

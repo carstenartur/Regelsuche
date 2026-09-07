@@ -361,7 +361,7 @@ public final class BinomialFormulaPlugin implements RegelsuchePlugin {
             if (!(node instanceof BinaryExpr outer) || outer.operator() != BinaryOperator.POW) {
                 return false;
             }
-            if (!(outer.right() instanceof de.regelsuche.ast.NumberExpr exponent) || exponent.value() != 2) {
+            if (!(outer.right() instanceof de.regelsuche.ast.NumberExpr exponent) || !exponent.value().equalsInteger(2)) {
                 return false;
             }
             return outer.left() instanceof BinaryExpr inner

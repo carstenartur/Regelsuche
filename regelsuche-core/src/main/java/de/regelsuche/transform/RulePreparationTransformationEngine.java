@@ -431,8 +431,7 @@ public final class RulePreparationTransformationEngine
         StringBuilder descriptor = new StringBuilder();
         if (expression instanceof NumberExpr number) {
             appendToken(descriptor, "number");
-            appendToken(descriptor, Long.toHexString(
-                Double.doubleToLongBits(number.value())));
+            appendToken(descriptor, number.value().canonicalText());
         } else if (expression instanceof VariableExpr variable) {
             appendToken(descriptor, "variable");
             appendToken(descriptor, variable.name());

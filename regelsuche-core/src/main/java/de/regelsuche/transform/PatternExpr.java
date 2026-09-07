@@ -6,6 +6,7 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.scalar.ExactRational;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -29,8 +30,16 @@ public sealed interface PatternExpr extends ExprTemplate
         return new Placeholder(name);
     }
 
-    static PatternExpr num(double value) {
+    static PatternExpr num(ExactRational value) {
         return new LiteralNumber(value);
+    }
+
+    static PatternExpr num(long value) {
+        return num(ExactRational.integer(value));
+    }
+
+    static PatternExpr num(String literal) {
+        return num(NumberExpr.exact(literal).value());
     }
 
     static PatternExpr variable(String name) {
@@ -87,11 +96,15 @@ public sealed interface PatternExpr extends ExprTemplate
         }
     }
 
-    record LiteralNumber(double value) implements PatternExpr {
+    record LiteralNumber(ExactRational value) implements PatternExpr {
+        public LiteralNumber {
+            Objects.requireNonNull(value, "value");
+        }
+
         @Override
         public boolean match(Expr expression, Map<String, Expr> bindings) {
             return expression instanceof NumberExpr numberExpr
-                && numberExpr.value() == value;
+                && numberExpr.value().equals(value);
         }
 
         @Override

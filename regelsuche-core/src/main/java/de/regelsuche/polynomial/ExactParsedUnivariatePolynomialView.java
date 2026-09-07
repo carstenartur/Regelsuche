@@ -175,7 +175,7 @@ public final class ExactParsedUnivariatePolynomialView {
         ExactParsedTerm parsed
     ) {
         return expression instanceof NumberExpr number
-            && number.value() == 0.0d
+            && number.value().equalsInteger(0)
             && parsed.literalFor(number).isEmpty();
     }
 

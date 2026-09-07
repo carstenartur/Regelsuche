@@ -75,6 +75,7 @@ public final class ExactParsedTerm {
             }
             ExactRationalParseEvidence evidence = literal.evidence();
             if (!evidence.exact()
+                    || !literal.node().value().equals(literal.exactValue())
                     || !literal.sourceLexeme().equals(
                         evidence.sourceLiteral())
                     || evidence.verify().status()
@@ -193,7 +194,7 @@ public final class ExactParsedTerm {
                 && !literalsByNode.containsKey(number);
             boolean syntheticUnaryZero = numericWithoutLiteral
                 && frame.allowSyntheticUnaryZero()
-                && number.value() == 0.0d
+                && number.value().equalsInteger(0)
                 && range == null;
             if (numericWithoutLiteral && !syntheticUnaryZero) {
                 throw new IllegalArgumentException(
@@ -283,7 +284,7 @@ public final class ExactParsedTerm {
     ) {
         if (binary.operator() != BinaryOperator.SUB
                 || !(binary.left() instanceof NumberExpr zero)
-                || zero.value() != 0.0d
+                || !zero.value().equalsInteger(0)
                 || literalsByNode.containsKey(zero)
                 || ranges.containsKey(zero)
                 || binaryRange == null) {

@@ -86,7 +86,7 @@ public final class ExactExpressionFormatter {
     }
 
     private static String syntheticNumber(NumberExpr number) {
-        if (number.value() == 0.0d) {
+        if (number.value().equalsInteger(0)) {
             return "0";
         }
         throw new IllegalArgumentException(

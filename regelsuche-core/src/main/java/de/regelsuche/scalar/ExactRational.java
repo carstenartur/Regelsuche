@@ -1,7 +1,12 @@
 package de.regelsuche.scalar;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import java.math.BigInteger;
+import java.math.BigDecimal;
+import java.math.MathContext;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Canonical arbitrary-precision rational number.
@@ -71,6 +76,14 @@ public record ExactRational(
             return NEGATIVE_ONE;
         }
         return new ExactRational(value, BigInteger.ONE);
+    }
+
+    /** Exact bounded input; JSON uses the same lossless scalar text contract. */
+    @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
+    public static ExactRational parse(String literal) {
+        var parsed = new ExactRationalDomain().parse(literal);
+        return parsed.value().orElseThrow(() -> new IllegalArgumentException(
+            "Invalid exact number: " + parsed.detailCode()));
     }
 
     public ExactRational add(ExactRational other) {
@@ -218,6 +231,41 @@ public record ExactRational(
         return denominator.equals(BigInteger.ONE);
     }
 
+    public boolean equalsInteger(long value) {
+        return isInteger() && numerator.equals(BigInteger.valueOf(value));
+    }
+
+    public int intValueExact() {
+        if (!isInteger()) {
+            throw new ArithmeticException("rational is not an integer");
+        }
+        return numerator.intValueExact();
+    }
+
+    public long longValueExact() {
+        if (!isInteger()) {
+            throw new ArithmeticException("rational is not an integer");
+        }
+        return numerator.longValueExact();
+    }
+
+    /** Explicitly rounded projection for numerical diagnostics, never equality. */
+    public BigDecimal toBigDecimal(MathContext context) {
+        return new BigDecimal(numerator).divide(new BigDecimal(denominator), context);
+    }
+
+    /** A root exists here only when both integer components are perfect squares. */
+    public Optional<ExactRational> sqrtExact() {
+        if (signum() < 0) {
+            return Optional.empty();
+        }
+        BigInteger[] top = numerator.sqrtAndRemainder();
+        BigInteger[] bottom = denominator.sqrtAndRemainder();
+        return top[1].signum() == 0 && bottom[1].signum() == 0
+            ? Optional.of(new ExactRational(top[0], bottom[0])) : Optional.empty();
+    }
+
+    @JsonValue
     public String canonicalText() {
         return isInteger()
             ? numerator.toString()

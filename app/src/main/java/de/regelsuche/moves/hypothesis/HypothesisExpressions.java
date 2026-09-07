@@ -1,5 +1,6 @@
 package de.regelsuche.moves.hypothesis;
 
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Equation;
@@ -129,15 +130,12 @@ final class HypothesisExpressions {
     }
 
     /** Formats a {@code double}, preferring an integer rendering when exact. */
-    static String formatNumber(double value) {
-        if (value == Math.rint(value) && !Double.isInfinite(value)) {
-            return Long.toString((long) value);
-        }
-        return Double.toString(value);
+    static String formatNumber(ExactRational value) {
+        return de.regelsuche.parse.ExpressionFormatter.format(new NumberExpr(value));
     }
 
     /** @return {@code true} when the node is a zero literal. */
     static boolean isZero(Expr expr) {
-        return expr instanceof NumberExpr number && number.value() == 0.0;
+        return expr instanceof NumberExpr number && number.value().equalsInteger(0);
     }
 }

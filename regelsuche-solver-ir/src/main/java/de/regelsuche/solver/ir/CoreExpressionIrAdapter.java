@@ -31,7 +31,13 @@ public final class CoreExpressionIrAdapter {
     public Expression toIr(Expr expression) {
         Objects.requireNonNull(expression, "expression");
         if (expression instanceof NumberExpr number) {
-            return new Literal(numberLiteral(number.value()));
+            try {
+                return new Literal(number.value().toBigDecimal(java.math.MathContext.UNLIMITED).toPlainString());
+            } catch (ArithmeticException repeatingDecimal) {
+                return new Binary(SolverIr.BinaryOperator.DIVIDE,
+                    new Literal(number.value().numerator().toString()),
+                    new Literal(number.value().denominator().toString()));
+            }
         }
         if (expression instanceof VariableExpr variable) {
             return new Symbol(variable.name());
@@ -53,7 +59,7 @@ public final class CoreExpressionIrAdapter {
     public Expr toCore(Expression expression) {
         Objects.requireNonNull(expression, "expression");
         if (expression instanceof Literal literal) {
-            return new NumberExpr(Double.parseDouble(literal.value()));
+            return NumberExpr.exact(literal.value());
         }
         if (expression instanceof Symbol symbol) {
             return new VariableExpr(symbol.name());
@@ -95,10 +101,4 @@ public final class CoreExpressionIrAdapter {
         };
     }
 
-    private static String numberLiteral(double value) {
-        if (!Double.isFinite(value)) {
-            throw new IllegalArgumentException("non-finite numbers are not supported");
-        }
-        return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
-    }
 }

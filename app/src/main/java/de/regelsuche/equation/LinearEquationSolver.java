@@ -8,6 +8,7 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.scalar.ExactRational;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -38,8 +39,8 @@ public final class LinearEquationSolver {
         if (leftForm.isEmpty() || rightForm.isEmpty()) {
             return Optional.empty();
         }
-        double aCoeff = leftForm.get().coefficient() - rightForm.get().coefficient();
-        double bConst = rightForm.get().constant() - leftForm.get().constant();
+        ExactRational aCoeff = leftForm.get().coefficient().subtract(rightForm.get().coefficient());
+        ExactRational bConst = rightForm.get().constant().subtract(leftForm.get().constant());
 
         List<EquationStep> steps = new ArrayList<>();
         List<Assumption> assumptions = new ArrayList<>();
@@ -48,7 +49,7 @@ public final class LinearEquationSolver {
         // only appears on the left.
         Expr currentLeft = equation.left();
         Expr currentRight = equation.right();
-        if (rightForm.get().coefficient() != 0.0) {
+        if (!rightForm.get().coefficient().isZero()) {
             Expr term = makeTerm(rightForm.get().coefficient(), variable);
             Equation next = new Equation(
                 new BinaryExpr(currentLeft, BinaryOperator.SUB, term),
@@ -65,7 +66,7 @@ public final class LinearEquationSolver {
         }
 
         // Subtract the left-hand-side constant so the variable side becomes a*x.
-        if (leftForm.get().constant() != 0.0) {
+        if (!leftForm.get().constant().isZero()) {
             Expr constant = number(leftForm.get().constant());
             Equation next = new Equation(
                 new BinaryExpr(currentLeft, BinaryOperator.SUB, constant),
@@ -85,8 +86,8 @@ public final class LinearEquationSolver {
             number(bConst)
         );
 
-        if (aCoeff == 0.0) {
-            if (bConst == 0.0) {
+        if (aCoeff.isZero()) {
+            if (bConst.isZero()) {
                 return Optional.of(new Solution(Status.IDENTITY, equation, isolated, null, List.copyOf(steps), List.copyOf(assumptions)));
             }
             return Optional.of(new Solution(Status.NO_SOLUTION, equation, isolated, null, List.copyOf(steps), List.copyOf(assumptions)));
@@ -96,7 +97,7 @@ public final class LinearEquationSolver {
         Expr divisor = number(aCoeff);
         Equation divided = new Equation(
             new VariableExpr(variable),
-            number(bConst / aCoeff)
+            number(bConst.divide(aCoeff))
         );
         Assumption divisorAssumption = Assumption.nonZero(ExpressionFormatter.format(divisor));
         assumptions.add(divisorAssumption);
@@ -111,23 +112,23 @@ public final class LinearEquationSolver {
             Status.UNIQUE,
             equation,
             divided,
-            bConst / aCoeff,
+            bConst.divide(aCoeff),
             List.copyOf(steps),
             List.copyOf(assumptions)
         ));
     }
 
-    private static Expr makeTerm(double coefficient, String variable) {
-        if (coefficient == 0.0) {
+    private static Expr makeTerm(ExactRational coefficient, String variable) {
+        if (coefficient.isZero()) {
             return new NumberExpr(0);
         }
-        if (coefficient == 1.0) {
+        if (coefficient.isOne()) {
             return new VariableExpr(variable);
         }
         return new BinaryExpr(new NumberExpr(coefficient), BinaryOperator.MUL, new VariableExpr(variable));
     }
 
-    private static Expr number(double value) {
+    private static Expr number(ExactRational value) {
         return new NumberExpr(value);
     }
 
@@ -136,7 +137,7 @@ public final class LinearEquationSolver {
         Status status,
         Equation original,
         Equation solved,
-        Double value,
+        ExactRational value,
         List<EquationStep> steps,
         List<Assumption> assumptions
     ) {
@@ -163,14 +164,14 @@ public final class LinearEquationSolver {
      * from an expression tree. Returns {@link Optional#empty()} when the
      * expression is not linear in {@code variable}.
      */
-    public record LinearForm(double coefficient, double constant) {
+    public record LinearForm(ExactRational coefficient, ExactRational constant) {
         public static Optional<LinearForm> of(Expr expr, String variable) {
             if (expr instanceof NumberExpr number) {
-                return Optional.of(new LinearForm(0.0, number.value()));
+                return Optional.of(new LinearForm(ExactRational.ZERO, number.value()));
             }
             if (expr instanceof VariableExpr variableExpr) {
                 if (variableExpr.name().equals(variable)) {
-                    return Optional.of(new LinearForm(1.0, 0.0));
+                    return Optional.of(new LinearForm(ExactRational.ONE, ExactRational.ZERO));
                 }
                 return Optional.empty();
             }
@@ -183,25 +184,25 @@ public final class LinearEquationSolver {
                 LinearForm l = left.get();
                 LinearForm r = right.get();
                 return switch (binary.operator()) {
-                    case ADD -> Optional.of(new LinearForm(l.coefficient + r.coefficient, l.constant + r.constant));
-                    case SUB -> Optional.of(new LinearForm(l.coefficient - r.coefficient, l.constant - r.constant));
+                    case ADD -> Optional.of(new LinearForm(l.coefficient.add(r.coefficient), l.constant.add(r.constant)));
+                    case SUB -> Optional.of(new LinearForm(l.coefficient.subtract(r.coefficient), l.constant.subtract(r.constant)));
                     case MUL -> {
-                        if (l.coefficient == 0.0) {
+                        if (l.coefficient.isZero()) {
                             // l is a pure constant, multiply r by it
-                            yield Optional.of(new LinearForm(l.constant * r.coefficient, l.constant * r.constant));
+                            yield Optional.of(new LinearForm(l.constant.multiply(r.coefficient), l.constant.multiply(r.constant)));
                         }
-                        if (r.coefficient == 0.0) {
-                            yield Optional.of(new LinearForm(r.constant * l.coefficient, r.constant * l.constant));
+                        if (r.coefficient.isZero()) {
+                            yield Optional.of(new LinearForm(r.constant.multiply(l.coefficient), r.constant.multiply(l.constant)));
                         }
                         // x * x or similar — non-linear.
                         yield Optional.empty();
                     }
                     case DIV -> {
-                        if (r.coefficient != 0.0 || r.constant == 0.0) {
+                        if (!r.coefficient.isZero() || r.constant.isZero()) {
                             // Division by anything containing the variable, or by zero, is rejected.
                             yield Optional.empty();
                         }
-                        yield Optional.of(new LinearForm(l.coefficient / r.constant, l.constant / r.constant));
+                        yield Optional.of(new LinearForm(l.coefficient.divide(r.constant), l.constant.divide(r.constant)));
                     }
                     case POW -> Optional.empty();
                 };

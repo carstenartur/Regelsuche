@@ -37,8 +37,8 @@ record BoundedExactMonomial(ExactRational coefficient, Map<String, Integer> powe
     ) {
         budget.visit(depth);
         if (expression instanceof NumberExpr number) {
-            return ExactRationalDomain.legacyDecimalValue(number.value())
-                .map(value -> new BoundedExactMonomial(value, Map.of()));
+            budget.coefficientBits(bits(number.value().numerator()), bits(number.value().denominator()));
+            return Optional.of(new BoundedExactMonomial(number.value(), Map.of()));
         }
         if (expression instanceof VariableExpr variable) {
             return Optional.of(new BoundedExactMonomial(
@@ -161,11 +161,8 @@ record BoundedExactMonomial(ExactRational coefficient, Map<String, Integer> powe
         return coefficient.equals(other.coefficient) && powers.equals(other.powers);
     }
 
-    boolean isConstant(double expected) {
-        return powers.isEmpty()
-            && ExactRationalDomain.legacyDecimalValue(expected)
-                .map(coefficient::equals)
-                .orElse(false);
+    boolean isConstant(ExactRational expected) {
+        return powers.isEmpty() && coefficient.equals(expected);
     }
 
     Expr toExpr() {
@@ -184,27 +181,13 @@ record BoundedExactMonomial(ExactRational coefficient, Map<String, Integer> powe
     }
 
     private Expr coefficientExpression() {
-        var decimal = ExactRationalDomain.exactLegacyDecimalDouble(coefficient);
-        if (decimal.isPresent()) {
-            return new NumberExpr(decimal.getAsDouble());
-        }
-        Expr numerator = integerLeaf(coefficient.numerator());
-        return coefficient.isInteger() ? numerator
-            : new BinaryExpr(numerator, BinaryOperator.DIV, integerLeaf(coefficient.denominator()));
+        return new NumberExpr(coefficient);
     }
 
-    private static NumberExpr integerLeaf(BigInteger value) {
-        var legacy = ExactRationalDomain.exactLegacyDecimalDouble(
-            ExactRational.integer(value));
-        if (legacy.isEmpty()) {
-            throw new LimitExceeded("ALGEBRAIC_BINDING_NOT_REPRESENTABLE");
-        }
-        return new NumberExpr(legacy.getAsDouble());
-    }
-
-    static int positiveInteger(double value) {
-        return value > 0 && value <= Integer.MAX_VALUE && value == Math.rint(value)
-            ? (int) value : -1;
+    static int positiveInteger(ExactRational value) {
+        return value.isInteger() && value.signum() > 0
+                && value.numerator().bitLength() <= 31
+            ? value.intValueExact() : -1;
     }
 
     private static int checkedExponent(long value) {

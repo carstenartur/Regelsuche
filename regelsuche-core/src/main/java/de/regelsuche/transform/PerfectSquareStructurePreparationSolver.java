@@ -315,7 +315,7 @@ public final class PerfectSquareStructurePreparationSolver {
         return expression instanceof BinaryExpr power
             && power.operator() == BinaryOperator.POW
             && power.right() instanceof NumberExpr exponent
-            && exponent.value() == 2;
+            && exponent.value().equalsInteger(2);
     }
 
     private static ResidualObligation residualObligation(

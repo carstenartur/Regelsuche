@@ -731,8 +731,7 @@ public final class PatternTargetedLocalBridgeSearch {
     ) {
         if (expression instanceof NumberExpr number) {
             append(target, "number");
-            append(target, Long.toHexString(
-                Double.doubleToLongBits(number.value())));
+            append(target, number.value().canonicalText());
         } else if (expression instanceof VariableExpr variable) {
             append(target, "variable");
             append(target, variable.name());

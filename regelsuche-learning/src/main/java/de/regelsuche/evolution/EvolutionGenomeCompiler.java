@@ -64,10 +64,8 @@ public final class EvolutionGenomeCompiler {
             return "?" + placeholder.name();
         }
         if (expression instanceof PatternExpr.LiteralNumber number) {
-            double value = number.value();
-            return value == Math.rint(value)
-                ? Long.toString((long) value)
-                : Double.toString(value);
+            return de.regelsuche.parse.ExpressionFormatter.format(
+                new de.regelsuche.ast.NumberExpr(number.value()));
         }
         if (expression instanceof PatternExpr.LiteralVariable variable) {
             return variable.name();
@@ -321,7 +319,7 @@ public final class EvolutionGenomeCompiler {
             return input.substring(start, position);
         }
 
-        private double readNumber() {
+        private String readNumber() {
             int start = position;
             boolean decimal = false;
             while (!isAtEnd()) {
@@ -339,11 +337,7 @@ public final class EvolutionGenomeCompiler {
             if (token.equals(".")) {
                 throw error("Invalid number");
             }
-            try {
-                return Double.parseDouble(token);
-            } catch (NumberFormatException exception) {
-                throw error("Invalid number");
-            }
+            return token;
         }
 
         private boolean consumeIf(char expected) {

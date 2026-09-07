@@ -18,6 +18,8 @@ import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
 import de.regelsuche.transform.RecognitionProfile;
 import de.regelsuche.value.ExprValueFactory;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.scalar.ExactRationalDomain;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
@@ -26,25 +28,24 @@ import java.util.Random;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-/** Safety regressions for the numeric boundary pending the exact-AST migration. */
+/** Exact-AST regressions, including the former floating-point boundary cases. */
 @Timeout(10)
 class NumericBoundaryRegressionTest {
     private final ExpressionParser parser = new ExpressionParser();
 
     @Test
-    void ordinaryParserRejectsDecimalInformationLoss() {
-        for (String source : List.of(
-                "9007199254740993", "9223372036854775807",
-                "1.0000000000000001", "0." + "0".repeat(400) + "1")) {
-            IllegalArgumentException error = assertThrows(
-                IllegalArgumentException.class, () -> parser.parseTerm(source));
-            assertTrue(error.getMessage().contains("position 0"));
+    void ordinaryParserPreservesPreviouslyRejectedPrecisionAndHonorsLimits() {
+        for (String source : List.of("9007199254740993", "9223372036854775807",
+                "1.0000000000000001")) {
+            assertEquals(source, ExpressionFormatter.format(parser.parseTerm(source)));
         }
-        assertThrows(IllegalArgumentException.class,
-            () -> parser.parseEquation("x = 9007199254740993"));
-        assertThrows(IllegalArgumentException.class,
-            () -> parser.parse(new InputRequest(
-                InputType.SYSTEM, "x=1; y=9007199254740993")));
+        assertEquals("x = 9007199254740993", ExpressionFormatter.format(
+            parser.parseEquation("x = 9007199254740993")));
+        assertEquals(2, parser.parse(new InputRequest(
+            InputType.SYSTEM, "x=1; y=9007199254740993")).equations().size());
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+            () -> parser.parseTerm("0." + "0".repeat(400) + "1"));
+        assertTrue(error.getMessage().contains("position 0"));
     }
 
     @Test
@@ -76,15 +77,15 @@ class NumericBoundaryRegressionTest {
     @Test
     void formatterDoesNotNarrowLargeIntegersOrEmitExponentSyntax() {
         assertEquals("100000000000000000000",
-            ExpressionFormatter.format(new NumberExpr(1.0e20)));
+            ExpressionFormatter.format(NumberExpr.exact("100000000000000000000")));
         assertEquals("0.0000000001",
-            ExpressionFormatter.format(new NumberExpr(1.0e-10)));
+            ExpressionFormatter.format(NumberExpr.exact("0.00000000010")));
         for (double value : new double[] {Double.MIN_VALUE, Double.MIN_NORMAL,
                 Double.MAX_VALUE, Math.nextUp(0x1.0p63)}) {
-            String rendered = ExpressionFormatter.format(new NumberExpr(value));
+            String rendered = ExpressionFormatter.format(new NumberExpr(legacy(value)));
             assertFalse(rendered.contains("E"));
             assertFalse(rendered.contains("e"));
-            assertEquals(0, BigDecimal.valueOf(value).compareTo(new BigDecimal(rendered)));
+            assertEquals(legacy(value), numericValue(parser.parseTerm(rendered)));
         }
     }
 
@@ -93,13 +94,13 @@ class NumericBoundaryRegressionTest {
         for (double value : new double[] {Double.NaN,
                 Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY}) {
             assertThrows(IllegalArgumentException.class,
-                () -> ExpressionFormatter.format(new NumberExpr(value)));
+                () -> NumberExpr.exact(Double.toString(value)));
         }
     }
 
     @Test
     void formatterPreservesNegativePowerBaseParentheses() {
-        Expr expression = new BinaryExpr(new NumberExpr(-1.0e20),
+        Expr expression = new BinaryExpr(NumberExpr.exact("-100000000000000000000"),
             BinaryOperator.POW, new NumberExpr(2));
         assertEquals("(-100000000000000000000) ^ 2",
             ExpressionFormatter.format(expression));
@@ -127,22 +128,19 @@ class NumericBoundaryRegressionTest {
                 RecognitionProfile.arithmeticAc(), RecognitionProfile.algebraicAc())) {
             for (double expected : new double[] {0.0, 1.0, 2.0, 0x1.0p53}) {
                 assertTrue(EquivalenceAwarePatternMatcher.matchDetailed(
-                    PatternExpr.num(expected), new NumberExpr(expected),
+                    PatternExpr.num(legacy(expected)), new NumberExpr(legacy(expected)),
                     Map.of(), profile).matched());
                 assertFalse(EquivalenceAwarePatternMatcher.matchDetailed(
-                    PatternExpr.num(expected), new NumberExpr(Math.nextUp(expected)),
+                    PatternExpr.num(legacy(expected)), new NumberExpr(legacy(Math.nextUp(expected))),
                     Map.of(), profile).matched());
             }
         }
     }
 
     @Test
-    void nonFiniteLiteralsCannotMatchThemselves() {
-        for (double value : new double[] {Double.NaN,
-                Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY}) {
-            assertFalse(EquivalenceAwarePatternMatcher.matchDetailed(
-                PatternExpr.num(value), new NumberExpr(value), Map.of(),
-                RecognitionProfile.exact()).matched());
+    void nonFiniteLiteralsCannotEnterAnExactPattern() {
+        for (String value : List.of("NaN", "Infinity", "-Infinity")) {
+            assertThrows(IllegalArgumentException.class, () -> PatternExpr.num(value));
         }
     }
 
@@ -174,7 +172,7 @@ class NumericBoundaryRegressionTest {
                 RecognitionProfile.algebraicAc()).matched());
             assertFalse(EquivalenceAwarePatternMatcher.matchDetailed(
                 powerPattern(2), new BinaryExpr(new VariableExpr("x"),
-                    BinaryOperator.POW, new NumberExpr(exponent)), Map.of(),
+                    BinaryOperator.POW, new NumberExpr(legacy(exponent))), Map.of(),
                 RecognitionProfile.algebraicAc()).matched());
         }
         assertTrue(EquivalenceAwarePatternMatcher.matchDetailed(
@@ -207,22 +205,28 @@ class NumericBoundaryRegressionTest {
     }
 
     private void assertRoundTrip(double value) {
-        Expr parsed = parser.parseTerm(ExpressionFormatter.format(new NumberExpr(value)));
-        double actual;
-        if (parsed instanceof NumberExpr number) {
-            actual = number.value();
-        } else {
-            BinaryExpr negative = (BinaryExpr) parsed;
-            assertEquals(BinaryOperator.SUB, negative.operator());
-            assertEquals(new NumberExpr(0), negative.left());
-            actual = -((NumberExpr) negative.right()).value();
+        Expr parsed = parser.parseTerm(ExpressionFormatter.format(new NumberExpr(legacy(value))));
+        assertEquals(legacy(value), numericValue(parsed));
+    }
+
+    private static ExactRational numericValue(Expr expression) {
+        if (expression instanceof NumberExpr number) {
+            return number.value();
         }
-        assertEquals(Double.doubleToLongBits(value == 0.0 ? 0.0 : value),
-            Double.doubleToLongBits(actual));
+        BinaryExpr binary = (BinaryExpr) expression;
+        return switch (binary.operator()) {
+            case SUB -> numericValue(binary.left()).subtract(numericValue(binary.right()));
+            case DIV -> numericValue(binary.left()).divide(numericValue(binary.right()));
+            default -> throw new AssertionError("Unexpected numeric syntax: " + expression);
+        };
+    }
+
+    private static ExactRational legacy(double value) {
+        return ExactRationalDomain.legacyDecimalValue(value).orElseThrow();
     }
 
     private static PatternExpr powerPattern(double exponent) {
         return PatternExpr.op(BinaryOperator.POW, PatternExpr.var("A"),
-            PatternExpr.num(exponent));
+            PatternExpr.num(legacy(exponent)));
     }
 }

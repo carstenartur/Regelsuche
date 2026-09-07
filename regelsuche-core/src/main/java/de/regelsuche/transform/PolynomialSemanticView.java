@@ -276,7 +276,7 @@ public final class PolynomialSemanticView {
             .map(ExactParsedTerm.LiteralOccurrence::exactValue)
             .map(PolynomialSemanticView::requireInteger)
             .orElseGet(() -> {
-                if (number.value() == 0.0d) {
+                if (number.value().equalsInteger(0)) {
                     return BigInteger.ZERO;
                 }
                 throw unsupported(

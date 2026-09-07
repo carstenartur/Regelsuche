@@ -90,23 +90,22 @@ public final class ExpressionFormatter {
         int parentPrecedence,
         StringBuilder builder
     ) {
-        double value = number.value();
-        if (!Double.isFinite(value)) {
-            throw new IllegalArgumentException("Cannot format a non-finite numeric AST leaf");
-        }
+        var value = number.value();
         String formatted;
-        if (Math.rint(value) == value && Math.abs(value) <= 9_007_199_254_740_992d) {
-            formatted = Long.toString((long) value);
-        } else {
-            // No long narrowing and no exponent syntax unsupported by the parser.
-            String decimal = Double.toString(value);
-            formatted = decimal.indexOf('E') < 0 ? decimal
-                : java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
+        boolean fraction = false;
+        try {
+            var decimal = value.toBigDecimal(java.math.MathContext.UNLIMITED).stripTrailingZeros();
+            if (decimal.scale() > de.regelsuche.scalar.ExactRationalDomain.MAX_DECIMAL_SCALE) {
+                throw new ArithmeticException("render using integer fraction syntax");
+            }
+            formatted = decimal.toPlainString();
+        } catch (ArithmeticException repeatingDecimal) {
+            formatted = value.numerator() + " / " + value.denominator();
+            fraction = true;
         }
-        if (number.value() < 0 && parentPrecedence > 0) {
-            builder.append('(')
-                .append(formatted)
-                .append(')');
+        if ((value.signum() < 0 && parentPrecedence > 0)
+                || (fraction && parentPrecedence > 0)) {
+            builder.append('(').append(formatted).append(')');
         } else {
             builder.append(formatted);
         }

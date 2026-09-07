@@ -84,7 +84,7 @@ public final class RadicalRules {
             if (functionExpr.arguments().get(0) instanceof BinaryExpr power
                 && power.operator() == BinaryOperator.POW
                 && power.right() instanceof NumberExpr exponent
-                && exponent.value() == 2.0) {
+                && exponent.value().equalsInteger(2)) {
                 return power.left();
             }
             return null;
@@ -199,7 +199,7 @@ public final class RadicalRules {
             return subtree instanceof FunctionExpr fn
                 && "sqrt".equals(fn.name())
                 && fn.arguments().size() == 1
-                && fn.arguments().get(0) instanceof NumberExpr n && n.value() == 0.0;
+                && fn.arguments().get(0) instanceof NumberExpr n && n.value().equalsInteger(0);
         }
 
         @Override
@@ -243,7 +243,7 @@ public final class RadicalRules {
             return subtree instanceof FunctionExpr fn
                 && "sqrt".equals(fn.name())
                 && fn.arguments().size() == 1
-                && fn.arguments().get(0) instanceof NumberExpr n && n.value() == 1.0;
+                && fn.arguments().get(0) instanceof NumberExpr n && n.value().equalsInteger(1);
         }
 
         @Override

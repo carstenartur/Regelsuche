@@ -1,5 +1,6 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.assumption.Assumption;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
@@ -237,7 +238,7 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
         return new PatternRewriteRule(id, source, target, RewriteKind.EXPAND, true, costDelta, true);
     }
 
-    private static PatternExpr num(double value) {
+    private static PatternExpr num(long value) {
         return PatternExpr.num(value);
     }
 
@@ -309,7 +310,7 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
             if (pair == null) {
                 throw new IllegalArgumentException("Rule does not match subtree");
             }
-            return new BinaryExpr(pair.base(), BinaryOperator.POW, new NumberExpr(pair.leftExponent() + pair.rightExponent()));
+            return new BinaryExpr(pair.base(), BinaryOperator.POW, new NumberExpr(pair.leftExponent().add(pair.rightExponent())));
         }
 
         private PowerPair exponents(Expr subtree) {
@@ -346,12 +347,13 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
             if (pair == null) {
                 throw new IllegalArgumentException("Rule does not match subtree");
             }
-            return new BinaryExpr(pair.base(), BinaryOperator.POW, new NumberExpr(pair.leftExponent() * pair.rightExponent()));
+            return new BinaryExpr(pair.base(), BinaryOperator.POW, new NumberExpr(pair.leftExponent().multiply(pair.rightExponent())));
         }
 
         private PowerPair powers(Expr subtree) {
             if (!(subtree instanceof BinaryExpr outerPower) || outerPower.operator() != BinaryOperator.POW
-                || !(outerPower.right() instanceof NumberExpr outerExponent)) {
+                || !(outerPower.right() instanceof NumberExpr outerExponent)
+                || !outerExponent.value().isInteger() || outerExponent.value().signum() <= 0) {
                 return null;
             }
             Power innerPower = asPower(outerPower.left());
@@ -589,15 +591,15 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
                 || !(left.right() instanceof NumberExpr leftOffset)) {
                 return null;
             }
-            double offset = outer.operator() == BinaryOperator.ADD
-                ? leftOffset.value() + right.value()
-                : leftOffset.value() - right.value();
-            if (offset == 0) {
+            ExactRational offset = outer.operator() == BinaryOperator.ADD
+                ? leftOffset.value().add(right.value())
+                : leftOffset.value().subtract(right.value());
+            if (offset.isZero()) {
                 return left.left();
             }
-            return offset > 0
+            return offset.signum() > 0
                 ? new BinaryExpr(left.left(), BinaryOperator.ADD, new NumberExpr(offset))
-                : new BinaryExpr(left.left(), BinaryOperator.SUB, new NumberExpr(-offset));
+                : new BinaryExpr(left.left(), BinaryOperator.SUB, new NumberExpr(offset.negate()));
         }
     }
 
@@ -750,20 +752,27 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
 
         private Expr folded(Expr subtree) {
             if (!(subtree instanceof BinaryExpr operation)
-                || !(operation.left() instanceof NumberExpr left)
-                || !(operation.right() instanceof NumberExpr right)
-                || !isInteger(left.value()) || !isInteger(right.value())) {
+                    || !(operation.left() instanceof NumberExpr left)
+                    || !(operation.right() instanceof NumberExpr right)
+                    || !withinNumericBudget(left.value())
+                    || !withinNumericBudget(right.value())) {
                 return null;
             }
-            double value = switch (operation.operator()) {
-                case ADD -> left.value() + right.value();
-                case SUB -> left.value() - right.value();
-                case MUL -> left.value() * right.value();
-                case DIV -> right.value() == 0 ? Double.NaN : left.value() / right.value();
-                default -> Double.NaN;
+            ExactRational value = switch (operation.operator()) {
+                case ADD -> left.value().add(right.value());
+                case SUB -> left.value().subtract(right.value());
+                case MUL -> left.value().multiply(right.value());
+                case DIV -> right.value().isZero() ? null : left.value().divide(right.value());
+                default -> null;
             };
-            return isInteger(value) ? new NumberExpr(value) : null;
+            return value != null && withinNumericBudget(value) ? new NumberExpr(value) : null;
         }
+
+        private boolean withinNumericBudget(ExactRational value) {
+            return value.numerator().abs().bitLength() <= 4096
+                && value.denominator().bitLength() <= 4096;
+        }
+
     }
 
     /**
@@ -805,11 +814,11 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
                 return null;
             }
             Power left = asPower(difference.left());
-            if (left == null || left.exponent() != 2) {
+            if (left == null || !left.exponent().equalsInteger(2)) {
                 return null;
             }
-            double root = Math.sqrt(literal.value());
-            if (literal.value() <= 0 || !isInteger(root)) {
+            ExactRational root = literal.value().sqrtExact().orElse(null);
+            if (literal.value().signum() <= 0 || root == null || !root.isInteger()) {
                 return null;
             }
             return new BinaryExpr(
@@ -898,25 +907,21 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
     }
 
     private static boolean isExplicitZero(Expr expression) {
-        return expression instanceof NumberExpr number && number.value() == 0;
-    }
-
-    private static boolean isInteger(double value) {
-        return Double.isFinite(value) && Math.rint(value) == value
-            && Math.abs(value) <= 1e15;
+        return expression instanceof NumberExpr number && number.value().equalsInteger(0);
     }
 
     private static Power asPower(Expr expression) {        if (expression instanceof BinaryExpr power && power.operator() == BinaryOperator.POW
-            && power.right() instanceof NumberExpr exponent) {
+            && power.right() instanceof NumberExpr exponent
+            && exponent.value().isInteger() && exponent.value().signum() > 0) {
             return new Power(power.left(), exponent.value());
         }
         return null;
     }
 
-    private record Power(Expr base, double exponent) {
+    private record Power(Expr base, ExactRational exponent) {
     }
 
-    private record PowerPair(Expr base, double leftExponent, double rightExponent) {
+    private record PowerPair(Expr base, ExactRational leftExponent, ExactRational rightExponent) {
     }
 
     private record CommonTerms(Expr common, Expr leftRemainder, Expr rightRemainder) {

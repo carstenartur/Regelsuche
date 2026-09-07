@@ -305,12 +305,12 @@ public final class RationalCommonDenominatorPreparationSolver {
 
     private static boolean isExplicitZero(Expr expression) {
         return expression instanceof NumberExpr number
-            && number.value() == 0;
+            && number.value().equalsInteger(0);
     }
 
     private static List<String> denominatorAssumptions(Expr denominator) {
         if (denominator instanceof NumberExpr number) {
-            return number.value() == 0
+            return number.value().equalsInteger(0)
                 ? List.of("0 != 0")
                 : List.of();
         }
@@ -448,9 +448,7 @@ public final class RationalCommonDenominatorPreparationSolver {
 
     private static String structureDescriptor(Expr expression) {
         if (expression instanceof NumberExpr number) {
-            return "N" + Long.toUnsignedString(
-                Double.doubleToRawLongBits(number.value()),
-                16);
+            return token("Q", number.value().canonicalText());
         }
         if (expression instanceof VariableExpr variable) {
             return token("V", variable.name());

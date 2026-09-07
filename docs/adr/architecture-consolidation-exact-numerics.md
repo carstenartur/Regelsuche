@@ -2,7 +2,7 @@
 
 Datum: 2026-09-06
 
-Status: laufende Konsolidierung; drei begrenzte Sicherheitsschnitte
+Status: exakte AST-Migration nach drei begrenzten Sicherheitsschnitten
 
 Ausgangsrevision: `4a52e933594c4eca9adb10f6f601e325bc624f2e`
 
@@ -189,14 +189,16 @@ Schluessel machen.
 
 ## Noch offene mathematische Grenzen
 
-`NumberExpr`, `PatternExpr.LiteralNumber` und die allgemeine Syntaxoberflaeche
-bleiben Double-basiert. Der zweite Schnitt macht die deklarierte
-Monomial-Koeffizientenrechnung und Wurzelinferenz rational exakt; der dritte
-Schnitt entfernt zusaetzliche Verengungen im Canonicalizer und sichert den
-Polynom-Rueckweg. Bereits vor diesen Grenzen verlorene Quelltextpraezision kann
-keiner dieser Adapter rekonstruieren. Allgemeine Wertidentitaet, E-Graph,
-Serialisierung, Persistenz, Solveradapter und weitere numerische Erzeuger sind
-damit noch nicht insgesamt exakt.
+Die drei oben beschriebenen Sicherheitsschnitte sind der historische Ausgangspunkt.
+Der anschliessende Meilenstein zieht `ExactRational` durch `NumberExpr`, beide
+Literal-Matcher, Wertidentitaet, numerische Transformationen, E-Graph und
+Solveruebergaenge. Der normale Parser behaelt jetzt grosse Zahlen innerhalb
+der expliziten Ressourcenlimits exakt. Die aktuelle API, JSON-Darstellung,
+Bruchsyntax und Grenzen stehen unter [Exakte Zahlen im AST](../exact-numeric-ast.md).
+
+Die kompakte Arena und der geschichtsunabhaengige Suchquotient aus #661 bleiben
+offen. Numerische Diagnostik verwendet ausdrueckliche gerundete Projektionen;
+der begrenzte Integer-Regelminer bleibt auf sein deklariertes Fragment beschraenkt.
 
 Die Migration muss den vorhandenen exakten Werttyp weiterverwenden. Sie darf
 keinen weiteren Zahlen-Sidecar und keine dauerhafte `value(): double`-Fassade

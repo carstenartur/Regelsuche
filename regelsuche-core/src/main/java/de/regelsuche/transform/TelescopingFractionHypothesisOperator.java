@@ -1,5 +1,6 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -42,7 +43,7 @@ public class TelescopingFractionHypothesisOperator implements HypothesisOperator
             return List.of();
         }
         NumberExpr numerator = numerator(division.left());
-        if (numerator == null || Double.compare(numerator.value(), 0.0) == 0) {
+        if (numerator == null || numerator.value().equalsInteger(0)) {
             return List.of();
         }
         List<Expr> factors = flattenMultiplication(division.right());
@@ -92,7 +93,7 @@ public class TelescopingFractionHypothesisOperator implements HypothesisOperator
         if (lowerOffset != null
             && upperOffset != null
             && same(lowerOffset.symbolicPart(), upperOffset.symbolicPart())
-            && Double.compare(upperOffset.offset() - lowerOffset.offset(), 1.0) == 0) {
+            && upperOffset.offset().subtract(lowerOffset.offset()).isOne()) {
             return new AdjacentPair(lower, upper);
         }
         return null;
@@ -107,7 +108,7 @@ public class TelescopingFractionHypothesisOperator implements HypothesisOperator
     }
 
     private boolean isOne(Expr expression) {
-        return expression instanceof NumberExpr number && Double.compare(number.value(), 1.0) == 0;
+        return expression instanceof NumberExpr number && number.value().equalsInteger(1);
     }
 
     private NumberExpr numerator(Expr expression) {
@@ -126,12 +127,12 @@ public class TelescopingFractionHypothesisOperator implements HypothesisOperator
                 return new AdditiveOffset(binary.right(), left.value());
             }
         }
-        return new AdditiveOffset(expression, 0.0);
+        return new AdditiveOffset(expression, ExactRational.ZERO);
     }
 
     private Expr fraction(NumberExpr numerator, Expr denominator) {
         return new BinaryExpr(
-            Double.compare(numerator.value(), 1.0) == 0 ? new NumberExpr(1) : new NumberExpr(numerator.value()),
+            numerator.value().equalsInteger(1) ? new NumberExpr(1) : new NumberExpr(numerator.value()),
             BinaryOperator.DIV,
             denominator
         );
@@ -155,6 +156,6 @@ public class TelescopingFractionHypothesisOperator implements HypothesisOperator
     private record AdjacentPair(Expr lower, Expr upper) {
     }
 
-    private record AdditiveOffset(Expr symbolicPart, double offset) {
+    private record AdditiveOffset(Expr symbolicPart, ExactRational offset) {
     }
 }

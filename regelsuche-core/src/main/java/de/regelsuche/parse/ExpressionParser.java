@@ -49,9 +49,8 @@ public class ExpressionParser {
     }
 
     /**
-     * Parses one term through the allocation-minimal legacy AST path.
-     * Numerals that cannot round-trip through the current numeric leaf are
-     * rejected instead of silently rounded. This does not make arithmetic exact.
+     * Parses one term with exact rational numeric leaves. Integer and finite
+     * decimal tokens share the bounded exact scalar grammar.
      * Exact source certificates and node ranges are created only by
      * {@link #parseExactTerm}.
      */
@@ -66,8 +65,8 @@ public class ExpressionParser {
     /**
      * Parses one term and retains source positions plus exact evidence for each
      * integer or finite-decimal token. Every source-backed AST node also receives
-     * a parser-issued half-open source range. The ordinary AST remains the same
-     * legacy {@link NumberExpr} tree.
+     * a parser-issued half-open source range. Both parser entry points construct the same
+     * exact {@link NumberExpr} values.
      */
     public ExactParsedTerm parseExactTerm(String term) {
         String source = Objects.requireNonNull(term, "term");
@@ -244,13 +243,6 @@ public class ExpressionParser {
 
         int end = cursor.position();
         String sourceLexeme = cursor.slice(start, end);
-        if (!cursor.retainsExactLiterals()) {
-            return cursor.retainRange(
-                new NumberExpr(parseRoundTrippingLegacyValue(sourceLexeme, start)),
-                start,
-                end);
-        }
-
         ExactRationalParseEvidence evidence =
             exactRationalDomain.parse(sourceLexeme);
         if (!evidence.exact()) {
@@ -259,69 +251,19 @@ public class ExpressionParser {
                     + "position " + start + ": " + evidence.detailCode());
         }
 
-        double legacyValue = parseFiniteLegacyValue(sourceLexeme, start);
-        if (legacyValue == 0.0d
-                && !evidence.value().orElseThrow().isZero()) {
-            throw new IllegalArgumentException(
-                "Exact numeric literal cannot be represented safely by the "
-                    + "legacy AST at position " + start);
-        }
-
         NumberExpr number = cursor.retainRange(
-            new NumberExpr(legacyValue),
+            new NumberExpr(evidence.value().orElseThrow()),
             start,
             end);
-        cursor.retainExactLiteral(
+        if (cursor.retainsExactLiterals()) {
+            cursor.retainExactLiteral(
             number,
             start,
             end,
             sourceLexeme,
             evidence);
+        }
         return number;
-    }
-
-    /**
-     * Until numeric AST values are exact, ordinary parsing must not silently
-     * change the decimal value of a source token. The exact entry point keeps
-     * its independent source certificate and does not use this admission gate.
-     */
-    private static double parseRoundTrippingLegacyValue(
-        String sourceLexeme,
-        int start
-    ) {
-        double value = parseFiniteLegacyValue(sourceLexeme, start);
-        // Every unsigned integer of at most 15 digits round-trips unchanged.
-        if (sourceLexeme.length() <= 15 && sourceLexeme.indexOf('.') < 0) {
-            return value;
-        }
-        if (new java.math.BigDecimal(sourceLexeme).compareTo(
-                java.math.BigDecimal.valueOf(value)) != 0) {
-            throw new IllegalArgumentException(
-                "Numeric literal would lose precision in the ordinary AST at "
-                    + "position " + start + "; use the exact parsing path");
-        }
-        return value;
-    }
-
-    private static double parseFiniteLegacyValue(
-        String sourceLexeme,
-        int start
-    ) {
-        double legacyValue;
-        try {
-            legacyValue = Double.parseDouble(sourceLexeme);
-        } catch (NumberFormatException exception) {
-            throw new IllegalArgumentException(
-                "Numeric literal is not representable by the legacy AST at "
-                    + "position " + start,
-                exception);
-        }
-        if (!Double.isFinite(legacyValue)) {
-            throw new IllegalArgumentException(
-                "Numeric literal is not representable by the legacy AST at "
-                    + "position " + start);
-        }
-        return legacyValue;
     }
 
     private Expr parseVariable(Cursor cursor) {

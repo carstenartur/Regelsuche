@@ -142,8 +142,8 @@ public record ExpressionFeatureVector(
     }
 
     private static int integerExponent(Expr expr) {
-        if (expr instanceof NumberExpr number && number.value() >= 0 && Math.rint(number.value()) == number.value()) {
-            return (int) number.value();
+        if (expr instanceof NumberExpr number && number.value().signum() >= 0 && number.value().isInteger() && number.value().numerator().bitLength() <= 31) {
+            return number.value().intValueExact();
         }
         return 1;
     }

@@ -85,7 +85,7 @@ public final class TrigPythagoreanIdentityOperator implements HypothesisOperator
         if (!(expression instanceof BinaryExpr power) || power.operator() != BinaryOperator.POW) {
             return false;
         }
-        if (!(power.right() instanceof NumberExpr exponent) || Double.compare(exponent.value(), 2.0) != 0) {
+        if (!(power.right() instanceof NumberExpr exponent) || !exponent.value().equalsInteger(2)) {
             return false;
         }
         if (!(power.left() instanceof FunctionExpr function)) {
@@ -95,6 +95,6 @@ public final class TrigPythagoreanIdentityOperator implements HypothesisOperator
     }
 
     private boolean isOne(Expr expression) {
-        return expression instanceof NumberExpr number && Double.compare(number.value(), 1.0) == 0;
+        return expression instanceof NumberExpr number && number.value().equalsInteger(1);
     }
 }

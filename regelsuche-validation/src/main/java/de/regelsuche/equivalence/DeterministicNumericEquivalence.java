@@ -61,7 +61,7 @@ final class DeterministicNumericEquivalence {
 
     private double evaluate(Expr expression, Map<String, Double> variables) {
         if (expression instanceof NumberExpr numberExpr) {
-            return numberExpr.value();
+            return numberExpr.value().toBigDecimal(java.math.MathContext.DECIMAL128).doubleValue();
         }
         if (expression instanceof VariableExpr variableExpr) {
             return variables.getOrDefault(variableExpr.name(), 0.0);

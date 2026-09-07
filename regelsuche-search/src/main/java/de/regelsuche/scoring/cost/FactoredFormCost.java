@@ -75,7 +75,7 @@ public final class FactoredFormCost implements CostModel {
             if (binary.operator() == BinaryOperator.POW
                 && isNonTrivial(binary.left())
                 && binary.right() instanceof NumberExpr number
-                && number.value() >= 2) {
+                && number.value().compareTo(de.regelsuche.scalar.ExactRational.integer(2)) >= 0) {
                 bonus += 2;
             }
             bonus += factorizationBonus(binary.left());
