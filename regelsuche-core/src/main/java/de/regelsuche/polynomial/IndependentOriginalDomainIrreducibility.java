@@ -228,8 +228,9 @@ final class IndependentOriginalDomainIrreducibility {
                 work.consume(
                     "independent-irreducibility.normalization.coefficients",
                     1);
-                integers[term.getKey().exponent(0)] =
-                    (BigInteger) term.getValue();
+                BigInteger coefficient = (BigInteger) term.getValue();
+                requireBitLength(coefficient, coefficientLimit);
+                integers[term.getKey().exponent(0)] = coefficient;
             }
         } else {
             ExactRational[] rationals =
@@ -239,8 +240,15 @@ final class IndependentOriginalDomainIrreducibility {
                 work.consume(
                     "independent-irreducibility.normalization.coefficients",
                     1);
-                rationals[term.getKey().exponent(0)] =
+                ExactRational coefficient =
                     (ExactRational) term.getValue();
+                requireBitLength(
+                    coefficient.numerator(),
+                    coefficientLimit);
+                requireBitLength(
+                    coefficient.denominator(),
+                    coefficientLimit);
+                rationals[term.getKey().exponent(0)] = coefficient;
             }
             BigInteger denominatorLcm = BigInteger.ONE;
             for (ExactRational coefficient : rationals) {

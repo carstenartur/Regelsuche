@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.scalar.ExactRational;
 import java.math.BigInteger;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class IndependentOriginalDomainIrreducibilityTest {
@@ -203,6 +204,64 @@ class IndependentOriginalDomainIrreducibilityTest {
                 .orElseThrow()
                 .outcome());
         assertTrue(report.work().totalWorkUnits() <= 1);
+    }
+
+    @Test
+    void fixedDegreeAndNormalizationLimitsFailBeforeLargeArithmetic() {
+        SparsePolynomial<BigInteger> highDegree =
+            new SparsePolynomial<>(
+                integerRing,
+                Map.of(
+                    Monomial.of(257), BigInteger.ONE,
+                    Monomial.of(0), BigInteger.ONE));
+        FactorizationRequest.StructuralLimits broadLimits =
+            new FactorizationRequest.StructuralLimits(
+                1,
+                300,
+                300,
+                20_000);
+        FactorizationVerifier.Report<BigInteger> degreeReport =
+            FactorizationVerifier.execute(
+                noCandidateEngine(
+                    BigIntegerDomain.DOMAIN_ID,
+                    FactorizationEngine.BackendClaim.NONE),
+                FactorizationRequest.independentComplete(
+                    highDegree,
+                    broadLimits,
+                    8,
+                    100_000));
+
+        SparsePolynomial<BigInteger> largeCoefficient =
+            UnivariatePolynomialView.of(
+                integerRing,
+                List.of(
+                    BigInteger.ONE,
+                    BigInteger.ONE.shiftLeft(16_384),
+                    BigInteger.ONE))
+                .toSparsePolynomial();
+        FactorizationVerifier.Report<BigInteger> normalizationReport =
+            FactorizationVerifier.execute(
+                noCandidateEngine(
+                    BigIntegerDomain.DOMAIN_ID,
+                    FactorizationEngine.BackendClaim.NONE),
+                FactorizationRequest.independentComplete(
+                    largeCoefficient,
+                    broadLimits,
+                    8,
+                    100_000));
+
+        assertEquals(
+            FactorizationVerifier.IndependentIrreducibilityOutcome
+                .DEGREE_LIMIT_EXCEEDED,
+            degreeReport.independentIrreducibilityTrace()
+                .orElseThrow()
+                .outcome());
+        assertEquals(
+            FactorizationVerifier.IndependentIrreducibilityOutcome
+                .NORMALIZATION_LIMIT_EXCEEDED,
+            normalizationReport.independentIrreducibilityTrace()
+                .orElseThrow()
+                .outcome());
     }
 
     @Test
