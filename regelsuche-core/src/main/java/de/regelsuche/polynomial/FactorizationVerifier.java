@@ -1,10 +1,13 @@
 package de.regelsuche.polynomial;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalInt;
 
 /**
  * Executes one factorization engine and issues trusted evidence only after
@@ -225,17 +228,8 @@ public final class FactorizationVerifier {
                 : ClaimStrength.NONE;
         if (request.evidenceRequirement()
                 == FactorizationRequest.EvidenceRequirement
-                    .INDEPENDENT_COMPLETE
-                && claim
-                    == ClaimStrength.BACKEND_CLAIMED_IRREDUCIBLE) {
-            return failure(
-                raw.engineId(),
-                Status.UNSUPPORTED_REQUEST,
-                "INDEPENDENT_IRREDUCIBILITY_VERIFIER_REQUIRED",
-                raw.work(),
-                claim,
-                raw.engineResultHash(),
-                request);
+                    .INDEPENDENT_COMPLETE) {
+            return independentlyVerifySource(request, raw, claim);
         }
         return failure(
             raw.engineId(),
@@ -245,6 +239,97 @@ public final class FactorizationVerifier {
             claim,
             raw.engineResultHash(),
             request);
+    }
+
+    private static <C> Report<C> independentlyVerifySource(
+        FactorizationRequest<C> request,
+        FactorizationEngine.EngineResult<C> raw,
+        ClaimStrength backendClaim
+    ) {
+        long remaining = request.maxWorkUnits()
+            - raw.work().totalWorkUnits();
+        IndependentOriginalDomainIrreducibility.Result evidence =
+            IndependentOriginalDomainIrreducibility.verify(
+                request,
+                remaining);
+        IndependentIrreducibilityTrace trace =
+            issueIndependentTrace(evidence);
+        PolynomialWorkLedger combined = merge(
+            raw.work(),
+            evidence.work());
+        return switch (evidence.outcome()) {
+            case CERTIFIED -> report(
+                raw.engineId(),
+                Status.IRREDUCIBLE,
+                evidence.detailCode(),
+                combined,
+                ClaimStrength.INDEPENDENTLY_CERTIFIED_IRREDUCIBLE,
+                List.of(),
+                raw.engineResultHash(),
+                request,
+                Optional.of(trace));
+            case UNSUPPORTED_DOMAIN -> report(
+                raw.engineId(),
+                Status.UNSUPPORTED_DOMAIN,
+                evidence.detailCode(),
+                combined,
+                backendClaim,
+                List.of(),
+                raw.engineResultHash(),
+                request,
+                Optional.of(trace));
+            case UNSUPPORTED_SHAPE -> report(
+                raw.engineId(),
+                Status.UNSUPPORTED_REQUEST,
+                evidence.detailCode(),
+                combined,
+                backendClaim,
+                List.of(),
+                raw.engineResultHash(),
+                request,
+                Optional.of(trace));
+            case NO_WITNESS_WITHIN_POLICY,
+                    WORK_BUDGET_EXHAUSTED,
+                    DEGREE_LIMIT_EXCEEDED,
+                    NORMALIZATION_LIMIT_EXCEEDED -> report(
+                raw.engineId(),
+                Status.BUDGET_INCONCLUSIVE,
+                evidence.detailCode(),
+                combined,
+                backendClaim,
+                List.of(),
+                raw.engineResultHash(),
+                request,
+                Optional.of(trace));
+            case TECHNICAL_FAILURE -> report(
+                raw.engineId(),
+                Status.TECHNICAL_FAILURE,
+                evidence.detailCode(),
+                combined,
+                backendClaim,
+                List.of(),
+                raw.engineResultHash(),
+                request,
+                Optional.of(trace));
+        };
+    }
+
+    private static IndependentIrreducibilityTrace issueIndependentTrace(
+        IndependentOriginalDomainIrreducibility.Result evidence
+    ) {
+        return new IndependentIrreducibilityTrace(
+            evidence.methodId(),
+            evidence.requestHash(),
+            evidence.sourceHash(),
+            evidence.outcome(),
+            evidence.proofMethod(),
+            evidence.detailCode(),
+            evidence.normalizedPrimitiveCoefficients(),
+            evidence.degree(),
+            evidence.primeAttempts(),
+            evidence.selectedPrime(),
+            evidence.work(),
+            evidence.traceHash());
     }
 
     private static <C> VerificationOutcome<C> verifyProposal(
@@ -366,7 +451,7 @@ public final class FactorizationVerifier {
         String engineResultHash,
         FactorizationRequest<C> request
     ) {
-        String verificationHash = reportHash(
+        return report(
             engineId,
             status,
             detailCode,
@@ -374,16 +459,8 @@ public final class FactorizationVerifier {
             claimStrength,
             candidates,
             engineResultHash,
-            request);
-        return new Report<>(
-            engineId,
-            status,
-            detailCode,
-            work,
-            claimStrength,
-            candidates,
-            engineResultHash,
-            verificationHash);
+            request,
+            Optional.empty());
     }
 
     private static <C> Report<C> failure(
@@ -395,24 +472,49 @@ public final class FactorizationVerifier {
         String engineResultHash,
         FactorizationRequest<C> request
     ) {
+        return report(
+            engineId,
+            status,
+            detailCode,
+            work,
+            claimStrength,
+            List.of(),
+            engineResultHash,
+            request,
+            Optional.empty());
+    }
+
+    private static <C> Report<C> report(
+        String engineId,
+        Status status,
+        String detailCode,
+        PolynomialWorkLedger work,
+        ClaimStrength claimStrength,
+        List<VerifiedCandidate<C>> candidates,
+        String engineResultHash,
+        FactorizationRequest<C> request,
+        Optional<IndependentIrreducibilityTrace> independentTrace
+    ) {
         String verificationHash = reportHash(
             engineId,
             status,
             detailCode,
             work,
             claimStrength,
-            List.of(),
+            candidates,
             engineResultHash,
-            request);
+            request,
+            independentTrace);
         return new Report<>(
             engineId,
             status,
             detailCode,
             work,
             claimStrength,
-            List.of(),
+            candidates,
             engineResultHash,
-            verificationHash);
+            verificationHash,
+            independentTrace);
     }
 
     private static <C> String reportHash(
@@ -423,7 +525,8 @@ public final class FactorizationVerifier {
         ClaimStrength claimStrength,
         List<VerifiedCandidate<C>> candidates,
         String engineResultHash,
-        FactorizationRequest<C> request
+        FactorizationRequest<C> request,
+        Optional<IndependentIrreducibilityTrace> independentTrace
     ) {
         StringBuilder material = new StringBuilder(VERIFIER_ID);
         PolynomialEvidence.append(material, engineId);
@@ -443,6 +546,10 @@ public final class FactorizationVerifier {
             PolynomialEvidence.append(
                 material,
                 candidate.canonicalMaterial()));
+        independentTrace.ifPresent(trace ->
+            PolynomialEvidence.append(
+                material,
+                trace.canonicalMaterial()));
         return PolynomialEvidence.sha256(material.toString());
     }
 
@@ -453,6 +560,11 @@ public final class FactorizationVerifier {
         return "ENGINE_EXCEPTION_" + (simple.isBlank()
             ? "RUNTIME"
             : simple.toUpperCase(java.util.Locale.ROOT));
+    }
+
+    private static boolean validHash(String value) {
+        return value != null
+            && value.matches("sha256:[0-9a-f]{64}");
     }
 
     public enum Status {
@@ -473,6 +585,298 @@ public final class FactorizationVerifier {
         BACKEND_CLAIMED_IRREDUCIBLE,
         INDEPENDENTLY_CERTIFIED_COMPLETE,
         INDEPENDENTLY_CERTIFIED_IRREDUCIBLE
+    }
+
+    /** Result of the bounded original-domain irreducibility verifier. */
+    public enum IndependentIrreducibilityOutcome {
+        CERTIFIED,
+        NO_WITNESS_WITHIN_POLICY,
+        WORK_BUDGET_EXHAUSTED,
+        DEGREE_LIMIT_EXCEEDED,
+        NORMALIZATION_LIMIT_EXCEEDED,
+        UNSUPPORTED_DOMAIN,
+        UNSUPPORTED_SHAPE,
+        TECHNICAL_FAILURE
+    }
+
+    /** Independently executed proof method, never an engine assertion. */
+    public enum IrreducibilityProofMethod {
+        NONE,
+        LINEAR_DEGREE,
+        MODULAR_RABIN
+    }
+
+    /** Outcome of one deterministic prime attempt. */
+    public enum PrimeAttemptOutcome {
+        DEGREE_LOSS,
+        REDUCIBLE_REDUCTION,
+        IRREDUCIBLE_WITNESS,
+        WORK_BUDGET_EXHAUSTED
+    }
+
+    /** One independently recomputed Rabin gcd checkpoint. */
+    public record FrobeniusCheckpoint(
+        int iterations,
+        int gcdDegree,
+        String residueHash
+    ) {
+        public FrobeniusCheckpoint {
+            if (iterations < 1
+                    || gcdDegree < 0
+                    || !validHash(residueHash)) {
+                throw new IllegalArgumentException(
+                    "invalid Frobenius checkpoint");
+            }
+        }
+
+        public String canonicalMaterial() {
+            StringBuilder result = new StringBuilder();
+            PolynomialEvidence.append(
+                result,
+                Integer.toString(iterations));
+            PolynomialEvidence.append(
+                result,
+                Integer.toString(gcdDegree));
+            PolynomialEvidence.append(result, residueHash);
+            return result.toString();
+        }
+    }
+
+    /** Audit data for one independently reduced prime. */
+    public record PrimeAttempt(
+        int prime,
+        PrimeAttemptOutcome outcome,
+        int reducedDegree,
+        List<FrobeniusCheckpoint> checkpoints,
+        boolean finalCongruence,
+        String finalResidueHash,
+        long workUnits,
+        String attemptHash
+    ) {
+        public PrimeAttempt {
+            if (prime < 2
+                    || outcome == null
+                    || reducedDegree < -1
+                    || finalResidueHash == null
+                    || !finalResidueHash.isEmpty()
+                        && !validHash(finalResidueHash)
+                    || workUnits < 0
+                    || !validHash(attemptHash)) {
+                throw new IllegalArgumentException(
+                    "invalid independent prime attempt");
+            }
+            checkpoints = List.copyOf(checkpoints);
+            if (outcome == PrimeAttemptOutcome.IRREDUCIBLE_WITNESS
+                    && (!finalCongruence
+                        || finalResidueHash.isEmpty())) {
+                throw new IllegalArgumentException(
+                    "irreducible witness requires final congruence");
+            }
+        }
+
+        public String canonicalMaterial() {
+            StringBuilder result = new StringBuilder();
+            PolynomialEvidence.append(
+                result,
+                Integer.toString(prime));
+            PolynomialEvidence.append(result, outcome.name());
+            PolynomialEvidence.append(
+                result,
+                Integer.toString(reducedDegree));
+            checkpoints.forEach(checkpoint ->
+                PolynomialEvidence.append(
+                    result,
+                    checkpoint.canonicalMaterial()));
+            PolynomialEvidence.append(
+                result,
+                Boolean.toString(finalCongruence));
+            PolynomialEvidence.append(result, finalResidueHash);
+            PolynomialEvidence.append(
+                result,
+                Long.toString(workUnits));
+            PolynomialEvidence.append(result, attemptHash);
+            return result.toString();
+        }
+    }
+
+    /**
+     * Verifier-issued trace for a bounded original-domain proof attempt.
+     * Only the enclosing {@link Report} authorizes its mathematical status.
+     */
+    public static final class IndependentIrreducibilityTrace {
+        private final IndependentTraceState state;
+
+        private IndependentIrreducibilityTrace(
+            String methodId,
+            String requestHash,
+            String sourceHash,
+            IndependentIrreducibilityOutcome outcome,
+            IrreducibilityProofMethod proofMethod,
+            String detailCode,
+            List<BigInteger> normalizedPrimitiveCoefficients,
+            int degree,
+            List<PrimeAttempt> primeAttempts,
+            int selectedPrime,
+            PolynomialWorkLedger work,
+            String traceHash
+        ) {
+            state = new IndependentTraceState(
+                methodId,
+                requestHash,
+                sourceHash,
+                outcome,
+                proofMethod,
+                detailCode,
+                normalizedPrimitiveCoefficients,
+                degree,
+                primeAttempts,
+                selectedPrime,
+                work,
+                traceHash);
+        }
+
+        public String methodId() {
+            return state.methodId();
+        }
+
+        public String requestHash() {
+            return state.requestHash();
+        }
+
+        public String sourceHash() {
+            return state.sourceHash();
+        }
+
+        public IndependentIrreducibilityOutcome outcome() {
+            return state.outcome();
+        }
+
+        public IrreducibilityProofMethod proofMethod() {
+            return state.proofMethod();
+        }
+
+        public String detailCode() {
+            return state.detailCode();
+        }
+
+        public List<BigInteger> normalizedPrimitiveCoefficients() {
+            return state.normalizedPrimitiveCoefficients();
+        }
+
+        public int degree() {
+            return state.degree();
+        }
+
+        public List<PrimeAttempt> primeAttempts() {
+            return state.primeAttempts();
+        }
+
+        public OptionalInt selectedPrime() {
+            return state.selectedPrime() == 0
+                ? OptionalInt.empty()
+                : OptionalInt.of(state.selectedPrime());
+        }
+
+        public PolynomialWorkLedger work() {
+            return state.work();
+        }
+
+        public String traceHash() {
+            return state.traceHash();
+        }
+
+        public boolean certified() {
+            return outcome()
+                == IndependentIrreducibilityOutcome.CERTIFIED;
+        }
+
+        public String canonicalMaterial() {
+            StringBuilder result = new StringBuilder();
+            PolynomialEvidence.append(result, methodId());
+            PolynomialEvidence.append(result, requestHash());
+            PolynomialEvidence.append(result, sourceHash());
+            PolynomialEvidence.append(result, outcome().name());
+            PolynomialEvidence.append(result, proofMethod().name());
+            PolynomialEvidence.append(result, detailCode());
+            normalizedPrimitiveCoefficients().forEach(coefficient ->
+                PolynomialEvidence.append(
+                    result,
+                    coefficient.toString()));
+            PolynomialEvidence.append(
+                result,
+                Integer.toString(degree()));
+            primeAttempts().forEach(attempt ->
+                PolynomialEvidence.append(
+                    result,
+                    attempt.canonicalMaterial()));
+            PolynomialEvidence.append(
+                result,
+                Integer.toString(state.selectedPrime()));
+            PolynomialEvidence.append(
+                result,
+                work().canonicalMaterial());
+            PolynomialEvidence.append(result, traceHash());
+            return result.toString();
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            return this == other
+                || other instanceof IndependentIrreducibilityTrace trace
+                    && state.equals(trace.state);
+        }
+
+        @Override
+        public int hashCode() {
+            return state.hashCode();
+        }
+
+        @Override
+        public String toString() {
+            return "IndependentIrreducibilityTrace[" + state + ']';
+        }
+
+        private record IndependentTraceState(
+            String methodId,
+            String requestHash,
+            String sourceHash,
+            IndependentIrreducibilityOutcome outcome,
+            IrreducibilityProofMethod proofMethod,
+            String detailCode,
+            List<BigInteger> normalizedPrimitiveCoefficients,
+            int degree,
+            List<PrimeAttempt> primeAttempts,
+            int selectedPrime,
+            PolynomialWorkLedger work,
+            String traceHash
+        ) {
+            private IndependentTraceState {
+                if (methodId == null
+                        || methodId.isBlank()
+                        || !validHash(requestHash)
+                        || !validHash(sourceHash)
+                        || outcome == null
+                        || proofMethod == null
+                        || detailCode == null
+                        || detailCode.isBlank()
+                        || degree < -1
+                        || selectedPrime < 0
+                        || work == null
+                        || !validHash(traceHash)) {
+                    throw new IllegalArgumentException(
+                        "invalid independent irreducibility trace");
+                }
+                normalizedPrimitiveCoefficients = List.copyOf(
+                    normalizedPrimitiveCoefficients);
+                primeAttempts = List.copyOf(primeAttempts);
+                if (outcome == IndependentIrreducibilityOutcome.CERTIFIED
+                        && proofMethod
+                            == IrreducibilityProofMethod.NONE) {
+                    throw new IllegalArgumentException(
+                        "certified trace requires a proof method");
+                }
+            }
+        }
     }
 
     /** Issuer-owned exact decomposition evidence. */
@@ -604,7 +1008,8 @@ public final class FactorizationVerifier {
             ClaimStrength claimStrength,
             List<VerifiedCandidate<C>> candidates,
             String engineResultHash,
-            String verificationHash
+            String verificationHash,
+            Optional<IndependentIrreducibilityTrace> independentTrace
         ) {
             state = new State<>(
                 engineId,
@@ -614,7 +1019,8 @@ public final class FactorizationVerifier {
                 claimStrength,
                 candidates,
                 engineResultHash,
-                verificationHash);
+                verificationHash,
+                independentTrace);
         }
 
         public String engineId() {
@@ -649,6 +1055,11 @@ public final class FactorizationVerifier {
             return state.verificationHash();
         }
 
+        public Optional<IndependentIrreducibilityTrace>
+                independentIrreducibilityTrace() {
+            return state.independentTrace();
+        }
+
         public boolean successful() {
             return status() == Status.PARTIAL_FACTORIZATION
                 || status() == Status.COMPLETE_FACTORIZATION;
@@ -679,7 +1090,8 @@ public final class FactorizationVerifier {
             ClaimStrength claimStrength,
             List<VerifiedCandidate<C>> candidates,
             String engineResultHash,
-            String verificationHash
+            String verificationHash,
+            Optional<IndependentIrreducibilityTrace> independentTrace
         ) {
             private State {
                 if (engineId == null
@@ -689,6 +1101,7 @@ public final class FactorizationVerifier {
                         || detailCode.isBlank()
                         || work == null
                         || claimStrength == null
+                        || independentTrace == null
                         || verificationHash == null
                         || !verificationHash.matches(
                             "sha256:[0-9a-f]{64}")) {
@@ -696,6 +1109,8 @@ public final class FactorizationVerifier {
                         "factorization verification report is invalid");
                 }
                 candidates = List.copyOf(candidates);
+                independentTrace = independentTrace.map(
+                    Objects::requireNonNull);
                 boolean success =
                     status == Status.PARTIAL_FACTORIZATION
                         || status == Status.COMPLETE_FACTORIZATION;
@@ -716,6 +1131,20 @@ public final class FactorizationVerifier {
                                 .INDEPENDENTLY_CERTIFIED_IRREDUCIBLE) {
                     throw new IllegalArgumentException(
                         "irreducibility requires independent evidence");
+                }
+                if (status == Status.IRREDUCIBLE
+                        && independentTrace.filter(
+                            IndependentIrreducibilityTrace::certified)
+                            .isEmpty()) {
+                    throw new IllegalArgumentException(
+                        "irreducibility requires a certified trace");
+                }
+                if (status != Status.IRREDUCIBLE
+                        && independentTrace.filter(
+                            IndependentIrreducibilityTrace::certified)
+                            .isPresent()) {
+                    throw new IllegalArgumentException(
+                        "certified trace requires irreducible status");
                 }
                 if (engineResultHash == null
                         || !engineResultHash.isEmpty()

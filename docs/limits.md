@@ -213,14 +213,24 @@ Daraus folgt eine verifizierte Zerlegung, aber ohne zusätzliche Evidence noch
 kein Nachweis, dass alle Faktoren irreduzibel oder die Zerlegung vollständig
 ist. Insbesondere gilt:
 
-- `NO_CANDIDATE` ist kein Irreduzibilitätsbeweis;
+- `NO_CANDIDATE` allein ist kein Irreduzibilitätsbeweis; nur der getrennte,
+  request-gebundene Originaldomänen-Prüfer darf daraus bei einem eigenen
+  gradtreuen modularen Zeugen `IRREDUCIBLE` autorisieren;
 - ein Backend-Claim erfüllt keinen `INDEPENDENT_COMPLETE`-Request;
 - die Quartikengine autorisiert keinen Claim für andere Grade oder
   Faktorgradaufteilungen;
 - die allgemeine rationale Inhaltsnormalisierung ist implementiert, eine
   vollständige `Q[x]`-Faktorisierungsengine jedoch noch nicht;
-- ein vollständiger Abschluss in `F_p[x]` darf nicht als Abschluss in `Z[x]`
-  oder `Q[x]` umetikettiert werden.
+- ein Engine-Abschluss in `F_p[x]` darf nicht als Abschluss in `Z[x]` oder
+  `Q[x]` umetikettiert werden; der unabhängige Prüfer verwendet stattdessen
+  eine selbst berechnete gradtreue Reduktion ausschließlich als hinreichenden
+  Irreduzibilitätszeugen.
+
+Der unabhängige Originaldomänen-Prüfer ist zusätzlich auf Grad 256,
+normalisierte Zwischenkoeffizienten bis 16.384 Bit und die feste Primzahlenfolge
+bis 47 begrenzt. Eine gradverlierende oder reduzierbare Reduktion sowie ein
+erschöpftes Präfix bleiben inkonklusiv. Die unabhängige Vollständigkeit einer
+ausgegebenen Faktorzerlegung ist weiterhin nicht implementiert.
 
 Weiterführende Seiten:
 

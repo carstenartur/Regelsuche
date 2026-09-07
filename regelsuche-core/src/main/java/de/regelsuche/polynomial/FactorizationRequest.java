@@ -45,6 +45,20 @@ public record FactorizationRequest<C>(
             maxWorkUnits);
     }
 
+    public static <C> FactorizationRequest<C> independentComplete(
+        SparsePolynomial<C> source,
+        StructuralLimits structuralLimits,
+        int maxCandidates,
+        long maxWorkUnits
+    ) {
+        return new FactorizationRequest<>(
+            source,
+            EvidenceRequirement.INDEPENDENT_COMPLETE,
+            structuralLimits,
+            maxCandidates,
+            maxWorkUnits);
+    }
+
     public Optional<String> structuralViolation() {
         return structuralLimits.firstViolation(source);
     }
