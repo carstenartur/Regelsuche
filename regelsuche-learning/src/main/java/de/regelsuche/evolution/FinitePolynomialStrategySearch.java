@@ -7,7 +7,6 @@ import de.regelsuche.evolution.ExactFinitePolynomialPlanReplayArtifactVerifier.L
 import de.regelsuche.evolution.ExactFinitePolynomialPlanReplayConfirmationVerifier.ConfirmedReplay;
 import de.regelsuche.evolution.ExactFinitePolynomialPlanReplayVerifier.ReplayReceipt;
 import de.regelsuche.json.JsonWriter;
-import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.HoleDomain;
 import de.regelsuche.parse.ExactExpressionFormatter;
 import de.regelsuche.parse.ExactParsedTerm;
 import de.regelsuche.parse.ExpressionParser;
@@ -30,51 +29,38 @@ import java.util.Optional;
 
 /**
  * Bounded TRAIN-only enumeration of finite polynomial template sequences.
- * This is an experimental selector, not evolution, a new expression interpreter,
- * learned grammar, production promotion, or a flagship FINAL TEST protocol.
+ * Accepts frozen declared or verifier-trace-derived templates. Template formation
+ * precedes selection on disjoint inputs; applications require fresh verification.
  */
 public final class FinitePolynomialStrategySearch {
-    public static final String REVISION = "regelsuche.finite-polynomial-strategy-search/v1";
+    public static final String REVISION = "regelsuche.finite-polynomial-strategy-search/v2";
     private static final SchematicProofPlan.Limits PLAN_LIMITS =
         new SchematicProofPlan.Limits(8, 8, 4, 200_000);
     private static final ExplorationLimits EXECUTION_LIMITS = new ExplorationLimits(16, 8, 3);
 
-    /** The {@code @v} slot uses only the single parser-issued input variable name. */
-    public record Template(String id, String expression, List<HoleDomain> domains) {
-        public Template {
-            id = SchematicProofPlan.requireId(id, "template id");
-            if (id.length() > 64) { throw new IllegalArgumentException("template id exceeds 64 characters"); }
-            expression = text(expression);
-            if (!expression.contains("@v")) {
-                throw new IllegalArgumentException("template must declare the variable slot @v");
-            }
-            domains = List.copyOf(domains).stream()
-                .sorted(Comparator.comparing(HoleDomain::holeId)).toList();
-            if (domains.isEmpty() || domains.size() > 4
-                    || domains.stream().map(HoleDomain::holeId).distinct().count() != domains.size()) {
-                throw new IllegalArgumentException("require one to four unique finite holes");
-            }
-            if (assignments(domains) > 256) {
-                throw new IllegalArgumentException("template exceeds 256 assignments");
-            }
-        }
-
-        long assignmentCount() { return assignments(domains); }
-        String instantiateVariable(String variable) { return expression.replace("@v", variable); }
-    }
-
     /** All trials use the same non-resettable within-trial limits. */
-    public record Grammar(List<Template> templates, int maxSequenceLength,
+    public record Grammar(List<FinitePolynomialTemplate> templates, int maxSequenceLength,
                           long maxAssignmentEvaluationsPerTrial, long maxTheoryPathWork) {
         public Grammar {
-            templates = List.copyOf(templates).stream().sorted(Comparator.comparing(Template::id)).toList();
+            templates = List.copyOf(templates).stream().sorted(Comparator.comparing(FinitePolynomialTemplate::id)).toList();
             if (templates.isEmpty() || templates.size() > 4
-                    || templates.stream().map(Template::id).distinct().count() != templates.size()
+                    || templates.stream().map(FinitePolynomialTemplate::id).distinct().count() != templates.size()
                     || maxSequenceLength < 1 || maxSequenceLength > 3
                     || maxAssignmentEvaluationsPerTrial < 0 || maxAssignmentEvaluationsPerTrial > 10_000
                     || maxTheoryPathWork < 0 || maxTheoryPathWork > 1_000_000) {
                 throw new IllegalArgumentException("invalid finite strategy grammar or budget");
             }
+            for (FinitePolynomialTemplate template : templates) {
+                text(template.expression());
+                if (template.domains().size() > 4 || template.assignmentCount() > 256) {
+                    throw new IllegalArgumentException("strategy template exceeds four holes or 256 assignments");
+                }
+            }
+        }
+
+        public List<String> formationStateIdentities() {
+            return templates.stream().flatMap(template -> template.formationStateIdentities().stream())
+                .distinct().sorted().toList();
         }
 
         public String toCanonicalJson() {
@@ -83,7 +69,10 @@ public final class FinitePolynomialStrategySearch {
                 .property("candidateVerifierRevision", ExactFinitePolynomialPlanCandidateEvidenceVerifier.REVISION_HASH)
                 .property("programRevision", BudgetedRewriteProgramExecution.REVISION)
                 .property("viewId", ExactParsedUnivariatePolynomialView.VIEW_ID)
-                .property("inputPolicy", "4096_CHARS_128_OPERATORS_EXACT_UNIVARIATE_DEFAULT_VIEW_V1")
+                .property("inputIdentityRevision", ExactFinitePolynomialInput.REVISION)
+                .property("inputViewBudget", ExactFinitePolynomialInput.BUDGET.canonicalMaterial())
+                .property("inputPolicy", "4096_CHARS_128_OPERATORS_FORMATION_SELECTION_APPLICATION_DISJOINT_V2")
+                .stringArray("formationStateIdentities", formationStateIdentities())
                 .property("preparation", "ONE_GENERATION_ONE_RECEIPT_REPLAY_ONE_CONFIRMATION_REPLAY")
                 .object("planLimits", value -> value.property("steps", PLAN_LIMITS.maxSteps())
                     .property("holes", PLAN_LIMITS.maxHoles()).property("obligations", PLAN_LIMITS.maxObligations())
@@ -98,14 +87,8 @@ public final class FinitePolynomialStrategySearch {
                 .property("maxSequenceLength", maxSequenceLength)
                 .property("maxAssignmentEvaluationsPerTrial", maxAssignmentEvaluationsPerTrial)
                 .property("maxTheoryPathWork", maxTheoryPathWork)
-                .array("templates", array -> templates.forEach(template -> array.objectValue(item -> {
-                    item.property("id", template.id()).property("expression", template.expression());
-                    item.array("domains", values -> template.domains().forEach(domain ->
-                        values.objectValue(value -> value.property("id", domain.holeId())
-                            .property("kind", domain.kind().name())
-                            .array("values", scalars -> domain.values().forEach(scalar ->
-                                scalars.value(scalar.canonicalText()))))));
-                }))).endObject().toString();
+                .array("templates", array -> templates.forEach(template -> array.objectValue(template::writeJson)))
+                .endObject().toString();
         }
 
         public String contentHash() { return SchematicProofPlan.hash(toCanonicalJson()); }
@@ -120,8 +103,13 @@ public final class FinitePolynomialStrategySearch {
 
     public enum Outcome {
         OBJECTIVE_REACHED, OBJECTIVE_MISS, COMPLETE_NO_SOLUTION, NO_CHANGE, ALREADY_SATISFIED,
-        ASSIGNMENT_BUDGET_INCONCLUSIVE, PATH_BUDGET_INCONCLUSIVE
+        APPLICABILITY_MISMATCH, ASSIGNMENT_BUDGET_INCONCLUSIVE, PATH_BUDGET_INCONCLUSIVE
     }
+
+    /** Work performed before solver admission, including rejected source shapes. */
+    public record ApplicabilityCheck(String templateHash, String sourceExpression, String inputIdentity,
+                                     FinitePolynomialTemplate.Applicability kind, boolean matches,
+                                     long identityViewWork, long shapeNodeVisits) {}
 
     /** Retains the real generated run, checked receipt, replay and selected evidence. */
     public record Attempt(String templateId, SchematicProofPlan plan, ExactFinitePolynomialPlanRun run,
@@ -147,10 +135,11 @@ public final class FinitePolynomialStrategySearch {
                         Outcome outcome, List<Attempt> attempts,
                         Optional<BudgetedRewriteProgramExecution> execution,
                         long assignmentEvaluations, long objectiveViewWork,
-                        long requiredNextAssignmentEvaluations) {
+                        long requiredNextAssignmentEvaluations, List<ApplicabilityCheck> applicabilityChecks) {
         public Trial {
             sequence = List.copyOf(sequence);
             attempts = List.copyOf(attempts);
+            applicabilityChecks = List.copyOf(applicabilityChecks);
             Objects.requireNonNull(execution, "execution");
         }
         public long pathWork() {
@@ -161,6 +150,12 @@ public final class FinitePolynomialStrategySearch {
             return outcome == Outcome.ASSIGNMENT_BUDGET_INCONCLUSIVE
                 || outcome == Outcome.PATH_BUDGET_INCONCLUSIVE;
         }
+        public long applicabilityViewWork() {
+            return applicabilityChecks.stream().mapToLong(ApplicabilityCheck::identityViewWork).reduce(0L, Math::addExact);
+        }
+        public long applicabilityShapeNodeVisits() {
+            return applicabilityChecks.stream().mapToLong(ApplicabilityCheck::shapeNodeVisits).reduce(0L, Math::addExact);
+        }
         public String toCanonicalJson() {
             return new JsonWriter().beginObject().property("revision", REVISION)
                 .property("grammarHash", grammarHash)
@@ -168,7 +163,14 @@ public final class FinitePolynomialStrategySearch {
                 .property("input", input).property("inputAlphaPolynomialHash", inputAlphaPolynomialHash)
                 .property("outcome", outcome.name()).property("assignmentEvaluations", assignmentEvaluations)
                 .property("objectiveViewWork", objectiveViewWork)
+                .property("applicabilityViewWork", applicabilityViewWork())
+                .property("applicabilityShapeNodeVisits", applicabilityShapeNodeVisits())
                 .property("requiredNextAssignmentEvaluations", requiredNextAssignmentEvaluations)
+                .array("applicabilityChecks", array -> applicabilityChecks.forEach(check -> array.objectValue(value ->
+                    value.property("templateHash", check.templateHash()).property("sourceExpression", check.sourceExpression())
+                        .property("inputIdentity", check.inputIdentity()).property("kind", check.kind().name())
+                        .property("matches", check.matches()).property("identityViewWork", check.identityViewWork())
+                        .property("shapeNodeVisits", check.shapeNodeVisits()))))
                 .property("programExecutionHash", execution.map(BudgetedRewriteProgramExecution::contentHash).orElse(""))
                 .array("attempts", array -> attempts.forEach(attempt -> array.objectValue(value ->
                     value.property("templateId", attempt.templateId()).property("planHash", attempt.plan().contentHash())
@@ -218,11 +220,20 @@ public final class FinitePolynomialStrategySearch {
             return rows.stream().mapToLong(row -> row.trial().assignmentEvaluations())
                 .reduce(0L, Math::addExact);
         }
+        public long inputViewWork() { return inputViewWork; }
+        public long totalApplicabilityViewWork() {
+            return rows.stream().mapToLong(row -> row.trial().applicabilityViewWork()).reduce(0L, Math::addExact);
+        }
+        public long totalApplicabilityShapeNodeVisits() {
+            return rows.stream().mapToLong(row -> row.trial().applicabilityShapeNodeVisits()).reduce(0L, Math::addExact);
+        }
         public String toCanonicalJson() {
             return new JsonWriter().beginObject().property("revision", REVISION)
                 .property("state", "TRAIN_COMPLETE_SELECTION_FROZEN")
                 .property("grammarHash", grammar.contentHash()).property("inputViewWork", inputViewWork)
                 .property("totalTrainingAssignmentEvaluations", totalTrainingAssignmentEvaluations())
+                .property("totalApplicabilityViewWork", totalApplicabilityViewWork())
+                .property("totalApplicabilityShapeNodeVisits", totalApplicabilityShapeNodeVisits())
                 .array("selectedSequence", array -> selectedSequence().orElse(List.of()).forEach(array::value))
                 .array("trainingIdentities", array -> trainingIdentities.forEach(array::value))
                 .array("rows", array -> rows.forEach(row -> array.objectValue(value ->
@@ -251,19 +262,20 @@ public final class FinitePolynomialStrategySearch {
                 || training.stream().map(TrainingInput::id).distinct().count() != training.size()) {
             throw new IllegalArgumentException("require one to sixteen unique TRAIN input IDs");
         }
-        List<List<Template>> sequences = enumerate(grammar);
+        List<List<FinitePolynomialTemplate>> sequences = enumerate(grammar);
         if (Math.multiplyExact(sequences.size(), training.size()) > 512) {
             throw new IllegalArgumentException("TRAIN matrix exceeds 512 complete trials");
         }
         // Validate every input and its exact/alpha duplicate boundary before any solving.
         List<InputAnalysis> analyzed = training.stream().map(value -> analyze(value.expression())).toList();
         List<String> identities = analyzed.stream().map(InputAnalysis::alphaHash).toList();
+        requireDisjointFormation(grammar, identities);
         if (new HashSet<>(identities).size() != identities.size()) {
             throw new IllegalArgumentException("duplicate alpha-equivalent TRAIN polynomials");
         }
         List<TrainingRow> rows = new ArrayList<>();
         List<Score> scores = new ArrayList<>();
-        for (List<Template> sequence : sequences) {
+        for (List<FinitePolynomialTemplate> sequence : sequences) {
             int hits = 0;
             int incomplete = 0;
             long assignments = 0;
@@ -292,27 +304,39 @@ public final class FinitePolynomialStrategySearch {
         List<String> selected = selection.selectedSequence().orElseThrow(() ->
             new IllegalStateException("no successful TRAIN strategy was selected"));
         InputAnalysis input = analyze(expression);
+        requireDisjointFormation(selection.grammar(), List.of(input.alphaHash()));
         if (selection.trainingIdentities.contains(input.alphaHash())) {
             throw new IllegalArgumentException("application repeats a TRAIN polynomial, including alpha renaming");
         }
-        List<Template> sequence = selected.stream().map(id -> selection.grammar.templates().stream()
+        List<FinitePolynomialTemplate> sequence = selected.stream().map(id -> selection.grammar.templates().stream()
             .filter(template -> template.id().equals(id)).findFirst().orElseThrow()).toList();
         return new Application(selection.contentHash(), evaluate(selection.grammar, sequence, input), input.viewWork());
     }
 
-    private Trial evaluate(Grammar grammar, List<Template> sequence, InputAnalysis input) {
+    private Trial evaluate(Grammar grammar, List<FinitePolynomialTemplate> sequence, InputAnalysis input) {
         if (input.alreadyFactored()) {
             return new Trial(grammar.contentHash(), ids(sequence), input.syntax(), input.alphaHash(),
-                Outcome.ALREADY_SATISFIED, List.of(), Optional.empty(), 0, 0, 0);
+                Outcome.ALREADY_SATISFIED, List.of(), Optional.empty(), 0, 0, 0, List.of());
         }
         List<Attempt> attempts = new ArrayList<>();
         List<RewriteProgram> nodes = new ArrayList<>();
+        List<ApplicabilityCheck> checks = new ArrayList<>();
         String current = input.syntax();
         long assignments = 0;
         long pathWork = 0;
         long requiredNext = 0;
         Outcome outcome = Outcome.OBJECTIVE_MISS;
-        for (Template template : sequence) {
+        for (FinitePolynomialTemplate template : sequence) {
+            var projection = checks.isEmpty() ? input.projection()
+                : ExactFinitePolynomialInput.analyze(new ExpressionParser().parseExactTerm(text(current)));
+            requireDisjointFormation(grammar, List.of(projection.identity()));
+            var shape = template.checkShape(projection);
+            checks.add(new ApplicabilityCheck(template.contentHash(), projection.expression(), projection.identity(),
+                template.applicability(), shape.matches(), checks.isEmpty() ? 0 : projection.workUnits(), shape.visitedNodes()));
+            if (!shape.matches()) {
+                outcome = Outcome.APPLICABILITY_MISMATCH;
+                break;
+            }
             requiredNext = Math.multiplyExact(3L, template.assignmentCount());
             if (requiredNext > grammar.maxAssignmentEvaluationsPerTrial() - assignments) {
                 outcome = Outcome.ASSIGNMENT_BUDGET_INCONCLUSIVE;
@@ -364,10 +388,10 @@ public final class FinitePolynomialStrategySearch {
             if (objective.reached()) { outcome = Outcome.OBJECTIVE_REACHED; }
         }
         return new Trial(grammar.contentHash(), ids(sequence), input.syntax(), input.alphaHash(), outcome,
-            attempts, execution, assignments, objectiveWork, requiredNext);
+            attempts, execution, assignments, objectiveWork, requiredNext, checks);
     }
 
-    private Attempt prepare(Template template, String source, String variable) {
+    private Attempt prepare(FinitePolynomialTemplate template, String source, String variable) {
         String ansatz = template.instantiateVariable(variable);
         var resolver = new ExactFinitePolynomialPlanResolver();
         var plan = resolver.createPlan("strategy-" + template.id(), source, ansatz,
@@ -396,25 +420,27 @@ public final class FinitePolynomialStrategySearch {
         return new Attempt(template.id(), plan, run, receipt, confirmation, selected);
     }
 
-    private record InputAnalysis(String syntax, String variable, String alphaHash, long viewWork, boolean alreadyFactored) {}
+    private record InputAnalysis(String syntax, String variable, String alphaHash, long viewWork,
+                                 boolean alreadyFactored, ExactFinitePolynomialInput.Projection projection) {}
     private record Objective(boolean reached, long viewWork) {}
 
     private static InputAnalysis analyze(String expression) {
         ExactParsedTerm parsed = new ExpressionParser().parseExactTerm(text(expression));
-        var analysis = new ExactParsedUnivariatePolynomialView().analyze(parsed);
-        SparsePolynomial<ExactRational> polynomial = analysis.polynomial().orElseThrow(() ->
-            new IllegalArgumentException("unsupported/inconclusive polynomial input: " + analysis.detailCode()));
+        var projection = ExactFinitePolynomialInput.analyze(parsed);
+        SparsePolynomial<ExactRational> polynomial = projection.polynomial();
         if (polynomial.isConstant()) { throw new IllegalArgumentException("input must be nonconstant univariate"); }
-        // Coefficients/exponents, not binary64 values or variable names, define split identity.
-        JsonWriter alpha = new JsonWriter().beginObject().property("kind", "exact-univariate-alpha/v1")
-            .array("terms", array -> polynomial.terms().forEach((monomial, coefficient) ->
-                array.objectValue(value -> value.property("exponent", monomial.exponent(0))
-                    .property("coefficient", coefficient.canonicalText()))));
         Objective initialObjective = factored(expression);
         return new InputAnalysis(ExactExpressionFormatter.format(parsed.expression(), parsed),
             polynomial.ring().variables().getFirst().id(),
-            SchematicProofPlan.hash(alpha.endObject().toString()),
-            Math.addExact(analysis.work().totalWorkUnits(), initialObjective.viewWork()), initialObjective.reached());
+            projection.identity(), Math.addExact(projection.workUnits(), initialObjective.viewWork()),
+            initialObjective.reached(), projection);
+    }
+
+    private static void requireDisjointFormation(Grammar grammar, List<String> identities) {
+        var excluded = grammar.formationStateIdentities();
+        if (identities.stream().anyMatch(excluded::contains)) {
+            throw new IllegalArgumentException("input overlaps a verified template formation state");
+        }
     }
 
     private static Objective factored(String expression) {
@@ -434,14 +460,14 @@ public final class FinitePolynomialStrategySearch {
             Math.addExact(left.work().totalWorkUnits(), right.work().totalWorkUnits()));
     }
 
-    private static List<List<Template>> enumerate(Grammar grammar) {
-        List<List<Template>> all = new ArrayList<>();
-        List<List<Template>> frontier = List.of(List.of());
+    private static List<List<FinitePolynomialTemplate>> enumerate(Grammar grammar) {
+        List<List<FinitePolynomialTemplate>> all = new ArrayList<>();
+        List<List<FinitePolynomialTemplate>> frontier = List.of(List.of());
         for (int depth = 0; depth < grammar.maxSequenceLength(); depth++) {
-            List<List<Template>> next = new ArrayList<>();
-            for (List<Template> prefix : frontier) {
-                for (Template template : grammar.templates()) {
-                    List<Template> word = new ArrayList<>(prefix);
+            List<List<FinitePolynomialTemplate>> next = new ArrayList<>();
+            for (List<FinitePolynomialTemplate> prefix : frontier) {
+                for (FinitePolynomialTemplate template : grammar.templates()) {
+                    List<FinitePolynomialTemplate> word = new ArrayList<>(prefix);
                     word.add(template);
                     next.add(List.copyOf(word));
                 }
@@ -452,13 +478,8 @@ public final class FinitePolynomialStrategySearch {
         return List.copyOf(all);
     }
 
-    private static List<String> ids(List<Template> templates) {
-        return templates.stream().map(Template::id).toList();
-    }
-    private static long assignments(List<HoleDomain> domains) {
-        long count = 1;
-        for (HoleDomain domain : domains) { count = Math.multiplyExact(count, domain.values().size()); }
-        return count;
+    private static List<String> ids(List<FinitePolynomialTemplate> templates) {
+        return templates.stream().map(FinitePolynomialTemplate::id).toList();
     }
     private static String text(String value) {
         if (value == null || value.isBlank() || value.length() > 4096

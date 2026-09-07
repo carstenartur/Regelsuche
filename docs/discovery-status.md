@@ -1,6 +1,6 @@
 # Discovery- und Forschungsstand
 
-**Stand: 6. September 2026**
+**Stand: 7. September 2026**
 
 Diese Übersicht trennt ausgelieferte Fähigkeiten, Entwicklungen nach dem
 Release, begrenzte Projektnachweise und noch nicht ausgeführte Studien.
@@ -193,11 +193,17 @@ verifier-gebundenen Trainingspfaden parametrisierte Ansatzfolgen. Die neue
 [Vorlagendokumentation](trace-derived-polynomial-plans.md) beschreibt die
 exakten Koeffizientenlücken, bewahrten Wiederholungsbeziehungen und erneute
 Prüfung jeder Anwendung. Semantisch gleiche Trainingspolynome zählen auch nach
-Umordnung oder Faktorisierung nicht mehrfach; der erste Anwendungsschritt
-weist zum Training äquivalente Eingaben ab.
+Umordnung oder Faktorisierung nicht mehrfach. Alle Anwendungsschritte weisen
+Eingaben ab, die einem beobachteten Formationszustand äquivalent sind.
 
-Dies ergänzt die Ausführungsmechanik, lernt aber noch keine neue Stufenfolge
-oder Verzweigungsstrategie. Die neuen Koeffizienteninstanzen sind bekannte
-Entwicklungsfälle derselben Familie, kein frischer FINAL TEST. Eine gemeinsame
-Strategieauswahl, vollständige Kostenbilanz und Produktionspromotion bleiben
-separate Aufgaben unter #874/#750.
+Der gemeinsame unveränderliche Vorlagenvertrag verbindet Lerner und Selektor:
+Formation, getrennte Auswahl-TRAIN-Matrix und neue Anwendung verwenden dieselbe
+exakte Polynomidentität. Herkunft, Quellform und endliche Domänen bleiben gebunden;
+die Auswahl trägt auch die Formationssperren nicht ausgewählter Vorlagen weiter.
+Der begrenzte Integrationstest erzeugt zwölf Auswahlzeilen und prüft jede der
+zwei späteren Theorieanwendungen frisch über die vorhandene Verifierpipeline.
+
+Die neuen Koeffizienteninstanzen sind bekannte Entwicklungsfälle derselben
+Familie, kein frischer FINAL TEST. Allgemeine Verzweigungsstrategien, unabhängige
+Kontrollen, vollständige Kostenbilanz und Produktionspromotion bleiben unter
+#874/#750 offen.

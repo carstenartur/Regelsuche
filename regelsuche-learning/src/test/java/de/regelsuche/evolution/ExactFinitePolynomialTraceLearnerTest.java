@@ -1,31 +1,36 @@
 package de.regelsuche.evolution;
 
-import static de.regelsuche.search.program.RewritePrograms.budgetedSource;
-import static de.regelsuche.search.program.RewritePrograms.sequence;
+import static de.regelsuche.evolution.FinitePolynomialTraceFixtures.prepare;
+
+import static de.regelsuche.evolution.FinitePolynomialTraceFixtures.reuse;
+
+import static de.regelsuche.evolution.FinitePolynomialTraceFixtures.execute;
+
+import static de.regelsuche.evolution.FinitePolynomialTraceFixtures.total;
+
+import static de.regelsuche.evolution.FinitePolynomialTraceFixtures.trace;
+
+import static de.regelsuche.evolution.FinitePolynomialTraceFixtures.chain;
+
+import static de.regelsuche.evolution.FinitePolynomialTraceFixtures.training;
+
+import static de.regelsuche.evolution.FinitePolynomialTraceFixtures.PLAN_LIMITS;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.regelsuche.evolution.ExactFinitePolynomialPlanCandidateEvidenceVerifier.VerifiedCandidateEvidence;
-import de.regelsuche.evolution.ExactFinitePolynomialPlanReplayArtifactVerifier.LoadedArtifact;
 import de.regelsuche.evolution.ExactFinitePolynomialTraceLearner.LearnedPlan;
 import de.regelsuche.evolution.ExactFinitePolynomialTraceLearner.Limits;
 import de.regelsuche.evolution.ExactFinitePolynomialTraceLearner.TrainingTrace;
 import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.HoleDomain;
 import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.HoleKind;
 import de.regelsuche.scalar.ExactRational;
-import de.regelsuche.search.program.BudgetedRewriteProgramExecution;
-import de.regelsuche.search.program.BudgetedRewriteProgramExecution.ExplorationLimits;
-import de.regelsuche.search.program.BudgetedRewriteProgramExecution.PathBudget;
-import de.regelsuche.search.program.RewriteProgram;
-import de.regelsuche.search.program.RewriteProgramInterpreter;
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -33,8 +38,6 @@ import org.junit.jupiter.api.Timeout;
 /** Real solver, verifier-owned evidence and interpreter; no mathematical mocks. */
 @Timeout(60)
 class ExactFinitePolynomialTraceLearnerTest {
-    private static final SchematicProofPlan.Limits PLAN_LIMITS = new SchematicProofPlan.Limits(8, 8, 4, 200_000);
-    private static final ExplorationLimits PROGRAM_LIMITS = new ExplorationLimits(100, 100, 8);
     private static final Limits LEARNING_LIMITS = new Limits(3, 8, 4, 4, 0, 16, 10_000);
     private final ExactFinitePolynomialTraceLearner learner = new ExactFinitePolynomialTraceLearner();
 
@@ -43,10 +46,10 @@ class ExactFinitePolynomialTraceLearnerTest {
         LearnedPlan plan = learner.learn(training(), LEARNING_LIMITS);
         assertEquals(2, plan.stages().size());
         assertEquals(3, plan.trainingRoots().size());
-        assertEquals(2, plan.stages().getFirst().holeDomains().size());
-        assertEquals(2, plan.stages().getLast().holeDomains().size());
-        assertTrue(plan.stages().getFirst().ansatzTemplate().contains("${variable}"));
-        assertFalse(plan.stages().getFirst().ansatzTemplate().contains("${shift}"));
+        assertEquals(2, plan.stages().getFirst().domains().size());
+        assertEquals(2, plan.stages().getLast().domains().size());
+        assertTrue(plan.stages().getFirst().expression().contains("@v"));
+        assertFalse(plan.stages().getFirst().expression().contains("${shift}"));
         assertTrue(plan.toCanonicalJson().contains("NON_EXECUTABLE_REQUIRES_FRESH_VERIFICATION"));
         assertEquals(SchematicProofPlan.hash(plan.toCanonicalJson()), plan.contentHash());
     }
@@ -79,8 +82,8 @@ class ExactFinitePolynomialTraceLearnerTest {
             traces.add(trace(List.of(evidence)));
         }
         LearnedPlan plan = learner.learn(traces, LEARNING_LIMITS);
-        assertEquals(1, plan.stages().getFirst().holeDomains().size());
-        String template = plan.stages().getFirst().ansatzTemplate();
+        assertEquals(1, plan.stages().getFirst().domains().size());
+        String template = plan.stages().getFirst().expression();
         assertEquals(2, template.split("\\$\\{coefficient-0}", -1).length - 1);
         var request = plan.instantiate(0, "y^2 + 10*y + 25").orElseThrow();
         var evidence = prepare("repeated-reuse", request.sourceExpression(), request.ansatzTemplate(), request.holeDomains(), 2);
@@ -234,7 +237,7 @@ class ExactFinitePolynomialTraceLearnerTest {
         assertNotEquals(plan.contentHash(), other.contentHash());
         assertThrows(UnsupportedOperationException.class, () -> plan.stages().clear());
         assertThrows(UnsupportedOperationException.class, () -> plan.trainingRoots().clear());
-        assertThrows(UnsupportedOperationException.class, () -> plan.stages().getFirst().holeDomains().clear());
+        assertThrows(UnsupportedOperationException.class, () -> plan.stages().getFirst().domains().clear());
         assertThrows(IllegalArgumentException.class, () -> new Limits(1, 8, 4, 4, 0, 16, 10_000));
         assertThrows(IllegalArgumentException.class, () -> new Limits(3, 8, 4, 4, Integer.MIN_VALUE, Integer.MAX_VALUE, 10_000));
     }
@@ -260,7 +263,6 @@ class ExactFinitePolynomialTraceLearnerTest {
             new Limits(2, 4, 4, 4, 0, 16, 10_000)));
         assertTrue(error.getMessage().contains("different operator structure"));
     }
-
 
     @Test
     void rejectsReorderedAndFactoredVersionsOfTheSameTrainingPolynomial() {
@@ -321,73 +323,4 @@ class ExactFinitePolynomialTraceLearnerTest {
         assertThrows(IllegalArgumentException.class, () -> learner.learn(List.of(valid), LEARNING_LIMITS));
     }
 
-    private static List<TrainingTrace> training() {
-        return new ArrayList<>(List.of(chain("x", 6, 5), chain("y", 8, 12), chain("u", 8, 7)));
-    }
-
-    private static TrainingTrace chain(String variable, int linear, int constant) {
-        // The learner receives none of these generating templates, only the resulting checked paths.
-        String completion = "(" + variable + "+${shift})^2 + ${constant}";
-        var completionDomains = List.of(HoleDomain.integerRange("shift", 0, 6),
-            HoleDomain.integerRange("constant", -12, 0));
-        String factorization = "(" + variable + "+${left})*(" + variable + "+${right})";
-        var factorDomains = List.of(HoleDomain.integerRange("left", 0, 8), HoleDomain.integerRange("right", 0, 8));
-        var first = prepare("completion", variable + "^2+" + linear + "*" + variable + "+" + constant,
-            completion, completionDomains, 2);
-        var second = prepare("factorization", first.data().transformedExpression(), factorization, factorDomains, 2);
-        return trace(List.of(first, second));
-    }
-
-    private static TrainingTrace trace(List<VerifiedCandidateEvidence> evidence) {
-        var execution = execute(evidence, total(evidence));
-        return new TrainingTrace(execution, execution.candidates().getFirst().contentHash(), evidence);
-    }
-
-    private static long total(List<VerifiedCandidateEvidence> evidence) {
-        return evidence.stream().mapToLong(e -> e.data().canonicalWork().totalWorkUnits()).reduce(0L, Math::addExact);
-    }
-
-    private static BudgetedRewriteProgramExecution execute(List<VerifiedCandidateEvidence> evidence, long budget) {
-        List<RewriteProgram> steps = new ArrayList<>();
-        for (int i = 0; i < evidence.size(); i++) {
-            steps.add(budgetedSource("stage-" + i, new VerifiedFinitePolynomialCandidateSource(evidence.get(i))));
-        }
-        return new RewriteProgramInterpreter().executeBudgeted(new RewriteProgram.Sequence(
-            RewriteProgram.NodeMetadata.named("verified-training-sequence"), steps),
-            evidence.getFirst().data().sourceExpression(), new PathBudget(0, budget), PROGRAM_LIMITS);
-    }
-
-    private static BudgetedRewriteProgramExecution reuse(LearnedPlan learned, String source) {
-        List<VerifiedCandidateEvidence> evidence = new ArrayList<>();
-        String current = source;
-        for (int step = 0; step < learned.stages().size(); step++) {
-            var request = learned.instantiate(step, current).orElseThrow();
-            var checked = prepare("reused-stage-" + step, request.sourceExpression(), request.ansatzTemplate(), request.holeDomains(), 2);
-            evidence.add(checked);
-            current = checked.data().transformedExpression();
-        }
-        return execute(evidence, total(evidence));
-    }
-
-    private static VerifiedCandidateEvidence prepare(String id, String source, String ansatz,
-                                                     List<HoleDomain> domains, int retained) {
-        var resolver = new ExactFinitePolynomialPlanResolver();
-        var plan = resolver.createPlan(id, source, ansatz, domains, retained, PLAN_LIMITS);
-        var run = resolver.resolve(plan, source, ansatz, domains, retained);
-        var receipt = new ExactFinitePolynomialPlanReplayVerifier().verify(plan, source, ansatz, domains, retained, run);
-        var bytesVerifier = new ExactFinitePolynomialPlanReplayArtifactVerifier();
-        var receiptRef = bytesVerifier.describeReceipt(receipt);
-        var receiptBytes = receipt.toCanonicalJson().getBytes(StandardCharsets.UTF_8);
-        var checkedReceipt = bytesVerifier.verifyReceipt(receiptRef,
-            ignored -> new LoadedArtifact(receiptRef.artifactId(), receiptBytes));
-        var receiptArtifact = new ExactFinitePolynomialPlanReplayReceiptArtifactVerifier().verify(checkedReceipt);
-        var runRef = bytesVerifier.describePlanRun(run);
-        var runBytes = run.toCanonicalJson().getBytes(StandardCharsets.UTF_8);
-        var checkedRun = bytesVerifier.verifyPlanRun(runRef, ignored -> new LoadedArtifact(runRef.artifactId(), runBytes));
-        var confirmation = new ExactFinitePolynomialPlanReplayConfirmationVerifier().verify(
-            receiptArtifact, checkedRun, run, plan, source, ansatz, domains, retained);
-        String selected = run.candidates().stream().map(ExactFinitePolynomialResolvedCandidate::contentHash)
-            .min(Comparator.naturalOrder()).orElseThrow();
-        return new ExactFinitePolynomialPlanCandidateEvidenceVerifier().verify(confirmation, plan, run, selected);
-    }
 }

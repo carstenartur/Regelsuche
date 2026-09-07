@@ -33,13 +33,11 @@ import java.util.Set;
  * Every later instantiation must pass the existing solver and evidence pipeline.
  */
 public final class ExactFinitePolynomialTraceLearner {
-    public static final String REVISION = "regelsuche.exact-finite-polynomial-trace-learner/v1";
-    private static final String VARIABLE = "${variable}";
+    public static final String REVISION = "regelsuche.exact-finite-polynomial-trace-learner/v2";
+    private static final String VARIABLE = FinitePolynomialTemplate.VARIABLE_SLOT;
     private static final int MAX_EXPRESSION_CHARS = 16_384;
     private static final int MAX_STRUCTURAL_TOKENS = 128;
     private static final int MAX_AST_NODES = 256;
-    private static final ExactParsedUnivariatePolynomialView.Budget IDENTITY_BUDGET =
-        new ExactParsedUnivariatePolynomialView.Budget(64, 4096, MAX_AST_NODES, 50_000);
 
     /** Policy is fixed before training; it is never enlarged after a reuse miss. */
     public record Limits(int minimumTraces, int maximumTraces, int maximumSteps,
@@ -76,35 +74,48 @@ public final class ExactFinitePolynomialTraceLearner {
         public Instantiation { holeDomains = List.copyOf(holeDomains); }
     }
 
-    public record Stage(String sourceShape, String ansatzTemplate, List<HoleDomain> holeDomains) {
-        public Stage { holeDomains = List.copyOf(holeDomains); }
+    record Stage(String sourceShape, String ansatzTemplate, List<HoleDomain> holeDomains) {
+        Stage { holeDomains = List.copyOf(holeDomains); }
     }
 
     /** Only learn() can issue a learned plan. No target or TEST outcome is an input. */
     public static final class LearnedPlan {
         private final Limits limits;
-        private final List<Stage> stages;
+        private final List<Stage> stageData;
+        private final List<FinitePolynomialTemplate> stages;
         private final List<String> trainingRoots;
         private final List<String> trainingInputIdentities;
+        private final List<String> formationStateIdentities;
+        private final int formationStateObservations;
         private final long trainingIdentityWorkUnits;
         private final String canonicalJson;
         private final String contentHash;
 
         private LearnedPlan(Limits limits, List<Stage> stages, List<String> trainingRoots,
-                            List<String> trainingInputIdentities, long trainingIdentityWorkUnits) {
+                            List<String> trainingInputIdentities, FormationStates formation) {
             this.limits = limits;
-            this.stages = List.copyOf(stages);
+            this.stageData = List.copyOf(stages);
             this.trainingRoots = List.copyOf(trainingRoots);
             this.trainingInputIdentities = List.copyOf(trainingInputIdentities);
-            this.trainingIdentityWorkUnits = trainingIdentityWorkUnits;
+            this.formationStateIdentities = formation.identities.stream().sorted().toList();
+            this.formationStateObservations = formation.observations;
+            this.trainingIdentityWorkUnits = formation.work;
             this.canonicalJson = render(limits, stages, trainingRoots,
-                this.trainingInputIdentities, trainingIdentityWorkUnits);
+                this.trainingInputIdentities, formationStateIdentities, formationStateObservations, formation.work);
             this.contentHash = SchematicProofPlan.hash(canonicalJson);
+            List<FinitePolynomialTemplate> templates = new ArrayList<>();
+            for (int index = 0; index < stages.size(); index++) {
+                templates.add(FinitePolynomialTemplate.learned(this, index));
+            }
+            this.stages = List.copyOf(templates);
         }
 
-        public List<Stage> stages() { return stages; }
+        public List<FinitePolynomialTemplate> stages() { return stages; }
+        Stage stageData(int index) { return stageData.get(index); }
         public List<String> trainingRoots() { return trainingRoots; }
         public List<String> trainingInputIdentities() { return trainingInputIdentities; }
+        public List<String> formationStateIdentities() { return formationStateIdentities; }
+        public int formationStateObservations() { return formationStateObservations; }
         /** Diagnostic exact-view work only, not total training or learning cost. */
         public long trainingIdentityWorkUnits() { return trainingIdentityWorkUnits; }
         public Limits limits() { return limits; }
@@ -121,18 +132,18 @@ public final class ExactFinitePolynomialTraceLearner {
             if (stageIndex < 0 || stageIndex >= stages.size()) {
                 throw new IllegalArgumentException("stageIndex must be in 0.." + (stages.size() - 1) + ": " + stageIndex);
             }
-            Stage stage = stages.get(stageIndex);
+            FinitePolynomialTemplate stage = stages.get(stageIndex);
             Parsed parsed = parse(expression);
-            if (stageIndex == 0 && trainingInputIdentities.contains(inputSignature(parsed).identity())) {
+            if (formationStateIdentities.contains(parsed.projection().identity())) {
                 throw new IllegalArgumentException("training-equivalent input is not held-out reuse");
             }
-            if (!stage.sourceShape().equals(shape(parsed, parsed.term().expression(), false))) {
+            if (!stage.sourceShape().equals(shape(parsed.term(), parsed.term().expression(), false))) {
                 return Optional.empty();
             }
-            String template = stage.ansatzTemplate().replace(VARIABLE, parsed.variable());
+            String template = stage.instantiateVariable(parsed.variable());
             return Optional.of(new Instantiation(
                 ExactExpressionFormatter.format(parsed.term().expression(), parsed.term()),
-                template, stage.holeDomains()));
+                template, stage.domains()));
         }
     }
 
@@ -145,16 +156,15 @@ public final class ExactFinitePolynomialTraceLearner {
         List<CheckedTrace> traces = training.stream().map(trace -> check(trace, limits))
             .sorted(Comparator.comparing(CheckedTrace::root)).toList();
         Set<String> sourceIdentities = new HashSet<>();
-        long identityWork = 0;
+        FormationStates formation = new FormationStates();
         int stepCount = traces.getFirst().path().steps().size();
         for (CheckedTrace trace : traces) {
             if (trace.path().steps().size() != stepCount) {
                 throw new IllegalArgumentException("training paths have different step counts");
             }
             Parsed source = parse(trace.path().sourceExpression());
-            InputSignature signature = inputSignature(source);
-            identityWork = Math.addExact(identityWork, signature.workUnits());
-            if (!sourceIdentities.add(signature.identity())) {
+            formation.observe(source);
+            if (!sourceIdentities.add(source.projection().identity())) {
                 throw new IllegalArgumentException("duplicate, alpha-renamed or equivalent training input");
             }
         }
@@ -165,14 +175,16 @@ public final class ExactFinitePolynomialTraceLearner {
                 trace.path().steps().get(step).transition().sourceExpression())).toList();
             List<Parsed> outputs = traces.stream().map(trace -> parse(
                 trace.path().steps().get(step).transition().transformedExpression())).toList();
+            inputs.forEach(formation::observe);
+            outputs.forEach(formation::observe);
             for (int row = 0; row < inputs.size(); row++) {
                 if (!inputs.get(row).variable().equals(outputs.get(row).variable())) {
                     throw new IllegalArgumentException("step changes its variable identity");
                 }
             }
-            String inputShape = shape(inputs.getFirst(), inputs.getFirst().term().expression(), false);
+            String inputShape = shape(inputs.getFirst().term(), inputs.getFirst().term().expression(), false);
             if (inputs.stream().anyMatch(input -> !inputShape.equals(
-                    shape(input, input.term().expression(), false)))) {
+                    shape(input.term(), input.term().expression(), false)))) {
                 throw new IllegalArgumentException("training sources have different syntax shapes");
             }
             Generalization context = new Generalization(limits);
@@ -184,7 +196,7 @@ public final class ExactFinitePolynomialTraceLearner {
             stages.add(new Stage(inputShape, template, context.domains));
         }
         return new LearnedPlan(limits, stages, traces.stream().map(CheckedTrace::root).toList(),
-            sourceIdentities.stream().sorted().toList(), identityWork);
+            sourceIdentities.stream().sorted().toList(), formation);
     }
 
     private static CheckedTrace check(TrainingTrace trace, Limits limits) {
@@ -227,7 +239,7 @@ public final class ExactFinitePolynomialTraceLearner {
         Expr first = nodes.getFirst();
         if (nodes.stream().allMatch(node -> node instanceof NumberExpr)) {
             List<BigInteger> values = new ArrayList<>();
-            for (int i = 0; i < nodes.size(); i++) { values.add(integer(rows.get(i), (NumberExpr) nodes.get(i))); }
+            for (int i = 0; i < nodes.size(); i++) { values.add(integer(rows.get(i).term(), (NumberExpr) nodes.get(i))); }
             if (values.stream().distinct().count() == 1) { return values.getFirst().toString(); }
             if (exponent) { throw new IllegalArgumentException("varying exponent is not a coefficient hole"); }
             return "${" + context.hole(values) + "}";
@@ -284,81 +296,81 @@ public final class ExactFinitePolynomialTraceLearner {
         Set<String> variables = new HashSet<>();
         validate(term.expression(), term, variables, new int[1]);
         if (variables.size() != 1) { throw new IllegalArgumentException("exactly one variable is required"); }
-        return new Parsed(term, variables.iterator().next());
+        return new Parsed(term, variables.iterator().next(), ExactFinitePolynomialInput.analyze(term));
     }
 
     private static void validate(Expr node, ExactParsedTerm term, Set<String> variables, int[] visits) {
-        if (++visits[0] > MAX_AST_NODES) { throw new IllegalArgumentException("trace learner AST limit"); }
+        if (++visits[0] > MAX_AST_NODES) { throw new UnsupportedTraceSyntax("trace learner AST limit"); }
         if (node instanceof NumberExpr number) {
-            integer(new Parsed(term, ""), number);
+            integer(term, number);
         } else if (node instanceof VariableExpr variable) {
             variables.add(variable.name());
         } else if (node instanceof BinaryExpr binary && binary.operator() != BinaryOperator.DIV) {
             if (binary.operator() == BinaryOperator.POW) {
-                if (!(binary.right() instanceof NumberExpr power)) { throw new IllegalArgumentException("literal exponent required"); }
-                BigInteger value = integer(new Parsed(term, ""), power);
+                if (!(binary.right() instanceof NumberExpr power)) { throw new UnsupportedTraceSyntax("literal exponent required"); }
+                BigInteger value = integer(term, power);
                 if (value.signum() < 0 || value.compareTo(BigInteger.valueOf(32)) > 0) {
-                    throw new IllegalArgumentException("unsupported exponent");
+                    throw new UnsupportedTraceSyntax("unsupported exponent");
                 }
             }
             validate(binary.left(), term, variables, visits);
             validate(binary.right(), term, variables, visits);
-        } else { throw new IllegalArgumentException("unsupported polynomial syntax in trace learner"); }
+        } else { throw new UnsupportedTraceSyntax("unsupported polynomial syntax in trace learner"); }
     }
 
-    private static BigInteger integer(Parsed parsed, NumberExpr number) {
+    private static BigInteger integer(ExactParsedTerm term, NumberExpr number) {
         // ExactParsedTerm validates every literal. Only its synthetic unary-minus
         // zero may lack literal evidence; no caller-supplied AST is accepted here.
-        ExactRational value = parsed.term().literalFor(number)
+        ExactRational value = term.literalFor(number)
             .map(ExactParsedTerm.LiteralOccurrence::exactValue).orElse(ExactRational.ZERO);
         if (!value.isInteger() || value.numerator().bitLength() > 512) {
-            throw new IllegalArgumentException("bounded integer coefficients required");
+            throw new UnsupportedTraceSyntax("bounded integer coefficients required");
         }
         return value.numerator();
     }
 
-    private static String shape(Parsed row, Expr node, boolean exponent) {
+    private static String shape(ExactParsedTerm term, Expr node, boolean exponent) {
         if (node instanceof NumberExpr number) {
-            return exponent ? integer(row, number).toString() : "#";
+            return exponent ? integer(term, number).toString() : "#";
         }
         if (node instanceof VariableExpr) { return VARIABLE; }
         BinaryExpr binary = (BinaryExpr) node;
-        return "(" + shape(row, binary.left(), false) + " " + binary.operator().symbol()
-            + " " + shape(row, binary.right(), binary.operator() == BinaryOperator.POW) + ")";
+        return "(" + shape(term, binary.left(), false) + " " + binary.operator().symbol()
+            + " " + shape(term, binary.right(), binary.operator() == BinaryOperator.POW) + ")";
     }
 
-    /** Variable-blind exact coefficients: syntax variants cannot inflate TRAIN support. */
-    private static InputSignature inputSignature(Parsed parsed) {
-        var analysis = new ExactParsedUnivariatePolynomialView(IDENTITY_BUDGET).analyze(parsed.term());
-        if (!analysis.supported()) {
-            throw new IllegalArgumentException("training identity " + analysis.status()
-                + ": " + analysis.detailCode());
+    static FinitePolynomialTemplate.ShapeCheck checkSourceShape(String expected, ExactParsedTerm term) {
+        int[] visits = new int[1];
+        Set<String> variables = new HashSet<>();
+        try {
+            validate(term.expression(), term, variables, visits);
+        } catch (UnsupportedTraceSyntax mismatch) {
+            return new FinitePolynomialTemplate.ShapeCheck(false, visits[0]);
         }
-        var polynomial = analysis.polynomial().orElseThrow();
-        String canonical = new JsonWriter().beginObject()
-            .property("schema", "regelsuche.trace-input-polynomial/v1")
-            .property("domain", polynomial.ring().coefficientDomain().id())
-            .array("terms", writer -> polynomial.terms().entrySet().stream()
-                .sorted(Comparator.comparingInt(entry -> entry.getKey().exponent(0)))
-                .forEach(entry -> writer.objectValue(term -> term
-                    .property("exponent", entry.getKey().exponent(0))
-                    .property("coefficient", entry.getValue().canonicalText()))))
-            .endObject().toString();
-        return new InputSignature(SchematicProofPlan.hash(canonical), analysis.work().totalWorkUnits());
+        if (variables.size() != 1) {
+            return new FinitePolynomialTemplate.ShapeCheck(false, visits[0]);
+        }
+        return new FinitePolynomialTemplate.ShapeCheck(
+            expected.equals(shape(term, term.expression(), false)), 2L * visits[0]);
     }
 
     private static String render(Limits limits, List<Stage> stages, List<String> roots,
-                                 List<String> inputIdentities, long identityWork) {
+                                 List<String> inputIdentities, List<String> formationIdentities,
+                                 int formationObservations, long identityWork) {
         return new JsonWriter().beginObject().property("schema", REVISION)
             .property("authority", "NON_EXECUTABLE_REQUIRES_FRESH_VERIFICATION")
             .property("resolverRevision", ExactFinitePolynomialPlanResolver.REVISION_HASH)
             .property("verifierRevision", ExactFinitePolynomialPlanCandidateEvidenceVerifier.REVISION_HASH)
             .property("sourceRevision", VerifiedFinitePolynomialCandidateSource.REVISION_HASH)
             .property("programRevision", BudgetedRewriteProgramExecution.REVISION)
+            .property("templateContractRevision", FinitePolynomialTemplate.REVISION)
+            .property("inputIdentityRevision", ExactFinitePolynomialInput.REVISION)
             .property("identityViewRevision", ExactParsedUnivariatePolynomialView.VIEW_ID)
-            .property("identityViewBudget", IDENTITY_BUDGET.canonicalMaterial())
+            .property("identityViewBudget", ExactFinitePolynomialInput.BUDGET.canonicalMaterial())
             .property("trainingIdentityWorkUnits", identityWork)
             .stringArray("trainingInputIdentities", inputIdentities)
+            .stringArray("formationStateIdentities", formationIdentities)
+            .property("formationStateObservations", formationObservations)
             .object("limits", w -> w.property("minimumTraces", limits.minimumTraces())
                 .property("maximumTraces", limits.maximumTraces()).property("maximumSteps", limits.maximumSteps())
                 .property("maximumHoles", limits.maximumHoles()).property("minimumCoefficient", limits.minimumCoefficient())
@@ -371,7 +383,22 @@ public final class ExactFinitePolynomialTraceLearner {
             .endObject().toString();
     }
 
-    private record InputSignature(String identity, long workUnits) {}
-    private record Parsed(ExactParsedTerm term, String variable) {}
+    private static final class FormationStates {
+        private final Set<String> identities = new HashSet<>();
+        private long work;
+        private int observations;
+        private void observe(Parsed parsed) {
+            identities.add(parsed.projection().identity());
+            work = Math.addExact(work, parsed.projection().workUnits());
+            observations++;
+        }
+    }
+
+    private static final class UnsupportedTraceSyntax extends IllegalArgumentException {
+        private static final long serialVersionUID = 1L;
+        private UnsupportedTraceSyntax(String message) { super(message); }
+    }
+
+    private record Parsed(ExactParsedTerm term, String variable, ExactFinitePolynomialInput.Projection projection) {}
     private record CheckedTrace(ExactTheoryPath path, String root) {}
 }
