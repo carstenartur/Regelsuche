@@ -6,21 +6,17 @@ Ein vom endlichen Polynomsolver bestätigter Kandidat ist keine Folge gewöhnlic
 AST-Regelanwendungen. Seine Ausführung darf deshalb weder eine erfundene Liste
 primitiver Regeln erhalten noch als kostenlose Makrokante in die Suche gelangen.
 
-Die Ausführung ist in klar getrennte Grenzen zerlegt:
-
 ```text
 verifier-gebundene Evidence
   -> BudgetedTransformationSource
   -> BudgetedTransformationSourceExecutor
   -> RewriteProgram.BudgetedSource
-  -> explizit budgetierter top-level Interpreter-Einstieg
+  -> explizit budgetierter Interpreter-Einstieg
 ```
 
-## Typisierter Programmknoten
+## Ein einzelner Source-Knoten
 
-`RewriteProgram.BudgetedSource` bindet `NodeMetadata` und genau eine
-`BudgetedTransformationSource`. Version 1 ist ausschließlich über diesen
-Einstieg ausführbar:
+Der bestehende isolierte Einstieg lautet:
 
 ```java
 interpreter.executeBudgetedSource(
@@ -30,89 +26,63 @@ interpreter.executeBudgetedSource(
 );
 ```
 
-Der Aufrufer muss die mathematische Arbeitsautorität explizit angeben. Es gibt
-keinen unbegrenzten Standardwert.
+Er akzeptiert einen einzelnen `RewriteProgram.BudgetedSource`, keine
+Kompositionsknoten. Der Aufrufer gibt die mathematische Arbeitsautorität
+explizit an. Es gibt keinen unbegrenzten Standardwert.
 
-## Eigenständiges Ergebnis
+`BudgetedTransformationSourceProgramExecution` bewahrt die vollständige
+Source-Ausführung, Node-Metadaten und Quellposition, Theorie-, Evidence- und
+Anwendungsidentitäten, Annahmen sowie die mathematische Arbeit jedes Kandidaten.
+Der Kandidat besitzt null primitive Rewrite-Schritte und genau einen exakten
+Theorieschritt. Das Ergebnis unterscheidet `CANDIDATES`, `NO_MATCH` und
+`BUDGET_INCONCLUSIVE` und besitzt eine kanonische Ausführungsidentität.
 
-`BudgetedTransformationSourceProgramExecution` bewahrt:
+Die mechanische Arbeitsbilanz zählt Interpreter-Aufruf, Knotenbesuch,
+Executor-Delegation, Projektion jedes Kandidaten und die vollständige delegierte
+Executor-Mechanik. Die mathematische Arbeit verbleibt separat auf jedem
+`ExactTheoryTransition`.
 
-- die vollständige Ausführung des budgetierten Source-Executors;
-- den Programmknoten und dessen Quellposition;
-- unveränderte Theorie-, Evidence- und Anwendungsidentitäten;
-- die Annahmen und mathematische Arbeit jedes Kandidaten;
-- null primitive Rewrite-Schritte und genau einen exakten Theorieschritt;
-- getrennte delegierte Source- und zusätzliche Programmechanik;
-- `CANDIDATES`, `NO_MATCH` und `BUDGET_INCONCLUSIVE` ohne Zustandskollaps;
-- eine kanonische, content-addressed Ausführungsidentität.
+## Komposition unter expliziter Pfadautorität
 
-Das Ergebnis bietet absichtlich keine Konvertierung zu `Transformation` oder
-`RewriteExecution`.
+Für `Choice`, `FirstApplicable`, `Sequence`, `Repeat` und `Prune` existiert der
+separate Einstieg `RewriteProgramInterpreter.executeBudgeted` mit zwei
+mathematischen Budgetdimensionen und expliziten Explorationsgrenzen. Er
+verwendet denselben Source-Executor und liefert typisierte exakte Theoriepfade,
+keine gewöhnlichen Transformationen.
 
-## Fail-closed unbudgetierte Grenze
+[Budgettreue Komposition](budgeted-rewrite-program-composition.md) beschreibt
+Preflight, vollständige Programmidentität, Restbudgetpropagation, die vier
+vollständig/unvollständig × mit/ohne Kandidaten-Zustände und die getrennten
+mechanischen Arbeitszähler. Dieser Entwicklungsschritt gehört nicht rückwirkend
+zum isolierten Einstieg des Releases 0.4.0.
 
-Der gewöhnliche Interpreter-Einstieg
+## Unbudgetierte Grenze
 
-```java
-interpreter.execute(program, expression)
-```
+Der gewöhnliche Aufruf `interpreter.execute(program, expression)` prüft weiterhin
+den vollständigen Programmbaum. Enthält dieser irgendwo einen `BudgetedSource`,
+wird er abgewiesen, bevor eine gewöhnliche `TransformationEngine` oder eine
+budgetierte Source ausgeführt wird. `ProgrammedTransformationEngine` bleibt
+auf gewöhnliche Transformationen beschränkt.
 
-prüft den vollständigen Programmbaum rein strukturell vor. Enthält er irgendwo
-einen `BudgetedSource`, wird er abgelehnt, bevor eine gewöhnliche
-`TransformationEngine` oder die budgetierte Source aufgerufen wird.
+Weder der isolierte noch der komponierte Einstieg konvertiert das Ergebnis zu
+`Transformation` oder `RewriteExecution`. Die Source-Protokollprüfung allein
+beweist keine mathematische Wahrheit; konkrete Adapter müssen ihre Autorität an
+unabhängig überprüfte Evidenz binden.
 
-Dadurch werden verhindert:
-
-- ein implizit unbegrenztes mathematisches Budget;
-- Budget-Reset in verschachtelten Knoten;
-- partielle Seiteneffekte vor später Ablehnung;
-- die Umdeutung eines exakten Theorieschritts in eine primitive Makrokante.
-
-`ProgrammedTransformationEngine` bleibt damit vorerst der gewöhnlichen
-Transformationsebene vorbehalten.
-
-## Getrennte Arbeit
-
-Die Programmechanik zählt:
-
-```text
-Interpreter-Aufruf
-+ besuchter top-level Programmknoten
-+ Delegation an den budgetierten Executor
-+ Projektion jedes exakten Theoriekandidaten
-+ vollständige delegierte Executor-Mechanik
-= totalMechanicalWorkUnits
-```
-
-Die mathematische Arbeit verbleibt auf jedem `ExactTheoryTransition` und wird
-nicht in diese mechanische Summe eingerechnet.
-
-## Claim-Grenze
-
-Diese Stufe etabliert isolierte top-level Ausführung eines verifizierten exakten
-Theorieschritts. Sie etabliert noch nicht:
-
-- Budgetpropagation durch `Choice`, `FirstApplicable`, `Sequence` oder `Repeat`;
-- gewöhnliche Search-Frontier-Integration;
-- primitive Rewrite-Provenienz;
-- formale Proof-Evidence;
-- gelernte Programmautorisierung;
-- Promotion oder mathematische Neuheit.
-
-Der nächste Slice muss mathematische Pfadautorität durch Kompositionsknoten
-tragen. Alternativen erhalten dasselbe eingehende Budget; Fortsetzungen und
-Wiederholungen nur den nach der konkreten Präfixarbeit verbleibenden Rest.
-Mechanische Explorationsarbeit bleibt separat.
-
-## Reproduktion
+## Reproduktion und verbleibende Grenze
 
 ```bash
 ./gradlew :regelsuche-search:test \
   --tests '*BudgetedTransformationSourceExecutorTest' \
-  --tests '*BudgetedTransformationSourceRewriteProgramTest'
+  --tests '*BudgetedTransformationSourceRewriteProgramTest' \
+  --tests '*BudgetedRewriteProgramCompositionTest'
 
 ./gradlew :regelsuche-learning:test \
   --tests '*VerifiedFinitePolynomialCandidateSourceTest'
 
 ./gradlew --no-configuration-cache ciCheck
 ```
+
+Gewöhnliche Search-Frontier-Integration, gemischte primitive/Theorie-Pfade,
+gelernte Programmautorisierung, formale Proof-Evidence, Promotion und
+mathematische Neuheit bleiben eigenständige offene Aufgaben.

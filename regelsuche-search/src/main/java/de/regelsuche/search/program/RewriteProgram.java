@@ -42,10 +42,10 @@ public sealed interface RewriteProgram permits
     /**
      * Explicitly budgeted exact-theory source.
      *
-     * <p>Version 1 is executable only as the top-level argument of
-     * {@link RewriteProgramInterpreter#executeBudgetedSource}. Ordinary
-     * unbudgeted interpretation and composition reject this node before any
-     * source is invoked.</p>
+     * <p>Use {@link RewriteProgramInterpreter#executeBudgetedSource} for one
+     * source or {@link RewriteProgramInterpreter#executeBudgeted} for typed
+     * composition. Ordinary unbudgeted interpretation rejects this node
+     * before any source is invoked.</p>
      */
     record BudgetedSource(
         NodeMetadata metadata,

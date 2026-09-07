@@ -50,6 +50,8 @@ public class ExpressionParser {
 
     /**
      * Parses one term through the allocation-minimal legacy AST path.
+     * Numerals that cannot round-trip through the current numeric leaf are
+     * rejected instead of silently rounded. This does not make arithmetic exact.
      * Exact source certificates and node ranges are created only by
      * {@link #parseExactTerm}.
      */
@@ -244,7 +246,7 @@ public class ExpressionParser {
         String sourceLexeme = cursor.slice(start, end);
         if (!cursor.retainsExactLiterals()) {
             return cursor.retainRange(
-                new NumberExpr(parseFiniteLegacyValue(sourceLexeme, start)),
+                new NumberExpr(parseRoundTrippingLegacyValue(sourceLexeme, start)),
                 start,
                 end);
         }
@@ -276,6 +278,29 @@ public class ExpressionParser {
             sourceLexeme,
             evidence);
         return number;
+    }
+
+    /**
+     * Until numeric AST values are exact, ordinary parsing must not silently
+     * change the decimal value of a source token. The exact entry point keeps
+     * its independent source certificate and does not use this admission gate.
+     */
+    private static double parseRoundTrippingLegacyValue(
+        String sourceLexeme,
+        int start
+    ) {
+        double value = parseFiniteLegacyValue(sourceLexeme, start);
+        // Every unsigned integer of at most 15 digits round-trips unchanged.
+        if (sourceLexeme.length() <= 15 && sourceLexeme.indexOf('.') < 0) {
+            return value;
+        }
+        if (new java.math.BigDecimal(sourceLexeme).compareTo(
+                java.math.BigDecimal.valueOf(value)) != 0) {
+            throw new IllegalArgumentException(
+                "Numeric literal would lose precision in the ordinary AST at "
+                    + "position " + start + "; use the exact parsing path");
+        }
+        return value;
     }
 
     private static double parseFiniteLegacyValue(

@@ -14,7 +14,7 @@ import java.util.Objects;
  *
  * <p>The ordinary interpreter composes primitive or proof-expandable
  * {@link Transformation} instances. Exact-theory sources use a separate,
- * explicitly budgeted top-level entry and are never converted into ordinary
+ * explicitly budgeted entries and are never converted into ordinary
  * transformations by this class.</p>
  */
 public final class RewriteProgramInterpreter {
@@ -84,6 +84,20 @@ public final class RewriteProgramInterpreter {
         return BudgetedTransformationSourceProgramExecution.create(
             program,
             execution);
+    }
+
+    /**
+     * Executes the frozen exact-theory-only composition lane under explicit
+     * path authority and exploration ceilings. No ordinary rewrite is emitted.
+     */
+    public BudgetedRewriteProgramExecution executeBudgeted(
+        RewriteProgram program,
+        String expression,
+        BudgetedRewriteProgramExecution.PathBudget budget,
+        BudgetedRewriteProgramExecution.ExplorationLimits limits
+    ) {
+        return new BudgetedRewriteProgramEvaluator(budgetedSourceExecutor)
+            .execute(program, expression, budget, limits);
     }
 
     private Evaluation evaluate(
@@ -411,7 +425,7 @@ public final class RewriteProgramInterpreter {
             case RewriteProgram.BudgetedSource ignored ->
                 throw new IllegalArgumentException(
                     "budgeted exact-theory sources require "
-                        + "executeBudgetedSource and cannot be composed yet");
+                        + "executeBudgetedSource or executeBudgeted with explicit budgets");
             case RewriteProgram.Choice choice ->
                 choice.alternatives().forEach(
                     RewriteProgramInterpreter::rejectBudgetedSources);

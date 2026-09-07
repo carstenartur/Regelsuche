@@ -231,9 +231,3 @@ Verträge und Gates.
   aus dem Checkout erzeugter Qualitäts- und Benchmarkbericht (nicht ins
   Repository eingecheckt; wird von `./gradlew benchmarkReport` erzeugt und als
   CI-Artefakt bereitgestellt).
-
-## Historische Dokumentation
-
-[README.legacy.md](README.legacy.md) bewahrt die frühere Langfassung des
-Top-Level-README für historische Detailrecherche. Sie ist keine aktuelle
-Einstiegs- oder Vertragsseite.

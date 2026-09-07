@@ -112,6 +112,199 @@ class ExpressionCanonicalizerTest {
     }
 
     @Test
+    void nonPolynomialDecimalCoefficientsNeverNarrowToIntegers() {
+        assertEquals("0.5 * sin(x)", canonicalizer.canonicalize("0.5*sin(x)"));
+        assertEquals("sin(x)", canonicalizer.canonicalize("0.5*sin(x) + 0.5*sin(x)"));
+        assertEquals("2 * sin(x)", canonicalizer.canonicalize("1.5*sin(x) + 0.5*sin(x)"));
+
+        assertNotEquals(canonicalizer.stableHash("0.5*sin(x)"), canonicalizer.stableHash("0"));
+        assertNotEquals(canonicalizer.stableHash("1.5*sin(x)"), canonicalizer.stableHash("sin(x)"));
+        assertNotEquals(
+            canonicalizer.stableHash("2147483648*sin(x)"),
+            canonicalizer.stableHash("2147483647*sin(x)"));
+    }
+
+    @Test
+    void assumptionFreeZeroProductsDoNotEraseUndefinedFactors() {
+        String undefined = "0*(1/0)";
+        String nested = "2 + 0*(1/0)";
+
+        assertNotEquals(canonicalizer.stableHash(undefined), canonicalizer.stableHash("0"));
+        assertNotEquals(canonicalizer.stableHash(nested), canonicalizer.stableHash("2"));
+        assertEquals(
+            canonicalizer.canonicalize(undefined),
+            canonicalizer.canonicalize(canonicalizer.canonicalize(undefined)));
+
+        AssumptionContext context = new AssumptionContext();
+        assertEquals("0", canonicalizer.canonicalizeWith("0*(x/x)", context));
+        assertTrue(context.snapshot().stream().anyMatch(
+            assumption -> assumption.kind() == Assumption.Kind.NON_ZERO));
+    }
+
+    @Test
+    void assumptionFreeCancellationDoesNotErasePartialTerms() {
+        for (String source : List.of(
+                "x/x - x/x",
+                "1/0 - 1/0",
+                "1/(x + 1) - 1/(x + 1)",
+                "x^(-1) - x^(-1)",
+                "x^0.5 - x^0.5",
+                "log(x) - log(x)",
+                "sqrt(x) - sqrt(x)",
+                "tan(x) - tan(x)",
+                "f(x) - f(x)")) {
+            String canonical = canonicalizer.canonicalize(source);
+            assertNotEquals(
+                canonicalizer.stableHash(source),
+                canonicalizer.stableHash("0"),
+                "partial or unknown expression must not become total 0: " + source);
+            assertEquals(
+                canonical,
+                canonicalizer.canonicalize(canonical),
+                "guarded fallback must be a canonical fixpoint: " + source);
+        }
+    }
+
+    @Test
+    void definednessPreservingCoefficientReductionRemainsAvailable() {
+        assertEquals("0", canonicalizer.canonicalize("x - x"));
+        assertEquals("0", canonicalizer.canonicalize("sin(x) - sin(x)"));
+        assertEquals("0", canonicalizer.canonicalize("cos(x) - cos(x)"));
+        assertEquals("0", canonicalizer.canonicalize("exp(x) - exp(x)"));
+        assertEquals("0", canonicalizer.canonicalize("abs(x) - abs(x)"));
+        assertEquals(
+            canonicalizer.canonicalize("1/x"),
+            canonicalizer.canonicalize("2*(1/x) - 1/x"));
+    }
+
+    @Test
+    void assumptionAwareCancellationRecordsRequiredDefinednessGuards() {
+        AssumptionContext quotientContext = new AssumptionContext();
+        assertEquals(
+            "0",
+            canonicalizer.canonicalizeWith(
+                "1/(x + 1) - 1/(x + 1)",
+                quotientContext));
+        assertTrue(quotientContext.snapshot().stream().anyMatch(
+            assumption -> assumption.kind() == Assumption.Kind.NON_ZERO
+                && assumption.expression().equals("x + 1 != 0")));
+
+        AssumptionContext inverseContext = new AssumptionContext();
+        assertEquals(
+            "0",
+            canonicalizer.canonicalizeWith(
+                "x^(-1) - x^(-1)",
+                inverseContext));
+        assertTrue(inverseContext.snapshot().stream().anyMatch(
+            assumption -> assumption.kind() == Assumption.Kind.NON_ZERO
+                && assumption.expression().equals("x != 0")));
+
+        AssumptionContext logContext = new AssumptionContext();
+        assertEquals(
+            "0",
+            canonicalizer.canonicalizeWith(
+                "log(x) - log(x)",
+                logContext));
+        assertTrue(logContext.snapshot().stream().anyMatch(
+            assumption -> assumption.kind() == Assumption.Kind.POSITIVE
+                && assumption.expression().equals("x > 0")));
+
+        AssumptionContext sqrtContext = new AssumptionContext();
+        assertEquals(
+            "0",
+            canonicalizer.canonicalizeWith(
+                "sqrt(x) - sqrt(x)",
+                sqrtContext));
+        assertTrue(sqrtContext.snapshot().stream().anyMatch(
+            assumption -> assumption.kind() == Assumption.Kind.NON_NEGATIVE
+                && assumption.expression().equals("x >= 0")));
+
+        AssumptionContext tanContext = new AssumptionContext();
+        assertEquals(
+            "0",
+            canonicalizer.canonicalizeWith(
+                "tan(x) - tan(x)",
+                tanContext));
+        assertTrue(tanContext.snapshot().stream().anyMatch(
+            assumption -> assumption.kind() == Assumption.Kind.NON_ZERO
+                && assumption.expression().equals("cos(x) != 0")));
+    }
+
+    @Test
+    void zeroPowersRequireDefinedNonZeroBases() {
+        String undefined = "(1/0)^0";
+        String conditional = "(1/x)^0";
+
+        assertNotEquals(
+            canonicalizer.stableHash(undefined),
+            canonicalizer.stableHash("1"));
+        assertNotEquals(
+            canonicalizer.stableHash(conditional),
+            canonicalizer.stableHash("1"));
+        assertNotEquals(
+            canonicalizer.stableHash("x^0"),
+            canonicalizer.stableHash("1"));
+        assertNotEquals(
+            canonicalizer.stableHash("0^0"),
+            canonicalizer.stableHash("1"));
+        assertNotEquals(
+            canonicalizer.stableHash("x^0 + y"),
+            canonicalizer.stableHash("1 + y"));
+        assertNotEquals(
+            canonicalizer.stableHash("2*x^0"),
+            canonicalizer.stableHash("2"));
+        assertEquals("1", canonicalizer.canonicalize("2^0"));
+
+        AssumptionContext variableContext = new AssumptionContext();
+        assertEquals("1", canonicalizer.canonicalizeWith("x^0", variableContext));
+        assertTrue(variableContext.snapshot().stream().anyMatch(
+            assumption -> assumption.kind() == Assumption.Kind.NON_ZERO
+                && assumption.expression().equals("x != 0")));
+
+        AssumptionContext conditionalContext = new AssumptionContext();
+        assertEquals("1", canonicalizer.canonicalizeWith(conditional, conditionalContext));
+        assertTrue(conditionalContext.snapshot().stream().anyMatch(
+            assumption -> assumption.kind() == Assumption.Kind.NON_ZERO
+                && assumption.expression().equals("x != 0")));
+    }
+
+    @Test
+    void unrepresentableExactCoefficientSumFallsBackWithoutRounding() {
+        String source = "sin(x) + 0.00000000000000001*sin(x)";
+        String canonical = canonicalizer.canonicalize(source);
+
+        assertNotEquals(canonicalizer.stableHash(source), canonicalizer.stableHash("sin(x)"));
+        assertEquals(canonical, canonicalizer.canonicalize(canonical));
+    }
+
+    @Test
+    void fractionalPowersAreNeverNarrowedWhenProductsAreCollected() {
+        for (String exponent : List.of("0.5", "1.5")) {
+            String source = "sin(x)^" + exponent + " * sin(x)^" + exponent;
+            String canonical = canonicalizer.canonicalize(source);
+            assertEquals(canonical, canonicalizer.canonicalize(canonical));
+            assertNotEquals(canonicalizer.stableHash(source), canonicalizer.stableHash("1"));
+            assertNotEquals(canonicalizer.stableHash(source), canonicalizer.stableHash("sin(x)^2"));
+        }
+    }
+
+    @Test
+    void exactPolynomialCoefficientDoesNotRoundBackIntoLegacyAst() {
+        String source = "0.123456789012345 * 0.123456789012345 * x";
+        double rounded = 0.123456789012345d * 0.123456789012345d;
+        String roundedExpression = Double.toString(rounded) + " * x";
+
+        assertTrue(new PolynomialNormalizer()
+            .normalize(parser.parseTerm(source)).isEmpty(),
+            "unrepresentable exact coefficient must make normalization decline");
+        assertNotEquals(canonicalizer.stableHash(source), canonicalizer.stableHash(roundedExpression));
+        String canonical = canonicalizer.canonicalize(source);
+        assertEquals(canonical, canonicalizer.canonicalize(canonical));
+
+        assertEquals("0.02 * x", canonicalizer.canonicalize("0.1 * 0.2 * x"));
+    }
+
+    @Test
     void polynomialSortedByDescendingDegree() {
         // monomials must appear high-degree first (mathematical normal form)
         assertEquals("x ^ 2 + 2 * x + 1", canonicalizer.canonicalize("1 + 2*x + x^2"));
