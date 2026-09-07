@@ -49,14 +49,40 @@ final class IndependentOriginalDomainIrreducibility {
     ) {
         String requestHash = PolynomialEvidence.sha256(
             request.canonicalMaterial());
+        return verifyPolynomial(
+            request.source(),
+            requestHash,
+            request.structuralLimits().maxCoefficientBitLength(),
+            maxWorkUnits);
+    }
+
+    static <C> Result verifyFactor(
+        FactorizationRequest<?> authorityRequest,
+        SparsePolynomial<C> factor,
+        long maxWorkUnits
+    ) {
+        return verifyPolynomial(
+            factor,
+            PolynomialEvidence.sha256(
+                authorityRequest.canonicalMaterial()),
+            authorityRequest.structuralLimits()
+                .maxCoefficientBitLength(),
+            maxWorkUnits);
+    }
+
+    private static <C> Result verifyPolynomial(
+        SparsePolynomial<C> source,
+        String requestHash,
+        int requestCoefficientLimit,
+        long maxWorkUnits
+    ) {
         String sourceHash = PolynomialEvidence.sha256(
-            request.source().canonicalMaterial());
+            source.canonicalMaterial());
         WorkBudget work = new WorkBudget(maxWorkUnits);
         ArrayList<PrimeAttempt> attempts = new ArrayList<>();
         List<BigInteger> normalized = List.of();
         int degree = -1;
         try {
-            SparsePolynomial<C> source = request.source();
             if (source.ring().variableCount() != 1
                     || source.isConstant()) {
                 return result(
@@ -99,7 +125,10 @@ final class IndependentOriginalDomainIrreducibility {
                     work.ledger());
             }
 
-            normalized = normalize(request, work);
+            normalized = normalize(
+                source,
+                requestCoefficientLimit,
+                work);
             degree = normalized.size() - 1;
             if (degree == 1) {
                 return result(
@@ -213,12 +242,12 @@ final class IndependentOriginalDomainIrreducibility {
     }
 
     private static <C> List<BigInteger> normalize(
-        FactorizationRequest<C> request,
+        SparsePolynomial<C> source,
+        int requestCoefficientLimit,
         WorkBudget work
     ) {
-        SparsePolynomial<C> source = request.source();
         int coefficientLimit = Math.min(
-            request.structuralLimits().maxCoefficientBitLength(),
+            requestCoefficientLimit,
             MAX_NORMALIZED_COEFFICIENT_BITS);
         BigInteger[] integers = new BigInteger[source.degree(0) + 1];
         Arrays.fill(integers, BigInteger.ZERO);

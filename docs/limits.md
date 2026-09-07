@@ -192,8 +192,8 @@ eine vollständige Backend-Zerlegung oder einen fail-closed Ausgang.
 
 Weiterhin offen oder bewusst begrenzt sind:
 
-- unabhängige Irreduzibilitätszertifikate für jeden ausgegebenen Faktor und
-  damit verifier-autorisierte Vollständigkeit der Zerlegung;
+- die entscheidungsvollständige Zertifizierung von Faktoren, für die das
+  feste unabhängige Primzahlenpräfix keinen modularen Zeugen liefert;
 - spätere LLL-/van-Hoeij-Rekombination für Fälle mit vielen modularen
   Faktoren;
 - breitere Grade, Faktorgradpartitionen und Koeffizientengrößen unter jeweils
@@ -219,7 +219,10 @@ ist. Insbesondere gilt:
 - `NO_CANDIDATE` allein ist kein Irreduzibilitätsbeweis; nur der getrennte,
   request-gebundene Originaldomänen-Prüfer darf daraus bei einem eigenen
   gradtreuen modularen Zeugen `IRREDUCIBLE` autorisieren;
-- ein Backend-Claim erfüllt keinen `INDEPENDENT_COMPLETE`-Request;
+- ein Backend-Claim erfüllt keinen `INDEPENDENT_COMPLETE`-Request; eine
+  vorgeschlagene vollständige Zerlegung benötigt zusätzlich Rest-Eins und
+  einen unabhängigen Nachweis für jeden unterschiedlichen nichtkonstanten
+  Faktor;
 - die Quartikengine autorisiert keinen Claim für andere Grade oder
   Faktorgradaufteilungen;
 - die allgemeine `Z[x]`-/`Q[x]`-Engine ist begrenzt; Budget- oder Policy-Misses
@@ -232,8 +235,12 @@ ist. Insbesondere gilt:
 Der unabhängige Originaldomänen-Prüfer ist zusätzlich auf Grad 256,
 normalisierte Zwischenkoeffizienten bis 16.384 Bit und die feste Primzahlenfolge
 bis 47 begrenzt. Eine gradverlierende oder reduzierbare Reduktion sowie ein
-erschöpftes Präfix bleiben inkonklusiv. Die unabhängige Vollständigkeit einer
-ausgegebenen Faktorzerlegung ist weiterhin nicht implementiert.
+erschöpftes Präfix bleiben inkonklusiv. Die Vollständigkeitskampagne verwendet
+dieselben Grenzen für jeden Faktor, beginnt erst nach exakter
+Produktrückprüfung und teilt das verbleibende Request-Budget. Nur Rest-Eins und
+ausschließlich zertifizierte Faktoren autorisieren
+`INDEPENDENTLY_CERTIFIED_COMPLETE`; jeder fehlende Faktorzeuge bleibt
+`BUDGET_INCONCLUSIVE`.
 
 Weiterführende Seiten:
 
