@@ -231,7 +231,7 @@ class ExpressionCanonicalizerTest {
     }
 
     @Test
-    void zeroPowersDoNotErasePartialBasesWithoutGuards() {
+    void zeroPowersRequireDefinedNonZeroBases() {
         String undefined = "(1/0)^0";
         String conditional = "(1/x)^0";
 
@@ -241,11 +241,29 @@ class ExpressionCanonicalizerTest {
         assertNotEquals(
             canonicalizer.stableHash(conditional),
             canonicalizer.stableHash("1"));
-        assertEquals("1", canonicalizer.canonicalize("x^0"));
+        assertNotEquals(
+            canonicalizer.stableHash("x^0"),
+            canonicalizer.stableHash("1"));
+        assertNotEquals(
+            canonicalizer.stableHash("0^0"),
+            canonicalizer.stableHash("1"));
+        assertNotEquals(
+            canonicalizer.stableHash("x^0 + y"),
+            canonicalizer.stableHash("1 + y"));
+        assertNotEquals(
+            canonicalizer.stableHash("2*x^0"),
+            canonicalizer.stableHash("2"));
+        assertEquals("1", canonicalizer.canonicalize("2^0"));
 
-        AssumptionContext context = new AssumptionContext();
-        assertEquals("1", canonicalizer.canonicalizeWith(conditional, context));
-        assertTrue(context.snapshot().stream().anyMatch(
+        AssumptionContext variableContext = new AssumptionContext();
+        assertEquals("1", canonicalizer.canonicalizeWith("x^0", variableContext));
+        assertTrue(variableContext.snapshot().stream().anyMatch(
+            assumption -> assumption.kind() == Assumption.Kind.NON_ZERO
+                && assumption.expression().equals("x != 0")));
+
+        AssumptionContext conditionalContext = new AssumptionContext();
+        assertEquals("1", canonicalizer.canonicalizeWith(conditional, conditionalContext));
+        assertTrue(conditionalContext.snapshot().stream().anyMatch(
             assumption -> assumption.kind() == Assumption.Kind.NON_ZERO
                 && assumption.expression().equals("x != 0")));
     }
