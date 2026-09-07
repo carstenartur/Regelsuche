@@ -114,8 +114,13 @@ public final class ExactFinitePolynomialTraceLearner {
         /**
          * Exact syntactic applicability only. Empty means a shape mismatch, not
          * mathematical impossibility. Unsupported syntax/limits throw explicitly.
+         * @param stageIndex zero-based index into {@link #stages()}
+         * @throws IllegalArgumentException if the stage index is outside the learned plan
          */
         public Optional<Instantiation> instantiate(int stageIndex, String expression) {
+            if (stageIndex < 0 || stageIndex >= stages.size()) {
+                throw new IllegalArgumentException("stageIndex must be in 0.." + (stages.size() - 1) + ": " + stageIndex);
+            }
             Stage stage = stages.get(stageIndex);
             Parsed parsed = parse(expression);
             if (stageIndex == 0 && trainingInputIdentities.contains(inputSignature(parsed).identity())) {
@@ -267,12 +272,12 @@ public final class ExactFinitePolynomialTraceLearner {
     private static Parsed parse(String expression) {
         Objects.requireNonNull(expression, "expression");
         if (expression.isBlank() || expression.length() > MAX_EXPRESSION_CHARS) {
-            throw new IllegalArgumentException("training expression length limit");
+            throw new IllegalArgumentException("trace learner expression length limit");
         }
         int structural = 0;
         for (int i = 0; i < expression.length(); i++) {
             if ("+-*/^(),".indexOf(expression.charAt(i)) >= 0 && ++structural > MAX_STRUCTURAL_TOKENS) {
-                throw new IllegalArgumentException("training expression structural limit");
+                throw new IllegalArgumentException("trace learner expression structural limit");
             }
         }
         ExactParsedTerm term = new ExpressionParser().parseExactTerm(expression);
@@ -283,7 +288,7 @@ public final class ExactFinitePolynomialTraceLearner {
     }
 
     private static void validate(Expr node, ExactParsedTerm term, Set<String> variables, int[] visits) {
-        if (++visits[0] > MAX_AST_NODES) { throw new IllegalArgumentException("training AST limit"); }
+        if (++visits[0] > MAX_AST_NODES) { throw new IllegalArgumentException("trace learner AST limit"); }
         if (node instanceof NumberExpr number) {
             integer(new Parsed(term, ""), number);
         } else if (node instanceof VariableExpr variable) {

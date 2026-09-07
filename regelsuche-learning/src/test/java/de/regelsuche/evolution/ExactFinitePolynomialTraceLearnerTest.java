@@ -169,7 +169,22 @@ class ExactFinitePolynomialTraceLearnerTest {
         assertThrows(IllegalArgumentException.class, () -> plan.instantiate(0, "x/2"));
         assertThrows(IllegalArgumentException.class, () -> plan.instantiate(0, "sin(x)"));
         assertThrows(IllegalArgumentException.class, () -> plan.instantiate(0, "x+0.5"));
-        assertThrows(IllegalArgumentException.class, () -> plan.instantiate(0, "x" + "+1".repeat(200)));
+        assertEquals("trace learner expression structural limit", assertThrows(IllegalArgumentException.class,
+            () -> plan.instantiate(0, "x" + "+1".repeat(200))).getMessage());
+        assertEquals("trace learner expression length limit", assertThrows(IllegalArgumentException.class,
+            () -> plan.instantiate(0, "x" + " ".repeat(16_384))).getMessage());
+        assertEquals("trace learner AST limit", assertThrows(IllegalArgumentException.class,
+            () -> plan.instantiate(0, "x" + "+1".repeat(128))).getMessage());
+    }
+
+    @Test
+    void rejectsStageIndicesOutsideTheFrozenPlanWithTheirValidRange() {
+        LearnedPlan plan = learner.learn(training(), LEARNING_LIMITS);
+        for (int index : List.of(-1, plan.stages().size())) {
+            var error = assertThrows(IllegalArgumentException.class,
+                () -> plan.instantiate(index, "z^2 + 10*z + 16"));
+            assertEquals("stageIndex must be in 0..1: " + index, error.getMessage());
+        }
     }
 
     @Test
