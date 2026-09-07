@@ -241,11 +241,12 @@ public class ExpressionCanonicalizer {
     private Expr canonicalizeMultiplication(BinaryExpr expression, AssumptionContext context) {
         List<Expr> factors = new ArrayList<>();
         collectFactors(expression, factors);
+        AssumptionContext factorContext = context == null ? null : new AssumptionContext();
         ExactRational numeric = ExactRational.ONE;
         List<Expr> numericFactors = new ArrayList<>();
         Map<String, FactorBucket> buckets = new LinkedHashMap<>();
         for (Expr factor : factors) {
-            Expr normalized = canonicalize(factor, context);
+            Expr normalized = canonicalize(factor, factorContext);
             if (normalized instanceof NumberExpr numberExpr) {
                 ExactRational exact = PolynomialNormalizer.legacyExact(
                     numberExpr.value());
@@ -257,10 +258,18 @@ public class ExpressionCanonicalizer {
             }
             Power power = asPower(normalized);
             String key = ExpressionFormatter.format(power.base());
-            buckets.computeIfAbsent(
+            FactorBucket bucket = buckets.computeIfAbsent(
                 key,
-                ignored -> new FactorBucket(power.base()))
-                .add(power.exponent());
+                ignored -> new FactorBucket(power.base()));
+            if (!bucket.add(power.exponent())) {
+                // Keep the product when its exact exponent sum leaves the
+                // supported range; wrapping could turn it into 1 or a pole.
+                return expression;
+            }
+        }
+        if (context != null) {
+            // Commit only assumptions from reductions retained in the result.
+            context.addAll(factorContext.snapshot());
         }
 
         List<Expr> ordered = new ArrayList<>();
@@ -531,10 +540,10 @@ public class ExpressionCanonicalizer {
      * order remains stable.
      */
     private static int compareMonomials(TermBucket left, TermBucket right) {
-        int leftDegree = monomialDegree(left.term());
-        int rightDegree = monomialDegree(right.term());
+        long leftDegree = monomialDegree(left.term());
+        long rightDegree = monomialDegree(right.term());
         if (leftDegree != rightDegree) {
-            return Integer.compare(rightDegree, leftDegree); // higher degree first
+            return Long.compare(rightDegree, leftDegree); // higher degree first
         }
         return ExpressionFormatter.format(left.term())
             .compareTo(ExpressionFormatter.format(right.term()));
@@ -548,7 +557,7 @@ public class ExpressionCanonicalizer {
      * recognised is treated as degree {@code 0} so the comparator stays
      * total.
      */
-    static int monomialDegree(Expr expression) {
+    static long monomialDegree(Expr expression) {
         if (expression instanceof NumberExpr) {
             return 0;
         }
@@ -734,8 +743,12 @@ public class ExpressionCanonicalizer {
             this.base = base;
         }
 
-        private void add(int value) {
+        private boolean add(int value) {
+            if (value > Integer.MAX_VALUE - exponent) {
+                return false;
+            }
             exponent += value;
+            return true;
         }
 
         private Expr base() {
