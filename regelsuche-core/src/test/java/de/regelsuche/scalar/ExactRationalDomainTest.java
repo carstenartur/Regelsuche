@@ -16,6 +16,24 @@ class ExactRationalDomainTest {
         new ExactRationalDomain();
 
     @Test
+    void valueOnlyAndEvidenceParsingEnforceTheSameGrammarAndLimits() {
+        for (ExactRationalDomain parser : java.util.List.of(domain,
+                new ExactRationalDomain(new ExactRationalDomain.Limits(32, 8, 4)))) {
+            for (String source : java.util.List.of("0", "-0", "+001", "-6 / -8", "1.0001",
+                    "9007199254740993", "1.0000000000000001", "9".repeat(1025),
+                    "0.00001", "1/0", ".5", "NaN", "1e3", "")) {
+                var evidence = parser.parse(source);
+                if (evidence.exact()) {
+                    assertEquals(evidence.value().orElseThrow(), parser.parseValue(source));
+                    assertTrue(new ExactRationalEvidenceVerifier().verify(evidence.serialized()).verified());
+                } else {
+                    assertThrows(IllegalArgumentException.class, () -> parser.parseValue(source));
+                }
+            }
+        }
+    }
+
+    @Test
     void canonicalizesSignsGreatestCommonDivisorsAndZero() {
         assertEquals(
             new ExactRational(

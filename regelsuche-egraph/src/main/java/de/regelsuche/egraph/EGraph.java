@@ -441,7 +441,7 @@ public final class EGraph {
     private Expr nodeToExpr(ENode node, Map<EClassId, ENode> bestNode) {
         String symbol = node.symbol();
         if (symbol.startsWith("num:")) {
-            return NumberExpr.exact(symbol.substring(4));
+            return new NumberExpr(de.regelsuche.scalar.ExactRational.fromCanonicalText(symbol.substring(4)));
         }
         if (symbol.startsWith("var:")) {
             return new VariableExpr(symbol.substring(4));

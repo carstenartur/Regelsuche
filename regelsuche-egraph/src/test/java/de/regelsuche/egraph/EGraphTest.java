@@ -179,7 +179,7 @@ class EGraphTest {
         var first = graph.addExpression(NumberExpr.exact("9007199254740992"));
         var second = graph.addExpression(NumberExpr.exact("9007199254740993"));
         assertNotEquals(graph.find(first), graph.find(second));
-        for (String literal : List.of("9007199254740993", "1/3", "-2/7", "1.0000000000000001")) {
+        for (String literal : List.of("9007199254740993", "1/3", "-2/7", "1.0000000000000001", "9".repeat(768) + "." + "1".repeat(256))) {
             var number = NumberExpr.exact(literal);
             var id = graph.addExpression(number);
             assertEquals(number, graph.extract(id, node -> 1));

@@ -56,7 +56,7 @@ public class ExpressionParser {
      */
     public Expr parseTerm(String term) {
         String source = Objects.requireNonNull(term, "term");
-        Cursor cursor = Cursor.legacy(source);
+        Cursor cursor = Cursor.ordinary(source);
         Expr expr = parseExpression(cursor);
         requireEnd(cursor);
         return expr;
@@ -243,6 +243,14 @@ public class ExpressionParser {
 
         int end = cursor.position();
         String sourceLexeme = cursor.slice(start, end);
+        if (!cursor.retainsExactLiterals()) {
+            try {
+                return new NumberExpr(exactRationalDomain.parseValue(sourceLexeme));
+            } catch (IllegalArgumentException invalid) {
+                throw new IllegalArgumentException(
+                    "Numeric literal at position " + start + ": " + invalid.getMessage(), invalid);
+            }
+        }
         ExactRationalParseEvidence evidence =
             exactRationalDomain.parse(sourceLexeme);
         if (!evidence.exact()) {
@@ -319,7 +327,7 @@ public class ExpressionParser {
             this.position = 0;
         }
 
-        private static Cursor legacy(String value) {
+        private static Cursor ordinary(String value) {
             return new Cursor(value, false);
         }
 

@@ -112,7 +112,9 @@ public class AstLatexRenderer implements MathRenderer {
     /** Render an arbitrary {@link Expr} with parent precedence context. */
     public String render(Expr expr, int parentPrecedence) {
         if (expr instanceof NumberExpr number) {
-            return formatNumber(number.value());
+            String formatted = formatNumber(number.value());
+            return number.value().signum() < 0 && parentPrecedence > 0
+                ? "\\left(" + formatted + "\\right)" : formatted;
         }
         if (expr instanceof VariableExpr variable) {
             return variable.name();

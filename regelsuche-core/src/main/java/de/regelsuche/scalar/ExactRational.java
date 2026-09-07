@@ -78,12 +78,40 @@ public record ExactRational(
         return new ExactRational(value, BigInteger.ONE);
     }
 
-    /** Exact bounded input; JSON uses the same lossless scalar text contract. */
-    @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
+    /** Exact source input under the separately enforced literal grammar and limits. */
     public static ExactRational parse(String literal) {
-        var parsed = new ExactRationalDomain().parse(literal);
-        return parsed.value().orElseThrow(() -> new IllegalArgumentException(
-            "Invalid exact number: " + parsed.detailCode()));
+        return new ExactRationalDomain().parseValue(literal);
+    }
+
+    /**
+     * Decodes normalized value text, independently of source-literal digit limits.
+     * A 4096-character envelope bounds allocation and covers the canonical form
+     * of every admitted source literal and every 4096-bit arithmetic result.
+     */
+    @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
+    public static ExactRational fromCanonicalText(String text) {
+        if (text == null || text.length() > ExactRationalDomain.MAX_LITERAL_CHARACTERS
+                || !text.matches("-?(0|[1-9][0-9]*)(/[1-9][0-9]*)?")) {
+            throw new IllegalArgumentException("Invalid canonical rational text");
+        }
+        int slash = text.indexOf('/');
+        ExactRational value = slash < 0
+            ? integer(new BigInteger(text))
+            : new ExactRational(new BigInteger(text.substring(0, slash)),
+                new BigInteger(text.substring(slash + 1)));
+        if (!value.canonicalText().equals(text)) {
+            throw new IllegalArgumentException("Rational text is not normalized");
+        }
+        return value;
+    }
+
+    /** Exact conversion of an already typed decimal, without source provenance. */
+    public static ExactRational fromDecimal(BigDecimal decimal) {
+        Objects.requireNonNull(decimal, "decimal");
+        int scale = decimal.scale();
+        return scale < 0
+            ? integer(decimal.unscaledValue().multiply(BigInteger.TEN.pow(Math.negateExact(scale))))
+            : new ExactRational(decimal.unscaledValue(), BigInteger.TEN.pow(scale));
     }
 
     public ExactRational add(ExactRational other) {

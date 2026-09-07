@@ -1,6 +1,6 @@
 # Exakte Faktorisierung an verschachtelten AST-Vorkommen
 
-**Implementierungsstand: 29. August 2026**
+**Implementierungsstand: 7. September 2026**
 
 ## Zweck
 
@@ -134,8 +134,10 @@ rekonstruierten Faktorausdrucks. Die Pipeline prüft anschließend:
   strukturellen SHA-256-Hash.
 
 Die strukturelle Verpflichtung kodiert Knotenart, Operator, Funktionsname,
-Argumentzahl, Variablenname und für die syntaktische AST-Form den hexadezimalen
-`double`-Wert eines `NumberExpr`. Jedes tatsächlich gehashte UTF-8-Byte wird in
+Argumentzahl, Variablenname und den kanonischen rationalen Wert eines
+`NumberExpr`. Seit der exakten AST-Migration verwendet die Pipeline
+`regelsuche.exact-nested-factorization-transformation/v2`; historische
+v1-Zertifikate behalten ihre damalige Revision und werden nicht umgeschrieben. Jedes tatsächlich gehashte UTF-8-Byte wird in
 einer eigenen Work-Ledger-Stufe verbucht. Numerische mathematische Autorität
 wird aus dem Struktur-Hash nicht abgeleitet; sie bleibt an den exakten Parser-
 und Rekonstruktionsnachweis gebunden.

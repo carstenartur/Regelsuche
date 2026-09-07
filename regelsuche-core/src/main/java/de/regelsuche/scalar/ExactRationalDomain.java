@@ -55,6 +55,22 @@ public final class ExactRationalDomain {
     }
 
     public ExactRationalParseEvidence parse(String literal) {
+        ParsedLiteral parsed = parseLiteral(literal);
+        return parsed.value() == null
+            ? ExactRationalParseEvidence.failure(parsed.status(), parsed.detailCode(), parsed.source(), limits)
+            : issueEvidence(parsed.source(), parsed.value());
+    }
+
+    /** Parses under the identical source policy without constructing unused certificates. */
+    public ExactRational parseValue(String literal) {
+        ParsedLiteral parsed = parseLiteral(literal);
+        if (parsed.value() == null) {
+            throw new IllegalArgumentException("Invalid exact number: " + parsed.detailCode());
+        }
+        return parsed.value();
+    }
+
+    private ParsedLiteral parseLiteral(String literal) {
         String raw = literal == null ? "" : literal;
         if (raw.length() > limits.maxLiteralCharacters()) {
             return failure(
@@ -130,16 +146,16 @@ public final class ExactRationalDomain {
         }
     }
 
-    private ExactRationalParseEvidence parseBounded(String source) {
+    private ParsedLiteral parseBounded(String source) {
+        if (INTEGER.matcher(source).matches()) {
+            return parseInteger(source);
+        }
         Matcher fraction = FRACTION.matcher(source);
         if (fraction.matches()) {
             return parseFraction(
                 source,
                 fraction.group(1),
                 fraction.group(2));
-        }
-        if (INTEGER.matcher(source).matches()) {
-            return parseInteger(source);
         }
         Matcher decimal = DECIMAL.matcher(source);
         if (decimal.matches()) {
@@ -155,7 +171,7 @@ public final class ExactRationalDomain {
             source);
     }
 
-    private ExactRationalParseEvidence parseFraction(
+    private ParsedLiteral parseFraction(
         String source,
         String numeratorText,
         String denominatorText
@@ -180,7 +196,7 @@ public final class ExactRationalDomain {
                 new BigInteger(denominatorText)));
     }
 
-    private ExactRationalParseEvidence parseInteger(String source) {
+    private ParsedLiteral parseInteger(String source) {
         if (digitCount(source) > limits.maxDigits()) {
             return failure(
                 Status.LIMIT_EXCEEDED,
@@ -192,7 +208,7 @@ public final class ExactRationalDomain {
             ExactRational.integer(new BigInteger(source)));
     }
 
-    private ExactRationalParseEvidence parseDecimal(
+    private ParsedLiteral parseDecimal(
         String source,
         String sign,
         String integral,
@@ -219,10 +235,11 @@ public final class ExactRationalDomain {
             new ExactRational(unscaled, scale));
     }
 
-    private ExactRationalParseEvidence exact(
-        String source,
-        ExactRational value
-    ) {
+    private static ParsedLiteral exact(String source, ExactRational value) {
+        return new ParsedLiteral(source, Status.EXACT, "EXACT_RATIONAL_LITERAL_ACCEPTED", value);
+    }
+
+    private ExactRationalParseEvidence issueEvidence(String source, ExactRational value) {
         String canonical = value.canonicalText();
         String valueId = hash(lengthPrefixed(
             DOMAIN_ID + ".value",
@@ -242,17 +259,11 @@ public final class ExactRationalDomain {
             certificate);
     }
 
-    private ExactRationalParseEvidence failure(
-        Status status,
-        String detailCode,
-        String source
-    ) {
-        return ExactRationalParseEvidence.failure(
-            status,
-            detailCode,
-            source,
-            limits);
+    private static ParsedLiteral failure(Status status, String detailCode, String source) {
+        return new ParsedLiteral(source, status, detailCode, null);
     }
+
+    private record ParsedLiteral(String source, Status status, String detailCode, ExactRational value) { }
 
     private String boundedSource(String raw) {
         return raw.substring(0, limits.maxLiteralCharacters());

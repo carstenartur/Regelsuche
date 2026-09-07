@@ -3,7 +3,9 @@
 `NumberExpr.value()` ist ein `ExactRational`. Der vorhandene gemeinsame Werttyp
 normalisiert Zähler und Nenner; Dezimalzeichen werden ohne Umweg über `double`
 gelesen. Das gilt für den normalen Parser und für `parseExactTerm`. Letzterer
-behält zusätzlich Quellbereiche und unabhängige Literalzertifikate.
+behält zusätzlich Quellbereiche und unabhängige Literalzertifikate. Der normale
+Parser nutzt dieselbe Grammatik und dieselben Grenzen, erzeugt jedoch keine
+anschließend ungenutzten Zertifikate.
 
 ```java
 var parser = new ExpressionParser();
@@ -28,12 +30,19 @@ rationales Zahlenblatt erzeugen. Endliche Dezimaldarstellungen innerhalb der
 Eingabegrenze werden dezimal ausgegeben; andere rationale Blätter als Bruch.
 In zusammengesetzten Ausdrücken werden solche Brüche geklammert. Wertprojektion
 erkennt konstante Division und Subtraktion, sodass auch rationale und negative
-Zahlen nach erneutem Parsen denselben Wertschlüssel erhalten. Syntaxvorkommen
-bleiben unabhängig adressierbar. `0/0` wird nicht zu einem Zahlenwert reduziert.
+Zahlen nach erneutem Parsen denselben Wertschlüssel erhalten. Für Bruchsyntax
+gilt die Zifferngrenze je Ganzzahltoken; der Formatter weist größere Komponenten
+explizit ab. Primitive Faltung erzeugt solche nicht wieder einlesbaren Ergebnisse
+nicht; die String-Kanonisierung behält dann den ursprünglichen Ausdruck bei.
+Syntaxvorkommen bleiben unabhängig adressierbar. `0/0` wird nicht zu einem Zahlenwert reduziert.
 
 JSON serialisiert rationale Werte als kanonischen Text, zum Beispiel
 `{"value":"9007199254740993/7"}` für ein `NumberExpr`. Damit brauchen auch
 JSON-Verbraucher keine große Zahl durch einen Gleitkommatyp zu transportieren.
+`ExactRational.fromCanonicalText` liest dieses normalisierte Wertformat innerhalb
+von 4.096 Zeichen. Es verwendet bewusst nicht erneut das Ziffernbudget eines
+Quellliterals: Ein zulässiges Dezimalliteral kann einen längeren kanonischen
+Bruch erzeugen. Nichtnormalisierte oder ungültige Transportwerte werden abgewiesen.
 E-Graph-Zahlensymbole verwenden denselben rationalen Text. Die Solver-IR behält
 ihre Dezimalliterale und stellt nichtterminierende Brüche als exakte Division
 zweier Ganzzahlliterale dar.

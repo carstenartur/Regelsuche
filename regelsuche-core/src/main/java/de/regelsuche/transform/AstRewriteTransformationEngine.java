@@ -722,9 +722,9 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
      * Folds an arithmetic node over two numeric literals into a single
      * literal.
      *
-     * <p>Folding stays inside the exact integer range: a division is only
-     * folded when it divides exactly, so no rewrite silently introduces a
-     * rounded floating-point literal.</p>
+     * <p>Arithmetic is rational and bounded by component bits and parser digits.
+     * Division by zero and results that cannot be replayed as bounded syntax
+     * do not match.</p>
      */
     private static final class FoldNumericArithmeticRule extends MetadataRule {
         private FoldNumericArithmeticRule() {
@@ -770,7 +770,8 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
 
         private boolean withinNumericBudget(ExactRational value) {
             return value.numerator().abs().bitLength() <= 4096
-                && value.denominator().bitLength() <= 4096;
+                && value.denominator().bitLength() <= 4096
+                && ExpressionFormatter.withinNumericSyntaxLimits(value);
         }
 
     }

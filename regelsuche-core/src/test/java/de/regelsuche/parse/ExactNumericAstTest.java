@@ -116,6 +116,32 @@ class ExactNumericAstTest {
     }
 
     @Test
+    void maximumSizeDecimalRetainsExactValueThroughJsonAndFormatting() throws Exception {
+        var number = NumberExpr.exact("9".repeat(768) + "." + "1".repeat(256));
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        assertEquals(number, mapper.readValue(mapper.writeValueAsString(number), NumberExpr.class));
+        for (String invalid : List.of("+1", "01", "-0", "2/4", "1/1", "0/0", "NaN", "1e3", "9".repeat(4097))) {
+            assertThrows(IllegalArgumentException.class, () -> ExactRational.fromCanonicalText(invalid));
+        }
+        assertEquals(number, parser.parseTerm(ExpressionFormatter.format(number)));
+        var scaled = new NumberExpr(new ExactRational(
+            new java.math.BigInteger("9".repeat(1024)), java.math.BigInteger.valueOf(2)));
+        try (var values = new ExprValueFactory()) {
+            assertEquals(values.fromExpr(scaled), values.fromExpr(parser.parseTerm(ExpressionFormatter.format(scaled))));
+        }
+    }
+
+    @Test
+    void numericFoldingDoesNotEmitTokensOutsideTheParserBudget() {
+        var fold = new AstRewriteTransformationEngine().rules().stream()
+            .filter(rule -> rule.id().equals("ast_fold_numeric_arithmetic")).findFirst().orElseThrow();
+        var source = parser.parseTerm("9".repeat(600) + " * " + "9".repeat(600));
+        assertFalse(fold.matches(source));
+        var canonical = new ExpressionCanonicalizer().canonicalize(ExpressionFormatter.format(source));
+        assertEquals(source, parser.parseTerm(canonical));
+    }
+
+    @Test
     void integerNarrowingAndIrrationalRootsRemainExplicitFailures() {
         assertThrows(ArithmeticException.class, () -> ExactRational.parse("2147483648").intValueExact());
         assertThrows(ArithmeticException.class, () -> ExactRational.parse("1/2").longValueExact());

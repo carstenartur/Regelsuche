@@ -14,6 +14,10 @@ class AstLatexRendererTest {
     void exactNumericLeavesRenderWithoutRounding() {
         assertEquals("9007199254740993", renderer.renderExpression("9007199254740993"));
         assertEquals("\\frac{1}{3}", renderer.render(de.regelsuche.ast.NumberExpr.exact("1/3"), 0));
+        var negativeBase = new de.regelsuche.ast.BinaryExpr(
+            de.regelsuche.ast.NumberExpr.exact("-1/3"), de.regelsuche.ast.BinaryOperator.POW,
+            new de.regelsuche.ast.NumberExpr(2));
+        assertTrue(renderer.render(negativeBase, 0).contains("\\left("));
         assertTrue(new AstMathMlRenderer().renderExpression("9007199254740993")
             .contains("<mn>9007199254740993</mn>"));
     }

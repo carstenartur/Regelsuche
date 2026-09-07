@@ -59,7 +59,7 @@ public final class CoreExpressionIrAdapter {
     public Expr toCore(Expression expression) {
         Objects.requireNonNull(expression, "expression");
         if (expression instanceof Literal literal) {
-            return NumberExpr.exact(literal.value());
+            return new NumberExpr(de.regelsuche.scalar.ExactRational.fromDecimal(new BigDecimal(literal.value())));
         }
         if (expression instanceof Symbol symbol) {
             return new VariableExpr(symbol.name());
