@@ -90,11 +90,18 @@ public final class ExpressionFormatter {
         int parentPrecedence,
         StringBuilder builder
     ) {
+        double value = number.value();
+        if (!Double.isFinite(value)) {
+            throw new IllegalArgumentException("Cannot format a non-finite numeric AST leaf");
+        }
         String formatted;
-        if (Math.rint(number.value()) == number.value()) {
-            formatted = Long.toString((long) number.value());
+        if (Math.rint(value) == value && Math.abs(value) <= 9_007_199_254_740_992d) {
+            formatted = Long.toString((long) value);
         } else {
-            formatted = Double.toString(number.value());
+            // No long narrowing and no exponent syntax unsupported by the parser.
+            String decimal = Double.toString(value);
+            formatted = decimal.indexOf('E') < 0 ? decimal
+                : java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
         }
         if (number.value() < 0 && parentPrecedence > 0) {
             builder.append('(')
@@ -143,6 +150,7 @@ public final class ExpressionFormatter {
         int rightAdjust = switch (operator) {
             case POW -> -1;
             case DIV, SUB -> 1;
+            case MUL -> isDivision(binary.right()) ? 1 : 0;
             default -> 0;
         };
         pending.push(new FormatExpression(
@@ -153,6 +161,11 @@ public final class ExpressionFormatter {
         pending.push(new FormatExpression(
             binary.left(),
             precedence + leftAdjust));
+    }
+
+    private static boolean isDivision(Expr expression) {
+        return expression instanceof BinaryExpr binary
+            && binary.operator() == BinaryOperator.DIV;
     }
 
     private sealed interface Action
