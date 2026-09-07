@@ -150,14 +150,14 @@ public final class DocsDiscoveryGalleryGenerator {
 
                 - [Walkthrough contract and container command](autonomous-discovery-walkthrough.md)
                 - [Result-card schema](schemas/regelsuche-autonomous-discovery-result-card-v1.schema.json)
-                - Generated sequence: [SVG](generated/autonomous-discovery-walkthrough/sequence.svg)
-                - Generated candidate lineage: [SVG](generated/autonomous-discovery-walkthrough/candidate-lineage.svg)
-                - Generated paired utility: [SVG](generated/autonomous-discovery-walkthrough/paired-utility.svg)
-                - Generated representative search: [SVG](generated/autonomous-discovery-walkthrough/representative-search.svg)
+                - Generated sequence: [SVG](generated/autonomous-discovery-walkthrough-exact-v2/sequence.svg)
+                - Generated candidate lineage: [SVG](generated/autonomous-discovery-walkthrough-exact-v2/candidate-lineage.svg)
+                - Generated paired utility: [SVG](generated/autonomous-discovery-walkthrough-exact-v2/paired-utility.svg)
+                - Generated representative search: [SVG](generated/autonomous-discovery-walkthrough-exact-v2/representative-search.svg)
 
-                <img src="generated/autonomous-discovery-walkthrough/sequence.svg" alt="Generated autonomous discovery evidence sequence with claim boundary">
+                <img src="generated/autonomous-discovery-walkthrough-exact-v2/sequence.svg" alt="Generated autonomous discovery evidence sequence with claim boundary">
 
-                <img src="generated/autonomous-discovery-walkthrough/paired-utility.svg" alt="Generated paired held-out baseline and candidate utility comparison">
+                <img src="generated/autonomous-discovery-walkthrough-exact-v2/paired-utility.svg" alt="Generated paired held-out baseline and candidate utility comparison">
 
                 ## Complete-square factorization
 
