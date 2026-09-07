@@ -181,20 +181,23 @@ Faktorisierung des ursprünglichen Polynoms in `Z[x]` oder `Q[x]`.
 Details stehen unter
 [Deterministische Auswahl einer geeigneten Primzahl](suitable-prime-selection.md).
 
-#### Noch offene vollständige `Z[x]`-/`Q[x]`-Pipeline
+#### Begrenzte vollständige `Z[x]`-/`Q[x]`-Engine
 
-Primkörperfaktorisierung und geeignete Primzahlauswahl sind notwendige
-Bausteine, aber noch keine vollständige Faktorisierungsengine für ganzzahlige
-oder rationale Quellen. Weiterhin offen sind:
+`NativeUnivariateFactorizationEngine` integriert inzwischen Inhalts- und
+Primitivteilnormalisierung, quadratfreie Zerlegung, geeignete Primzahlauswahl,
+lineares Multifaktor-Hensel-Lifting, deterministische
+Zassenhaus-Rekombination und exakte rationale Reassemblierung. Innerhalb der
+expliziten Struktur-, Kandidaten-, Zwischenwert- und Arbeitsgrenzen liefert sie
+eine vollständige Backend-Zerlegung oder einen fail-closed Ausgang.
 
-- Hensel-Lifting der modularen Faktoren;
-- ganzzahlige Faktorrekomposition, zunächst etwa Zassenhaus;
-- spätere LLL-/van-Hoeij-Rekombination, wenn sie qualifiziert ist;
-- exakte rationale Faktorreassemblierung;
-- Integration der vollständigen `Z[x]`-/`Q[x]`-Evidence in den allgemeinen
-  Engine-/Verifier-Vertrag;
-- beliebige unterstützte Grade und Faktorgradpartitionen unter eingefrorenen
-  Qualifikationsbudgets;
+Weiterhin offen oder bewusst begrenzt sind:
+
+- unabhängige Irreduzibilitätszertifikate für jeden ausgegebenen Faktor und
+  damit verifier-autorisierte Vollständigkeit der Zerlegung;
+- spätere LLL-/van-Hoeij-Rekombination für Fälle mit vielen modularen
+  Faktoren;
+- breitere Grade, Faktorgradpartitionen und Koeffizientengrößen unter jeweils
+  explizit qualifizierten Budgets;
 - multivariate Faktorisierung.
 
 Die weiterhin integrierte `BinaryQuarticFactorizationEngine` unterstützt
@@ -219,8 +222,8 @@ ist. Insbesondere gilt:
 - ein Backend-Claim erfüllt keinen `INDEPENDENT_COMPLETE`-Request;
 - die Quartikengine autorisiert keinen Claim für andere Grade oder
   Faktorgradaufteilungen;
-- die allgemeine rationale Inhaltsnormalisierung ist implementiert, eine
-  vollständige `Q[x]`-Faktorisierungsengine jedoch noch nicht;
+- die allgemeine `Z[x]`-/`Q[x]`-Engine ist begrenzt; Budget- oder Policy-Misses
+  werden nicht zu Vollständigkeits- oder Irreduzibilitätsclaims;
 - ein Engine-Abschluss in `F_p[x]` darf nicht als Abschluss in `Z[x]` oder
   `Q[x]` umetikettiert werden; der unabhängige Prüfer verwendet stattdessen
   eine selbst berechnete gradtreue Reduktion ausschließlich als hinreichenden
