@@ -11,6 +11,14 @@ class AstLatexRendererTest {
     private final AstLatexRenderer renderer = new AstLatexRenderer();
 
     @Test
+    void exactNumericLeavesRenderWithoutRounding() {
+        assertEquals("9007199254740993", renderer.renderExpression("9007199254740993"));
+        assertEquals("\\frac{1}{3}", renderer.render(de.regelsuche.ast.NumberExpr.exact("1/3"), 0));
+        assertTrue(new AstMathMlRenderer().renderExpression("9007199254740993")
+            .contains("<mn>9007199254740993</mn>"));
+    }
+
+    @Test
     void rendersDivisionAsFrac() {
         String result = renderer.renderExpression("(a + b) / 2");
         assertTrue(result.contains("\\frac{"), result);

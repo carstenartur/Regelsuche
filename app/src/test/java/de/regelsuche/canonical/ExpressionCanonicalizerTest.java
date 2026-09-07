@@ -269,7 +269,7 @@ class ExpressionCanonicalizerTest {
     }
 
     @Test
-    void unrepresentableExactCoefficientSumFallsBackWithoutRounding() {
+    void exactCoefficientSumRemainsDistinctFromRoundedValue() {
         String source = "sin(x) + 0.00000000000000001*sin(x)";
         String canonical = canonicalizer.canonicalize(source);
 
@@ -289,14 +289,13 @@ class ExpressionCanonicalizerTest {
     }
 
     @Test
-    void exactPolynomialCoefficientDoesNotRoundBackIntoLegacyAst() {
+    void exactPolynomialCoefficientIsRepresentedWithoutRounding() {
         String source = "0.123456789012345 * 0.123456789012345 * x";
         double rounded = 0.123456789012345d * 0.123456789012345d;
         String roundedExpression = Double.toString(rounded) + " * x";
 
-        assertTrue(new PolynomialNormalizer()
-            .normalize(parser.parseTerm(source)).isEmpty(),
-            "unrepresentable exact coefficient must make normalization decline");
+        assertEquals("0.015241578753238669120562399025 * x", de.regelsuche.parse.ExpressionFormatter.format(
+            new PolynomialNormalizer().normalize(parser.parseTerm(source)).orElseThrow()));
         assertNotEquals(canonicalizer.stableHash(source), canonicalizer.stableHash(roundedExpression));
         String canonical = canonicalizer.canonicalize(source);
         assertEquals(canonical, canonicalizer.canonicalize(canonical));

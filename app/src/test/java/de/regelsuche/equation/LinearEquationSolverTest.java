@@ -8,6 +8,7 @@ import de.regelsuche.assumption.Assumption;
 import de.regelsuche.ast.Equation;
 import de.regelsuche.demo.MathDomainDemos;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scalar.ExactRational;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
@@ -32,10 +33,20 @@ class LinearEquationSolverTest {
         assertTrue(solution.isPresent());
         LinearEquationSolver.Solution solved = solution.get();
         assertEquals(LinearEquationSolver.Status.UNIQUE, solved.status());
-        assertEquals(5.0, solved.value());
+        assertEquals(ExactRational.integer(5), solved.value());
         assertTrue(solved.assumptions().stream()
             .anyMatch(a -> a.kind() == Assumption.Kind.NON_ZERO),
             "expected non-zero assumption for divisor");
+    }
+
+    @Test
+    void rationalSolutionsAndAdjacentLargeCoefficientsRemainExact() {
+        var third = solver.solve(parser.parseEquation("3*x = 1"), "x").orElseThrow();
+        assertEquals(ExactRational.parse("1/3"), third.value());
+        var adjacent = solver.solve(parser.parseEquation(
+            "9007199254740993*x = 9007199254740992*x + 1"), "x").orElseThrow();
+        assertEquals(LinearEquationSolver.Status.UNIQUE, adjacent.status());
+        assertEquals(ExactRational.ONE, adjacent.value());
     }
 
     @Test

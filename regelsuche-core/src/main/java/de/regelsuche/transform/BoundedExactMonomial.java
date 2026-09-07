@@ -6,7 +6,6 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.scalar.ExactRational;
-import de.regelsuche.scalar.ExactRationalDomain;
 import java.math.BigInteger;
 import java.util.Collections;
 import java.util.Map;
@@ -16,11 +15,9 @@ import java.util.TreeMap;
 /**
  * Exact coefficient arithmetic for the matcher's bounded monomial fragment.
  *
- * <p>The temporary input bridge interprets finite legacy numeric leaves under
- * their shortest-decimal convention. It does not recover source precision lost
- * before matching. Symbolic divisors are outside this assumption-free fragment.
- * Inferred coefficients prefer a finite decimal leaf only after exact
- * decimal round-trip verification; other rationals use integer/fraction syntax.</p>
+ * <p>Input and inferred numeric leaves carry exact rational values. Coefficient
+ * bit budgets apply before and during arithmetic. Symbolic divisors remain
+ * outside this assumption-free fragment.</p>
  */
 record BoundedExactMonomial(ExactRational coefficient, Map<String, Integer> powers) {
     BoundedExactMonomial {

@@ -133,7 +133,7 @@ class SearchBenchmarkTest {
 
     private static TreeResult tree(Expr expression, Map<String, Double> variables) {
         if (expression instanceof NumberExpr number) {
-            return new TreeResult(number.value(), 1);
+            return new TreeResult(number.value().toBigDecimal(java.math.MathContext.DECIMAL128).doubleValue(), 1);
         }
         if (expression instanceof VariableExpr variable) {
             Double value = variables.get(variable.name());

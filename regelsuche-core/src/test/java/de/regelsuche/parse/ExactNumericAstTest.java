@@ -14,6 +14,7 @@ import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.ExprMatcher;
 import de.regelsuche.transform.PatternRewriteRule;
 import de.regelsuche.value.ExprValueFactory;
 import java.util.HashMap;
@@ -81,6 +82,10 @@ class ExactNumericAstTest {
         var literal = PatternExpr.num("9007199254740993");
         assertTrue(literal.match(parser.parseTerm("9007199254740993"), new HashMap<>()));
         assertFalse(literal.match(parser.parseTerm("9007199254740992"), new HashMap<>()));
+        var matcher = ExprMatcher.literalNumber("9007199254740993");
+        assertTrue(matcher.match(parser.parseTerm("9007199254740993")).matched());
+        assertFalse(matcher.match(parser.parseTerm("9007199254740992")).matched());
+        assertTrue(ExprMatcher.literalNumber("1/3").match(NumberExpr.exact("1/3")).matched());
         var rule = new PatternRewriteRule("exact-large-add-zero",
             PatternExpr.op(BinaryOperator.ADD, PatternExpr.var("A"), PatternExpr.num(0)), PatternExpr.var("A"));
         var source = parser.parseTerm("9007199254740993 + 0");

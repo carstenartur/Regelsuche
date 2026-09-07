@@ -6,7 +6,6 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.scalar.ExactRational;
-import de.regelsuche.scalar.ExactRationalDomain;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -22,12 +21,9 @@ import java.util.TreeMap;
  * variables, addition, subtraction, multiplication and non-negative integer
  * powers.
  *
- * <p>Legacy {@link NumberExpr} nodes still expose {@code double}; conversion
- * of that already-rounded value is isolated in the shared
- * {@link ExactRationalDomain} migration bridge. All normalization arithmetic
- * itself uses the authoritative {@link ExactRational} contract. Exact results
- * are converted back only when the legacy AST can represent the same rational
- * value without rounding.</p>
+ * <p>Numeric leaves and normalization arithmetic use the authoritative
+ * {@link ExactRational} contract. Expansion and coefficient bit budgets bound
+ * normalization work; accepted coefficients are emitted without rounding.</p>
  */
 public final class PolynomialNormalizer {
     private static final int MAX_EXPANDED_TERMS = 1_000;

@@ -313,7 +313,7 @@ class BrahmaguptaFibonacciSingleLearnedRuleIntegrationTest {
 
     private static boolean isTwo(Expr expression) {
         return expression instanceof NumberExpr number
-            && Double.compare(number.value(), 2.0) == 0;
+            && number.value().equalsInteger(2);
     }
 
     private record FrontierState(
