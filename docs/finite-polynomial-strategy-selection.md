@@ -27,6 +27,12 @@ Herkunft und Anwendbarkeit. Eine deklarierte Vorlage hat `DECLARED_GRAMMAR` und
 `VERIFIED_TRACE_DERIVED` mit `EXACT_SOURCE_SHAPE` liefern. Diese Vorlage behält
 Quellform, Formationshash und verifier-gebundene Provenienzwurzeln.
 
+Der gemeinsame Vorlagenvertrag begrenzt Ausdrücke bereits bei ihrer Erstellung
+auf 4096 Zeichen; der Selektor verwendet dieselbe Konstante. Seine zusätzlichen
+Grenzen von vier Lücken und 256 Belegungen pro Vorlage gelten für die vollständige
+Versuchsmatrix. Größere endliche Lückendomänen des Lerners sind damit keine
+stillschweigende Erlaubnis für eine größere Selektorsuche.
+
 Der Ablauf ist: verifizierte Formationsspuren, Freeze ihrer Vorlagen, davon
 getrennte Selektor-TRAIN-Matrix, Freeze der Auswahl, neue Anwendung. Nach
 `learner.learn(verifiedTrainingTraces, limits)` können dessen `stages()` direkt

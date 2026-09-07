@@ -181,7 +181,7 @@ Die gemeinsame exakte Polynomprojektion verhindert inkompatible Hashschemata
 zwischen Formation, Selektor-TRAIN und Anwendung. Lerner und Selektor tragen
 dafür jeweils Revision v2.
 
-Zehn zusätzliche Tests in `TraceDerivedPolynomialStrategyTest` prüfen die
+Elf zusätzliche Tests in `TraceDerivedPolynomialStrategyTest` prüfen die
 vollständige Verbindung mit getrennten Formations-, Auswahl- und Anwendungspolynomen.
 Sie behalten alle zwölf Selektorzeilen, neue Kandidatenevidenz und die kumulativen
 Belegungs-/Pfadbudgets. Überlappende oder nur anders geschriebene Formationszustände

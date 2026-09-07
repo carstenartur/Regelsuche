@@ -482,7 +482,7 @@ public final class FinitePolynomialStrategySearch {
         return templates.stream().map(FinitePolynomialTemplate::id).toList();
     }
     private static String text(String value) {
-        if (value == null || value.isBlank() || value.length() > 4096
+        if (value == null || value.isBlank() || value.length() > FinitePolynomialTemplate.MAX_EXPRESSION_CHARS
                 || !StandardCharsets.UTF_8.newEncoder().canEncode(value)
                 || value.chars().anyMatch(Character::isISOControl)
                 || value.chars().filter(c -> "+-*/^(),".indexOf(c) >= 0).count() > 128) {

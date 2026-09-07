@@ -12,6 +12,7 @@ import java.util.Objects;
 public final class FinitePolynomialTemplate {
     public static final String REVISION = "regelsuche.finite-polynomial-template/v1";
     public static final String VARIABLE_SLOT = "@v";
+    public static final int MAX_EXPRESSION_CHARS = 4096;
 
     public enum Origin { DECLARED_GRAMMAR, VERIFIED_TRACE_DERIVED }
     public enum Applicability { ANY_SUPPORTED_UNIVARIATE, EXACT_SOURCE_SHAPE }
@@ -29,14 +30,15 @@ public final class FinitePolynomialTemplate {
     private FinitePolynomialTemplate(String id, String expression, List<HoleDomain> domains,
                                     Origin origin, String sourceShape, LearnedPlan formation) {
         this.id = SchematicProofPlan.requireId(id, "template id");
-        if (id.length() > 64 || expression == null || expression.isBlank() || expression.length() > 16_384
+        if (id.length() > 64 || expression == null || expression.isBlank() || expression.length() > MAX_EXPRESSION_CHARS
                 || !StandardCharsets.UTF_8.newEncoder().canEncode(expression)
                 || expression.chars().anyMatch(Character::isISOControl)
                 || !expression.contains(VARIABLE_SLOT)) {
             throw new IllegalArgumentException("invalid finite template or variable slot @v");
         }
         this.expression = expression.trim().replaceAll("\\s+", " ");
-        this.domains = List.copyOf(domains).stream().sorted(Comparator.comparing(HoleDomain::holeId)).toList();
+        this.domains = List.copyOf(Objects.requireNonNull(domains, "domains")).stream()
+            .sorted(Comparator.comparing(HoleDomain::holeId)).toList();
         if (this.domains.isEmpty() || this.domains.size() > 12
                 || this.domains.stream().map(HoleDomain::holeId).distinct().count() != this.domains.size()
                 || assignmentCount() > 100_000) {
@@ -107,6 +109,7 @@ public final class FinitePolynomialTemplate {
     void writeJson(JsonWriter writer) {
         writer.property("schema", REVISION).property("authority", "REQUIRES_FRESH_VERIFICATION")
             .property("id", id).property("expression", expression).property("variableSlot", VARIABLE_SLOT)
+            .property("maxExpressionChars", MAX_EXPRESSION_CHARS)
             .property("origin", origin.name()).property("applicability", applicability().name())
             .property("sourceShape", sourceShape)
             .property("applicabilityRevision", origin == Origin.VERIFIED_TRACE_DERIVED

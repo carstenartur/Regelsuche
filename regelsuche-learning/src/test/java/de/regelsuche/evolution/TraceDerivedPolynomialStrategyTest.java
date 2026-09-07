@@ -31,6 +31,20 @@ class TraceDerivedPolynomialStrategyTest {
     private final FinitePolynomialStrategySearch search = new FinitePolynomialStrategySearch();
 
     @Test
+    void templateFactoryOwnsTheSharedTextLimitAndNamesMissingDomains() {
+        var domains = List.of(HoleDomain.integerRange("coefficient", 0, 1));
+        String expression = "@v+${coefficient}";
+        String atLimit = expression + " ".repeat(FinitePolynomialTemplate.MAX_EXPRESSION_CHARS - expression.length());
+        var template = FinitePolynomialTemplate.declared("at-limit", atLimit, domains);
+        assertEquals(expression, template.expression());
+        assertEquals(List.of(template), new Grammar(List.of(template), 1, 0, 0).templates());
+        assertThrows(IllegalArgumentException.class, () ->
+            FinitePolynomialTemplate.declared("too-long", atLimit + " ", domains));
+        assertEquals("domains", assertThrows(NullPointerException.class, () ->
+            FinitePolynomialTemplate.declared("missing-domains", expression, null)).getMessage());
+    }
+
+    @Test
     void commonTemplatesRetainEveryObservedFormationStateAndVerifierRoot() {
         var traces = training();
         var plan = learner.learn(traces, LIMITS);
