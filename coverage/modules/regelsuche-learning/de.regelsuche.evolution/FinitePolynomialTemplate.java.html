@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FinitePolynomialTemplate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">FinitePolynomialTemplate.java</span></div><h1>FinitePolynomialTemplate.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.ExactFinitePolynomialTraceLearner.LearnedPlan;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.HoleDomain;
+import java.nio.charset.StandardCharsets;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+
+/** Immutable, non-authorizing template shared by trace learning and strategy selection. */
+public final class FinitePolynomialTemplate {
+    public static final String REVISION = &quot;regelsuche.finite-polynomial-template/v1&quot;;
+    public static final String VARIABLE_SLOT = &quot;@v&quot;;
+    public static final int MAX_EXPRESSION_CHARS = 4096;
+
+<span class="fc" id="L17">    public enum Origin { DECLARED_GRAMMAR, VERIFIED_TRACE_DERIVED }</span>
+<span class="fc" id="L18">    public enum Applicability { ANY_SUPPORTED_UNIVARIATE, EXACT_SOURCE_SHAPE }</span>
+
+    private final String id;
+    private final String expression;
+    private final List&lt;HoleDomain&gt; domains;
+    private final Origin origin;
+    private final String sourceShape;
+    private final String formationHash;
+    private final List&lt;String&gt; provenanceRoots;
+    private final List&lt;String&gt; formationInputIdentities;
+    private final List&lt;String&gt; formationStateIdentities;
+
+    private FinitePolynomialTemplate(String id, String expression, List&lt;HoleDomain&gt; domains,
+<span class="fc" id="L31">                                    Origin origin, String sourceShape, LearnedPlan formation) {</span>
+<span class="fc" id="L32">        this.id = SchematicProofPlan.requireId(id, &quot;template id&quot;);</span>
+<span class="pc bpc" id="L33" title="3 of 8 branches missed.">        if (id.length() &gt; 64 || expression == null || expression.isBlank() || expression.length() &gt; MAX_EXPRESSION_CHARS</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">                || !StandardCharsets.UTF_8.newEncoder().canEncode(expression)</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">                || expression.chars().anyMatch(Character::isISOControl)</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">                || !expression.contains(VARIABLE_SLOT)) {</span>
+<span class="fc" id="L37">            throw new IllegalArgumentException(&quot;invalid finite template or variable slot @v&quot;);</span>
+        }
+<span class="fc" id="L39">        this.expression = expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="fc" id="L40">        this.domains = List.copyOf(Objects.requireNonNull(domains, &quot;domains&quot;)).stream()</span>
+<span class="fc" id="L41">            .sorted(Comparator.comparing(HoleDomain::holeId)).toList();</span>
+<span class="pc bpc" id="L42" title="2 of 4 branches missed.">        if (this.domains.isEmpty() || this.domains.size() &gt; 12</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">                || this.domains.stream().map(HoleDomain::holeId).distinct().count() != this.domains.size()</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">                || assignmentCount() &gt; 100_000) {</span>
+<span class="nc" id="L45">            throw new IllegalArgumentException(&quot;invalid or excessive finite template domains&quot;);</span>
+        }
+<span class="fc" id="L47">        this.origin = origin;</span>
+<span class="fc" id="L48">        this.sourceShape = sourceShape;</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        this.formationHash = formation == null ? &quot;&quot; : formation.contentHash();</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        this.provenanceRoots = formation == null ? List.of() : formation.trainingRoots();</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        this.formationInputIdentities = formation == null ? List.of() : formation.trainingInputIdentities();</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        this.formationStateIdentities = formation == null ? List.of() : formation.formationStateIdentities();</span>
+<span class="fc" id="L53">    }</span>
+
+    public static FinitePolynomialTemplate declared(String id, String expression, List&lt;HoleDomain&gt; domains) {
+<span class="fc" id="L56">        return new FinitePolynomialTemplate(id, expression, domains, Origin.DECLARED_GRAMMAR, &quot;&quot;, null);</span>
+    }
+
+    // Only a verifier-backed, privately issued LearnedPlan can supply this origin.
+    static FinitePolynomialTemplate learned(LearnedPlan formation, int stageIndex) {
+<span class="fc" id="L61">        Objects.requireNonNull(formation, &quot;formation&quot;);</span>
+<span class="fc" id="L62">        var stage = formation.stageData(stageIndex);</span>
+<span class="fc" id="L63">        String digest = formation.contentHash().substring(&quot;sha256:&quot;.length());</span>
+<span class="fc" id="L64">        return new FinitePolynomialTemplate(&quot;trace-&quot; + digest.substring(0, 40) + &quot;-&quot; + stageIndex,</span>
+<span class="fc" id="L65">            stage.ansatzTemplate(), stage.holeDomains(), Origin.VERIFIED_TRACE_DERIVED,</span>
+<span class="fc" id="L66">            stage.sourceShape(), formation);</span>
+    }
+
+<span class="fc" id="L69">    public String id() { return id; }</span>
+<span class="fc" id="L70">    public String expression() { return expression; }</span>
+<span class="fc" id="L71">    public List&lt;HoleDomain&gt; domains() { return domains; }</span>
+<span class="fc" id="L72">    public Origin origin() { return origin; }</span>
+    public Applicability applicability() {
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        return origin == Origin.DECLARED_GRAMMAR</span>
+<span class="fc" id="L75">            ? Applicability.ANY_SUPPORTED_UNIVARIATE : Applicability.EXACT_SOURCE_SHAPE;</span>
+    }
+<span class="fc" id="L77">    public String sourceShape() { return sourceShape; }</span>
+<span class="fc" id="L78">    public String formationHash() { return formationHash; }</span>
+<span class="fc" id="L79">    public List&lt;String&gt; provenanceRoots() { return provenanceRoots; }</span>
+<span class="fc" id="L80">    public List&lt;String&gt; formationInputIdentities() { return formationInputIdentities; }</span>
+<span class="fc" id="L81">    public List&lt;String&gt; formationStateIdentities() { return formationStateIdentities; }</span>
+
+    public long assignmentCount() {
+<span class="fc" id="L84">        long count = 1;</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        for (HoleDomain domain : domains) {</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            if (count &gt; 100_000L / domain.values().size()) {</span>
+<span class="nc" id="L87">                throw new IllegalArgumentException(&quot;template exceeds 100000 assignments&quot;);</span>
+            }
+<span class="fc" id="L89">            count *= domain.values().size();</span>
+<span class="fc" id="L90">        }</span>
+<span class="fc" id="L91">        return count;</span>
+    }
+
+<span class="fc" id="L94">    String instantiateVariable(String variable) { return expression.replace(VARIABLE_SLOT, variable); }</span>
+
+<span class="fc" id="L96">    record ShapeCheck(boolean matches, long visitedNodes) {}</span>
+
+    ShapeCheck checkShape(ExactFinitePolynomialInput.Projection input) {
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        return applicability() == Applicability.ANY_SUPPORTED_UNIVARIATE ? new ShapeCheck(true, 0)</span>
+<span class="fc" id="L100">            : ExactFinitePolynomialTraceLearner.checkSourceShape(sourceShape, input.parsed());</span>
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L104">        JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L105">        writeJson(writer);</span>
+<span class="fc" id="L106">        return writer.endObject().toString();</span>
+    }
+
+    void writeJson(JsonWriter writer) {
+<span class="fc" id="L110">        writer.property(&quot;schema&quot;, REVISION).property(&quot;authority&quot;, &quot;REQUIRES_FRESH_VERIFICATION&quot;)</span>
+<span class="fc" id="L111">            .property(&quot;id&quot;, id).property(&quot;expression&quot;, expression).property(&quot;variableSlot&quot;, VARIABLE_SLOT)</span>
+<span class="fc" id="L112">            .property(&quot;maxExpressionChars&quot;, MAX_EXPRESSION_CHARS)</span>
+<span class="fc" id="L113">            .property(&quot;origin&quot;, origin.name()).property(&quot;applicability&quot;, applicability().name())</span>
+<span class="fc" id="L114">            .property(&quot;sourceShape&quot;, sourceShape)</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            .property(&quot;applicabilityRevision&quot;, origin == Origin.VERIFIED_TRACE_DERIVED</span>
+<span class="fc" id="L116">                ? ExactFinitePolynomialTraceLearner.REVISION : ExactFinitePolynomialInput.REVISION)</span>
+<span class="fc" id="L117">            .property(&quot;formationHash&quot;, formationHash).stringArray(&quot;provenanceRoots&quot;, provenanceRoots)</span>
+<span class="fc" id="L118">            .property(&quot;inputIdentityRevision&quot;, ExactFinitePolynomialInput.REVISION)</span>
+<span class="fc" id="L119">            .property(&quot;inputViewBudget&quot;, ExactFinitePolynomialInput.BUDGET.canonicalMaterial())</span>
+<span class="fc" id="L120">            .stringArray(&quot;formationInputIdentities&quot;, formationInputIdentities)</span>
+<span class="fc" id="L121">            .stringArray(&quot;formationStateIdentities&quot;, formationStateIdentities)</span>
+<span class="fc" id="L122">            .array(&quot;domains&quot;, values -&gt; domains.forEach(domain -&gt; values.objectValue(value -&gt;</span>
+<span class="fc" id="L123">                value.property(&quot;id&quot;, domain.holeId()).property(&quot;kind&quot;, domain.kind().name())</span>
+<span class="fc" id="L124">                    .array(&quot;values&quot;, scalars -&gt; domain.values().forEach(scalar -&gt; scalars.value(scalar.canonicalText()))))));</span>
+<span class="fc" id="L125">    }</span>
+
+<span class="fc" id="L127">    public String contentHash() { return SchematicProofPlan.hash(toCanonicalJson()); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

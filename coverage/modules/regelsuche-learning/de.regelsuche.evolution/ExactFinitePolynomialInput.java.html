@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactFinitePolynomialInput.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ExactFinitePolynomialInput.java</span></div><h1>ExactFinitePolynomialInput.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.parse.ExactExpressionFormatter;
+import de.regelsuche.parse.ExactParsedTerm;
+import de.regelsuche.polynomial.ExactParsedUnivariatePolynomialView;
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.scalar.ExactRational;
+import java.util.Comparator;
+
+/** One bounded exact identity authority for formation, selection and application. */
+final class ExactFinitePolynomialInput {
+    static final String REVISION = &quot;regelsuche.exact-finite-polynomial-input/v1&quot;;
+<span class="fc" id="L14">    static final ExactParsedUnivariatePolynomialView.Budget BUDGET =</span>
+        new ExactParsedUnivariatePolynomialView.Budget(64, 4096, 256, 50_000);
+
+    private ExactFinitePolynomialInput() {}
+
+<span class="fc" id="L19">    record Projection(ExactParsedTerm parsed, SparsePolynomial&lt;ExactRational&gt; polynomial,</span>
+                      String expression, String identity, long workUnits) {}
+
+    static Projection analyze(ExactParsedTerm parsed) {
+<span class="fc" id="L23">        var analysis = new ExactParsedUnivariatePolynomialView(BUDGET).analyze(parsed);</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">        if (!analysis.supported()) {</span>
+<span class="fc" id="L25">            throw new IllegalArgumentException(&quot;finite polynomial input &quot; + analysis.status()</span>
+<span class="fc" id="L26">                + &quot;: &quot; + analysis.detailCode());</span>
+        }
+<span class="fc" id="L28">        var polynomial = analysis.polynomial().orElseThrow();</span>
+<span class="fc" id="L29">        boolean constantRing = polynomial.ring().variables().isEmpty();</span>
+<span class="fc" id="L30">        String canonical = new JsonWriter().beginObject()</span>
+<span class="fc" id="L31">            .property(&quot;schema&quot;, REVISION)</span>
+<span class="fc" id="L32">            .property(&quot;domain&quot;, polynomial.ring().coefficientDomain().id())</span>
+<span class="fc" id="L33">            .array(&quot;terms&quot;, writer -&gt; polynomial.terms().entrySet().stream()</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">                .sorted(Comparator.comparingInt(entry -&gt; constantRing ? 0 : entry.getKey().exponent(0)))</span>
+<span class="fc" id="L35">                .forEach(entry -&gt; writer.objectValue(term -&gt; term</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">                    .property(&quot;exponent&quot;, constantRing ? 0 : entry.getKey().exponent(0))</span>
+<span class="fc" id="L37">                    .property(&quot;coefficient&quot;, entry.getValue().canonicalText()))))</span>
+<span class="fc" id="L38">            .endObject().toString();</span>
+<span class="fc" id="L39">        return new Projection(parsed, polynomial,</span>
+<span class="fc" id="L40">            ExactExpressionFormatter.format(parsed.expression(), parsed),</span>
+<span class="fc" id="L41">            SchematicProofPlan.hash(canonical), analysis.work().totalWorkUnits());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

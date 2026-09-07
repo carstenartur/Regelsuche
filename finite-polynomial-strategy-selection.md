@@ -8,25 +8,94 @@ wird auf allen TRAIN-Eingaben mit demselben Budget ausgeführt. Erst danach wird
 eine Folge ausgewählt und unveränderlich eingefroren. Auf einer späteren Eingabe
 werden ihre Koeffizienten neu bestimmt; die Auswahl wird nicht erneut trainiert.
 
-Das ist eine begrenzte, datenabhängige Strategieauswahl. Die Ansatzformen, das
-Suchziel und die Rangfolge der Bewertungskriterien sind weiterhin vorgegeben.
+Das ist eine begrenzte, datenabhängige Strategieauswahl. Die Ansatzformen werden
+vor der Auswahl eingefroren; Suchziel und Rangfolge der Bewertungskriterien
+bleiben vorgegeben. Vorlagen können deklariert oder aus verifizierten Spuren
+abgeleitet sein.
 Der Baustein ist keine neue evolutionäre Population, keine zweite Ausdruckssuche
 und kein Nachweis, dass die Grammatik oder eine verzweigende Taktik gelernt wurde.
 Er ergänzt die [budgetierte Programmkomposition](budgeted-rewrite-program-composition.md)
 und verwendet deren bestehenden Interpreter.
 
+## Gemeinsamer Vorlagenvertrag und getrennte Lernphasen
+
+`FinitePolynomialTemplate` ist der gemeinsame unveränderliche Vertrag von
+`ExactFinitePolynomialTraceLearner` und Selektor. Er bindet den Inhalt samt Hash,
+den Variablenslot `@v`, die vollständigen endlichen Koeffizientendomänen sowie
+Herkunft und Anwendbarkeit. Eine deklarierte Vorlage hat `DECLARED_GRAMMAR` und
+`ANY_SUPPORTED_UNIVARIATE`. Nur ein vom Lerner ausgestellter `LearnedPlan` kann
+`VERIFIED_TRACE_DERIVED` mit `EXACT_SOURCE_SHAPE` liefern. Diese Vorlage behält
+Quellform, Formationshash und verifier-gebundene Provenienzwurzeln.
+
+Der gemeinsame Vorlagenvertrag begrenzt Ausdrücke bereits bei ihrer Erstellung
+auf 4096 Zeichen; der Selektor verwendet dieselbe Konstante. Seine zusätzlichen
+Grenzen von vier Lücken und 256 Belegungen pro Vorlage gelten für die vollständige
+Versuchsmatrix. Größere endliche Lückendomänen des Lerners sind damit keine
+stillschweigende Erlaubnis für eine größere Selektorsuche.
+
+Der Ablauf ist: verifizierte Formationsspuren, Freeze ihrer Vorlagen, davon
+getrennte Selektor-TRAIN-Matrix, Freeze der Auswahl, neue Anwendung. Nach
+`learner.learn(verifiedTrainingTraces, limits)` können dessen `stages()` direkt
+als Vorlagen einer `Grammar` übergeben werden. Es gibt keine zweite
+Solver- oder Interpreterimplementierung für gelernte Vorlagen.
+
+```java
+var limits = new ExactFinitePolynomialTraceLearner.Limits(3, 8, 4, 4, 0, 12, 10_000);
+var learned = new ExactFinitePolynomialTraceLearner().learn(verifiedTrainingTraces, limits);
+var grammar = new FinitePolynomialStrategySearch.Grammar(learned.stages(), 2, 2000, 1000);
+var search = new FinitePolynomialStrategySearch();
+var selected = search.train(grammar, List.of(
+    new FinitePolynomialStrategySearch.TrainingInput("select-one", "x^2+10*x+16"),
+    new FinitePolynomialStrategySearch.TrainingInput("select-two", "y^2+12*y+35")));
+var application = search.apply(selected, "u^2+14*u+45");
+```
+
+`verifiedTrainingTraces` bezeichnet hier die real geprüften Pfade des
+[Lernerbeispiels](trace-derived-polynomial-plans.md). Die ausführbare gemeinsame
+Fixture steht in `TraceDerivedPolynomialStrategyTest`. Aus drei Formationspfaden
+entstehen zwei Vorlagen und zwölf Selektorzeilen. Deren Quellformvertrag führt
+zur Folge Ergänzung/Faktorisierung; die Anwendung erreicht `(u+5)*(u+9)` mit
+zwei erneut verifizierten Theorieschritten und null primitiven Regelschritten.
+Die deklarierte Grammatik bleibt eine eigene Kontrolle, in der direkte
+Faktorisierung gewinnt. Der Vergleich beweist keine Überlegenheit der gelernten
+Grammatik; deren engere Anwendbarkeit ist Teil der Versuchskonfiguration.
+
+Jede Vorlage behält getrennt die Identitäten ihrer Formationswurzeln und aller
+in den geprüften Pfaden beobachteten Polynomzustände, einschließlich Zwischen-
+und Endausdrücken. Die Vereinigung über **alle** Grammatikvorlagen ist für
+Selektor-TRAIN und Anwendung gesperrt, auch wenn eine Vorlage nicht gewinnt.
+Äquivalenzerhaltende Schritte können dieselbe Polynomidentität besitzen;
+Beobachtungszahl und tatsächlich geleistete Projektionsarbeit bleiben erhalten.
+
+Beide Lernphasen verwenden dieselbe variable-neutrale exakte Identität und
+denselben begrenzten Polynomview: Grad 64, 4096 Koeffizientenbits, 256 Knoten,
+50.000 Arithmetikoperationen. Eine erschöpfte Identitätsprüfung bricht mit
+`BUDGET_INCONCLUSIVE` ab. Sie erlaubt weder einen Neuheitsanspruch noch einen
+übersprungenen Ausschluss. Die Selektorrevision steigt deshalb auf v2; die
+frühere eigene Identitätskodierung wird nicht weitergeführt.
+
+Eine unpassende gelernte Quellform wird als `APPLICABILITY_MISMATCH` ohne
+Solverlauf aufbewahrt. `COMPLETE_NO_SOLUTION` verlangt dagegen den tatsächlich
+vollständigen endlichen Solverlauf. Jede Anwendbarkeitsprüfung bindet den vollen
+Vorlagenhash, ihre Quelle und Identität sowie die besuchten Formknoten und die
+exakte View-Arbeit. Die schon geprüfte Anfangsprojektion wird wiederverwendet
+und einmal bei `inputViewWork` gezählt; spätere Stufen behalten zusätzliche
+Projektionen in ihren Versuchen. Diese getrennten Zähler ändern die bestehende
+Rangfolge nicht und sind keine vollständige Gesamtkostenmessung.
+
 ## Ausführbares Java-Beispiel
 
 ```java
 import de.regelsuche.evolution.FinitePolynomialStrategySearch;
+import de.regelsuche.evolution.FinitePolynomialTemplate;
 import de.regelsuche.evolution.FinitePolynomialStrategySearch.*;
 import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.HoleDomain;
 import java.util.List;
 
-var completion = new Template("completion", "(@v+${shift})^2+${constant}",
+var completion = FinitePolynomialTemplate.declared("completion", "(@v+${shift})^2+${constant}",
     List.of(HoleDomain.integerRange("shift", -4, 4),
             HoleDomain.integerRange("constant", -6, 6)));
-var factors = new Template("factors", "(@v+${left})*(@v+${right})",
+var factors = FinitePolynomialTemplate.declared("factors", "(@v+${left})*(@v+${right})",
     List.of(HoleDomain.integerRange("left", -6, 6),
             HoleDomain.integerRange("right", -6, 6)));
 var grammar = new Grammar(List.of(completion, factors), 2, 2000, 1000);
@@ -142,6 +211,7 @@ ersetzen keine unabhängige Artefakt-Importprüfung oder produktive Promotion.
 
 ```bash
 ./gradlew :regelsuche-learning:test --tests '*FinitePolynomialStrategySearchTest'
+./gradlew :regelsuche-learning:test --tests '*TraceDerivedPolynomialStrategyTest'
 ./gradlew --no-configuration-cache ciCheck
 ```
 
