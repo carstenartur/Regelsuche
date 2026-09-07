@@ -164,6 +164,43 @@ class NativeUnivariateFactorizationEngineTest {
     }
 
     @Test
+    void independentlyCertifiesOriginalDomainIrreducibilityOnRequest() {
+        SparsePolynomial<BigInteger> source = integer(1, 0, 1);
+        FactorizationRequest<BigInteger> independent =
+            FactorizationRequest.independentComplete(
+                source,
+                LIMITS,
+                CANDIDATES,
+                WORK);
+
+        FactorizationVerifier.Report<BigInteger> report =
+            FactorizationVerifier.execute(
+                NativeUnivariateFactorizationEngine.boundedIntegers(),
+                independent);
+
+        assertEquals(
+            FactorizationVerifier.Status.IRREDUCIBLE,
+            report.status());
+        assertEquals(
+            FactorizationVerifier.ClaimStrength
+                .INDEPENDENTLY_CERTIFIED_IRREDUCIBLE,
+            report.claimStrength());
+        FactorizationVerifier.IndependentIrreducibilityTrace trace =
+            report.independentIrreducibilityTrace().orElseThrow();
+        assertEquals(3, trace.selectedPrime().orElseThrow());
+        assertEquals(
+            List.of(
+                FactorizationVerifier.PrimeAttemptOutcome
+                    .REDUCIBLE_REDUCTION,
+                FactorizationVerifier.PrimeAttemptOutcome
+                    .IRREDUCIBLE_WITNESS),
+            trace.primeAttempts().stream()
+                .map(FactorizationVerifier.PrimeAttempt::outcome)
+                .toList());
+        assertTrue(report.work().totalWorkUnits() <= WORK);
+    }
+
+    @Test
     void candidateExhaustionIsNotIrreducibility() {
         SparsePolynomial<BigInteger> source = integer(-2, 1, 1);
         FactorizationRequest<BigInteger> bounded =

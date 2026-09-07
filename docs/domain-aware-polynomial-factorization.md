@@ -1,6 +1,6 @@
 # Domänenbewusste Polynomfaktorisierung
 
-**Implementierungsstand: 28. August 2026**
+**Implementierungsstand: 7. September 2026**
 
 Regelsuche behandelt Polynomfaktorisierung nicht als Sonderfall eines einzelnen
 Quartikoperators. Der mathematische Kern trennt Koeffizientendomänen,
@@ -34,16 +34,18 @@ Verantwortung gestaltet.
 | Exakte Produktrückprüfung durch `FactorizationVerifier` | implementiert |
 | Exaktes Faktorenrendering mit Reparse-/Ringrekonstruktion am Wurzelvorkommen | implementiert |
 | Verschachtelte occurrence-preserving Suchintegration | noch offen |
-| Unabhängige Vollständigkeits-/Irreduzibilitätszertifikate | noch offen |
+| Unabhängiger begrenzter Originaldomänen-Irreduzibilitätsnachweis | implementiert |
+| Unabhängige Vollständigkeitszertifikate für Faktorzerlegungen | noch offen |
 | LLL-/van-Hoeij-Rekombination für größere Fälle | noch offen |
 | Automatische Integration der allgemeinen Engine in Suche und Workbench | noch offen |
 
 Die native Engine liefert damit eine vollständige **Backend-Zerlegung** im
 begrenzten unterstützten Fragment. Regelsuche rekonstruiert jedes ausgegebene
-Produkt exakt. Der allgemeine `FactorizationVerifier` beweist jedoch nicht
-unabhängig, dass die Faktoren irreduzibel sind oder dass kein weiterer Faktor
-existiert. Deshalb bleiben positive Vollständigkeits- und
-Irreduzibilitätsaussagen als Backend-Claims sichtbar.
+Produkt exakt. Für das ursprüngliche univariate Polynom kann der allgemeine
+`FactorizationVerifier` auf ausdrückliche Anforderung inzwischen einen eigenen
+begrenzten Irreduzibilitätsnachweis führen. Die unabhängige Zertifizierung aller
+ausgegebenen Faktoren und damit einer vollständigen Zerlegung bleibt offen;
+Backend-Claims werden dafür nicht hochgestuft.
 
 ## Gesamtfluss
 
@@ -253,10 +255,12 @@ Ein Algorithmus mit zusätzlichem Zwischenwertwachstum darf eine eng begrenzte
 Stufenpolitik ergänzen, aber keine zweite Request-Oberfläche mit duplizierten
 Struktur- oder Arbeitsbudgets einführen.
 
-Ein Backend-Claim erfüllt `INDEPENDENT_COMPLETE` niemals allein. Eine Engine,
-die keine algorithmisch unabhängige Vollständigkeits- oder
-Irreduzibilitätsevidence liefern kann, muss einen solchen Request als nicht
-unterstützt behandeln.
+Ein Backend-Claim erfüllt `INDEPENDENT_COMPLETE` niemals allein. Eine Engine
+darf für einen solchen Request weiterhin untrusted Vorschläge oder einen
+begrenzten Miss liefern. Nur der zentrale Verifier kann daraus mit einem
+algorithmisch unabhängigen Nachweis einen autorisierten Status erzeugen. Für
+Faktorvorschläge bleibt `INDEPENDENT_COMPLETE` bis zur separaten
+Vollständigkeitszertifizierung fail-closed.
 
 ## Allgemeine univariate Darstellung
 
@@ -475,6 +479,50 @@ als Zerlegung ausgegeben. Die Engine bewahrt dann einen
 `BACKEND_CLAIMED_IRREDUCIBLE`-Claim; der Verifier macht daraus ohne
 unabhängiges Zertifikat keinen `IRREDUCIBLE`-Status.
 
+## Unabhängiger Irreduzibilitätsnachweis in der Originaldomäne
+
+Bei `EvidenceRequirement.INDEPENDENT_COMPLETE` und einem Engine-Ausgang ohne
+Faktorvorschlag prüft
+`regelsuche.original-domain-irreducibility/v1` das ursprüngliche univariate
+Polynom unabhängig. Der Prüfer unterstützt begrenzt `Z[x]` und `Q[x]` und
+verwendet weder die von der Engine gewählte Primzahl noch Berlekamp-, Hensel-,
+Zassenhaus- oder Engine-Zertifikate.
+
+Der Ablauf ist:
+
+1. exakte Umwandlung in einen primitiven ganzzahligen Assoziierten mit
+   positivem Leitkoeffizienten;
+2. direkter exakter Abschluss für Grad eins;
+3. andernfalls Reduktion über die feste Primzahlenfolge
+   `2, 3, 5, ..., 47`;
+4. explizite Ablehnung jeder gradverlierenden Reduktion;
+5. unabhängig implementierte Rabin-/Frobenius-Prüfung in `F_p[x]`;
+6. Autorisierung erst beim ersten gradtreuen irreduziblen Modularbild.
+
+Der letzte Schritt ist ein hinreichender Zeuge: Ein primitives Polynom mit
+gradtreuem irreduziblem Bild modulo `p` ist nach dem Reduktionssatz und dem
+Gaußschen Lemma über `Q` irreduzibel. Das gilt auch für den ursprünglichen
+rationalen Assoziierten. Die Umkehrung wird nicht behauptet. Eine reduzierbare
+Modularreduktion beweist nichts über die Originalquelle; der Prüfer versucht
+die nächste Primzahl. Fehlt im festen Präfix ein Zeuge, bleibt der Ausgang
+`BUDGET_INCONCLUSIVE`.
+
+Die issuer-owned `IndependentIrreducibilityTrace` bindet den vollständigen
+Request und die Quelle, die primitive Koeffizientenfolge, jeden Primversuch,
+Frobenius-/GGT-Checkpoints, den ausgewählten Zeugen, das eigene Work Ledger und
+den Trace-Hash. Auch ein inkonklusiver Ausgang bewahrt abgeschlossene
+Pechprimzahl- und reduzierbare Versuche. Grad 256 und 16.384 Bit für
+normalisierte Zwischenkoeffizienten sind zusätzliche feste Obergrenzen; die
+engeren Requestgrenzen und das bereits von der Engine belastete Gesamtbudget
+gelten weiterhin.
+
+Dieser Abschnitt zertifiziert bewusst nur die Irreduzibilität der
+Originalquelle. Die unabhängige Irreduzibilität aller ausgegebenen Faktoren,
+exakte Rest-Eins und vollständige Zerlegung werden in einem eigenen
+Ausbauschritt autorisiert. Ein bloßer Engine-Miss oder
+`BACKEND_CLAIMED_IRREDUCIBLE` bleibt ohne die beschriebene Prüferspur
+unzureichend.
+
 ## Untrusted Engine-SPI und unabhängiger Verifier
 
 `FactorizationEngine<C>` arbeitet ausschließlich auf dem mathematischen
@@ -512,6 +560,7 @@ Erst danach entstehen issuer-owned Typen:
 
 ```text
 FactorizationVerifier.VerifiedCandidate<C>
+FactorizationVerifier.IndependentIrreducibilityTrace
 FactorizationVerifier.Report<C>
 ```
 
@@ -555,6 +604,10 @@ suitable-prime.modular-reduction
 hensel.step-<n>.corrections
 zassenhaus.candidate.attempts
 verify.factor-product-multiplications
+independent-irreducibility.normalization.content-gcd
+independent-irreducibility.prime-reduction
+independent-irreducibility.frobenius-multiplications
+independent-irreducibility.gcd-remainder-steps
 transform.source-evidence-text-validation
 render.inspected-polynomial-terms
 transform.exact-reparse-input-code-units
@@ -661,8 +714,9 @@ Issue #763 verfolgt nach dem exakten Wurzel-Transformationspfad insbesondere:
 3. den eingefrorenen Vergleich von keiner Faktorisierung, On-Demand-Ausführung
    und verifier-gebundenem Cache unter gleicher sichtbarer Information und
    kanonischer Arbeit;
-4. algorithmisch unabhängige Vollständigkeits- und
-   Irreduzibilitätszertifikate für `Z[x]` und `Q[x]`;
+4. die vorhandene unabhängige Originalquellen-Irreduzibilität auf jeden
+   ausgegebenen nichtkonstanten Faktor anwenden und daraus eine gebundene
+   Vollständigkeitsevidence für Zerlegungen in `Z[x]` und `Q[x]` bilden;
 5. stärkere Rekombination, zunächst LLL-/van-Hoeij-artig, für Fälle mit vielen
    modularen Faktoren;
 6. breitere gehaltene und adversarielle Korpora mit abgestuften Budgets;
