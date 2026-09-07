@@ -1,8 +1,11 @@
 package de.regelsuche.canonical;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.assumption.AssumptionContext;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
@@ -54,6 +57,20 @@ class PolynomialNormalizerTest {
         assertTrue(normalizer.normalize(parse("x^0")).isEmpty());
         assertTrue(normalizer.normalize(parse("0^0")).isEmpty());
         assertTrue(normalizer.normalize(parse("x^0 + y")).isEmpty());
+    }
+
+    @Test
+    void zeroPowerCancellationRequiresNonZeroBase() {
+        ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
+        assertNotEquals(
+            canonicalizer.stableHash("x^0 - x^0"),
+            canonicalizer.stableHash("0"));
+
+        AssumptionContext context = new AssumptionContext();
+        assertEquals("0", canonicalizer.canonicalizeWith("x^0 - x^0", context));
+        assertTrue(context.snapshot().stream().anyMatch(
+            assumption -> assumption.kind() == Assumption.Kind.NON_ZERO
+                && assumption.expression().equals("x != 0")));
     }
 
     private String normalize(String expression) {
