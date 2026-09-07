@@ -301,9 +301,20 @@ public class ExpressionCanonicalizer {
         Expr base = canonicalize(expression.left(), context);
         Expr exponent = canonicalize(expression.right(), context);
         if (isNumber(exponent, 0)) {
-            return canElideWithoutDomainLoss(base, context)
-                ? new NumberExpr(1)
-                : new BinaryExpr(base, BinaryOperator.POW, exponent);
+            Expr retained = new BinaryExpr(base, BinaryOperator.POW, exponent);
+            if (!canElideWithoutDomainLoss(base, context)) {
+                return retained;
+            }
+            if (base instanceof NumberExpr number) {
+                return Double.isFinite(number.value()) && number.value() != 0.0d
+                    ? new NumberExpr(1)
+                    : retained;
+            }
+            if (context == null) {
+                return retained;
+            }
+            context.add(Assumption.nonZero(ExpressionFormatter.format(base)));
+            return new NumberExpr(1);
         }
         if (isNumber(exponent, 1)) {
             return base;
