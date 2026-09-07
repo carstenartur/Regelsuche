@@ -241,11 +241,12 @@ public class ExpressionCanonicalizer {
     private Expr canonicalizeMultiplication(BinaryExpr expression, AssumptionContext context) {
         List<Expr> factors = new ArrayList<>();
         collectFactors(expression, factors);
+        AssumptionContext factorContext = context == null ? null : new AssumptionContext();
         ExactRational numeric = ExactRational.ONE;
         List<Expr> numericFactors = new ArrayList<>();
         Map<String, FactorBucket> buckets = new LinkedHashMap<>();
         for (Expr factor : factors) {
-            Expr normalized = canonicalize(factor, context);
+            Expr normalized = canonicalize(factor, factorContext);
             if (normalized instanceof NumberExpr numberExpr) {
                 ExactRational exact = PolynomialNormalizer.legacyExact(
                     numberExpr.value());
@@ -265,6 +266,10 @@ public class ExpressionCanonicalizer {
                 // supported range; wrapping could turn it into 1 or a pole.
                 return expression;
             }
+        }
+        if (context != null) {
+            // Commit only assumptions from reductions retained in the result.
+            context.addAll(factorContext.snapshot());
         }
 
         List<Expr> ordered = new ArrayList<>();

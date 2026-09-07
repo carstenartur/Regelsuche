@@ -142,6 +142,10 @@ autorisieren.
 Auch die Summe einzeln unterstuetzter positiver Integerexponenten wird vor
 der Addition auf die `int`-Grenze geprueft. Wuerde sie diese Grenze
 ueberschreiten, behaelt der allgemeine Canonicalizer das urspruengliche Produkt.
+Annahmen aus der vorlaeufigen Normalisierung der Faktoren werden dabei verworfen;
+sie werden erst nach erfolgreicher Exponentensammlung in den Caller-Kontext
+uebernommen. Vorhandene Annahmen und Bedingungen aus beibehaltenen
+Geschwisterausdruecken bleiben erhalten.
 So kann `x^2147483647 * x^2147483647 * x * x` weder durch Ueberlauf zu `1`
 werden noch einen falschen kanonischen Schluessel erhalten. Dieser konservative
 Fallback kann weniger aequivalente Faktorfolgen zusammenfassen; er erweitert
