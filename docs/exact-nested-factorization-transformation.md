@@ -215,8 +215,11 @@ Maven-/Produkt-/Docker-Vertrag verbindlich.
 
 ## Abgrenzung
 
-Der Slice aktiviert die Faktorisierung noch nicht als Standardstrategie der
-Suche oder der Workbench. Er führt auch noch keinen abgeleiteten Makrocache und
-keinen eingefrorenen On-Demand-/Cache-/No-Factorization-Vergleich aus. Diese
-Folgestufen können nun jedoch dieselbe occurrence-gebundene
-Transformationsevidence und dieselbe strukturelle Ersetzungsautorität nutzen.
+Der Slice aktiviert die Faktorisierung nicht als Standardstrategie der Suche
+oder der Workbench. Die inzwischen explizit konfigurierbare
+[Such-, Cache- und Lernintegration](exact-polynomial-search-integration.md)
+nutzt dieselbe occurrence-gebundene Transformationsevidence und strukturelle
+Ersetzungsautorität. Ihr Replay prüft weiterhin die aktuelle Struktur- und
+Zertifikatsanforderung; ein Produktnachweis wird nicht durch Caching zu einem
+unabhängigen Vollständigkeitsnachweis. Der eingefrorene vergleichende
+Nutzennachweis bleibt separat unter #748 offen.
