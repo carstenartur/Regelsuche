@@ -50,6 +50,7 @@ public final class ExactNestedFactorizationTransformationPipeline {
     private final ExpressionParser parser;
     private final ExactParsedUnivariatePolynomialView reconstructionView;
     private final Policy policy;
+    private final PolynomialWorkAuthority authority;
 
     public ExactNestedFactorizationTransformationPipeline() {
         this(
@@ -61,6 +62,16 @@ public final class ExactNestedFactorizationTransformationPipeline {
             Policy.boundedDefaults());
     }
 
+    public ExactNestedFactorizationTransformationPipeline(PolynomialWorkAuthority authority) {
+        this(
+            new ExactParsedSubtermProjector(ExactParsedSubtermProjector.Policy.boundedDefaults(), authority),
+            new ExactParsedUnivariatePolynomialView(ExactParsedUnivariatePolynomialView.DEFAULT_BUDGET, authority),
+            new ExactFactorizationExpressionRenderer(ExactFactorizationExpressionRenderer.Policy.boundedDefaults(), authority),
+            new ExpressionParser(),
+            new ExactParsedUnivariatePolynomialView(ExactParsedUnivariatePolynomialView.DEFAULT_BUDGET, authority),
+            Policy.boundedDefaults(), authority);
+    }
+
     public ExactNestedFactorizationTransformationPipeline(
         ExactParsedSubtermProjector projector,
         ExactParsedUnivariatePolynomialView extractionView,
@@ -69,6 +80,18 @@ public final class ExactNestedFactorizationTransformationPipeline {
         ExactParsedUnivariatePolynomialView reconstructionView,
         Policy policy
     ) {
+        this(projector, extractionView, renderer, parser, reconstructionView,
+            policy, PolynomialWorkAuthority.unbounded());
+    }
+
+    private ExactNestedFactorizationTransformationPipeline(
+            ExactParsedSubtermProjector projector,
+            ExactParsedUnivariatePolynomialView extractionView,
+            ExactFactorizationExpressionRenderer renderer,
+            ExpressionParser parser,
+            ExactParsedUnivariatePolynomialView reconstructionView,
+            Policy policy, PolynomialWorkAuthority authority) {
+        this.authority = Objects.requireNonNull(authority, "authority");
         this.projector = Objects.requireNonNull(projector, "projector");
         this.extractionView = Objects.requireNonNull(
             extractionView,
@@ -177,7 +200,7 @@ public final class ExactNestedFactorizationTransformationPipeline {
         }
         ExactParsedTerm projected = projection.projected().orElseThrow();
         var validation = ExactFactorizationTransformationPipeline.validateReplaySource(
-            projected, authorization, remainingAfterReservation(prior, checked.replacementReserve()));
+            projected, authorization, remainingAfterReservation(prior, checked.replacementReserve()), authority);
         PolynomialWorkLedger throughValidation = merge(prior, validation.work());
         if (validation.status() != ExactFactorizationTransformationPipeline.Status.TRANSFORMED) {
             return projectionFailure(mapTransformationStatus(validation.status()), validation.detailCode(),
@@ -188,6 +211,12 @@ public final class ExactNestedFactorizationTransformationPipeline {
             Math.addExact(3L, Math.multiplyExact(4L, retainedSource.termCount()))));
         if (!policyWork.within(remainingAfterReservation(throughValidation, checked.replacementReserve()))) {
             return projectionFailure(Status.BUDGET_INCONCLUSIVE, "REPLAY_POLICY_VALIDATION_AUTHORITY_INSUFFICIENT",
+                position, projection, throughValidation);
+        }
+        try {
+            authority.consume(policyWork);
+        } catch (PolynomialWorkAuthority.LimitReached exception) {
+            return projectionFailure(Status.BUDGET_INCONCLUSIVE, exception.getMessage(),
                 position, projection, throughValidation);
         }
         throughValidation = merge(throughValidation, policyWork);
@@ -240,7 +269,7 @@ public final class ExactNestedFactorizationTransformationPipeline {
         TreePosition position,
         boolean factorizationRequired
     ) {
-        Work work = new Work(policy.maxTotalWorkUnits());
+        Work work = new Work(policy.maxTotalWorkUnits(), authority);
         if (position.path().size() > policy.maxPathDepth()) {
             return Outcome.failure(failure(
                 Status.BUDGET_INCONCLUSIVE,
@@ -249,11 +278,8 @@ public final class ExactNestedFactorizationTransformationPipeline {
                 work.ledger()));
         }
         try {
-            TreePosition.SelectionResult selection = position.selectAt(
-                root.expression());
-            work.consume(
-                "nested.position-preflight-path-navigation",
-                position.path().size());
+            work.consume("nested.position-preflight-path-navigation", position.path().size());
+            TreePosition.SelectionResult selection = position.selectAt(root.expression());
             switch (selection.status()) {
                 case SELECTED -> {
                     // The shared TreePosition authority accepted this path.
@@ -280,7 +306,7 @@ public final class ExactNestedFactorizationTransformationPipeline {
                 policy.maxRootNodes(),
                 work,
                 "nested.root-preflight-node-visits");
-        } catch (WorkLimitReached | RepresentationLimitReached exception) {
+        } catch (WorkLimitReached | RepresentationLimitReached | PolynomialWorkAuthority.LimitReached exception) {
             return Outcome.failure(failure(
                 Status.BUDGET_INCONCLUSIVE,
                 exception.getMessage(),
@@ -352,7 +378,7 @@ public final class ExactNestedFactorizationTransformationPipeline {
         ExactParsedFactorizationPipeline.Result factorization =
             new ExactParsedFactorizationPipeline(
                 extractionView,
-                factorizationPolicy(factorizationAuthority))
+                factorizationPolicy(factorizationAuthority), authority)
                 .factor(projected, engine);
         ExactFactorizationTransformationPipeline.Result transformation =
             transformProjected(projected, factorization, candidateIndex);
@@ -390,7 +416,7 @@ public final class ExactNestedFactorizationTransformationPipeline {
             new ExactFactorizationTransformationPipeline(
                 renderer,
                 parser,
-                reconstructionView);
+                reconstructionView, authority);
         if (candidateIndex.isPresent()) {
             return transformationPipeline.transformRoot(
                 projected,
@@ -405,7 +431,7 @@ public final class ExactNestedFactorizationTransformationPipeline {
         TreePosition position,
         PreparedTransformation prepared
     ) {
-        Work work = new Work(prepared.replacementReserve());
+        Work work = new Work(prepared.replacementReserve(), authority);
         try {
             Expr selected = selectAuthorizedOccurrence(
                 root,
@@ -446,7 +472,7 @@ public final class ExactNestedFactorizationTransformationPipeline {
                 position,
                 prepared,
                 work);
-        } catch (WorkLimitReached | RepresentationLimitReached exception) {
+        } catch (WorkLimitReached | RepresentationLimitReached | PolynomialWorkAuthority.LimitReached exception) {
             return preparedFailure(
                 Status.BUDGET_INCONCLUSIVE,
                 exception.getMessage(),
@@ -469,10 +495,8 @@ public final class ExactNestedFactorizationTransformationPipeline {
         PreparedTransformation prepared,
         Work work
     ) {
+        work.consume("nested.application-path-navigation", position.path().size());
         Expr selected = position.subtreeAt(root.expression()).orElse(null);
-        work.consume(
-            "nested.application-path-navigation",
-            position.path().size());
         if (selected == null) {
             throw applicationFailure(
                 Status.POSITION_NOT_PRESENT,
@@ -488,12 +512,9 @@ public final class ExactNestedFactorizationTransformationPipeline {
             "nested.application-staleness-format-node-visits",
             prepared.projection().work().units(
                 "projection.subtree-node-visits"));
-        String applicationText = ExpressionFormatter.format(selected);
-        work.consume(
-            "nested.application-staleness-text-code-units",
-            Math.addExact(
-                (long) position.text().length(),
-                applicationText.length()));
+        work.consume("nested.application-staleness-text-code-units", position.text().length());
+        String applicationText = ExpressionFormatter.formatMeasured(selected,
+            units -> work.consume("nested.application-staleness-text-code-units", units));
         if (!position.text().equals(applicationText)) {
             throw applicationFailure(
                 Status.POSITION_STALE,
@@ -516,15 +537,13 @@ public final class ExactNestedFactorizationTransformationPipeline {
             policy.maxReplacementNodes(),
             work,
             "nested.replacement-node-visits");
-        TreePosition.ReplacementResult applied = position.replaceAt(
-            root.expression(),
-            replacement);
-        work.consume(
-            "nested.replacement-path-navigation",
-            position.path().size());
-        work.consume(
-            "nested.replacement-ancestor-copies",
-            applied.copiedAncestors());
+        work.consumeTogether(new PolynomialWorkLedger(Map.of(
+            "nested.replacement-path-navigation", (long) position.path().size(),
+            "nested.replacement-ancestor-copies", (long) position.path().size())));
+        TreePosition.ReplacementResult applied = position.replaceAt(root.expression(), replacement);
+        if (applied.copiedAncestors() != position.path().size()) {
+            throw invariant("STRUCTURAL_REPLACEMENT_COPY_COUNT_CHANGED");
+        }
         if (!applied.success()
                 || applied.selectedSubtree().orElseThrow() != selected) {
             throw invariant(
@@ -541,11 +560,8 @@ public final class ExactNestedFactorizationTransformationPipeline {
             throw invariant(
                 "STRUCTURAL_REPLACEMENT_CHANGED_UNAUTHORIZED_SURROUNDING_AST");
         }
-        Expr replayedOccurrence = position.subtreeAt(
-            rewrittenRoot).orElse(null);
-        work.consume(
-            "nested.rewritten-path-replay",
-            position.path().size());
+        work.consume("nested.rewritten-path-replay", position.path().size());
+        Expr replayedOccurrence = position.subtreeAt(rewrittenRoot).orElse(null);
         if (replayedOccurrence != replacement) {
             throw invariant(
                 "REWRITTEN_PATH_DOES_NOT_RESOLVE_TO_REPLACEMENT");
@@ -559,15 +575,13 @@ public final class ExactNestedFactorizationTransformationPipeline {
         AppliedReplacement applied,
         Work work
     ) {
-        TreePosition.ReplacementResult replay = position.replaceAt(
-            root.expression(),
-            applied.replacement());
-        work.consume(
-            "nested.replacement-replay-path-navigation",
-            position.path().size());
-        work.consume(
-            "nested.replacement-replay-ancestor-copies",
-            replay.copiedAncestors());
+        work.consumeTogether(new PolynomialWorkLedger(Map.of(
+            "nested.replacement-replay-path-navigation", (long) position.path().size(),
+            "nested.replacement-replay-ancestor-copies", (long) position.path().size())));
+        TreePosition.ReplacementResult replay = position.replaceAt(root.expression(), applied.replacement());
+        if (replay.copiedAncestors() != position.path().size()) {
+            throw invariant("STRUCTURAL_REPLAY_COPY_COUNT_CHANGED");
+        }
         if (!replay.success()) {
             throw invariant("STRUCTURAL_REPLACEMENT_IS_NOT_REPLAYABLE");
         }
@@ -1461,8 +1475,11 @@ public final class ExactNestedFactorizationTransformationPipeline {
         private final Map<String, Long> stages = new LinkedHashMap<>();
         private long total;
 
-        private Work(long limit) {
+        private final PolynomialWorkAuthority authority;
+
+        private Work(long limit, PolynomialWorkAuthority authority) {
             this.limit = limit;
+            this.authority = authority;
         }
 
         private void consume(String stage, long units) {
@@ -1477,8 +1494,19 @@ public final class ExactNestedFactorizationTransformationPipeline {
             if (units == 0) {
                 return;
             }
+            authority.consume(stage, units);
             total += units;
             stages.merge(stage, units, Math::addExact);
+        }
+
+        private void consumeTogether(PolynomialWorkLedger charge) {
+            if (charge.totalWorkUnits() == 0) return;
+            if (charge.totalWorkUnits() > limit - total) {
+                throw new WorkLimitReached("NESTED_REPLACEMENT_REPLAY_WORK_BUDGET_EXCEEDED");
+            }
+            authority.consume(charge);
+            total += charge.totalWorkUnits();
+            charge.stages().forEach((stage, units) -> stages.merge(stage, units, Math::addExact));
         }
 
         private PolynomialWorkLedger ledger() {

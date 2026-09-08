@@ -1,5 +1,8 @@
 package de.regelsuche.parse;
 
+import de.regelsuche.polynomial.PolynomialWorkAuthority;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
@@ -43,12 +46,18 @@ public final class ExactParsedSubtermProjector {
     public static final long MAX_WORK_UNITS = 50_000_000L;
 
     private final Policy policy;
+    private final PolynomialWorkAuthority authority;
 
     public ExactParsedSubtermProjector() {
         this(Policy.boundedDefaults());
     }
 
     public ExactParsedSubtermProjector(Policy policy) {
+        this(policy, PolynomialWorkAuthority.unbounded());
+    }
+
+    public ExactParsedSubtermProjector(Policy policy, PolynomialWorkAuthority authority) {
+        this.authority = Objects.requireNonNull(authority, "authority");
         this.policy = Objects.requireNonNull(policy, "policy");
     }
 
@@ -75,7 +84,7 @@ public final class ExactParsedSubtermProjector {
                 "expected subtree text must not be blank");
         }
 
-        Work work = new Work(policy.maxWorkUnits());
+        Work work = new Work(policy.maxWorkUnits(), authority);
         if (stablePath.size() > policy.maxPathDepth()) {
             return failure(
                 Status.BUDGET_INCONCLUSIVE,
@@ -170,13 +179,11 @@ public final class ExactParsedSubtermProjector {
             work.consume(
                 "projection.staleness-format-node-visits",
                 scan.nodeCount());
-            String actual = ExpressionFormatter.format(selected);
+            String actual = ExpressionFormatter.formatMeasured(selected,
+                units -> work.consume("projection.staleness-format-code-units", units));
             if (actual.length() > policy.maxFormattedCodeUnits()) {
                 throw limit("MAX_ACTUAL_FORMATTED_CODE_UNITS_EXCEEDED");
             }
-            work.consume(
-                "projection.staleness-format-code-units",
-                actual.length());
             work.consume(
                 "projection.staleness-text-comparison",
                 Math.addExact(
@@ -209,14 +216,11 @@ public final class ExactParsedSubtermProjector {
             work.consume(
                 "projection.revalidation-range-bindings",
                 scan.shiftedRanges().size());
-            work.consume(
-                "projection.revalidation-literal-bindings",
-                scan.literals().size());
-            work.consume(
-                "projection.revalidation-literal-code-units",
-                Math.addExact(
+            work.consumeTogether(new PolynomialWorkLedger(Map.of(
+                "projection.revalidation-literal-bindings", (long) scan.literals().size(),
+                "projection.revalidation-literal-code-units", Math.addExact(
                     Math.multiplyExact(4L, literalLexemeUnits),
-                    Math.multiplyExact(512L, scan.literals().size())));
+                    Math.multiplyExact(512L, scan.literals().size())))));
 
             ExactParsedTerm projected;
             try {
@@ -247,7 +251,7 @@ public final class ExactParsedSubtermProjector {
                 scan.rangeCommitmentHash(),
                 projected,
                 work);
-        } catch (ProjectionLimitReached exception) {
+        } catch (ProjectionLimitReached | PolynomialWorkAuthority.LimitReached exception) {
             return failure(
                 Status.BUDGET_INCONCLUSIVE,
                 exception.getMessage(),
@@ -830,8 +834,11 @@ public final class ExactParsedSubtermProjector {
         private final Map<String, Long> stages = new TreeMap<>();
         private long total;
 
-        private Work(long limit) {
+        private final PolynomialWorkAuthority authority;
+
+        private Work(long limit, PolynomialWorkAuthority authority) {
             this.limit = limit;
+            this.authority = authority;
         }
 
         private void consume(String stage, long units) {
@@ -841,8 +848,20 @@ public final class ExactParsedSubtermProjector {
             if (units == 0) {
                 return;
             }
+            authority.consume(stage, units);
             total += units;
             stages.merge(stage, units, Math::addExact);
+        }
+
+        private void consumeTogether(PolynomialWorkLedger charge) {
+            if (charge.totalWorkUnits() == 0) return;
+            if (charge.totalWorkUnits() > limit - total) {
+                throw limit("SUBTERM_PROJECTION_WORK_BUDGET_EXCEEDED");
+            }
+            authority.consume(charge);
+            total += charge.totalWorkUnits();
+            charge.stages().forEach((stage, units) ->
+                stages.merge(stage, units, Math::addExact));
         }
 
         private WorkLedger ledger() {

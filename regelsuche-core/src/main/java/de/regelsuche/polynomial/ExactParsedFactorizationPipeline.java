@@ -21,6 +21,7 @@ public final class ExactParsedFactorizationPipeline {
 
     private final ExactParsedUnivariatePolynomialView view;
     private final Policy policy;
+    private final PolynomialWorkAuthority authority;
 
     public ExactParsedFactorizationPipeline() {
         this(
@@ -32,7 +33,14 @@ public final class ExactParsedFactorizationPipeline {
         ExactParsedUnivariatePolynomialView view,
         Policy policy
     ) {
-        this.view = Objects.requireNonNull(view, "view");
+        this(view, policy, PolynomialWorkAuthority.unbounded());
+    }
+
+    public ExactParsedFactorizationPipeline(ExactParsedUnivariatePolynomialView view,
+            Policy policy, PolynomialWorkAuthority authority) {
+        this.authority = Objects.requireNonNull(authority, "authority");
+        this.view = new ExactParsedUnivariatePolynomialView(
+            Objects.requireNonNull(view, "view").budget(), authority);
         this.policy = Objects.requireNonNull(policy, "policy");
         long extractionCeiling = Math.addExact(
             (long) view.budget().maxVisitedNodes(),
@@ -112,8 +120,10 @@ public final class ExactParsedFactorizationPipeline {
                 extractionWork);
         }
 
-        long remainingWork = policy.maxTotalWorkUnits() - extractionUnits;
-        if (remainingWork < 1) {
+        long remainingWork = Math.min(policy.maxTotalWorkUnits() - extractionUnits,
+            authority.remainingOpaqueWorkUnits());
+        PolynomialWorkLedger dispatch = authority.opaqueInvocationOverhead();
+        if (remainingWork <= dispatch.totalWorkUnits()) {
             return Result.failure(
                 Status.BUDGET_INCONCLUSIVE,
                 "NO_FACTORIZATION_WORK_BUDGET_REMAINING",
@@ -122,6 +132,9 @@ public final class ExactParsedFactorizationPipeline {
                 extraction,
                 extractionWork);
         }
+
+        authority.consume(dispatch);
+        remainingWork -= dispatch.totalWorkUnits();
 
         FactorizationRequest<ExactRational> request =
             new FactorizationRequest<>(
@@ -132,9 +145,12 @@ public final class ExactParsedFactorizationPipeline {
                 remainingWork);
         FactorizationVerifier.Report<ExactRational> report =
             FactorizationVerifier.execute(engine, request);
+        if (!report.work().within(remainingWork)) {
+            throw new IllegalStateException("OPAQUE_FACTORIZATION_EXCEEDED_ADMITTED_RAW_AUTHORITY");
+        }
+        authority.consume(report.work());
         PolynomialWorkLedger totalWork = merge(
-            extractionWork,
-            report.work());
+            merge(extractionWork, dispatch), report.work());
         if (!totalWork.within(policy.maxTotalWorkUnits())) {
             throw new IllegalStateException(
                 "factorization pipeline exceeded its total-work authority");

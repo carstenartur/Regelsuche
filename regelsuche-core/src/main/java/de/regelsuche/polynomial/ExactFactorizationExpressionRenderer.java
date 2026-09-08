@@ -33,12 +33,18 @@ public final class ExactFactorizationExpressionRenderer {
         MAX_PARSER_LITERAL_MAGNITUDE.bitLength();
 
     private final Policy policy;
+    private final PolynomialWorkAuthority authority;
 
     public ExactFactorizationExpressionRenderer() {
         this(Policy.boundedDefaults());
     }
 
     public ExactFactorizationExpressionRenderer(Policy policy) {
+        this(policy, PolynomialWorkAuthority.unbounded());
+    }
+
+    public ExactFactorizationExpressionRenderer(Policy policy, PolynomialWorkAuthority authority) {
+        this.authority = Objects.requireNonNull(authority, "authority");
         this.policy = Objects.requireNonNull(policy, "policy");
     }
 
@@ -50,7 +56,7 @@ public final class ExactFactorizationExpressionRenderer {
         FactorizationVerifier.VerifiedCandidate<ExactRational> candidate
     ) {
         Objects.requireNonNull(candidate, "candidate");
-        Work work = new Work(policy.maxWorkUnits());
+        Work work = new Work(policy.maxWorkUnits(), authority);
         try {
             PolynomialRing<ExactRational> ring =
                 candidate.unresolvedRemainder().ring();
@@ -88,7 +94,7 @@ public final class ExactFactorizationExpressionRenderer {
                 candidate,
                 output.toString(),
                 work.ledger());
-        } catch (RepresentationLimitReached exception) {
+        } catch (RepresentationLimitReached | PolynomialWorkAuthority.LimitReached exception) {
             return Result.failure(
                 Status.BUDGET_INCONCLUSIVE,
                 exception.getMessage(),
@@ -579,8 +585,11 @@ public final class ExactFactorizationExpressionRenderer {
         private final Map<String, Long> stages = new LinkedHashMap<>();
         private long total;
 
-        private Work(long limit) {
+        private final PolynomialWorkAuthority authority;
+
+        private Work(long limit, PolynomialWorkAuthority authority) {
             this.limit = limit;
+            this.authority = authority;
         }
 
         private void consume(String stage, long units) {
@@ -591,6 +600,7 @@ public final class ExactFactorizationExpressionRenderer {
             if (units == 0) {
                 return;
             }
+            authority.consume(stage, units);
             total += units;
             stages.merge(stage, units, Math::addExact);
         }

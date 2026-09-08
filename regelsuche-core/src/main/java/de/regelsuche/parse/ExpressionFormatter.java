@@ -19,7 +19,12 @@ public final class ExpressionFormatter {
     }
 
     public static String format(Expr expr) {
-        StringBuilder builder = new StringBuilder();
+        return formatMeasured(expr, units -> { });
+    }
+
+    /** Charges emitted code units before appending each formatter fragment. */
+    public static String formatMeasured(Expr expr, java.util.function.LongConsumer emittedCodeUnits) {
+        Output builder = new Output(emittedCodeUnits);
         append(
             Objects.requireNonNull(expr, "expr"),
             0,
@@ -29,7 +34,7 @@ public final class ExpressionFormatter {
 
     public static String format(Equation equation) {
         Objects.requireNonNull(equation, "equation");
-        StringBuilder builder = new StringBuilder();
+        Output builder = new Output(units -> { });
         append(equation.left(), 0, builder);
         builder.append(" = ");
         append(equation.right(), 0, builder);
@@ -39,7 +44,7 @@ public final class ExpressionFormatter {
     private static void append(
         Expr expression,
         int parentPrecedence,
-        StringBuilder builder
+        Output builder
     ) {
         Deque<Action> pending = new ArrayDeque<>();
         pending.push(new FormatExpression(
@@ -64,7 +69,7 @@ public final class ExpressionFormatter {
         Expr expression,
         int parentPrecedence,
         Deque<Action> pending,
-        StringBuilder builder
+        Output builder
     ) {
         if (expression instanceof NumberExpr number) {
             appendNumber(number, parentPrecedence, builder);
@@ -90,7 +95,7 @@ public final class ExpressionFormatter {
     private static void appendNumber(
         NumberExpr number,
         int parentPrecedence,
-        StringBuilder builder
+        Output builder
     ) {
         var value = number.value();
         if (!withinNumericSyntaxLimits(value)) {
@@ -131,7 +136,7 @@ public final class ExpressionFormatter {
     private static void scheduleFunction(
         FunctionExpr function,
         Deque<Action> pending,
-        StringBuilder builder
+        Output builder
     ) {
         builder.append(function.name()).append('(');
         pending.push(new AppendText(")"));
@@ -152,7 +157,7 @@ public final class ExpressionFormatter {
         BinaryExpr binary,
         int parentPrecedence,
         Deque<Action> pending,
-        StringBuilder builder
+        Output builder
     ) {
         BinaryOperator operator = binary.operator();
         int precedence = operator.precedence();
@@ -182,6 +187,32 @@ public final class ExpressionFormatter {
     private static boolean isDivision(Expr expression) {
         return expression instanceof BinaryExpr binary
             && binary.operator() == BinaryOperator.DIV;
+    }
+
+    private static final class Output {
+        private final StringBuilder text = new StringBuilder();
+        private final java.util.function.LongConsumer emittedCodeUnits;
+
+        private Output(java.util.function.LongConsumer emittedCodeUnits) {
+            this.emittedCodeUnits = Objects.requireNonNull(emittedCodeUnits, "emittedCodeUnits");
+        }
+
+        private Output append(String value) {
+            emittedCodeUnits.accept(value.length());
+            text.append(value);
+            return this;
+        }
+
+        private Output append(char value) {
+            emittedCodeUnits.accept(1);
+            text.append(value);
+            return this;
+        }
+
+        @Override
+        public String toString() {
+            return text.toString();
+        }
     }
 
     private sealed interface Action

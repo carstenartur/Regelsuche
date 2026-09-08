@@ -29,6 +29,7 @@ public final class ExactFactorizationTransformationPipeline {
     private final ExactFactorizationExpressionRenderer renderer;
     private final ExpressionParser parser;
     private final ExactParsedUnivariatePolynomialView reparseView;
+    private final PolynomialWorkAuthority authority;
 
     public ExactFactorizationTransformationPipeline() {
         this(
@@ -42,11 +43,19 @@ public final class ExactFactorizationTransformationPipeline {
         ExpressionParser parser,
         ExactParsedUnivariatePolynomialView reparseView
     ) {
-        this.renderer = Objects.requireNonNull(renderer, "renderer");
+        this(renderer, parser, reparseView, PolynomialWorkAuthority.unbounded());
+    }
+
+    public ExactFactorizationTransformationPipeline(
+            ExactFactorizationExpressionRenderer renderer,
+            ExpressionParser parser, ExactParsedUnivariatePolynomialView reparseView,
+            PolynomialWorkAuthority authority) {
+        this.authority = Objects.requireNonNull(authority, "authority");
+        this.renderer = new ExactFactorizationExpressionRenderer(
+            Objects.requireNonNull(renderer, "renderer").policy(), authority);
         this.parser = Objects.requireNonNull(parser, "parser");
-        this.reparseView = Objects.requireNonNull(
-            reparseView,
-            "reparseView");
+        this.reparseView = new ExactParsedUnivariatePolynomialView(
+            Objects.requireNonNull(reparseView, "reparseView").budget(), authority);
     }
 
     public ExactFactorizationExpressionRenderer renderer() {
@@ -253,6 +262,12 @@ public final class ExactFactorizationTransformationPipeline {
                 afterParse);
         }
 
+        if (!charge(parseWork)) {
+            return Result.failure(Status.BUDGET_INCONCLUSIVE,
+                "SHARED_POLYNOMIAL_WORK_AUTHORITY_EXHAUSTED", authorization.occurrence(),
+                factorization, candidateIndex, candidateCertificate, Optional.of(rendering),
+                Optional.empty(), Optional.empty(), afterRendering);
+        }
         ExactParsedTerm reparsed;
         try {
             reparsed = parser.parseExactTerm(expression);
@@ -360,6 +375,12 @@ public final class ExactFactorizationTransformationPipeline {
         PolynomialWorkLedger afterComparison = merge(
             totalWork,
             comparisonWork);
+        if (!charge(comparisonWork)) {
+            return Result.failure(Status.BUDGET_INCONCLUSIVE,
+                "SHARED_POLYNOMIAL_WORK_AUTHORITY_EXHAUSTED", authorization.occurrence(),
+                factorization, candidateIndex, candidateCertificate, Optional.of(rendering),
+                Optional.of(reparsed), Optional.of(reconstruction), totalWork);
+        }
         if (!withinOriginalAuthority(factorization, afterComparison)) {
             return Result.failure(
                 Status.BUDGET_INCONCLUSIVE,
@@ -409,6 +430,11 @@ public final class ExactFactorizationTransformationPipeline {
         Result retained,
         long availableWork
     ) {
+        return validateReplaySource(source, retained, availableWork, PolynomialWorkAuthority.unbounded());
+    }
+
+    static ReplaySourceValidation validateReplaySource(ExactParsedTerm source,
+            Result retained, long availableWork, PolynomialWorkAuthority authority) {
         Objects.requireNonNull(source, "source");
         Objects.requireNonNull(retained, "retained");
         if (!retained.transformed() || availableWork < 0) {
@@ -419,6 +445,12 @@ public final class ExactFactorizationTransformationPipeline {
             return new ReplaySourceValidation(Status.BUDGET_INCONCLUSIVE,
                 "REPLAY_SOURCE_VALIDATION_AUTHORITY_INSUFFICIENT", PolynomialWorkLedger.empty());
         }
+        try {
+            authority.consume(work);
+        } catch (PolynomialWorkAuthority.LimitReached exception) {
+            return new ReplaySourceValidation(Status.BUDGET_INCONCLUSIVE,
+                exception.getMessage(), PolynomialWorkLedger.empty());
+        }
         String violation = sourceContinuityViolation(source, retained.factorization());
         return new ReplaySourceValidation(violation == null ? Status.TRANSFORMED : Status.SOURCE_EVIDENCE_MISMATCH,
             violation == null ? "REPLAY_SOURCE_EVIDENCE_VALIDATED" : violation, work);
@@ -426,7 +458,7 @@ public final class ExactFactorizationTransformationPipeline {
 
     record ReplaySourceValidation(Status status, String detailCode, PolynomialWorkLedger work) { }
 
-    private static SourceAuthorization authorizeSource(
+    private SourceAuthorization authorizeSource(
         ExactParsedTerm source,
         ExactParsedFactorizationPipeline.Result factorization
     ) {
@@ -437,7 +469,7 @@ public final class ExactFactorizationTransformationPipeline {
             factorization.extraction());
         long remaining = factorization.policy().maxTotalWorkUnits()
             - factorization.totalWork().totalWorkUnits();
-        if (!validationWork.within(remaining)) {
+        if (!validationWork.within(remaining) || !charge(validationWork)) {
             return new SourceAuthorization(
                 occurrence,
                 factorization.totalWork(),
@@ -533,6 +565,15 @@ public final class ExactFactorizationTransformationPipeline {
         return Math.addExact(
             result,
             reparseView.budget().maxVisitedNodes());
+    }
+
+    private boolean charge(PolynomialWorkLedger work) {
+        try {
+            authority.consume(work);
+            return true;
+        } catch (PolynomialWorkAuthority.LimitReached exception) {
+            return false;
+        }
     }
 
     private static boolean withinOriginalAuthority(

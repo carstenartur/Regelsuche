@@ -526,7 +526,8 @@ public final class VerifiedPolynomialTransitionCacheStore {
             }
         }
 
-        private static VerifiedTransition from(
+        /** Observation of the existing issuer-owned primitive expansion. */
+        public static VerifiedTransition from(
             ExactFactorizationTransformationPipeline.Result result
         ) {
             if (!result.transformed()) {

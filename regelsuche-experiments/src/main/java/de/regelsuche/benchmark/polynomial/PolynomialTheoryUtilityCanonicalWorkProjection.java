@@ -67,8 +67,27 @@ public final class PolynomialTheoryUtilityCanonicalWorkProjection {
     ) {
         var frozenInput = Objects.requireNonNull(input, "input");
         var raw = Objects.requireNonNull(rawWork, "rawWork");
-        PolynomialTheoryUtilityWorkBreakdown work =
-            new PolynomialTheoryUtilityWorkBreakdown(
+        PolynomialTheoryUtilityWorkBreakdown work = measure(raw);
+        requireWithinAuthority(frozenInput, work);
+        String rawWorkHash = hash(raw.identityMaterial());
+        String projectionId = projectionId(
+            frozenInput.inputId(),
+            rawWorkHash,
+            work
+        );
+        return new Projection(
+            projectionId,
+            frozenInput.inputId(),
+            REVISION,
+            rawWorkHash,
+            work
+        );
+    }
+
+    /** Computes the frozen v2 vector without allocating any execution authority. */
+    public static PolynomialTheoryUtilityWorkBreakdown measure(RawWork raw) {
+        Objects.requireNonNull(raw, "raw");
+        return new PolynomialTheoryUtilityWorkBreakdown(
                 raw.primitiveWork(),
                 canonicalUnits(raw.matchingWork(), Dimension.MATCHING),
                 canonicalUnits(
@@ -114,20 +133,6 @@ public final class PolynomialTheoryUtilityCanonicalWorkProjection {
                     Dimension.EVIDENCE_CONSTRUCTION
                 )
             );
-        requireWithinAuthority(frozenInput, work);
-        String rawWorkHash = hash(raw.identityMaterial());
-        String projectionId = projectionId(
-            frozenInput.inputId(),
-            rawWorkHash,
-            work
-        );
-        return new Projection(
-            projectionId,
-            frozenInput.inputId(),
-            REVISION,
-            rawWorkHash,
-            work
-        );
     }
 
     private static void requireWithinAuthority(

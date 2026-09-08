@@ -15,7 +15,7 @@ ausgewählt.
 | Ausführungsplan | `FROZEN_NOT_EXECUTED` |
 | Adaptereingaben | `READY_NOT_EXECUTED` |
 | Qualifikation | `SEALED_NOT_OPENED` |
-| Profilausführung | `NOT_STARTED` |
+| Profilausführung | `NATIVE_ADAPTER_CHARACTERIZED_NOT_QUALIFIED` |
 | Standardentscheidung | `NOT_SELECTED` |
 
 Ein grüner Build belegt nur die interne Konsistenz und Reproduzierbarkeit
@@ -190,12 +190,19 @@ ist inzwischen ausdrücklich konfigurierbar. Die Zulassungsdiagnose für ihre
 konservative Roharbeitsgrenze stoppt jedoch bei allen 360 eingefrorenen
 Eingaben der drei allgemeinen Profile vor einem Engine-Aufruf. Dies ist kein
 vollständiger Studienlauf und kein negatives mathematisches Ergebnis.
-Zunächst fehlt eine nachweislich budgettreue Laufzeitabbildung der kanonischen
-Arbeitsautorität; die eingefrorenen Grenzen werden nicht nachträglich erhöht.
+Für den Studienadapter steht nun eine [gemeinsame kanonische
+Laufzeitautorität](polynomial-theory-utility-runtime-authority.md) bereit. Sie
+verwendet dieselbe eingefrorene v2-Projektion vor jeder Arbeitserweiterung und
+setzt die Zeilenautorität zwischen Auftreten nicht zurück. Der native
+On-Demand-Adapter ist an alle 120 unveränderlichen Eingabeumschläge seines
+Profils angeschlossen und wird mit vollständiger Roh- und Attempt-Evidenz
+zweimal deterministisch charakterisiert.
 
-Als Nächstes werden die fünf ausführbaren Profiladapter gegen die 600
-unveränderlichen Eingabeumschläge implementiert. Sie dürfen ausschließlich
-einen versionierten zielblinden Candidate-Freeze erzeugen. Erst nachdem dessen
-Bytes gebunden sind, darf der getrennte Qualifikationsschritt die versiegelte
-Datei öffnen. Politikauswahl und eine mögliche Standardempfehlung bleiben
-weitere mechanisch abgeleitete Schritte.
+Diese Charakterisierung ist keine vollständige 600-Zeilen-Candidate-Freeze.
+Cache-, Spezialkontroll- und externer Messadapter sowie die Reproduktionen und
+die Qualifikation bleiben weitere Schritte. Der Laufzeitvertrag dokumentiert
+zusätzlich eine anhand eines echten abgebrochenen Cache-Replays geprüfte
+Lücke im eingefrorenen negativen Resultatvertrag. Arbeit und erfolgreiche
+Teilbeobachtungen dürfen nicht gelöscht werden, um diese Grenze zu umgehen.
+Die Qualifikation wird erst nach einer vollständigen, gültigen
+Candidate-Freeze geöffnet.

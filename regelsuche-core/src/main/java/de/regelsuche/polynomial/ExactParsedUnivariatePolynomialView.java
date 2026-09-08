@@ -36,12 +36,18 @@ public final class ExactParsedUnivariatePolynomialView {
         new Budget(16, 4_096, 512, 10_000);
 
     private final Budget budget;
+    private final PolynomialWorkAuthority authority;
 
     public ExactParsedUnivariatePolynomialView() {
         this(DEFAULT_BUDGET);
     }
 
     public ExactParsedUnivariatePolynomialView(Budget budget) {
+        this(budget, PolynomialWorkAuthority.unbounded());
+    }
+
+    public ExactParsedUnivariatePolynomialView(Budget budget, PolynomialWorkAuthority authority) {
+        this.authority = Objects.requireNonNull(authority, "authority");
         this.budget = Objects.requireNonNull(budget, "budget");
     }
 
@@ -51,7 +57,7 @@ public final class ExactParsedUnivariatePolynomialView {
 
     public Analysis analyze(ExactParsedTerm parsed) {
         Objects.requireNonNull(parsed, "parsed");
-        Work work = new Work(budget);
+        Work work = new Work(budget, authority);
         List<LiteralBinding> literals = parsed.literals().stream()
             .map(LiteralBinding::from)
             .toList();
@@ -69,7 +75,7 @@ public final class ExactParsedUnivariatePolynomialView {
                 toSparsePolynomial(value),
                 literals,
                 work.snapshot());
-        } catch (BudgetExceeded exception) {
+        } catch (BudgetExceeded | PolynomialWorkAuthority.LimitReached exception) {
             return Analysis.failure(
                 Status.BUDGET_INCONCLUSIVE,
                 exception.getMessage(),
@@ -673,14 +679,18 @@ public final class ExactParsedUnivariatePolynomialView {
         private int visitedNodes;
         private int arithmeticOperations;
 
-        private Work(Budget budget) {
+        private final PolynomialWorkAuthority authority;
+
+        private Work(Budget budget, PolynomialWorkAuthority authority) {
             this.budget = budget;
+            this.authority = authority;
         }
 
         private void visit() {
             if (visitedNodes >= budget.maxVisitedNodes()) {
                 throw budgetExceeded("MAX_VISITED_NODES_EXCEEDED");
             }
+            authority.consume("exact-parsed-view.ast-visits", 1);
             visitedNodes++;
         }
 
@@ -695,6 +705,7 @@ public final class ExactParsedUnivariatePolynomialView {
                 throw budgetExceeded(
                     "MAX_ARITHMETIC_OPERATIONS_EXCEEDED");
             }
+            authority.consume("exact-parsed-view.arithmetic-operations", units);
             arithmeticOperations += units;
         }
 
