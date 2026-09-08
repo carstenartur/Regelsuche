@@ -123,6 +123,35 @@
     - validation-evidence
   tags: [validation, counterexample, equivalence]
 
+- id: verified-trace-strategy-learning
+  label: "Verified shortest-trace learning and conditional continuation dispatch"
+  description: "Learns reusable primitive rewrite sequences from target-free TRAIN searches, admits them only after bounded shortest-path verification for concrete endpoints and a frozen primitive inventory, and measures separately trained continuation dispatch on fixed public development inputs. This does not establish shortest paths for every substitution or a sealed final-test result."
+  modules: [regelsuche-learning, regelsuche-search, regelsuche-core, regelsuche-math-algorithms]
+  ownerModules: [regelsuche-learning, regelsuche-search]
+  typePatterns:
+    - 'PrimitiveTraceMinimalityVerifier'
+    - 'TraceRewriteStrategyLearner'
+    - 'TraceStrategyDispatchLearner'
+    - 'TraceStrategyDispatchExample'
+    - 'TraceStrategyTransferExample'
+    - 'CompiledLinearRewriteEngine'
+    - 'PrimitiveBudgetedTransformationEngine'
+    - 'ExactPolynomialAnalysis'
+  testPatterns:
+    - 'PrimitiveTraceMinimalityVerifierTest'
+    - 'TraceRewriteStrategyLearnerTest'
+    - 'TraceStrategyDispatchLearnerTest'
+    - 'TraceStrategyDispatchExampleTest'
+    - 'TraceStrategyTransferExampleTest'
+    - 'CompiledLinearRewriteEngineTest'
+    - 'TargetFreeWorkBudgetSearchTest'
+    - 'ExactPolynomialAnalysisTest'
+  docPatterns:
+    - docs/primitive-trace-minimality.md
+    - docs/trace-strategy-transfer.md
+    - docs/conditional-strategy-dispatch.md
+  tags: [learning, primitive-replay, shortest-path, dispatch, reproducibility]
+
 - id: proof-workflows
   label: "Proof workflow support"
   description: "Supports proof-oriented workflows including critical-pair completion (Knuth-Bendix), Groebner basis reduction and PSLQ-style numerical relation search."
@@ -344,9 +373,9 @@
 
 - id: polynomial-factorization
   label: "Exact polynomial factorization"
-  description: "Provides bounded exact univariate factorization over Z[x] and Q[x] through content normalization, square-free decomposition, finite-field factorization, suitable-prime selection, Hensel lifting, Zassenhaus recombination, independent product verification and a typed SymPy comparison backend."
-  modules: [regelsuche-core, regelsuche-math-algorithms, regelsuche-math-sympy]
-  ownerModules: [regelsuche-math-algorithms]
+  description: "Provides bounded exact univariate factorization over Z[x] and Q[x] through content normalization, square-free decomposition, finite-field factorization, suitable-prime selection, Hensel lifting, Zassenhaus recombination, independent product verification and a typed SymPy comparison backend. Shared runtime authority retains measured native pipeline work; study qualification and the complete five-profile comparison remain open."
+  modules: [regelsuche-core, regelsuche-math-algorithms, regelsuche-math-sympy, regelsuche-experiments]
+  ownerModules: [regelsuche-math-algorithms, regelsuche-experiments]
   packages:
     - de.regelsuche.polynomial
     - de.regelsuche.math.algorithms.polynomial
@@ -358,6 +387,8 @@
     - 'SuitablePrime*'
     - 'UnivariateContent*'
     - 'SquareFreeDecomposition'
+    - 'PolynomialWorkAuthority'
+    - 'PolynomialTheoryUtilityWorkAuthority'
   testPatterns:
     - '*Factorization*Test'
     - '*Zassenhaus*Test'
@@ -365,6 +396,9 @@
     - 'SuitablePrime*Test'
     - 'UnivariateContent*Test'
     - 'SquareFreeDecompositionTest'
+    - 'PolynomialTheoryUtilityWorkAuthorityTest'
+    - 'PolynomialTheoryUtilityOnDemandRuntimeTest'
+    - 'PolynomialTheoryUtilityInterruptedReplayContractTest'
   docPatterns:
     - docs/domain-aware-polynomial-factorization.md
     - docs/univariate-polynomial-foundation.md
@@ -373,6 +407,8 @@
     - docs/suitable-prime-selection.md
     - docs/hensel-lifting.md
     - docs/sympy-factorization-adapter.md
+    - docs/polynomial-theory-utility-runtime-authority.md
+    - docs/polynomial-theory-utility-study.md
   evidenceTypes:
     - validation-evidence
   jmhPatterns:
