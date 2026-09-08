@@ -74,6 +74,15 @@ class PolynomialTheoryUtilityOnDemandRuntimeTest {
         assertTrue(first.stream().anyMatch(value ->
             !value.measured().measurements().factorizationAttempts().isEmpty()),
             "runtime admission must reach the native engine on the frozen matrix");
+        var witnessed = first.stream().filter(value ->
+            !value.measured().measurements().factorizationAttempts().isEmpty()).findFirst().orElseThrow();
+        assertThrows(IllegalArgumentException.class, () ->
+            new PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter.Execution(witnessed.measured(),
+                de.regelsuche.polynomial.PolynomialWorkLedger.empty(), witnessed.projection(),
+                witnessed.occurrences(), witnessed.evidenceHash()));
+        assertThrows(IllegalArgumentException.class, () ->
+            new PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter.Execution(witnessed.measured(),
+                witnessed.rawWork(), witnessed.projection(), List.of(), witnessed.evidenceHash()));
     }
 
     @Test

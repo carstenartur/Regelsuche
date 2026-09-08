@@ -120,10 +120,7 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
         if (!transitions.isEmpty() && terminal != TerminalStatus.VALIDATED_TRANSITION) {
             throw new UnrepresentableExecution(observations, authority.ledger(), authority.projection());
         }
-        StringBuilder proofMaterial = new StringBuilder();
-        append(proofMaterial, authority.projection().projectionId());
-        observations.forEach(value -> append(proofMaterial, value.identityMaterial()));
-        String proof = hash(proofMaterial.toString());
+        String proof = executionHash(authority.projection(), observations);
         var result = PolynomialTheoryUtilityCandidateResult.create(input, formation, terminal,
             "NATIVE_SHARED_CANONICAL_AUTHORITY:" + proof, authority.work(), transitions,
             terminal == TerminalStatus.VALIDATED_TRANSITION ? "VERIFIED"
@@ -272,6 +269,14 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
         target.append(value.getBytes(StandardCharsets.UTF_8).length).append(':').append(value);
     }
 
+    private static String executionHash(PolynomialTheoryUtilityCanonicalWorkProjection.Projection projection,
+            List<Occurrence> observations) {
+        StringBuilder material = new StringBuilder();
+        append(material, projection.projectionId());
+        observations.forEach(value -> append(material, value.identityMaterial()));
+        return hash(material.toString());
+    }
+
     private static String hash(String material) {
         return PolynomialTheoryUtilityExecutionIdentity.sha256(material.getBytes(StandardCharsets.UTF_8));
     }
@@ -318,6 +323,29 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
     public record Execution(PolynomialTheoryUtilityMeasuredCandidate measured, PolynomialWorkLedger rawWork,
             PolynomialTheoryUtilityCanonicalWorkProjection.Projection projection,
             List<Occurrence> occurrences, String evidenceHash) {
-        public Execution { occurrences = List.copyOf(occurrences); }
+        public Execution {
+            Objects.requireNonNull(measured, "measured");
+            Objects.requireNonNull(rawWork, "rawWork");
+            Objects.requireNonNull(projection, "projection");
+            occurrences = List.copyOf(occurrences);
+            var result = measured.result();
+            var expected = PolynomialTheoryUtilityCanonicalWorkProjection.project(result.input(),
+                PolynomialTheoryUtilityCanonicalWorkProjection.partition(result.work().primitiveWork(), rawWork));
+            if (!projection.equals(expected) || !result.work().equals(projection.work())
+                    || !executionHash(projection, occurrences).equals(evidenceHash)
+                    || !result.detailCode().equals("NATIVE_SHARED_CANONICAL_AUTHORITY:" + evidenceHash)) {
+                throw new IllegalArgumentException("native execution evidence differs from its measured result");
+            }
+            var required = new java.util.LinkedHashMap<String, Long>();
+            for (var occurrence : occurrences) {
+                if (occurrence.pipeline() != null) {
+                    occurrence.pipeline().totalWork().stages().forEach((stage, units) ->
+                        required.merge(stage, units, Math::addExact));
+                }
+            }
+            if (required.entrySet().stream().anyMatch(entry -> rawWork.units(entry.getKey()) < entry.getValue())) {
+                throw new IllegalArgumentException("native execution omitted consumed pipeline work");
+            }
+        }
     }
 }
