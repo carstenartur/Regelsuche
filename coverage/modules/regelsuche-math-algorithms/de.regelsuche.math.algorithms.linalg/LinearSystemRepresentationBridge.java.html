@@ -653,8 +653,8 @@ import java.util.TreeSet;
         }
 
         private AffineForm scale(Rational factor) {
-<span class="pc bpc" id="L656" title="1 of 2 branches missed.">            if (factor.isZero()) {</span>
-<span class="nc" id="L657">                return constant(Rational.ZERO);</span>
+<span class="fc bfc" id="L656" title="All 2 branches covered.">            if (factor.isZero()) {</span>
+<span class="fc" id="L657">                return constant(Rational.ZERO);</span>
             }
 <span class="fc" id="L659">            Map&lt;String, Rational&gt; result = new TreeMap&lt;&gt;();</span>
 <span class="fc" id="L660">            coefficients.forEach((variable, coefficient) -&gt;</span>

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MatrixOperatorRules.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">MatrixOperatorRules.java</span></div><h1>MatrixOperatorRules.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import java.util.ArrayList;
+import java.util.List;
+import static de.regelsuche.math.algorithms.linalg.ExactMatrixExpression.*;
+
+/** Finite one-step ordered rules; all dimension and inverse guards replay first. */
+public final class MatrixOperatorRules {
+    private MatrixOperatorRules() { }
+
+<span class="fc" id="L11">    public record Rewrite(String rule, ExactMatrixExpression expression) { }</span>
+
+    public static List&lt;Rewrite&gt; prepare(ExactMatrixExpression source, ExactMatrixAlgebra algebra,
+            ExactMatrixAlgebra.Work work) {
+<span class="fc" id="L15">        algebra.evaluate(source);</span>
+<span class="fc" id="L16">        List&lt;Rewrite&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L17">        visit(source, result, work);</span>
+<span class="fc" id="L18">        return List.copyOf(result);</span>
+    }
+
+    private static void visit(ExactMatrixExpression source, List&lt;Rewrite&gt; result, ExactMatrixAlgebra.Work work) {
+<span class="fc" id="L22">        work.consume(1);</span>
+<span class="fc bfc" id="L23" title="All 3 branches covered.">        switch (source) {</span>
+<span class="fc" id="L24">            case Product product -&gt; {</span>
+<span class="fc" id="L25">                productRules(product, result);</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">                for (Rewrite child : children(product.left(), work)) {</span>
+<span class="nc" id="L27">                    result.add(new Rewrite(child.rule(), new Product(child.expression(), product.right())));</span>
+<span class="nc" id="L28">                }</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">                for (Rewrite child : children(product.right(), work)) {</span>
+<span class="nc" id="L30">                    result.add(new Rewrite(child.rule(), new Product(product.left(), child.expression())));</span>
+<span class="nc" id="L31">                }</span>
+<span class="fc" id="L32">            }</span>
+<span class="fc" id="L33">            case Sum sum -&gt; {</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">                for (Rewrite child : children(sum.left(), work)) {</span>
+<span class="nc" id="L35">                    result.add(new Rewrite(child.rule(), new Sum(child.expression(), sum.right())));</span>
+<span class="nc" id="L36">                }</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">                for (Rewrite child : children(sum.right(), work)) {</span>
+<span class="nc" id="L38">                    result.add(new Rewrite(child.rule(), new Sum(sum.left(), child.expression())));</span>
+<span class="nc" id="L39">                }</span>
+<span class="fc" id="L40">            }</span>
+            default -&gt; { }
+        }
+<span class="fc" id="L43">    }</span>
+
+    private static List&lt;Rewrite&gt; children(ExactMatrixExpression expression, ExactMatrixAlgebra.Work work) {
+<span class="fc" id="L46">        List&lt;Rewrite&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L47">        visit(expression, results, work);</span>
+<span class="fc" id="L48">        return results;</span>
+    }
+
+    private static void productRules(Product product, List&lt;Rewrite&gt; result) {
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (product.left() instanceof Identity) {</span>
+<span class="nc" id="L53">            result.add(new Rewrite(&quot;LEFT_IDENTITY&quot;, product.right()));</span>
+        }
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (product.right() instanceof Identity) {</span>
+<span class="nc" id="L56">            result.add(new Rewrite(&quot;RIGHT_IDENTITY&quot;, product.left()));</span>
+        }
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (product.left() instanceof Product nested) {</span>
+<span class="nc" id="L59">            result.add(new Rewrite(&quot;ORDERED_ASSOCIATIVITY&quot;, new Product(nested.left(),</span>
+<span class="nc" id="L60">                new Product(nested.right(), product.right()))));</span>
+        }
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (product.right() instanceof Sum sum) {</span>
+<span class="fc" id="L63">            result.add(new Rewrite(&quot;LEFT_DISTRIBUTIVITY&quot;, new Sum(</span>
+<span class="fc" id="L64">                new Product(product.left(), sum.left()), new Product(product.left(), sum.right()))));</span>
+        }
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (product.left() instanceof Sum sum) {</span>
+<span class="nc" id="L67">            result.add(new Rewrite(&quot;RIGHT_DISTRIBUTIVITY&quot;, new Sum(</span>
+<span class="nc" id="L68">                new Product(sum.left(), product.right()), new Product(sum.right(), product.right()))));</span>
+        }
+<span class="fc" id="L70">        cancellation(product.left(), product.right(), result);</span>
+<span class="fc" id="L71">        cancellation(product.right(), product.left(), result);</span>
+<span class="fc" id="L72">    }</span>
+
+    private static void cancellation(ExactMatrixExpression possibleInverse, ExactMatrixExpression other,
+            List&lt;Rewrite&gt; result) {
+<span class="pc bpc" id="L76" title="1 of 4 branches missed.">        if (possibleInverse instanceof Inverse inverse &amp;&amp; inverse.operand().equals(other)) {</span>
+<span class="fc" id="L77">            result.add(new Rewrite(&quot;VERIFIED_INVERSE_CANCELLATION&quot;, new Identity(inverse.witness().rows())));</span>
+        }
+<span class="fc" id="L79">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

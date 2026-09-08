@@ -65,7 +65,7 @@ public final class StreamingJsonRequestBody {
      * with existing optional request bodies.&lt;/p&gt;
      */
     public Map&lt;String, Object&gt; readObject(HttpExchange exchange) throws IOException {
-<span class="nc" id="L68">        return readObject(exchange, ObjectCursor::readRemainingObject);</span>
+<span class="fc" id="L68">        return readObject(exchange, ObjectCursor::readRemainingObject);</span>
     }
 
     /**

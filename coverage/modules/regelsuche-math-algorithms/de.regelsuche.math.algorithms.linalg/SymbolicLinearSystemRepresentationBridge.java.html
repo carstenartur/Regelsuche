@@ -178,9 +178,9 @@ import java.util.TreeSet;
         }
 <span class="fc" id="L179">        Polynomial left = polynomial(binary.left(), work);</span>
 <span class="fc" id="L180">        Polynomial right = polynomial(binary.right(), work);</span>
-<span class="pc bpc" id="L181" title="3 of 5 branches missed.">        return switch (binary.operator()) {</span>
+<span class="pc bpc" id="L181" title="2 of 5 branches missed.">        return switch (binary.operator()) {</span>
 <span class="fc" id="L182">            case ADD -&gt; left.add(right);</span>
-<span class="nc" id="L183">            case SUB -&gt; left.subtract(right);</span>
+<span class="fc" id="L183">            case SUB -&gt; left.subtract(right);</span>
 <span class="fc" id="L184">            case MUL -&gt; left.multiply(right);</span>
 <span class="nc" id="L185">            case DIV -&gt; divideByConstant(left, right);</span>
 <span class="nc" id="L186">            case POW -&gt; throw new IllegalStateException(</span>

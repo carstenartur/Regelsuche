@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MatrixPreparationSources.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">MatrixPreparationSources.java</span></div><h1>MatrixPreparationSources.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Equation;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.representation.RepresentationBridge;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Consumer;
+import static de.regelsuche.math.algorithms.linalg.ExactMatrixExpression.*;
+
+/** Deterministic, source-seeded residuals. There is no unrestricted matrix factorizer. */
+final class MatrixPreparationSources {
+<span class="fc" id="L26">    record Proposal(String origin, ExactMatrixExpression expression, List&lt;String&gt; provenance) { }</span>
+<span class="fc" id="L27">    private record Declared(Matrix matrix, Optional&lt;PolynomialMatrix&gt; inverse) { }</span>
+<span class="fc" id="L28">    private record Occurrences(Expr expression, List&lt;String&gt; paths) { }</span>
+    private final MatrixPreparation.Request request;
+    private final ExactMatrixAlgebra.Work work;
+    private final ExactMatrixAlgebra algebra;
+<span class="fc" id="L32">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L33">    private final Map&lt;String, Declared&gt; catalog = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L34">    private List&lt;String&gt; rationalOrder = List.of();</span>
+
+<span class="fc" id="L36">    MatrixPreparationSources(MatrixPreparation.Request request, ExactMatrixAlgebra.Work work) {</span>
+<span class="fc" id="L37">        this.request = request;</span>
+<span class="fc" id="L38">        this.work = work;</span>
+<span class="fc" id="L39">        algebra = new ExactMatrixAlgebra(work);</span>
+<span class="fc" id="L40">    }</span>
+
+    List&lt;Equation&gt; equations() {
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        for (MatrixPreparation.NamedMatrix declaration : request.catalog()) {</span>
+<span class="fc" id="L44">            PolynomialMatrix value = parseMatrix(declaration.entries());</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">            Optional&lt;PolynomialMatrix&gt; inverse = declaration.inverseWitness().isEmpty()</span>
+<span class="fc" id="L46">                ? Optional.empty() : Optional.of(parseMatrix(declaration.inverseWitness()));</span>
+<span class="fc" id="L47">            catalog.put(declaration.name(), new Declared(new Matrix(declaration.name(), value), inverse));</span>
+<span class="fc" id="L48">        }</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (!request.matrixExpression().isBlank()) {</span>
+<span class="fc" id="L50">            ExactMatrixExpression expression = operator(request.matrixExpression());</span>
+<span class="pc bpc" id="L51" title="2 of 4 branches missed.">            if (request.profile() != MatrixPreparation.Profile.EXPERIMENTAL_OPERATOR_V1 &amp;&amp; containsInverse(expression)) {</span>
+<span class="nc" id="L52">                throw new ExactMatrixAlgebra.Unsupported(&quot;INVERSE_REQUIRES_EXPERIMENTAL_PROFILE&quot;);</span>
+            }
+<span class="fc" id="L54">            return fromMatrix(algebra.evaluate(expression), request.unknowns(), request.rightHandSide());</span>
+        }
+<span class="fc" id="L56">        List&lt;Equation&gt; equations = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        for (String row : request.equations().split(&quot;[;\\n]+&quot;)) {</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">            if (!row.isBlank()) {</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">                if (equations.size() &gt;= ExactMatrixAlgebra.MAX_DIMENSION) {</span>
+<span class="nc" id="L60">                    throw new ExactMatrixAlgebra.Unsupported(&quot;SOURCE_ROW_LIMIT&quot;);</span>
+                }
+<span class="fc" id="L62">                Equation equation = parser.parseEquation(MatrixPreparation.text(row));</span>
+                // Bound expansion before entering the existing versioned symbolic recognizer.
+<span class="fc" id="L64">                algebra.scalar(equation.left());</span>
+<span class="fc" id="L65">                algebra.scalar(equation.right());</span>
+<span class="fc" id="L66">                equations.add(equation);</span>
+            }
+        }
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (equations.isEmpty()) {</span>
+<span class="nc" id="L70">            throw new IllegalArgumentException(&quot;equation-system input is empty&quot;);</span>
+        }
+<span class="fc" id="L72">        return List.copyOf(equations);</span>
+    }
+
+    private PolynomialMatrix parseMatrix(List&lt;List&lt;String&gt;&gt; entries) {
+<span class="fc" id="L76">        PolynomialMatrix matrix = algebra.matrix(entries.size(), entries.getFirst().size(),</span>
+<span class="fc" id="L77">            (row, column) -&gt; algebra.scalar(parser.parseTerm(entries.get(row).get(column))));</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        for (List&lt;Polynomial&gt; row : matrix.entries()) {</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            for (Polynomial entry : row) {</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                for (String parameter : entry.variables()) {</span>
+<span class="fc" id="L81">                    work.consume(1);</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">                    ExactMatrixAlgebra.require(!request.unknowns().contains(parameter),</span>
+                        &quot;CATALOG_COEFFICIENT_USES_VECTOR_COORDINATE&quot;);
+<span class="fc" id="L84">                }</span>
+<span class="fc" id="L85">            }</span>
+<span class="fc" id="L86">        }</span>
+<span class="fc" id="L87">        return matrix;</span>
+    }
+
+    private List&lt;Equation&gt; fromMatrix(PolynomialMatrix matrix, List&lt;String&gt; coordinates, List&lt;String&gt; rhs) {
+<span class="pc bpc" id="L91" title="2 of 4 branches missed.">        ExactMatrixAlgebra.require(matrix.columns() == coordinates.size() &amp;&amp; matrix.rows() == rhs.size(),</span>
+            &quot;MATRIX_EQUATION_DIMENSION_MISMATCH&quot;);
+<span class="fc" id="L93">        List&lt;Equation&gt; equations = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        for (int row = 0; row &lt; matrix.rows(); row++) {</span>
+<span class="fc" id="L95">            List&lt;String&gt; terms = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            for (int column = 0; column &lt; matrix.columns(); column++) {</span>
+<span class="fc" id="L97">                work.consume(1);</span>
+<span class="fc" id="L98">                terms.add(&quot;(&quot; + matrix.get(row, column).toCanonicalString() + &quot;)*&quot; + coordinates.get(column));</span>
+            }
+<span class="fc" id="L100">            Expr right = parser.parseTerm(rhs.get(row));</span>
+<span class="fc" id="L101">            algebra.scalar(right);</span>
+<span class="fc" id="L102">            equations.add(new Equation(parser.parseTerm(String.join(&quot; + &quot;, terms)), right));</span>
+        }
+<span class="fc" id="L104">        return List.copyOf(equations);</span>
+    }
+
+    List&lt;Equation&gt; rationalEquations(SymbolicLinearSystem system) {
+<span class="fc" id="L108">        return fromMatrix(system.coefficients(), system.unknowns(), system.rightHandSide().values().stream()</span>
+<span class="fc" id="L109">            .map(Polynomial::toCanonicalString).toList());</span>
+    }
+
+    void retainRationalOrder(List&lt;String&gt; coordinates) {
+<span class="fc" id="L113">        rationalOrder = List.copyOf(coordinates);</span>
+<span class="fc" id="L114">    }</span>
+
+    void propose(SymbolicLinearSystem system, List&lt;Equation&gt; equations,
+            Optional&lt;ExactLinearSystemBlockDecomposition&gt; decomposition, Consumer&lt;Proposal&gt; accept) {
+<span class="fc" id="L118">        accept.accept(new Proposal(&quot;DIRECT_MATRIX_REPRESENTATION&quot;, new Matrix(&quot;A&quot;, system.coefficients()), List.of(&quot;source formation&quot;)));</span>
+<span class="fc" id="L119">        sourceProduct(system, equations).ifPresent(accept);</span>
+<span class="fc" id="L120">        sourceIdentity(system, equations).ifPresent(accept);</span>
+<span class="fc" id="L121">        decomposition.flatMap(blocks -&gt; blocks(system, blocks)).ifPresent(accept);</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (!request.matrixExpression().isBlank()) {</span>
+<span class="fc" id="L123">            accept.accept(new Proposal(&quot;DECLARED_MATRIX_EQUATION&quot;, operator(request.matrixExpression()),</span>
+<span class="fc" id="L124">                List.of(&quot;matrix equation: &quot; + request.matrixExpression())));</span>
+        }
+<span class="fc" id="L126">        experimental(accept);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        for (Declared left : catalog.values()) {</span>
+<span class="fc" id="L128">            accept.accept(new Proposal(&quot;VISIBLE_CATALOG_MATRIX&quot;, left.matrix(), List.of(&quot;catalog: &quot; + left.matrix().name())));</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (left.matrix().value().rows() == left.matrix().value().columns()) {</span>
+<span class="fc" id="L130">                accept.accept(new Proposal(&quot;VISIBLE_IDENTITY_PLUS_OPERATOR&quot;,</span>
+<span class="fc" id="L131">                    new Sum(new Identity(left.matrix().value().rows()), left.matrix()),</span>
+<span class="fc" id="L132">                    List.of(&quot;catalog: &quot; + left.matrix().name())));</span>
+            }
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            for (Declared right : catalog.values()) {</span>
+<span class="fc" id="L135">                work.consume(1);</span>
+<span class="fc" id="L136">                accept.accept(new Proposal(&quot;VISIBLE_ORDERED_FACTORS&quot;, new Product(left.matrix(), right.matrix()),</span>
+<span class="fc" id="L137">                    List.of(&quot;left catalog factor: &quot; + left.matrix().name(), &quot;right catalog factor: &quot; + right.matrix().name())));</span>
+<span class="fc" id="L138">            }</span>
+<span class="fc" id="L139">        }</span>
+<span class="fc" id="L140">    }</span>
+
+    private void experimental(Consumer&lt;Proposal&gt; accept) {
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (!request.operatorExpressions().isEmpty()</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">                &amp;&amp; request.profile() != MatrixPreparation.Profile.EXPERIMENTAL_OPERATOR_V1) {</span>
+<span class="nc" id="L145">            throw new ExactMatrixAlgebra.Unsupported(&quot;OPERATOR_RECIPES_REQUIRE_EXPERIMENTAL_PROFILE&quot;);</span>
+        }
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        for (String recipe : request.operatorExpressions()) {</span>
+<span class="fc" id="L148">            ExactMatrixExpression expression = operator(recipe);</span>
+            // A cancellation cannot launder a false inverse witness in its original expression.
+<span class="fc" id="L150">            algebra.evaluate(expression);</span>
+<span class="fc" id="L151">            accept.accept(new Proposal(&quot;DECLARED_OPERATOR_EXPRESSION&quot;, expression, List.of(&quot;operator recipe: &quot; + recipe)));</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            for (MatrixOperatorRules.Rewrite rewrite : MatrixOperatorRules.prepare(expression, algebra, work)) {</span>
+<span class="fc" id="L153">                accept.accept(new Proposal(rewrite.rule(), rewrite.expression(),</span>
+<span class="fc" id="L154">                    List.of(&quot;operator recipe: &quot; + recipe, &quot;guarded ordered rule: &quot; + rewrite.rule())));</span>
+<span class="fc" id="L155">            }</span>
+<span class="fc" id="L156">        }</span>
+<span class="fc" id="L157">    }</span>
+
+    private ExactMatrixExpression operator(String input) {
+<span class="fc" id="L160">        return operator(parser.parseTerm(MatrixPreparation.text(input)), 0);</span>
+    }
+
+    private ExactMatrixExpression operator(Expr expression, int depth) {
+<span class="fc" id="L164">        work.consume(1);</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        ExactMatrixAlgebra.require(depth &lt;= ExactMatrixAlgebra.MAX_DEPTH, &quot;OPERATOR_DEPTH_LIMIT&quot;);</span>
+<span class="pc bpc" id="L166" title="1 of 4 branches missed.">        return switch (expression) {</span>
+<span class="fc" id="L167">            case VariableExpr variable -&gt; {</span>
+<span class="fc" id="L168">                Declared entry = catalog.get(variable.name());</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">                ExactMatrixAlgebra.require(entry != null, &quot;MATRIX_NOT_IN_VISIBLE_CATALOG&quot;);</span>
+<span class="fc" id="L170">                yield entry.matrix();</span>
+            }
+<span class="pc bpc" id="L172" title="1 of 3 branches missed.">            case BinaryExpr binary -&gt; switch (binary.operator()) {</span>
+<span class="fc" id="L173">                case MUL -&gt; new Product(operator(binary.left(), depth + 1), operator(binary.right(), depth + 1));</span>
+<span class="fc" id="L174">                case ADD -&gt; new Sum(operator(binary.left(), depth + 1), operator(binary.right(), depth + 1));</span>
+<span class="nc" id="L175">                default -&gt; throw new ExactMatrixAlgebra.Unsupported(&quot;SCALAR_RULE_OUTSIDE_ORDERED_MATRIX_CONTRACT&quot;);</span>
+            };
+<span class="fc" id="L177">            case FunctionExpr function -&gt; operatorFunction(function, depth);</span>
+<span class="nc" id="L178">            default -&gt; throw new ExactMatrixAlgebra.Unsupported(&quot;MATRIX_OPERATOR_SYNTAX_UNSUPPORTED&quot;);</span>
+        };
+    }
+
+    private ExactMatrixExpression operatorFunction(FunctionExpr function, int depth) {
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        ExactMatrixAlgebra.require(function.arguments().size() == 1, &quot;OPERATOR_ARITY_MISMATCH&quot;);</span>
+<span class="pc bpc" id="L184" title="1 of 4 branches missed.">        if (function.name().equalsIgnoreCase(&quot;I&quot;) &amp;&amp; function.argument() instanceof NumberExpr number) {</span>
+<span class="fc" id="L185">            Rational dimension = Rational.fromExact(number.value());</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">            ExactMatrixAlgebra.require(dimension.denominator().equals(java.math.BigInteger.ONE)</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">                &amp;&amp; dimension.numerator().signum() &gt; 0</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">                &amp;&amp; dimension.numerator().compareTo(java.math.BigInteger.valueOf(ExactMatrixAlgebra.MAX_DIMENSION)) &lt;= 0,</span>
+                &quot;IDENTITY_DIMENSION_LIMIT&quot;);
+<span class="fc" id="L190">            return new Identity(dimension.numerator().intValueExact());</span>
+        }
+<span class="pc bpc" id="L192" title="2 of 4 branches missed.">        if (function.name().equals(&quot;inverse&quot;) &amp;&amp; function.argument() instanceof VariableExpr variable) {</span>
+<span class="fc" id="L193">            Declared declaration = catalog.get(variable.name());</span>
+<span class="pc bpc" id="L194" title="2 of 4 branches missed.">            ExactMatrixAlgebra.require(declaration != null &amp;&amp; declaration.inverse().isPresent(), &quot;EXACT_INVERSE_WITNESS_REQUIRED&quot;);</span>
+<span class="fc" id="L195">            return new Inverse(operator(function.argument(), depth + 1), declaration.inverse().orElseThrow());</span>
+        }
+<span class="nc" id="L197">        throw new ExactMatrixAlgebra.Unsupported(&quot;OPERATOR_FUNCTION_UNSUPPORTED&quot;);</span>
+    }
+
+    private static boolean containsInverse(ExactMatrixExpression expression) {
+<span class="pc bpc" id="L201" title="2 of 4 branches missed.">        return switch (expression) {</span>
+<span class="nc" id="L202">            case Inverse ignored -&gt; true;</span>
+<span class="pc bpc" id="L203" title="2 of 4 branches missed.">            case Product p -&gt; containsInverse(p.left()) || containsInverse(p.right());</span>
+<span class="nc bnc" id="L204" title="All 4 branches missed.">            case Sum s -&gt; containsInverse(s.left()) || containsInverse(s.right());</span>
+<span class="fc" id="L205">            default -&gt; false;</span>
+        };
+    }
+
+    private Optional&lt;Proposal&gt; sourceIdentity(SymbolicLinearSystem system, List&lt;Equation&gt; equations) {
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        if (system.equationCount() != system.unknownCount()) {</span>
+<span class="fc" id="L211">            return Optional.empty();</span>
+        }
+<span class="fc" id="L213">        List&lt;String&gt; origins = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        for (int row = 0; row &lt; equations.size(); row++) {</span>
+<span class="fc" id="L215">            var coordinate = new VariableExpr(system.unknowns().get(row));</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">            if (!positiveCoordinate(equations.get(row).left(), coordinate, 1)</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">                    &amp;&amp; !positiveCoordinate(equations.get(row).right(), coordinate, -1)) {</span>
+<span class="fc" id="L218">                return Optional.empty();</span>
+            }
+<span class="fc" id="L220">            origins.add(&quot;source row &quot; + row + &quot;: explicit +&quot; + coordinate.name());</span>
+        }
+<span class="fc" id="L222">        PolynomialMatrix residual = algebra.matrix(system.equationCount(), system.unknownCount(), (r, c) -&gt;</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">            algebra.add(system.coefficients().get(r, c), Polynomial.constant(r.equals(c) ? Rational.NEGATIVE_ONE : Rational.ZERO)));</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        if (residual.entries().stream().flatMap(List::stream).allMatch(Polynomial::isZero)) {</span>
+<span class="fc" id="L225">            return Optional.empty();</span>
+        }
+<span class="fc" id="L227">        return Optional.of(new Proposal(&quot;SOURCE_IDENTITY_PLUS_OPERATOR&quot;,</span>
+<span class="fc" id="L228">            new Sum(new Identity(system.unknownCount()), new Matrix(&quot;source residual&quot;, residual)), origins));</span>
+    }
+
+    private boolean positiveCoordinate(Expr expression, VariableExpr coordinate, int sign) {
+<span class="fc" id="L232">        work.consume(1);</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        if (expression.equals(coordinate)) {</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">            return sign == 1;</span>
+        }
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L237" title="All 4 branches covered.">            if (binary.operator() == BinaryOperator.ADD || binary.operator() == BinaryOperator.SUB) {</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">                return positiveCoordinate(binary.left(), coordinate, sign)</span>
+<span class="fc bfc" id="L239" title="All 4 branches covered.">                    || positiveCoordinate(binary.right(), coordinate, binary.operator() == BinaryOperator.SUB ? -sign : sign);</span>
+            }
+        }
+<span class="fc" id="L242">        return false;</span>
+    }
+
+    private Optional&lt;Proposal&gt; blocks(SymbolicLinearSystem system, ExactLinearSystemBlockDecomposition decomposition) {
+<span class="pc bpc" id="L246" title="1 of 6 branches missed.">        if (decomposition.components().stream().anyMatch(c -&gt; c.sourceRowIndices().isEmpty() || c.sourceColumnIndices().isEmpty())) {</span>
+<span class="fc" id="L247">            return Optional.empty();</span>
+        }
+<span class="fc" id="L249">        List&lt;ExactMatrixExpression&gt; blocks = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L250">        List&lt;Integer&gt; columns = decomposition.columnPermutation().stream()</span>
+<span class="fc" id="L251">            .map(index -&gt; system.unknowns().indexOf(rationalOrder.get(index))).toList();</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        for (var component : decomposition.components()) {</span>
+<span class="fc" id="L253">            List&lt;Integer&gt; mapped = component.sourceColumnIndices().stream()</span>
+<span class="fc" id="L254">                .map(index -&gt; system.unknowns().indexOf(rationalOrder.get(index))).toList();</span>
+<span class="fc" id="L255">            PolynomialMatrix block = algebra.matrix(component.sourceRowIndices().size(), mapped.size(), (r, c) -&gt;</span>
+<span class="fc" id="L256">                system.coefficients().get(component.sourceRowIndices().get(r), mapped.get(c)));</span>
+<span class="fc" id="L257">            blocks.add(new Matrix(&quot;block &quot; + blocks.size(), block));</span>
+<span class="fc" id="L258">        }</span>
+<span class="fc" id="L259">        return Optional.of(new Proposal(&quot;CERTIFIED_BLOCK_DIAGONAL_EXPOSURE&quot;,</span>
+<span class="fc" id="L260">            new Mapped(new BlockDiagonal(blocks), decomposition.rowPermutation(), columns),</span>
+<span class="fc" id="L261">            List.of(&quot;certified row and coordinate component partition&quot;)));</span>
+    }
+
+    private Optional&lt;Proposal&gt; sourceProduct(SymbolicLinearSystem system, List&lt;Equation&gt; equations) {
+<span class="fc" id="L265">        Map&lt;String, Occurrences&gt; occurrences = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        for (int row = 0; row &lt; equations.size(); row++) {</span>
+<span class="fc" id="L267">            collect(equations.get(row).left(), &quot;row[&quot; + row + &quot;].left&quot;, occurrences);</span>
+<span class="fc" id="L268">            collect(equations.get(row).right(), &quot;row[&quot; + row + &quot;].right&quot;, occurrences);</span>
+        }
+<span class="fc" id="L270">        Map&lt;String, String&gt; aliases = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L271">        List&lt;List&lt;Polynomial&gt;&gt; innerRows = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L272">        List&lt;String&gt; provenance = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">        for (Map.Entry&lt;String, Occurrences&gt; entry : occurrences.entrySet()) {</span>
+<span class="pc bpc" id="L274" title="1 of 4 branches missed.">            if (entry.getValue().paths().size() &lt; 2 || aliases.size() + system.unknownCount() &gt;= ExactMatrixAlgebra.MAX_DIMENSION) {</span>
+<span class="nc" id="L275">                continue;</span>
+            }
+<span class="fc" id="L277">            var inner = symbolic(List.of(new Equation(entry.getValue().expression(), new NumberExpr(0))), system.unknowns());</span>
+<span class="pc bpc" id="L278" title="2 of 4 branches missed.">            if (!inner.represented() || !inner.representation().orElseThrow().homogeneous()) {</span>
+<span class="nc" id="L279">                continue;</span>
+            }
+<span class="fc" id="L281">            String alias = freshAlias(aliases.size(), system);</span>
+<span class="fc" id="L282">            aliases.put(entry.getKey(), alias);</span>
+<span class="fc" id="L283">            innerRows.add(inner.representation().orElseThrow().coefficients().entries().getFirst());</span>
+<span class="fc" id="L284">            provenance.add(alias + &quot; = &quot; + entry.getKey() + &quot; at &quot; + entry.getValue().paths());</span>
+<span class="fc" id="L285">        }</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">        if (aliases.isEmpty()) {</span>
+<span class="fc" id="L287">            return Optional.empty();</span>
+        }
+<span class="fc" id="L289">        List&lt;String&gt; outerUnknowns = new ArrayList&lt;&gt;(aliases.values());</span>
+<span class="fc" id="L290">        outerUnknowns.addAll(system.unknowns());</span>
+<span class="fc" id="L291">        List&lt;Equation&gt; outerEquations = equations.stream().map(e -&gt; new Equation(</span>
+<span class="fc" id="L292">            replace(e.left(), aliases), replace(e.right(), aliases))).toList();</span>
+<span class="fc" id="L293">        var outer = symbolic(outerEquations, outerUnknowns);</span>
+<span class="pc bpc" id="L294" title="2 of 4 branches missed.">        if (!outer.represented() || !outer.representation().orElseThrow().rightHandSide().equals(system.rightHandSide())) {</span>
+<span class="nc" id="L295">            return Optional.empty();</span>
+        }
+<span class="fc" id="L297">        PolynomialMatrix outerMatrix = outer.representation().orElseThrow().coefficients();</span>
+<span class="fc" id="L298">        innerRows.addAll(algebra.identity(system.unknownCount()).entries());</span>
+<span class="fc" id="L299">        List&lt;Integer&gt; active = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">        for (int column = 0; column &lt; outerMatrix.columns(); column++) {</span>
+<span class="fc" id="L301">            int index = column;</span>
+<span class="fc bfc" id="L302" title="All 4 branches covered.">            if (outerMatrix.entries().stream().anyMatch(row -&gt; !row.get(index).isZero())) {</span>
+<span class="fc" id="L303">                active.add(index);</span>
+            }
+        }
+<span class="pc bpc" id="L306" title="2 of 4 branches missed.">        if (active.stream().noneMatch(index -&gt; index &lt; aliases.size())) {</span>
+<span class="nc" id="L307">            return Optional.empty();</span>
+        }
+<span class="fc" id="L309">        PolynomialMatrix left = algebra.matrix(system.equationCount(), active.size(), (r, c) -&gt; outerMatrix.get(r, active.get(c)));</span>
+<span class="fc" id="L310">        PolynomialMatrix right = algebra.matrix(active.size(), system.unknownCount(), (r, c) -&gt; innerRows.get(active.get(r)).get(c));</span>
+<span class="fc" id="L311">        provenance.add(&quot;intermediate order: &quot; + active.stream().map(outerUnknowns::get).toList());</span>
+<span class="fc" id="L312">        return Optional.of(new Proposal(&quot;REPEATED_SOURCE_LINEAR_FORMS&quot;,</span>
+            new Product(new Matrix(&quot;F&quot;, left), new Matrix(&quot;G&quot;, right)), provenance));
+    }
+
+    private void collect(Expr expression, String path, Map&lt;String, Occurrences&gt; occurrences) {
+<span class="fc" id="L317">        work.consume(1);</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L319" title="All 4 branches covered.">            if ((binary.operator() == BinaryOperator.ADD || binary.operator() == BinaryOperator.SUB)</span>
+<span class="fc bfc" id="L320" title="All 2 branches covered.">                    &amp;&amp; coordinateOccurrences(expression) &gt; 1) {</span>
+<span class="fc" id="L321">                occurrences.computeIfAbsent(ExpressionFormatter.format(expression), ignored -&gt;</span>
+<span class="fc" id="L322">                    new Occurrences(expression, new ArrayList&lt;&gt;())).paths().add(path);</span>
+            }
+<span class="fc" id="L324">            collect(binary.left(), path + &quot;.left&quot;, occurrences);</span>
+<span class="fc" id="L325">            collect(binary.right(), path + &quot;.right&quot;, occurrences);</span>
+        }
+<span class="fc" id="L327">    }</span>
+
+    private int coordinateOccurrences(Expr expression) {
+<span class="fc" id="L330">        work.consume(1);</span>
+<span class="fc bfc" id="L331" title="All 3 branches covered.">        return switch (expression) {</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">            case VariableExpr v -&gt; request.unknowns().contains(v.name()) ? 1 : 0;</span>
+<span class="fc" id="L333">            case BinaryExpr b -&gt; coordinateOccurrences(b.left()) + coordinateOccurrences(b.right());</span>
+<span class="fc" id="L334">            default -&gt; 0;</span>
+        };
+    }
+
+    private Expr replace(Expr expression, Map&lt;String, String&gt; aliases) {
+<span class="fc" id="L339">        work.consume(1);</span>
+<span class="fc" id="L340">        String alias = aliases.get(ExpressionFormatter.format(expression));</span>
+<span class="fc bfc" id="L341" title="All 2 branches covered.">        if (alias != null) {</span>
+<span class="fc" id="L342">            return new VariableExpr(alias);</span>
+        }
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        return expression instanceof BinaryExpr b</span>
+<span class="fc" id="L345">            ? new BinaryExpr(replace(b.left(), aliases), b.operator(), replace(b.right(), aliases)) : expression;</span>
+    }
+
+    private String freshAlias(int index, SymbolicLinearSystem system) {
+<span class="fc" id="L349">        String alias = &quot;_representation_&quot; + index;</span>
+<span class="pc bpc" id="L350" title="2 of 4 branches missed.">        while (system.unknowns().contains(alias) || system.scalarParameters().contains(alias)) {</span>
+<span class="nc" id="L351">            alias += &quot;_&quot;;</span>
+        }
+<span class="fc" id="L353">        return alias;</span>
+    }
+
+    private RepresentationBridge.Result&lt;SymbolicLinearSystem, SymbolicLinearSystemRepresentationBridge.Certificate&gt;
+            symbolic(List&lt;Equation&gt; equations, List&lt;String&gt; unknowns) {
+<span class="fc" id="L358">        var result = new SymbolicLinearSystemRepresentationBridge().analyze(</span>
+            new SymbolicLinearSystemRepresentationBridge.Source(equations, unknowns),
+<span class="fc" id="L360">            new RepresentationBridge.Budget(work.remaining()));</span>
+<span class="fc" id="L361">        work.consume(result.work().consumedWorkUnits());</span>
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">        if (result.status() == RepresentationBridge.Status.BUDGET_INCONCLUSIVE) {</span>
+<span class="nc" id="L363">            throw new ExactMatrixAlgebra.Exhausted();</span>
+        }
+<span class="fc" id="L365">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

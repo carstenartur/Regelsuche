@@ -74,21 +74,21 @@ public record ExactLinearSolutionConsequence(
     public static ExactLinearSolutionConsequence fromRref(
         ExactRrefReduction reduction
     ) {
-<span class="nc" id="L77">        Objects.requireNonNull(reduction, &quot;reduction&quot;);</span>
-<span class="nc bnc" id="L78" title="All 2 branches missed.">        return switch (reduction.solutionClassification()) {</span>
+<span class="fc" id="L77">        Objects.requireNonNull(reduction, &quot;reduction&quot;);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        return switch (reduction.solutionClassification()) {</span>
             case UNIQUE, UNDERDETERMINED -&gt;
-<span class="nc" id="L80">                new ExactLinearSolutionConsequence(</span>
-<span class="nc" id="L81">                    reduction.variables(),</span>
-<span class="nc" id="L82">                    reduction.solutionClassification(),</span>
-<span class="nc" id="L83">                    reduction.particularSolution(),</span>
-<span class="nc" id="L84">                    reduction.nullspaceBasis(),</span>
-<span class="nc" id="L85">                    Optional.empty());</span>
-<span class="nc" id="L86">            case INCONSISTENT -&gt; new ExactLinearSolutionConsequence(</span>
-<span class="nc" id="L87">                reduction.variables(),</span>
+<span class="fc" id="L80">                new ExactLinearSolutionConsequence(</span>
+<span class="fc" id="L81">                    reduction.variables(),</span>
+<span class="fc" id="L82">                    reduction.solutionClassification(),</span>
+<span class="fc" id="L83">                    reduction.particularSolution(),</span>
+<span class="fc" id="L84">                    reduction.nullspaceBasis(),</span>
+<span class="fc" id="L85">                    Optional.empty());</span>
+<span class="fc" id="L86">            case INCONSISTENT -&gt; new ExactLinearSolutionConsequence(</span>
+<span class="fc" id="L87">                reduction.variables(),</span>
                 SolutionClassification.INCONSISTENT,
-<span class="nc" id="L89">                Optional.empty(),</span>
-<span class="nc" id="L90">                List.of(),</span>
-<span class="nc" id="L91">                Optional.of(Rational.ONE));</span>
+<span class="fc" id="L89">                Optional.empty(),</span>
+<span class="fc" id="L90">                List.of(),</span>
+<span class="fc" id="L91">                Optional.of(Rational.ONE));</span>
         };
     }
 

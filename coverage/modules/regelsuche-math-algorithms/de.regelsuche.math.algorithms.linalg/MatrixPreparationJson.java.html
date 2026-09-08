@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MatrixPreparationJson.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">MatrixPreparationJson.java</span></div><h1>MatrixPreparationJson.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.representation.RepresentationBridge;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/** Versioned request and canonical evidence contract shared by CLI, Workbench and reproduction. */
+public final class MatrixPreparationJson {
+    public static final String REQUEST_SCHEMA = &quot;regelsuche.matrix-preparation-request/v1&quot;;
+    public static final String ARTIFACT_SCHEMA = &quot;regelsuche.matrix-preparation-artifact/v1&quot;;
+<span class="fc" id="L15">    private static final Set&lt;String&gt; REQUEST_FIELDS = Set.of(&quot;schema&quot;, &quot;equations&quot;, &quot;unknowns&quot;, &quot;profile&quot;,</span>
+        &quot;maxWorkUnits&quot;, &quot;catalog&quot;, &quot;operatorExpressions&quot;, &quot;eigenvalueParameter&quot;, &quot;nonZeroVector&quot;,
+        &quot;matrixExpression&quot;, &quot;rightHandSide&quot;);
+
+    private MatrixPreparationJson() { }
+
+    public static MatrixPreparation.Request readRequest(Map&lt;String, ?&gt; object) {
+<span class="nc bnc" id="L22" title="All 4 branches missed.">        if (!REQUEST_SCHEMA.equals(object.get(&quot;schema&quot;)) || !REQUEST_FIELDS.containsAll(object.keySet())) {</span>
+<span class="nc" id="L23">            throw new IllegalArgumentException(&quot;unsupported matrix-preparation request schema or field&quot;);</span>
+        }
+<span class="nc" id="L25">        List&lt;MatrixPreparation.NamedMatrix&gt; catalog = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L26" title="All 2 branches missed.">        for (Object value : list(object, &quot;catalog&quot;)) {</span>
+<span class="nc" id="L27">            Map&lt;String, ?&gt; entry = object(value);</span>
+<span class="nc bnc" id="L28" title="All 2 branches missed.">            if (!Set.of(&quot;name&quot;, &quot;entries&quot;, &quot;inverseWitness&quot;).containsAll(entry.keySet())) {</span>
+<span class="nc" id="L29">                throw new IllegalArgumentException(&quot;unsupported matrix declaration field&quot;);</span>
+            }
+<span class="nc" id="L31">            catalog.add(new MatrixPreparation.NamedMatrix(string(entry, &quot;name&quot;, &quot;&quot;),</span>
+<span class="nc" id="L32">                rows(entry, &quot;entries&quot;), rows(entry, &quot;inverseWitness&quot;)));</span>
+<span class="nc" id="L33">        }</span>
+<span class="nc" id="L34">        return new MatrixPreparation.Request(string(object, &quot;equations&quot;, &quot;&quot;), strings(object, &quot;unknowns&quot;),</span>
+<span class="nc" id="L35">            MatrixPreparation.Profile.valueOf(string(object, &quot;profile&quot;, &quot;SAFE_PREPARED_REPRESENTATION_V1&quot;)),</span>
+<span class="nc" id="L36">            integer(object, &quot;maxWorkUnits&quot;, MatrixPreparation.DEFAULT_WORK), catalog,</span>
+<span class="nc" id="L37">            strings(object, &quot;operatorExpressions&quot;), string(object, &quot;eigenvalueParameter&quot;, &quot;&quot;),</span>
+<span class="nc" id="L38">            bool(object, &quot;nonZeroVector&quot;), string(object, &quot;matrixExpression&quot;, &quot;&quot;), strings(object, &quot;rightHandSide&quot;));</span>
+    }
+
+    public static String requestJson(MatrixPreparation.Request request) {
+<span class="nc" id="L42">        JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="nc" id="L43">        writeRequest(writer, request);</span>
+<span class="nc" id="L44">        return writer.endObject().toString();</span>
+    }
+
+    public static void writeRequest(JsonWriter writer, MatrixPreparation.Request request) {
+<span class="fc" id="L48">        writer.property(&quot;schema&quot;, REQUEST_SCHEMA).property(&quot;equations&quot;, request.equations())</span>
+<span class="fc" id="L49">            .stringArray(&quot;unknowns&quot;, request.unknowns()).property(&quot;profile&quot;, request.profile().name())</span>
+<span class="fc" id="L50">            .property(&quot;maxWorkUnits&quot;, request.maxWorkUnits()).array(&quot;catalog&quot;, w -&gt; request.catalog().forEach(matrix -&gt;</span>
+<span class="fc" id="L51">                w.objectValue(m -&gt; {</span>
+<span class="fc" id="L52">                    m.property(&quot;name&quot;, matrix.name());</span>
+<span class="fc" id="L53">                    writeRows(m, &quot;entries&quot;, matrix.entries());</span>
+<span class="fc" id="L54">                    writeRows(m, &quot;inverseWitness&quot;, matrix.inverseWitness());</span>
+<span class="fc" id="L55">                }))).stringArray(&quot;operatorExpressions&quot;, request.operatorExpressions())</span>
+<span class="fc" id="L56">            .property(&quot;eigenvalueParameter&quot;, request.eigenvalueParameter()).property(&quot;nonZeroVector&quot;, request.nonZeroVector())</span>
+<span class="fc" id="L57">            .property(&quot;matrixExpression&quot;, request.matrixExpression()).stringArray(&quot;rightHandSide&quot;, request.rightHandSide());</span>
+<span class="fc" id="L58">    }</span>
+
+    public static String toJson(MatrixPreparation.Analysis analysis) {
+<span class="fc" id="L61">        JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L62">        writer.property(&quot;schema&quot;, ARTIFACT_SCHEMA).property(&quot;contentHash&quot;, contentHash(analysis))</span>
+<span class="fc" id="L63">            .object(&quot;evidence&quot;, w -&gt; writeAnalysis(w, analysis));</span>
+<span class="fc" id="L64">        return writer.endObject().toString() + &quot;\n&quot;;</span>
+    }
+
+    /** Recompute the complete retained artifact; a supplied digest alone has no authority. */
+    public static String replay(Map&lt;String, ?&gt; artifact) {
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        if (!ARTIFACT_SCHEMA.equals(artifact.get(&quot;schema&quot;))) {</span>
+<span class="nc" id="L70">            throw new IllegalArgumentException(&quot;unsupported matrix-preparation artifact schema&quot;);</span>
+        }
+<span class="nc" id="L72">        Map&lt;String, ?&gt; evidence = object(artifact.get(&quot;evidence&quot;));</span>
+<span class="nc" id="L73">        var request = readRequest(object(evidence.get(&quot;request&quot;)));</span>
+<span class="nc" id="L74">        String recomputed = toJson(new MatrixPreparation().analyze(request));</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        if (!new de.regelsuche.json.JsonReader(recomputed).readObject().equals(artifact)) {</span>
+<span class="nc" id="L76">            throw new IllegalArgumentException(&quot;retained representation evidence does not match complete replay&quot;);</span>
+        }
+<span class="nc" id="L78">        return recomputed;</span>
+    }
+
+    public static String contentHash(MatrixPreparation.Analysis analysis) {
+<span class="fc" id="L82">        JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L83">        writeAnalysis(writer, analysis);</span>
+<span class="fc" id="L84">        return MatrixRepresentationBridge.hash(writer.endObject().toString());</span>
+    }
+
+    private static void writeAnalysis(JsonWriter writer, MatrixPreparation.Analysis analysis) {
+<span class="fc" id="L88">        writer.property(&quot;schema&quot;, MatrixPreparation.SCHEMA).property(&quot;status&quot;, analysis.status().name())</span>
+<span class="fc" id="L89">            .property(&quot;detailCode&quot;, analysis.detailCode()).property(&quot;profile&quot;, analysis.request().profile().name())</span>
+<span class="fc" id="L90">            .object(&quot;request&quot;, w -&gt; writeRequest(w, analysis.request()));</span>
+<span class="fc" id="L91">        writeWork(writer, &quot;work&quot;, analysis.work());</span>
+<span class="fc" id="L92">        writer.property(&quot;workConvention&quot;, &quot;MATRIX_PREPARATION_CONSTRUCTION_V1; independent audit reruns use separate bounded budgets&quot;)</span>
+<span class="fc" id="L93">            .property(&quot;physicalInterpretation&quot;, &quot;NONE&quot;);</span>
+<span class="fc" id="L94">        analysis.formation().ifPresent(result -&gt; writer.object(&quot;formation&quot;, w -&gt; writeFormation(w, result)));</span>
+<span class="fc" id="L95">        writer.array(&quot;candidates&quot;, w -&gt; analysis.attempts().forEach(attempt -&gt; w.objectValue(a -&gt; writeAttempt(a, attempt))));</span>
+<span class="fc" id="L96">        analysis.blocks().ifPresent(result -&gt; writer.object(&quot;blocks&quot;, w -&gt; {</span>
+<span class="fc" id="L97">            writeStatus(w, result);</span>
+<span class="fc" id="L98">            result.certificate().ifPresent(c -&gt; w.property(&quot;certificate&quot;, c.contentHash()));</span>
+<span class="fc" id="L99">            result.representation().ifPresent(blocks -&gt; {</span>
+<span class="fc" id="L100">                w.array(&quot;rowPermutation&quot;, a -&gt; blocks.rowPermutation().forEach(a::value));</span>
+<span class="fc" id="L101">                w.array(&quot;columnPermutation&quot;, a -&gt; blocks.columnPermutation().forEach(a::value));</span>
+<span class="fc" id="L102">                w.stringArray(&quot;capabilities&quot;, blocks.unlockedCapabilities());</span>
+<span class="fc" id="L103">            });</span>
+<span class="fc" id="L104">        }));</span>
+<span class="fc" id="L105">        analysis.eigenproblem().ifPresent(result -&gt; writer.object(&quot;eigenproblem&quot;, w -&gt; {</span>
+<span class="fc" id="L106">            writeStatus(w, result);</span>
+<span class="fc" id="L107">            result.certificate().ifPresent(c -&gt; w.property(&quot;certificate&quot;, c.contentHash()));</span>
+<span class="fc" id="L108">            result.representation().ifPresent(eigen -&gt; {</span>
+<span class="fc" id="L109">                w.stringArray(&quot;variableOrder&quot;, eigen.vectorCoordinates())</span>
+<span class="fc" id="L110">                    .property(&quot;eigenvalueParameter&quot;, eigen.eigenvalueParameter())</span>
+<span class="fc" id="L111">                    .stringArray(&quot;assumptions&quot;, eigen.requiredAssumptions())</span>
+<span class="fc" id="L112">                    .stringArray(&quot;capabilities&quot;, eigen.unlockedCapabilities())</span>
+<span class="fc" id="L113">                    .property(&quot;modelInterpretation&quot;, eigen.modelInterpretation().name());</span>
+<span class="fc" id="L114">                MatrixRepresentationBridge.writeMatrix(w, &quot;operator&quot;, eigen.operator());</span>
+<span class="fc" id="L115">                MatrixRepresentationBridge.writeMatrix(w, &quot;shiftedOperator&quot;, eigen.shiftedOperator());</span>
+<span class="fc" id="L116">            });</span>
+<span class="fc" id="L117">        }));</span>
+<span class="fc" id="L118">        writer.object(&quot;solving&quot;, w -&gt; writeSolving(w, analysis));</span>
+<span class="fc" id="L119">    }</span>
+
+    private static void writeFormation(JsonWriter writer,
+            RepresentationBridge.Result&lt;SymbolicLinearSystem, SymbolicLinearSystemRepresentationBridge.Certificate&gt; result) {
+<span class="fc" id="L123">        writeStatus(writer, result);</span>
+<span class="fc" id="L124">        result.certificate().ifPresent(c -&gt; writer.property(&quot;certificate&quot;, c.contentHash()));</span>
+<span class="fc" id="L125">        result.representation().ifPresent(system -&gt; {</span>
+<span class="fc" id="L126">            writer.stringArray(&quot;variableOrder&quot;, system.unknowns()).stringArray(&quot;parameters&quot;, system.scalarParameters())</span>
+<span class="fc" id="L127">                .stringArray(&quot;assumptions&quot;, List.of()).property(&quot;rowCount&quot;, system.equationCount())</span>
+<span class="fc" id="L128">                .property(&quot;columnCount&quot;, system.unknownCount());</span>
+<span class="fc" id="L129">            MatrixRepresentationBridge.writeMatrix(writer, &quot;coefficients&quot;, system.coefficients());</span>
+<span class="fc" id="L130">            writer.stringArray(&quot;rightHandSide&quot;, system.rightHandSide().values().stream().map(Polynomial::toCanonicalString).toList());</span>
+<span class="fc" id="L131">            writer.array(&quot;sourceRows&quot;, w -&gt; system.rowOrigins().forEach(row -&gt; w.objectValue(r -&gt;</span>
+<span class="fc" id="L132">                r.property(&quot;sourceIndex&quot;, row.sourceIndex()).property(&quot;equation&quot;, row.sourceEquation()))));</span>
+<span class="fc" id="L133">        });</span>
+<span class="fc" id="L134">    }</span>
+
+    private static void writeAttempt(JsonWriter writer, MatrixPreparation.Attempt attempt) {
+<span class="fc" id="L137">        var outcome = attempt.outcome();</span>
+<span class="fc" id="L138">        writer.property(&quot;origin&quot;, attempt.origin()).property(&quot;accepted&quot;, outcome.accepted())</span>
+<span class="fc" id="L139">            .property(&quot;detailCode&quot;, outcome.detailCode()).stringArray(&quot;provenance&quot;, attempt.provenance())</span>
+<span class="fc" id="L140">            .object(&quot;expression&quot;, w -&gt; MatrixRepresentationBridge.writeExpression(w, attempt.expression()));</span>
+<span class="fc" id="L141">        writeWork(writer, &quot;work&quot;, outcome.work());</span>
+<span class="fc" id="L142">        writer.object(&quot;formation&quot;, w -&gt; {</span>
+<span class="fc" id="L143">            writeStatus(w, outcome.formation());</span>
+<span class="fc" id="L144">            outcome.formation().certificate().ifPresent(c -&gt; w.property(&quot;certificate&quot;, c.contentHash()));</span>
+<span class="fc" id="L145">        });</span>
+<span class="fc" id="L146">        outcome.formation().representation().ifPresent(view -&gt;</span>
+<span class="fc" id="L147">            writer.stringArray(&quot;newlyUnlockedCapabilities&quot;, view.newlyUnlockedCapabilities()));</span>
+<span class="fc" id="L148">        outcome.replay().ifPresent(result -&gt; writer.object(&quot;replay&quot;, w -&gt; {</span>
+<span class="fc" id="L149">            writeStatus(w, result);</span>
+<span class="fc" id="L150">            result.certificate().ifPresent(c -&gt; w.property(&quot;certificate&quot;, c.contentHash()));</span>
+<span class="fc" id="L151">            result.representation().ifPresent(rows -&gt; w.stringArray(&quot;leftHandSides&quot;,</span>
+<span class="fc" id="L152">                rows.stream().map(Polynomial::toCanonicalString).toList()));</span>
+<span class="fc" id="L153">        }));</span>
+<span class="fc" id="L154">    }</span>
+
+    private static void writeSolving(JsonWriter writer, MatrixPreparation.Analysis analysis) {
+<span class="fc" id="L157">        writer.property(&quot;phase&quot;, &quot;DOWNSTREAM_EXACT_CONSEQUENCES&quot;);</span>
+<span class="fc" id="L158">        analysis.rowReduction().ifPresent(result -&gt; writer.object(&quot;rref&quot;, w -&gt; {</span>
+<span class="fc" id="L159">            w.property(&quot;status&quot;, result.status().name()).property(&quot;detailCode&quot;, result.detailCode());</span>
+<span class="fc" id="L160">            w.property(&quot;relation&quot;, RepresentationBridge.Relation.SOLUTION_SET_EQUIVALENCE.name());</span>
+<span class="fc" id="L161">            writeWork(w, &quot;work&quot;, result.work());</span>
+<span class="fc" id="L162">            w.stringArray(&quot;variableOrder&quot;, analysis.exactSystem().orElseThrow().variables());</span>
+<span class="fc" id="L163">            result.certificate().ifPresent(c -&gt; w.property(&quot;certificate&quot;, c.contentHash()));</span>
+<span class="fc" id="L164">            result.reduction().ifPresent(reduction -&gt; {</span>
+<span class="fc" id="L165">                w.property(&quot;classification&quot;, reduction.solutionClassification().name());</span>
+<span class="fc" id="L166">                writeRows(w, &quot;augmentedRows&quot;, reduction.reducedAugmentedRows().stream()</span>
+<span class="fc" id="L167">                    .map(row -&gt; row.stream().map(Object::toString).toList()).toList());</span>
+<span class="fc" id="L168">                w.stringArray(&quot;rowOperations&quot;, reduction.rowOperations().stream().map(Object::toString).toList());</span>
+<span class="fc" id="L169">                reduction.particularSolution().ifPresent(v -&gt; w.stringArray(&quot;particularSolution&quot;,</span>
+<span class="fc" id="L170">                    v.values().stream().map(Object::toString).toList()));</span>
+<span class="fc" id="L171">                writeRows(w, &quot;nullspaceBasis&quot;, reduction.nullspaceBasis().stream()</span>
+<span class="fc" id="L172">                    .map(v -&gt; v.values().stream().map(Object::toString).toList()).toList());</span>
+<span class="fc" id="L173">                w.stringArray(&quot;newlyUnlockedCapabilities&quot;, reduction.capabilityFrontier().newlyUnlocked());</span>
+<span class="fc" id="L174">            });</span>
+<span class="fc" id="L175">        }));</span>
+<span class="fc" id="L176">        analysis.characteristicPolynomial().ifPresent(result -&gt; writer.object(&quot;characteristicPolynomial&quot;, w -&gt; {</span>
+<span class="fc" id="L177">            w.property(&quot;status&quot;, result.status().name()).property(&quot;detailCode&quot;, result.detailCode());</span>
+<span class="fc" id="L178">            w.property(&quot;relation&quot;, RepresentationBridge.Relation.SPECTRAL_OR_SIMILARITY_RELATION.name());</span>
+<span class="fc" id="L179">            writeWork(w, &quot;work&quot;, result.work());</span>
+<span class="fc" id="L180">            result.certificate().ifPresent(c -&gt; w.property(&quot;certificate&quot;, c.contentHash()));</span>
+<span class="fc" id="L181">            result.characteristicPolynomial().ifPresent(polynomial -&gt; w.property(&quot;equation&quot;, polynomial.singularityEquation()));</span>
+<span class="fc" id="L182">        }));</span>
+<span class="fc" id="L183">    }</span>
+
+    private static void writeStatus(JsonWriter writer, RepresentationBridge.Result&lt;?, ?&gt; result) {
+<span class="fc" id="L186">        writer.property(&quot;status&quot;, result.status().name()).property(&quot;detailCode&quot;, result.detailCode());</span>
+<span class="fc" id="L187">        result.relation().ifPresent(relation -&gt; writer.property(&quot;relation&quot;, relation.name()));</span>
+<span class="fc" id="L188">        writeWork(writer, &quot;work&quot;, result.work());</span>
+<span class="fc" id="L189">    }</span>
+
+    public static void writeWork(JsonWriter writer, String key, RepresentationBridge.WorkLedger work) {
+<span class="fc" id="L192">        writer.object(key, w -&gt; w.property(&quot;configured&quot;, work.configuredWorkUnits())</span>
+<span class="fc" id="L193">            .property(&quot;consumed&quot;, work.consumedWorkUnits()).property(&quot;remaining&quot;, work.remainingWorkUnits()));</span>
+<span class="fc" id="L194">    }</span>
+
+    private static void writeRows(JsonWriter writer, String key, List&lt;List&lt;String&gt;&gt; rows) {
+<span class="fc" id="L197">        writer.array(key, w -&gt; rows.forEach(row -&gt; w.arrayValue(r -&gt; row.forEach(r::value))));</span>
+<span class="fc" id="L198">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public static Map&lt;String, ?&gt; object(Object value) {
+<span class="nc bnc" id="L202" title="All 6 branches missed.">        if (!(value instanceof Map&lt;?, ?&gt; map) || map.keySet().stream().anyMatch(key -&gt; !(key instanceof String))) {</span>
+<span class="nc" id="L203">            throw new IllegalArgumentException(&quot;expected an object&quot;);</span>
+        }
+<span class="nc" id="L205">        return (Map&lt;String, ?&gt;) map;</span>
+    }
+
+    private static String string(Map&lt;String, ?&gt; object, String key, String fallback) {
+<span class="nc bnc" id="L209" title="All 2 branches missed.">        if (!object.containsKey(key)) {</span>
+<span class="nc" id="L210">            return fallback;</span>
+        }
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        if (!(object.get(key) instanceof String value)) {</span>
+<span class="nc" id="L213">            throw new IllegalArgumentException(key + &quot; must be a string&quot;);</span>
+        }
+<span class="nc" id="L215">        return value;</span>
+    }
+
+    private static int integer(Map&lt;String, ?&gt; object, String key, int fallback) {
+<span class="nc" id="L219">        Object value = object.get(key);</span>
+<span class="nc bnc" id="L220" title="All 4 branches missed.">        if (value == null &amp;&amp; !object.containsKey(key)) {</span>
+<span class="nc" id="L221">            return fallback;</span>
+        }
+<span class="nc bnc" id="L223" title="All 4 branches missed.">        if (!(value instanceof Integer || value instanceof Long)) {</span>
+<span class="nc" id="L224">            throw new IllegalArgumentException(key + &quot; must be an integer&quot;);</span>
+        }
+<span class="nc" id="L226">        return Math.toIntExact(((Number) value).longValue());</span>
+    }
+
+    private static boolean bool(Map&lt;String, ?&gt; object, String key) {
+<span class="nc bnc" id="L230" title="All 2 branches missed.">        if (!object.containsKey(key)) {</span>
+<span class="nc" id="L231">            return false;</span>
+        }
+<span class="nc bnc" id="L233" title="All 2 branches missed.">        if (!(object.get(key) instanceof Boolean value)) {</span>
+<span class="nc" id="L234">            throw new IllegalArgumentException(key + &quot; must be a boolean&quot;);</span>
+        }
+<span class="nc" id="L236">        return value;</span>
+    }
+
+    private static List&lt;?&gt; list(Map&lt;String, ?&gt; object, String key) {
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        if (!object.containsKey(key)) {</span>
+<span class="nc" id="L241">            return List.of();</span>
+        }
+<span class="nc bnc" id="L243" title="All 2 branches missed.">        if (!(object.get(key) instanceof List&lt;?&gt; value)) {</span>
+<span class="nc" id="L244">            throw new IllegalArgumentException(key + &quot; must be an array&quot;);</span>
+        }
+<span class="nc" id="L246">        return value;</span>
+    }
+
+    private static List&lt;String&gt; strings(Map&lt;String, ?&gt; object, String key) {
+<span class="nc" id="L250">        return strings(list(object, key));</span>
+    }
+
+    private static List&lt;String&gt; strings(List&lt;?&gt; values) {
+<span class="nc" id="L254">        return values.stream().map(value -&gt; {</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">            if (!(value instanceof String string)) {</span>
+<span class="nc" id="L256">                throw new IllegalArgumentException(&quot;array entries must be strings&quot;);</span>
+            }
+<span class="nc" id="L258">            return string;</span>
+<span class="nc" id="L259">        }).toList();</span>
+    }
+
+    private static List&lt;List&lt;String&gt;&gt; rows(Map&lt;String, ?&gt; object, String key) {
+<span class="nc" id="L263">        return list(object, key).stream().map(value -&gt; {</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">            if (!(value instanceof List&lt;?&gt; row)) {</span>
+<span class="nc" id="L265">                throw new IllegalArgumentException(&quot;matrix rows must be arrays&quot;);</span>
+            }
+<span class="nc" id="L267">            return strings(row);</span>
+<span class="nc" id="L268">        }).toList();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

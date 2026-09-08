@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MatrixRepresentationBridge.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">MatrixRepresentationBridge.java</span></div><h1>MatrixRepresentationBridge.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
+import de.regelsuche.representation.RepresentationBridge;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.List;
+import java.util.Objects;
+
+/** Discharges a complete ordered matrix-equality obligation, never a sampled equality. */
+<span class="fc" id="L14">public final class MatrixRepresentationBridge implements</span>
+        RepresentationBridge&lt;MatrixRepresentationBridge.Obligation,
+            MatrixRepresentationBridge.View, MatrixRepresentationBridge.Certificate&gt; {
+    public static final String SCHEMA = &quot;regelsuche.ordered-matrix-bridge/v1&quot;;
+<span class="fc" id="L18">    public static final Relation RELATION = Relation.LINEAR_MAP_REPRESENTATION_EQUIVALENCE;</span>
+
+    @Override
+    public Result&lt;View, Certificate&gt; analyze(Obligation source, Budget budget) {
+<span class="fc" id="L22">        ExactMatrixAlgebra.Work work = new ExactMatrixAlgebra.Work(budget.maxWorkUnits());</span>
+<span class="fc" id="L23">        ExactMatrixAlgebra algebra = new ExactMatrixAlgebra(work);</span>
+        try {
+<span class="fc" id="L25">            PolynomialMatrix expected = algebra.checked(source.coefficients());</span>
+<span class="fc" id="L26">            PolynomialMatrix actual = algebra.evaluate(source.expression());</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">            if (!algebra.equal(expected, actual)) {</span>
+<span class="fc" id="L28">                return Result.withoutRepresentation(Status.NOT_APPLICABLE, work.ledger(), &quot;ORDERED_MATRIX_EQUALITY_REJECTED&quot;);</span>
+            }
+<span class="fc" id="L30">            View view = new View(source, capabilities(source.expression()));</span>
+<span class="fc" id="L31">            return Result.represented(view, new Certificate(SCHEMA, hash(canonical(source))),</span>
+<span class="fc" id="L32">                RELATION, work.ledger(), &quot;COMPLETE_ORDERED_MATRIX_EQUALITY_VERIFIED&quot;);</span>
+<span class="nc" id="L33">        } catch (ExactMatrixAlgebra.Exhausted exception) {</span>
+<span class="nc" id="L34">            return Result.withoutRepresentation(Status.BUDGET_INCONCLUSIVE, work.ledger(), &quot;MATRIX_OBLIGATION_WORK_EXHAUSTED&quot;);</span>
+<span class="fc" id="L35">        } catch (ExactMatrixAlgebra.Unsupported exception) {</span>
+<span class="fc" id="L36">            return Result.withoutRepresentation(Status.DOMAIN_UNSUPPORTED, work.ledger(), exception.getMessage());</span>
+        }
+    }
+
+    @Override
+    public boolean verify(Obligation source, Result&lt;View, Certificate&gt; result) {
+<span class="pc bpc" id="L42" title="3 of 6 branches missed.">        return source != null &amp;&amp; result != null &amp;&amp; result.represented()</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            &amp;&amp; analyze(source, new Budget(result.work().configuredWorkUnits())).equals(result);</span>
+    }
+
+    private static List&lt;String&gt; capabilities(ExactMatrixExpression expression) {
+<span class="pc bpc" id="L47" title="1 of 6 branches missed.">        return switch (expression) {</span>
+<span class="fc" id="L48">            case ExactMatrixExpression.Product ignored -&gt; List.of(&quot;STAGED_MATRIX_VECTOR_APPLICATION&quot;);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            case ExactMatrixExpression.Sum s -&gt; List.of(s.left() instanceof ExactMatrixExpression.Identity</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">                || s.right() instanceof ExactMatrixExpression.Identity</span>
+<span class="fc" id="L51">                    ? &quot;IDENTITY_PLUS_OPERATOR_APPLICATION&quot; : &quot;ORDERED_DISTRIBUTIVE_APPLICATION&quot;);</span>
+<span class="nc" id="L52">            case ExactMatrixExpression.Inverse ignored -&gt; List.of(&quot;EXACT_INVERSE_APPLICATION&quot;);</span>
+<span class="fc" id="L53">            case ExactMatrixExpression.BlockDiagonal ignored -&gt; List.of(&quot;INDEPENDENT_BLOCK_APPLICATION&quot;);</span>
+<span class="fc" id="L54">            case ExactMatrixExpression.Mapped m -&gt; capabilities(m.expression());</span>
+<span class="fc" id="L55">            default -&gt; List.of();</span>
+        };
+    }
+
+    public record Obligation(PolynomialMatrix coefficients, List&lt;String&gt; sourceRows,
+            List&lt;String&gt; coordinates, String formationRoot, ExactMatrixExpression expression,
+            List&lt;String&gt; provenance) {
+<span class="fc" id="L62">        public Obligation {</span>
+<span class="fc" id="L63">            Objects.requireNonNull(coefficients, &quot;coefficients&quot;);</span>
+<span class="fc" id="L64">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L65">            sourceRows = List.copyOf(sourceRows);</span>
+<span class="fc" id="L66">            coordinates = List.copyOf(coordinates);</span>
+<span class="fc" id="L67">            provenance = List.copyOf(provenance);</span>
+<span class="pc bpc" id="L68" title="2 of 4 branches missed.">            if (sourceRows.size() != coefficients.rows() || coordinates.size() != coefficients.columns()</span>
+<span class="pc bpc" id="L69" title="2 of 4 branches missed.">                    || coordinates.stream().distinct().count() != coordinates.size()</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">                    || formationRoot == null || formationRoot.isBlank()) {</span>
+<span class="nc" id="L71">                throw new IllegalArgumentException(&quot;matrix obligation must retain its formation and ordered mappings&quot;);</span>
+            }
+<span class="fc" id="L73">        }</span>
+    }
+
+    public record View(Obligation obligation, List&lt;String&gt; newlyUnlockedCapabilities) {
+<span class="fc" id="L77">        public View {</span>
+<span class="fc" id="L78">            Objects.requireNonNull(obligation, &quot;obligation&quot;);</span>
+<span class="fc" id="L79">            newlyUnlockedCapabilities = List.copyOf(newlyUnlockedCapabilities);</span>
+<span class="fc" id="L80">        }</span>
+    }
+
+    public record Certificate(String schema, String contentHash) {
+<span class="fc" id="L84">        public Certificate {</span>
+<span class="fc" id="L85">            Objects.requireNonNull(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L86">            Objects.requireNonNull(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L87">        }</span>
+    }
+
+    /** A concrete downstream principal: staged composition must replay every coordinate. */
+<span class="fc" id="L91">    public static final class VectorReplay implements RepresentationBridge&lt;View, List&lt;Polynomial&gt;, Certificate&gt; {</span>
+        @Override
+        public Result&lt;List&lt;Polynomial&gt;, Certificate&gt; analyze(View source, Budget budget) {
+<span class="fc" id="L94">            ExactMatrixAlgebra.Work work = new ExactMatrixAlgebra.Work(budget.maxWorkUnits());</span>
+<span class="fc" id="L95">            ExactMatrixAlgebra algebra = new ExactMatrixAlgebra(work);</span>
+            try {
+<span class="fc" id="L97">                Obligation obligation = source.obligation();</span>
+<span class="fc" id="L98">                List&lt;Polynomial&gt; coordinates = obligation.coordinates().stream().map(Polynomial::variable).toList();</span>
+<span class="fc" id="L99">                List&lt;Polynomial&gt; staged = algebra.apply(obligation.expression(), coordinates);</span>
+<span class="fc" id="L100">                List&lt;Polynomial&gt; direct = algebra.apply(obligation.coefficients(), coordinates);</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">                if (!staged.equals(direct)) {</span>
+<span class="nc" id="L102">                    return Result.withoutRepresentation(Status.INVALID_CERTIFICATE, work.ledger(), &quot;STAGED_VECTOR_REPLAY_REJECTED&quot;);</span>
+                }
+<span class="fc" id="L104">                String material = canonical(obligation) + &quot;\n&quot; + staged.stream()</span>
+<span class="fc" id="L105">                    .map(Polynomial::toCanonicalString).toList();</span>
+<span class="fc" id="L106">                return Result.represented(staged, new Certificate(&quot;regelsuche.ordered-vector-replay/v1&quot;, hash(material)),</span>
+<span class="fc" id="L107">                    RELATION, work.ledger(), &quot;COMPLETE_STAGED_VECTOR_REPLAY_VERIFIED&quot;);</span>
+<span class="fc" id="L108">            } catch (ExactMatrixAlgebra.Exhausted exception) {</span>
+<span class="fc" id="L109">                return Result.withoutRepresentation(Status.BUDGET_INCONCLUSIVE, work.ledger(), &quot;VECTOR_REPLAY_WORK_EXHAUSTED&quot;);</span>
+<span class="nc" id="L110">            } catch (ExactMatrixAlgebra.Unsupported exception) {</span>
+<span class="nc" id="L111">                return Result.withoutRepresentation(Status.DOMAIN_UNSUPPORTED, work.ledger(), exception.getMessage());</span>
+            }
+        }
+
+        @Override
+        public boolean verify(View source, Result&lt;List&lt;Polynomial&gt;, Certificate&gt; result) {
+<span class="pc bpc" id="L117" title="3 of 6 branches missed.">            return source != null &amp;&amp; result != null &amp;&amp; result.represented()</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">                &amp;&amp; analyze(source, new Budget(result.work().configuredWorkUnits())).equals(result);</span>
+        }
+    }
+
+    public static String canonical(Obligation source) {
+<span class="fc" id="L123">        JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L124">        writer.property(&quot;schema&quot;, SCHEMA).property(&quot;relation&quot;, RELATION.name())</span>
+<span class="fc" id="L125">            .property(&quot;formationRoot&quot;, source.formationRoot())</span>
+<span class="fc" id="L126">            .stringArray(&quot;sourceRows&quot;, source.sourceRows()).stringArray(&quot;coordinates&quot;, source.coordinates())</span>
+<span class="fc" id="L127">            .stringArray(&quot;provenance&quot;, source.provenance());</span>
+<span class="fc" id="L128">        writeMatrix(writer, &quot;coefficients&quot;, source.coefficients());</span>
+<span class="fc" id="L129">        writer.object(&quot;expression&quot;, w -&gt; writeExpression(w, source.expression()));</span>
+<span class="fc" id="L130">        return writer.endObject().toString();</span>
+    }
+
+    public static void writeExpression(JsonWriter writer, ExactMatrixExpression expression) {
+<span class="fc" id="L134">        writer.property(&quot;display&quot;, expression.display());</span>
+<span class="fc bfc" id="L135" title="All 7 branches covered.">        switch (expression) {</span>
+<span class="fc" id="L136">            case ExactMatrixExpression.Matrix m -&gt; {</span>
+<span class="fc" id="L137">                writer.property(&quot;kind&quot;, &quot;MATRIX&quot;).property(&quot;name&quot;, m.name());</span>
+<span class="fc" id="L138">                writeMatrix(writer, &quot;entries&quot;, m.value());</span>
+<span class="fc" id="L139">            }</span>
+<span class="fc" id="L140">            case ExactMatrixExpression.Identity i -&gt; writer.property(&quot;kind&quot;, &quot;IDENTITY&quot;).property(&quot;dimension&quot;, i.dimension());</span>
+<span class="fc" id="L141">            case ExactMatrixExpression.Product p -&gt; writeBinary(writer, &quot;ORDERED_PRODUCT&quot;, p.left(), p.right());</span>
+<span class="fc" id="L142">            case ExactMatrixExpression.Sum s -&gt; writeBinary(writer, &quot;SUM&quot;, s.left(), s.right());</span>
+<span class="fc" id="L143">            case ExactMatrixExpression.Inverse i -&gt; {</span>
+<span class="fc" id="L144">                writer.property(&quot;kind&quot;, &quot;INVERSE&quot;).object(&quot;operand&quot;, w -&gt; writeExpression(w, i.operand()));</span>
+<span class="fc" id="L145">                writeMatrix(writer, &quot;inverseWitness&quot;, i.witness());</span>
+<span class="fc" id="L146">            }</span>
+<span class="fc" id="L147">            case ExactMatrixExpression.BlockDiagonal b -&gt; writer.property(&quot;kind&quot;, &quot;BLOCK_DIAGONAL&quot;)</span>
+<span class="fc" id="L148">                .array(&quot;blocks&quot;, w -&gt; b.blocks().forEach(block -&gt; w.objectValue(v -&gt; writeExpression(v, block))));</span>
+<span class="fc" id="L149">            case ExactMatrixExpression.Mapped m -&gt; writer.property(&quot;kind&quot;, &quot;RESTORE_SOURCE_ORDER&quot;)</span>
+<span class="fc" id="L150">                .array(&quot;rows&quot;, w -&gt; m.rows().forEach(w::value))</span>
+<span class="fc" id="L151">                .array(&quot;columns&quot;, w -&gt; m.columns().forEach(w::value))</span>
+<span class="fc" id="L152">                .object(&quot;expression&quot;, w -&gt; writeExpression(w, m.expression()));</span>
+        }
+<span class="fc" id="L154">    }</span>
+
+    private static void writeBinary(JsonWriter writer, String kind, ExactMatrixExpression left, ExactMatrixExpression right) {
+<span class="fc" id="L157">        writer.property(&quot;kind&quot;, kind).object(&quot;left&quot;, w -&gt; writeExpression(w, left))</span>
+<span class="fc" id="L158">            .object(&quot;right&quot;, w -&gt; writeExpression(w, right));</span>
+<span class="fc" id="L159">    }</span>
+
+    public static void writeMatrix(JsonWriter writer, String key, PolynomialMatrix matrix) {
+<span class="fc" id="L162">        writer.array(key, w -&gt; matrix.entries().forEach(row -&gt; w.arrayValue(r -&gt;</span>
+<span class="fc" id="L163">            row.forEach(p -&gt; r.value(p.toCanonicalString())))));</span>
+<span class="fc" id="L164">    }</span>
+
+    public static String hash(String value) {
+        try {
+<span class="fc" id="L168">            return java.util.HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L169">                .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L170">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L171">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

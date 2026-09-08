@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MatrixPreparationQualification.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">MatrixPreparationQualification.java</span></div><h1>MatrixPreparationQualification.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.util.AtomicJsonFile;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.representation.RepresentationBridge;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/** Finite profile characterization; the frozen RREF-v1 experiment is left intact. */
+public final class MatrixPreparationQualification {
+    public static final String SCHEMA = &quot;regelsuche.matrix-preparation-qualification/v1&quot;;
+    private MatrixPreparationQualification() { }
+
+    public static void main(String[] args) throws IOException {
+<span class="nc bnc" id="L20" title="All 4 branches missed.">        if (args.length == 3 &amp;&amp; args[0].equals(&quot;verify&quot;)) {</span>
+<span class="nc" id="L21">            verifyDirectories(Path.of(args[1]), Path.of(args[2]));</span>
+<span class="nc bnc" id="L22" title="All 2 branches missed.">        } else if (args.length == 1) {</span>
+<span class="nc" id="L23">            write(Path.of(args[0]));</span>
+        } else {
+<span class="nc" id="L25">            throw new IllegalArgumentException(&quot;supply output directory, or verify &lt;host-directory&gt; &lt;container-directory&gt;&quot;);</span>
+        }
+<span class="nc" id="L27">    }</span>
+
+    public static Map&lt;String, String&gt; artifacts() {
+<span class="fc" id="L30">        Map&lt;String, String&gt; artifacts = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L31">        JsonWriter report = new JsonWriter().beginObject();</span>
+<span class="fc" id="L32">        report.property(&quot;schema&quot;, SCHEMA).property(&quot;totalBudgetPerRoute&quot;, MatrixPreparation.DEFAULT_WORK)</span>
+<span class="fc" id="L33">            .property(&quot;claim&quot;, &quot;Finite exact correctness and capability characterization; no universal speedup claim&quot;)</span>
+<span class="fc" id="L34">            .property(&quot;workConvention&quot;, &quot;Construction ledgers exclude separately bounded independent audit reruns in both routes&quot;)</span>
+<span class="fc" id="L35">            .property(&quot;directBaseline&quot;, DirectScalarEliminationSolver.SOLVER_ID);</span>
+<span class="fc" id="L36">        report.array(&quot;cases&quot;, writer -&gt; cases().forEach(fixture -&gt; writer.objectValue(w -&gt; writeCase(w, fixture, artifacts))));</span>
+<span class="fc" id="L37">        report.array(&quot;artifactIdentities&quot;, writer -&gt; artifacts.forEach((name, contents) -&gt; writer.objectValue(w -&gt;</span>
+<span class="fc" id="L38">            w.property(&quot;file&quot;, name).property(&quot;sha256&quot;, MatrixRepresentationBridge.hash(contents)))));</span>
+<span class="fc" id="L39">        artifacts.put(&quot;qualification.json&quot;, report.endObject().toString() + &quot;\n&quot;);</span>
+<span class="fc" id="L40">        return java.util.Collections.unmodifiableMap(artifacts);</span>
+    }
+
+    private static void writeCase(JsonWriter writer, Fixture fixture, Map&lt;String, String&gt; artifacts) {
+<span class="fc" id="L44">        writer.property(&quot;id&quot;, fixture.id()).property(&quot;source&quot;, fixture.source());</span>
+<span class="fc" id="L45">        writer.stringArray(&quot;experimentalRecipes&quot;, fixture.operators());</span>
+<span class="fc" id="L46">        List&lt;MatrixPreparation.Analysis&gt; analyses = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        for (MatrixPreparation.Profile profile : MatrixPreparation.Profile.values()) {</span>
+<span class="fc" id="L48">            var request = new MatrixPreparation.Request(fixture.source(), fixture.unknowns(), profile,</span>
+<span class="fc" id="L49">                MatrixPreparation.DEFAULT_WORK, fixture.catalog(),</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">                profile == MatrixPreparation.Profile.EXPERIMENTAL_OPERATOR_V1 ? fixture.operators() : List.of(), fixture.eigenvalue(),</span>
+<span class="fc" id="L51">                fixture.nonzero(), &quot;&quot;, List.of());</span>
+<span class="fc" id="L52">            MatrixPreparation preparation = new MatrixPreparation();</span>
+<span class="fc" id="L53">            var analysis = preparation.analyze(request);</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            if (!preparation.verify(analysis)) {</span>
+<span class="nc" id="L55">                throw new IllegalStateException(&quot;profile replay failed: &quot; + fixture.id() + &quot;/&quot; + profile);</span>
+            }
+<span class="fc" id="L57">            analyses.add(analysis);</span>
+<span class="fc" id="L58">            artifacts.put(fixture.id() + &quot;-&quot; + profile + &quot;.json&quot;, MatrixPreparationJson.toJson(analysis));</span>
+        }
+<span class="fc" id="L60">        writer.array(&quot;profiles&quot;, w -&gt; analyses.forEach(analysis -&gt; w.objectValue(profile -&gt; {</span>
+<span class="fc" id="L61">            profile.property(&quot;profile&quot;, analysis.request().profile().name()).property(&quot;status&quot;, analysis.status().name())</span>
+<span class="fc" id="L62">                .property(&quot;acceptedRepresentations&quot;, analysis.acceptedCount())</span>
+<span class="fc" id="L63">                .property(&quot;contentHash&quot;, MatrixPreparationJson.contentHash(analysis));</span>
+<span class="fc" id="L64">            MatrixPreparationJson.writeWork(profile, &quot;work&quot;, analysis.work());</span>
+<span class="fc" id="L65">            profile.stringArray(&quot;newlyUnlockedCapabilities&quot;, analysis.attempts().stream().filter(a -&gt; a.outcome().accepted())</span>
+<span class="fc" id="L66">                .flatMap(a -&gt; a.outcome().formation().representation().orElseThrow().newlyUnlockedCapabilities().stream()).distinct().toList());</span>
+<span class="fc" id="L67">        })));</span>
+<span class="fc" id="L68">        compareDirect(writer, fixture, analyses);</span>
+<span class="fc" id="L69">    }</span>
+
+    private static void compareDirect(JsonWriter writer, Fixture fixture, List&lt;MatrixPreparation.Analysis&gt; analyses) {
+<span class="fc" id="L72">        MatrixPreparation.Analysis safe = analyses.get(1);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (safe.equations().isEmpty()) {</span>
+<span class="nc" id="L74">            writer.property(&quot;comparison&quot;, &quot;SOURCE_UNSUPPORTED&quot;);</span>
+<span class="nc" id="L75">            return;</span>
+        }
+<span class="fc" id="L77">        var source = new DirectScalarEliminationSolver.Source(safe.equations(), fixture.unknowns());</span>
+<span class="fc" id="L78">        DirectScalarEliminationSolver direct = new DirectScalarEliminationSolver();</span>
+<span class="fc" id="L79">        var baseline = direct.solve(source, new RepresentationBridge.Budget(MatrixPreparation.DEFAULT_WORK));</span>
+<span class="fc" id="L80">        writer.object(&quot;direct&quot;, w -&gt; {</span>
+<span class="fc" id="L81">            w.property(&quot;status&quot;, baseline.status().name()).property(&quot;detailCode&quot;, baseline.detailCode());</span>
+<span class="fc" id="L82">            MatrixPreparationJson.writeWork(w, &quot;work&quot;, baseline.work());</span>
+<span class="fc" id="L83">            baseline.certificate().ifPresent(c -&gt; w.property(&quot;certificate&quot;, c.contentHash()));</span>
+<span class="fc" id="L84">        });</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (baseline.status() != DirectScalarEliminationSolver.Status.SOLVED) {</span>
+<span class="fc" id="L86">            writer.property(&quot;comparison&quot;, &quot;OUTSIDE_DIRECT_EXACT_FRAGMENT&quot;);</span>
+<span class="fc" id="L87">            return;</span>
+        }
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (!direct.verify(source, baseline)) {</span>
+<span class="nc" id="L90">            throw new IllegalStateException(&quot;direct baseline verification failed: &quot; + fixture.id());</span>
+        }
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        for (MatrixPreparation.Analysis analysis : analyses.subList(1, analyses.size())) {</span>
+<span class="fc" id="L93">            var reduction = analysis.rowReduction().flatMap(ExactRrefSolver.Result::reduction).orElseThrow(() -&gt;</span>
+<span class="nc" id="L94">                new IllegalStateException(&quot;prepared profile failed a directly solved fixture: &quot; + fixture.id()));</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">            if (!ExactLinearSolutionConsequence.fromRref(reduction).equals(baseline.consequence().orElseThrow())) {</span>
+<span class="nc" id="L96">                throw new IllegalStateException(&quot;solution-set disagreement: &quot; + fixture.id());</span>
+            }
+<span class="fc" id="L98">        }</span>
+<span class="fc" id="L99">        writer.property(&quot;comparison&quot;, &quot;EXACT_SOLUTION_CONSEQUENCES_AGREE&quot;);</span>
+<span class="fc" id="L100">    }</span>
+
+<span class="fc" id="L102">    private record Fixture(String id, String source, List&lt;String&gt; unknowns,</span>
+            List&lt;MatrixPreparation.NamedMatrix&gt; catalog, String eigenvalue, boolean nonzero, List&lt;String&gt; operators) { }
+
+    private static Fixture scalar(String id, String source, String... unknowns) {
+<span class="fc" id="L106">        return new Fixture(id, source, List.of(unknowns), List.of(), &quot;&quot;, false, List.of());</span>
+    }
+
+    private static List&lt;Fixture&gt; cases() {
+<span class="fc" id="L110">        return List.of(</span>
+<span class="fc" id="L111">            scalar(&quot;source-product&quot;, &quot;2*(x+y)+3*(x-y)=5; (x+y)+4*(x-y)=6&quot;, &quot;x&quot;, &quot;y&quot;),</span>
+<span class="fc" id="L112">            scalar(&quot;mapped-blocks&quot;, &quot;x+y=2; z=3; x-y=0&quot;, &quot;z&quot;, &quot;y&quot;, &quot;x&quot;),</span>
+<span class="fc" id="L113">            scalar(&quot;identity-plus&quot;, &quot;x+(2*x+y)=4; y+(x+3*y)=5&quot;, &quot;x&quot;, &quot;y&quot;),</span>
+<span class="fc" id="L114">            scalar(&quot;unused-coordinate&quot;, &quot;x=2&quot;, &quot;unused&quot;, &quot;x&quot;),</span>
+<span class="fc" id="L115">            scalar(&quot;inconsistent&quot;, &quot;x+y=1; x+y=2&quot;, &quot;x&quot;, &quot;y&quot;),</span>
+<span class="fc" id="L116">            scalar(&quot;exact-decimals&quot;, &quot;0.1*x+0.2*y=0.3; x-y=0&quot;, &quot;x&quot;, &quot;y&quot;),</span>
+<span class="fc" id="L117">            scalar(&quot;nonlinear-control&quot;, &quot;x*y=1; x+y=2&quot;, &quot;x&quot;, &quot;y&quot;),</span>
+<span class="fc" id="L118">            new Fixture(&quot;visible-factors&quot;, &quot;5*x-y=5; 5*x-3*y=6&quot;, List.of(&quot;x&quot;, &quot;y&quot;), List.of(</span>
+<span class="fc" id="L119">                new MatrixPreparation.NamedMatrix(&quot;P&quot;, List.of(List.of(&quot;2&quot;, &quot;3&quot;), List.of(&quot;1&quot;, &quot;4&quot;)), List.of()),</span>
+<span class="fc" id="L120">                new MatrixPreparation.NamedMatrix(&quot;Q&quot;, List.of(List.of(&quot;1&quot;, &quot;1&quot;), List.of(&quot;1&quot;, &quot;-1&quot;)), List.of())), &quot;&quot;, false, List.of()),</span>
+<span class="fc" id="L121">            new Fixture(&quot;ordered-distributivity&quot;, &quot;3*x+2*y=5; x+2*y=3&quot;, List.of(&quot;x&quot;, &quot;y&quot;), List.of(</span>
+<span class="fc" id="L122">                new MatrixPreparation.NamedMatrix(&quot;A&quot;, List.of(List.of(&quot;1&quot;, &quot;1&quot;), List.of(&quot;0&quot;, &quot;1&quot;)), List.of()),</span>
+<span class="fc" id="L123">                new MatrixPreparation.NamedMatrix(&quot;B&quot;, List.of(List.of(&quot;1&quot;, &quot;0&quot;), List.of(&quot;1&quot;, &quot;1&quot;)), List.of())),</span>
+<span class="fc" id="L124">                &quot;&quot;, false, List.of(&quot;A*(B+I(2))&quot;)),</span>
+<span class="fc" id="L125">            new Fixture(&quot;guarded-inverse&quot;, &quot;x=2; y=3&quot;, List.of(&quot;x&quot;, &quot;y&quot;), List.of(</span>
+<span class="fc" id="L126">                new MatrixPreparation.NamedMatrix(&quot;T&quot;, List.of(List.of(&quot;1&quot;, &quot;1&quot;), List.of(&quot;0&quot;, &quot;1&quot;)),</span>
+<span class="fc" id="L127">                    List.of(List.of(&quot;1&quot;, &quot;-1&quot;), List.of(&quot;0&quot;, &quot;1&quot;)))), &quot;&quot;, false, List.of(&quot;T*inverse(T)&quot;)),</span>
+<span class="fc" id="L128">            new Fixture(&quot;eigenproblem&quot;, &quot;a*x+b*y=lambda*x; c*x+d*y=lambda*y&quot;, List.of(&quot;x&quot;, &quot;y&quot;), List.of(), &quot;lambda&quot;, true, List.of()),</span>
+<span class="fc" id="L129">            new Fixture(&quot;missing-vector-guard&quot;, &quot;a*x+b*y=lambda*x; c*x+d*y=lambda*y&quot;, List.of(&quot;x&quot;, &quot;y&quot;), List.of(), &quot;lambda&quot;, false, List.of()));</span>
+    }
+
+    public static void write(Path directory) throws IOException {
+<span class="fc" id="L133">        Files.createDirectories(directory);</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; artifact : artifacts().entrySet()) {</span>
+<span class="fc" id="L135">            AtomicJsonFile.writeUtf8(directory.resolve(artifact.getKey()), artifact.getValue());</span>
+<span class="fc" id="L136">        }</span>
+<span class="fc" id="L137">    }</span>
+
+    public static void verifyDirectories(Path host, Path container) throws IOException {
+<span class="fc" id="L140">        Map&lt;String, String&gt; expected = artifacts();</span>
+<span class="fc" id="L141">        requireFiles(host, expected.keySet());</span>
+<span class="fc" id="L142">        requireFiles(container, expected.keySet());</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : expected.entrySet()) {</span>
+<span class="fc" id="L144">            String hostContents = Files.readString(host.resolve(entry.getKey()));</span>
+<span class="fc" id="L145">            String containerContents = Files.readString(container.resolve(entry.getKey()));</span>
+<span class="pc bpc" id="L146" title="1 of 4 branches missed.">            if (!entry.getValue().equals(hostContents) || !hostContents.equals(containerContents)) {</span>
+<span class="fc" id="L147">                throw new IllegalStateException(&quot;matrix reproduction mismatch: &quot; + entry.getKey());</span>
+            }
+<span class="fc" id="L149">        }</span>
+<span class="fc" id="L150">    }</span>
+
+    private static void requireFiles(Path directory, java.util.Set&lt;String&gt; expected) throws IOException {
+<span class="fc" id="L153">        try (var paths = Files.list(directory)) {</span>
+<span class="fc" id="L154">            var actual = paths.map(path -&gt; path.getFileName().toString()).collect(java.util.stream.Collectors.toSet());</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">            if (!actual.equals(expected)) {</span>
+<span class="nc" id="L156">                throw new IllegalStateException(&quot;matrix reproduction file inventory mismatch: &quot; + directory);</span>
+            }
+        }
+<span class="fc" id="L159">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RepresentationPreparation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.representation</a> &gt; <span class="el_source">RepresentationPreparation.java</span></div><h1>RepresentationPreparation.java</h1><pre class="source lang-java linenums">package de.regelsuche.representation;
+
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+/** Shared typed formation and concrete principal replay for representation preparation. */
+public final class RepresentationPreparation {
+    private RepresentationPreparation() { }
+
+    /**
+     * Typed entry point for representation principals. Neither the source nor
+     * its relation is coerced into scalar Expr equality. The same finite budget
+     * covers bridge formation and concrete downstream replay; independent audit
+     * verification reruns each retained stage with its original bounded budget.
+     */
+    public static &lt;S, T, C, R, D&gt; Outcome&lt;T, C, R, D&gt; analyze(
+        S source,
+        RepresentationBridge&lt;S, T, C&gt; bridge,
+        Set&lt;RepresentationBridge.Relation&gt; acceptedRelations,
+        RepresentationBridge&lt;T, R, D&gt; principal,
+        RepresentationBridge.Budget budget
+    ) {
+<span class="nc" id="L24">        var formation = bridge.analyze(source, budget);</span>
+<span class="nc bnc" id="L25" title="All 2 branches missed.">        if (!formation.represented()) {</span>
+<span class="nc" id="L26">            return new Outcome&lt;&gt;(formation, Optional.empty(), false, formation.detailCode());</span>
+        }
+<span class="nc bnc" id="L28" title="All 4 branches missed.">        if (!acceptedRelations.contains(formation.relation().orElseThrow()) || !bridge.verify(source, formation)) {</span>
+<span class="nc" id="L29">            return new Outcome&lt;&gt;(formation, Optional.empty(), false, &quot;RELATION_OR_FORMATION_REJECTED&quot;);</span>
+        }
+<span class="nc" id="L31">        T represented = formation.representation().orElseThrow();</span>
+<span class="nc" id="L32">        var replay = principal.analyze(represented,</span>
+<span class="nc" id="L33">            new RepresentationBridge.Budget(formation.work().remainingWorkUnits()));</span>
+<span class="nc bnc" id="L34" title="All 4 branches missed.">        boolean accepted = replay.represented() &amp;&amp; principal.verify(represented, replay);</span>
+<span class="nc" id="L35">        return new Outcome&lt;&gt;(formation, Optional.of(replay), accepted,</span>
+<span class="nc bnc" id="L36" title="All 2 branches missed.">            accepted ? &quot;TYPED_REPRESENTATION_AND_PRINCIPAL_VERIFIED&quot; : replay.detailCode());</span>
+    }
+
+    public record Outcome&lt;T, C, R, D&gt;(
+        RepresentationBridge.Result&lt;T, C&gt; formation,
+        Optional&lt;RepresentationBridge.Result&lt;R, D&gt;&gt; replay,
+        boolean accepted,
+        String detailCode
+    ) {
+<span class="nc" id="L45">        public Outcome {</span>
+<span class="nc" id="L46">            Objects.requireNonNull(formation, &quot;formation&quot;);</span>
+<span class="nc" id="L47">            Objects.requireNonNull(replay, &quot;replay&quot;);</span>
+<span class="nc" id="L48">            Objects.requireNonNull(detailCode, &quot;detailCode&quot;);</span>
+<span class="nc bnc" id="L49" title="All 8 branches missed.">            if (accepted &amp;&amp; (!formation.represented() || replay.isEmpty() || !replay.orElseThrow().represented())) {</span>
+<span class="nc" id="L50">                throw new IllegalArgumentException(&quot;accepted preparation requires formation and concrete replay&quot;);</span>
+            }
+<span class="nc" id="L52">        }</span>
+
+        public RepresentationBridge.WorkLedger work() {
+<span class="nc" id="L55">            int consumed = formation.work().consumedWorkUnits()</span>
+<span class="nc" id="L56">                + replay.map(result -&gt; result.work().consumedWorkUnits()).orElse(0);</span>
+<span class="nc" id="L57">            return RepresentationBridge.WorkLedger.of(</span>
+<span class="nc" id="L58">                formation.work().configuredWorkUnits(), consumed);</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

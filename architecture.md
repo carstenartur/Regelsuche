@@ -228,8 +228,13 @@ Eigenproblem erkannt werden. Diese Brücken behalten Relationstyp,
 Objektidentität, Variablenrollen und Round-trip-Evidence. Sie werden nicht in
 einen einzelnen Ausdrucksstring abgeflacht.
 
-Die direkte Teilnahme dieser typisierten Objektbrücken am Unified Preparation
-Coordinator bleibt eine offene Integrationsgrenze.
+Der typisierte Einstieg `UnifiedRulePreparationCoordinator.prepareRepresentation`
+verwendet den gemeinsamen Core-Koordinator `RepresentationPreparation` für
+Formation und konkreten Principal-Replay. Relationstypen und Nachweise bleiben
+getrennt erhalten. Die [Matrix- und Operatorvorbereitung](matrix-operator-preparation.md)
+nutzt denselben Ablauf für begrenzte Quell- und Katalogvorschläge; die Workbench
+zeigt und reproduziert deren vollständige Evidenz. Weitere Vorbereitungsfamilien
+von #745 bleiben eigenständige Integrationsarbeit.
 
 ## Domänenbewusste Polynomdarstellung und Faktorisierung
 

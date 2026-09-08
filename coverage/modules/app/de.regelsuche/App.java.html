@@ -122,30 +122,31 @@ import java.util.Optional;
                 + &quot;[--export json,markdown,mermaid,latex,inventory] &quot;
                 + &quot;[--dir PATH]&quot;);
 <span class="fc" id="L124">        System.out.println(&quot;  transform &lt;expression&gt;&quot;);</span>
-<span class="fc" id="L125">        System.out.println(</span>
+<span class="fc" id="L125">        System.out.println(&quot;  representations analyze &lt;request.json&gt; | replay &lt;artifact.json&gt;&quot;);</span>
+<span class="fc" id="L126">        System.out.println(</span>
             &quot;  showcase-train-preflight &lt;showcase-plan.json&gt; &quot;
                 + &quot;&lt;output-directory&gt;&quot;);
-<span class="fc" id="L128">        System.out.println(</span>
+<span class="fc" id="L129">        System.out.println(</span>
             &quot;  showcase-train-freeze &lt;showcase-plan.json&gt; &quot;
                 + &quot;&lt;repository-commit&gt; &lt;output-directory&gt;&quot;);
-<span class="fc" id="L131">        System.out.println(</span>
+<span class="fc" id="L132">        System.out.println(</span>
             &quot;  plugins list|reload|watch|status &quot;
                 + &quot;[--dir PATH] [--rules PATH]&quot;);
-<span class="fc" id="L134">        System.out.println(&quot;  rules list [--dir PATH] [--profile ID]&quot;);</span>
-<span class="fc" id="L135">        System.out.println(&quot;  rules validate &lt;file.regelsuche&gt;&quot;);</span>
-<span class="fc" id="L136">        System.out.println(&quot;  rules conflicts [--dir PATH]&quot;);</span>
-<span class="fc" id="L137">        System.out.println(</span>
+<span class="fc" id="L135">        System.out.println(&quot;  rules list [--dir PATH] [--profile ID]&quot;);</span>
+<span class="fc" id="L136">        System.out.println(&quot;  rules validate &lt;file.regelsuche&gt;&quot;);</span>
+<span class="fc" id="L137">        System.out.println(&quot;  rules conflicts [--dir PATH]&quot;);</span>
+<span class="fc" id="L138">        System.out.println(</span>
             &quot;  rules profiles [--dir PATH] [--profile ID]&quot;);
-<span class="fc" id="L139">        System.out.println(&quot;  rules debug &lt;expression&gt; [--dir PATH]&quot;);</span>
-<span class="fc" id="L140">        System.out.println(</span>
+<span class="fc" id="L140">        System.out.println(&quot;  rules debug &lt;expression&gt; [--dir PATH]&quot;);</span>
+<span class="fc" id="L141">        System.out.println(</span>
             &quot;  rules import &lt;file-or-dir&gt; [--into PATH]&quot;);
-<span class="fc" id="L142">        System.out.println(</span>
+<span class="fc" id="L143">        System.out.println(</span>
             &quot;  rules export [--profile ID] [--dir PATH] [--out PATH]&quot;);
-<span class="fc" id="L144">        System.out.println(&quot;  inventory list&quot;);</span>
-<span class="fc" id="L145">        System.out.println(&quot;  inventory export --format json [--dir PATH]&quot;);</span>
-<span class="fc" id="L146">        System.out.println(</span>
+<span class="fc" id="L145">        System.out.println(&quot;  inventory list&quot;);</span>
+<span class="fc" id="L146">        System.out.println(&quot;  inventory export --format json [--dir PATH]&quot;);</span>
+<span class="fc" id="L147">        System.out.println(</span>
             &quot;  path show &lt;pathId&gt; --format markdown|latex|mermaid|json&quot;);
-<span class="fc" id="L148">        System.out.println(&quot;Valid input types: term, equation, system&quot;);</span>
-<span class="fc" id="L149">    }</span>
+<span class="fc" id="L149">        System.out.println(&quot;Valid input types: term, equation, system&quot;);</span>
+<span class="fc" id="L150">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

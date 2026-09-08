@@ -1,0 +1,332 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactMatrixAlgebra.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">ExactMatrixAlgebra.java</span></div><h1>ExactMatrixAlgebra.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
+import de.regelsuche.representation.RepresentationBridge;
+import java.util.ArrayList;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.BiFunction;
+
+/** Bounded polynomial matrix arithmetic and a separate staged vector replay. */
+public final class ExactMatrixAlgebra {
+    public static final int MAX_DIMENSION = 16;
+    public static final int MAX_TERMS = 256;
+    public static final int MAX_DEGREE = 32;
+    public static final int MAX_COEFFICIENT_BITS = 2048;
+    public static final int MAX_DEPTH = 32;
+    private final Work work;
+<span class="fc" id="L25">    private final Map&lt;ExactMatrixExpression, PolynomialMatrix&gt; values = new IdentityHashMap&lt;&gt;();</span>
+
+<span class="fc" id="L27">    public ExactMatrixAlgebra(Work work) {</span>
+<span class="fc" id="L28">        this.work = java.util.Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L29">    }</span>
+
+    public PolynomialMatrix evaluate(ExactMatrixExpression expression) {
+<span class="fc" id="L32">        return evaluate(expression, 0);</span>
+    }
+
+    private PolynomialMatrix evaluate(ExactMatrixExpression expression, int depth) {
+<span class="fc" id="L36">        enter(depth);</span>
+<span class="fc" id="L37">        PolynomialMatrix cached = values.get(expression);</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (cached != null) {</span>
+<span class="fc" id="L39">            return cached;</span>
+        }
+<span class="fc bfc" id="L41" title="All 7 branches covered.">        PolynomialMatrix value = switch (expression) {</span>
+<span class="fc" id="L42">            case ExactMatrixExpression.Matrix m -&gt; checked(m.value());</span>
+<span class="fc" id="L43">            case ExactMatrixExpression.Identity i -&gt; identity(i.dimension());</span>
+<span class="fc" id="L44">            case ExactMatrixExpression.Product p -&gt; multiply(</span>
+<span class="fc" id="L45">                evaluate(p.left(), depth + 1), evaluate(p.right(), depth + 1));</span>
+<span class="fc" id="L46">            case ExactMatrixExpression.Sum s -&gt; add(</span>
+<span class="fc" id="L47">                evaluate(s.left(), depth + 1), evaluate(s.right(), depth + 1));</span>
+<span class="fc" id="L48">            case ExactMatrixExpression.Inverse i -&gt; inverse(i, depth);</span>
+<span class="fc" id="L49">            case ExactMatrixExpression.BlockDiagonal b -&gt; blocks(b, depth);</span>
+<span class="fc" id="L50">            case ExactMatrixExpression.Mapped m -&gt; restore(m, depth);</span>
+<span class="fc" id="L51">        };</span>
+<span class="fc" id="L52">        values.put(expression, value);</span>
+<span class="fc" id="L53">        return value;</span>
+    }
+
+    private PolynomialMatrix inverse(ExactMatrixExpression.Inverse inverse, int depth) {
+<span class="fc" id="L57">        PolynomialMatrix matrix = evaluate(inverse.operand(), depth + 1);</span>
+<span class="fc" id="L58">        PolynomialMatrix witness = checked(inverse.witness());</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        require(matrix.rows() == matrix.columns(), &quot;INVERSE_REQUIRES_SQUARE_MATRIX&quot;);</span>
+<span class="fc" id="L60">        PolynomialMatrix unit = identity(matrix.rows());</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        require(equal(multiply(matrix, witness), unit)</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            &amp;&amp; equal(multiply(witness, matrix), unit), &quot;INVERSE_WITNESS_REJECTED&quot;);</span>
+<span class="fc" id="L63">        return witness;</span>
+    }
+
+    private PolynomialMatrix blocks(ExactMatrixExpression.BlockDiagonal expression, int depth) {
+<span class="fc" id="L67">        List&lt;PolynomialMatrix&gt; blocks = expression.blocks().stream()</span>
+<span class="fc" id="L68">            .map(block -&gt; evaluate(block, depth + 1)).toList();</span>
+<span class="fc" id="L69">        int rows = blocks.stream().mapToInt(PolynomialMatrix::rows).sum();</span>
+<span class="fc" id="L70">        int columns = blocks.stream().mapToInt(PolynomialMatrix::columns).sum();</span>
+<span class="fc" id="L71">        List&lt;List&lt;Polynomial&gt;&gt; result = mutableZeros(rows, columns);</span>
+<span class="fc" id="L72">        int rowOffset = 0;</span>
+<span class="fc" id="L73">        int columnOffset = 0;</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        for (PolynomialMatrix block : blocks) {</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            for (int row = 0; row &lt; block.rows(); row++) {</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">                for (int column = 0; column &lt; block.columns(); column++) {</span>
+<span class="fc" id="L77">                    work.consume(1);</span>
+<span class="fc" id="L78">                    result.get(rowOffset + row).set(columnOffset + column, block.get(row, column));</span>
+                }
+            }
+<span class="fc" id="L81">            rowOffset += block.rows();</span>
+<span class="fc" id="L82">            columnOffset += block.columns();</span>
+<span class="fc" id="L83">        }</span>
+<span class="fc" id="L84">        return new PolynomialMatrix(result);</span>
+    }
+
+    private PolynomialMatrix restore(ExactMatrixExpression.Mapped mapping, int depth) {
+<span class="fc" id="L88">        PolynomialMatrix source = evaluate(mapping.expression(), depth + 1);</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        require(source.rows() == mapping.rows().size()</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            &amp;&amp; source.columns() == mapping.columns().size(), &quot;MAPPING_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc" id="L91">        List&lt;List&lt;Polynomial&gt;&gt; result = mutableZeros(source.rows(), source.columns());</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        for (int row = 0; row &lt; source.rows(); row++) {</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            for (int column = 0; column &lt; source.columns(); column++) {</span>
+<span class="fc" id="L94">                work.consume(1);</span>
+<span class="fc" id="L95">                result.get(mapping.rows().get(row)).set(mapping.columns().get(column), source.get(row, column));</span>
+            }
+        }
+<span class="fc" id="L98">        return new PolynomialMatrix(result);</span>
+    }
+
+    public PolynomialMatrix multiply(PolynomialMatrix left, PolynomialMatrix right) {
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        require(left.columns() == right.rows(), &quot;PRODUCT_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc" id="L103">        return matrix(left.rows(), right.columns(), (row, column) -&gt; {</span>
+<span class="fc" id="L104">            Polynomial sum = Polynomial.zero();</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            for (int inner = 0; inner &lt; left.columns(); inner++) {</span>
+<span class="fc" id="L106">                sum = add(sum, multiply(left.get(row, inner), right.get(inner, column)));</span>
+            }
+<span class="fc" id="L108">            return sum;</span>
+        });
+    }
+
+    public PolynomialMatrix add(PolynomialMatrix left, PolynomialMatrix right) {
+<span class="pc bpc" id="L113" title="2 of 4 branches missed.">        require(left.rows() == right.rows() &amp;&amp; left.columns() == right.columns(),</span>
+            &quot;SUM_DIMENSION_MISMATCH&quot;);
+<span class="fc" id="L115">        return matrix(left.rows(), left.columns(), (r, c) -&gt; add(left.get(r, c), right.get(r, c)));</span>
+    }
+
+    public boolean equal(PolynomialMatrix left, PolynomialMatrix right) {
+<span class="pc bpc" id="L119" title="2 of 4 branches missed.">        if (left.rows() != right.rows() || left.columns() != right.columns()) {</span>
+<span class="nc" id="L120">            return false;</span>
+        }
+<span class="fc" id="L122">        boolean equal = true;</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (int row = 0; row &lt; left.rows(); row++) {</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            for (int column = 0; column &lt; left.columns(); column++) {</span>
+<span class="fc" id="L125">                work.consume(1);</span>
+<span class="fc" id="L126">                equal &amp;= left.get(row, column).equals(right.get(row, column));</span>
+            }
+        }
+<span class="fc" id="L129">        return equal;</span>
+    }
+
+    public PolynomialMatrix identity(int dimension) {
+<span class="fc" id="L133">        return matrix(dimension, dimension, (r, c) -&gt; Polynomial.constant(</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            r.equals(c) ? Rational.ONE : Rational.ZERO));</span>
+    }
+
+    public PolynomialMatrix matrix(int rows, int columns, BiFunction&lt;Integer, Integer, Polynomial&gt; entry) {
+<span class="fc" id="L138">        dimensions(rows, columns);</span>
+<span class="fc" id="L139">        List&lt;List&lt;Polynomial&gt;&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        for (int row = 0; row &lt; rows; row++) {</span>
+<span class="fc" id="L141">            List&lt;Polynomial&gt; entries = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            for (int column = 0; column &lt; columns; column++) {</span>
+<span class="fc" id="L143">                work.consume(1);</span>
+<span class="fc" id="L144">                entries.add(checked(entry.apply(row, column)));</span>
+            }
+<span class="fc" id="L146">            result.add(entries);</span>
+        }
+<span class="fc" id="L148">        return new PolynomialMatrix(result);</span>
+    }
+
+    private List&lt;List&lt;Polynomial&gt;&gt; mutableZeros(int rows, int columns) {
+<span class="fc" id="L152">        return matrix(rows, columns, (r, c) -&gt; Polynomial.zero()).entries().stream()</span>
+<span class="fc" id="L153">            .map(row -&gt; (List&lt;Polynomial&gt;) new ArrayList&lt;&gt;(row)).toList();</span>
+    }
+
+    public PolynomialMatrix checked(PolynomialMatrix matrix) {
+<span class="fc" id="L157">        return matrix(matrix.rows(), matrix.columns(), matrix::get);</span>
+    }
+
+    /** Replays composition right-to-left on a vector, independently of matrix expansion. */
+    public List&lt;Polynomial&gt; apply(ExactMatrixExpression expression, List&lt;Polynomial&gt; vector) {
+<span class="fc" id="L162">        return apply(expression, vector, 0);</span>
+    }
+
+    private List&lt;Polynomial&gt; apply(ExactMatrixExpression expression, List&lt;Polynomial&gt; vector, int depth) {
+<span class="fc" id="L166">        enter(depth);</span>
+<span class="fc bfc" id="L167" title="All 4 branches covered.">        return switch (expression) {</span>
+<span class="fc" id="L168">            case ExactMatrixExpression.Product p -&gt; apply(p.left(), apply(p.right(), vector, depth + 1), depth + 1);</span>
+<span class="fc" id="L169">            case ExactMatrixExpression.Sum s -&gt; addVectors(</span>
+<span class="fc" id="L170">                apply(s.left(), vector, depth + 1), apply(s.right(), vector, depth + 1));</span>
+<span class="fc" id="L171">            case ExactMatrixExpression.Identity i -&gt; {</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">                require(i.dimension() == vector.size(), &quot;VECTOR_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc" id="L173">                yield List.copyOf(vector);</span>
+            }
+<span class="fc" id="L175">            default -&gt; apply(evaluate(expression, depth + 1), vector);</span>
+        };
+    }
+
+    public List&lt;Polynomial&gt; apply(PolynomialMatrix matrix, List&lt;Polynomial&gt; vector) {
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        require(matrix.columns() == vector.size(), &quot;VECTOR_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc" id="L181">        List&lt;Polynomial&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        for (int row = 0; row &lt; matrix.rows(); row++) {</span>
+<span class="fc" id="L183">            Polynomial value = Polynomial.zero();</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">            for (int column = 0; column &lt; matrix.columns(); column++) {</span>
+<span class="fc" id="L185">                value = add(value, multiply(matrix.get(row, column), vector.get(column)));</span>
+            }
+<span class="fc" id="L187">            result.add(value);</span>
+        }
+<span class="fc" id="L189">        return List.copyOf(result);</span>
+    }
+
+    private List&lt;Polynomial&gt; addVectors(List&lt;Polynomial&gt; left, List&lt;Polynomial&gt; right) {
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        require(left.size() == right.size(), &quot;VECTOR_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc" id="L194">        List&lt;Polynomial&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        for (int i = 0; i &lt; left.size(); i++) {</span>
+<span class="fc" id="L196">            result.add(add(left.get(i), right.get(i)));</span>
+        }
+<span class="fc" id="L198">        return List.copyOf(result);</span>
+    }
+
+    public Polynomial scalar(Expr expression) {
+<span class="fc" id="L202">        return scalar(expression, 0);</span>
+    }
+
+    private Polynomial scalar(Expr expression, int depth) {
+<span class="fc" id="L206">        enter(depth);</span>
+<span class="pc bpc" id="L207" title="1 of 4 branches missed.">        return switch (expression) {</span>
+<span class="fc" id="L208">            case NumberExpr n -&gt; checked(Polynomial.constant(Rational.fromExact(n.value())));</span>
+<span class="fc" id="L209">            case VariableExpr v -&gt; Polynomial.variable(v.name());</span>
+<span class="fc" id="L210">            case BinaryExpr b -&gt; binaryScalar(b, depth);</span>
+<span class="nc" id="L211">            default -&gt; throw new Unsupported(&quot;NON_POLYNOMIAL_SCALAR&quot;);</span>
+        };
+    }
+
+    private Polynomial binaryScalar(BinaryExpr expression, int depth) {
+<span class="fc" id="L216">        Polynomial left = scalar(expression.left(), depth + 1);</span>
+<span class="fc" id="L217">        Polynomial right = scalar(expression.right(), depth + 1);</span>
+<span class="pc bpc" id="L218" title="1 of 5 branches missed.">        return switch (expression.operator()) {</span>
+<span class="fc" id="L219">            case ADD -&gt; add(left, right);</span>
+<span class="fc" id="L220">            case SUB -&gt; add(left, right.multiply(Rational.NEGATIVE_ONE));</span>
+<span class="fc" id="L221">            case MUL -&gt; multiply(left, right);</span>
+            case DIV -&gt; {
+<span class="pc bpc" id="L223" title="1 of 4 branches missed.">                require(right.variables().isEmpty() &amp;&amp; !right.isZero(), &quot;NON_CONSTANT_OR_ZERO_DENOMINATOR&quot;);</span>
+<span class="fc" id="L224">                yield checked(left.multiply(Rational.ONE.divide(right.terms().values().iterator().next())));</span>
+            }
+<span class="nc" id="L226">            case POW -&gt; power(left, right);</span>
+        };
+    }
+
+    private Polynomial power(Polynomial base, Polynomial exponent) {
+<span class="fc" id="L231">        require(exponent.variables().isEmpty(), &quot;NON_CONSTANT_EXPONENT&quot;);</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        Rational value = exponent.isZero() ? Rational.ZERO : exponent.terms().values().iterator().next();</span>
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">        require(value.denominator().equals(java.math.BigInteger.ONE)</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">            &amp;&amp; value.numerator().signum() &gt;= 0</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">            &amp;&amp; value.numerator().compareTo(java.math.BigInteger.valueOf(20)) &lt;= 0, &quot;EXPONENT_OUTSIDE_FRAGMENT&quot;);</span>
+<span class="pc bpc" id="L236" title="1 of 4 branches missed.">        require(!base.isZero() || !value.isZero(), &quot;ZERO_TO_ZERO_POWER&quot;);</span>
+<span class="pc bpc" id="L237" title="2 of 4 branches missed.">        require(!value.isZero() || base.variables().isEmpty(), &quot;ZERO_EXPONENT_REQUIRES_NONZERO_BASE&quot;);</span>
+<span class="nc" id="L238">        Polynomial result = Polynomial.constant(Rational.ONE);</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">        for (int i = 0; i &lt; value.numerator().intValueExact(); i++) {</span>
+<span class="nc" id="L240">            result = multiply(result, base);</span>
+        }
+<span class="nc" id="L242">        return result;</span>
+    }
+
+    public Polynomial add(Polynomial left, Polynomial right) {
+<span class="fc" id="L246">        work.consume(Math.max(1L, (long) left.termCount() + right.termCount()));</span>
+<span class="fc" id="L247">        return checked(left.add(right));</span>
+    }
+
+    public Polynomial multiply(Polynomial left, Polynomial right) {
+<span class="fc" id="L251">        work.consume(Math.max(1L, (long) left.termCount() * right.termCount()));</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">        require((long) left.totalDegree() + right.totalDegree() &lt;= MAX_DEGREE,</span>
+            &quot;POLYNOMIAL_DEGREE_LIMIT&quot;);
+<span class="fc" id="L254">        return checked(left.multiply(right));</span>
+    }
+
+    private Polynomial checked(Polynomial value) {
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">        require(value.termCount() &lt;= MAX_TERMS,</span>
+            &quot;POLYNOMIAL_SIZE_LIMIT&quot;);
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        for (var monomial : value.terms().keySet()) {</span>
+<span class="fc" id="L261">            work.consume(1);</span>
+<span class="fc" id="L262">            long degree = monomial.powers().values().stream().mapToLong(Integer::longValue).sum();</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">            require(degree &lt;= MAX_DEGREE, &quot;POLYNOMIAL_DEGREE_LIMIT&quot;);</span>
+<span class="fc" id="L264">        }</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        for (Rational coefficient : value.terms().values()) {</span>
+<span class="fc" id="L266">            work.consume(1);</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">            require(coefficient.numerator().bitLength() &lt;= MAX_COEFFICIENT_BITS</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">                &amp;&amp; coefficient.denominator().bitLength() &lt;= MAX_COEFFICIENT_BITS,</span>
+                &quot;COEFFICIENT_SIZE_LIMIT&quot;);
+<span class="fc" id="L270">        }</span>
+<span class="fc" id="L271">        return value;</span>
+    }
+
+    private void enter(int depth) {
+<span class="fc" id="L275">        work.consume(1);</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">        require(depth &lt;= MAX_DEPTH, &quot;EXPRESSION_DEPTH_LIMIT&quot;);</span>
+<span class="fc" id="L277">    }</span>
+
+    private static void dimensions(int rows, int columns) {
+<span class="pc bpc" id="L280" title="4 of 8 branches missed.">        require(rows &gt; 0 &amp;&amp; columns &gt; 0 &amp;&amp; rows &lt;= MAX_DIMENSION &amp;&amp; columns &lt;= MAX_DIMENSION,</span>
+            &quot;MATRIX_DIMENSION_LIMIT&quot;);
+<span class="fc" id="L282">    }</span>
+
+    static void require(boolean valid, String reason) {
+<span class="fc bfc" id="L285" title="All 2 branches covered.">        if (!valid) {</span>
+<span class="fc" id="L286">            throw new Unsupported(reason);</span>
+        }
+<span class="fc" id="L288">    }</span>
+
+    public static final class Work {
+        private final int configured;
+        private int consumed;
+
+<span class="fc" id="L294">        public Work(int configured) {</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">            if (configured &lt; 0) {</span>
+<span class="nc" id="L296">                throw new IllegalArgumentException(&quot;work must not be negative&quot;);</span>
+            }
+<span class="fc" id="L298">            this.configured = configured;</span>
+<span class="fc" id="L299">        }</span>
+
+        public void consume(long units) {
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">            if (units &lt; 0) {</span>
+<span class="nc" id="L303">                throw new IllegalArgumentException(&quot;negative work&quot;);</span>
+            }
+<span class="fc bfc" id="L305" title="All 2 branches covered.">            if (units &gt; remaining()) {</span>
+<span class="fc" id="L306">                throw new Exhausted();</span>
+            }
+<span class="fc" id="L308">            consumed += (int) units;</span>
+<span class="fc" id="L309">        }</span>
+
+        public int remaining() {
+<span class="fc" id="L312">            return configured - consumed;</span>
+        }
+
+        public RepresentationBridge.WorkLedger ledger() {
+<span class="fc" id="L316">            return RepresentationBridge.WorkLedger.of(configured, consumed);</span>
+        }
+    }
+
+<span class="fc" id="L320">    public static final class Exhausted extends RuntimeException {</span>
+        private static final long serialVersionUID = 1L;
+    }
+
+    public static final class Unsupported extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        public Unsupported(String detail) {
+<span class="fc" id="L328">            super(detail);</span>
+<span class="fc" id="L329">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
