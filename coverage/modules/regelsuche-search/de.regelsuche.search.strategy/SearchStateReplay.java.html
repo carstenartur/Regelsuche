@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchStateReplay.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.strategy</a> &gt; <span class="el_source">SearchStateReplay.java</span></div><h1>SearchStateReplay.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.strategy;
+
+import de.regelsuche.json.JsonWriter;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Objects;
+import java.util.function.Supplier;
+
+/** Portable common-state observation. Loading never reconstructs executable transformations. */
+public final class SearchStateReplay {
+    public static final String SCHEMA = &quot;regelsuche.search-state-replay/v1&quot;;
+    private SearchStateReplay() { }
+
+    public static String toCanonicalJson(SearchState state) {
+<span class="fc" id="L15">        Objects.requireNonNull(state, &quot;state&quot;);</span>
+<span class="fc" id="L16">        var json = new JsonWriter().beginObject().property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L17">            .property(&quot;expression&quot;, state.expression()).property(&quot;depth&quot;, state.depth())</span>
+<span class="fc" id="L18">            .property(&quot;canonicalHash&quot;, state.canonicalHash())</span>
+<span class="fc" id="L19">            .stringArray(&quot;path&quot;, state.path()).stringArray(&quot;appliedRuleIds&quot;, state.appliedRuleIds())</span>
+<span class="fc" id="L20">            .stringArray(&quot;applicationKeys&quot;, state.appliedRuleApplications().stream().sorted().toList())</span>
+<span class="fc" id="L21">            .stringArray(&quot;assumptions&quot;, state.assumptions()).property(&quot;expandedStepCount&quot;, state.expandedStepCount())</span>
+<span class="fc" id="L22">            .property(&quot;parentExpression&quot;, state.parentExpression()).property(&quot;appliedRuleId&quot;, state.appliedRuleId());</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        if (state.appliedRuleKind() == null) json.nullProperty(&quot;appliedRuleKind&quot;);</span>
+<span class="fc" id="L24">        else json.property(&quot;appliedRuleKind&quot;, state.appliedRuleKind().name());</span>
+<span class="fc" id="L25">        json.property(&quot;mayIncreaseComplexity&quot;, state.mayIncreaseComplexity())</span>
+<span class="fc" id="L26">            .property(&quot;estimatedCostDelta&quot;, state.estimatedCostDelta())</span>
+<span class="fc" id="L27">            .property(&quot;equivalencePreserving&quot;, state.equivalencePreservingByConstruction()).property(&quot;improvement&quot;, state.improvement())</span>
+<span class="fc" id="L28">            .stringArray(&quot;appliedRuleKinds&quot;, state.appliedRuleKinds().stream().map(Enum::name).toList())</span>
+<span class="fc" id="L29">            .array(&quot;equivalencePreservingFlags&quot;, array -&gt; state.equivalencePreservingFlags().forEach(array::value));</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        if (state.score() == null) json.nullProperty(&quot;score&quot;);</span>
+<span class="fc" id="L31">        else json.object(&quot;score&quot;, score -&gt; score.property(&quot;stringLength&quot;, state.score().stringLength())</span>
+<span class="fc" id="L32">                .property(&quot;astNodeCount&quot;, state.score().astNodeCount()).property(&quot;operatorCount&quot;, state.score().operatorCount())</span>
+<span class="fc" id="L33">                .property(&quot;nestingDepth&quot;, state.score().nestingDepth()).property(&quot;recognizedPatternBonus&quot;, state.score().recognizedPatternBonus()));</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        json.property(&quot;executionRetained&quot;, state.transformations() != null);</span>
+<span class="pc" id="L35">        state.recordedExecution().ifPresent(execution -&gt; json.property(&quot;execution&quot;, execution.toCanonicalJson()));</span>
+<span class="fc" id="L36">        return json.endObject().toString();</span>
+    }
+
+    public static SearchState verifyArtifact(Path file, SearchReplayArtifact.Reference reference,
+            Supplier&lt;SearchState&gt; independentlyReplayedState) throws IOException {
+<span class="nc" id="L41">        String expected = SearchReplayArtifact.load(file, reference);</span>
+<span class="nc" id="L42">        SearchState actual = Objects.requireNonNull(independentlyReplayedState, &quot;replay source&quot;).get();</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">        if (actual.transformations() == null) throw new IllegalArgumentException(&quot;observational-only state cannot authorize replay&quot;);</span>
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        if (!expected.equals(toCanonicalJson(actual))) throw new IllegalArgumentException(&quot;search state replay differs from artifact&quot;);</span>
+<span class="nc" id="L45">        return actual;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

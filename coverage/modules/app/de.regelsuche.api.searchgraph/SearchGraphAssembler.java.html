@@ -154,110 +154,117 @@ public final class SearchGraphAssembler {
 <span class="fc" id="L154">        Map&lt;String, List&lt;String&gt;&gt; edgePathIds = buildEdgePathIds(edges, successes);</span>
 <span class="fc" id="L155">        List&lt;SearchGraphEdgeDto&gt; edgeDtos = new ArrayList&lt;&gt;(edges.size());</span>
 <span class="fc bfc" id="L156" title="All 2 branches covered.">        for (GraphEdge edge : edges) {</span>
-<span class="fc" id="L157">            String key = edge.fromExpression() + &quot;|&quot; + edge.toExpression() + &quot;|&quot; + edge.transformationRule();</span>
+<span class="fc" id="L157">            String key = edgeKey(edge);</span>
 <span class="fc" id="L158">            edgeDtos.add(new SearchGraphEdgeDto(</span>
 <span class="fc" id="L159">                edge.fromExpression(),</span>
 <span class="fc" id="L160">                edge.toExpression(),</span>
 <span class="fc" id="L161">                edge.transformationRule(),</span>
-<span class="fc" id="L162">                edge.rewriteKind(),</span>
-<span class="fc" id="L163">                edge.scoreAfter() - edge.scoreBefore(),</span>
-<span class="fc" id="L164">                List.of(),</span>
-<span class="pc bpc" id="L165" title="1 of 2 branches missed.">                edgePathIds.getOrDefault(key, List.of(edge.pathId() == null ? &quot;&quot; : edge.pathId())),</span>
-<span class="fc" id="L166">                edge.equivalencePreservingByConstruction(),</span>
-<span class="fc" id="L167">                edge.macroMoveExpansion()</span>
+<span class="fc" id="L162">                de.regelsuche.export.MathPresentation.DEFAULT.ruleLatex(edge.transformationRule()),</span>
+<span class="fc" id="L163">                edge.rewriteKind(),</span>
+<span class="fc" id="L164">                edge.scoreAfter() - edge.scoreBefore(),</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">                edge.execution() == null ? List.of() : edge.execution().assumptions(),</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">                edgePathIds.getOrDefault(key, List.of(edge.pathId() == null ? &quot;&quot; : edge.pathId())),</span>
+<span class="fc" id="L167">                edge.equivalencePreservingByConstruction(),</span>
+<span class="fc" id="L168">                edge.macroMoveExpansion(),</span>
+<span class="fc" id="L169">                edge.execution()</span>
             ));
-<span class="fc" id="L169">        }</span>
+<span class="fc" id="L171">        }</span>
 
         // ---- Build cluster DTOs (one per distinct clusterId).
-<span class="fc" id="L172">        Map&lt;String, List&lt;String&gt;&gt; nodesByCluster = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L173" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : clusterByNode.entrySet()) {</span>
-<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            if (entry.getValue().isEmpty()) {</span>
-<span class="nc" id="L175">                continue;</span>
+<span class="fc" id="L174">        Map&lt;String, List&lt;String&gt;&gt; nodesByCluster = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : clusterByNode.entrySet()) {</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">            if (entry.getValue().isEmpty()) {</span>
+<span class="nc" id="L177">                continue;</span>
             }
-<span class="fc" id="L177">            nodesByCluster.computeIfAbsent(entry.getValue(), k -&gt; new ArrayList&lt;&gt;()).add(entry.getKey());</span>
-<span class="fc" id="L178">        }</span>
-<span class="fc" id="L179">        List&lt;SearchGraphClusterDto&gt; clusterDtos = new ArrayList&lt;&gt;(nodesByCluster.size());</span>
-<span class="fc bfc" id="L180" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;String&gt;&gt; entry : nodesByCluster.entrySet()) {</span>
-<span class="fc" id="L181">            clusterDtos.add(new SearchGraphClusterDto(entry.getKey(), entry.getKey(), entry.getValue()));</span>
-<span class="fc" id="L182">        }</span>
+<span class="fc" id="L179">            nodesByCluster.computeIfAbsent(entry.getValue(), k -&gt; new ArrayList&lt;&gt;()).add(entry.getKey());</span>
+<span class="fc" id="L180">        }</span>
+<span class="fc" id="L181">        List&lt;SearchGraphClusterDto&gt; clusterDtos = new ArrayList&lt;&gt;(nodesByCluster.size());</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;String&gt;&gt; entry : nodesByCluster.entrySet()) {</span>
+<span class="fc" id="L183">            clusterDtos.add(new SearchGraphClusterDto(entry.getKey(), entry.getKey(), entry.getValue()));</span>
+<span class="fc" id="L184">        }</span>
         // Augment with macro-sequence and structural clusters when transformations are supplied.
-<span class="pc bpc" id="L184" title="1 of 4 branches missed.">        if (transformations != null &amp;&amp; !transformations.isEmpty()) {</span>
-<span class="fc" id="L185">            clusterDtos.addAll(macroClusterer.cluster(transformations));</span>
+<span class="pc bpc" id="L186" title="1 of 4 branches missed.">        if (transformations != null &amp;&amp; !transformations.isEmpty()) {</span>
+<span class="fc" id="L187">            clusterDtos.addAll(macroClusterer.cluster(transformations));</span>
         }
-<span class="fc" id="L187">        clusterDtos.addAll(structuralClusterer.cluster(orderedNodes));</span>
+<span class="fc" id="L189">        clusterDtos.addAll(structuralClusterer.cluster(orderedNodes));</span>
 
-<span class="fc" id="L189">        SearchGraphStatsDto stats = SearchGraphStatsService.compute(</span>
+<span class="fc" id="L191">        SearchGraphStatsDto stats = SearchGraphStatsService.compute(</span>
             snapshot,
             successes,
             candidates,
             macroRuleCount
         );
 
-<span class="fc" id="L196">        return new SearchGraphDto(nodeDtos, edgeDtos, clusterDtos, stats);</span>
+<span class="fc" id="L198">        return new SearchGraphDto(nodeDtos, edgeDtos, clusterDtos, stats);</span>
     }
 
     // -------------------------------------------------------------- helpers
 
+    private static String edgeKey(GraphEdge edge) {
+<span class="fc" id="L204">        return edge.fromExpression() + &quot;|&quot; + edge.toExpression() + &quot;|&quot; + edge.transformationRule()</span>
+<span class="fc" id="L205">            + &quot;|&quot; + edge.executionIdentity();</span>
+    }
+
     private static Set&lt;String&gt; collectBestPathExpressions(
         List&lt;GraphEdge&gt; edges, List&lt;SimplificationSuccess&gt; successes
     ) {
-<span class="fc" id="L204">        Set&lt;String&gt; result = new HashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (successes.isEmpty()) {</span>
-<span class="fc" id="L206">            return result;</span>
+<span class="fc" id="L211">        Set&lt;String&gt; result = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (successes.isEmpty()) {</span>
+<span class="fc" id="L213">            return result;</span>
         }
-<span class="fc" id="L208">        SimplificationSuccess best = successes.stream()</span>
-<span class="fc" id="L209">            .max(Comparator.comparingInt(SimplificationSuccess::improvement))</span>
-<span class="fc" id="L210">            .orElseThrow();</span>
+<span class="fc" id="L215">        SimplificationSuccess best = successes.stream()</span>
+<span class="fc" id="L216">            .max(Comparator.comparingInt(SimplificationSuccess::improvement))</span>
+<span class="fc" id="L217">            .orElseThrow();</span>
 
         // Walk backwards from best.simplifiedExpression to best.originalExpression
         // following edges that match by toExpression / fromExpression.
-<span class="fc" id="L214">        Map&lt;String, GraphEdge&gt; incomingByExpression = new HashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L215" title="All 2 branches covered.">        for (GraphEdge edge : edges) {</span>
+<span class="fc" id="L221">        Map&lt;String, GraphEdge&gt; incomingByExpression = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        for (GraphEdge edge : edges) {</span>
             // pick the strongest improving edge as canonical incoming
-<span class="fc" id="L217">            GraphEdge prev = incomingByExpression.get(edge.toExpression());</span>
-<span class="fc bfc" id="L218" title="All 4 branches covered.">            if (prev == null || edge.improvement() &gt; prev.improvement()) {</span>
-<span class="fc" id="L219">                incomingByExpression.put(edge.toExpression(), edge);</span>
+<span class="fc" id="L224">            GraphEdge prev = incomingByExpression.get(edge.toExpression());</span>
+<span class="fc bfc" id="L225" title="All 4 branches covered.">            if (prev == null || edge.improvement() &gt; prev.improvement()) {</span>
+<span class="fc" id="L226">                incomingByExpression.put(edge.toExpression(), edge);</span>
             }
-<span class="fc" id="L221">        }</span>
+<span class="fc" id="L228">        }</span>
 
-<span class="fc" id="L223">        String cursor = best.simplifiedExpression();</span>
-<span class="fc" id="L224">        String root = best.originalExpression();</span>
-<span class="fc" id="L225">        result.add(cursor);</span>
-<span class="fc" id="L226">        Set&lt;String&gt; guard = new HashSet&lt;&gt;();</span>
-<span class="pc bpc" id="L227" title="1 of 4 branches missed.">        while (!Objects.equals(cursor, root) &amp;&amp; guard.add(cursor)) {</span>
-<span class="fc" id="L228">            GraphEdge incoming = incomingByExpression.get(cursor);</span>
-<span class="pc bpc" id="L229" title="1 of 2 branches missed.">            if (incoming == null) {</span>
-<span class="nc" id="L230">                break;</span>
+<span class="fc" id="L230">        String cursor = best.simplifiedExpression();</span>
+<span class="fc" id="L231">        String root = best.originalExpression();</span>
+<span class="fc" id="L232">        result.add(cursor);</span>
+<span class="fc" id="L233">        Set&lt;String&gt; guard = new HashSet&lt;&gt;();</span>
+<span class="pc bpc" id="L234" title="1 of 4 branches missed.">        while (!Objects.equals(cursor, root) &amp;&amp; guard.add(cursor)) {</span>
+<span class="fc" id="L235">            GraphEdge incoming = incomingByExpression.get(cursor);</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">            if (incoming == null) {</span>
+<span class="nc" id="L237">                break;</span>
             }
-<span class="fc" id="L232">            cursor = incoming.fromExpression();</span>
-<span class="fc" id="L233">            result.add(cursor);</span>
-<span class="fc" id="L234">        }</span>
-<span class="fc" id="L235">        result.add(root);</span>
-<span class="fc" id="L236">        return result;</span>
+<span class="fc" id="L239">            cursor = incoming.fromExpression();</span>
+<span class="fc" id="L240">            result.add(cursor);</span>
+<span class="fc" id="L241">        }</span>
+<span class="fc" id="L242">        result.add(root);</span>
+<span class="fc" id="L243">        return result;</span>
     }
 
     private static boolean isLeafOnSuccess(String expr, List&lt;SimplificationSuccess&gt; successes) {
-<span class="fc bfc" id="L240" title="All 2 branches covered.">        for (SimplificationSuccess s : successes) {</span>
-<span class="fc bfc" id="L241" title="All 2 branches covered.">            if (expr.equals(s.simplifiedExpression())) {</span>
-<span class="fc" id="L242">                return true;</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        for (SimplificationSuccess s : successes) {</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            if (expr.equals(s.simplifiedExpression())) {</span>
+<span class="fc" id="L249">                return true;</span>
             }
-<span class="fc" id="L244">        }</span>
-<span class="fc" id="L245">        return false;</span>
+<span class="fc" id="L251">        }</span>
+<span class="fc" id="L252">        return false;</span>
     }
 
     private static Map&lt;String, String&gt; computeClusterByNode(List&lt;GraphEdge&gt; edges) {
-<span class="fc" id="L249">        Map&lt;String, Integer&gt; ruleUsage = new HashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L250" title="All 2 branches covered.">        for (GraphEdge edge : edges) {</span>
-<span class="fc" id="L251">            ruleUsage.merge(edge.transformationRule(), 1, Integer::sum);</span>
-<span class="fc" id="L252">        }</span>
-<span class="fc" id="L253">        Map&lt;String, String&gt; result = new HashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L254" title="All 2 branches covered.">        for (GraphEdge edge : edges) {</span>
-<span class="fc" id="L255">            int count = ruleUsage.getOrDefault(edge.transformationRule(), 0);</span>
-<span class="fc bfc" id="L256" title="All 2 branches covered.">            if (count &gt;= 2) {</span>
-<span class="fc" id="L257">                result.put(edge.toExpression(), &quot;cluster:&quot; + edge.transformationRule());</span>
-            }
+<span class="fc" id="L256">        Map&lt;String, Integer&gt; ruleUsage = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        for (GraphEdge edge : edges) {</span>
+<span class="fc" id="L258">            ruleUsage.merge(edge.transformationRule(), 1, Integer::sum);</span>
 <span class="fc" id="L259">        }</span>
-<span class="fc" id="L260">        return result;</span>
+<span class="fc" id="L260">        Map&lt;String, String&gt; result = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">        for (GraphEdge edge : edges) {</span>
+<span class="fc" id="L262">            int count = ruleUsage.getOrDefault(edge.transformationRule(), 0);</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">            if (count &gt;= 2) {</span>
+<span class="fc" id="L264">                result.put(edge.toExpression(), &quot;cluster:&quot; + edge.transformationRule());</span>
+            }
+<span class="fc" id="L266">        }</span>
+<span class="fc" id="L267">        return result;</span>
     }
 
     private static Map&lt;String, List&lt;String&gt;&gt; buildEdgePathIds(
@@ -265,28 +272,28 @@ public final class SearchGraphAssembler {
     ) {
         // The TransformationSearchService records pathId = root + &quot;#&quot; + depth,
         // so we group edges by (from,to,rule) and surface their pathIds.
-<span class="fc" id="L268">        Map&lt;String, List&lt;String&gt;&gt; result = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L269" title="All 2 branches covered.">        for (GraphEdge edge : edges) {</span>
-<span class="fc" id="L270">            String key = edge.fromExpression() + &quot;|&quot; + edge.toExpression() + &quot;|&quot; + edge.transformationRule();</span>
-<span class="fc" id="L271">            String pathId = edge.pathId();</span>
-<span class="pc bpc" id="L272" title="2 of 4 branches missed.">            if (pathId == null || pathId.isBlank()) {</span>
-<span class="nc" id="L273">                continue;</span>
+<span class="fc" id="L275">        Map&lt;String, List&lt;String&gt;&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        for (GraphEdge edge : edges) {</span>
+<span class="fc" id="L277">            String key = edgeKey(edge);</span>
+<span class="fc" id="L278">            String pathId = edge.pathId();</span>
+<span class="pc bpc" id="L279" title="2 of 4 branches missed.">            if (pathId == null || pathId.isBlank()) {</span>
+<span class="nc" id="L280">                continue;</span>
             }
-<span class="fc" id="L275">            result.computeIfAbsent(key, k -&gt; new ArrayList&lt;&gt;()).add(pathId);</span>
-<span class="fc" id="L276">        }</span>
+<span class="fc" id="L282">            result.computeIfAbsent(key, k -&gt; new ArrayList&lt;&gt;()).add(pathId);</span>
+<span class="fc" id="L283">        }</span>
         // Annotate successes by linking their (root -&gt; simplified) pair to a synthetic best-path id.
-<span class="fc bfc" id="L278" title="All 2 branches covered.">        for (SimplificationSuccess success : successes) {</span>
-<span class="fc bfc" id="L279" title="All 2 branches covered.">            for (GraphEdge edge : edges) {</span>
-<span class="fc bfc" id="L280" title="All 2 branches covered.">                if (edge.fromExpression().equals(success.originalExpression())</span>
-<span class="fc bfc" id="L281" title="All 2 branches covered.">                    &amp;&amp; edge.toExpression().equals(success.simplifiedExpression())</span>
-<span class="fc bfc" id="L282" title="All 2 branches covered.">                    &amp;&amp; Objects.equals(edge.transformationRule(), success.transformationRule())) {</span>
-<span class="fc" id="L283">                    String key = edge.fromExpression() + &quot;|&quot; + edge.toExpression() + &quot;|&quot; + edge.transformationRule();</span>
-<span class="fc" id="L284">                    String successId = &quot;success:&quot; + success.originalExpression() + &quot;-&gt;&quot; + success.simplifiedExpression();</span>
-<span class="pc" id="L285">                    result.computeIfAbsent(key, k -&gt; new ArrayList&lt;&gt;()).add(successId);</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">        for (SimplificationSuccess success : successes) {</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">            for (GraphEdge edge : edges) {</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">                if (edge.fromExpression().equals(success.originalExpression())</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">                    &amp;&amp; edge.toExpression().equals(success.simplifiedExpression())</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">                    &amp;&amp; Objects.equals(edge.transformationRule(), success.transformationRule())) {</span>
+<span class="fc" id="L290">                    String key = edgeKey(edge);</span>
+<span class="fc" id="L291">                    String successId = &quot;success:&quot; + success.originalExpression() + &quot;-&gt;&quot; + success.simplifiedExpression();</span>
+<span class="pc" id="L292">                    result.computeIfAbsent(key, k -&gt; new ArrayList&lt;&gt;()).add(successId);</span>
                 }
-<span class="fc" id="L287">            }</span>
-<span class="fc" id="L288">        }</span>
-<span class="fc" id="L289">        return result;</span>
+<span class="fc" id="L294">            }</span>
+<span class="fc" id="L295">        }</span>
+<span class="fc" id="L296">        return result;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

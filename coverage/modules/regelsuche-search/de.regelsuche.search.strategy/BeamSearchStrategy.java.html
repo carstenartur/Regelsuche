@@ -104,38 +104,40 @@ import java.util.Set;
 <span class="fc" id="L104">                        transformation.equivalencePreservingByConstruction(),</span>
                         improvement,
                         appliedRuleKinds,
-                        equivalenceFlags
+                        equivalenceFlags,
+<span class="fc" id="L108">                        SearchState.accumulatedAssumptions(current, transformation),</span>
+<span class="fc" id="L109">                        SearchState.extendedPath(current, transformation)</span>
                     );
-<span class="pc bpc" id="L109" title="1 of 2 branches missed.">                    if (visited.contains(stateKey(nextState))) {</span>
-<span class="nc" id="L110">                        continue;</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">                    if (visited.contains(stateKey(nextState))) {</span>
+<span class="nc" id="L112">                        continue;</span>
                     }
-<span class="fc" id="L112">                    next.add(nextState);</span>
-<span class="fc" id="L113">                    generated++;</span>
-<span class="fc" id="L114">                }</span>
-<span class="fc" id="L115">            }</span>
-<span class="fc" id="L116">            next.sort(Comparator</span>
-<span class="fc" id="L117">                .comparingInt((SearchState state) -&gt; priority(state, problem))</span>
-<span class="fc" id="L118">                .thenComparingInt(SearchState::depth)</span>
-<span class="fc" id="L119">                .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.appliedRuleIds()))</span>
-<span class="fc" id="L120">                .thenComparing(SearchState::canonicalHash)</span>
-<span class="fc" id="L121">                .thenComparing(SearchState::expression)</span>
-<span class="pc" id="L122">                .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.path()))</span>
-<span class="pc" id="L123">                .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, sortedValues(state.appliedRuleApplications()))));</span>
-<span class="fc" id="L124">            beam = next.stream().limit(problem.heuristic().beamWidth()).toList();</span>
+<span class="fc" id="L114">                    next.add(nextState);</span>
+<span class="fc" id="L115">                    generated++;</span>
+<span class="fc" id="L116">                }</span>
+<span class="fc" id="L117">            }</span>
+<span class="fc" id="L118">            next.sort(Comparator</span>
+<span class="fc" id="L119">                .comparingInt((SearchState state) -&gt; priority(state, problem))</span>
+<span class="fc" id="L120">                .thenComparingInt(SearchState::depth)</span>
+<span class="fc" id="L121">                .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.appliedRuleIds()))</span>
+<span class="fc" id="L122">                .thenComparing(SearchState::canonicalHash)</span>
+<span class="fc" id="L123">                .thenComparing(SearchState::expression)</span>
+<span class="pc" id="L124">                .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.path()))</span>
+<span class="pc" id="L125">                .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, sortedValues(state.appliedRuleApplications()))));</span>
+<span class="fc" id="L126">            beam = next.stream().limit(problem.heuristic().beamWidth()).toList();</span>
         }
-<span class="fc" id="L126">        return explored;</span>
+<span class="fc" id="L128">        return explored;</span>
     }
 
     private int priority(SearchState state, SearchProblem problem) {
-<span class="fc" id="L130">        return SearchPriority.bestFirst(state, problem);</span>
+<span class="fc" id="L132">        return SearchPriority.bestFirst(state, problem);</span>
     }
 
     private String stateKey(SearchState state) {
-<span class="fc" id="L134">        return state.canonicalHash() + &quot;:&quot; + String.join(&quot;,&quot;, sortedValues(state.appliedRuleApplications()));</span>
+<span class="fc" id="L136">        return state.canonicalHash() + &quot;:&quot; + String.join(&quot;,&quot;, sortedValues(state.appliedRuleApplications()));</span>
     }
 
     private List&lt;String&gt; sortedValues(Set&lt;String&gt; values) {
-<span class="fc" id="L138">        return values.stream().sorted().toList();</span>
+<span class="fc" id="L140">        return values.stream().sorted().toList();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

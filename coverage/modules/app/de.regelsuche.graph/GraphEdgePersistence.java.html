@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GraphEdgePersistence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.graph</a> &gt; <span class="el_source">GraphEdgePersistence.java</span></div><h1>GraphEdgePersistence.java</h1><pre class="source lang-java linenums">package de.regelsuche.graph;
+
+import de.regelsuche.transform.RecordedExecution;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.validation.CandidateProofStatus;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/** Property mapping shared by Neo4j writes and reads; missing historic evidence stays unknown. */
+final class GraphEdgePersistence {
+    private GraphEdgePersistence() { }
+
+    static Map&lt;String, Object&gt; properties(GraphEdge edge) {
+<span class="fc" id="L14">        Map&lt;String, Object&gt; values = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L15">        values.put(&quot;from&quot;, edge.fromExpression()); values.put(&quot;to&quot;, edge.toExpression());</span>
+<span class="fc" id="L16">        values.put(&quot;rule&quot;, edge.transformationRule()); values.put(&quot;depth&quot;, edge.depth());</span>
+<span class="fc" id="L17">        values.put(&quot;improvement&quot;, edge.improvement()); values.put(&quot;pathId&quot;, edge.pathId());</span>
+<span class="fc" id="L18">        values.put(&quot;canonicalHash&quot;, edge.canonicalHash()); values.put(&quot;scoreBefore&quot;, edge.scoreBefore());</span>
+<span class="fc" id="L19">        values.put(&quot;scoreAfter&quot;, edge.scoreAfter()); values.put(&quot;rewriteKind&quot;, edge.rewriteKind().name());</span>
+<span class="fc" id="L20">        values.put(&quot;mayIncreaseComplexity&quot;, edge.mayIncreaseComplexity());</span>
+<span class="fc" id="L21">        values.put(&quot;estimatedCostDelta&quot;, edge.estimatedCostDelta());</span>
+<span class="fc" id="L22">        values.put(&quot;equivalencePreservingByConstruction&quot;, edge.equivalencePreservingByConstruction());</span>
+<span class="fc" id="L23">        values.put(&quot;validationStatus&quot;, edge.validationStatus().name());</span>
+<span class="fc" id="L24">        values.put(&quot;executionIdentity&quot;, edge.executionIdentity());</span>
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        values.put(&quot;execution&quot;, edge.execution() == null ? null : edge.execution().toCanonicalJson());</span>
+<span class="fc" id="L26">        return values;</span>
+    }
+
+    static GraphEdge read(String from, String to, Map&lt;String, Object&gt; values) {
+<span class="fc" id="L30">        var execution = RecordedExecution.readOptional(values);</span>
+<span class="pc bpc" id="L31" title="1 of 4 branches missed.">        if (execution != null &amp;&amp; !execution.contentHash().equals(values.get(&quot;executionIdentity&quot;))) {</span>
+<span class="fc" id="L32">            throw new IllegalArgumentException(&quot;stored graph execution identity differs from its evidence&quot;);</span>
+        }
+<span class="fc" id="L34">        return new GraphEdge(from, to, text(values, &quot;rule&quot;, &quot;&quot;), integer(values, &quot;depth&quot;), integer(values, &quot;improvement&quot;),</span>
+<span class="fc" id="L35">            text(values, &quot;pathId&quot;, &quot;&quot;), text(values, &quot;canonicalHash&quot;, &quot;&quot;), integer(values, &quot;scoreBefore&quot;), integer(values, &quot;scoreAfter&quot;),</span>
+<span class="fc" id="L36">            RewriteKind.valueOf(text(values, &quot;rewriteKind&quot;, RewriteKind.NORMALIZE.name())),</span>
+<span class="fc" id="L37">            bool(values, &quot;mayIncreaseComplexity&quot;, false), integer(values, &quot;estimatedCostDelta&quot;),</span>
+<span class="fc" id="L38">            bool(values, &quot;equivalencePreservingByConstruction&quot;, true),</span>
+<span class="fc" id="L39">            CandidateProofStatus.valueOf(text(values, &quot;validationStatus&quot;, CandidateProofStatus.OBSERVED.name())), null, execution);</span>
+    }
+
+    private static String text(Map&lt;String, Object&gt; values, String key, String fallback) {
+<span class="fc" id="L43">        Object value = values.get(key);</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (value == null) return fallback;</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (!(value instanceof String result)) throw new IllegalArgumentException(&quot;invalid graph property: &quot; + key);</span>
+<span class="fc" id="L46">        return result;</span>
+    }
+    private static int integer(Map&lt;String, Object&gt; values, String key) {
+<span class="fc" id="L49">        Object value = values.get(key);</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (value == null) return 0;</span>
+<span class="pc bpc" id="L51" title="3 of 4 branches missed.">        if (!(value instanceof Integer) &amp;&amp; !(value instanceof Long)) throw new IllegalArgumentException(&quot;invalid graph integer: &quot; + key);</span>
+<span class="fc" id="L52">        return Math.toIntExact(((Number) value).longValue());</span>
+    }
+    private static boolean bool(Map&lt;String, Object&gt; values, String key, boolean fallback) {
+<span class="fc" id="L55">        Object value = values.get(key);</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (value == null) return fallback;</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (!(value instanceof Boolean result)) throw new IllegalArgumentException(&quot;invalid graph boolean: &quot; + key);</span>
+<span class="fc" id="L58">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

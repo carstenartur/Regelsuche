@@ -117,22 +117,23 @@ public class RandomMonteCarloSearchStrategy implements SearchStrategy {
                     improvement,
                     appliedRuleKinds,
                     equivalenceFlags,
-                    assumptions
+                    assumptions,
+<span class="fc" id="L121">                    SearchState.extendedPath(current, transformation)</span>
                 );
-<span class="fc bfc" id="L122" title="All 2 branches covered.">                if (!visited.contains(stateKey(nextState))) {</span>
-<span class="fc" id="L123">                    frontier.add(nextState);</span>
-<span class="fc" id="L124">                    generated++;</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">                if (!visited.contains(stateKey(nextState))) {</span>
+<span class="fc" id="L124">                    frontier.add(nextState);</span>
+<span class="fc" id="L125">                    generated++;</span>
                 }
-<span class="fc" id="L126">            }</span>
-<span class="fc" id="L127">        }</span>
-<span class="fc" id="L128">        return explored;</span>
+<span class="fc" id="L127">            }</span>
+<span class="fc" id="L128">        }</span>
+<span class="fc" id="L129">        return explored;</span>
     }
 
     private String stateKey(SearchState state) {
-<span class="fc" id="L132">        return state.canonicalHash() + &quot;:&quot;</span>
-<span class="fc" id="L133">            + state.assumptionFingerprint() + &quot;:&quot;</span>
-<span class="fc" id="L134">            + String.join(&quot;,&quot;, state.appliedRuleApplications().stream()</span>
-<span class="fc" id="L135">                .sorted().toList());</span>
+<span class="fc" id="L133">        return state.canonicalHash() + &quot;:&quot;</span>
+<span class="fc" id="L134">            + state.assumptionFingerprint() + &quot;:&quot;</span>
+<span class="fc" id="L135">            + String.join(&quot;,&quot;, state.appliedRuleApplications().stream()</span>
+<span class="fc" id="L136">                .sorted().toList());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

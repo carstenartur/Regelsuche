@@ -140,7 +140,7 @@ public class RuleDiscoveryService {
 <span class="fc" id="L140">                        state.mayIncreaseComplexity(),</span>
 <span class="fc" id="L141">                        state.estimatedCostDelta(),</span>
 <span class="fc" id="L142">                        state.equivalencePreservingByConstruction(),</span>
-                        CandidateProofStatus.OBSERVED
+<span class="fc" id="L143">                        CandidateProofStatus.OBSERVED, null, state.incomingExecution().orElse(null)</span>
                     ));
                 }
 <span class="fc bfc" id="L146" title="All 2 branches covered.">                if (state.depth() == 0) {</span>
@@ -244,14 +244,16 @@ public class RuleDiscoveryService {
                 scoreAfter,
                 equivalencePreserving,
 <span class="fc" id="L246">                ruleIds.get(i),</span>
-<span class="fc" id="L247">                state.assumptions()</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">                state.transformations() == null ? state.assumptions() : state.transformations().get(i).assumptions(),</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">                state.transformations() == null ? null : de.regelsuche.transform.RecordedExecution.capture(</span>
+<span class="fc" id="L249">                    before, List.of(state.transformations().get(i)))</span>
             ));
         }
-<span class="fc" id="L250">        return steps;</span>
+<span class="fc" id="L252">        return steps;</span>
     }
 
     public void shutdown() {
-<span class="fc" id="L254">        executorService.shutdown();</span>
-<span class="fc" id="L255">    }</span>
+<span class="fc" id="L256">        executorService.shutdown();</span>
+<span class="fc" id="L257">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

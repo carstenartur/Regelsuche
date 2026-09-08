@@ -64,8 +64,8 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
 <span class="pc bpc" id="L64" title="1 of 4 branches missed.">        while (visitedOrder.size() &lt; budget &amp;&amp; iteration &lt; maxIterations) {</span>
 <span class="fc" id="L65">            iteration++;</span>
 <span class="fc" id="L66">            Node rootNode = nodes.get(rootKey);</span>
-<span class="pc bpc" id="L67" title="2 of 4 branches missed.">            if (rootNode != null &amp;&amp; rootNode.terminal) {</span>
-<span class="nc" id="L68">                break;</span>
+<span class="pc bpc" id="L67" title="1 of 4 branches missed.">            if (rootNode != null &amp;&amp; rootNode.terminal) {</span>
+<span class="fc" id="L68">                break;</span>
             }
 <span class="fc" id="L70">            String selectedKey = select(nodes, rootKey);</span>
 <span class="fc" id="L71">            SearchState selected = states.get(selectedKey);</span>
@@ -80,9 +80,9 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
                 continue;
             }
 <span class="fc" id="L82">            List&lt;SearchState&gt; children = expand(problem, selected);</span>
-<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            if (children.isEmpty()) {</span>
-<span class="nc" id="L84">                nodes.get(selectedKey).markTerminal();</span>
-<span class="nc" id="L85">                continue;</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            if (children.isEmpty()) {</span>
+<span class="fc" id="L84">                nodes.get(selectedKey).markTerminal();</span>
+<span class="fc" id="L85">                continue;</span>
             }
 <span class="fc" id="L87">            int addedThisIteration = 0;</span>
 <span class="fc bfc" id="L88" title="All 2 branches covered.">            for (SearchState child : children) {</span>
@@ -224,51 +224,67 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
 <span class="fc" id="L224">                transformation.equivalencePreservingByConstruction(),</span>
                 improvement,
                 appliedRuleKinds,
-                equivalenceFlags
+                equivalenceFlags,
+<span class="fc" id="L228">                SearchState.accumulatedAssumptions(parent, transformation),</span>
+<span class="fc" id="L229">                SearchState.extendedPath(parent, transformation)</span>
             ));
-<span class="pc bpc" id="L229" title="1 of 2 branches missed.">            if (children.size() &gt;= problem.heuristic().maxCandidatesPerState()) {</span>
-<span class="nc" id="L230">                break;</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">            if (children.size() &gt;= problem.heuristic().maxCandidatesPerState()) {</span>
+<span class="nc" id="L232">                break;</span>
             }
-<span class="fc" id="L232">        }</span>
-<span class="fc" id="L233">        children.sort(Comparator.comparingInt((SearchState state) -&gt; state.score().weightedTotal()));</span>
-<span class="fc" id="L234">        return children;</span>
+<span class="fc" id="L234">        }</span>
+<span class="fc" id="L235">        children.sort(Comparator.comparingInt((SearchState state) -&gt; state.score().weightedTotal()));</span>
+<span class="fc" id="L236">        return children;</span>
     }
 
     private double rollout(SearchProblem problem, SearchState start) {
-<span class="fc" id="L238">        SearchState current = start;</span>
-<span class="fc" id="L239">        double bestImprovement = current.improvement();</span>
-<span class="fc bfc" id="L240" title="All 2 branches covered.">        for (int step = 0; step &lt; rolloutDepth; step++) {</span>
-<span class="fc" id="L241">            List&lt;Transformation&gt; options = problem.transformations(current.expression());</span>
-<span class="pc bpc" id="L242" title="1 of 2 branches missed.">            if (options.isEmpty()) {</span>
-<span class="nc" id="L243">                break;</span>
+<span class="fc" id="L240">        SearchState current = start;</span>
+<span class="fc" id="L241">        double bestImprovement = current.improvement();</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        for (int step = 0; step &lt; rolloutDepth; step++) {</span>
+<span class="fc" id="L243">            List&lt;Transformation&gt; options = problem.transformations(current.expression());</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">            if (options.isEmpty()) {</span>
+<span class="fc" id="L245">                break;</span>
             }
-<span class="fc" id="L245">            Transformation pick = options.get(random.nextInt(options.size()));</span>
-<span class="fc" id="L246">            String nextExpression = pick.transformedExpression();</span>
-<span class="pc bpc" id="L247" title="1 of 2 branches missed.">            if (nextExpression.equals(current.expression())) {</span>
-<span class="nc" id="L248">                break;</span>
+<span class="fc" id="L247">            Transformation pick = options.get(random.nextInt(options.size()));</span>
+<span class="fc" id="L248">            String nextExpression = pick.transformedExpression();</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">            if (nextExpression.equals(current.expression())) {</span>
+<span class="nc" id="L250">                break;</span>
             }
-<span class="fc" id="L250">            ExpressionScore nextScore = problem.scorer().score(nextExpression);</span>
-<span class="fc" id="L251">            int improvement = current.score().weightedTotal() - nextScore.weightedTotal();</span>
-<span class="fc" id="L252">            bestImprovement = Math.max(bestImprovement, improvement);</span>
-<span class="fc" id="L253">            current = new SearchState(</span>
+<span class="fc" id="L252">            ExpressionScore nextScore = problem.scorer().score(nextExpression);</span>
+<span class="fc" id="L253">            int improvement = current.score().weightedTotal() - nextScore.weightedTotal();</span>
+<span class="fc" id="L254">            bestImprovement = Math.max(bestImprovement, improvement);</span>
+<span class="fc" id="L255">            List&lt;String&gt; rolloutPath = new ArrayList&lt;&gt;(current.path());</span>
+<span class="fc" id="L256">            rolloutPath.add(nextExpression);</span>
+<span class="fc" id="L257">            List&lt;String&gt; rolloutRules = new ArrayList&lt;&gt;(current.appliedRuleIds());</span>
+<span class="fc" id="L258">            rolloutRules.add(pick.rule());</span>
+<span class="fc" id="L259">            Set&lt;String&gt; rolloutApplications = new java.util.HashSet&lt;&gt;(current.appliedRuleApplications());</span>
+<span class="fc" id="L260">            rolloutApplications.add(pick.applicationKey());</span>
+<span class="fc" id="L261">            List&lt;RewriteKind&gt; rolloutKinds = new ArrayList&lt;&gt;(current.appliedRuleKinds());</span>
+<span class="fc" id="L262">            rolloutKinds.add(pick.kind());</span>
+<span class="fc" id="L263">            List&lt;Boolean&gt; rolloutFlags = new ArrayList&lt;&gt;(current.equivalencePreservingFlags());</span>
+<span class="fc" id="L264">            rolloutFlags.add(pick.equivalencePreservingByConstruction());</span>
+<span class="fc" id="L265">            current = new SearchState(</span>
                 nextExpression,
-<span class="fc" id="L255">                current.depth() + 1,</span>
+<span class="fc" id="L267">                current.depth() + 1,</span>
                 nextScore,
-<span class="fc" id="L257">                current.path(),</span>
-<span class="fc" id="L258">                current.appliedRuleIds(),</span>
-<span class="fc" id="L259">                current.appliedRuleApplications(),</span>
-<span class="fc" id="L260">                current.expandedStepCount(),</span>
-<span class="fc" id="L261">                problem.canonicalizer().stableHash(nextExpression),</span>
-<span class="fc" id="L262">                current.expression(),</span>
-<span class="fc" id="L263">                pick.rule(),</span>
-<span class="fc" id="L264">                pick.kind(),</span>
-<span class="fc" id="L265">                pick.mayIncreaseComplexity(),</span>
-<span class="fc" id="L266">                pick.estimatedCostDelta(),</span>
-<span class="fc" id="L267">                pick.equivalencePreservingByConstruction(),</span>
-                improvement
+                rolloutPath,
+                rolloutRules,
+                rolloutApplications,
+<span class="fc bfc" id="L272" title="All 2 branches covered.">                current.expandedStepCount() + (pick.kind() == RewriteKind.EXPAND ? 1 : 0),</span>
+<span class="fc" id="L273">                problem.canonicalizer().stableHash(nextExpression),</span>
+<span class="fc" id="L274">                current.expression(),</span>
+<span class="fc" id="L275">                pick.rule(),</span>
+<span class="fc" id="L276">                pick.kind(),</span>
+<span class="fc" id="L277">                pick.mayIncreaseComplexity(),</span>
+<span class="fc" id="L278">                pick.estimatedCostDelta(),</span>
+<span class="fc" id="L279">                pick.equivalencePreservingByConstruction(),</span>
+                improvement,
+                rolloutKinds,
+                rolloutFlags,
+<span class="fc" id="L283">                SearchState.accumulatedAssumptions(current, pick),</span>
+<span class="fc" id="L284">                SearchState.extendedPath(current, pick)</span>
             );
         }
-<span class="fc" id="L271">        return bestImprovement;</span>
+<span class="fc" id="L287">        return bestImprovement;</span>
     }
 
     private void backpropagate(Map&lt;String, Node&gt; nodes, SearchState leaf, double reward) {
@@ -277,32 +293,32 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
         // because expansion already added the child key to its parent's child
         // set. Updating the leaf statistics is sufficient to bias future UCB
         // decisions toward improving subtrees.
-<span class="fc" id="L280">        Node node = nodes.get(stateKey(leaf));</span>
-<span class="fc bfc" id="L281" title="All 2 branches covered.">        if (node != null) {</span>
-<span class="fc" id="L282">            node.visits++;</span>
-<span class="fc" id="L283">            node.totalReward += reward;</span>
+<span class="fc" id="L296">        Node node = nodes.get(stateKey(leaf));</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (node != null) {</span>
+<span class="fc" id="L298">            node.visits++;</span>
+<span class="fc" id="L299">            node.totalReward += reward;</span>
         }
-<span class="fc" id="L285">    }</span>
+<span class="fc" id="L301">    }</span>
 
     private static String stateKey(SearchState state) {
-<span class="fc" id="L288">        return state.canonicalHash() + &quot;:&quot; + state.appliedRuleApplications();</span>
+<span class="fc" id="L304">        return state.canonicalHash() + &quot;:&quot; + state.appliedRuleApplications();</span>
     }
 
-<span class="fc" id="L291">    private static final class Node {</span>
-<span class="fc" id="L292">        private final List&lt;String&gt; children = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L307">    private static final class Node {</span>
+<span class="fc" id="L308">        private final List&lt;String&gt; children = new ArrayList&lt;&gt;();</span>
         private int visits;
         private double totalReward;
         private boolean terminal;
 
         void addChild(String key) {
-<span class="fc bfc" id="L298" title="All 2 branches covered.">            if (!children.contains(key)) {</span>
-<span class="fc" id="L299">                children.add(key);</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">            if (!children.contains(key)) {</span>
+<span class="fc" id="L315">                children.add(key);</span>
             }
-<span class="fc" id="L301">        }</span>
+<span class="fc" id="L317">        }</span>
 
         void markTerminal() {
-<span class="fc" id="L304">            terminal = true;</span>
-<span class="fc" id="L305">        }</span>
+<span class="fc" id="L320">            terminal = true;</span>
+<span class="fc" id="L321">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

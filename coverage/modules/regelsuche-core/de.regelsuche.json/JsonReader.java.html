@@ -74,9 +74,9 @@ public final class JsonReader {
 <span class="fc" id="L74">        expect('[');</span>
 <span class="fc" id="L75">        List&lt;Object&gt; values = new ArrayList&lt;&gt;();</span>
 <span class="fc" id="L76">        skipWhitespace();</span>
-<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (peek(']')) {</span>
-<span class="nc" id="L78">            index++;</span>
-<span class="nc" id="L79">            return values;</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (peek(']')) {</span>
+<span class="fc" id="L78">            index++;</span>
+<span class="fc" id="L79">            return values;</span>
         }
         do {
 <span class="fc" id="L82">            values.add(readValue());</span>
@@ -97,13 +97,13 @@ public final class JsonReader {
 <span class="fc bfc" id="L97" title="All 2 branches covered.">        if (peek('&quot;')) {</span>
 <span class="fc" id="L98">            return readString();</span>
         }
-<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (source.startsWith(&quot;true&quot;, index)) {</span>
-<span class="nc" id="L101">            index += 4;</span>
-<span class="nc" id="L102">            return true;</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (source.startsWith(&quot;true&quot;, index)) {</span>
+<span class="fc" id="L101">            index += 4;</span>
+<span class="fc" id="L102">            return true;</span>
         }
-<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (source.startsWith(&quot;false&quot;, index)) {</span>
-<span class="nc" id="L105">            index += 5;</span>
-<span class="nc" id="L106">            return false;</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (source.startsWith(&quot;false&quot;, index)) {</span>
+<span class="fc" id="L105">            index += 5;</span>
+<span class="fc" id="L106">            return false;</span>
         }
 <span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (source.startsWith(&quot;null&quot;, index)) {</span>
 <span class="nc" id="L109">            index += 4;</span>
@@ -120,11 +120,11 @@ public final class JsonReader {
 <span class="fc bfc" id="L120" title="All 2 branches covered.">            if (current == '&quot;') {</span>
 <span class="fc" id="L121">                return builder.toString();</span>
             }
-<span class="pc bpc" id="L123" title="1 of 2 branches missed.">            if (current == '\\') {</span>
-<span class="nc" id="L124">                char escaped = source.charAt(index++);</span>
-<span class="nc bnc" id="L125" title="All 10 branches missed.">                builder.append(switch (escaped) {</span>
-<span class="nc" id="L126">                    case '&quot;' -&gt; '&quot;';</span>
-<span class="nc" id="L127">                    case '\\' -&gt; '\\';</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (current == '\\') {</span>
+<span class="fc" id="L124">                char escaped = source.charAt(index++);</span>
+<span class="pc bpc" id="L125" title="8 of 10 branches missed.">                builder.append(switch (escaped) {</span>
+<span class="fc" id="L126">                    case '&quot;' -&gt; '&quot;';</span>
+<span class="fc" id="L127">                    case '\\' -&gt; '\\';</span>
 <span class="nc" id="L128">                    case '/' -&gt; '/';</span>
 <span class="nc" id="L129">                    case 'n' -&gt; '\n';</span>
 <span class="nc" id="L130">                    case 'r' -&gt; '\r';</span>
@@ -134,7 +134,7 @@ public final class JsonReader {
 <span class="nc" id="L134">                    case 'u' -&gt; readUnicodeEscape();</span>
 <span class="nc" id="L135">                    default -&gt; escaped;</span>
                 });
-<span class="nc" id="L137">            } else {</span>
+<span class="fc" id="L137">            } else {</span>
 <span class="fc" id="L138">                builder.append(current);</span>
             }
 <span class="fc" id="L140">        }</span>
@@ -149,8 +149,8 @@ public final class JsonReader {
 
     private Number readNumber() {
 <span class="fc" id="L151">        int start = index;</span>
-<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (peek('-')) {</span>
-<span class="nc" id="L153">            index++;</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (peek('-')) {</span>
+<span class="fc" id="L153">            index++;</span>
         }
 <span class="pc bpc" id="L155" title="1 of 2 branches missed.">        while (index &lt; source.length()) {</span>
 <span class="fc" id="L156">            char current = source.charAt(index);</span>

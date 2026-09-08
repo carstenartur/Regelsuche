@@ -39,15 +39,15 @@ public sealed interface TransformationProvenance permits TransformationProvenanc
     }
 
     default void requireSource(String expression) {
-<span class="nc bnc" id="L42" title="All 3 branches missed.">        String boundSource = switch (this) {</span>
-<span class="nc" id="L43">            case PrimitiveRewriteSequence ignored -&gt; expression;</span>
+<span class="pc bpc" id="L42" title="1 of 3 branches missed.">        String boundSource = switch (this) {</span>
+<span class="fc" id="L43">            case PrimitiveRewriteSequence ignored -&gt; expression;</span>
 <span class="nc" id="L44">            case ExactTheoryStep step -&gt; step.evidence().binding().sourceExpression();</span>
-<span class="nc" id="L45">            case Sequence sequence -&gt; sequence.sourceExpression();</span>
-<span class="nc" id="L46">        };</span>
-<span class="nc bnc" id="L47" title="All 2 branches missed.">        if (!boundSource.equals(expression)) {</span>
+<span class="fc" id="L45">            case Sequence sequence -&gt; sequence.sourceExpression();</span>
+<span class="fc" id="L46">        };</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (!boundSource.equals(expression)) {</span>
 <span class="nc" id="L48">            throw new IllegalArgumentException(&quot;transformation differs from its evidence-bound source&quot;);</span>
         }
-<span class="nc" id="L50">    }</span>
+<span class="fc" id="L50">    }</span>
 
     record PrimitiveRewriteSequence(List&lt;String&gt; primitiveRuleIds, String applicationKey)
             implements TransformationProvenance {
@@ -91,36 +91,36 @@ public sealed interface TransformationProvenance permits TransformationProvenanc
 
     /** Ordered, source-bound composition retaining every application and intermediate expression. */
     record Sequence(String sourceExpression, List&lt;Transformation&gt; steps) implements TransformationProvenance {
-<span class="nc" id="L94">        public Sequence {</span>
-<span class="nc bnc" id="L95" title="All 4 branches missed.">            if (sourceExpression == null || sourceExpression.isBlank()) throw new IllegalArgumentException(&quot;blank source&quot;);</span>
-<span class="nc" id="L96">            steps = List.copyOf(steps);</span>
-<span class="nc bnc" id="L97" title="All 2 branches missed.">            if (steps.isEmpty()) throw new IllegalArgumentException(&quot;empty execution sequence&quot;);</span>
-<span class="nc" id="L98">            String current = sourceExpression;</span>
-<span class="nc" id="L99">            ExecutionWork work = ExecutionWork.ZERO;</span>
-<span class="nc bnc" id="L100" title="All 2 branches missed.">            for (Transformation step : steps) {</span>
-<span class="nc" id="L101">                step.provenance().requireSource(current);</span>
-<span class="nc" id="L102">                current = step.transformedExpression();</span>
-<span class="nc" id="L103">                work = work.plus(step.executionWork());</span>
-<span class="nc" id="L104">            }</span>
-<span class="nc" id="L105">        }</span>
+<span class="fc" id="L94">        public Sequence {</span>
+<span class="pc bpc" id="L95" title="2 of 4 branches missed.">            if (sourceExpression == null || sourceExpression.isBlank()) throw new IllegalArgumentException(&quot;blank source&quot;);</span>
+<span class="fc" id="L96">            steps = List.copyOf(steps);</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">            if (steps.isEmpty()) throw new IllegalArgumentException(&quot;empty execution sequence&quot;);</span>
+<span class="fc" id="L98">            String current = sourceExpression;</span>
+<span class="fc" id="L99">            ExecutionWork work = ExecutionWork.ZERO;</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            for (Transformation step : steps) {</span>
+<span class="fc" id="L101">                step.provenance().requireSource(current);</span>
+<span class="fc" id="L102">                current = step.transformedExpression();</span>
+<span class="fc" id="L103">                work = work.plus(step.executionWork());</span>
+<span class="fc" id="L104">            }</span>
+<span class="fc" id="L105">        }</span>
         @Override public List&lt;String&gt; primitiveRuleIds() {
-<span class="nc" id="L107">            return steps.stream().flatMap(step -&gt; step.primitiveRuleIds().stream()).toList();</span>
+<span class="fc" id="L107">            return steps.stream().flatMap(step -&gt; step.primitiveRuleIds().stream()).toList();</span>
         }
         @Override public ExecutionWork work() {
-<span class="nc" id="L110">            return steps.stream().map(Transformation::executionWork).reduce(ExecutionWork.ZERO, ExecutionWork::plus);</span>
+<span class="fc" id="L110">            return steps.stream().map(Transformation::executionWork).reduce(ExecutionWork.ZERO, ExecutionWork::plus);</span>
         }
         @Override public void write(JsonWriter writer) {
-<span class="nc" id="L113">            writer.property(&quot;kind&quot;, &quot;SEQUENCE&quot;).property(&quot;sourceExpression&quot;, sourceExpression)</span>
-<span class="nc" id="L114">                .array(&quot;steps&quot;, array -&gt; steps.forEach(step -&gt; array.objectValue(item -&gt; {</span>
-<span class="nc" id="L115">                    item.property(&quot;rule&quot;, step.rule()).property(&quot;output&quot;, step.transformedExpression())</span>
-<span class="nc" id="L116">                        .property(&quot;applicationKey&quot;, step.applicationKey()).property(&quot;kind&quot;, step.kind().name())</span>
-<span class="nc" id="L117">                        .property(&quot;mayIncreaseComplexity&quot;, step.mayIncreaseComplexity())</span>
-<span class="nc" id="L118">                        .property(&quot;estimatedCostDelta&quot;, step.estimatedCostDelta())</span>
-<span class="nc" id="L119">                        .property(&quot;equivalencePreserving&quot;, step.equivalencePreservingByConstruction())</span>
-<span class="nc" id="L120">                        .stringArray(&quot;assumptions&quot;, step.assumptions()).property(&quot;packId&quot;, step.packId())</span>
-<span class="nc" id="L121">                        .property(&quot;license&quot;, step.license()).property(&quot;provenance&quot;, step.provenance().toCanonicalJson());</span>
-<span class="nc" id="L122">                })));</span>
-<span class="nc" id="L123">        }</span>
+<span class="fc" id="L113">            writer.property(&quot;kind&quot;, &quot;SEQUENCE&quot;).property(&quot;sourceExpression&quot;, sourceExpression)</span>
+<span class="fc" id="L114">                .array(&quot;steps&quot;, array -&gt; steps.forEach(step -&gt; array.objectValue(item -&gt; {</span>
+<span class="fc" id="L115">                    item.property(&quot;rule&quot;, step.rule()).property(&quot;output&quot;, step.transformedExpression())</span>
+<span class="fc" id="L116">                        .property(&quot;applicationKey&quot;, step.applicationKey()).property(&quot;kind&quot;, step.kind().name())</span>
+<span class="fc" id="L117">                        .property(&quot;mayIncreaseComplexity&quot;, step.mayIncreaseComplexity())</span>
+<span class="fc" id="L118">                        .property(&quot;estimatedCostDelta&quot;, step.estimatedCostDelta())</span>
+<span class="fc" id="L119">                        .property(&quot;equivalencePreserving&quot;, step.equivalencePreservingByConstruction())</span>
+<span class="fc" id="L120">                        .stringArray(&quot;assumptions&quot;, step.assumptions()).property(&quot;packId&quot;, step.packId())</span>
+<span class="fc" id="L121">                        .property(&quot;license&quot;, step.license()).property(&quot;provenance&quot;, step.provenance().toCanonicalJson());</span>
+<span class="fc" id="L122">                })));</span>
+<span class="fc" id="L123">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

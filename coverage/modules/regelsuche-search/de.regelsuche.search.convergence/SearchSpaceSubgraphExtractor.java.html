@@ -352,7 +352,7 @@ import java.util.stream.Collectors;
 <span class="nc" id="L352">                continue;</span>
             }
 <span class="nc" id="L354">            int generated = 0;</span>
-<span class="nc bnc" id="L355" title="All 2 branches missed.">            for (Transformation transformation : problem.engine().transform(current.expression())) {</span>
+<span class="nc bnc" id="L355" title="All 2 branches missed.">            for (Transformation transformation : problem.transformations(current.expression())) {</span>
 <span class="nc bnc" id="L356" title="All 4 branches missed.">                if (generated &gt;= problem.heuristic().maxCandidatesPerState() || states.size() &gt;= MAX_NODES) {</span>
 <span class="nc" id="L357">                    break;</span>
                 }
@@ -392,33 +392,34 @@ import java.util.stream.Collectors;
 <span class="nc" id="L392">                    current.score().weightedTotal() - nextScore.weightedTotal(),</span>
                     kinds,
                     flags,
-                    assumptions
+                    assumptions,
+<span class="nc" id="L396">                    SearchState.extendedPath(current, transformation)</span>
                 ));
-<span class="nc" id="L397">                generated++;</span>
-<span class="nc" id="L398">            }</span>
-<span class="nc" id="L399">        }</span>
-<span class="nc" id="L400">    }</span>
+<span class="nc" id="L398">                generated++;</span>
+<span class="nc" id="L399">            }</span>
+<span class="nc" id="L400">        }</span>
+<span class="nc" id="L401">    }</span>
 
     private String idForExpression(String expression) {
-<span class="nc bnc" id="L403" title="All 2 branches missed.">        String normalized = (expression == null ? &quot;&quot; : expression).trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
-<span class="nc" id="L404">        return &quot;space_&quot; + sha256(normalized);</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">        String normalized = (expression == null ? &quot;&quot; : expression).trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="nc" id="L405">        return &quot;space_&quot; + sha256(normalized);</span>
     }
 
     private String sha256(String expression) {
         try {
-<span class="nc" id="L409">            MessageDigest digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
-<span class="nc" id="L410">            byte[] hash = digest.digest(expression.getBytes(StandardCharsets.UTF_8));</span>
-<span class="nc" id="L411">            StringBuilder builder = new StringBuilder();</span>
-<span class="nc bnc" id="L412" title="All 2 branches missed.">            for (byte b : hash) {</span>
-<span class="nc" id="L413">                builder.append(String.format(&quot;%02x&quot;, b));</span>
+<span class="nc" id="L410">            MessageDigest digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="nc" id="L411">            byte[] hash = digest.digest(expression.getBytes(StandardCharsets.UTF_8));</span>
+<span class="nc" id="L412">            StringBuilder builder = new StringBuilder();</span>
+<span class="nc bnc" id="L413" title="All 2 branches missed.">            for (byte b : hash) {</span>
+<span class="nc" id="L414">                builder.append(String.format(&quot;%02x&quot;, b));</span>
             }
-<span class="nc" id="L415">            return builder.toString();</span>
-<span class="nc" id="L416">        } catch (NoSuchAlgorithmException ex) {</span>
-<span class="nc" id="L417">            throw new IllegalStateException(ex);</span>
+<span class="nc" id="L416">            return builder.toString();</span>
+<span class="nc" id="L417">        } catch (NoSuchAlgorithmException ex) {</span>
+<span class="nc" id="L418">            throw new IllegalStateException(ex);</span>
         }
     }
 
-<span class="nc" id="L421">    private record EdgeDraft(String id, String fromId, String toId, String ruleId, RuleFamily family, int depth) {</span>
+<span class="nc" id="L422">    private record EdgeDraft(String id, String fromId, String toId, String ruleId, RuleFamily family, int depth) {</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

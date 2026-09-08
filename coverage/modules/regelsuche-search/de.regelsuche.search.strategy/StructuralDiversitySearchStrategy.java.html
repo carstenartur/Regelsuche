@@ -35,7 +35,7 @@ import java.util.Set;
 <span class="fc" id="L35">        int rootAstSize = problem.canonicalizer().astNodeCount(root);</span>
 
 <span class="fc" id="L37">        for (int depth = 0;</span>
-<span class="pc bpc" id="L38" title="1 of 4 branches missed.">                depth &lt;= problem.heuristic().maxDepth() &amp;&amp; !frontier.isEmpty();</span>
+<span class="fc bfc" id="L38" title="All 4 branches covered.">                depth &lt;= problem.heuristic().maxDepth() &amp;&amp; !frontier.isEmpty();</span>
 <span class="fc" id="L39">                depth++) {</span>
 <span class="fc" id="L40">            Map&lt;StructuralCell, SearchState&gt; nextElites = new LinkedHashMap&lt;&gt;();</span>
 <span class="fc bfc" id="L41" title="All 2 branches covered.">            for (SearchState current : frontier) {</span>
@@ -178,7 +178,8 @@ import java.util.Set;
             improvement,
             kinds,
             equivalenceFlags,
-            assumptions
+            assumptions,
+<span class="fc" id="L182">            SearchState.extendedPath(current, transformation)</span>
         );
     }
 
@@ -187,52 +188,52 @@ import java.util.Set;
         Map&lt;StructuralCell, SearchState&gt; elites,
         int rootAstSize
     ) {
-<span class="fc" id="L190">        return elites.entrySet().stream()</span>
-<span class="fc" id="L191">            .sorted(Comparator</span>
-<span class="fc" id="L192">                .&lt;Map.Entry&lt;StructuralCell, SearchState&gt;&gt;comparingInt(entry -&gt;</span>
-<span class="nc" id="L193">                    entry.getKey().noveltyFrom(rootAstSize))</span>
-<span class="fc" id="L194">                .reversed()</span>
-<span class="pc" id="L195">                .thenComparing(entry -&gt; entry.getKey().stableKey())</span>
-<span class="fc" id="L196">                .thenComparing(Map.Entry::getValue, eliteComparator(problem)))</span>
-<span class="fc" id="L197">            .limit(problem.heuristic().beamWidth())</span>
-<span class="fc" id="L198">            .map(Map.Entry::getValue)</span>
-<span class="fc" id="L199">            .toList();</span>
+<span class="fc" id="L191">        return elites.entrySet().stream()</span>
+<span class="fc" id="L192">            .sorted(Comparator</span>
+<span class="fc" id="L193">                .&lt;Map.Entry&lt;StructuralCell, SearchState&gt;&gt;comparingInt(entry -&gt;</span>
+<span class="nc" id="L194">                    entry.getKey().noveltyFrom(rootAstSize))</span>
+<span class="fc" id="L195">                .reversed()</span>
+<span class="pc" id="L196">                .thenComparing(entry -&gt; entry.getKey().stableKey())</span>
+<span class="fc" id="L197">                .thenComparing(Map.Entry::getValue, eliteComparator(problem)))</span>
+<span class="fc" id="L198">            .limit(problem.heuristic().beamWidth())</span>
+<span class="fc" id="L199">            .map(Map.Entry::getValue)</span>
+<span class="fc" id="L200">            .toList();</span>
     }
 
     private Comparator&lt;SearchState&gt; eliteComparator(SearchProblem problem) {
-<span class="fc" id="L203">        return Comparator</span>
-<span class="fc" id="L204">            .comparingInt((SearchState state) -&gt; priority(state, problem))</span>
-<span class="fc" id="L205">            .thenComparingInt(SearchState::depth)</span>
-<span class="fc" id="L206">            .thenComparing(SearchState::canonicalHash)</span>
-<span class="fc" id="L207">            .thenComparing(SearchState::expression)</span>
-<span class="pc" id="L208">            .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.appliedRuleIds()))</span>
-<span class="pc" id="L209">            .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.path()));</span>
+<span class="fc" id="L204">        return Comparator</span>
+<span class="fc" id="L205">            .comparingInt((SearchState state) -&gt; priority(state, problem))</span>
+<span class="fc" id="L206">            .thenComparingInt(SearchState::depth)</span>
+<span class="fc" id="L207">            .thenComparing(SearchState::canonicalHash)</span>
+<span class="fc" id="L208">            .thenComparing(SearchState::expression)</span>
+<span class="pc" id="L209">            .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.appliedRuleIds()))</span>
+<span class="pc" id="L210">            .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.path()));</span>
     }
 
     private int priority(SearchState state, SearchProblem problem) {
-<span class="fc" id="L213">        return SearchPriority.bestFirst(state, problem);</span>
+<span class="fc" id="L214">        return SearchPriority.bestFirst(state, problem);</span>
     }
 
     private String stateKey(SearchState state) {
-<span class="fc" id="L217">        return state.canonicalHash() + &quot;:&quot;</span>
-<span class="fc" id="L218">            + String.join(&quot;,&quot;, state.appliedRuleApplications().stream()</span>
-<span class="fc" id="L219">                .sorted()</span>
-<span class="fc" id="L220">                .toList());</span>
+<span class="fc" id="L218">        return state.canonicalHash() + &quot;:&quot;</span>
+<span class="fc" id="L219">            + String.join(&quot;,&quot;, state.appliedRuleApplications().stream()</span>
+<span class="fc" id="L220">                .sorted()</span>
+<span class="fc" id="L221">                .toList());</span>
     }
 
     private static String normalize(String expression) {
-<span class="fc" id="L224">        return Objects.requireNonNull(expression, &quot;expression&quot;)</span>
-<span class="fc" id="L225">            .trim()</span>
-<span class="fc" id="L226">            .replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="fc" id="L225">        return Objects.requireNonNull(expression, &quot;expression&quot;)</span>
+<span class="fc" id="L226">            .trim()</span>
+<span class="fc" id="L227">            .replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
     }
 
     private static &lt;T&gt; List&lt;T&gt; appended(List&lt;T&gt; values, T value) {
-<span class="fc" id="L230">        List&lt;T&gt; result = new ArrayList&lt;&gt;(values);</span>
-<span class="fc" id="L231">        result.add(value);</span>
-<span class="fc" id="L232">        return result;</span>
+<span class="fc" id="L231">        List&lt;T&gt; result = new ArrayList&lt;&gt;(values);</span>
+<span class="fc" id="L232">        result.add(value);</span>
+<span class="fc" id="L233">        return result;</span>
     }
 
-<span class="fc" id="L235">    private record StructuralCell(</span>
+<span class="fc" id="L236">    private record StructuralCell(</span>
         int astSizeBand,
         int expansionDebt,
         RewriteKind lastKind,
@@ -243,40 +244,40 @@ import java.util.Set;
             SearchProblem problem,
             SearchState state
         ) {
-<span class="fc" id="L246">            String expression = state.expression();</span>
-<span class="fc" id="L247">            return new StructuralCell(</span>
-<span class="fc" id="L248">                Math.min(24,</span>
-<span class="fc" id="L249">                    problem.canonicalizer().astNodeCount(expression) / 3),</span>
-<span class="fc" id="L250">                Math.min(8, state.expandedStepCount()),</span>
-<span class="fc" id="L251">                state.appliedRuleKind(),</span>
-<span class="fc" id="L252">                Math.min(4, occurrences(expression, '/')),</span>
-<span class="fc" id="L253">                Math.min(6, occurrences(expression, '^'))</span>
+<span class="fc" id="L247">            String expression = state.expression();</span>
+<span class="fc" id="L248">            return new StructuralCell(</span>
+<span class="fc" id="L249">                Math.min(24,</span>
+<span class="fc" id="L250">                    problem.canonicalizer().astNodeCount(expression) / 3),</span>
+<span class="fc" id="L251">                Math.min(8, state.expandedStepCount()),</span>
+<span class="fc" id="L252">                state.appliedRuleKind(),</span>
+<span class="fc" id="L253">                Math.min(4, occurrences(expression, '/')),</span>
+<span class="fc" id="L254">                Math.min(6, occurrences(expression, '^'))</span>
             );
         }
 
         private int noveltyFrom(int rootAstSize) {
-<span class="nc" id="L258">            int rootBand = Math.min(24, rootAstSize / 3);</span>
-<span class="nc" id="L259">            return Math.abs(astSizeBand - rootBand) * 4</span>
+<span class="nc" id="L259">            int rootBand = Math.min(24, rootAstSize / 3);</span>
+<span class="nc" id="L260">            return Math.abs(astSizeBand - rootBand) * 4</span>
                 + expansionDebt * 5
-<span class="nc bnc" id="L261" title="All 2 branches missed.">                + (lastKind == RewriteKind.EXPAND ? 4 : 0)</span>
-<span class="nc bnc" id="L262" title="All 2 branches missed.">                + (lastKind == RewriteKind.FACTOR ? 3 : 0)</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">                + (lastKind == RewriteKind.EXPAND ? 4 : 0)</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">                + (lastKind == RewriteKind.FACTOR ? 3 : 0)</span>
                 + denominatorBand * 2
                 + powerBand;
         }
 
         private String stableKey() {
-<span class="nc" id="L268">            return astSizeBand + &quot;:&quot; + expansionDebt + &quot;:&quot; + lastKind.name()</span>
+<span class="nc" id="L269">            return astSizeBand + &quot;:&quot; + expansionDebt + &quot;:&quot; + lastKind.name()</span>
                 + &quot;:&quot; + denominatorBand + &quot;:&quot; + powerBand;
         }
 
         private static int occurrences(String expression, char marker) {
-<span class="fc" id="L273">            int count = 0;</span>
-<span class="fc bfc" id="L274" title="All 2 branches covered.">            for (int index = 0; index &lt; expression.length(); index++) {</span>
-<span class="pc bpc" id="L275" title="1 of 2 branches missed.">                if (expression.charAt(index) == marker) {</span>
-<span class="nc" id="L276">                    count++;</span>
+<span class="fc" id="L274">            int count = 0;</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">            for (int index = 0; index &lt; expression.length(); index++) {</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">                if (expression.charAt(index) == marker) {</span>
+<span class="nc" id="L277">                    count++;</span>
                 }
             }
-<span class="fc" id="L279">            return count;</span>
+<span class="fc" id="L280">            return count;</span>
         }
     }
 }

@@ -153,30 +153,31 @@ public class TransformationSearchService {
 <span class="fc" id="L153">                    state.estimatedCostDelta(),</span>
 <span class="fc" id="L154">                    state.equivalencePreservingByConstruction(),</span>
                     CandidateProofStatus.OBSERVED,
-                    macroExpansion
+                    macroExpansion,
+<span class="fc" id="L157">                    state.incomingExecution().orElse(null)</span>
                 ));
             }
-<span class="fc bfc" id="L159" title="All 2 branches covered.">            if (state.improvement() &gt; 0) {</span>
-<span class="fc" id="L160">                SimplificationSuccess success = new SimplificationSuccess(</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            if (state.improvement() &gt; 0) {</span>
+<span class="fc" id="L161">                SimplificationSuccess success = new SimplificationSuccess(</span>
                     root,
-<span class="fc" id="L162">                    state.expression(),</span>
-<span class="fc" id="L163">                    state.appliedRuleId(),</span>
-<span class="fc" id="L164">                    state.depth(),</span>
-<span class="fc" id="L165">                    state.improvement(),</span>
-<span class="fc" id="L166">                    Instant.now()</span>
+<span class="fc" id="L163">                    state.expression(),</span>
+<span class="fc" id="L164">                    state.appliedRuleId(),</span>
+<span class="fc" id="L165">                    state.depth(),</span>
+<span class="fc" id="L166">                    state.improvement(),</span>
+<span class="fc" id="L167">                    Instant.now()</span>
                 );
-<span class="fc" id="L168">                successes.add(success);</span>
-<span class="fc" id="L169">                int oldComplexity = scorer.score(state.parentExpression()).weightedTotal();</span>
-<span class="fc" id="L170">                int newComplexity = state.score().weightedTotal();</span>
-<span class="pc bpc" id="L171" title="1 of 2 branches missed.">                if (heuristic.shouldNotify(oldComplexity, newComplexity)) {</span>
-<span class="fc" id="L172">                    notifier.onSignificantSimplification(state.parentExpression(), state.expression());</span>
+<span class="fc" id="L169">                successes.add(success);</span>
+<span class="fc" id="L170">                int oldComplexity = scorer.score(state.parentExpression()).weightedTotal();</span>
+<span class="fc" id="L171">                int newComplexity = state.score().weightedTotal();</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">                if (heuristic.shouldNotify(oldComplexity, newComplexity)) {</span>
+<span class="fc" id="L173">                    notifier.onSignificantSimplification(state.parentExpression(), state.expression());</span>
                 }
             }
-<span class="fc" id="L175">        }</span>
-<span class="fc" id="L176">    }</span>
+<span class="fc" id="L176">        }</span>
+<span class="fc" id="L177">    }</span>
 
     static int complexity(String expression) {
-<span class="nc" id="L179">        return new ExpressionScorer().score(expression).weightedTotal();</span>
+<span class="nc" id="L180">        return new ExpressionScorer().score(expression).weightedTotal();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

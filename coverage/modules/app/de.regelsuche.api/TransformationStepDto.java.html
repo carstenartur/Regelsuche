@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransformationStepDto.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.api</a> &gt; <span class="el_source">TransformationStepDto.java</span></div><h1>TransformationStepDto.java</h1><pre class="source lang-java linenums">package de.regelsuche.api;
 
 import de.regelsuche.discovery.TransformationStep;
+import de.regelsuche.transform.RecordedExecution;
 import java.util.List;
 
-<span class="fc" id="L6">public record TransformationStepDto(</span>
+public record TransformationStepDto(
     int index,
     String beforeExpression,
     String afterExpression,
@@ -13,8 +14,21 @@ import java.util.List;
     int scoreAfter,
     boolean equivalencePreserving,
     String explanation,
-    List&lt;String&gt; assumptions
+    List&lt;String&gt; assumptions,
+    RecordedExecution execution
 ) {
+<span class="fc" id="L20">    public TransformationStepDto {</span>
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        if (execution != null) execution.requireStep(beforeExpression, afterExpression, ruleId,</span>
+<span class="fc" id="L23">            de.regelsuche.transform.RewriteKind.valueOf(ruleKind), equivalencePreserving, assumptions);</span>
+<span class="fc" id="L24">    }</span>
+
+    public TransformationStepDto(int index, String beforeExpression, String afterExpression, String ruleId,
+            String ruleKind, int scoreBefore, int scoreAfter, boolean equivalencePreserving,
+            String explanation, List&lt;String&gt; assumptions) {
+<span class="nc" id="L29">        this(index, beforeExpression, afterExpression, ruleId, ruleKind, scoreBefore, scoreAfter,</span>
+            equivalencePreserving, explanation, assumptions, null);
+<span class="nc" id="L31">    }</span>
     public TransformationStepDto(
         int index,
         String beforeExpression,
@@ -26,22 +40,23 @@ import java.util.List;
         boolean equivalencePreserving,
         String explanation
     ) {
-<span class="nc" id="L29">        this(index, beforeExpression, afterExpression, ruleId, ruleKind, scoreBefore, scoreAfter,</span>
-<span class="nc" id="L30">            equivalencePreserving, explanation, List.of());</span>
-<span class="nc" id="L31">    }</span>
+<span class="nc" id="L43">        this(index, beforeExpression, afterExpression, ruleId, ruleKind, scoreBefore, scoreAfter,</span>
+<span class="nc" id="L44">            equivalencePreserving, explanation, List.of());</span>
+<span class="nc" id="L45">    }</span>
 
     public static TransformationStepDto from(TransformationStep step) {
-<span class="fc" id="L34">        return new TransformationStepDto(</span>
-<span class="fc" id="L35">            step.index(),</span>
-<span class="fc" id="L36">            step.beforeExpression(),</span>
-<span class="fc" id="L37">            step.afterExpression(),</span>
-<span class="fc" id="L38">            step.ruleId(),</span>
-<span class="fc" id="L39">            step.ruleKind().name(),</span>
-<span class="fc" id="L40">            step.scoreBefore(),</span>
-<span class="fc" id="L41">            step.scoreAfter(),</span>
-<span class="fc" id="L42">            step.equivalencePreserving(),</span>
-<span class="fc" id="L43">            step.explanation(),</span>
-<span class="fc" id="L44">            step.assumptions()</span>
+<span class="fc" id="L48">        return new TransformationStepDto(</span>
+<span class="fc" id="L49">            step.index(),</span>
+<span class="fc" id="L50">            step.beforeExpression(),</span>
+<span class="fc" id="L51">            step.afterExpression(),</span>
+<span class="fc" id="L52">            step.ruleId(),</span>
+<span class="fc" id="L53">            step.ruleKind().name(),</span>
+<span class="fc" id="L54">            step.scoreBefore(),</span>
+<span class="fc" id="L55">            step.scoreAfter(),</span>
+<span class="fc" id="L56">            step.equivalencePreserving(),</span>
+<span class="fc" id="L57">            step.explanation(),</span>
+<span class="fc" id="L58">            step.assumptions(),</span>
+<span class="fc" id="L59">            step.execution()</span>
         );
     }
 }

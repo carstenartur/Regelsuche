@@ -23,76 +23,77 @@ final class SearchEventJson {
 <span class="fc" id="L23">        appendNumberField(json, &quot;frontierSize&quot;, event.frontierSize());</span>
 <span class="fc" id="L24">        appendNumberField(json, &quot;visitedCount&quot;, event.visitedCount());</span>
 <span class="fc" id="L25">        appendNumberField(json, &quot;generatedCount&quot;, event.generatedCount());</span>
-<span class="fc" id="L26">        appendLastStringField(json, &quot;pruningReason&quot;, event.pruningReason());</span>
-<span class="fc" id="L27">        json.append('}');</span>
-<span class="fc" id="L28">        return json.toString();</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (event.execution() != null) appendStringField(json, &quot;execution&quot;, event.execution().toCanonicalJson());</span>
+<span class="fc" id="L27">        appendLastStringField(json, &quot;pruningReason&quot;, event.pruningReason());</span>
+<span class="fc" id="L28">        json.append('}');</span>
+<span class="fc" id="L29">        return json.toString();</span>
     }
 
     private static void appendNumberField(StringBuilder json, String name, long value) {
-<span class="fc" id="L32">        appendFieldName(json, name);</span>
-<span class="fc" id="L33">        json.append(value).append(',');</span>
-<span class="fc" id="L34">    }</span>
+<span class="fc" id="L33">        appendFieldName(json, name);</span>
+<span class="fc" id="L34">        json.append(value).append(',');</span>
+<span class="fc" id="L35">    }</span>
 
     private static void appendLastStringField(StringBuilder json, String name, String value) {
-<span class="fc" id="L37">        appendFieldName(json, name);</span>
-<span class="fc" id="L38">        appendQuoted(json, value);</span>
+<span class="fc" id="L38">        appendFieldName(json, name);</span>
+<span class="fc" id="L39">        appendQuoted(json, value);</span>
         // no trailing comma — this is the last field
-<span class="fc" id="L40">    }</span>
+<span class="fc" id="L41">    }</span>
 
     private static void appendStringField(StringBuilder json, String name, String value) {
-<span class="fc" id="L43">        appendFieldName(json, name);</span>
-<span class="fc" id="L44">        appendQuoted(json, value);</span>
-<span class="fc" id="L45">        json.append(',');</span>
-<span class="fc" id="L46">    }</span>
+<span class="fc" id="L44">        appendFieldName(json, name);</span>
+<span class="fc" id="L45">        appendQuoted(json, value);</span>
+<span class="fc" id="L46">        json.append(',');</span>
+<span class="fc" id="L47">    }</span>
 
     private static void appendEnumField(StringBuilder json, String name, Enum&lt;?&gt; value) {
-<span class="fc" id="L49">        appendFieldName(json, name);</span>
-<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (value == null) {</span>
-<span class="nc" id="L51">            json.append(&quot;null&quot;);</span>
+<span class="fc" id="L50">        appendFieldName(json, name);</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L52">            json.append(&quot;null&quot;);</span>
         } else {
-<span class="fc" id="L53">            appendQuoted(json, value.name());</span>
+<span class="fc" id="L54">            appendQuoted(json, value.name());</span>
         }
-<span class="fc" id="L55">        json.append(',');</span>
-<span class="fc" id="L56">    }</span>
+<span class="fc" id="L56">        json.append(',');</span>
+<span class="fc" id="L57">    }</span>
 
     private static void appendArrayField(StringBuilder json, String name, List&lt;String&gt; values) {
-<span class="fc" id="L59">        appendFieldName(json, name);</span>
-<span class="fc" id="L60">        json.append('[');</span>
-<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        for (int i = 0; i &lt; values.size(); i++) {</span>
-<span class="nc bnc" id="L62" title="All 2 branches missed.">            if (i &gt; 0) {</span>
-<span class="nc" id="L63">                json.append(',');</span>
+<span class="fc" id="L60">        appendFieldName(json, name);</span>
+<span class="fc" id="L61">        json.append('[');</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        for (int i = 0; i &lt; values.size(); i++) {</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">            if (i &gt; 0) {</span>
+<span class="nc" id="L64">                json.append(',');</span>
             }
-<span class="nc" id="L65">            appendQuoted(json, values.get(i));</span>
+<span class="nc" id="L66">            appendQuoted(json, values.get(i));</span>
         }
-<span class="fc" id="L67">        json.append(&quot;],&quot;);</span>
-<span class="fc" id="L68">    }</span>
+<span class="fc" id="L68">        json.append(&quot;],&quot;);</span>
+<span class="fc" id="L69">    }</span>
 
     private static void appendFieldName(StringBuilder json, String name) {
-<span class="fc" id="L71">        appendQuoted(json, name);</span>
-<span class="fc" id="L72">        json.append(':');</span>
-<span class="fc" id="L73">    }</span>
+<span class="fc" id="L72">        appendQuoted(json, name);</span>
+<span class="fc" id="L73">        json.append(':');</span>
+<span class="fc" id="L74">    }</span>
 
     private static void appendQuoted(StringBuilder json, String value) {
-<span class="fc" id="L76">        json.append('&quot;');</span>
-<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        String text = value == null ? &quot;&quot; : value;</span>
-<span class="fc bfc" id="L78" title="All 2 branches covered.">        for (int i = 0; i &lt; text.length(); i++) {</span>
-<span class="fc" id="L79">            char c = text.charAt(i);</span>
-<span class="pc bpc" id="L80" title="5 of 6 branches missed.">            switch (c) {</span>
-<span class="nc" id="L81">                case '&quot;' -&gt; json.append(&quot;\\\&quot;&quot;);</span>
-<span class="nc" id="L82">                case '\\' -&gt; json.append(&quot;\\\\&quot;);</span>
-<span class="nc" id="L83">                case '\n' -&gt; json.append(&quot;\\n&quot;);</span>
-<span class="nc" id="L84">                case '\r' -&gt; json.append(&quot;\\r&quot;);</span>
-<span class="nc" id="L85">                case '\t' -&gt; json.append(&quot;\\t&quot;);</span>
+<span class="fc" id="L77">        json.append('&quot;');</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        String text = value == null ? &quot;&quot; : value;</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        for (int i = 0; i &lt; text.length(); i++) {</span>
+<span class="fc" id="L80">            char c = text.charAt(i);</span>
+<span class="pc bpc" id="L81" title="3 of 6 branches missed.">            switch (c) {</span>
+<span class="fc" id="L82">                case '&quot;' -&gt; json.append(&quot;\\\&quot;&quot;);</span>
+<span class="fc" id="L83">                case '\\' -&gt; json.append(&quot;\\\\&quot;);</span>
+<span class="nc" id="L84">                case '\n' -&gt; json.append(&quot;\\n&quot;);</span>
+<span class="nc" id="L85">                case '\r' -&gt; json.append(&quot;\\r&quot;);</span>
+<span class="nc" id="L86">                case '\t' -&gt; json.append(&quot;\\t&quot;);</span>
                 default -&gt; {
-<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                    if (c &lt; 0x20) {</span>
-<span class="nc" id="L88">                        json.append(String.format(&quot;\\u%04x&quot;, (int) c));</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                    if (c &lt; 0x20) {</span>
+<span class="nc" id="L89">                        json.append(String.format(&quot;\\u%04x&quot;, (int) c));</span>
                     } else {
-<span class="fc" id="L90">                        json.append(c);</span>
+<span class="fc" id="L91">                        json.append(c);</span>
                     }
                 }
             }
         }
-<span class="fc" id="L95">        json.append('&quot;');</span>
-<span class="fc" id="L96">    }</span>
+<span class="fc" id="L96">        json.append('&quot;');</span>
+<span class="fc" id="L97">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

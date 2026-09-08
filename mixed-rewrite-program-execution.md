@@ -50,7 +50,8 @@ into an executable capability. Replay obtains fresh verifier-issued evidence and
 re-executes the declared program; the integration test compares the complete
 canonical provenance, content hash and transformation after full fresh replay.
 The search frontier adds canonical run observations and fresh execution comparison.
-Repository-wide artifact loading and other search-state serializers remain separate work.
+The [recorded execution contract](recorded-search-execution.md) extends this
+boundary to common states, application persistence and artifact-loading replay.
 
 ## Explicit budgets and retained work
 
@@ -112,7 +113,8 @@ and bounded reachability consumers reject exact-theory values. They cannot
 interpret zero primitive steps as a free edge. `WorkBudgetBestFirstSearchStrategy`
 accepts mixed programs with explicit path and global work authority and retains
 typed paths, source observations and replay evidence. Repository-wide state
-serialization and artifact-loading replay remain open in #900. This API does not
+serialization retains the same provenance as non-executable observations, and
+artifact replay requires fresh independently verified execution. This API does not
 add a primitive derivation, general theorem-prover soundness or tactic-quality claim.
 
 The characterization uses actual AST add-zero/multiply-one rules around a real

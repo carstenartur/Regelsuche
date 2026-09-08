@@ -151,8 +151,8 @@ public record Transformation(
         }
 <span class="fc" id="L152">        requireBoundProvenance(provenance, transformedExpression, applicationKey, assumptions,</span>
             equivalencePreservingByConstruction);
-<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (!(provenance instanceof TransformationProvenance.PrimitiveRewriteSequence)</span>
-<span class="nc bnc" id="L155" title="All 2 branches missed.">                &amp;&amp; provenance.work().exactTheorySteps() &gt; 0) {</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (!(provenance instanceof TransformationProvenance.PrimitiveRewriteSequence)</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">                &amp;&amp; provenance.work().exactTheorySteps() &gt; 0) {</span>
 <span class="nc" id="L156">            applicationKey = &quot;execution:&quot; + provenance.contentHash();</span>
         }
 <span class="fc" id="L158">    }</span>
@@ -160,7 +160,7 @@ public record Transformation(
     private static void requireBoundProvenance(TransformationProvenance provenance,
             String transformedExpression, String applicationKey, List&lt;String&gt; assumptions,
             boolean equivalencePreservingByConstruction) {
-<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        if (provenance instanceof TransformationProvenance.PrimitiveRewriteSequence primitive</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        if (provenance instanceof TransformationProvenance.PrimitiveRewriteSequence primitive</span>
 <span class="pc bpc" id="L164" title="1 of 2 branches missed.">                &amp;&amp; !primitive.applicationKey().equals(applicationKey)) {</span>
 <span class="nc" id="L165">            throw new IllegalArgumentException(&quot;primitive application identity differs from provenance&quot;);</span>
         }
@@ -170,13 +170,13 @@ public record Transformation(
 <span class="nc" id="L170">                throw new IllegalArgumentException(&quot;transformation differs from its verified theory evidence&quot;);</span>
             }
         }
-<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (provenance instanceof TransformationProvenance.Sequence sequence) {</span>
-<span class="nc" id="L174">            var boundAssumptions = AssumptionSignature.ofExpressions(sequence.steps().stream()</span>
-<span class="nc" id="L175">                .flatMap(step -&gt; step.assumptions().stream()).toList()).normalizedAssumptions();</span>
-<span class="nc bnc" id="L176" title="All 2 branches missed.">            if (!transformedExpression.equals(sequence.steps().getLast().transformedExpression())</span>
-<span class="nc bnc" id="L177" title="All 2 branches missed.">                    || !assumptions.equals(boundAssumptions)</span>
-<span class="nc" id="L178">                    || equivalencePreservingByConstruction != sequence.steps().stream()</span>
-<span class="nc bnc" id="L179" title="All 2 branches missed.">                        .allMatch(Transformation::equivalencePreservingByConstruction)) {</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (provenance instanceof TransformationProvenance.Sequence sequence) {</span>
+<span class="fc" id="L174">            var boundAssumptions = AssumptionSignature.ofExpressions(sequence.steps().stream()</span>
+<span class="fc" id="L175">                .flatMap(step -&gt; step.assumptions().stream()).toList()).normalizedAssumptions();</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">            if (!transformedExpression.equals(sequence.steps().getLast().transformedExpression())</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">                    || !assumptions.equals(boundAssumptions)</span>
+<span class="fc" id="L178">                    || equivalencePreservingByConstruction != sequence.steps().stream()</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">                        .allMatch(Transformation::equivalencePreservingByConstruction)) {</span>
 <span class="nc" id="L180">                throw new IllegalArgumentException(&quot;transformation differs from its retained sequence&quot;);</span>
             }
         }

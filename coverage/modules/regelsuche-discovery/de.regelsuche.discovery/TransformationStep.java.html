@@ -2,6 +2,7 @@
 
 import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.RecordedExecution;
 import java.util.List;
 
 public record TransformationStep(
@@ -14,15 +15,26 @@ public record TransformationStep(
     int scoreAfter,
     boolean equivalencePreserving,
     String explanation,
-    List&lt;String&gt; assumptions
+    List&lt;String&gt; assumptions,
+    RecordedExecution execution
 ) {
-<span class="fc" id="L19">    public TransformationStep {</span>
-<span class="pc bpc" id="L20" title="3 of 8 branches missed.">        if (beforeExpression == null || afterExpression == null || ruleId == null || ruleKind == null) {</span>
-<span class="fc" id="L21">            throw new IllegalArgumentException(&quot;step expressions, ruleId and ruleKind are required&quot;);</span>
+<span class="fc" id="L21">    public TransformationStep {</span>
+<span class="pc bpc" id="L22" title="3 of 8 branches missed.">        if (beforeExpression == null || afterExpression == null || ruleId == null || ruleKind == null) {</span>
+<span class="fc" id="L23">            throw new IllegalArgumentException(&quot;step expressions, ruleId and ruleKind are required&quot;);</span>
         }
-<span class="fc bfc" id="L23" title="All 2 branches covered.">        explanation = explanation == null ? &quot;&quot; : explanation;</span>
-<span class="fc" id="L24">        assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();</span>
-<span class="fc" id="L25">    }</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        explanation = explanation == null ? &quot;&quot; : explanation;</span>
+<span class="fc" id="L26">        assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (execution != null) execution.requireStep(beforeExpression, afterExpression, ruleId, ruleKind,</span>
+            equivalencePreserving, assumptions);
+<span class="fc" id="L29">    }</span>
+
+    /** Display-only observations may lack retained execution; they cannot authorize replay. */
+    public TransformationStep(int index, String beforeExpression, String afterExpression, String ruleId,
+            RewriteKind ruleKind, int scoreBefore, int scoreAfter, boolean equivalencePreserving,
+            String explanation, List&lt;String&gt; assumptions) {
+<span class="fc" id="L35">        this(index, beforeExpression, afterExpression, ruleId, ruleKind, scoreBefore, scoreAfter,</span>
+            equivalencePreserving, explanation, assumptions, null);
+<span class="fc" id="L37">    }</span>
 
     public TransformationStep(
         int index,
@@ -35,8 +47,8 @@ public record TransformationStep(
         boolean equivalencePreserving,
         String explanation
     ) {
-<span class="fc" id="L38">        this(index, beforeExpression, afterExpression, ruleId, ruleKind, scoreBefore, scoreAfter,</span>
-<span class="fc" id="L39">            equivalencePreserving, explanation, List.of());</span>
-<span class="fc" id="L40">    }</span>
+<span class="fc" id="L50">        this(index, beforeExpression, afterExpression, ruleId, ruleKind, scoreBefore, scoreAfter,</span>
+<span class="fc" id="L51">            equivalencePreserving, explanation, List.of());</span>
+<span class="fc" id="L52">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

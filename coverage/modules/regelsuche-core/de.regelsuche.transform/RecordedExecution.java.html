@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RecordedExecution.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">RecordedExecution.java</span></div><h1>RecordedExecution.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.json.JsonReader;
+import de.regelsuche.json.JsonWriter;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Portable observation of the canonical execution provenance, never an execution
+ * capability. Loading public bytes cannot construct an {@link ExactTheoryEvidence}.
+ * A replay must obtain fresh transformations from trusted sources and compare the
+ * entire observation, including every intermediate expression and evidence byte.
+ */
+public final class RecordedExecution {
+    public static final String SCHEMA = &quot;regelsuche.recorded-execution/v1&quot;;
+    public static final int MAX_CODE_UNITS = 8_000_000;
+    public static final int MAX_NESTING = 64;
+    private final String sourceExpression;
+    private final String transformedExpression;
+    private final String provenance;
+    private final ExecutionWork work;
+    private final int edgeCount;
+    private final String canonicalJson;
+    private final String contentHash;
+
+<span class="fc" id="L34">    private RecordedExecution(String source, String output, String provenance, ExecutionWork work, int edgeCount) {</span>
+<span class="fc" id="L35">        this.sourceExpression = source;</span>
+<span class="fc" id="L36">        this.transformedExpression = output;</span>
+<span class="fc" id="L37">        this.provenance = provenance;</span>
+<span class="fc" id="L38">        this.work = work;</span>
+<span class="fc" id="L39">        this.edgeCount = edgeCount;</span>
+<span class="fc" id="L40">        canonicalJson = new JsonWriter().beginObject().property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L41">            .property(&quot;sourceExpression&quot;, source).property(&quot;transformedExpression&quot;, output)</span>
+<span class="fc" id="L42">            .property(&quot;provenance&quot;, provenance).property(&quot;edgeCount&quot;, edgeCount)</span>
+<span class="fc" id="L43">            .property(&quot;primitiveRewrites&quot;, work.primitiveRewrites())</span>
+<span class="fc" id="L44">            .property(&quot;exactTheorySteps&quot;, work.exactTheorySteps())</span>
+<span class="fc" id="L45">            .property(&quot;exactTheoryWorkUnits&quot;, work.exactTheoryWorkUnits())</span>
+<span class="fc" id="L46">            .property(&quot;canonicalWorkUnits&quot;, work.canonicalWorkUnits()).endObject().toString();</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (canonicalJson.length() &gt; MAX_CODE_UNITS) throw new IllegalArgumentException(&quot;execution artifact too large&quot;);</span>
+<span class="fc" id="L48">        contentHash = hash(canonicalJson);</span>
+<span class="fc" id="L49">    }</span>
+
+    public static RecordedExecution capture(String source, List&lt;Transformation&gt; steps) {
+<span class="fc" id="L52">        requireText(source);</span>
+<span class="fc" id="L53">        var retained = List.copyOf(steps);</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (retained.isEmpty()) return new RecordedExecution(source, source, &quot;&quot;, ExecutionWork.ZERO, 0);</span>
+<span class="fc" id="L55">        var sequence = new TransformationProvenance.Sequence(source, retained);</span>
+<span class="fc" id="L56">        return new RecordedExecution(source, retained.getLast().transformedExpression(),</span>
+<span class="fc" id="L57">            sequence.toCanonicalJson(), sequence.work(), retained.size());</span>
+    }
+
+    /** Strict, bounded observational loading; no evidence provider is invoked. */
+    public static RecordedExecution fromCanonicalJson(String json) {
+<span class="fc" id="L62">        var values = readObject(json);</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (!SCHEMA.equals(text(values, &quot;schema&quot;))) throw new IllegalArgumentException(&quot;unsupported execution schema&quot;);</span>
+<span class="fc" id="L64">        String source = text(values, &quot;sourceExpression&quot;);</span>
+<span class="fc" id="L65">        String output = text(values, &quot;transformedExpression&quot;);</span>
+<span class="fc" id="L66">        String provenance = string(values, &quot;provenance&quot;);</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        Summary summary = provenance.isEmpty() ? new Summary(source, ExecutionWork.ZERO, 0)</span>
+<span class="fc" id="L68">            : summarize(provenance, source, 0, new ParseAllowance());</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (!output.equals(summary.output())) throw new IllegalArgumentException(&quot;execution endpoint differs from provenance&quot;);</span>
+<span class="fc" id="L70">        var result = new RecordedExecution(source, output, provenance, summary.work(), summary.edges());</span>
+        // Binds all derived counters, field names, order, integer syntax and omitted fields.
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (!result.toCanonicalJson().equals(json)) throw new IllegalArgumentException(&quot;noncanonical or inconsistent execution artifact&quot;);</span>
+<span class="fc" id="L73">        return result;</span>
+    }
+
+<span class="nc" id="L76">    public String sourceExpression() { return sourceExpression; }</span>
+<span class="nc" id="L77">    public String transformedExpression() { return transformedExpression; }</span>
+<span class="nc" id="L78">    public String provenance() { return provenance; }</span>
+<span class="fc" id="L79">    public ExecutionWork work() { return work; }</span>
+<span class="nc" id="L80">    public int edgeCount() { return edgeCount; }</span>
+<span class="fc" id="L81">    public String toCanonicalJson() { return canonicalJson; }</span>
+<span class="fc" id="L82">    public String contentHash() { return contentHash; }</span>
+
+    public List&lt;String&gt; assumptions() {
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if (edgeCount == 0) return List.of();</span>
+<span class="fc" id="L86">        return de.regelsuche.assumption.AssumptionSignature.ofExpressions(list(readObject(provenance), &quot;steps&quot;).stream()</span>
+<span class="fc" id="L87">            .flatMap(step -&gt; list(object(step), &quot;assumptions&quot;).stream()).map(String.class::cast).toList()).normalizedAssumptions();</span>
+    }
+
+    public static void writeOptional(JsonWriter writer, RecordedExecution execution) {
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        if (execution != null) writer.property(&quot;execution&quot;, execution.toCanonicalJson());</span>
+<span class="nc" id="L92">    }</span>
+
+    public static RecordedExecution readOptional(Map&lt;String, Object&gt; values) {
+<span class="nc" id="L95">        Object value = values.get(&quot;execution&quot;);</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (value == null) return null;</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (!(value instanceof String json)) throw new IllegalArgumentException(&quot;expected canonical execution JSON string&quot;);</span>
+<span class="nc" id="L98">        return fromCanonicalJson(json);</span>
+    }
+
+    public void requireEndpoints(String source, String output) {
+<span class="pc bpc" id="L102" title="2 of 4 branches missed.">        if (!sourceExpression.equals(source) || !transformedExpression.equals(output)) {</span>
+<span class="nc" id="L103">            throw new IllegalArgumentException(&quot;recorded execution differs from its owning expressions&quot;);</span>
+        }
+<span class="fc" id="L105">    }</span>
+
+    public void requireReplay(String source, List&lt;Transformation&gt; independentlyVerifiedSteps) {
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (!equals(capture(source, independentlyVerifiedSteps))) {</span>
+<span class="fc" id="L109">            throw new IllegalArgumentException(&quot;execution replay differs in provenance, evidence or work&quot;);</span>
+        }
+<span class="fc" id="L111">    }</span>
+
+    public void requireStep(String source, String output, String rule, RewriteKind kind,
+            boolean equivalencePreserving, List&lt;String&gt; assumptions) {
+<span class="nc" id="L115">        requireStep(source, output, rule, equivalencePreserving);</span>
+<span class="nc" id="L116">        var step = object(list(readObject(provenance), &quot;steps&quot;).getFirst());</span>
+<span class="nc bnc" id="L117" title="All 4 branches missed.">        if (!text(step, &quot;kind&quot;).equals(kind.name()) || !list(step, &quot;assumptions&quot;).equals(assumptions)) {</span>
+<span class="nc" id="L118">            throw new IllegalArgumentException(&quot;step metadata differs from retained execution&quot;);</span>
+        }
+<span class="nc" id="L120">    }</span>
+
+    public void requireStep(String source, String output, String rule, boolean equivalencePreserving) {
+<span class="fc" id="L123">        requireEndpoints(source, output);</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (edgeCount != 1) throw new IllegalArgumentException(&quot;step record requires exactly one outer edge&quot;);</span>
+<span class="fc" id="L125">        var step = object(list(readObject(provenance), &quot;steps&quot;).getFirst());</span>
+<span class="pc bpc" id="L126" title="3 of 4 branches missed.">        if (!text(step, &quot;rule&quot;).equals(rule) || !Objects.equals(step.get(&quot;equivalencePreserving&quot;), equivalencePreserving)) {</span>
+<span class="fc" id="L127">            throw new IllegalArgumentException(&quot;step metadata differs from retained execution&quot;);</span>
+        }
+<span class="nc" id="L129">    }</span>
+
+    @Override public boolean equals(Object other) {
+<span class="pc bpc" id="L132" title="1 of 4 branches missed.">        return other instanceof RecordedExecution recorded &amp;&amp; canonicalJson.equals(recorded.canonicalJson);</span>
+    }
+<span class="nc" id="L134">    @Override public int hashCode() { return canonicalJson.hashCode(); }</span>
+<span class="nc" id="L135">    @Override public String toString() { return canonicalJson; }</span>
+
+    private static Summary summarize(String json, String source, int depth, ParseAllowance allowance) {
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (depth &gt; MAX_NESTING) throw new IllegalArgumentException(&quot;execution provenance nesting exceeded&quot;);</span>
+<span class="fc" id="L139">        allowance.consume(json.length());</span>
+<span class="fc" id="L140">        var value = readObject(json);</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (!TransformationProvenance.SCHEMA.equals(text(value, &quot;schema&quot;))) {</span>
+<span class="nc" id="L142">            throw new IllegalArgumentException(&quot;unsupported provenance schema&quot;);</span>
+        }
+<span class="pc bpc" id="L144" title="2 of 4 branches missed.">        return switch (text(value, &quot;kind&quot;)) {</span>
+            case &quot;PRIMITIVE_REWRITE_SEQUENCE&quot; -&gt; {
+<span class="fc" id="L146">                requireKeys(value, &quot;schema&quot;, &quot;kind&quot;, &quot;primitiveRuleIds&quot;, &quot;applicationKey&quot;);</span>
+<span class="fc" id="L147">                var rules = list(value, &quot;primitiveRuleIds&quot;);</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                if (rules.isEmpty()) throw new IllegalArgumentException(&quot;empty primitive lineage&quot;);</span>
+<span class="fc" id="L149">                rules.forEach(rule -&gt; requireText((String) rule));</span>
+<span class="fc" id="L150">                text(value, &quot;applicationKey&quot;);</span>
+<span class="fc" id="L151">                yield new Summary(null, new ExecutionWork(rules.size(), 0, 0), 1);</span>
+            }
+            case &quot;EXACT_THEORY_STEP&quot; -&gt; {
+<span class="nc" id="L154">                requireKeys(value, &quot;schema&quot;, &quot;kind&quot;, &quot;sourceExpression&quot;, &quot;transformedExpression&quot;, &quot;theoryStepId&quot;,</span>
+                    &quot;evidenceHash&quot;, &quot;receiptArtifactId&quot;, &quot;runArtifactId&quot;, &quot;canonicalWorkUnits&quot;, &quot;assumptions&quot;, &quot;canonicalEvidenceJson&quot;);
+<span class="nc bnc" id="L156" title="All 4 branches missed.">                if (!source.equals(text(value, &quot;sourceExpression&quot;)) || !list(value, &quot;assumptions&quot;).isEmpty()) {</span>
+<span class="nc" id="L157">                    throw new IllegalArgumentException(&quot;theory source or assumptions substituted&quot;);</span>
+                }
+                // Binding is explicitly observational, not accepted by fromVerified.
+<span class="nc" id="L160">                var binding = new ExactTheoryEvidence.Binding(source, text(value, &quot;transformedExpression&quot;),</span>
+<span class="nc" id="L161">                    text(value, &quot;theoryStepId&quot;), text(value, &quot;evidenceHash&quot;), text(value, &quot;receiptArtifactId&quot;),</span>
+<span class="nc" id="L162">                    text(value, &quot;runArtifactId&quot;), integer(value, &quot;canonicalWorkUnits&quot;), text(value, &quot;canonicalEvidenceJson&quot;));</span>
+<span class="nc" id="L163">                yield new Summary(binding.transformedExpression(), new ExecutionWork(0, 1, binding.canonicalWorkUnits()), 1);</span>
+            }
+            case &quot;SEQUENCE&quot; -&gt; {
+<span class="fc" id="L166">                requireKeys(value, &quot;schema&quot;, &quot;kind&quot;, &quot;sourceExpression&quot;, &quot;steps&quot;);</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                if (!source.equals(text(value, &quot;sourceExpression&quot;))) throw new IllegalArgumentException(&quot;sequence source substituted&quot;);</span>
+<span class="fc" id="L168">                var steps = list(value, &quot;steps&quot;);</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">                if (steps.isEmpty()) throw new IllegalArgumentException(&quot;empty provenance sequence&quot;);</span>
+<span class="fc" id="L170">                String current = source;</span>
+<span class="fc" id="L171">                ExecutionWork total = ExecutionWork.ZERO;</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">                for (Object raw : steps) {</span>
+<span class="fc" id="L173">                    var step = object(raw);</span>
+<span class="fc" id="L174">                    requireKeys(step, &quot;rule&quot;, &quot;output&quot;, &quot;applicationKey&quot;, &quot;kind&quot;, &quot;mayIncreaseComplexity&quot;, &quot;estimatedCostDelta&quot;,</span>
+                        &quot;equivalencePreserving&quot;, &quot;assumptions&quot;, &quot;packId&quot;, &quot;license&quot;, &quot;provenance&quot;);
+<span class="fc" id="L176">                    text(step, &quot;rule&quot;); text(step, &quot;applicationKey&quot;); text(step, &quot;packId&quot;); text(step, &quot;license&quot;);</span>
+<span class="fc" id="L177">                    RewriteKind.valueOf(text(step, &quot;kind&quot;));</span>
+<span class="fc" id="L178">                    bool(step, &quot;mayIncreaseComplexity&quot;); bool(step, &quot;equivalencePreserving&quot;);</span>
+<span class="fc" id="L179">                    Math.toIntExact(integer(step, &quot;estimatedCostDelta&quot;));</span>
+<span class="fc" id="L180">                    list(step, &quot;assumptions&quot;).forEach(assumption -&gt; requireText((String) assumption));</span>
+<span class="fc" id="L181">                    Summary nested = summarize(text(step, &quot;provenance&quot;), current, depth + 1, allowance);</span>
+<span class="fc" id="L182">                    current = text(step, &quot;output&quot;);</span>
+<span class="pc bpc" id="L183" title="1 of 4 branches missed.">                    if (nested.output() != null &amp;&amp; !nested.output().equals(current)) {</span>
+<span class="nc" id="L184">                        throw new IllegalArgumentException(&quot;nested execution endpoint substituted&quot;);</span>
+                    }
+<span class="fc" id="L186">                    total = total.plus(nested.work());</span>
+<span class="fc" id="L187">                }</span>
+<span class="fc" id="L188">                yield new Summary(current, total, steps.size());</span>
+            }
+<span class="nc" id="L190">            default -&gt; throw new IllegalArgumentException(&quot;unknown execution provenance kind&quot;);</span>
+        };
+    }
+
+    private static Map&lt;String, Object&gt; readObject(String json) {
+<span class="fc" id="L195">        Objects.requireNonNull(json, &quot;json&quot;);</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        if (json.length() &gt; MAX_CODE_UNITS) throw new IllegalArgumentException(&quot;execution artifact too large&quot;);</span>
+<span class="fc" id="L197">        int depth = 0;</span>
+<span class="fc" id="L198">        boolean quoted = false, escaped = false;</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        for (int i = 0; i &lt; json.length(); i++) {</span>
+<span class="fc" id="L200">            char c = json.charAt(i);</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">            if (quoted) {</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">                if (escaped) escaped = false;</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">                else if (c == '\\') escaped = true;</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">                else if (c == '&quot;') quoted = false;</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">            } else if (c == '&quot;') quoted = true;</span>
+<span class="fc bfc" id="L206" title="All 6 branches covered.">            else if ((c == '{' || c == '[') &amp;&amp; ++depth &gt; MAX_NESTING) {</span>
+<span class="fc" id="L207">                throw new IllegalArgumentException(&quot;execution JSON nesting exceeded&quot;);</span>
+<span class="fc bfc" id="L208" title="All 4 branches covered.">            } else if (c == '}' || c == ']') depth--;</span>
+        }
+<span class="fc" id="L210">        try { return new JsonReader(json).readObject(); }</span>
+<span class="fc" id="L211">        catch (RuntimeException malformed) { throw new IllegalArgumentException(&quot;malformed execution JSON&quot;, malformed); }</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static Map&lt;String, Object&gt; object(Object value) {
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (!(value instanceof Map&lt;?, ?&gt;)) throw new IllegalArgumentException(&quot;expected execution object&quot;);</span>
+<span class="fc" id="L217">        return (Map&lt;String, Object&gt;) value;</span>
+    }
+    private static List&lt;?&gt; list(Map&lt;String, Object&gt; values, String key) {
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        if (!(values.get(key) instanceof List&lt;?&gt; result)) throw new IllegalArgumentException(&quot;expected execution array: &quot; + key);</span>
+<span class="fc" id="L221">        return result;</span>
+    }
+    private static String string(Map&lt;String, Object&gt; values, String key) {
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        if (!(values.get(key) instanceof String result)) throw new IllegalArgumentException(&quot;expected execution string: &quot; + key);</span>
+<span class="fc" id="L225">        return result;</span>
+    }
+    private static String text(Map&lt;String, Object&gt; values, String key) {
+<span class="fc" id="L228">        String result = string(values, key); requireText(result); return result;</span>
+    }
+    private static long integer(Map&lt;String, Object&gt; values, String key) {
+<span class="fc" id="L231">        Object result = values.get(key);</span>
+<span class="pc bpc" id="L232" title="3 of 4 branches missed.">        if (!(result instanceof Integer) &amp;&amp; !(result instanceof Long)) throw new IllegalArgumentException(&quot;expected execution integer: &quot; + key);</span>
+<span class="fc" id="L233">        return ((Number) result).longValue();</span>
+    }
+    private static void bool(Map&lt;String, Object&gt; values, String key) {
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">        if (!(values.get(key) instanceof Boolean)) throw new IllegalArgumentException(&quot;expected execution boolean: &quot; + key);</span>
+<span class="fc" id="L237">    }</span>
+    private static void requireText(String value) {
+<span class="pc bpc" id="L239" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) throw new IllegalArgumentException(&quot;blank execution field&quot;);</span>
+<span class="fc" id="L240">    }</span>
+    private static void requireKeys(Map&lt;String, Object&gt; values, String... keys) {
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">        if (!values.keySet().equals(Set.of(keys))) throw new IllegalArgumentException(&quot;unexpected execution fields&quot;);</span>
+<span class="fc" id="L243">    }</span>
+    private static String hash(String value) {
+        try {
+<span class="fc" id="L246">            var bytes = StandardCharsets.UTF_8.newEncoder().encode(CharBuffer.wrap(value));</span>
+<span class="fc" id="L247">            var digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="fc" id="L248">            digest.update(bytes);</span>
+<span class="fc" id="L249">            return &quot;sha256:&quot; + HexFormat.of().formatHex(digest.digest());</span>
+<span class="fc" id="L250">        } catch (CharacterCodingException malformed) { throw new IllegalArgumentException(&quot;invalid execution Unicode&quot;, malformed); }</span>
+<span class="nc" id="L251">        catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }</span>
+    }
+<span class="fc" id="L253">    private record Summary(String output, ExecutionWork work, int edges) { }</span>
+<span class="fc" id="L254">    private static final class ParseAllowance {</span>
+<span class="fc" id="L255">        private long remaining = MAX_CODE_UNITS * 4L;</span>
+        void consume(long units) {
+<span class="fc" id="L257">            remaining -= units;</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            if (remaining &lt; 0) throw new IllegalArgumentException(&quot;execution decoding work exceeded&quot;);</span>
+<span class="fc" id="L259">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

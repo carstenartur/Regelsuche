@@ -133,54 +133,56 @@ public class DefaultTransformationExportService implements TransformationExportS
 <span class="fc" id="L133">        writer.property(&quot;scoreAfter&quot;, step.scoreAfter());</span>
 <span class="fc" id="L134">        writer.property(&quot;equivalencePreserving&quot;, step.equivalencePreserving());</span>
 <span class="fc" id="L135">        writer.property(&quot;explanation&quot;, step.explanation());</span>
-<span class="fc" id="L136">    }</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (!step.assumptions().isEmpty()) writer.stringArray(&quot;assumptions&quot;, step.assumptions());</span>
+<span class="fc" id="L137">        de.regelsuche.transform.RecordedExecution.writeOptional(writer, step.execution());</span>
+<span class="fc" id="L138">    }</span>
 
     private void writeScore(JsonWriter writer, ExpressionScore score) {
-<span class="fc" id="L139">        writer.property(&quot;stringLength&quot;, score.stringLength());</span>
-<span class="fc" id="L140">        writer.property(&quot;astNodeCount&quot;, score.astNodeCount());</span>
-<span class="fc" id="L141">        writer.property(&quot;operatorCount&quot;, score.operatorCount());</span>
-<span class="fc" id="L142">        writer.property(&quot;nestingDepth&quot;, score.nestingDepth());</span>
-<span class="fc" id="L143">        writer.property(&quot;recognizedPatternBonus&quot;, score.recognizedPatternBonus());</span>
-<span class="fc" id="L144">        writer.property(&quot;weightedTotal&quot;, score.weightedTotal());</span>
-<span class="fc" id="L145">    }</span>
+<span class="fc" id="L141">        writer.property(&quot;stringLength&quot;, score.stringLength());</span>
+<span class="fc" id="L142">        writer.property(&quot;astNodeCount&quot;, score.astNodeCount());</span>
+<span class="fc" id="L143">        writer.property(&quot;operatorCount&quot;, score.operatorCount());</span>
+<span class="fc" id="L144">        writer.property(&quot;nestingDepth&quot;, score.nestingDepth());</span>
+<span class="fc" id="L145">        writer.property(&quot;recognizedPatternBonus&quot;, score.recognizedPatternBonus());</span>
+<span class="fc" id="L146">        writer.property(&quot;weightedTotal&quot;, score.weightedTotal());</span>
+<span class="fc" id="L147">    }</span>
 
     private void writeRule(JsonWriter writer, ReusableRule rule) {
-<span class="fc" id="L148">        writer.property(&quot;id&quot;, rule.id());</span>
-<span class="fc" id="L149">        writer.property(&quot;leftPattern&quot;, rule.leftPattern());</span>
-<span class="fc" id="L150">        writer.property(&quot;rightPattern&quot;, rule.rightPattern());</span>
-<span class="fc" id="L151">        writer.stringArray(&quot;parameterRelations&quot;, rule.parameterRelations());</span>
-<span class="fc" id="L152">        writer.property(&quot;proofStatus&quot;, rule.proofStatus().name());</span>
-<span class="fc" id="L153">        writer.property(&quot;knownRuleStatus&quot;, rule.knownRuleStatus().name());</span>
-<span class="fc" id="L154">        writer.property(&quot;supportingExamples&quot;, rule.supportingExamples());</span>
-<span class="fc" id="L155">        writer.property(&quot;averageImprovement&quot;, rule.averageImprovement());</span>
-<span class="fc" id="L156">        writer.property(&quot;createdAt&quot;, rule.createdAt().toString());</span>
-<span class="fc" id="L157">        writer.property(&quot;canonicalHash&quot;, rule.canonicalHash());</span>
-<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        if (rule.lastUsedAt() == null) {</span>
-<span class="fc" id="L159">            writer.nullProperty(&quot;lastUsedAt&quot;);</span>
+<span class="fc" id="L150">        writer.property(&quot;id&quot;, rule.id());</span>
+<span class="fc" id="L151">        writer.property(&quot;leftPattern&quot;, rule.leftPattern());</span>
+<span class="fc" id="L152">        writer.property(&quot;rightPattern&quot;, rule.rightPattern());</span>
+<span class="fc" id="L153">        writer.stringArray(&quot;parameterRelations&quot;, rule.parameterRelations());</span>
+<span class="fc" id="L154">        writer.property(&quot;proofStatus&quot;, rule.proofStatus().name());</span>
+<span class="fc" id="L155">        writer.property(&quot;knownRuleStatus&quot;, rule.knownRuleStatus().name());</span>
+<span class="fc" id="L156">        writer.property(&quot;supportingExamples&quot;, rule.supportingExamples());</span>
+<span class="fc" id="L157">        writer.property(&quot;averageImprovement&quot;, rule.averageImprovement());</span>
+<span class="fc" id="L158">        writer.property(&quot;createdAt&quot;, rule.createdAt().toString());</span>
+<span class="fc" id="L159">        writer.property(&quot;canonicalHash&quot;, rule.canonicalHash());</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        if (rule.lastUsedAt() == null) {</span>
+<span class="fc" id="L161">            writer.nullProperty(&quot;lastUsedAt&quot;);</span>
         } else {
-<span class="nc" id="L161">            writer.property(&quot;lastUsedAt&quot;, rule.lastUsedAt().toString());</span>
+<span class="nc" id="L163">            writer.property(&quot;lastUsedAt&quot;, rule.lastUsedAt().toString());</span>
         }
-<span class="fc" id="L163">        writer.property(&quot;usageCount&quot;, rule.usageCount());</span>
-<span class="fc" id="L164">    }</span>
+<span class="fc" id="L165">        writer.property(&quot;usageCount&quot;, rule.usageCount());</span>
+<span class="fc" id="L166">    }</span>
 
     private void writeCandidate(JsonWriter writer, RuleCandidate candidate) {
-<span class="fc" id="L167">        writer.property(&quot;leftPattern&quot;, candidate.leftPattern());</span>
-<span class="fc" id="L168">        writer.property(&quot;rightPattern&quot;, candidate.rightPattern());</span>
-<span class="fc" id="L169">        writer.property(&quot;examplesCount&quot;, candidate.examplesCount());</span>
-<span class="fc" id="L170">        writer.property(&quot;averageScoreImprovement&quot;, candidate.averageScoreImprovement());</span>
-<span class="fc" id="L171">        writer.property(&quot;maximumScoreImprovement&quot;, candidate.maximumScoreImprovement());</span>
-<span class="fc" id="L172">        writer.property(&quot;equivalenceVerified&quot;, candidate.equivalenceVerified());</span>
-<span class="fc" id="L173">        writer.property(&quot;generalizationPlausible&quot;, candidate.generalizationPlausible());</span>
-<span class="fc" id="L174">        writer.property(&quot;containsFreeParameters&quot;, candidate.containsFreeParameters());</span>
-<span class="fc" id="L175">        writer.stringArray(&quot;parameterRelations&quot;, candidate.parameterRelations());</span>
-<span class="fc" id="L176">        writer.property(&quot;status&quot;, candidate.status().name());</span>
-<span class="fc" id="L177">        writer.property(&quot;proofStatus&quot;, candidate.proofStatus().name());</span>
-<span class="fc" id="L178">        writer.property(&quot;canonicalHash&quot;, candidate.canonicalHash());</span>
-<span class="fc" id="L179">        writer.stringArray(&quot;supportingTransformationIds&quot;, candidate.supportingTransformationIds());</span>
-<span class="fc" id="L180">    }</span>
+<span class="fc" id="L169">        writer.property(&quot;leftPattern&quot;, candidate.leftPattern());</span>
+<span class="fc" id="L170">        writer.property(&quot;rightPattern&quot;, candidate.rightPattern());</span>
+<span class="fc" id="L171">        writer.property(&quot;examplesCount&quot;, candidate.examplesCount());</span>
+<span class="fc" id="L172">        writer.property(&quot;averageScoreImprovement&quot;, candidate.averageScoreImprovement());</span>
+<span class="fc" id="L173">        writer.property(&quot;maximumScoreImprovement&quot;, candidate.maximumScoreImprovement());</span>
+<span class="fc" id="L174">        writer.property(&quot;equivalenceVerified&quot;, candidate.equivalenceVerified());</span>
+<span class="fc" id="L175">        writer.property(&quot;generalizationPlausible&quot;, candidate.generalizationPlausible());</span>
+<span class="fc" id="L176">        writer.property(&quot;containsFreeParameters&quot;, candidate.containsFreeParameters());</span>
+<span class="fc" id="L177">        writer.stringArray(&quot;parameterRelations&quot;, candidate.parameterRelations());</span>
+<span class="fc" id="L178">        writer.property(&quot;status&quot;, candidate.status().name());</span>
+<span class="fc" id="L179">        writer.property(&quot;proofStatus&quot;, candidate.proofStatus().name());</span>
+<span class="fc" id="L180">        writer.property(&quot;canonicalHash&quot;, candidate.canonicalHash());</span>
+<span class="fc" id="L181">        writer.stringArray(&quot;supportingTransformationIds&quot;, candidate.supportingTransformationIds());</span>
+<span class="fc" id="L182">    }</span>
 
     private String escapeMermaid(String value) {
-<span class="fc" id="L183">        return value.replace(&quot;\&quot;&quot;, &quot;'&quot;);</span>
+<span class="fc" id="L185">        return value.replace(&quot;\&quot;&quot;, &quot;'&quot;);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
