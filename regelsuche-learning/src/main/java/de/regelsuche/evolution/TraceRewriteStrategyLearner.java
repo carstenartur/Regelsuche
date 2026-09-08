@@ -270,7 +270,7 @@ public final class TraceRewriteStrategyLearner {
         return new Application(strategy.contentHash(), profile, source, identity, result, calls);
     }
 
-    private int audit(String source, List<de.regelsuche.transform.Transformation> steps) {
+    int audit(String source, List<de.regelsuche.transform.Transformation> steps) {
         int calls = 0;
         String current = source;
         for (var step : steps) {

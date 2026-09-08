@@ -103,6 +103,14 @@ einer veränderten Regelreihenfolge. Die HTML-Demo zeigt jeden primitiven Schrit
 Der aktuelle Entwicklungsbestand liefert gleiche Ergebnisse bei **mehr
 Sucharbeit** mit dem gelernten Programm; alle Vergleichszeilen bleiben sichtbar.
 
+Die [gezielte Fortsetzung gelernter Strategien](docs/conditional-strategy-dispatch.md)
+behebt einen Teil dieser Mehrarbeit: Sie nutzt bereits erzeugte erste Schritte,
+kompiliert lineare Fortsetzungen einmal und lernt auf getrenntem TRAIN, wann
+diese nützlich sind. Auf 288 neuen Entwicklungsaufgaben benötigt sie bei gleicher
+Ergebnisqualität insgesamt **1,4 % weniger gezählte Arbeit als die starke
+Greedy-Kontrolle**. Die einmaligen Lernkosten sind auf diesem Bestand noch nicht
+eingespielt. Die neue Demo zeigt auch irreführende Hinweise und teurere Einzelfälle.
+
 ## Workbench statt Konsolenausgabe
 
 Browser-E2E-Tests prüfen die sichtbaren Abläufe und erzeugen dieselben

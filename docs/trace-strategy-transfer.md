@@ -36,7 +36,7 @@ keinen API-Schlüssel und keine externen Webressourcen. Zu jeder Aufgabe lassen
 sich Ausgang, Endausdruck, primitive Regeln, konkrete Anwendungen und Sucharbeit
 aufklappen. Auch die inneren Schritte einer Programmkante bleiben sichtbar.
 
-Das Verzeichnis wird nach dem Vergleichshash benannt. Es enthält `protocol.json`,
+Das Verzeichnis wird nach dem Hash des Artefaktmanifests benannt. Es enthält `protocol.json`,
 `strategy.json`, `report.json`, `report.md`, `index.html`, alle vier Trainings-
 und 21 unterstützten Anwendungssuchen sowie ein abschließendes Hashmanifest.
 Eine Wiederholung muss dieselben Bytes erzeugen; abweichende vorhandene Dateien

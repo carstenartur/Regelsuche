@@ -145,8 +145,6 @@ public final class TraceStrategyTransferExample {
 
     /** Writes a content-addressed run; existing differing files are never replaced. */
     public static Path write(Report report, Path output) throws IOException {
-        Path directory = output.resolve(report.contentHash().substring("sha256:".length()));
-        Files.createDirectories(directory);
         Map<String, String> artifacts = new TreeMap<>();
         artifacts.put("protocol.json", report.protocol());
         artifacts.put("strategy.json", report.strategy().toCanonicalJson());
@@ -160,11 +158,19 @@ public final class TraceStrategyTransferExample {
             if (row.application() != null) artifacts.put(row.example().id() + "-" + row.profile().name().toLowerCase(java.util.Locale.ROOT)
                 + ".search.json", row.application().search().toCanonicalJson());
         }
-        for (var artifact : artifacts.entrySet()) writeIdentical(directory.resolve(artifact.getKey()), artifact.getValue());
-        String manifest = new JsonWriter().beginObject().property("schema", REVISION).property("reportHash", report.contentHash())
+        return writeArtifacts(report.contentHash(), artifacts, output, REVISION);
+    }
+
+    static Path writeArtifacts(String reportHash, Map<String, String> artifacts, Path output, String revision) throws IOException {
+        String manifest = new JsonWriter().beginObject().property("schema", revision).property("reportHash", reportHash)
             .array("artifacts", values -> artifacts.forEach((name, content) -> values.objectValue(value ->
                 value.property("name", name).property("sha256", SchematicProofPlan.hash(content)))))
             .endObject().toString();
+        // Bind the presentation and artifact set too: a renderer change must
+        // create a new bundle even when all mathematical observations match.
+        Path directory = output.resolve(SchematicProofPlan.hash(manifest).substring("sha256:".length()));
+        Files.createDirectories(directory);
+        for (var artifact : artifacts.entrySet()) writeIdentical(directory.resolve(artifact.getKey()), artifact.getValue());
         writeIdentical(directory.resolve("manifest.json"), manifest);
         return directory;
     }
@@ -232,11 +238,11 @@ public final class TraceStrategyTransferExample {
         return out.append("<p><a href=\"report.json\">Vergleichsdaten</a> · <a href=\"strategy.json\">Strategie und Herkunft</a> · <a href=\"manifest.json\">Nachweise</a></p></html>").toString();
     }
 
-    private static String escape(String value) {
+    static String escape(String value) {
         return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
     }
 
-    private static void appendPrimitiveSteps(StringBuilder out, List<de.regelsuche.transform.Transformation> steps) {
+    static void appendPrimitiveSteps(StringBuilder out, List<de.regelsuche.transform.Transformation> steps) {
         for (var step : steps) {
             if (step.provenance() instanceof de.regelsuche.transform.TransformationProvenance.Sequence sequence) {
                 appendPrimitiveSteps(out, sequence.steps());
