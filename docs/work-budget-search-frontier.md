@@ -110,12 +110,14 @@ primitive allowance, mixed macro edges, exact and insufficient path/global
 budgets, distinct evidence at the same expression, discarded proposal work,
 incomplete expansions and fresh full-verifier/search replay with tamper controls.
 
-## Remaining scope of #900
+## Repository-wide storage and replay
 
 The budgeted best-first frontier now retains and charges verified exact theory.
-Other algorithms using the older `SearchState`, application/DTO persistence and
-repository-wide artifact-loading replay still require migration. Those consumers
-continue rejecting exact-theory transitions without explicit work authority.
+The [recorded execution contract](recorded-search-execution.md) carries that same
+provenance through common `SearchState` observations, application/DTO persistence,
+graph views and independently verified artifact-loading replay. Older algorithms
+still reject exact-theory transitions without explicit work authority; recording
+their actual primitive paths does not grant a theory budget.
 This change does not promote learned plans, change frozen matched-work artifacts,
 invent primitive derivations, or assert general theorem-prover soundness,
 mathematical novelty or tactic quality.

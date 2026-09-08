@@ -41,6 +41,7 @@
             <testInclude>de/regelsuche/dockere2e/PostgresDiscoveryPersistenceTest.java</testInclude>
             <testInclude>de/regelsuche/dockere2e/HibernateFullModePersistenceTest.java</testInclude>
             <testInclude>de/regelsuche/dockere2e/ScientificDiscoveryPostgresE2ETest.java</testInclude>
+            <testInclude>de/regelsuche/dockere2e/Neo4jExpressionGraphStoreTest.java</testInclude>
           </testIncludes>
         </configuration>
       </plugin>
@@ -72,6 +73,7 @@
             <include>**/PostgresDiscoveryPersistenceTest.java</include>
             <include>**/HibernateFullModePersistenceTest.java</include>
             <include>**/ScientificDiscoveryPostgresE2ETest.java</include>
+            <include>**/Neo4jExpressionGraphStoreTest.java</include>
           </includes>
           <systemPropertyVariables>
             <regelsuche.projectRoot>${maven.multiModuleProjectDirectory}</regelsuche.projectRoot>

@@ -421,8 +421,8 @@
 - id: schematic-exact-plan-replay
   label: "Schematic exact-plan resolution, replay and budgeted source"
   description: "Creates content-addressed schematic proof plans, resolves finite polynomial coefficient and sign holes exhaustively, replays complete plan runs under bound solver and resolver revisions, and exposes one explicitly selected verifier-owned result through a non-primitive budgeted exact-theory source."
-  modules: [regelsuche-core, regelsuche-learning, regelsuche-math-algorithms, regelsuche-search]
-  ownerModules: [regelsuche-core, regelsuche-learning, regelsuche-search]
+  modules: [regelsuche-core, regelsuche-learning, regelsuche-math-algorithms, regelsuche-search, regelsuche-discovery, app]
+  ownerModules: [regelsuche-core, regelsuche-learning, regelsuche-search, regelsuche-discovery, app]
   typePatterns:
     - 'SchematicProofPlan*'
     - 'ExactFinitePolynomialPlan*'
@@ -439,6 +439,11 @@
     - 'WorkBudgetBestFirstSearchStrategy'
     - 'SearchExpansionSource'
     - 'WorkSearchReplay'
+    - 'RecordedExecution'
+    - 'SearchReplayArtifact'
+    - 'SearchStateReplay'
+    - 'RecordedPathReplay'
+    - 'GraphEdgePersistence'
   testPatterns:
     - 'SchematicProofPlan*Test'
     - 'ExactFinitePolynomialPlan*Test'
@@ -448,6 +453,12 @@
     - 'VerifiedTheorySearchFrontierTest'
     - 'WorkBudgetBestFirstSearchStrategyTest'
     - 'TransformationProvenanceTest'
+    - 'RecordedExecutionTest'
+    - 'StoredExecutionReplayTest'
+    - 'GraphEdgePersistenceTest'
+    - 'Neo4jExpressionGraphStoreTest'
+    - 'SearchStateRetentionTest'
+    - 'StoredPathRoundTripRegressionTest'
   docPatterns:
     - docs/schematic-proof-plan-ir.md
     - docs/schematic-proof-plan-residual-composition.md
@@ -457,6 +468,7 @@
     - docs/budgeted-exact-theory-source.md
     - docs/mixed-rewrite-program-execution.md
     - docs/work-budget-search-frontier.md
+    - docs/recorded-search-execution.md
   evidenceTypes:
     - validation-evidence
   tags: [schematic-plan, exact-solver, replay, exact-theory, budgeted-execution, reproducibility]

@@ -23,6 +23,7 @@ final class SearchEventJson {
         appendNumberField(json, "frontierSize", event.frontierSize());
         appendNumberField(json, "visitedCount", event.visitedCount());
         appendNumberField(json, "generatedCount", event.generatedCount());
+        if (event.execution() != null) appendStringField(json, "execution", event.execution().toCanonicalJson());
         appendLastStringField(json, "pruningReason", event.pruningReason());
         json.append('}');
         return json.toString();

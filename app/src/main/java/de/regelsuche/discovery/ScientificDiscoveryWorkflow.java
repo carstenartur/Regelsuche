@@ -420,7 +420,8 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
             state.parentExpression(), state.expression(), state.appliedRuleId(), state.depth(), state.improvement(),
             root + "#" + state.depth(), state.canonicalHash(), scorer.score(state.parentExpression()).weightedTotal(),
             state.score().weightedTotal(), state.appliedRuleKind(), state.mayIncreaseComplexity(),
-            state.estimatedCostDelta(), state.equivalencePreservingByConstruction(), CandidateProofStatus.OBSERVED));
+            state.estimatedCostDelta(), state.equivalencePreservingByConstruction(), CandidateProofStatus.OBSERVED,
+            null, state.incomingExecution().orElse(null)));
     }
 
     private boolean isBridgeState(String expression) {
@@ -481,7 +482,11 @@ public final class ScientificDiscoveryWorkflow implements AutoCloseable {
             String from = path.get(i);
             String to = path.get(i + 1);
             steps.add(new TransformationStep(i, from, to, rules.get(i), i < kinds.size() ? kinds.get(i) : RewriteKind.NORMALIZE,
-                scorer.score(from).weightedTotal(), scorer.score(to).weightedTotal(), true, rules.get(i), state.assumptions()));
+                scorer.score(from).weightedTotal(), scorer.score(to).weightedTotal(),
+                i >= state.equivalencePreservingFlags().size() || state.equivalencePreservingFlags().get(i), rules.get(i),
+                state.transformations() == null ? state.assumptions() : state.transformations().get(i).assumptions(),
+                state.transformations() == null ? null : de.regelsuche.transform.RecordedExecution.capture(
+                    from, List.of(state.transformations().get(i)))));
         }
         return new DiscoveredTransformation(pathId, root, state.expression(), steps, before, state.score(),
             before.improvementTo(state.score()), CandidateProofStatus.OBSERVED, FIXED_INSTANT, state.canonicalHash());

@@ -11,6 +11,9 @@ public final class SemanticSearchGraphJsonSerializer {
     public static String toJson(SemanticSearchGraphDto dto) {
         JsonWriter writer = new JsonWriter();
         writer.beginObject();
+        if (!dto.executionObservations().isEmpty()) writer.object("executionObservations", observations ->
+            dto.executionObservations().entrySet().stream().sorted(java.util.Map.Entry.comparingByKey()).forEach(entry ->
+                observations.property(entry.getKey(), entry.getValue().toCanonicalJson())));
         writer.array("nodes", w -> dto.nodes().forEach(node -> w.objectValue(inner -> {
             inner.property("id", node.id());
             inner.property("canonicalExpression", node.canonicalExpression());
@@ -56,6 +59,7 @@ public final class SemanticSearchGraphJsonSerializer {
                             s.property("beforeExpression", step.beforeExpression());
                             s.property("afterExpression", step.afterExpression());
                             s.property("ruleId", step.ruleId());
+                            de.regelsuche.transform.RecordedExecution.writeOptional(s, step.execution());
                         })));
                 });
             }

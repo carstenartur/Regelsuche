@@ -2,6 +2,7 @@ package de.regelsuche.discovery;
 
 import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.RecordedExecution;
 import java.util.List;
 
 public record TransformationStep(
@@ -14,7 +15,8 @@ public record TransformationStep(
     int scoreAfter,
     boolean equivalencePreserving,
     String explanation,
-    List<String> assumptions
+    List<String> assumptions,
+    RecordedExecution execution
 ) {
     public TransformationStep {
         if (beforeExpression == null || afterExpression == null || ruleId == null || ruleKind == null) {
@@ -22,6 +24,16 @@ public record TransformationStep(
         }
         explanation = explanation == null ? "" : explanation;
         assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();
+        if (execution != null) execution.requireStep(beforeExpression, afterExpression, ruleId, ruleKind,
+            equivalencePreserving, assumptions);
+    }
+
+    /** Display-only observations may lack retained execution; they cannot authorize replay. */
+    public TransformationStep(int index, String beforeExpression, String afterExpression, String ruleId,
+            RewriteKind ruleKind, int scoreBefore, int scoreAfter, boolean equivalencePreserving,
+            String explanation, List<String> assumptions) {
+        this(index, beforeExpression, afterExpression, ruleId, ruleKind, scoreBefore, scoreAfter,
+            equivalencePreserving, explanation, assumptions, null);
     }
 
     public TransformationStep(

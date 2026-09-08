@@ -120,7 +120,8 @@ final class SearchTelemetry {
             frontierSize,
             visitedCount,
             generatedCount,
-            pruningReason
+            pruningReason,
+            state.recordedExecution().orElse(null)
         ));
     }
 
@@ -154,7 +155,8 @@ final class SearchTelemetry {
             frontierSize,
             visitedCount,
             generatedCount,
-            pruningReason
+            pruningReason,
+            de.regelsuche.transform.RecordedExecution.capture(state.expression(), java.util.List.of(transformation))
         ));
     }
 

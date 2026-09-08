@@ -224,7 +224,9 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
                 transformation.equivalencePreservingByConstruction(),
                 improvement,
                 appliedRuleKinds,
-                equivalenceFlags
+                equivalenceFlags,
+                SearchState.accumulatedAssumptions(parent, transformation),
+                SearchState.extendedPath(parent, transformation)
             ));
             if (children.size() >= problem.heuristic().maxCandidatesPerState()) {
                 break;
@@ -250,14 +252,24 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
             ExpressionScore nextScore = problem.scorer().score(nextExpression);
             int improvement = current.score().weightedTotal() - nextScore.weightedTotal();
             bestImprovement = Math.max(bestImprovement, improvement);
+            List<String> rolloutPath = new ArrayList<>(current.path());
+            rolloutPath.add(nextExpression);
+            List<String> rolloutRules = new ArrayList<>(current.appliedRuleIds());
+            rolloutRules.add(pick.rule());
+            Set<String> rolloutApplications = new java.util.HashSet<>(current.appliedRuleApplications());
+            rolloutApplications.add(pick.applicationKey());
+            List<RewriteKind> rolloutKinds = new ArrayList<>(current.appliedRuleKinds());
+            rolloutKinds.add(pick.kind());
+            List<Boolean> rolloutFlags = new ArrayList<>(current.equivalencePreservingFlags());
+            rolloutFlags.add(pick.equivalencePreservingByConstruction());
             current = new SearchState(
                 nextExpression,
                 current.depth() + 1,
                 nextScore,
-                current.path(),
-                current.appliedRuleIds(),
-                current.appliedRuleApplications(),
-                current.expandedStepCount(),
+                rolloutPath,
+                rolloutRules,
+                rolloutApplications,
+                current.expandedStepCount() + (pick.kind() == RewriteKind.EXPAND ? 1 : 0),
                 problem.canonicalizer().stableHash(nextExpression),
                 current.expression(),
                 pick.rule(),
@@ -265,7 +277,11 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
                 pick.mayIncreaseComplexity(),
                 pick.estimatedCostDelta(),
                 pick.equivalencePreservingByConstruction(),
-                improvement
+                improvement,
+                rolloutKinds,
+                rolloutFlags,
+                SearchState.accumulatedAssumptions(current, pick),
+                SearchState.extendedPath(current, pick)
             );
         }
         return bestImprovement;

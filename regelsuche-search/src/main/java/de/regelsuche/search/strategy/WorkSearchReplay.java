@@ -35,6 +35,13 @@ public final class WorkSearchReplay {
         return replay;
     }
 
+    /** Artifact bytes are verified before the full verifier/source reconstruction is requested. */
+    public static Result verifyArtifact(java.nio.file.Path file, SearchReplayArtifact.Reference reference,
+            java.util.function.Supplier<Problem> independentlyVerifiedProblem) throws java.io.IOException {
+        String expected = SearchReplayArtifact.load(file, reference);
+        return verify(expected, Objects.requireNonNull(independentlyVerifiedProblem, "verified problem source").get());
+    }
+
     public static String toCanonicalJson(Result result) {
         var json = new JsonWriter().beginObject().property("schema", SCHEMA)
             .property("workRevision", result.metrics().workRevision().schema())

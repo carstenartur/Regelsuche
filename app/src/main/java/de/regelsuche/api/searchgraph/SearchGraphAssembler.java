@@ -154,17 +154,19 @@ public final class SearchGraphAssembler {
         Map<String, List<String>> edgePathIds = buildEdgePathIds(edges, successes);
         List<SearchGraphEdgeDto> edgeDtos = new ArrayList<>(edges.size());
         for (GraphEdge edge : edges) {
-            String key = edge.fromExpression() + "|" + edge.toExpression() + "|" + edge.transformationRule();
+            String key = edgeKey(edge);
             edgeDtos.add(new SearchGraphEdgeDto(
                 edge.fromExpression(),
                 edge.toExpression(),
                 edge.transformationRule(),
+                de.regelsuche.export.MathPresentation.DEFAULT.ruleLatex(edge.transformationRule()),
                 edge.rewriteKind(),
                 edge.scoreAfter() - edge.scoreBefore(),
-                List.of(),
+                edge.execution() == null ? List.of() : edge.execution().assumptions(),
                 edgePathIds.getOrDefault(key, List.of(edge.pathId() == null ? "" : edge.pathId())),
                 edge.equivalencePreservingByConstruction(),
-                edge.macroMoveExpansion()
+                edge.macroMoveExpansion(),
+                edge.execution()
             ));
         }
 
@@ -197,6 +199,11 @@ public final class SearchGraphAssembler {
     }
 
     // -------------------------------------------------------------- helpers
+
+    private static String edgeKey(GraphEdge edge) {
+        return edge.fromExpression() + "|" + edge.toExpression() + "|" + edge.transformationRule()
+            + "|" + edge.executionIdentity();
+    }
 
     private static Set<String> collectBestPathExpressions(
         List<GraphEdge> edges, List<SimplificationSuccess> successes
@@ -267,7 +274,7 @@ public final class SearchGraphAssembler {
         // so we group edges by (from,to,rule) and surface their pathIds.
         Map<String, List<String>> result = new LinkedHashMap<>();
         for (GraphEdge edge : edges) {
-            String key = edge.fromExpression() + "|" + edge.toExpression() + "|" + edge.transformationRule();
+            String key = edgeKey(edge);
             String pathId = edge.pathId();
             if (pathId == null || pathId.isBlank()) {
                 continue;
@@ -280,7 +287,7 @@ public final class SearchGraphAssembler {
                 if (edge.fromExpression().equals(success.originalExpression())
                     && edge.toExpression().equals(success.simplifiedExpression())
                     && Objects.equals(edge.transformationRule(), success.transformationRule())) {
-                    String key = edge.fromExpression() + "|" + edge.toExpression() + "|" + edge.transformationRule();
+                    String key = edgeKey(edge);
                     String successId = "success:" + success.originalExpression() + "->" + success.simplifiedExpression();
                     result.computeIfAbsent(key, k -> new ArrayList<>()).add(successId);
                 }

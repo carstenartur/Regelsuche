@@ -104,7 +104,9 @@ public class BeamSearchStrategy implements SearchStrategy {
                         transformation.equivalencePreservingByConstruction(),
                         improvement,
                         appliedRuleKinds,
-                        equivalenceFlags
+                        equivalenceFlags,
+                        SearchState.accumulatedAssumptions(current, transformation),
+                        SearchState.extendedPath(current, transformation)
                     );
                     if (visited.contains(stateKey(nextState))) {
                         continue;
