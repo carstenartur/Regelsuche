@@ -11,6 +11,13 @@ import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.search.program.BudgetedTransformationSource;
 import de.regelsuche.search.program.RewriteProgramInterpreter;
 import de.regelsuche.search.program.RewritePrograms;
+import de.regelsuche.search.program.BudgetedRewriteProgramExecution.PathBudget;
+import de.regelsuche.search.strategy.SearchExpansionSource;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy;
+import de.regelsuche.search.strategy.WorkSearchReplay;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.transform.ExactTheoryEvidence;
 import de.regelsuche.transform.PolynomialDerivedMacroCache;
 import java.util.List;
 import java.util.Map;
@@ -106,6 +113,59 @@ class PolynomialSearchIntegrationTest {
             externalSource.lastObservation().orElseThrow().occurrence().status());
         assertThrows(IllegalArgumentException.class, () -> PolynomialSearchIntegration.open(
             PolynomialSearchIntegration.Profile.ON_DEMAND_VERIFIED_FACTORIZATION, Optional.of(unavailable), 2));
+    }
+
+    @Test
+    void actualBestFirstFrontierRetainsTheoryWorkAndReplaysIndependentColdRuns() {
+        String expression = "x^2-1";
+        String target = open(PolynomialSearchIntegration.Profile.ON_DEMAND_VERIFIED_FACTORIZATION)
+            .sourceAt(List.of()).orElseThrow().transform(expression, WORK).candidates().getFirst().transformedExpression();
+        var session = open(PolynomialSearchIntegration.Profile.VERIFIED_DERIVED_MACRO_CACHE);
+        var expansion = (SearchExpansionSource.ExactPolynomial) session.frontierAt(List.of()).orElseThrow();
+        var strategy = new WorkBudgetBestFirstSearchStrategy();
+        var first = strategy.search(problem(expression, target, expansion, WORK));
+        assertTrue(first.reached(), first.status().name());
+        assertFalse(first.expansions().isEmpty());
+        assertEquals(0, first.reachedState().primitiveDepth());
+        assertEquals(1, first.reachedState().executionWork().exactTheorySteps());
+        assertTrue(first.reachedState().executionWork().exactTheoryWorkUnits() > 0);
+        assertEquals(expansion.source().lastWork().totalWorkUnits(),
+            first.metrics().transformationWork().delegatedMechanicalWorkUnits());
+        String json = first.toCanonicalJson();
+        assertTrue(json.contains("delegatedMechanicalWorkUnits"));
+        var fresh = open(PolynomialSearchIntegration.Profile.VERIFIED_DERIVED_MACRO_CACHE).frontierAt(List.of()).orElseThrow();
+        assertEquals(json, WorkSearchReplay.verify(json, problem(expression, target, fresh, WORK)).toCanonicalJson());
+        var replay = strategy.search(problem(expression, target, expansion, WORK));
+        assertTrue(replay.reached());
+        assertEquals(first.reachedState().executionWork(), replay.reachedState().executionWork());
+        assertEquals(1, expansion.source().cacheStats().replays());
+        var verified = expansion.source().lastVerifiedExecution().orElseThrow();
+        var evidence = ExactTheoryEvidence.fromVerified(verified);
+        assertThrows(IllegalArgumentException.class, () -> ExactTheoryEvidence.fromVerified(verified.result()));
+        assertThrows(IllegalArgumentException.class, () -> ExactTheoryEvidence.fromVerified(evidence.binding()));
+        assertThrows(IllegalArgumentException.class, () -> ExactTheoryEvidence.fromVerified(evidence.binding().canonicalEvidenceJson()));
+    }
+
+    @Test
+    void frontierRefusesTinyTheoryAuthorityAndChargesMechanicsBeforeEnqueue() {
+        var expansion = (SearchExpansionSource.ExactPolynomial) open(
+            PolynomialSearchIntegration.Profile.ON_DEMAND_VERIFIED_FACTORIZATION).frontierAt(List.of()).orElseThrow();
+        var tiny = expansion.expand("x^2-1", new PathBudget(0, 1));
+        assertFalse(tiny.complete());
+        assertTrue(tiny.candidates().isEmpty());
+        assertTrue(expansion.source().lastVerifiedExecution().isEmpty());
+        var exhausted = new WorkBudgetBestFirstSearchStrategy().search(problem("x^2-1", "unreached", expansion, 100));
+        assertEquals(WorkBudgetBestFirstSearchStrategy.Status.WORK_BUDGET, exhausted.status());
+        assertEquals(0, exhausted.metrics().enqueuedStates());
+        assertTrue(exhausted.metrics().transformationWork().delegatedMechanicalWorkUnits() > 100);
+        assertFalse(exhausted.reached());
+    }
+
+    private WorkBudgetBestFirstSearchStrategy.Problem problem(String source, String target,
+            SearchExpansionSource expansion, long mechanical) {
+        return new WorkBudgetBestFirstSearchStrategy.Problem(source, target, expansion,
+            new ExpressionScorer(), new ExpressionCanonicalizer(),
+            new WorkBudgetBestFirstSearchStrategy.Budget(0, WORK, 10, 10, 10, mechanical));
     }
 
     private PolynomialSearchIntegration.Session open(PolynomialSearchIntegration.Profile profile) {

@@ -1,6 +1,7 @@
 package de.regelsuche.search.program;
 
 import de.regelsuche.moves.enumerate.TreePosition;
+import de.regelsuche.json.JsonWriter;
 import de.regelsuche.parse.ExactParsedSubtermProjector;
 import de.regelsuche.parse.ExactParsedTerm;
 import de.regelsuche.parse.ExpressionFormatter;
@@ -15,6 +16,7 @@ import de.regelsuche.polynomial.PolynomialWorkLedger;
 import de.regelsuche.polynomial.VerifiedPolynomialTransitionCacheStore;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.transform.PolynomialTheorySubsumptionClassifier;
+import de.regelsuche.transform.ExactTheoryEvidence;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -44,6 +46,7 @@ public final class ExactPolynomialTransformationSource implements BudgetedTransf
     private final SourceIdentity identity;
     private Optional<Observation> lastObservation = Optional.empty();
     private PolynomialWorkLedger lastWork = PolynomialWorkLedger.empty();
+    private Optional<VerifiedExecution> lastVerifiedExecution = Optional.empty();
 
     public ExactPolynomialTransformationSource(FactorizationEngine<ExactRational> engine,
             Mode mode, List<Integer> path, int cacheCapacity) {
@@ -73,6 +76,7 @@ public final class ExactPolynomialTransformationSource implements BudgetedTransf
     @Override public SourceIdentity identity() { return identity; }
     public synchronized Optional<Observation> lastObservation() { return lastObservation; }
     public synchronized PolynomialWorkLedger lastWork() { return lastWork; }
+    public synchronized Optional<VerifiedExecution> lastVerifiedExecution() { return lastVerifiedExecution; }
     public synchronized VerifiedPolynomialTransitionCacheStore.Stats cacheStats() {
         synchronized (cacheState) {
             var stats = cache.stats();
@@ -120,6 +124,7 @@ public final class ExactPolynomialTransformationSource implements BudgetedTransf
         }
         lastObservation = Optional.empty();
         lastWork = PolynomialWorkLedger.empty();
+        lastVerifiedExecution = Optional.empty();
         long ceiling = Math.min(availableMathematicalWorkUnits,
             ExactNestedFactorizationTransformationPipeline.Policy.boundedDefaults().maxTotalWorkUnits());
         Work work = new Work(ceiling);
@@ -196,15 +201,30 @@ public final class ExactPolynomialTransformationSource implements BudgetedTransf
             + expression.substring(range.endExclusive());
         // The surrounding source is sliced, never rendered through NumberExpr/double.
         new ExpressionParser().parseExactTerm(rewritten);
+        long mathematical = Math.max(1L, primitive.factorization().totalWork().totalWorkUnits());
+        long evidenceCeiling = Math.addExact(4096L, Math.multiplyExact(8L,
+            Math.addExact((long) expression.length(), rewritten.length())));
+        work.require(evidenceCeiling);
+        String evidenceJson = new JsonWriter().beginObject()
+            .property("schema", "regelsuche.verified-polynomial-search-execution/v1")
+            .property("source", expression).property("transformed", rewritten)
+            .property("primitiveEvidenceHash", primitive.certificateHash())
+            .property("occurrenceEvidenceHash", nested.certificateHash())
+            .property("theoryStepId", ExactFactorizationTransformationPipeline.TRANSFORMATION_ID)
+            .property("mathematicalWorkUnits", mathematical).endObject().toString();
+        long evidenceUnits = evidenceJson.getBytes(StandardCharsets.UTF_8).length;
+        if (evidenceUnits > evidenceCeiling) throw new IllegalStateException("execution evidence exceeded its admitted ceiling");
+        work.add("nested.rewritten-execution-evidence-utf8-bytes", evidenceUnits);
         if (mode == Mode.VERIFIED_CACHE && released == null) retain(primitive, List.of(position.pathKey()), work);
         lastObservation = Optional.of(new Observation(nested, Optional.ofNullable(released), work.ledger()));
-        long mathematical = Math.max(1L, primitive.factorization().totalWork().totalWorkUnits());
         var transition = ExactTheoryTransition.create(expression, rewritten,
             ExactFactorizationTransformationPipeline.TRANSFORMATION_ID, primitive.certificateHash(), List.of(),
             mathematical, nested.certificateHash());
         lastWork = work.ledger();
-        return Result.candidates(identity, expression, available, List.of(transition), work.total,
+        var result = Result.candidates(identity, expression, available, List.of(transition), work.total,
             released == null ? "ON_DEMAND_VERIFIED_POLYNOMIAL" : "VERIFIED_POLYNOMIAL_CACHE_REPLAY");
+        lastVerifiedExecution = Optional.of(new VerifiedExecution(result, evidenceJson));
+        return result;
     }
 
     private void retain(ExactFactorizationTransformationPipeline.Result primitive, List<String> provenance, Work work) {
@@ -243,6 +263,23 @@ public final class ExactPolynomialTransformationSource implements BudgetedTransf
     public record Observation(ExactNestedFactorizationTransformationPipeline.Result occurrence,
             Optional<VerifiedPolynomialTransitionCacheStore.ReplayResult> cacheReplay, PolynomialWorkLedger executionWork) {
         public Observation { Objects.requireNonNull(occurrence); Objects.requireNonNull(cacheReplay); Objects.requireNonNull(executionWork); }
+    }
+
+    /** Private-constructor capability, issued only after the actual occurrence rewrite succeeds. */
+    public static final class VerifiedExecution {
+        private final Result result;
+        private final String evidenceJson;
+        private VerifiedExecution(Result result, String evidenceJson) {
+            this.result = result;
+            this.evidenceJson = evidenceJson;
+        }
+        public Result result() { return result; }
+        ExactTheoryEvidence.Binding binding() {
+            var transition = result.candidates().getFirst();
+            return new ExactTheoryEvidence.Binding(transition.sourceExpression(), transition.transformedExpression(),
+                transition.theoryStepId(), transition.evidenceHash(), hash(evidenceJson), result.contentHash(),
+                transition.mathematicalWorkUnits(), evidenceJson);
+        }
     }
 
     private static final class Work {

@@ -6,6 +6,7 @@ import de.regelsuche.mining.PolynomialTheoryFormationOutcomeLedger;
 import de.regelsuche.mining.RuleCandidateFormationObserver;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.search.program.ExactPolynomialTransformationSource;
+import de.regelsuche.search.strategy.SearchExpansionSource;
 import de.regelsuche.transform.HypothesisOperator;
 import de.regelsuche.transform.PolynomialDecompositionSynthesisOperator;
 import de.regelsuche.transform.PolynomialDerivedMacroCache;
@@ -86,6 +87,10 @@ public final class PolynomialSearchIntegration {
         public Optional<ExactPolynomialTransformationSource> sourceAt(List<Integer> path) {
             Objects.requireNonNull(path, "path");
             return source == null ? Optional.empty() : Optional.of(source.atPath(path));
+        }
+
+        public Optional<SearchExpansionSource> frontierAt(List<Integer> path) {
+            return sourceAt(path).map(SearchExpansionSource.ExactPolynomial::new);
         }
 
         /**

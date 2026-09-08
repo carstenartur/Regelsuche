@@ -134,6 +134,10 @@ public final class WorkSearchReplay {
     }
 
     private static void writeTransformationWork(JsonWriter json, TransformationWorkMetrics work) {
+        // Preserve frozen historical bytes when no delegated source ran.
+        if (work.delegatedMechanicalWorkUnits() != 0) {
+            json.property("delegatedMechanicalWorkUnits", work.delegatedMechanicalWorkUnits());
+        }
         json.property("engineInvocations", work.engineInvocations()).property("programNodeVisits", work.programNodeVisits())
             .property("sourceInvocations", work.sourceInvocations()).property("sourceCandidates", work.sourceCandidates())
             .property("composedCandidates", work.composedCandidates()).property("requirementEvaluations", work.requirementEvaluations())

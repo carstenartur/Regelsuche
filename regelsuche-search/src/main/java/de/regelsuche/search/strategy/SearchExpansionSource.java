@@ -6,6 +6,12 @@ import de.regelsuche.search.program.RewriteCandidate;
 import de.regelsuche.search.program.RewriteExecution;
 import de.regelsuche.search.program.RewriteProgram;
 import de.regelsuche.search.program.RewriteProgramInterpreter;
+import de.regelsuche.search.program.ExactPolynomialTransformationSource;
+import de.regelsuche.search.program.BudgetedTransformationSource;
+import de.regelsuche.transform.ExactTheoryEvidence;
+import de.regelsuche.transform.ExecutionWork;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationWorkMetrics;
 import de.regelsuche.transform.MeasuredTransformationEngine;
 import java.util.List;
 import java.util.Objects;
@@ -52,6 +58,39 @@ public sealed interface SearchExpansionSource {
         @Override public RewriteExecution expand(String expression, PathBudget remainingPathBudget) {
             return new RewriteProgramInterpreter().executeWithWorkBudget(
                 program, expression, remainingPathBudget);
+        }
+
+        @Override public WorkRevision workRevision() { return WorkRevision.MIXED_V2; }
+    }
+
+    /** Actual best-first frontier handoff; retains theory evidence and delegated mechanics separately. */
+    record ExactPolynomial(ExactPolynomialTransformationSource source) implements SearchExpansionSource {
+        public ExactPolynomial { Objects.requireNonNull(source, "source"); }
+
+        @Override public RewriteExecution expand(String expression, PathBudget remainingPathBudget) {
+            Objects.requireNonNull(remainingPathBudget, "remainingPathBudget");
+            synchronized (source) {
+                var result = source.transform(expression, remainingPathBudget.exactTheoryWorkUnits());
+                var capability = source.lastVerifiedExecution();
+                List<RewriteCandidate> candidates = capability.map(verified -> {
+                    if (!verified.result().equals(result)) throw new IllegalStateException("polynomial execution changed during handoff");
+                    var transformation = Transformation.exactTheory(ExactTheoryEvidence.fromVerified(verified));
+                    return List.of(new RewriteCandidate(source.identity().sourceId(), expression,
+                        transformation.transformedExpression(), List.of(transformation)));
+                }).orElse(List.of());
+                var observations = candidates.stream().map(candidate ->
+                    new RewriteExecution.SourceObservation(candidate, remainingPathBudget,
+                        remainingPathBudget.admits(candidate.executionWork()))).toList();
+                var mathematical = candidates.stream().map(RewriteCandidate::executionWork)
+                    .reduce(ExecutionWork.ZERO, ExecutionWork::plus);
+                var mechanics = TransformationWorkMetrics.flatEngine(candidates.size())
+                    .withDelegatedMechanicalWork(result.mechanicalWorkUnits()).withCandidateWork(mathematical);
+                boolean complete = result.status() != BudgetedTransformationSource.Status.BUDGET_INCONCLUSIVE
+                    && observations.stream().allMatch(RewriteExecution.SourceObservation::admitted);
+                return new RewriteExecution(observations.stream().filter(RewriteExecution.SourceObservation::admitted)
+                    .map(RewriteExecution.SourceObservation::candidate).toList(), complete, mechanics, observations,
+                    remainingPathBudget);
+            }
         }
 
         @Override public WorkRevision workRevision() { return WorkRevision.MIXED_V2; }

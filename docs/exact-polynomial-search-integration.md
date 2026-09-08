@@ -43,6 +43,26 @@ nested-pipeline ceiling, and does not reset work between lookup, projection,
 factorization, verification, replacement or replay. Insufficient admission
 returns `BUDGET_INCONCLUSIVE`, not a mathematical impossibility or `NO_MATCH`.
 
+For the actual best-first frontier, use
+`session.frontierAt(path).orElseThrow()` as the `SearchExpansionSource` of a
+`WorkBudgetBestFirstSearchStrategy.Problem`. The standalone `BudgetedSource`
+program lane is not implicitly interchangeable with the mixed-work frontier.
+The explicit frontier adapter retains every source observation, maps only a
+private-constructor `VerifiedExecution` through the installed
+`ExactTheoryEvidenceProvider`, and emits a typed exact-theory transformation
+with zero primitive rewrites. Public source-result records, bindings, JSON and
+hashes cannot create that capability. The receipt binds the canonical
+occurrence execution evidence; its run identity binds the source result.
+
+`TransformationWorkMetrics.delegatedMechanicalWorkUnits` retains the source's
+actual mechanics separately from invocations and mathematical path cost. It
+survives aggregation, duplicate accounting and canonical search replay. The
+frontier checks the charged batch before enqueueing candidates; insufficient
+theory authority remains an incomplete expansion. The existing frontier's
+batch-accounting limit is not a replacement for the stricter, still-open
+canonical runtime admission contract of #748. Historical event-only metrics
+retain zero delegated work and their existing scalar totals and replay bytes.
+
 The interpreter retains exact-theory steps separately from primitive rewrite
 steps. The transition's mathematical work retains the original factorization
 work even on a cache hit. Replay mechanics record only this execution, not a
@@ -147,3 +167,7 @@ Regression tests cover original-authority identity, distinct occurrence
 applications, stale/changed/evicted replay, exact surrounding literals, actual
 miner-to-program integration, profile isolation, backend absence/failure,
 finite work, FIFO bounds and unchanged canonical stage partitioning.
+The best-first integration tests also reach a concrete target without primitive
+rewrite credit, reproduce an independent cold-run replay byte-for-byte, retain
+cache mathematical lineage, reject public-data evidence substitution, and
+charge delegated mechanics before a search candidate can be enqueued.
