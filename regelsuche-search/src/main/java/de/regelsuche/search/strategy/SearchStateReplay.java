@@ -19,16 +19,19 @@ public final class SearchStateReplay {
             .stringArray("path", state.path()).stringArray("appliedRuleIds", state.appliedRuleIds())
             .stringArray("applicationKeys", state.appliedRuleApplications().stream().sorted().toList())
             .stringArray("assumptions", state.assumptions()).property("expandedStepCount", state.expandedStepCount())
-            .property("parentExpression", state.parentExpression()).property("appliedRuleId", state.appliedRuleId())
-            .property("appliedRuleKind", state.appliedRuleKind().name()).property("mayIncreaseComplexity", state.mayIncreaseComplexity())
+            .property("parentExpression", state.parentExpression()).property("appliedRuleId", state.appliedRuleId());
+        if (state.appliedRuleKind() == null) json.nullProperty("appliedRuleKind");
+        else json.property("appliedRuleKind", state.appliedRuleKind().name());
+        json.property("mayIncreaseComplexity", state.mayIncreaseComplexity())
             .property("estimatedCostDelta", state.estimatedCostDelta())
             .property("equivalencePreserving", state.equivalencePreservingByConstruction()).property("improvement", state.improvement())
             .stringArray("appliedRuleKinds", state.appliedRuleKinds().stream().map(Enum::name).toList())
-            .array("equivalencePreservingFlags", array -> state.equivalencePreservingFlags().forEach(array::value))
-            .object("score", score -> score.property("stringLength", state.score().stringLength())
+            .array("equivalencePreservingFlags", array -> state.equivalencePreservingFlags().forEach(array::value));
+        if (state.score() == null) json.nullProperty("score");
+        else json.object("score", score -> score.property("stringLength", state.score().stringLength())
                 .property("astNodeCount", state.score().astNodeCount()).property("operatorCount", state.score().operatorCount())
-                .property("nestingDepth", state.score().nestingDepth()).property("recognizedPatternBonus", state.score().recognizedPatternBonus()))
-            .property("executionRetained", state.transformations() != null);
+                .property("nestingDepth", state.score().nestingDepth()).property("recognizedPatternBonus", state.score().recognizedPatternBonus()));
+        json.property("executionRetained", state.transformations() != null);
         state.recordedExecution().ifPresent(execution -> json.property("execution", execution.toCanonicalJson()));
         return json.endObject().toString();
     }

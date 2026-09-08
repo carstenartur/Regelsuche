@@ -44,5 +44,11 @@ class SearchStateRetentionTest {
             "canonical", "", "", RewriteKind.NORMALIZE, false, 0, true, 0);
         assertTrue(placeholder.recordedExecution().isEmpty());
         assertTrue(placeholder.executionWork().isEmpty());
+        assertTrue(SearchStateReplay.toCanonicalJson(placeholder).contains("\"score\":null"));
+        var historic = new SearchState("x", 1, new ExpressionScorer().score("x"), List.of("x + 0", "x"),
+            List.of("recorded rule"), Set.of(), 0, "canonical", null, null, null, false, 0, true, 0);
+        String json = SearchStateReplay.toCanonicalJson(historic);
+        assertTrue(json.contains("\"appliedRuleKind\":null"));
+        assertTrue(json.contains("\"executionRetained\":false"));
     }
 }
