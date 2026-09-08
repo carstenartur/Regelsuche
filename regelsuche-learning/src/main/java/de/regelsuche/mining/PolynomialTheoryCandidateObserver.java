@@ -36,7 +36,10 @@ public final class PolynomialTheoryCandidateObserver
         this(classifier, macroCache, outcomeLedger, (classification, evidence) -> { });
     }
 
-    /** Optional executable handoff receives this exact classification, including duplicate observations. */
+    /**
+     * Optional executable handoff receives this exact classification, including duplicate observations.
+     * It runs after retention, outside this observer's lock; concurrent callers may deliver handoffs concurrently.
+     */
     public PolynomialTheoryCandidateObserver(
         PolynomialTheorySubsumptionClassifier classifier,
         PolynomialDerivedMacroCache macroCache,
@@ -56,7 +59,7 @@ public final class PolynomialTheoryCandidateObserver
     }
 
     @Override
-    public synchronized Disposition onCandidateFormed(
+    public Disposition onCandidateFormed(
         RuleCandidate candidate,
         Evidence evidence
     ) {
@@ -77,23 +80,25 @@ public final class PolynomialTheoryCandidateObserver
                 "polynomial theory observer requires source provenance");
         }
 
-        PolynomialTheorySubsumptionClassifier.Classification classification =
-            classifier.classify(
+        PolynomialTheorySubsumptionClassifier.Classification classification;
+        synchronized (this) {
+            classification = classifier.classify(
                 candidate.leftPattern(),
                 candidate.rightPattern());
-        Optional<String> macroEntryId = Optional.empty();
-        if (classification.subsumed()) {
-            PolynomialDerivedMacroCache.Entry retained = macroCache.retain(
+            Optional<String> macroEntryId = Optional.empty();
+            if (classification.subsumed()) {
+                PolynomialDerivedMacroCache.Entry retained = macroCache.retain(
+                    classification,
+                    List.of(classification.theoryMethodId()),
+                    checkedEvidence.sourceProvenance());
+                macroEntryId = Optional.of(retained.id());
+            }
+            outcomeLedger.retain(
+                candidate,
+                checkedEvidence,
                 classification,
-                List.of(classification.theoryMethodId()),
-                checkedEvidence.sourceProvenance());
-            macroEntryId = Optional.of(retained.id());
+                macroEntryId);
         }
-        outcomeLedger.retain(
-            candidate,
-            checkedEvidence,
-            classification,
-            macroEntryId);
         if (classification.subsumed()) verifiedHandoff.accept(classification, checkedEvidence);
         return classification.subsumed() ? Disposition.DERIVED_CACHE_ONLY : Disposition.RETAIN_FOR_REVIEW;
     }

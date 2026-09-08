@@ -1104,6 +1104,7 @@ public class WebWorkbenchServer {
                 inner.property("toExpression", step.toExpression());
                 inner.property("toLatex", step.toLatex());
                 inner.property("ruleId", step.ruleId());
+                de.regelsuche.transform.RecordedExecution.writeOptional(inner, step.execution());
                 inner.property("ruleExplanation", step.ruleExplanation());
                 inner.property("scoreDelta", step.scoreDelta());
                 inner.property("equivalencePreserving", step.equivalencePreserving());
@@ -1132,6 +1133,7 @@ public class WebWorkbenchServer {
             macro.property("compressionRatio", expansion.compressionRatio());
             macro.property("expanded", expansion.expanded());
             macro.stringArray("supportingPathIds", expansion.supportingPathIds());
+            if (!expansion.assumptions().isEmpty()) macro.stringArray("assumptions", expansion.assumptions());
             macro.object("stats", stats -> {
                 stats.property("timesConsidered", expansion.stats().timesConsidered());
                 stats.property("timesApplied", expansion.stats().timesApplied());
@@ -1150,6 +1152,8 @@ public class WebWorkbenchServer {
                     inner.property("scoreAfter", step.scoreAfter());
                     inner.property("equivalencePreserving", step.equivalencePreserving());
                     inner.property("explanation", step.explanation());
+                    if (!step.assumptions().isEmpty()) inner.stringArray("assumptions", step.assumptions());
+                    de.regelsuche.transform.RecordedExecution.writeOptional(inner, step.execution());
                 })));
         });
     }
@@ -2172,6 +2176,8 @@ public class WebWorkbenchServer {
                 inner.property("ruleId", step.ruleId());
                 inner.property("ruleKind", step.ruleKind().name());
                 inner.property("explanation", step.explanation());
+                inner.stringArray("assumptions", step.assumptions());
+                de.regelsuche.transform.RecordedExecution.writeOptional(inner, step.execution());
                 inner.array("diffTokens", tokensArr ->
                     de.regelsuche.didactic.SymbolDiff.diff(
                             step.beforeExpression(), step.afterExpression())

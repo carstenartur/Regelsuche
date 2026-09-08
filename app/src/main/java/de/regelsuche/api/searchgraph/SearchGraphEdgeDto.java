@@ -1,6 +1,7 @@
 package de.regelsuche.api.searchgraph;
 
 import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.RecordedExecution;
 import de.regelsuche.mining.MacroMoveExpansion;
 import java.util.List;
 
@@ -21,7 +22,8 @@ public record SearchGraphEdgeDto(
     List<String> assumptions,
     List<String> pathIds,
     boolean equivalencePreserving,
-    MacroMoveExpansion macroMoveExpansion
+    MacroMoveExpansion macroMoveExpansion,
+    RecordedExecution execution
 ) {
     public SearchGraphEdgeDto {
         if (from == null || to == null) {
@@ -32,6 +34,22 @@ public record SearchGraphEdgeDto(
         ruleKind = ruleKind == null ? RewriteKind.NORMALIZE : ruleKind;
         assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
         pathIds = pathIds == null ? List.of() : List.copyOf(pathIds);
+        if (execution != null) execution.requireStep(from, to, ruleId, ruleKind, equivalencePreserving, assumptions);
+    }
+
+    public SearchGraphEdgeDto(String from, String to, String ruleId, String ruleLatex, RewriteKind ruleKind,
+            int scoreDelta, List<String> assumptions, List<String> pathIds, boolean equivalencePreserving,
+            MacroMoveExpansion macroMoveExpansion) {
+        this(from, to, ruleId, ruleLatex, ruleKind, scoreDelta, assumptions, pathIds,
+            equivalencePreserving, macroMoveExpansion, null);
+    }
+
+    public String sourceEdgeId() {
+        return sourceEdgeId(from, to, ruleId, execution);
+    }
+
+    public static String sourceEdgeId(String from, String to, String rule, RecordedExecution execution) {
+        return from + "->" + to + ":" + rule + (execution == null ? "" : "#" + execution.contentHash());
     }
 
     public SearchGraphEdgeDto(

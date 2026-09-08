@@ -304,7 +304,11 @@ public final class ExactPolynomialTransformationSource implements BudgetedTransf
     private static String hash(String... values) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            for (String value : values) digest.update((value.length()+":"+value).getBytes(StandardCharsets.UTF_8));
+            for (String value : values) {
+                byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+                digest.update((bytes.length + ":").getBytes(StandardCharsets.UTF_8));
+                digest.update(bytes);
+            }
             return "sha256:"+HexFormat.of().formatHex(digest.digest());
         } catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
     }

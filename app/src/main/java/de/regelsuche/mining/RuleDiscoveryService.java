@@ -140,7 +140,7 @@ public class RuleDiscoveryService {
                         state.mayIncreaseComplexity(),
                         state.estimatedCostDelta(),
                         state.equivalencePreservingByConstruction(),
-                        CandidateProofStatus.OBSERVED
+                        CandidateProofStatus.OBSERVED, null, state.incomingExecution().orElse(null)
                     ));
                 }
                 if (state.depth() == 0) {
@@ -244,7 +244,9 @@ public class RuleDiscoveryService {
                 scoreAfter,
                 equivalencePreserving,
                 ruleIds.get(i),
-                state.assumptions()
+                state.transformations() == null ? state.assumptions() : state.transformations().get(i).assumptions(),
+                state.transformations() == null ? null : de.regelsuche.transform.RecordedExecution.capture(
+                    before, List.of(state.transformations().get(i)))
             ));
         }
         return steps;

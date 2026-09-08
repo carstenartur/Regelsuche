@@ -6,6 +6,7 @@ import de.regelsuche.explain.ExplanationService;
 import de.regelsuche.export.MathDiff;
 import de.regelsuche.export.MathPresentation;
 import de.regelsuche.mining.MacroMoveExpansion;
+import de.regelsuche.transform.RecordedExecution;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -99,13 +100,23 @@ public record PathReplayDto(
         boolean comparatorFlipped,
         List<int[]> changedFromSpans,
         List<int[]> changedToSpans,
-        MacroMoveExpansion macroMoveExpansion
+        MacroMoveExpansion macroMoveExpansion,
+        RecordedExecution execution
     ) {
         public ReplayStep {
             changedFromSpans = changedFromSpans == null
                 ? List.of() : List.copyOf(changedFromSpans);
             changedToSpans = changedToSpans == null
                 ? List.of() : List.copyOf(changedToSpans);
+            if (execution != null) execution.requireStep(fromExpression, toExpression, ruleId, equivalencePreserving);
+        }
+
+        public ReplayStep(int stepIndex, String fromExpression, String fromLatex, String toExpression,
+                String toLatex, String ruleId, String ruleExplanation, int scoreDelta, boolean equivalencePreserving,
+                boolean comparatorFlipped, List<int[]> changedFromSpans, List<int[]> changedToSpans,
+                MacroMoveExpansion macroMoveExpansion) {
+            this(stepIndex, fromExpression, fromLatex, toExpression, toLatex, ruleId, ruleExplanation, scoreDelta,
+                equivalencePreserving, comparatorFlipped, changedFromSpans, changedToSpans, macroMoveExpansion, null);
         }
 
         public ReplayStep(
@@ -219,7 +230,8 @@ public record PathReplayDto(
                 flipped,
                 diff.fromSpans(),
                 diff.toSpans(),
-                macroExpansionsByStepIndex == null ? null : macroExpansionsByStepIndex.get(step.index())
+                macroExpansionsByStepIndex == null ? null : macroExpansionsByStepIndex.get(step.index()),
+                step.execution()
             ));
         }
         return new PathReplayDto(path.id(), replaySteps);

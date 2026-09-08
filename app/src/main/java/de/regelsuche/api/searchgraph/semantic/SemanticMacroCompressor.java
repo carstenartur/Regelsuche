@@ -48,6 +48,6 @@ public final class SemanticMacroCompressor {
     }
 
     private static String rawEdgeId(SearchGraphEdgeDto edge) {
-        return edge.from() + "->" + edge.to() + ":" + edge.ruleId();
+        return edge.sourceEdgeId();
     }
 }

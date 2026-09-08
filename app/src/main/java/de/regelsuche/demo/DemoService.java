@@ -121,7 +121,9 @@ public final class DemoService {
                     state.mayIncreaseComplexity(),
                     state.estimatedCostDelta(),
                     state.equivalencePreservingByConstruction(),
-                    CandidateProofStatus.OBSERVED
+                    CandidateProofStatus.OBSERVED,
+                    null,
+                    state.incomingExecution().orElse(null)
                 ));
                 edgesSaved++;
                 allAppliedRuleIds.add(state.appliedRuleId());
@@ -259,7 +261,10 @@ public final class DemoService {
                 scoreBefore,
                 scoreAfter,
                 equivalencePreserving,
-                ruleIds.get(i)
+                ruleIds.get(i),
+                state.transformations() == null ? List.of() : state.transformations().get(i).assumptions(),
+                state.transformations() == null ? null : de.regelsuche.transform.RecordedExecution.capture(
+                    beforeExpr, List.of(state.transformations().get(i)))
             ));
         }
         return steps;

@@ -15,15 +15,22 @@ import de.regelsuche.search.program.BudgetedRewriteProgramExecution.PathBudget;
 import de.regelsuche.search.strategy.SearchExpansionSource;
 import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy;
 import de.regelsuche.search.strategy.WorkSearchReplay;
+import de.regelsuche.search.strategy.SearchReplayArtifact;
+import de.regelsuche.search.strategy.SearchStateReplay;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.transform.ExactTheoryEvidence;
 import de.regelsuche.transform.PolynomialDerivedMacroCache;
+import de.regelsuche.transform.RecordedExecution;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class PolynomialSearchIntegrationTest {
     private static final long WORK = 40_000_000;
@@ -116,7 +123,7 @@ class PolynomialSearchIntegrationTest {
     }
 
     @Test
-    void actualBestFirstFrontierRetainsTheoryWorkAndReplaysIndependentColdRuns() {
+    void actualBestFirstFrontierRetainsTheoryWorkAndReplaysIndependentColdRuns(@TempDir Path directory) throws IOException {
         String expression = "x^2-1";
         String target = open(PolynomialSearchIntegration.Profile.ON_DEMAND_VERIFIED_FACTORIZATION)
             .sourceAt(List.of()).orElseThrow().transform(expression, WORK).candidates().getFirst().transformedExpression();
@@ -134,7 +141,19 @@ class PolynomialSearchIntegrationTest {
         String json = first.toCanonicalJson();
         assertTrue(json.contains("delegatedMechanicalWorkUnits"));
         var fresh = open(PolynomialSearchIntegration.Profile.VERIFIED_DERIVED_MACRO_CACHE).frontierAt(List.of()).orElseThrow();
-        assertEquals(json, WorkSearchReplay.verify(json, problem(expression, target, fresh, WORK)).toCanonicalJson());
+        var independentlyReplayed = WorkSearchReplay.verify(json, problem(expression, target, fresh, WORK));
+        assertEquals(json, independentlyReplayed.toCanonicalJson());
+        var common = first.reachedState().toSearchState(new ExpressionScorer());
+        var recorded = common.recordedExecution().orElseThrow();
+        assertEquals(first.reachedState().executionWork(), recorded.work());
+        assertEquals(recorded, RecordedExecution.fromCanonicalJson(recorded.toCanonicalJson()));
+        String stateJson = SearchStateReplay.toCanonicalJson(common);
+        Path artifact = directory.resolve("polynomial-search.json");
+        Files.writeString(artifact, stateJson);
+        var restored = SearchStateReplay.verifyArtifact(artifact, SearchReplayArtifact.describe(stateJson),
+            () -> independentlyReplayed.reachedState().toSearchState(new ExpressionScorer()));
+        assertEquals(recorded, restored.recordedExecution().orElseThrow());
+        assertThrows(IllegalArgumentException.class, () -> ExactTheoryEvidence.fromVerified(recorded));
         var replay = strategy.search(problem(expression, target, expansion, WORK));
         assertTrue(replay.reached());
         assertEquals(first.reachedState().executionWork(), replay.reachedState().executionWork());

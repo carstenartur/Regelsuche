@@ -75,6 +75,22 @@ class ScientificDiscoveryReproductionTest {
     }
 
     @Test
+    void nativeSearchPathsKeepTheirExecutionWhenStored() {
+        var seeds = ScientificSeedCorpora.curated().stream().filter(seed -> seed.category().equals("binomial")).toList();
+        assertFalse(seeds.isEmpty());
+        try (var workflow = ScientificDiscoveryWorkflow.boot(PersistenceConfig.inMemory(), null)) {
+            var run = workflow.run("retained-search", seeds, seeds.size(), 1, tempDir.resolve("retained"));
+            var paths = run.context().graphStore().discoveredTransformations();
+            assertFalse(paths.isEmpty());
+            assertTrue(paths.stream().allMatch(path -> !path.steps().isEmpty()
+                && path.steps().stream().allMatch(step -> step.execution() != null)));
+            assertTrue(run.context().graphStore().snapshot().edges().stream().allMatch(edge -> edge.execution() != null));
+            var exported = new de.regelsuche.export.DefaultTransformationExportService().exportJson(paths, List.of());
+            assertEquals(paths, new de.regelsuche.export.DefaultTransformationImportService().importJson(exported).transformations());
+        }
+    }
+
+    @Test
     void budgetAndParallelismKeepScientificResultsDeterministic() {
         List<SeedExpression> seeds = ScientificSeedCorpora.curated();
         DeterministicDiscoveryExperimentRunner.DiscoveryReport serial;

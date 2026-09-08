@@ -16,6 +16,23 @@ class ExactPolynomialTransformationSourceTest {
     private static final long WORK = 40_000_000;
 
     @Test
+    void sourceIdentityUsesUtf8ByteLengthsForNonAsciiEngineIds() {
+        FactorizationEngine<ExactRational> engine = new FactorizationEngine<>() {
+            public String engineId() { return "engine:ä𝄞"; }
+            public String coefficientDomainId() { return ExactRationalField.DOMAIN_ID; }
+            public EngineResult<ExactRational> propose(FactorizationRequest<ExactRational> request) {
+                throw new AssertionError("identity construction must not invoke the engine");
+            }
+        };
+        var source = new ExactPolynomialTransformationSource(engine,
+            ExactPolynomialTransformationSource.Mode.ON_DEMAND, List.of(), 2);
+        // Independent UTF-8 length-prefixed SHA-256 fixture; includes a supplementary code point.
+        assertEquals("sha256:8a7c90a6c6da59468620bf77d9c9ac47df2a4d1d092755a0fc203d09e2aec4b1",
+            source.identity().revisionHash());
+        assertEquals(source.identity().revisionHash(), source.identity().authorityHash());
+    }
+
+    @Test
     void searchExecutorReusesTheSamePrimitiveAtTwoDifferentOccurrences() {
         AtomicInteger calls = new AtomicInteger();
         var source = new ExactPolynomialTransformationSource(counted(calls),

@@ -178,7 +178,8 @@ public final class StructuralDiversitySearchStrategy implements SearchStrategy {
             improvement,
             kinds,
             equivalenceFlags,
-            assumptions
+            assumptions,
+            SearchState.extendedPath(current, transformation)
         );
     }
 

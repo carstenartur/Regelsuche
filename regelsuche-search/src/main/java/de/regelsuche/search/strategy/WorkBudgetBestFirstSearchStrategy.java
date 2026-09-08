@@ -523,6 +523,21 @@ public final class WorkBudgetBestFirstSearchStrategy {
                 .anyMatch(rule -> rule.startsWith("program:"));
         }
 
+        /** Common application/export state without flattening its verified typed path. */
+        public SearchState toSearchState(de.regelsuche.scoring.ExpressionScorer scorer) {
+            Transformation incoming = transformations.isEmpty() ? null : transformations.getLast();
+            String parent = edgeDepth == 0 ? null : path.get(path.size() - 2);
+            return new SearchState(expression, edgeDepth, score, path, appliedRuleIds, appliedRuleApplications,
+                expandingSteps, canonicalHash, parent, incoming == null ? null : incoming.rule(),
+                incoming == null ? RewriteKind.NORMALIZE : incoming.kind(),
+                incoming != null && incoming.mayIncreaseComplexity(), incoming == null ? 0 : incoming.estimatedCostDelta(),
+                incoming == null || incoming.equivalencePreservingByConstruction(),
+                parent == null ? 0 : scorer.score(parent).weightedTotal() - score.weightedTotal(),
+                transformations.stream().map(Transformation::kind).toList(),
+                transformations.stream().map(Transformation::equivalencePreservingByConstruction).toList(),
+                assumptions, transformations);
+        }
+
         private static void requirePath(String expression, int depth, List<String> path,
                 List<String> rules, List<String> primitives, Set<String> applications, List<String> assumptions,
                 int expandingSteps, List<Transformation> steps, ExecutionWork work) {
