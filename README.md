@@ -216,6 +216,13 @@ als Eigenproblem `A*v = lambda*v` erkannt, in die exakte Koeffizientenmatrix
 allein erzeugen keine physikalische Interpretation. Siehe
 [Symbolische Gleichungssysteme und Eigenprobleme](docs/symbolic-eigenproblem-representation.md).
 
+Die Workbench bietet außerdem **Alternative Darstellungen** mit aus der Quelle
+gewonnenen Matrixprodukten, unabhängigen Blöcken und expliziten Operatorregeln.
+Jede bestätigte Alternative behält die Variablenreihenfolge und einen exakten
+Replay aller Quellzeilen. Nachweise lassen sich exportieren und nach einem
+Neustart erneut prüfen. Siehe [Matrix- und Operatorvorbereitung](docs/matrix-operator-preparation.md)
+für Profile, CLI, Grenzen und reproduzierbare Vergleichsnachweise.
+
 ## Schnellstart
 
 Die **Standarddemo läuft ohne externe Infrastruktur**. Sie benötigt weder eine

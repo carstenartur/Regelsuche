@@ -3,6 +3,10 @@
 Issue #721 introduces a typed cross-representation bridge from a list of
 scalar equations to an exact symbolic matrix equation.
 
+The successor [matrix/operator preparation and Workbench replay](matrix-operator-preparation.md)
+adds bounded source/catalog alternatives and the typed preparation entry point
+under #746. The baseline contracts and frozen RREF comparison below remain intact.
+
 ## First executable slice
 
 The implemented route is:

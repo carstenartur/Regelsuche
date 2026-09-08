@@ -97,6 +97,27 @@ public class CliRouter {
         return CliCommandRegistry.defaults().contains(token);
     }
 
+    private int runRepresentations(String[] args) {
+        if (args.length != 2 || !(args[0].equals("analyze") || args[0].equals("replay"))) {
+            out.println("Usage: representations analyze <request.json> | replay <artifact.json>");
+            return 1;
+        }
+        try (var input = java.nio.file.Files.newInputStream(java.nio.file.Path.of(args[1]))) {
+            var json = new de.regelsuche.web.StreamingJsonRequestBody(4 * 1024 * 1024).readObject(input);
+            if (args[0].equals("replay")) {
+                out.print(de.regelsuche.math.algorithms.linalg.MatrixPreparationJson.replay(json));
+            } else {
+                var request = de.regelsuche.math.algorithms.linalg.MatrixPreparationJson.readRequest(json);
+                var result = new de.regelsuche.math.algorithms.linalg.MatrixPreparation().analyze(request);
+                out.print(de.regelsuche.math.algorithms.linalg.MatrixPreparationJson.toJson(result));
+            }
+            return 0;
+        } catch (java.io.IOException | IllegalArgumentException | ArithmeticException exception) {
+            out.println("Representation request failed: " + exception.getMessage());
+            return 1;
+        }
+    }
+
     public int run(String[] args) {
         try {
             String command = args[0].toLowerCase(Locale.ROOT);
@@ -111,6 +132,7 @@ public class CliRouter {
                 case "explain" -> runExplain(rest);
                 case "plugins" -> runPlugins(rest);
                 case "rules" -> runRules(rest);
+                case "representations" -> runRepresentations(rest);
                 default -> {
                     out.println("Unknown command: " + command);
                     yield 1;

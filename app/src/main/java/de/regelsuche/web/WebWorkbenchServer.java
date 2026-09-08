@@ -324,6 +324,7 @@ public class WebWorkbenchServer {
         handlers.put("/api/benchmark", this::handleBenchmark);
         handlers.put("/api/didactic", this::handleDidactic);
         handlers.put("/api/inspect", this::handleInspect);
+        handlers.put("/api/representations", this::handleMatrixRepresentations);
         handlers.put("/api/rule-radar", ruleRadarHandler);
         handlers.put(
             REPRESENTATION_RUN_CONTEXT,
@@ -368,6 +369,25 @@ public class WebWorkbenchServer {
                 sendStatus(exchange, 400, "invalid JSON request body");
             }
         };
+    }
+
+    private void handleMatrixRepresentations(HttpExchange exchange) throws IOException {
+        boolean replay = exchange.getRequestURI().getPath().endsWith("/replay");
+        try {
+            String json;
+            if (replay) {
+                json = de.regelsuche.math.algorithms.linalg.MatrixPreparationJson.replay(
+                    requestBodies.readMatrixRepresentationArtifact(exchange));
+                exchange.getResponseHeaders().set("X-Representation-Replay", "VERIFIED");
+            } else {
+                var request = requestBodies.readMatrixPreparation(exchange);
+                var analysis = new de.regelsuche.math.algorithms.linalg.MatrixPreparation().analyze(request);
+                json = de.regelsuche.math.algorithms.linalg.MatrixPreparationJson.toJson(analysis);
+            }
+            sendJson(exchange, 200, json);
+        } catch (IllegalArgumentException | ArithmeticException exception) {
+            sendStatus(exchange, replay ? 409 : 400, exception.getMessage());
+        }
     }
 
     private void secure(HttpContext context) {

@@ -122,6 +122,7 @@ public class App {
                 + "[--export json,markdown,mermaid,latex,inventory] "
                 + "[--dir PATH]");
         System.out.println("  transform <expression>");
+        System.out.println("  representations analyze <request.json> | replay <artifact.json>");
         System.out.println(
             "  showcase-train-preflight <showcase-plan.json> "
                 + "<output-directory>");

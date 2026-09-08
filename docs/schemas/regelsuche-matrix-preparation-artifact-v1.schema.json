@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "contentHash",
+    "evidence"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.matrix-preparation-artifact/v1"
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evidence": {
+      "type": "object",
+      "required": [
+        "schema",
+        "request",
+        "status",
+        "work",
+        "candidates",
+        "solving"
+      ],
+      "properties": {
+        "schema": {
+          "const": "regelsuche.matrix-preparation/v1"
+        },
+        "request": {
+          "$ref": "regelsuche-matrix-preparation-request-v1.schema.json"
+        }
+      }
+    }
+  }
+}

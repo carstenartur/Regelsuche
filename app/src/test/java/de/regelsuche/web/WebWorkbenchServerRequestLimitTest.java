@@ -343,6 +343,8 @@ class WebWorkbenchServerRequestLimitTest {
             new Endpoint("/api/discover", "/api/discover", "\"min\":1,\"max\":0"),
             new Endpoint("/api/inventory", "/api/inventory", "\"json\":\"\""),
             new Endpoint("/api/discovery-runs", "/api/discovery-runs", ""),
+            new Endpoint("/api/representations", "/api/representations", ""),
+            new Endpoint("/api/representations/replay", "/api/representations/replay", ""),
             new Endpoint("/api/inspect/tree/apply", "/api/inspect/tree/apply", ""),
             new Endpoint("/api/didactic/step-check", "/api/didactic/step-check", ""),
             new Endpoint(
