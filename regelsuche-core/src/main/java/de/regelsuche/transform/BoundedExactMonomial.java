@@ -6,7 +6,6 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.scalar.ExactRational;
-import de.regelsuche.scalar.ExactRationalDomain;
 import java.math.BigInteger;
 import java.util.Collections;
 import java.util.Map;
@@ -16,11 +15,9 @@ import java.util.TreeMap;
 /**
  * Exact coefficient arithmetic for the matcher's bounded monomial fragment.
  *
- * <p>The temporary input bridge interprets finite legacy numeric leaves under
- * their shortest-decimal convention. It does not recover source precision lost
- * before matching. Symbolic divisors are outside this assumption-free fragment.
- * Inferred coefficients prefer a finite decimal leaf only after exact
- * decimal round-trip verification; other rationals use integer/fraction syntax.</p>
+ * <p>Input and inferred numeric leaves carry exact rational values. Coefficient
+ * bit budgets apply before and during arithmetic. Symbolic divisors remain
+ * outside this assumption-free fragment.</p>
  */
 record BoundedExactMonomial(ExactRational coefficient, Map<String, Integer> powers) {
     BoundedExactMonomial {
@@ -37,8 +34,8 @@ record BoundedExactMonomial(ExactRational coefficient, Map<String, Integer> powe
     ) {
         budget.visit(depth);
         if (expression instanceof NumberExpr number) {
-            return ExactRationalDomain.legacyDecimalValue(number.value())
-                .map(value -> new BoundedExactMonomial(value, Map.of()));
+            budget.coefficientBits(bits(number.value().numerator()), bits(number.value().denominator()));
+            return Optional.of(new BoundedExactMonomial(number.value(), Map.of()));
         }
         if (expression instanceof VariableExpr variable) {
             return Optional.of(new BoundedExactMonomial(
@@ -161,11 +158,8 @@ record BoundedExactMonomial(ExactRational coefficient, Map<String, Integer> powe
         return coefficient.equals(other.coefficient) && powers.equals(other.powers);
     }
 
-    boolean isConstant(double expected) {
-        return powers.isEmpty()
-            && ExactRationalDomain.legacyDecimalValue(expected)
-                .map(coefficient::equals)
-                .orElse(false);
+    boolean isConstant(ExactRational expected) {
+        return powers.isEmpty() && coefficient.equals(expected);
     }
 
     Expr toExpr() {
@@ -184,27 +178,13 @@ record BoundedExactMonomial(ExactRational coefficient, Map<String, Integer> powe
     }
 
     private Expr coefficientExpression() {
-        var decimal = ExactRationalDomain.exactLegacyDecimalDouble(coefficient);
-        if (decimal.isPresent()) {
-            return new NumberExpr(decimal.getAsDouble());
-        }
-        Expr numerator = integerLeaf(coefficient.numerator());
-        return coefficient.isInteger() ? numerator
-            : new BinaryExpr(numerator, BinaryOperator.DIV, integerLeaf(coefficient.denominator()));
+        return new NumberExpr(coefficient);
     }
 
-    private static NumberExpr integerLeaf(BigInteger value) {
-        var legacy = ExactRationalDomain.exactLegacyDecimalDouble(
-            ExactRational.integer(value));
-        if (legacy.isEmpty()) {
-            throw new LimitExceeded("ALGEBRAIC_BINDING_NOT_REPRESENTABLE");
-        }
-        return new NumberExpr(legacy.getAsDouble());
-    }
-
-    static int positiveInteger(double value) {
-        return value > 0 && value <= Integer.MAX_VALUE && value == Math.rint(value)
-            ? (int) value : -1;
+    static int positiveInteger(ExactRational value) {
+        return value.isInteger() && value.signum() > 0
+                && value.numerator().bitLength() <= 31
+            ? value.intValueExact() : -1;
     }
 
     private static int checkedExponent(long value) {

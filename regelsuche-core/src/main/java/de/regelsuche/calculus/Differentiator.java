@@ -1,5 +1,6 @@
 package de.regelsuche.calculus;
 
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -95,13 +96,13 @@ public final class Differentiator {
 
     private Expr powerRule(Expr base, Expr exponent, Expr baseDerivative, String variable) {
         if (exponent instanceof NumberExpr n) {
-            double power = n.value();
+            ExactRational power = n.value();
             // n * base^(n-1) * base'
             Expr coefficient = new NumberExpr(power);
             Expr reducedPower = new BinaryExpr(
                 base,
                 BinaryOperator.POW,
-                new NumberExpr(power - 1)
+                new NumberExpr(power.subtract(ExactRational.ONE))
             );
             Expr core = new BinaryExpr(coefficient, BinaryOperator.MUL, reducedPower);
             return new BinaryExpr(core, BinaryOperator.MUL, baseDerivative);
@@ -149,7 +150,7 @@ public final class Differentiator {
                     return left;
                 }
                 if (left instanceof NumberExpr l && right instanceof NumberExpr r) {
-                    return new NumberExpr(l.value() + r.value());
+                    return new NumberExpr(l.value().add(r.value()));
                 }
             }
             case SUB -> {
@@ -157,7 +158,7 @@ public final class Differentiator {
                     return left;
                 }
                 if (left instanceof NumberExpr l && right instanceof NumberExpr r) {
-                    return new NumberExpr(l.value() - r.value());
+                    return new NumberExpr(l.value().subtract(r.value()));
                 }
             }
             case MUL -> {
@@ -171,7 +172,7 @@ public final class Differentiator {
                     return left;
                 }
                 if (left instanceof NumberExpr l && right instanceof NumberExpr r) {
-                    return new NumberExpr(l.value() * r.value());
+                    return new NumberExpr(l.value().multiply(r.value()));
                 }
             }
             case DIV -> {
@@ -199,7 +200,7 @@ public final class Differentiator {
         return new BinaryExpr(left, op, right);
     }
 
-    private static boolean isNumber(Expr expr, double value) {
-        return expr instanceof NumberExpr number && number.value() == value;
+    private static boolean isNumber(Expr expr, long value) {
+        return expr instanceof NumberExpr number && number.value().equalsInteger(value);
     }
 }

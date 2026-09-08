@@ -145,7 +145,7 @@ public final class RationalRules {
         }
 
         private boolean isZero(Expr expr) {
-            return expr instanceof NumberExpr number && number.value() == 0;
+            return expr instanceof NumberExpr number && number.value().equalsInteger(0);
         }
 
         private record Cancellable(
@@ -237,7 +237,7 @@ public final class RationalRules {
         }
 
         private boolean isExplicitZero(Expr expr) {
-            return expr instanceof NumberExpr number && number.value() == 0;
+            return expr instanceof NumberExpr number && number.value().equalsInteger(0);
         }
 
         private record Pair(Expr leftNumerator, Expr leftDenominator, Expr rightNumerator, Expr rightDenominator) {
@@ -317,10 +317,10 @@ public final class RationalRules {
             if (!(outer.right() instanceof BinaryExpr inner) || inner.operator() != BinaryOperator.DIV) {
                 return null;
             }
-            if (inner.right() instanceof NumberExpr n && n.value() == 0) {
+            if (inner.right() instanceof NumberExpr n && n.value().equalsInteger(0)) {
                 return null;
             }
-            if (inner.left() instanceof NumberExpr leftNumber && leftNumber.value() == 0) {
+            if (inner.left() instanceof NumberExpr leftNumber && leftNumber.value().equalsInteger(0)) {
                 return null;
             }
             return new Parts(outer.left(), inner.left(), inner.right());

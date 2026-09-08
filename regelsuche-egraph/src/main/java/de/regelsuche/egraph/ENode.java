@@ -216,11 +216,8 @@ public record ENode(String symbol, List<EClassId> children) {
             }
         }
 
-        private static String format(double value) {
-            if (value == Math.floor(value) && !Double.isInfinite(value)) {
-                return Long.toString((long) value);
-            }
-            return Double.toString(value);
+        private static String format(de.regelsuche.scalar.ExactRational value) {
+            return value.canonicalText();
         }
     }
 }

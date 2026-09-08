@@ -116,7 +116,7 @@ class BrahmaguptaAdditivePairPrecursorIntegrationTest {
             candidate -> candidate instanceof BinaryExpr power
                 && power.operator() == BinaryOperator.POW
                 && power.right() instanceof NumberExpr exponent
-                && Double.compare(exponent.value(), 2.0) == 0
+                && exponent.value().equalsInteger(2)
                 && power.left() instanceof BinaryExpr sum
                 && sum.operator() == BinaryOperator.ADD
                 && ((sum.left().equals(left)

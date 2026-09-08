@@ -28,7 +28,7 @@ public final class PerfectSquareAstPredicate {
         return expression instanceof BinaryExpr binary
             && binary.operator() == BinaryOperator.POW
             && binary.right() instanceof NumberExpr exponent
-            && Double.compare(exponent.value(), 2.0) == 0;
+            && exponent.value().equalsInteger(2);
     }
 
     private static boolean containsPerfectSquare(Expr expression) {

@@ -1,5 +1,6 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -143,7 +144,7 @@ final class UnivariatePolynomial {
     /** @return the polynomial rendered back into an expression tree. */
     Expr toExpression() {
         if (isZero() || variable.isEmpty()) {
-            return new NumberExpr(coefficients[0].doubleValue());
+            return new NumberExpr(ExactRational.integer(coefficients[0]));
         }
         Expr result = null;
         for (int exponent = degree(); exponent >= 0; exponent--) {
@@ -171,7 +172,7 @@ final class UnivariatePolynomial {
 
     private Expr term(BigInteger coefficient, int exponent) {
         if (exponent == 0) {
-            return new NumberExpr(coefficient.doubleValue());
+            return new NumberExpr(ExactRational.integer(coefficient));
         }
         Expr power = exponent == 1
             ? new VariableExpr(variable)
@@ -182,7 +183,7 @@ final class UnivariatePolynomial {
         return coefficient.equals(BigInteger.ONE)
             ? power
             : new BinaryExpr(
-                new NumberExpr(coefficient.doubleValue()),
+                new NumberExpr(ExactRational.integer(coefficient)),
                 BinaryOperator.MUL,
                 power);
     }
@@ -300,13 +301,9 @@ final class UnivariatePolynomial {
         return Arrays.copyOf(coefficients, degree + 1);
     }
 
-    private static BigInteger exactInteger(double value) {
-        if (!Double.isFinite(value)
-                || Math.rint(value) != value
-                || Math.abs(value) > MAX_ABSOLUTE_COEFFICIENT.doubleValue()) {
-            return null;
-        }
-        return BigInteger.valueOf((long) value);
+    private static BigInteger exactInteger(ExactRational value) {
+        return value.isInteger() && isAcceptedCoefficient(value.numerator())
+            ? value.numerator() : null;
     }
 
     private static boolean isAcceptedCoefficient(BigInteger value) {

@@ -35,7 +35,7 @@ public final class PowerRootAssumptionRules implements HypothesisOperator {
         if (!(argument instanceof BinaryExpr power) || power.operator() != BinaryOperator.POW) {
             return List.of();
         }
-        if (!(power.right() instanceof NumberExpr exponent) || Double.compare(exponent.value(), 2.0) != 0) {
+        if (!(power.right() instanceof NumberExpr exponent) || !exponent.value().equalsInteger(2)) {
             return List.of();
         }
         String base = ExpressionFormatter.format(power.left());

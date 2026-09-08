@@ -9,6 +9,7 @@ import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scalar.ExactRational;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -42,14 +43,14 @@ public final class CompleteSquareBridgeOperator implements HypothesisOperator {
         }
         String formattedInput = ExpressionFormatter.format(root);
         int originalSize = canonicalizer.astNodeCount(formattedInput);
-        List<SignedTerm> terms = flattenAdditiveTerms(root, 1.0);
+        List<SignedTerm> terms = flattenAdditiveTerms(root, 1);
         if (terms.size() != 3) {
             return List.of();
         }
 
         Map<String, ScoredCandidate> candidates = new LinkedHashMap<>();
         for (int squareIndex = 0; squareIndex < terms.size(); squareIndex++) {
-            if (Double.compare(terms.get(squareIndex).sign(), 1.0) != 0) {
+            if (terms.get(squareIndex).sign() != 1) {
                 continue;
             }
             Expr base = squareBase(terms.get(squareIndex).expression());
@@ -57,14 +58,14 @@ public final class CompleteSquareBridgeOperator implements HypothesisOperator {
                 continue;
             }
             LinearTerm linear = null;
-            Double constant = null;
+            ExactRational constant = null;
             for (int index = 0; index < terms.size(); index++) {
                 if (index == squareIndex) {
                     continue;
                 }
                 SignedTerm term = terms.get(index);
                 if (term.expression() instanceof NumberExpr numberExpr) {
-                    constant = term.sign() * numberExpr.value();
+                    constant = numberExpr.value().multiply(ExactRational.integer(term.sign()));
                 } else {
                     LinearTerm candidate = linearTermForBase(term.expression(), base, term.sign());
                     if (candidate != null) {
@@ -72,15 +73,15 @@ public final class CompleteSquareBridgeOperator implements HypothesisOperator {
                     }
                 }
             }
-            if (linear == null || constant == null || !isInteger(linear.coefficient())) {
+            if (linear == null || constant == null || !linear.coefficient().isInteger()) {
                 continue;
             }
-            double offset = linear.coefficient() / 2.0;
-            double remainder = constant - offset * offset;
+            ExactRational offset = linear.coefficient().divide(ExactRational.integer(2));
+            ExactRational remainder = constant.subtract(offset.multiply(offset));
             Expr completed = squared(offsetExpression(base, offset));
             addCandidate(withRemainder(completed, remainder), formattedInput, originalSize, candidates);
-            if (remainder < 0) {
-                Double squareRoot = perfectSquareRoot(-remainder);
+            if (remainder.signum() < 0) {
+                ExactRational squareRoot = perfectSquareRoot(remainder.negate());
                 if (squareRoot != null) {
                     addCandidate(
                         new BinaryExpr(completed, BinaryOperator.SUB, squared(new NumberExpr(squareRoot))),
@@ -123,7 +124,7 @@ public final class CompleteSquareBridgeOperator implements HypothesisOperator {
         )));
     }
 
-    private List<SignedTerm> flattenAdditiveTerms(Expr expression, double sign) {
+    private List<SignedTerm> flattenAdditiveTerms(Expr expression, int sign) {
         if (expression instanceof BinaryExpr binaryExpr) {
             if (binaryExpr.operator() == BinaryOperator.ADD) {
                 List<SignedTerm> terms = new ArrayList<>();
@@ -145,7 +146,7 @@ public final class CompleteSquareBridgeOperator implements HypothesisOperator {
         if (expression instanceof BinaryExpr binary
             && binary.operator() == BinaryOperator.POW
             && binary.right() instanceof NumberExpr exponent
-            && Double.compare(exponent.value(), 2.0) == 0
+            && exponent.value().equalsInteger(2)
         ) {
             return binary.left();
         }
@@ -158,13 +159,13 @@ public final class CompleteSquareBridgeOperator implements HypothesisOperator {
         return null;
     }
 
-    private LinearTerm linearTermForBase(Expr expression, Expr base, double sign) {
+    private LinearTerm linearTermForBase(Expr expression, Expr base, int sign) {
         List<Expr> factors = flattenMultiplication(expression);
-        double coefficient = sign;
+        ExactRational coefficient = ExactRational.integer(sign);
         List<Expr> symbolic = new ArrayList<>();
         for (Expr factor : factors) {
             if (factor instanceof NumberExpr numberExpr) {
-                coefficient *= numberExpr.value();
+                coefficient = coefficient.multiply(numberExpr.value());
             } else {
                 symbolic.add(factor);
             }
@@ -185,22 +186,22 @@ public final class CompleteSquareBridgeOperator implements HypothesisOperator {
         return List.of(expression);
     }
 
-    private Expr offsetExpression(Expr base, double offset) {
-        if (offset == 0) {
+    private Expr offsetExpression(Expr base, ExactRational offset) {
+        if (offset.isZero()) {
             return base;
         }
-        return offset > 0
+        return offset.signum() > 0
             ? new BinaryExpr(base, BinaryOperator.ADD, new NumberExpr(offset))
-            : new BinaryExpr(base, BinaryOperator.SUB, new NumberExpr(-offset));
+            : new BinaryExpr(base, BinaryOperator.SUB, new NumberExpr(offset.negate()));
     }
 
-    private Expr withRemainder(Expr completed, double remainder) {
-        if (remainder == 0) {
+    private Expr withRemainder(Expr completed, ExactRational remainder) {
+        if (remainder.isZero()) {
             return completed;
         }
-        return remainder > 0
+        return remainder.signum() > 0
             ? new BinaryExpr(completed, BinaryOperator.ADD, new NumberExpr(remainder))
-            : new BinaryExpr(completed, BinaryOperator.SUB, new NumberExpr(-remainder));
+            : new BinaryExpr(completed, BinaryOperator.SUB, new NumberExpr(remainder.negate()));
     }
 
     private Expr squared(Expr expression) {
@@ -212,36 +213,14 @@ public final class CompleteSquareBridgeOperator implements HypothesisOperator {
             .equals(canonicalizer.stableHash(ExpressionFormatter.format(right)));
     }
 
-    private boolean isInteger(double value) {
-        return Math.rint(value) == value;
+    private ExactRational perfectSquareRoot(ExactRational value) {
+        return value.sqrtExact().orElse(null);
     }
 
-    private Double perfectSquareRoot(double value) {
-        if (value < 0) {
-            return null;
-        }
-        if (Math.rint(value) == value) {
-            long rounded = (long) value;
-            long root = Math.round(Math.sqrt(rounded));
-            if (root * root == rounded) {
-                return (double) root;
-            }
-        }
-        double scaled = value * 4;
-        if (Math.rint(scaled) == scaled && scaled > 0) {
-            long rounded = (long) scaled;
-            long root = Math.round(Math.sqrt(rounded));
-            if (root * root == rounded) {
-                return root / 2.0;
-            }
-        }
-        return null;
+    private record SignedTerm(int sign, Expr expression) {
     }
 
-    private record SignedTerm(double sign, Expr expression) {
-    }
-
-    private record LinearTerm(double coefficient) {
+    private record LinearTerm(ExactRational coefficient) {
     }
 
     private record ScoredCandidate(int score, Transformation transformation) {

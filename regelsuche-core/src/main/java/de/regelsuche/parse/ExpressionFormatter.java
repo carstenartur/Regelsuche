@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Objects;
 
 public final class ExpressionFormatter {
+    private static final java.math.BigInteger NUMERIC_SYNTAX_LIMIT = java.math.BigInteger.TEN.pow(
+        de.regelsuche.scalar.ExactRationalDomain.MAX_DIGITS);
     private ExpressionFormatter() {
     }
 
@@ -90,26 +92,40 @@ public final class ExpressionFormatter {
         int parentPrecedence,
         StringBuilder builder
     ) {
-        double value = number.value();
-        if (!Double.isFinite(value)) {
-            throw new IllegalArgumentException("Cannot format a non-finite numeric AST leaf");
+        var value = number.value();
+        if (!withinNumericSyntaxLimits(value)) {
+            throw new IllegalArgumentException("Numeric leaf exceeds parser digit limits");
         }
         String formatted;
-        if (Math.rint(value) == value && Math.abs(value) <= 9_007_199_254_740_992d) {
-            formatted = Long.toString((long) value);
-        } else {
-            // No long narrowing and no exponent syntax unsupported by the parser.
-            String decimal = Double.toString(value);
-            formatted = decimal.indexOf('E') < 0 ? decimal
-                : java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
+        boolean fraction = false;
+        if (value.isInteger()) {
+            formatted = value.numerator().toString();
+        } else try {
+            var decimal = value.toBigDecimal(java.math.MathContext.UNLIMITED).stripTrailingZeros();
+            if (decimal.scale() > de.regelsuche.scalar.ExactRationalDomain.MAX_DECIMAL_SCALE) {
+                throw new ArithmeticException("render using integer fraction syntax");
+            }
+            formatted = decimal.toPlainString();
+            if (formatted.replace("-", "").replace(".", "").length()
+                    > de.regelsuche.scalar.ExactRationalDomain.MAX_DIGITS) {
+                throw new ArithmeticException("render using integer fraction syntax");
+            }
+        } catch (ArithmeticException repeatingDecimal) {
+            formatted = value.numerator() + " / " + value.denominator();
+            fraction = true;
         }
-        if (number.value() < 0 && parentPrecedence > 0) {
-            builder.append('(')
-                .append(formatted)
-                .append(')');
+        if ((value.signum() < 0 && parentPrecedence > 0)
+                || (fraction && parentPrecedence > 0)) {
+            builder.append('(').append(formatted).append(')');
         } else {
             builder.append(formatted);
         }
+    }
+
+    /** Whether integer/fraction syntax can represent both components within parser limits. */
+    public static boolean withinNumericSyntaxLimits(de.regelsuche.scalar.ExactRational value) {
+        return value.numerator().abs().compareTo(NUMERIC_SYNTAX_LIMIT) < 0
+            && value.denominator().compareTo(NUMERIC_SYNTAX_LIMIT) < 0;
     }
 
     private static void scheduleFunction(

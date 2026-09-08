@@ -1,5 +1,6 @@
 package de.regelsuche.calculus;
 
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -216,11 +217,11 @@ public final class CalculusDerivativeRules {
             DiffMatch m = matchDiff(subtree);
             BinaryExpr power = (BinaryExpr) m.body();
             NumberExpr exponent = (NumberExpr) power.right();
-            double n = exponent.value();
+            ExactRational n = exponent.value();
             return new BinaryExpr(
                 new NumberExpr(n),
                 BinaryOperator.MUL,
-                new BinaryExpr(power.left(), BinaryOperator.POW, new NumberExpr(n - 1))
+                new BinaryExpr(power.left(), BinaryOperator.POW, new NumberExpr(n.subtract(ExactRational.ONE)))
             );
         }
     }

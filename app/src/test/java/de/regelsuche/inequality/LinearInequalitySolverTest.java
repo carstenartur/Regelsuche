@@ -10,6 +10,7 @@ import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scalar.ExactRational;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
@@ -37,8 +38,16 @@ class LinearInequalitySolverTest {
         LinearInequalitySolver.Solution solved = solution.get();
         assertNotNull(solved.solved());
         assertEquals(Comparator.GT, solved.solved().comparator());
-        assertEquals(-2.0, solved.value());
+        assertEquals(ExactRational.integer(-2), solved.value());
         assertEquals("x > -2", solved.solved().formatted());
+    }
+
+    @Test
+    void rationalBoundAndDirectionRemainExactForNegativeCoefficient() {
+        var result = solver.solve(new Inequality(parse("-3*x"), Comparator.LT, parse("1")), "x")
+            .orElseThrow();
+        assertEquals(ExactRational.parse("-1/3"), result.value());
+        assertEquals(Comparator.GT, result.solved().comparator());
     }
 
     @Test

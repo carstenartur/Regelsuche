@@ -103,7 +103,7 @@ final class KnowledgePatternParser {
         }
         String number = readNumber();
         if (!number.isBlank()) {
-            return PatternExpr.num(Double.parseDouble(number));
+            return PatternExpr.num(number);
         }
         throw new IllegalArgumentException(
             "Expected expression at position " + pos + " in " + input

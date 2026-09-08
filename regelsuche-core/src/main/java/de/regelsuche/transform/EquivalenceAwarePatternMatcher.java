@@ -129,8 +129,7 @@ public final class EquivalenceAwarePatternMatcher {
         if (pattern instanceof PatternExpr.LiteralNumber number) {
             if (expression instanceof NumberExpr numberExpr) {
                 // A literal is a constraint, not a numerical sampling tolerance.
-                return Double.isFinite(numberExpr.value())
-                    && numberExpr.value() == number.value();
+                return numberExpr.value().equals(number.value());
             }
             return profile.inferAlgebraicBindings()
                 && BoundedExactMonomial.from(expression, budget.algebraic)

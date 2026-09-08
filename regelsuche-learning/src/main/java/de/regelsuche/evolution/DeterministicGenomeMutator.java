@@ -409,7 +409,7 @@ public final class DeterministicGenomeMutator {
         }
         if (pattern instanceof PatternExpr.LiteralNumber number) {
             return value instanceof PatternExpr.LiteralNumber other
-                && number.value() == other.value();
+                && number.value().equals(other.value());
         }
         if (pattern instanceof PatternExpr.LiteralVariable variable) {
             return value instanceof PatternExpr.LiteralVariable other

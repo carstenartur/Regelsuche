@@ -1,5 +1,6 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -275,13 +276,10 @@ record ExactPositiveMonomial(
                 : ParseResult.supported(combined);
         }
 
-        private static long exactPositiveInteger(double value) {
-            return Double.isFinite(value)
-                    && value >= 1
-                    && value == Math.rint(value)
-                    && value <= MAX_EXACT_DOUBLE_INTEGER
-                ? (long) value
-                : -1;
+        private static long exactPositiveInteger(ExactRational value) {
+            return value.isInteger() && value.signum() > 0
+                    && value.numerator().compareTo(java.math.BigInteger.valueOf(MAX_EXACT_DOUBLE_INTEGER)) <= 0
+                ? value.longValueExact() : -1;
         }
     }
 }

@@ -47,18 +47,16 @@ class ExpressionParserExactLiteralTest {
         assertEquals("0002", integer.sourceLexeme());
         assertEquals(ExactRational.integer(2), integer.exactValue());
 
-        assertTrue(parsed.literalFor(new NumberExpr(0.1)).isEmpty());
+        assertTrue(parsed.literalFor(NumberExpr.exact("0.1")).isEmpty());
     }
 
     @Test
-    void legacyTermParsingDoesNotPayExactDomainBudgets() {
+    void bothParserEntrypointsHonorTheConfiguredExactLimits() {
         ExpressionParser constrained = new ExpressionParser(
             new ExactRationalDomain(
                 new ExactRationalDomain.Limits(1, 1, 0)));
 
-        assertEquals(
-            "123",
-            ExpressionFormatter.format(constrained.parseTerm("123")));
+        assertThrows(IllegalArgumentException.class, () -> constrained.parseTerm("123"));
         assertThrows(
             IllegalArgumentException.class,
             () -> constrained.parseExactTerm("123"));
@@ -107,7 +105,7 @@ class ExpressionParserExactLiteralTest {
                 BigInteger.ONE,
                 BigInteger.TEN.pow(256)),
             parsed.literals().getFirst().exactValue());
-        assertTrue(parsed.literals().getFirst().node().value() > 0.0d);
+        assertTrue(parsed.literals().getFirst().node().value().signum() > 0);
     }
 
     @Test
@@ -122,7 +120,7 @@ class ExpressionParserExactLiteralTest {
     }
 
     @Test
-    void rejectsUnsupportedOrUnsafeLegacyAstRepresentations() {
+    void acceptsLargeIntegersAndRejectsUnsupportedOrOverBudgetLiterals() {
         String overflow = "9".repeat(309);
         String scaleLimit = "0." + "0".repeat(256) + "1";
         String digitLimit = "9".repeat(1_025);
@@ -130,9 +128,7 @@ class ExpressionParserExactLiteralTest {
         assertThrows(
             IllegalArgumentException.class,
             () -> parser.parseExactTerm("1."));
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> parser.parseExactTerm(overflow));
+        assertEquals(overflow, ExpressionFormatter.format(parser.parseExactTerm(overflow).expression()));
         assertThrows(
             IllegalArgumentException.class,
             () -> parser.parseExactTerm(scaleLimit));

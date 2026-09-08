@@ -22,9 +22,9 @@ import java.util.Set;
  * One parsed term together with source-bound exact evidence for numeric tokens
  * and parser-issued source ranges for concrete AST nodes.
  *
- * <p>The ordinary AST remains unchanged: literal spelling and source layout are
+ * <p>Numeric values live in the AST; literal spelling and source layout are
  * deliberately not part of {@code Expr.equals}, canonical search identity or
- * historical evidence. Consumers that need exact source coefficients or one
+ * historical evidence. Consumers that need source certificates or one
  * exact subtree occurrence must retain this parser-issued companion object and
  * resolve data by node identity.</p>
  *
@@ -75,6 +75,7 @@ public final class ExactParsedTerm {
             }
             ExactRationalParseEvidence evidence = literal.evidence();
             if (!evidence.exact()
+                    || !literal.node().value().equals(literal.exactValue())
                     || !literal.sourceLexeme().equals(
                         evidence.sourceLiteral())
                     || evidence.verify().status()
@@ -193,7 +194,7 @@ public final class ExactParsedTerm {
                 && !literalsByNode.containsKey(number);
             boolean syntheticUnaryZero = numericWithoutLiteral
                 && frame.allowSyntheticUnaryZero()
-                && number.value() == 0.0d
+                && number.value().equalsInteger(0)
                 && range == null;
             if (numericWithoutLiteral && !syntheticUnaryZero) {
                 throw new IllegalArgumentException(
@@ -283,7 +284,7 @@ public final class ExactParsedTerm {
     ) {
         if (binary.operator() != BinaryOperator.SUB
                 || !(binary.left() instanceof NumberExpr zero)
-                || zero.value() != 0.0d
+                || !zero.value().equalsInteger(0)
                 || literalsByNode.containsKey(zero)
                 || ranges.containsKey(zero)
                 || binaryRange == null) {

@@ -323,7 +323,7 @@ public final class LogarithmicRules {
                 && fn.name().equals(name)
                 && fn.arguments().size() == 1
                 && fn.arguments().get(0) instanceof de.regelsuche.ast.NumberExpr n
-                && n.value() == 1.0;
+                && n.value().equalsInteger(1);
         }
 
         @Override

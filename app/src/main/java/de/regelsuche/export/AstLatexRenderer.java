@@ -112,7 +112,9 @@ public class AstLatexRenderer implements MathRenderer {
     /** Render an arbitrary {@link Expr} with parent precedence context. */
     public String render(Expr expr, int parentPrecedence) {
         if (expr instanceof NumberExpr number) {
-            return formatNumber(number.value());
+            String formatted = formatNumber(number.value());
+            return number.value().signum() < 0 && parentPrecedence > 0
+                ? "\\left(" + formatted + "\\right)" : formatted;
         }
         if (expr instanceof VariableExpr variable) {
             return variable.name();
@@ -189,11 +191,11 @@ public class AstLatexRenderer implements MathRenderer {
         return sb.append("\\end{cases}").toString();
     }
 
-    private static String formatNumber(double value) {
-        if (value == (long) value) {
-            return Long.toString((long) value);
-        }
-        return Double.toString(value);
+    private static String formatNumber(de.regelsuche.scalar.ExactRational value) {
+        String formatted = de.regelsuche.parse.ExpressionFormatter.format(new NumberExpr(value));
+        return formatted.contains("/")
+            ? "\\frac{" + value.numerator() + "}{" + value.denominator() + "}"
+            : formatted;
     }
 
     private static String escapeText(String value) {

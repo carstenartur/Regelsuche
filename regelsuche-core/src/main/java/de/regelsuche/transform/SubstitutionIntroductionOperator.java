@@ -126,7 +126,7 @@ public final class SubstitutionIntroductionOperator implements HypothesisOperato
         if (!(expression instanceof BinaryExpr div)
             || div.operator() != BinaryOperator.DIV
             || !(div.left() instanceof NumberExpr numerator)
-            || Double.compare(numerator.value(), 1.0) != 0) {
+            || !numerator.value().equalsInteger(1)) {
             return List.of();
         }
         List<Expr> factors = flattenMultiplication(div.right());
@@ -182,8 +182,8 @@ public final class SubstitutionIntroductionOperator implements HypothesisOperato
         if (expression instanceof BinaryExpr binary) {
             if (binary.operator() == BinaryOperator.POW
                 && binary.right() instanceof NumberExpr exponent
-                && exponent.value() >= 2.0
-                && Math.rint(exponent.value()) == exponent.value()) {
+                && exponent.value().compareTo(de.regelsuche.scalar.ExactRational.integer(2)) >= 0
+                && exponent.value().isInteger()) {
                 counts.merge(binary.left(), 1, Integer::sum);
             }
             collectPowerBases(binary.left(), counts);

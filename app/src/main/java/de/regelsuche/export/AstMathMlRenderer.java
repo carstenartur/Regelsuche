@@ -83,8 +83,11 @@ public class AstMathMlRenderer implements MathRenderer {
 
     private String render(Expr expr) {
         if (expr instanceof NumberExpr number) {
-            double value = number.value();
-            return "<mn>" + (value == (long) value ? Long.toString((long) value) : Double.toString(value)) + "</mn>";
+            var value = number.value();
+            String formatted = de.regelsuche.parse.ExpressionFormatter.format(number);
+            return formatted.contains("/")
+                ? "<mfrac><mn>" + value.numerator() + "</mn><mn>" + value.denominator() + "</mn></mfrac>"
+                : "<mn>" + formatted + "</mn>";
         }
         if (expr instanceof VariableExpr variable) {
             return "<mi>" + escape(variable.name()) + "</mi>";

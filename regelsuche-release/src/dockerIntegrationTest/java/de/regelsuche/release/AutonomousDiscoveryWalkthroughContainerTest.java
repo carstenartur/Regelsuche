@@ -72,7 +72,7 @@ class AutonomousDiscoveryWalkthroughContainerTest {
 
             assertTreesEqual(localOutput, containerOutput);
             Path committedFigures = PROJECT_ROOT.resolve(
-                "docs/generated/autonomous-discovery-walkthrough");
+                "docs/generated/autonomous-discovery-walkthrough-exact-v2");
             assertTrue(Files.isDirectory(committedFigures), committedFigures.toString());
             assertTreesEqual(localOutput.resolve("figures"), committedFigures);
         } finally {

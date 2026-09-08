@@ -222,10 +222,8 @@ public final class DirectScalarEliminationSolver {
     ) {
         work.consume(Stage.SOURCE_ANALYSIS);
         if (expression instanceof NumberExpr number) {
-            if (!Double.isFinite(number.value())) {
-                throw new UnsupportedExpression("NON_FINITE_NUMBER");
-            }
-            return AffineForm.constant(Rational.fromDouble(number.value()));
+
+            return AffineForm.constant(Rational.fromExact(number.value()));
         }
         if (expression instanceof VariableExpr variable) {
             if (!variables.contains(variable.name())) {

@@ -160,8 +160,7 @@ public final class RuleInventoryFingerprint {
             append(descriptor, placeholder.name());
         } else if (pattern instanceof PatternExpr.LiteralNumber number) {
             append(descriptor, "number");
-            append(descriptor, Long.toHexString(
-                Double.doubleToLongBits(number.value())));
+            append(descriptor, number.value().canonicalText());
         } else if (pattern instanceof PatternExpr.LiteralVariable variable) {
             append(descriptor, "variable");
             append(descriptor, variable.name());

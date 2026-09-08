@@ -159,10 +159,8 @@ public final class SymbolicLinearSystemRepresentationBridge implements
     ) {
         work.consume();
         if (expression instanceof NumberExpr number) {
-            if (!Double.isFinite(number.value())) {
-                throw new UnsupportedExpression("NON_FINITE_NUMBER");
-            }
-            return Polynomial.constant(Rational.fromDouble(number.value()));
+
+            return Polynomial.constant(Rational.fromExact(number.value()));
         }
         if (expression instanceof VariableExpr variable) {
             return Polynomial.variable(variable.name());
@@ -224,20 +222,17 @@ public final class SymbolicLinearSystemRepresentationBridge implements
 
     private static int integerExponent(Expr expression, WorkCounter work) {
         work.consume();
-        if (!(expression instanceof NumberExpr number)
-                || !Double.isFinite(number.value())) {
+        if (!(expression instanceof NumberExpr number)) {
             throw new UnsupportedExpression(
                 "NON_LITERAL_SYMBOLIC_POLYNOMIAL_EXPONENT");
         }
-        double value = number.value();
-        int exponent = (int) value;
-        if (Math.abs(value - exponent) > 1e-9
-                || exponent < 0
-                || exponent > MAX_EXPONENT) {
+        var value = number.value();
+        if (!value.isInteger() || value.signum() < 0
+                || value.numerator().compareTo(java.math.BigInteger.valueOf(MAX_EXPONENT)) > 0) {
             throw new UnsupportedExpression(
                 "EXPONENT_OUTSIDE_SYMBOLIC_POLYNOMIAL_FRAGMENT");
         }
-        return exponent;
+        return value.intValueExact();
     }
 
     private static LinearRow splitLinear(

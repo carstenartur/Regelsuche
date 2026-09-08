@@ -453,7 +453,7 @@ public final class PolynomialTheorySubsumptionClassifier {
         return parsed.literalFor(number)
             .map(ExactParsedTerm.LiteralOccurrence::exactValue)
             .orElseGet(() -> {
-                if (number.value() == 0.0d) {
+                if (number.value().equalsInteger(0)) {
                     return ExactRational.ZERO;
                 }
                 throw new IllegalStateException(

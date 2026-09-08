@@ -9,6 +9,7 @@ import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scalar.ExactRational;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -79,7 +80,7 @@ public class ConservativeCompleteSquareHypothesisOperator implements HypothesisO
                 continue;
             }
             LinearTerm linear = null;
-            Double constant = null;
+            ExactRational constant = null;
             for (int index = 0; index < terms.size(); index++) {
                 if (index == squareIndex) {
                     continue;
@@ -94,15 +95,15 @@ public class ConservativeCompleteSquareHypothesisOperator implements HypothesisO
             if (linear == null || constant == null || !isEvenInteger(linear.coefficient())) {
                 continue;
             }
-            double offset = linear.coefficient() / 2.0;
-            double remainder = constant - offset * offset;
-            if (remainder > 0 || !isPerfectSquare(Math.abs(remainder))) {
+            ExactRational offset = linear.coefficient().divide(ExactRational.integer(2));
+            ExactRational remainder = constant.subtract(offset.multiply(offset));
+            if (remainder.signum() > 0 || !isPerfectSquare(remainder.abs())) {
                 continue;
             }
             Expr completed = squared(new BinaryExpr(base, BinaryOperator.ADD, new NumberExpr(offset)));
-            Expr candidate = remainder == 0
+            Expr candidate = remainder.isZero()
                 ? completed
-                : new BinaryExpr(completed, BinaryOperator.SUB, squared(new NumberExpr(Math.sqrt(Math.abs(remainder)))));
+                : new BinaryExpr(completed, BinaryOperator.SUB, squared(new NumberExpr(remainder.abs().sqrtExact().orElseThrow())));
             addCandidate(candidate, formattedInput, originalSize, candidates);
         }
     }
@@ -172,18 +173,18 @@ public class ConservativeCompleteSquareHypothesisOperator implements HypothesisO
         return expression instanceof BinaryExpr binary
             && binary.operator() == BinaryOperator.POW
             && binary.right() instanceof NumberExpr exponent
-            && Double.compare(exponent.value(), 2.0) == 0
+            && exponent.value().equalsInteger(2)
             ? binary.left()
             : null;
     }
 
     private LinearTerm linearTermForBase(Expr expression, Expr base) {
         List<Expr> factors = flattenMultiplication(expression);
-        double coefficient = 1.0;
+        ExactRational coefficient = ExactRational.ONE;
         List<Expr> symbolic = new ArrayList<>();
         for (Expr factor : factors) {
             if (factor instanceof NumberExpr numberExpr) {
-                coefficient *= numberExpr.value();
+                coefficient = coefficient.multiply(numberExpr.value());
             } else {
                 symbolic.add(factor);
             }
@@ -196,16 +197,16 @@ public class ConservativeCompleteSquareHypothesisOperator implements HypothesisO
 
     private boolean crossTermMatches(Expr expression, Expr left, Expr right) {
         List<Expr> factors = flattenMultiplication(expression);
-        double coefficient = 1.0;
+        ExactRational coefficient = ExactRational.ONE;
         List<Expr> symbolic = new ArrayList<>();
         for (Expr factor : factors) {
             if (factor instanceof NumberExpr numberExpr) {
-                coefficient *= numberExpr.value();
+                coefficient = coefficient.multiply(numberExpr.value());
             } else {
                 symbolic.add(factor);
             }
         }
-        return Double.compare(coefficient, 2.0) == 0
+        return coefficient.equalsInteger(2)
             && symbolic.size() == 2
             && ((sameExpression(symbolic.get(0), left) && sameExpression(symbolic.get(1), right))
             || (sameExpression(symbolic.get(0), right) && sameExpression(symbolic.get(1), left)));
@@ -230,20 +231,15 @@ public class ConservativeCompleteSquareHypothesisOperator implements HypothesisO
         return new BinaryExpr(expression, BinaryOperator.POW, new NumberExpr(2));
     }
 
-    private boolean isEvenInteger(double value) {
-        return Math.rint(value) == value && ((long) value) % 2 == 0;
+    private boolean isEvenInteger(ExactRational value) {
+        return value.isInteger() && !value.numerator().testBit(0);
     }
 
-    private boolean isPerfectSquare(double value) {
-        if (value < 0 || Math.rint(value) != value) {
-            return false;
-        }
-        long rounded = (long) value;
-        long root = Math.round(Math.sqrt(rounded));
-        return root * root == rounded;
+    private boolean isPerfectSquare(ExactRational value) {
+        return value.isInteger() && value.sqrtExact().isPresent();
     }
 
-    private record LinearTerm(double coefficient) {
+    private record LinearTerm(ExactRational coefficient) {
     }
 
     private record ScoredCandidate(int score, Transformation transformation) {

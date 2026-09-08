@@ -234,10 +234,8 @@ public final class LinearSystemRepresentationBridge implements
     private static AffineForm affine(Expr expression, WorkCounter work) {
         work.consume();
         if (expression instanceof NumberExpr number) {
-            if (!Double.isFinite(number.value())) {
-                throw new UnsupportedExpression("NON_FINITE_NUMBER");
-            }
-            return AffineForm.constant(Rational.fromDouble(number.value()));
+
+            return AffineForm.constant(Rational.fromExact(number.value()));
         }
         if (expression instanceof VariableExpr variable) {
             return AffineForm.variable(variable.name());

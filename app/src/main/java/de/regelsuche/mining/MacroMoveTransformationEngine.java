@@ -1,5 +1,6 @@
 package de.regelsuche.mining;
 
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.discovery.TransformationStep;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
@@ -230,7 +231,7 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
         return lowerOffset != null
             && upperOffset != null
             && same(lowerOffset.symbolicPart(), upperOffset.symbolicPart())
-            && Double.compare(upperOffset.offset() - lowerOffset.offset(), 1.0) == 0;
+            && upperOffset.offset().subtract(lowerOffset.offset()).isOne();
     }
 
     private AdditiveOffset additiveOffset(Expr expression) {
@@ -245,11 +246,11 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
                 return new AdditiveOffset(binary.right(), left.value());
             }
         }
-        return new AdditiveOffset(expression, 0.0);
+        return new AdditiveOffset(expression, ExactRational.ZERO);
     }
 
     private boolean isOne(Expr expression) {
-        return expression instanceof NumberExpr number && Double.compare(number.value(), 1.0) == 0;
+        return expression instanceof NumberExpr number && number.value().equalsInteger(1);
     }
 
     private boolean same(Expr left, Expr right) {
@@ -257,7 +258,7 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
             .equals(canonicalizer.stableHash(ExpressionFormatter.format(right)));
     }
 
-    private record AdditiveOffset(Expr symbolicPart, double offset) {
+    private record AdditiveOffset(Expr symbolicPart, ExactRational offset) {
     }
 
     private String macroRuleId(ReusableRule rule) {

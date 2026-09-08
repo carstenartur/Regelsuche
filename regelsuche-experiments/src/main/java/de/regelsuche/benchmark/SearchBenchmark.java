@@ -214,7 +214,7 @@ public class SearchBenchmark {
             }
             Step step;
             if (value instanceof NumberValue number) {
-                step = Step.number(number.value());
+                step = Step.number(number.value().toBigDecimal(java.math.MathContext.DECIMAL128).doubleValue());
             } else if (value instanceof VariableValue variable) {
                 step = Step.variable(variable.name());
             } else if (value instanceof OrderedValue ordered) {

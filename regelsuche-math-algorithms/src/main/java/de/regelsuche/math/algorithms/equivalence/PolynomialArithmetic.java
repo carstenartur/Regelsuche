@@ -74,7 +74,7 @@ final class PolynomialArithmetic {
 
     private Optional<Polynomial> asPolynomial(Expr expression) {
         if (expression instanceof NumberExpr numberExpr) {
-            return Optional.of(Polynomial.constant(Rational.fromDouble(numberExpr.value())));
+            return Optional.of(Polynomial.constant(Rational.fromExact(numberExpr.value())));
         }
         if (expression instanceof VariableExpr variableExpr) {
             return Optional.of(Polynomial.variable(variableExpr.name()));
@@ -101,12 +101,11 @@ final class PolynomialArithmetic {
         if (!(expression instanceof NumberExpr numberExpr)) {
             return Optional.empty();
         }
-        double value = numberExpr.value();
-        int exponent = (int) value;
-        if (Math.abs(value - exponent) > 1e-9 || exponent < 0 || exponent > 20) {
+        var value = numberExpr.value();
+        if (!value.isInteger() || value.signum() < 0 || value.numerator().compareTo(java.math.BigInteger.valueOf(20)) > 0) {
             return Optional.empty();
         }
-        return Optional.of(exponent);
+        return Optional.of(value.intValueExact());
     }
 
     record LinearEquation(Rational coefficient, Polynomial rest) {

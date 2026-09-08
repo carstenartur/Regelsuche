@@ -53,10 +53,7 @@ public final class EGraphPatternApplier {
         throw new IllegalArgumentException("Unsupported pattern: " + target.getClass());
     }
 
-    private static String formatNumber(double value) {
-        if (value == Math.floor(value) && !Double.isInfinite(value)) {
-            return Long.toString((long) value);
-        }
-        return Double.toString(value);
+    private static String formatNumber(de.regelsuche.scalar.ExactRational value) {
+        return value.canonicalText();
     }
 }

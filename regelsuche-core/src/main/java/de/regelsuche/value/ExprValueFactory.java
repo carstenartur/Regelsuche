@@ -5,6 +5,7 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.scalar.ExactRational;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -46,8 +47,12 @@ public final class ExprValueFactory implements AutoCloseable {
         return intern(new VariableValue(name), VariableValue.class);
     }
 
-    public synchronized NumberValue number(double value) {
+    public synchronized NumberValue number(ExactRational value) {
         return intern(new NumberValue(value), NumberValue.class);
+    }
+
+    public NumberValue number(long value) {
+        return number(ExactRational.integer(value));
     }
 
     public ExprValue sum(List<? extends ExprValue> operands) {
@@ -138,9 +143,14 @@ public final class ExprValueFactory implements AutoCloseable {
             ExprValue right = fromExprRecursive(binary.right(), valuesBySyntax);
             value = switch (binary.operator()) {
                 case ADD -> sum(List.of(left, right));
-                case SUB -> ordered(ValueOperator.SUB, List.of(left, right));
+                case SUB -> left instanceof NumberValue a && right instanceof NumberValue b
+                    ? number(a.value().subtract(b.value()))
+                    : ordered(ValueOperator.SUB, List.of(left, right));
                 case MUL -> product(List.of(left, right));
-                case DIV -> ordered(ValueOperator.DIV, List.of(left, right));
+                case DIV -> left instanceof NumberValue a && right instanceof NumberValue b
+                        && !b.value().isZero()
+                    ? number(a.value().divide(b.value()))
+                    : ordered(ValueOperator.DIV, List.of(left, right));
                 case POW -> ordered(ValueOperator.POW, List.of(left, right));
             };
         } else {
@@ -263,24 +273,20 @@ public final class ExprValueFactory implements AutoCloseable {
     }
 
     public static final class NumberValue extends ExprValue {
-        private final double value;
+        private final ExactRational value;
 
-        private NumberValue(double value) {
-            super(ValueKey.number(normalizeZero(value)));
-            this.value = normalizeZero(value);
+        private NumberValue(ExactRational value) {
+            super(ValueKey.number(Objects.requireNonNull(value, "value")));
+            this.value = value;
         }
 
-        public double value() {
+        public ExactRational value() {
             return value;
-        }
-
-        private static double normalizeZero(double value) {
-            return value == 0.0d ? 0.0d : value;
         }
 
         @Override
         public String toString() {
-            return Double.toString(value);
+            return value.canonicalText();
         }
     }
 
@@ -417,7 +423,7 @@ public final class ExprValueFactory implements AutoCloseable {
 
     /** Versioned structural key, authoritative outside one factory scope. */
     public record ValueKey(String encoded) implements Comparable<ValueKey> {
-        public static final String FORMAT_VERSION = "regelsuche.expr-value/v1";
+        public static final String FORMAT_VERSION = "regelsuche.expr-value/v2";
         private static final String PREFIX = FORMAT_VERSION + ":";
 
         public ValueKey {
@@ -431,9 +437,9 @@ public final class ExprValueFactory implements AutoCloseable {
             return new ValueKey(PREFIX + "V" + segment(name));
         }
 
-        private static ValueKey number(double value) {
+        private static ValueKey number(ExactRational value) {
             return new ValueKey(
-                    PREFIX + "N" + Long.toUnsignedString(Double.doubleToLongBits(value), 16));
+                    PREFIX + "Q" + segment(value.canonicalText()));
         }
 
         private static ValueKey ordered(ValueOperator operator, List<ExprValue> operands) {

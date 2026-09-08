@@ -58,7 +58,7 @@ final class ExprMatcherEngine {
         }
         if (matcher instanceof ExprMatcher.LiteralNumber literal) {
             return expression instanceof NumberExpr number
-                    && Double.compare(number.value(), literal.value()) == 0
+                    && number.value().equals(literal.value())
                 ? List.of(state.traced("literal-number"))
                 : List.of();
         }
@@ -558,14 +558,13 @@ final class ExprMatcherEngine {
         Expr expression,
         ExprMatcher.NumberPropertyKind kind
     ) {
-        if (!(expression instanceof NumberExpr number)
-                || !Double.isFinite(number.value())) {
+        if (!(expression instanceof NumberExpr number)) {
             return false;
         }
         return switch (kind) {
             case NUMBER_LITERAL -> true;
-            case INTEGER_LITERAL -> number.value() == Math.rint(number.value());
-            case NON_ZERO_NUMBER_LITERAL -> number.value() != 0.0;
+            case INTEGER_LITERAL -> number.value().isInteger();
+            case NON_ZERO_NUMBER_LITERAL -> !number.value().equalsInteger(0);
         };
     }
 

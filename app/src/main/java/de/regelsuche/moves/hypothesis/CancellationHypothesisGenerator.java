@@ -1,5 +1,6 @@
 package de.regelsuche.moves.hypothesis;
 
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.Equation;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
@@ -63,9 +64,9 @@ public final class CancellationHypothesisGenerator implements ParameterHypothesi
         Expr expr = term.expr();
         String value;
         if (expr instanceof NumberExpr number) {
-            double signed = term.positive() ? number.value() : -number.value();
-            double cancellation = -signed;
-            value = (cancellation > 0 ? "+" : "") + HypothesisExpressions.formatNumber(cancellation);
+            ExactRational signed = term.positive() ? number.value() : number.value().negate();
+            ExactRational cancellation = signed.negate();
+            value = (cancellation.signum() > 0 ? "+" : "") + HypothesisExpressions.formatNumber(cancellation);
         } else {
             // To cancel a positive summand we subtract it; to cancel a negative
             // summand we add it.

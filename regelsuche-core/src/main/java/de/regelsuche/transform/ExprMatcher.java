@@ -1,5 +1,6 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import java.util.Arrays;
@@ -37,7 +38,15 @@ public sealed interface ExprMatcher
         return new Any();
     }
 
-    static ExprMatcher literalNumber(double value) {
+    static ExprMatcher literalNumber(long value) {
+        return literalNumber(ExactRational.integer(value));
+    }
+
+    static ExprMatcher literalNumber(String value) {
+        return literalNumber(de.regelsuche.ast.NumberExpr.exact(value).value());
+    }
+
+    static ExprMatcher literalNumber(ExactRational value) {
         return new LiteralNumber(value);
     }
 
@@ -267,17 +276,14 @@ public sealed interface ExprMatcher
         }
     }
 
-    record LiteralNumber(double value) implements ExprMatcher {
+    record LiteralNumber(ExactRational value) implements ExprMatcher {
         public LiteralNumber {
-            if (!Double.isFinite(value)) {
-                throw new IllegalArgumentException(
-                    "literal number must be finite");
-            }
+            Objects.requireNonNull(value, "value");
         }
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor("literal-number", Double.toString(value));
+            return descriptor("literal-number", value.canonicalText());
         }
     }
 

@@ -11,8 +11,8 @@ import java.math.BigDecimal;
 import java.util.Objects;
 
 /**
- * Formats one parser-issued exact term without reading numeric leaf values back
- * from the legacy {@code double} representation.
+ * Formats one parser-issued exact term using independently verified source
+ * literal evidence. Synthetic unary-minus zero is the only evidence-free leaf.
  */
 public final class ExactExpressionFormatter {
     private ExactExpressionFormatter() {
@@ -86,7 +86,7 @@ public final class ExactExpressionFormatter {
     }
 
     private static String syntheticNumber(NumberExpr number) {
-        if (number.value() == 0.0d) {
+        if (number.value().equalsInteger(0)) {
             return "0";
         }
         throw new IllegalArgumentException(

@@ -90,11 +90,31 @@ workflow. `./gradlew test` runs the deterministic local characterization and a
 Testcontainers test that builds the real `walkthrough` target from a stable
 snapshot of Git-tracked checkout files, executes it as a one-shot container,
 compares the complete container and local outputs byte for byte and rejects
-drift in the committed gallery SVGs. Mutable `.gradle`, `build` and Git metadata
+drift in the current versioned gallery SVGs. Mutable `.gradle`, `build` and Git metadata
 are excluded from that build context by construction. `./gradlew check` also
 runs the pinned independent Python schema, hash and evidence-link verifier.
 GitHub CI only provisions external tools, invokes these Gradle lifecycles and
 retains their reports.
+
+## Versioned gallery references
+
+The current [gallery reference](generated/autonomous-discovery-walkthrough-exact-v2-reference.json)
+is bound to source revision `3942c345edb1996dddfc32d4797d5ab9cdc1e4d6`,
+which introduced exact numeric AST identity. Its four SVGs live in
+`docs/generated/autonomous-discovery-walkthrough-exact-v2/`.
+
+The prior SVGs in `docs/generated/autonomous-discovery-walkthrough/` retain
+all their original bytes; revision `d7b477c51aa75834596c63e8dc9a503aa928c6fa`
+is the reproducible pre-migration reference. They are historical output,
+not a required hash identity for the new scalar representation.
+
+Two separate JVM executions of the new code produced 54 byte-identical output
+files. Compared with the historical figures, only the candidate-lineage root
+hash changes. The evidence sequence, paired utility and representative search
+figures are byte-identical. No retained historical qualification is rewritten,
+and these unchanged utility values establish no additional search advantage.
+The container/local byte comparison and full current-gallery comparison remain
+required CI checks against the new versioned reference.
 
 ## Evidence sequence
 

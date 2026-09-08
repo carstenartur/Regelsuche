@@ -18,10 +18,10 @@ public class RulePatternParser {
 
     private RulePatternNode convert(Expr expression) {
         if (expression instanceof NumberExpr numberExpr) {
-            if (Math.rint(numberExpr.value()) != numberExpr.value()) {
-                throw new IllegalArgumentException("Only integer pattern numbers are supported: " + numberExpr.value());
+            if (!numberExpr.value().isInteger() || numberExpr.value().numerator().bitLength() > 31) {
+                throw new IllegalArgumentException("Only 32-bit integer pattern numbers are supported: " + numberExpr.value());
             }
-            return new PatternNumber((int) numberExpr.value());
+            return new PatternNumber(numberExpr.value().intValueExact());
         }
         if (expression instanceof VariableExpr variableExpr) {
             return new PatternVariable(variableExpr.name());

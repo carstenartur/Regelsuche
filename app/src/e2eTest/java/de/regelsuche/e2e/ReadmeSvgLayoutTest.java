@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 class ReadmeSvgLayoutTest {
     private static final List<String> FIGURES = List.of(
         "docs/assets/ast-rule-radar.svg",
-        "docs/generated/autonomous-discovery-walkthrough/representative-search.svg");
+        "docs/generated/autonomous-discovery-walkthrough-exact-v2/representative-search.svg");
 
     // This deliberately checks text/text intersections, viewport clipping and later-painted
     // opaque rectangles/circles. It is not a general SVG path-intersection algorithm.

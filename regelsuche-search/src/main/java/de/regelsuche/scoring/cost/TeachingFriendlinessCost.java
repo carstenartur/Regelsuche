@@ -71,8 +71,8 @@ public final class TeachingFriendlinessCost implements CostModel {
 
     private int largeCoefficientPenalty(Expr expression) {
         if (expression instanceof NumberExpr number) {
-            double absValue = Math.abs(number.value());
-            return absValue > LARGE_COEFFICIENT_THRESHOLD ? 2 : 0;
+            var absValue = number.value().abs();
+            return absValue.compareTo(de.regelsuche.scalar.ExactRational.integer(LARGE_COEFFICIENT_THRESHOLD)) > 0 ? 2 : 0;
         }
         if (expression instanceof BinaryExpr binary) {
             return largeCoefficientPenalty(binary.left()) + largeCoefficientPenalty(binary.right());

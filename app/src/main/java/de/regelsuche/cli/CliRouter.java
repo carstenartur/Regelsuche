@@ -882,11 +882,8 @@ public class CliRouter {
             return placeholder.name();
         }
         if (expr instanceof de.regelsuche.transform.PatternExpr.LiteralNumber number) {
-            double value = number.value();
-            if (value == Math.rint(value)) {
-                return Long.toString((long) value);
-            }
-            return Double.toString(value);
+            return de.regelsuche.parse.ExpressionFormatter.format(
+                new de.regelsuche.ast.NumberExpr(number.value()));
         }
         if (expr instanceof de.regelsuche.transform.PatternExpr.LiteralVariable variable) {
             return variable.name();

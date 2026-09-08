@@ -951,7 +951,7 @@ public final class SemanticSearchGraphAssembler {
             return new BinaryExpr(left, binary.operator(), right);
         }
         if (left instanceof NumberExpr leftNumber && right instanceof NumberExpr rightNumber) {
-            return new NumberExpr(leftNumber.value() * rightNumber.value());
+            return new NumberExpr(leftNumber.value().multiply(rightNumber.value()));
         }
         if (left.equals(right)) {
             return new BinaryExpr(left, BinaryOperator.POW, new NumberExpr(2));

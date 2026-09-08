@@ -241,9 +241,7 @@ public final class PatternMatchAnalyzer {
             }
             if (required instanceof PatternExpr.LiteralNumber literal) {
                 if (actual instanceof NumberExpr number
-                        && Double.compare(
-                            number.value(),
-                            literal.value()) == 0) {
+                        && number.value().equals(literal.value())) {
                     state.matchedPatternNodes++;
                 } else {
                     state.mismatch(

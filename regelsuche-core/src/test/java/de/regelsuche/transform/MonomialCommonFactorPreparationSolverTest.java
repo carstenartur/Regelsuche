@@ -77,7 +77,7 @@ class MonomialCommonFactorPreparationSolverTest {
             1,
             ExactPositiveMonomial.MAX_EXACT_DOUBLE_INTEGER);
         var unsafe = new ExactPositiveMonomial.Parser(limits).parse(
-            new NumberExpr((double) (1L << 53)));
+            new NumberExpr(1L << 53));
         assertEquals(
             ExactPositiveMonomial.ParseStatus.UNSUPPORTED,
             unsafe.status());

@@ -6,7 +6,6 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.scalar.ExactRational;
-import de.regelsuche.scalar.ExactRationalDomain;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -22,15 +21,13 @@ import java.util.TreeMap;
  * variables, addition, subtraction, multiplication and non-negative integer
  * powers.
  *
- * <p>Legacy {@link NumberExpr} nodes still expose {@code double}; conversion
- * of that already-rounded value is isolated in the shared
- * {@link ExactRationalDomain} migration bridge. All normalization arithmetic
- * itself uses the authoritative {@link ExactRational} contract. Exact results
- * are converted back only when the legacy AST can represent the same rational
- * value without rounding.</p>
+ * <p>Numeric leaves and normalization arithmetic use the authoritative
+ * {@link ExactRational} contract. Expansion and coefficient bit budgets bound
+ * normalization work; accepted coefficients are emitted without rounding.</p>
  */
 public final class PolynomialNormalizer {
     private static final int MAX_EXPANDED_TERMS = 1_000;
+    private static final int MAX_COEFFICIENT_BITS = 4_096;
 
     private final boolean expandCompositePolynomials;
 
@@ -111,7 +108,7 @@ public final class PolynomialNormalizer {
                 || !isNonNegativeInteger(number.value())) {
             return null;
         }
-        int exponentValue = (int) number.value();
+        int exponentValue = number.value().intValueExact();
         // In expression semantics A^0 removes A and is therefore only sound
         // after A is known to be defined and non-zero. Leave this case to the
         // assumption-aware expression canonicalizer instead of folding it as
@@ -130,10 +127,9 @@ public final class PolynomialNormalizer {
         return basePolynomial.pow(exponentValue);
     }
 
-    private boolean isNonNegativeInteger(double value) {
-        return value >= 0
-            && value <= Integer.MAX_VALUE
-            && Math.rint(value) == value;
+    private boolean isNonNegativeInteger(ExactRational value) {
+        return value.isInteger() && value.signum() >= 0
+            && value.numerator().bitLength() <= 31;
     }
 
     private record Monomial(Map<String, Integer> powers) {
@@ -245,13 +241,8 @@ public final class PolynomialNormalizer {
             this.terms = normalizedTerms(terms);
         }
 
-        private static Polynomial constant(double value) {
-            ExactRational coefficient = legacyExact(value);
-            return coefficient == null
-                ? null
-                : monomial(
-                    coefficient,
-                    Monomial.constant());
+        private static Polynomial constant(ExactRational value) {
+            return monomial(value, Monomial.constant());
         }
 
         private static Polynomial monomial(
@@ -303,6 +294,9 @@ public final class PolynomialNormalizer {
                     }
                     ExactRational coefficient =
                         left.getValue().multiply(right.getValue());
+                    if (!withinCoefficientBudget(coefficient)) {
+                        return null;
+                    }
                     result.merge(
                         monomial,
                         coefficient,
@@ -349,6 +343,11 @@ public final class PolynomialNormalizer {
                 }
             }
             return result;
+        }
+
+        private static boolean withinCoefficientBudget(ExactRational value) {
+            return value.numerator().abs().bitLength() <= MAX_COEFFICIENT_BITS
+                && value.denominator().bitLength() <= MAX_COEFFICIENT_BITS;
         }
 
         private Expr toExpr() {
@@ -411,44 +410,8 @@ public final class PolynomialNormalizer {
         }
     }
 
-    /** Temporary convenience for canonical-package callers. */
-    static ExactRational legacyExact(double value) {
-        return ExactRationalDomain.legacyDecimalValue(value)
-            .orElse(null);
-    }
-
-    /**
-     * Returns an AST expression for exactly the same rational, or {@code null}
-     * when the legacy Double-backed AST cannot encode it without rounding.
-     */
     static Expr exactRationalExpression(ExactRational value) {
-        var legacy = ExactRationalDomain.exactLegacyDecimalDouble(value);
-        if (legacy.isPresent()) {
-            return new NumberExpr(legacy.getAsDouble());
-        }
-
-        NumberExpr numerator = exactIntegerLeaf(value.numerator());
-        if (numerator == null) {
-            return null;
-        }
-        if (value.isInteger()) {
-            return numerator;
-        }
-        NumberExpr denominator = exactIntegerLeaf(value.denominator());
-        return denominator == null
-            ? null
-            : new BinaryExpr(
-                numerator,
-                BinaryOperator.DIV,
-                denominator);
-    }
-
-    private static NumberExpr exactIntegerLeaf(BigInteger value) {
-        var legacy = ExactRationalDomain.exactLegacyDecimalDouble(
-            ExactRational.integer(value));
-        return legacy.isPresent()
-            ? new NumberExpr(legacy.getAsDouble())
-            : null;
+        return new NumberExpr(value);
     }
 
     private static Expr withCoefficient(
@@ -456,7 +419,7 @@ public final class PolynomialNormalizer {
         Expr term
     ) {
         if (term instanceof NumberExpr number
-                && number.value() == 1) {
+                && number.value().equalsInteger(1)) {
             return exactRationalExpression(coefficient);
         }
         if (coefficient.isOne()) {

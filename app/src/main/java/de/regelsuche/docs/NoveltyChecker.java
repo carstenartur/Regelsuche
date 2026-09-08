@@ -188,12 +188,9 @@ final class NoveltyChecker {
         return "unknown(" + expression + ")";
     }
 
-    private static String formatNumber(double value) {
-        if (Double.isFinite(value) && Math.rint(value) == value) {
-            return Long.toString((long) value);
+    private static String formatNumber(de.regelsuche.scalar.ExactRational value) {
+            return value.canonicalText();
         }
-        return Double.toString(value);
-    }
 
     private static String normalizeExpression(String expression) {
         return expression == null ? "" : expression.replaceAll("\\s+", "");

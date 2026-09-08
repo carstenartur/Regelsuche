@@ -1,5 +1,6 @@
 package de.regelsuche.rules;
 
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -227,11 +228,11 @@ public final class PolynomialRules {
             if (terms == null) {
                 throw new IllegalArgumentException("Rule does not match subtree");
             }
-            double combined = terms.leftCoefficient() + terms.rightCoefficient();
-            if (combined == 0) {
+            ExactRational combined = terms.leftCoefficient().add(terms.rightCoefficient());
+            if (combined.isZero()) {
                 return new NumberExpr(0);
             }
-            if (combined == 1) {
+            if (combined.isOne()) {
                 return terms.body();
             }
             return new BinaryExpr(new NumberExpr(combined), BinaryOperator.MUL, terms.body());
@@ -247,7 +248,7 @@ public final class PolynomialRules {
                 return null;
             }
             // Avoid overlap with ast_double_term (A + A) by requiring at least one explicit numeric coefficient.
-            if (left.coefficient() == 1 && right.coefficient() == 1) {
+            if (left.coefficient().isOne() && right.coefficient().isOne()) {
                 return null;
             }
             return new LikeTerms(left.coefficient(), right.coefficient(), left.body());
@@ -262,13 +263,13 @@ public final class PolynomialRules {
                     return new Coefficient(number.value(), binary.left());
                 }
             }
-            return new Coefficient(1, expression);
+            return new Coefficient(ExactRational.ONE, expression);
         }
 
-        private record Coefficient(double coefficient, Expr body) {
+        private record Coefficient(ExactRational coefficient, Expr body) {
         }
 
-        private record LikeTerms(double leftCoefficient, double rightCoefficient, Expr body) {
+        private record LikeTerms(ExactRational leftCoefficient, ExactRational rightCoefficient, Expr body) {
         }
     }
 }

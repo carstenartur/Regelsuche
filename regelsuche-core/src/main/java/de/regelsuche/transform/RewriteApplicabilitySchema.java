@@ -117,7 +117,7 @@ public record RewriteApplicabilitySchema(
         Set<PatternExpr> denominators
     ) {
         if (expression instanceof PatternExpr.LiteralNumber number) {
-            if (number.value() == 0.0d) {
+            if (number.value().equalsInteger(0)) {
                 throw new IllegalArgumentException(
                     "applicability schema contains division by zero");
             }
@@ -133,8 +133,8 @@ public record RewriteApplicabilitySchema(
                 && operation.operator() == BinaryOperator.POW
                 && operation.right()
                     instanceof PatternExpr.LiteralNumber exponent
-                && exponent.value() > 0.0d
-                && exponent.value() == Math.rint(exponent.value())) {
+                && exponent.value().signum() > 0
+                && exponent.value().isInteger()) {
             collectNonZeroFactors(operation.left(), denominators);
             return;
         }

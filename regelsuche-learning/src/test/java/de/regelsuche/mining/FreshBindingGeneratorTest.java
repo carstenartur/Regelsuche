@@ -35,8 +35,8 @@ class FreshBindingGeneratorTest {
             List.of("N1 = 2*A", "N2 = A^2", "N3 = -A")
         );
 
-        assertEquals(6, ((NumberExpr) bindings.get("N1")).value());
-        assertEquals(9, ((NumberExpr) bindings.get("N2")).value());
-        assertEquals(-3, ((NumberExpr) bindings.get("N3")).value());
+        assertEquals(de.regelsuche.scalar.ExactRational.integer(6), ((NumberExpr) bindings.get("N1")).value());
+        assertEquals(de.regelsuche.scalar.ExactRational.integer(9), ((NumberExpr) bindings.get("N2")).value());
+        assertEquals(de.regelsuche.scalar.ExactRational.integer(-3), ((NumberExpr) bindings.get("N3")).value());
     }
 }

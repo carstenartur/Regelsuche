@@ -1,5 +1,6 @@
 package de.regelsuche.calculus;
 
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -105,14 +106,14 @@ public final class Integrator {
         if (!(exponent instanceof NumberExpr n)) {
             return Optional.empty();
         }
-        double power = n.value();
-        if (power == -1.0) {
+        ExactRational power = n.value();
+        if (power.isNegativeOne()) {
             return Optional.of(new FunctionExpr("ln", new FunctionExpr("abs", varExpr)));
         }
         return Optional.of(new BinaryExpr(
-            new BinaryExpr(varExpr, BinaryOperator.POW, new NumberExpr(power + 1)),
+            new BinaryExpr(varExpr, BinaryOperator.POW, new NumberExpr(power.add(ExactRational.ONE))),
             BinaryOperator.DIV,
-            new NumberExpr(power + 1)
+            new NumberExpr(power.add(ExactRational.ONE))
         ));
     }
 

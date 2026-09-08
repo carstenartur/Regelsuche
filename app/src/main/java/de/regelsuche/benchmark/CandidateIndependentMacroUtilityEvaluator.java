@@ -212,7 +212,7 @@ final class CandidateIndependentMacroUtilityEvaluator {
         }
         if (pattern instanceof NumberExpr left
                 && concrete instanceof NumberExpr right) {
-            return Double.compare(left.value(), right.value()) == 0;
+            return left.value().equals(right.value());
         }
         if (pattern instanceof VariableExpr left
                 && concrete instanceof VariableExpr right) {
@@ -252,7 +252,7 @@ final class CandidateIndependentMacroUtilityEvaluator {
 
     private Expr negate(Expr expression) {
         if (expression instanceof NumberExpr number) {
-            return new NumberExpr(-number.value());
+            return new NumberExpr(number.value().negate());
         }
         return new BinaryExpr(
             new NumberExpr(0),

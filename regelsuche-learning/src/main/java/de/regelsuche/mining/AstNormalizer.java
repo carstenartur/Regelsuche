@@ -23,10 +23,10 @@ public class AstNormalizer {
 
     private NormalizedNode normalize(Expr expression, Map<String, String> variables) {
         if (expression instanceof NumberExpr numberExpr) {
-            if (Math.rint(numberExpr.value()) != numberExpr.value()) {
-                throw new IllegalArgumentException("Only integer literals can be generalized: " + numberExpr.value());
+            if (!numberExpr.value().isInteger() || numberExpr.value().numerator().bitLength() > 31) {
+                throw new IllegalArgumentException("Only 32-bit integer literals can be generalized: " + numberExpr.value());
             }
-            return NormalizedNode.number((int) numberExpr.value());
+            return NormalizedNode.number(numberExpr.value().intValueExact());
         }
         if (expression instanceof VariableExpr variableExpr) {
             String canonicalName = variables.computeIfAbsent(variableExpr.name(), key -> variables.isEmpty() ? "x" : "v" + variables.size());

@@ -198,7 +198,7 @@ public final class CalculusBasicRules {
             return subtree instanceof FunctionExpr fn
                 && "exp".equals(fn.name())
                 && fn.arguments().size() == 1
-                && fn.arguments().get(0) instanceof NumberExpr n && n.value() == 0.0;
+                && fn.arguments().get(0) instanceof NumberExpr n && n.value().equalsInteger(0);
         }
 
         @Override

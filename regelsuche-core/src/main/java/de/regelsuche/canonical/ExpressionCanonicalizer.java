@@ -176,26 +176,12 @@ public class ExpressionCanonicalizer {
         List<SignedTerm> rendered = new ArrayList<>();
         for (TermBucket bucket : ordered) {
             if (bucket.coefficient().isZero()) {
-                if (!appendContributions(rendered, bucket)) {
-                    return expression;
-                }
+                appendContributions(rendered, bucket);
                 continue;
             }
 
-            Expr combined = withCoefficient(
-                bucket.term(), bucket.coefficient().abs());
-            if (combined != null) {
-                rendered.add(new SignedTerm(
-                    bucket.coefficient().signum(), combined));
-                continue;
-            }
-
-            // Exact arithmetic may produce a value that the legacy Double AST
-            // cannot represent. Preserve the original exact contributions
-            // deterministically instead of rounding the combined coefficient.
-            if (!appendContributions(rendered, bucket)) {
-                return expression;
-            }
+            rendered.add(new SignedTerm(bucket.coefficient().signum(),
+                withCoefficient(bucket.term(), bucket.coefficient().abs())));
         }
 
         Expr result = null;
@@ -222,20 +208,16 @@ public class ExpressionCanonicalizer {
         return result == null ? new NumberExpr(0) : result;
     }
 
-    private boolean appendContributions(
+    private void appendContributions(
         List<SignedTerm> rendered,
         TermBucket bucket
     ) {
         for (ExactRational contribution : bucket.contributions()) {
             Expr fallback = withCoefficient(
                 bucket.term(), contribution.abs());
-            if (fallback == null) {
-                return false;
-            }
             rendered.add(new SignedTerm(
                 contribution.signum(), fallback));
         }
-        return true;
     }
 
     private Expr canonicalizeMultiplication(BinaryExpr expression, AssumptionContext context) {
@@ -243,18 +225,12 @@ public class ExpressionCanonicalizer {
         collectFactors(expression, factors);
         AssumptionContext factorContext = context == null ? null : new AssumptionContext();
         ExactRational numeric = ExactRational.ONE;
-        List<Expr> numericFactors = new ArrayList<>();
         Map<String, FactorBucket> buckets = new LinkedHashMap<>();
         for (Expr factor : factors) {
             Expr normalized = canonicalize(factor, factorContext);
             if (normalized instanceof NumberExpr numberExpr) {
-                ExactRational exact = PolynomialNormalizer.legacyExact(
-                    numberExpr.value());
-                if (exact != null) {
-                    numeric = numeric.multiply(exact);
-                    numericFactors.add(numberExpr);
-                    continue;
-                }
+                numeric = numeric.multiply(numberExpr.value());
+                continue;
             }
             Power power = asPower(normalized);
             String key = ExpressionFormatter.format(power.base());
@@ -273,21 +249,8 @@ public class ExpressionCanonicalizer {
         }
 
         List<Expr> ordered = new ArrayList<>();
-        if (!numericFactors.isEmpty()) {
-            Expr combined = PolynomialNormalizer.exactRationalExpression(
-                numeric);
-            if (combined != null) {
-                if (!numeric.isOne() || buckets.isEmpty()) {
-                    ordered.add(combined);
-                }
-            } else {
-                numericFactors.sort((left, right) ->
-                    ExpressionFormatter.format(left).compareTo(
-                        ExpressionFormatter.format(right)));
-                ordered.addAll(numericFactors);
-            }
-        } else if (buckets.isEmpty()) {
-            ordered.add(new NumberExpr(1));
+        if (!numeric.isOne() || buckets.isEmpty()) {
+            ordered.add(PolynomialNormalizer.exactRationalExpression(numeric));
         }
 
         buckets.values().stream()
@@ -315,7 +278,7 @@ public class ExpressionCanonicalizer {
                 return retained;
             }
             if (base instanceof NumberExpr number) {
-                return Double.isFinite(number.value()) && number.value() != 0.0d
+                return !number.value().equalsInteger(0)
                     ? new NumberExpr(1)
                     : retained;
             }
@@ -345,6 +308,10 @@ public class ExpressionCanonicalizer {
     private Expr canonicalizeDivision(BinaryExpr expression, AssumptionContext context) {
         Expr numerator = canonicalize(expression.left(), context);
         Expr denominator = canonicalize(expression.right(), context);
+        if (numerator instanceof NumberExpr a && denominator instanceof NumberExpr b
+                && !b.value().isZero()) {
+            return new NumberExpr(a.value().divide(b.value()));
+        }
         if (context != null && !isNumber(denominator, 0) && !isNumber(denominator, 1)) {
             String denomText = ExpressionFormatter.format(denominator);
             // 0 / d -> 0 (d ≠ 0)
@@ -490,23 +457,23 @@ public class ExpressionCanonicalizer {
         Expr exponent,
         List<Assumption> requirements
     ) {
-        Double value = signedIntegerLiteralValue(exponent);
+        ExactRational value = signedIntegerLiteralValue(exponent);
         if (value == null) {
             return false;
         }
-        return value > 0
+        return value.signum() > 0
             || requireNonZeroForElision(base, requirements);
     }
 
     /**
-     * Returns an integral numeric exponent represented by the legacy AST.
+     * Returns an integral numeric exponent represented by the AST.
      * Negative literals are parsed as {@code 0 - n}, so recognize that exact
      * parser shape without broadening this guard into a general evaluator.
      */
-    private Double signedIntegerLiteralValue(Expr expression) {
+    private ExactRational signedIntegerLiteralValue(Expr expression) {
         if (expression instanceof NumberExpr number) {
-            double value = number.value();
-            return Double.isFinite(value) && value == Math.rint(value)
+            ExactRational value = number.value();
+            return value.isInteger()
                 ? value
                 : null;
         }
@@ -514,9 +481,9 @@ public class ExpressionCanonicalizer {
                 && binary.operator() == BinaryOperator.SUB
                 && isNumber(binary.left(), 0)
                 && binary.right() instanceof NumberExpr number) {
-            double magnitude = number.value();
-            return Double.isFinite(magnitude) && magnitude == Math.rint(magnitude)
-                ? -magnitude
+            ExactRational magnitude = number.value();
+            return magnitude.isInteger()
+                ? magnitude.negate()
                 : null;
         }
         return null;
@@ -527,7 +494,7 @@ public class ExpressionCanonicalizer {
         List<Assumption> requirements
     ) {
         if (expression instanceof NumberExpr number) {
-            return number.value() != 0.0d;
+            return !number.value().equalsInteger(0);
         }
         requirements.add(Assumption.nonZero(
             ExpressionFormatter.format(expression)));
@@ -604,18 +571,13 @@ public class ExpressionCanonicalizer {
         if (expression instanceof BinaryExpr product
                 && product.operator() == BinaryOperator.MUL
                 && product.left() instanceof NumberExpr numberExpr) {
-            ExactRational exact = PolynomialNormalizer.legacyExact(
-                numberExpr.value());
-            if (exact != null && !exact.isZero()) {
+            ExactRational exact = numberExpr.value();
+            if (!exact.isZero()) {
                 return new Coefficient(exact, product.right());
             }
         }
         if (expression instanceof NumberExpr numberExpr) {
-            ExactRational exact = PolynomialNormalizer.legacyExact(
-                numberExpr.value());
-            if (exact != null) {
-                return new Coefficient(exact, new NumberExpr(1));
-            }
+            return new Coefficient(numberExpr.value(), new NumberExpr(1));
         }
         return new Coefficient(ExactRational.ONE, expression);
     }
@@ -633,9 +595,7 @@ public class ExpressionCanonicalizer {
         }
         Expr numeric = PolynomialNormalizer.exactRationalExpression(
                 coefficient);
-        return numeric == null
-            ? null
-            : new BinaryExpr(numeric, BinaryOperator.MUL, term);
+        return new BinaryExpr(numeric, BinaryOperator.MUL, term);
     }
 
     private Expr leftAssociate(List<Expr> expressions, BinaryOperator operator) {
@@ -658,17 +618,15 @@ public class ExpressionCanonicalizer {
         return new Power(expression, 1);
     }
 
-    private static int nonNegativeInteger(double value) {
-        return value >= 0
-                && value <= Integer.MAX_VALUE
-                && value == Math.rint(value)
-            ? (int) value
-            : -1;
+    private static int nonNegativeInteger(ExactRational value) {
+        return value.isInteger() && value.signum() >= 0
+                && value.numerator().bitLength() <= 31
+            ? value.intValueExact() : -1;
     }
 
     private boolean isNumber(Expr expression, int value) {
         return expression instanceof NumberExpr numberExpr
-            && numberExpr.value() == value;
+            && numberExpr.value().equalsInteger(value);
     }
 
     private int count(Expr expression) {

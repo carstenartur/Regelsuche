@@ -124,7 +124,7 @@ public final class EquationRewriteEngine {
         public List<EquationStep> apply(Equation equation, EquationRewriteContext context) {
             List<EquationStep> steps = new ArrayList<>();
             for (Expr operand : context.candidateOperands()) {
-                if (operand instanceof NumberExpr numberExpr && numberExpr.value() == 0.0) {
+                if (operand instanceof NumberExpr numberExpr && numberExpr.value().equalsInteger(0)) {
                     // Division by zero is undefined.
                     continue;
                 }
@@ -158,7 +158,7 @@ public final class EquationRewriteEngine {
         public List<EquationStep> apply(Equation equation, EquationRewriteContext context) {
             List<EquationStep> steps = new ArrayList<>();
             for (Expr operand : context.candidateOperands()) {
-                if (operand instanceof NumberExpr numberExpr && numberExpr.value() == 0.0) {
+                if (operand instanceof NumberExpr numberExpr && numberExpr.value().equalsInteger(0)) {
                     // Multiplying by zero collapses to 0 = 0, which is unsound.
                     continue;
                 }

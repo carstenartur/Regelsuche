@@ -1,5 +1,6 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -47,7 +48,7 @@ public final class TelescopingDifferenceAstPredicate {
         if (expression instanceof BinaryExpr binary
             && binary.operator() == BinaryOperator.DIV
             && binary.left() instanceof NumberExpr number
-            && Double.compare(number.value(), 1.0) == 0) {
+            && number.value().equalsInteger(1)) {
             return binary.right();
         }
         return null;
@@ -59,8 +60,8 @@ public final class TelescopingDifferenceAstPredicate {
         if (candidateOffset != null
             && baseOffset != null
             && same(candidateOffset.symbolicPart(), baseOffset.symbolicPart())) {
-            double step = candidateOffset.offset() - baseOffset.offset();
-            if (step >= 1.0 && step == Math.floor(step)) {
+            ExactRational step = candidateOffset.offset().subtract(baseOffset.offset());
+            if (step.signum() > 0 && step.isInteger()) {
                 return true;
             }
         }
@@ -77,8 +78,8 @@ public final class TelescopingDifferenceAstPredicate {
 
     private static boolean isPositiveInteger(Expr expression) {
         return expression instanceof NumberExpr number
-            && number.value() >= 1.0
-            && number.value() == Math.floor(number.value());
+            && number.value().signum() > 0
+            && number.value().isInteger();
     }
 
     private static boolean same(Expr left, Expr right) {
@@ -98,9 +99,9 @@ public final class TelescopingDifferenceAstPredicate {
                 return new AdditiveOffset(binary.right(), left.value());
             }
         }
-        return new AdditiveOffset(expression, 0.0);
+        return new AdditiveOffset(expression, ExactRational.ZERO);
     }
 
-    private record AdditiveOffset(Expr symbolicPart, double offset) {
+    private record AdditiveOffset(Expr symbolicPart, ExactRational offset) {
     }
 }

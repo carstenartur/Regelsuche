@@ -1,5 +1,6 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -72,7 +73,7 @@ public final class QuadraticFactorizationHypothesisOperator implements Hypothesi
                 continue;
             }
             if (term instanceof NumberExpr number && isInteger(number.value())) {
-                constant = (int) number.value();
+                constant = number.value().intValueExact();
                 continue;
             }
         }
@@ -103,7 +104,7 @@ public final class QuadraticFactorizationHypothesisOperator implements Hypothesi
         return expression instanceof BinaryExpr binary
             && binary.operator() == BinaryOperator.POW
             && binary.right() instanceof NumberExpr exponent
-            && Double.compare(exponent.value(), 2.0) == 0
+            && exponent.value().equalsInteger(2)
             ? binary.left()
             : null;
     }
@@ -114,7 +115,11 @@ public final class QuadraticFactorizationHypothesisOperator implements Hypothesi
         int variableCount = 0;
         for (Expr factor : factors) {
             if (factor instanceof NumberExpr number && isInteger(number.value())) {
-                coefficient *= (int) number.value();
+                long product = (long) coefficient * number.value().intValueExact();
+                if (Math.abs(product) > 10_000) {
+                    return null;
+                }
+                coefficient = (int) product;
             } else if (same(factor, variable)) {
                 variableCount++;
             } else {
@@ -148,7 +153,7 @@ public final class QuadraticFactorizationHypothesisOperator implements Hypothesi
 
     private Expr negate(Expr expression) {
         if (expression instanceof NumberExpr number) {
-            return new NumberExpr(-number.value());
+            return new NumberExpr(number.value().negate());
         }
         return new BinaryExpr(new NumberExpr(-1), BinaryOperator.MUL, expression);
     }
@@ -168,8 +173,8 @@ public final class QuadraticFactorizationHypothesisOperator implements Hypothesi
             .equals(canonicalizer.stableHash(ExpressionFormatter.format(right)));
     }
 
-    private boolean isInteger(double value) {
-        return Math.rint(value) == value;
+    private boolean isInteger(ExactRational value) {
+        return value.isInteger() && value.numerator().abs().compareTo(java.math.BigInteger.valueOf(10_000)) <= 0;
     }
 
     private record Quadratic(Expr variable, int sum, int constant) {

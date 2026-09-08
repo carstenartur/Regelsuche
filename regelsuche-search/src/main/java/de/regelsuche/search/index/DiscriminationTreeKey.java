@@ -70,10 +70,7 @@ record DiscriminationTreeKey(Set<String> requiredPaths) {
         return name.length() == 1 && Character.isUpperCase(name.charAt(0));
     }
 
-    private static String formatNumber(double value) {
-        if (value == Math.rint(value)) {
-            return Long.toString((long) value);
-        }
-        return Double.toString(value);
+    private static String formatNumber(de.regelsuche.scalar.ExactRational value) {
+        return value.canonicalText();
     }
 }

@@ -9,6 +9,7 @@ import de.regelsuche.math.algorithms.equivalence.RationalAssumptionRewriteAdapte
 import de.regelsuche.math.algorithms.equivalence.RationalAssumptionRewriteAdapter.FormationStatus;
 import de.regelsuche.math.algorithms.equivalence.RationalAssumptionRewriteAdapter.ResourceBudget;
 import de.regelsuche.math.algorithms.equivalence.RationalAssumptionRewriteAdapter.SearchStatus;
+import de.regelsuche.parse.ExpressionParser;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -85,6 +86,18 @@ class RationalAssumptionRewriteAdapterTest {
             "((a-b)*(a+c))/(a-b)",
             "a+c",
             List.of("a != b")));
+    }
+
+    @Test
+    void doesNotClaimTargetBeforeTheLastPrimitiveFitsTheDepthBudget() {
+        var formation = adapter.formCandidate(formationSeeds(), BUDGET);
+        var result = adapter.evaluate(new EvaluationTask(
+            "numeric-cleanup", "(7*z)/z", "7", List.of("z != 0")),
+            formation, new ResourceBudget(1, 200, 200));
+
+        assertEquals(SearchStatus.NO_RESULT, result.status());
+        assertTrue(result.steps().isEmpty());
+        assertBalanced(result.resourceUse());
     }
 
     @Test
@@ -165,6 +178,10 @@ class RationalAssumptionRewriteAdapterTest {
             result.status(), result.detail());
         assertFalse(result.steps().isEmpty());
         assertEquals(task.source(), result.steps().getFirst().source());
+        var parser = new ExpressionParser();
+        assertEquals(parser.parseTerm(task.target()),
+            parser.parseTerm(result.steps().getLast().target()),
+            "the retained path must construct the target syntax");
         assertBalanced(result.resourceUse());
         return result;
     }

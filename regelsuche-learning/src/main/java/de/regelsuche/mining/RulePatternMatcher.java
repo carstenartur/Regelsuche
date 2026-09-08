@@ -55,7 +55,7 @@ public class RulePatternMatcher {
             return existing.equals(expression);
         }
         if (pattern instanceof PatternNumber number) {
-            return expression instanceof NumberExpr value && Double.compare(value.value(), number.value()) == 0;
+            return expression instanceof NumberExpr value && value.value().equalsInteger(number.value());
         }
         if (pattern instanceof PatternFunction function) {
             if (!(expression instanceof FunctionExpr value)
