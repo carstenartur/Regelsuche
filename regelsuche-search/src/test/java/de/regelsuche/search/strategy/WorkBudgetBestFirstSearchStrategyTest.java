@@ -6,9 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.scoring.ExpressionScorer;
-import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy.Budget;
-import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy.Problem;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Budget;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Problem;
 import de.regelsuche.transform.MeasuredTransformationEngine;
+import de.regelsuche.search.strategy.SearchExpansionSource;
 import de.regelsuche.transform.MeasuredTransformationEngines;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
@@ -18,9 +19,9 @@ import de.regelsuche.transform.TransformationWorkMetrics;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-class PrimitiveWorkBestFirstSearchStrategyTest {
-    private final PrimitiveWorkBestFirstSearchStrategy search =
-        new PrimitiveWorkBestFirstSearchStrategy();
+class WorkBudgetBestFirstSearchStrategyTest {
+    private final WorkBudgetBestFirstSearchStrategy search =
+        new WorkBudgetBestFirstSearchStrategy();
 
     @Test
     void macroEdgeCannotBypassPrimitiveStepBudget() {
@@ -32,14 +33,14 @@ class PrimitiveWorkBestFirstSearchStrategyTest {
 
         var blocked = search.search(problem(
             macro,
-            new Budget(1, 10, 10, 10, 1000)));
+            Budget.primitive(1, 10, 10, 10, 1000)));
         var admitted = search.search(problem(
             macro,
-            new Budget(2, 10, 10, 10, 1000)));
+            Budget.primitive(2, 10, 10, 10, 1000)));
 
         assertFalse(blocked.reached());
         assertEquals(
-            PrimitiveWorkBestFirstSearchStrategy.Status.PRIMITIVE_BUDGET,
+            WorkBudgetBestFirstSearchStrategy.Status.PRIMITIVE_BUDGET,
             blocked.status());
         assertTrue(blocked.metrics().primitiveBudgetPrunes() > 0);
         assertTrue(admitted.reached());
@@ -60,11 +61,11 @@ class PrimitiveWorkBestFirstSearchStrategyTest {
 
         var result = search.search(problem(
             expensive,
-            new Budget(2, 10, 10, 10, 5)));
+            Budget.primitive(2, 10, 10, 10, 5)));
 
         assertFalse(result.reached());
         assertEquals(
-            PrimitiveWorkBestFirstSearchStrategy.Status.WORK_BUDGET,
+            WorkBudgetBestFirstSearchStrategy.Status.WORK_BUDGET,
             result.status());
         assertTrue(result.metrics().transformationWork().totalWorkUnits() > 5);
         assertEquals(0, result.metrics().enqueuedStates());
@@ -77,11 +78,11 @@ class PrimitiveWorkBestFirstSearchStrategyTest {
 
         var result = search.search(problem(
             empty,
-            new Budget(1, 10, 10, 10, 3)));
+            Budget.primitive(1, 10, 10, 10, 3)));
 
         assertFalse(result.reached());
         assertEquals(
-            PrimitiveWorkBestFirstSearchStrategy.Status.WORK_BUDGET,
+            WorkBudgetBestFirstSearchStrategy.Status.WORK_BUDGET,
             result.status());
         assertEquals(0,
             result.metrics().transformationWork().totalWorkUnits());
@@ -108,7 +109,7 @@ class PrimitiveWorkBestFirstSearchStrategyTest {
                     expression.equals("a")
                         ? List.of(macro("a_to_c", "c", "r1", "r2"))
                         : List.of()));
-        Budget budget = new Budget(2, 10, 10, 10, 1000);
+        Budget budget = Budget.primitive(2, 10, 10, 10, 1000);
 
         var flatResult = search.search(problem(flatMeasured, budget));
         var macroResult = search.search(problem(withMacro, budget));
@@ -134,7 +135,7 @@ class PrimitiveWorkBestFirstSearchStrategyTest {
         return new Problem(
             "a",
             "c",
-            engine,
+            new SearchExpansionSource.Measured(engine),
             new ExpressionScorer(),
             new ExpressionCanonicalizer(),
             budget);

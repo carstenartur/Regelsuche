@@ -7,14 +7,15 @@ import de.regelsuche.evolution.EvolutionRewriteProgramTrainFitnessEvidence.CaseM
 import de.regelsuche.evolution.EvolutionRewriteProgramTrainFitnessEvidence.PathCorrectness;
 import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
 import de.regelsuche.scoring.ExpressionScorer;
-import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy;
-import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy.Budget;
-import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy.Problem;
-import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy.Result;
-import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy.State;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Budget;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Problem;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Result;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.State;
 import de.regelsuche.search.strategy.SearchWorkMetrics;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.MeasuredTransformationEngine;
+import de.regelsuche.search.strategy.SearchExpansionSource;
 import de.regelsuche.transform.MeasuredTransformationEngines;
 import de.regelsuche.transform.TransformationWorkMetrics;
 import java.util.ArrayList;
@@ -372,7 +373,7 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
     private Budget effectiveBudget(EvolutionGenome genome) {
         EvolutionRewriteProgramTrainSuite.PrimitiveWorkBudget configured =
             suite.primitiveWorkBudget();
-        return new Budget(
+        return Budget.primitive(
             Math.min(
                 configured.maxPrimitiveSteps(),
                 genome.budget().maxApplicationsPerPath()),
@@ -543,11 +544,11 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
         String target,
         Budget budget
     ) {
-        return new PrimitiveWorkBestFirstSearchStrategy().search(
+        return new WorkBudgetBestFirstSearchStrategy().search(
             new Problem(
                 input,
                 target,
-                engine,
+                new SearchExpansionSource.Measured(engine),
                 new ExpressionScorer(),
                 new ExpressionCanonicalizer(),
                 budget));

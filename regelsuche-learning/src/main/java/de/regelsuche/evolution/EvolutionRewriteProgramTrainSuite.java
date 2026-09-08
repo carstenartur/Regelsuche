@@ -5,7 +5,7 @@ import de.regelsuche.json.JsonWriter;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.search.SearchHeuristic;
-import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -108,7 +108,7 @@ public record EvolutionRewriteProgramTrainSuite(
             contentHash);
     }
 
-    public PrimitiveWorkBestFirstSearchStrategy.Budget searchBudget() {
+    public WorkBudgetBestFirstSearchStrategy.Budget searchBudget() {
         return primitiveWorkBudget.toSearchBudget();
     }
 
@@ -194,7 +194,7 @@ public record EvolutionRewriteProgramTrainSuite(
         long maxWorkUnits
     ) {
         public PrimitiveWorkBudget {
-            new PrimitiveWorkBestFirstSearchStrategy.Budget(
+            WorkBudgetBestFirstSearchStrategy.Budget.primitive(
                 maxPrimitiveSteps,
                 maxExploredStates,
                 maxCandidatesPerState,
@@ -255,8 +255,8 @@ public record EvolutionRewriteProgramTrainSuite(
             return maxWorkUnits - exactPathAuditReserve();
         }
 
-        PrimitiveWorkBestFirstSearchStrategy.Budget toSearchBudget() {
-            return new PrimitiveWorkBestFirstSearchStrategy.Budget(
+        WorkBudgetBestFirstSearchStrategy.Budget toSearchBudget() {
+            return WorkBudgetBestFirstSearchStrategy.Budget.primitive(
                 maxPrimitiveSteps,
                 maxExploredStates,
                 maxCandidatesPerState,

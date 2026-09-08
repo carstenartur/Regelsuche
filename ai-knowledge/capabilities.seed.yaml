@@ -397,12 +397,17 @@
     - 'TransformationProvenance'
     - 'ExecutionWork'
     - 'WorkAwareTransformationEngine'
+    - 'WorkBudgetBestFirstSearchStrategy'
+    - 'SearchExpansionSource'
+    - 'WorkSearchReplay'
   testPatterns:
     - 'SchematicProofPlan*Test'
     - 'ExactFinitePolynomialPlan*Test'
     - 'ExactFinitePolynomialHoleSolverTest'
     - 'BudgetedTransformationSource*Test'
     - 'VerifiedFinitePolynomialCandidateSourceTest'
+    - 'VerifiedTheorySearchFrontierTest'
+    - 'WorkBudgetBestFirstSearchStrategyTest'
     - 'TransformationProvenanceTest'
   docPatterns:
     - docs/schematic-proof-plan-ir.md
@@ -412,6 +417,7 @@
     - docs/exact-finite-polynomial-plan-replay-receipt.md
     - docs/budgeted-exact-theory-source.md
     - docs/mixed-rewrite-program-execution.md
+    - docs/work-budget-search-frontier.md
   evidenceTypes:
     - validation-evidence
   tags: [schematic-plan, exact-solver, replay, exact-theory, budgeted-execution, reproducibility]

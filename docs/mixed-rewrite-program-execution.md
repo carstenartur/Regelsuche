@@ -4,7 +4,8 @@ This slice of #900 gives `Transformation`, `RewriteCandidate` and `RewriteExecut
 one common structural provenance model. `executeWithWorkBudget` runs ordinary
 `RewriteProgram.Source` nodes containing both AST rewrites and one explicitly
 selected, independently verified finite-polynomial candidate. It advances mixed
-program execution; ordinary search-frontier admission remains open.
+program execution; [the work-budget search frontier](work-budget-search-frontier.md)
+now consumes the same observations and typed transformations.
 
 ## Canonical provenance and authority
 
@@ -48,7 +49,8 @@ assumptions. Serialization is observational: canonical JSON does not deserialize
 into an executable capability. Replay obtains fresh verifier-issued evidence and
 re-executes the declared program; the integration test compares the complete
 canonical provenance, content hash and transformation after full fresh replay.
-This slice does not introduce an artifact-loading or search-trace replay service.
+The search frontier adds canonical run observations and fresh execution comparison.
+Repository-wide artifact loading and other search-state serializers remain separate work.
 
 ## Explicit budgets and retained work
 
@@ -105,12 +107,13 @@ an unmarked ordinary engine. The old `executeBudgetedSource` and theory-only
 `executeBudgeted` contracts remain available and unchanged; public hash-bound
 protocol values are not promoted into verifier capabilities by this migration.
 
-Legacy transformation batches, ordinary search strategies and bounded
-reachability consumers reject exact-theory values. They cannot interpret zero
-primitive steps as a free edge. #900 still requires an explicit search-frontier
-work authority, retained theory provenance in search state, complete replay and a
-versioned matched-work comparison for that new frontier. This API does not add a
-primitive derivation, general theorem-prover soundness or tactic-quality claim.
+Legacy transformation batches, search strategies without explicit theory budgets,
+and bounded reachability consumers reject exact-theory values. They cannot
+interpret zero primitive steps as a free edge. `WorkBudgetBestFirstSearchStrategy`
+accepts mixed programs with explicit path and global work authority and retains
+typed paths, source observations and replay evidence. Repository-wide state
+serialization and artifact-loading replay remain open in #900. This API does not
+add a primitive derivation, general theorem-prover soundness or tactic-quality claim.
 
 The characterization uses actual AST add-zero/multiply-one rules around a real
 finite solver result. It covers both insufficient dimensions, repeat, incomplete

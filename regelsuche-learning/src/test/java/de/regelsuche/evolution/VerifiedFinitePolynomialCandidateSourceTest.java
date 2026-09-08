@@ -1,5 +1,6 @@
 package de.regelsuche.evolution;
 
+import static de.regelsuche.evolution.VerifiedPolynomialFixture.*;
 import static de.regelsuche.search.program.RewritePrograms.budgetedSource;
 import static de.regelsuche.search.program.RewritePrograms.choice;
 import static de.regelsuche.search.program.RewritePrograms.firstApplicable;
@@ -24,7 +25,6 @@ import de.regelsuche.search.program.BudgetedTransformationSource;
 import de.regelsuche.search.program.BudgetedTransformationSourceExecutor;
 import de.regelsuche.search.program.RewriteProgram;
 import de.regelsuche.search.program.RewriteProgramInterpreter;
-import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.ExactTheoryEvidence;
 import de.regelsuche.transform.ExecutionWork;
 import de.regelsuche.transform.Transformation;
@@ -57,8 +57,6 @@ import org.junit.jupiter.api.Timeout;
  */
 @Timeout(20)
 class VerifiedFinitePolynomialCandidateSourceTest {
-    private static final SchematicProofPlan.Limits PLAN_LIMITS =
-        new SchematicProofPlan.Limits(8, 8, 4, 200_000);
     private static final ExplorationLimits PROGRAM_LIMITS =
         new ExplorationLimits(100, 100, 8);
     private final RewriteProgramInterpreter interpreter = new RewriteProgramInterpreter();
@@ -580,25 +578,6 @@ class VerifiedFinitePolynomialCandidateSourceTest {
         assertEquals(0L, result.workMetrics().duplicateCandidatesDropped());
     }
 
-    private static VerifiedCandidateEvidence unitEvidence(String id) {
-        return prepare(id, "x*x", "(${unit}*x)^2",
-            List.of(HoleDomain.integerRange("unit", 1, 1)), 1).evidence().getFirst();
-    }
-
-    private static RewriteProgram ordinaryTheory(String id, VerifiedCandidateEvidence evidence) {
-        return RewritePrograms.source(id, new VerifiedFinitePolynomialTransformationEngine(evidence));
-    }
-
-    private static RewriteProgram primitive(String id, String ruleId) {
-        return RewritePrograms.source(id, new AstRewriteTransformationEngine(AstRewriteTransformationEngine.defaultRules()
-            .stream().filter(rule -> rule.id().equals(ruleId)).toList()));
-    }
-
-    private static RewriteProgram mixedProgram(VerifiedCandidateEvidence evidence) {
-        return sequence("mixed", primitive("pre", "ast_add_zero_right"), ordinaryTheory("theory", evidence),
-            primitive("post", "ast_multiply_one_left"));
-    }
-
     private RewriteExecution mixed(VerifiedCandidateEvidence evidence, PathBudget budget) {
         return interpreter.executeWithWorkBudget(mixedProgram(evidence), "x*x + 0", budget);
     }
@@ -614,10 +593,6 @@ class VerifiedFinitePolynomialCandidateSourceTest {
 
     private static RewriteProgram.BudgetedSource node(String id, VerifiedCandidateEvidence evidence) {
         return budgetedSource(id, new VerifiedFinitePolynomialCandidateSource(evidence));
-    }
-
-    private static long work(VerifiedCandidateEvidence evidence) {
-        return evidence.data().canonicalWork().totalWorkUnits();
     }
 
     private static void assertSourceEvidence(BudgetedRewriteProgramExecution execution,
@@ -646,38 +621,6 @@ class VerifiedFinitePolynomialCandidateSourceTest {
             factorDomains, 2).evidence().getFirst();
         return new Chain(first, second);
     }
-
-    private static Prepared prepare(String id, String source, String ansatz,
-                                    List<HoleDomain> domains, int retainedLimit) {
-        var resolver = new ExactFinitePolynomialPlanResolver();
-        var plan = resolver.createPlan(id, source, ansatz, domains, retainedLimit, PLAN_LIMITS);
-        var run = resolver.resolve(plan, source, ansatz, domains, retainedLimit);
-        var receipt = new ExactFinitePolynomialPlanReplayVerifier()
-            .verify(plan, source, ansatz, domains, retainedLimit, run);
-        var bytesVerifier = new ExactFinitePolynomialPlanReplayArtifactVerifier();
-        var receiptReference = bytesVerifier.describeReceipt(receipt);
-        byte[] receiptBytes = receipt.toCanonicalJson().getBytes(StandardCharsets.UTF_8);
-        var checkedReceiptBytes = bytesVerifier.verifyReceipt(receiptReference,
-            ignored -> new LoadedArtifact(receiptReference.artifactId(), receiptBytes));
-        var receiptArtifact = new ExactFinitePolynomialPlanReplayReceiptArtifactVerifier()
-            .verify(checkedReceiptBytes);
-        var runReference = bytesVerifier.describePlanRun(run);
-        byte[] runBytes = run.toCanonicalJson().getBytes(StandardCharsets.UTF_8);
-        var checkedRunBytes = bytesVerifier.verifyPlanRun(runReference,
-            ignored -> new LoadedArtifact(runReference.artifactId(), runBytes));
-        var confirmation = new ExactFinitePolynomialPlanReplayConfirmationVerifier().verify(
-            receiptArtifact, checkedRunBytes, run, plan, source, ansatz, domains, retainedLimit);
-        var evidenceVerifier = new ExactFinitePolynomialPlanCandidateEvidenceVerifier();
-        // Deterministic selection without a historical endpoint or expected coefficient.
-        var evidence = run.candidates().stream()
-            .sorted(Comparator.comparing(ExactFinitePolynomialResolvedCandidate::contentHash))
-            .map(candidate -> evidenceVerifier.verify(confirmation, plan, run, candidate.contentHash()))
-            .toList();
-        return new Prepared(run, evidence);
-    }
-
-    private record Prepared(ExactFinitePolynomialPlanRun run,
-                            List<VerifiedCandidateEvidence> evidence) {}
 
     private record Chain(VerifiedCandidateEvidence first, VerifiedCandidateEvidence second) {
         String input() { return first.data().sourceExpression(); }
