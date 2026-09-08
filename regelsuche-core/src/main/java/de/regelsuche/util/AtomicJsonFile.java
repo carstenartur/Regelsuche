@@ -9,7 +9,7 @@ import java.nio.file.StandardCopyOption;
 
 /**
  * Small helper that centralises the "write-tmp-then-atomic-move" idiom used
- * by every persistent JSON store in the codebase
+ * by persistent JSON stores in the codebase
  * ({@code JsonFileProofCache}, {@code JsonFileProofJobRepository},
  * {@code JsonFileDidacticEventStore}, {@code JsonFileSearchGraphRepository}).
  *
@@ -26,26 +26,37 @@ public final class AtomicJsonFile {
 
     /**
      * Writes {@code contents} to {@code target}, ensuring parent directories
-     * exist and using an atomic temp-file swap so concurrent readers never
-     * see a partially-written file.
+     * exist. Each writer owns a unique temporary file in the destination
+     * directory. Replacement is atomic when the filesystem supports it;
+     * otherwise this falls back to a plain replacement move.
      *
      * @param target   destination path
      * @param contents UTF-8 payload to write
      * @throws IOException if the write or the move fails irrecoverably
      */
     public static void writeUtf8(Path target, String contents) throws IOException {
-        Path parent = target.getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
-        }
-        String tmpName = target.getFileName().toString() + ".tmp";
-        Path tmp = (parent != null) ? parent.resolve(tmpName) : Path.of(tmpName);
-        Files.writeString(tmp, contents, StandardCharsets.UTF_8);
+        Path destination = target.toAbsolutePath();
+        Files.createDirectories(destination.getParent());
+        Path tmp = Files.createTempFile(destination.getParent(), ".json-write-", ".tmp");
         try {
-            Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING,
+            Files.writeString(tmp, contents, StandardCharsets.UTF_8);
+            replace(tmp, destination);
+        } catch (IOException | RuntimeException failure) {
+            try {
+                Files.deleteIfExists(tmp);
+            } catch (IOException cleanupFailure) {
+                failure.addSuppressed(cleanupFailure);
+            }
+            throw failure;
+        }
+    }
+
+    private static void replace(Path source, Path destination) throws IOException {
+        try {
+            Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING,
                 StandardCopyOption.ATOMIC_MOVE);
         } catch (AtomicMoveNotSupportedException atomicNotSupported) {
-            Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+            Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 }

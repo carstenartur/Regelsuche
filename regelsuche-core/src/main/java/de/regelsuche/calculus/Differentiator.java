@@ -1,5 +1,6 @@
 package de.regelsuche.calculus;
 
+import de.regelsuche.assumption.ExpressionDefinedness;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
@@ -97,6 +98,9 @@ public final class Differentiator {
     private Expr powerRule(Expr base, Expr exponent, Expr baseDerivative, String variable) {
         if (exponent instanceof NumberExpr n) {
             ExactRational power = n.value();
+            if (power.equalsInteger(1)) {
+                return baseDerivative;
+            }
             // n * base^(n-1) * base'
             Expr coefficient = new NumberExpr(power);
             Expr reducedPower = new BinaryExpr(
@@ -125,7 +129,8 @@ public final class Differentiator {
      * Lightweight constant-folding pass that simplifies the syntactic noise
      * inherent to the chain rule (e.g. {@code <expr> * 1 -> <expr>},
      * {@code 0 + x -> x}). It deliberately stays AST-local and does not
-     * attempt full simplification.
+     * attempt full simplification. Elision uses the same real-domain guard as
+     * canonicalization and never silently introduces an assumption.
      */
     public static Expr simplify(Expr expr) {
         if (expr instanceof BinaryExpr binary) {
@@ -141,63 +146,73 @@ public final class Differentiator {
     }
 
     private static Expr foldBinary(Expr left, BinaryOperator op, Expr right) {
-        switch (op) {
-            case ADD -> {
-                if (isNumber(left, 0)) {
-                    return right;
-                }
-                if (isNumber(right, 0)) {
-                    return left;
-                }
-                if (left instanceof NumberExpr l && right instanceof NumberExpr r) {
-                    return new NumberExpr(l.value().add(r.value()));
-                }
-            }
-            case SUB -> {
-                if (isNumber(right, 0)) {
-                    return left;
-                }
-                if (left instanceof NumberExpr l && right instanceof NumberExpr r) {
-                    return new NumberExpr(l.value().subtract(r.value()));
-                }
-            }
-            case MUL -> {
-                if (isNumber(left, 0) || isNumber(right, 0)) {
-                    return new NumberExpr(0);
-                }
-                if (isNumber(left, 1)) {
-                    return right;
-                }
-                if (isNumber(right, 1)) {
-                    return left;
-                }
-                if (left instanceof NumberExpr l && right instanceof NumberExpr r) {
-                    return new NumberExpr(l.value().multiply(r.value()));
-                }
-            }
-            case DIV -> {
-                if (isNumber(right, 1)) {
-                    return left;
-                }
-                if (isNumber(left, 0)) {
-                    return new NumberExpr(0);
-                }
-            }
-            case POW -> {
-                if (isNumber(right, 1)) {
-                    return left;
-                }
-                if (isNumber(right, 0)) {
-                    return new NumberExpr(1);
-                }
-                if (isNumber(left, 1)) {
-                    return new NumberExpr(1);
-                }
-            }
-            default -> {
-            }
+        return switch (op) {
+            case ADD -> foldAddition(left, right);
+            case SUB -> foldSubtraction(left, right);
+            case MUL -> foldProduct(left, right);
+            case DIV -> foldDivision(left, right);
+            case POW -> foldPower(left, right);
+        };
+    }
+
+    private static Expr foldAddition(Expr left, Expr right) {
+        if (isNumber(left, 0)) {
+            return right;
         }
-        return new BinaryExpr(left, op, right);
+        if (isNumber(right, 0)) {
+            return left;
+        }
+        if (left instanceof NumberExpr l && right instanceof NumberExpr r) {
+            return new NumberExpr(l.value().add(r.value()));
+        }
+        return new BinaryExpr(left, BinaryOperator.ADD, right);
+    }
+
+    private static Expr foldSubtraction(Expr left, Expr right) {
+        if (isNumber(right, 0)) {
+            return left;
+        }
+        if (left instanceof NumberExpr l && right instanceof NumberExpr r) {
+            return new NumberExpr(l.value().subtract(r.value()));
+        }
+        return new BinaryExpr(left, BinaryOperator.SUB, right);
+    }
+
+    private static Expr foldProduct(Expr left, Expr right) {
+        if ((isNumber(left, 0) && ExpressionDefinedness.isTotal(right))
+                || (isNumber(right, 0) && ExpressionDefinedness.isTotal(left))) {
+            return new NumberExpr(0);
+        }
+        if (isNumber(left, 1)) {
+            return right;
+        }
+        if (isNumber(right, 1)) {
+            return left;
+        }
+        if (left instanceof NumberExpr l && right instanceof NumberExpr r) {
+            return new NumberExpr(l.value().multiply(r.value()));
+        }
+        return new BinaryExpr(left, BinaryOperator.MUL, right);
+    }
+
+    private static Expr foldDivision(Expr left, Expr right) {
+        if (isNumber(right, 1)) {
+            return left;
+        }
+        Expr division = new BinaryExpr(left, BinaryOperator.DIV, right);
+        return isNumber(left, 0) && ExpressionDefinedness.isTotal(division) ? new NumberExpr(0) : division;
+    }
+
+    private static Expr foldPower(Expr left, Expr right) {
+        if (isNumber(right, 1)) {
+            return left;
+        }
+        Expr power = new BinaryExpr(left, BinaryOperator.POW, right);
+        if ((isNumber(right, 0) && ExpressionDefinedness.isTotal(power))
+                || (isNumber(left, 1) && ExpressionDefinedness.isTotal(right))) {
+            return new NumberExpr(1);
+        }
+        return power;
     }
 
     private static boolean isNumber(Expr expr, long value) {

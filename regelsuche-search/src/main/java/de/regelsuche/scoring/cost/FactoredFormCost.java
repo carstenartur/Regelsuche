@@ -24,7 +24,8 @@ public final class FactoredFormCost implements CostModel {
             // Fall back to operator count without structural knowledge.
             return Math.max(0, score.operatorCount());
         }
-        return baseCost(parsedAst) + topLevelAdditionPenalty(parsedAst) - factorizationBonus(parsedAst);
+        return (int) Math.clamp((long) baseCost(parsedAst) + topLevelAdditionPenalty(parsedAst)
+            - factorizationBonus(parsedAst), 0, Integer.MAX_VALUE);
     }
 
     @Override

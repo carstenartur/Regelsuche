@@ -3,10 +3,10 @@ package de.regelsuche.search.strategy;
 public class AStarSearchStrategy extends BestFirstSearchStrategy {
     @Override
     protected int priority(SearchState state) {
-        int costSoFar = state.depth() * 3 + state.expandedStepCount() * 4;
-        int estimatedRemainingCost = Math.max(0, state.score().weightedTotal() - state.score().recognizedPatternBonus());
+        long costSoFar = state.depth() * 3L + state.expandedStepCount() * 4L;
+        long estimatedRemainingCost = Math.max(0, (long) state.score().weightedTotal() - state.score().recognizedPatternBonus());
         int diversityBonus = Math.min(6, state.appliedRuleIds().stream().distinct().toList().size());
-        return costSoFar + estimatedRemainingCost - diversityBonus;
+        return SearchPriority.saturate(costSoFar + estimatedRemainingCost - diversityBonus);
     }
 
     @Override
@@ -14,13 +14,10 @@ public class AStarSearchStrategy extends BestFirstSearchStrategy {
         if (problem.costModel() == null) {
             return priority(state);
         }
-        int costSoFar = state.depth() * 3 + state.expandedStepCount() * 4;
+        long costSoFar = state.depth() * 3L + state.expandedStepCount() * 4L;
         int modelCost = problem.costModel().cost(state.expression(), problem.canonicalizer(), state.score());
-        if (modelCost == Integer.MAX_VALUE) {
-            return Integer.MAX_VALUE / 2;
-        }
-        int estimatedRemainingCost = Math.max(0, modelCost - state.score().recognizedPatternBonus());
+        long estimatedRemainingCost = Math.max(0, (long) modelCost - state.score().recognizedPatternBonus());
         int diversityBonus = Math.min(6, state.appliedRuleIds().stream().distinct().toList().size());
-        return costSoFar + estimatedRemainingCost - diversityBonus;
+        return SearchPriority.saturate(costSoFar + estimatedRemainingCost - diversityBonus);
     }
 }

@@ -45,6 +45,11 @@ import java.util.function.ToIntFunction;
  *       matching is intentionally out of scope for PR 2b.</li>
  * </ul>
  * </p>
+ *
+ * <p>Only equivalence-preserving rules may merge classes. Concrete rule
+ * applications must introduce no unresolved assumptions. Pattern subclasses
+ * use concrete matching so their additional guards and apply semantics remain
+ * authoritative; the direct e-node path is reserved for the base pattern rule.</p>
  */
 public final class EqualitySaturation {
 
@@ -188,52 +193,77 @@ public final class EqualitySaturation {
         List<EClassId> deterministicSnapshot = canonicalSorted(eGraph, classSnapshot);
 
         for (RewriteRule rule : rules) {
-            if (rule instanceof PatternRewriteRule pattern) {
-                List<EGraphPatternMatcher.Match> matches = matcher.matchAll(rule.id(), pattern.source(), deterministicSnapshot);
-                for (EGraphPatternMatcher.Match match : matches) {
-                    EClassId rhs = applier.instantiate(pattern.target(), match.bindings());
-                    EClassId lhs = eGraph.find(match.root());
-                    if (!eGraph.areEquivalent(lhs, rhs)) {
-                        eGraph.union(lhs, rhs);
-                        appliedRules.merge(rule.id(), 1, Integer::sum);
-                        fired++;
-                    }
-                }
-            } else {
-                Set<EClassId> seen = new LinkedHashSet<>();
-                for (EClassId raw : deterministicSnapshot) {
-                    EClassId canonical = eGraph.find(raw);
-                    if (!seen.add(canonical)) {
-                        continue;
-                    }
-                    Expr representative;
-                    try {
-                        representative = eGraph.extract(canonical, costOfNode);
-                    } catch (IllegalStateException ex) {
-                        continue;
-                    }
-                    if (!rule.matches(representative)) {
-                        continue;
-                    }
-                    Expr rewritten;
-                    try {
-                        rewritten = rule.apply(representative);
-                    } catch (RuntimeException ex) {
-                        continue;
-                    }
-                    if (rewritten == null || rewritten.equals(representative)) {
-                        continue;
-                    }
-                    EClassId rhs = eGraph.addExpression(rewritten);
-                    if (!eGraph.areEquivalent(canonical, rhs)) {
-                        eGraph.union(canonical, rhs);
-                        appliedRules.merge(rule.id(), 1, Integer::sum);
-                        fired++;
-                    }
-                }
+            if (!rule.isEquivalencePreservingByConstruction()) {
+                continue;
+            }
+            // Only the unmodified pattern implementation has no additional
+            // matching, assumption or apply semantics to preserve.
+            int applications = rule.getClass() == PatternRewriteRule.class
+                ? applyPattern(eGraph, matcher, applier, (PatternRewriteRule) rule, deterministicSnapshot)
+                : applyConcrete(eGraph, rule, costOfNode, deterministicSnapshot);
+            if (applications > 0) {
+                appliedRules.merge(rule.id(), applications, Integer::sum);
+                fired += applications;
             }
         }
         return fired;
+    }
+
+    private int applyPattern(EGraph graph, EGraphPatternMatcher matcher, EGraphPatternApplier applier,
+            PatternRewriteRule rule, List<EClassId> snapshot) {
+        int fired = 0;
+        List<EGraphPatternMatcher.Match> matches = matcher.matchAll(rule.id(), rule.source(), snapshot);
+        for (EGraphPatternMatcher.Match match : matches) {
+            EClassId rhs = applier.instantiate(rule.target(), match.bindings());
+            EClassId lhs = graph.find(match.root());
+            if (!graph.areEquivalent(lhs, rhs)) {
+                graph.union(lhs, rhs);
+                fired++;
+            }
+        }
+        return fired;
+    }
+
+    private int applyConcrete(EGraph graph, RewriteRule rule, ToIntFunction<ENode> costOfNode,
+            List<EClassId> snapshot) {
+        int fired = 0;
+        Set<EClassId> seen = new LinkedHashSet<>();
+        for (EClassId raw : snapshot) {
+            EClassId canonical = graph.find(raw);
+            if (!seen.add(canonical)) {
+                continue;
+            }
+            Expr rewritten = rewriteConcrete(graph, canonical, rule, costOfNode);
+            if (rewritten == null) {
+                continue;
+            }
+            EClassId rhs = graph.addExpression(rewritten);
+            if (!graph.areEquivalent(canonical, rhs)) {
+                graph.union(canonical, rhs);
+                fired++;
+            }
+        }
+        return fired;
+    }
+
+    private Expr rewriteConcrete(EGraph graph, EClassId source, RewriteRule rule,
+            ToIntFunction<ENode> costOfNode) {
+        Expr representative;
+        try {
+            representative = graph.extract(source, costOfNode);
+        } catch (IllegalStateException ex) {
+            return null;
+        }
+        if (!rule.matches(representative) || !rule.assumptions(representative).isEmpty()) {
+            // An unconditional e-class cannot retain an undischarged guard.
+            return null;
+        }
+        try {
+            Expr rewritten = rule.apply(representative);
+            return representative.equals(rewritten) ? null : rewritten;
+        } catch (RuntimeException ex) {
+            return null;
+        }
     }
 
     private static Collection<EClassId> allClasses(EGraph eGraph) {

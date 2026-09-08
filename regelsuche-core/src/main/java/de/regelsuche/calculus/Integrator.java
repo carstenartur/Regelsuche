@@ -19,7 +19,7 @@ import java.util.Optional;
  *   <li>constant: {@code ∫ c dx = c*x},</li>
  *   <li>variable: {@code ∫ x dx = x^2 / 2},</li>
  *   <li>power (constant exponent {@code n != -1}): {@code ∫ x^n dx = x^(n+1)/(n+1)},</li>
- *   <li>{@code ∫ 1/x dx = ln(x)},</li>
+ *   <li>{@code ∫ 1/x dx = ln(abs(x))} on intervals excluding zero,</li>
  *   <li>{@code ∫ exp(x) dx = exp(x)}, {@code ∫ sin(x) dx = -cos(x)}, {@code ∫ cos(x) dx = sin(x)},</li>
  *   <li>linearity: {@code ∫ (f + g) dx = ∫f + ∫g}, {@code ∫ c*f dx = c * ∫f}.</li>
  * </ul>

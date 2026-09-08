@@ -126,25 +126,8 @@ public class BeamSearchStrategy implements SearchStrategy {
         return explored;
     }
 
-    private int priority(SearchState state) {
-        int depthPenalty = state.depth() * 2;
-        int expansionPenalty = state.expandedStepCount() * 5;
-        int noImprovementPenalty = state.improvement() <= 0 && state.depth() > 0 ? 4 : 0;
-        return state.score().weightedTotal() + depthPenalty + expansionPenalty + noImprovementPenalty;
-    }
-
     private int priority(SearchState state, SearchProblem problem) {
-        if (problem.costModel() == null) {
-            return priority(state);
-        }
-        int depthPenalty = state.depth() * 2;
-        int expansionPenalty = state.expandedStepCount() * 5;
-        int noImprovementPenalty = state.improvement() <= 0 && state.depth() > 0 ? 4 : 0;
-        int modelCost = problem.costModel().cost(state.expression(), problem.canonicalizer(), state.score());
-        if (modelCost == Integer.MAX_VALUE) {
-            return Integer.MAX_VALUE / 2;
-        }
-        return modelCost + depthPenalty + expansionPenalty + noImprovementPenalty;
+        return SearchPriority.bestFirst(state, problem);
     }
 
     private String stateKey(SearchState state) {

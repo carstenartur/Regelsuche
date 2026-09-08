@@ -13,12 +13,10 @@ import java.util.List;
 /**
  * Rewards structurally symmetric expressions over asymmetric ones.
  *
- * <p>A sum {@code a + b} or product {@code a * b} is considered symmetric
- * when its canonical operands sort identically once viewed as a multiset —
- * which is automatically the case after PR 1 canonicalization. The cost
- * model goes one step further and rewards "palindromic" polynomial
- * coefficient sequences (e.g. {@code 1 + 3*x + 3*x^2 + x^3}) which the
- * search would otherwise treat as a long sum.</p>
+ * <p>The heuristic rewards sums and products with similarly sized operand
+ * strings and exact palindromic operand sequences such as {@code a + b + a}.
+ * It charges six units per operator before subtracting at most five bonus
+ * units per operator, so symmetry rewards never produce negative costs.</p>
  *
  * <p>Used by {@link TransformationGoal#PROOF_FRIENDLY PROOF_FRIENDLY},
  * where symmetric structures simplify case-splits in subsequent proof
@@ -29,11 +27,13 @@ public final class SymmetryCost implements CostModel {
     @Override
     public int cost(String expression, Expr parsedAst, ExpressionScore score) {
         if (parsedAst == null) {
-            return Math.max(0, score.operatorCount());
+            return (int) Math.clamp(6L * score.operatorCount(), 0, Integer.MAX_VALUE);
         }
         int operators = countOperators(parsedAst);
         int symmetryBonus = symmetryBonus(parsedAst);
-        return operators - symmetryBonus;
+        // Each operator has at most five bonus units. Charging six units
+        // leaves a positive structural cost while preserving symmetry rewards.
+        return (int) Math.min(Integer.MAX_VALUE, 6L * operators - symmetryBonus);
     }
 
     @Override
@@ -86,9 +86,8 @@ public final class SymmetryCost implements CostModel {
 
     /**
      * Sums or products with three or more operands whose canonical strings
-     * sort into a multiset of equal-length tokens get a small bonus. The
-     * post-PR-1 canonicalizer already produces a sorted representation, so
-     * any large sum that looks "rectangular" is rewarded.
+     * have nearly equal lengths get a small bonus. This is a textual
+     * uniformity heuristic, not a polynomial coefficient symmetry test.
      */
     private int commutativeBonus(List<String> operands) {
         if (operands.size() < 3) {
@@ -125,25 +124,4 @@ public final class SymmetryCost implements CostModel {
         return anyMirrored ? 3 : 0;
     }
 
-    /** Two operands have the same "shape" — unused after the palindrome
-     * tightening above, kept for binary compatibility within the package. */
-    @SuppressWarnings("unused")
-    private boolean sameShape(String left, String right) {
-        return skeleton(left).equals(skeleton(right));
-    }
-
-    private String skeleton(String operand) {
-        StringBuilder builder = new StringBuilder(operand.length());
-        for (int i = 0; i < operand.length(); i++) {
-            char character = operand.charAt(i);
-            if (Character.isDigit(character)) {
-                builder.append('n');
-            } else if (Character.isLetter(character)) {
-                builder.append('v');
-            } else if (!Character.isWhitespace(character)) {
-                builder.append(character);
-            }
-        }
-        return builder.toString();
-    }
 }

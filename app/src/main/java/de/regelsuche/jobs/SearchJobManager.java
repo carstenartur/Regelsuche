@@ -1,5 +1,6 @@
 package de.regelsuche.jobs;
 
+import de.regelsuche.util.AtomicJsonFile;
 import de.regelsuche.checkpoint.InMemorySearchCheckpointRepository;
 import de.regelsuche.checkpoint.SearchCheckpoint;
 import de.regelsuche.checkpoint.SearchCheckpointRepository;
@@ -190,7 +191,7 @@ public class SearchJobManager {
             builder.append('\n');
         }
         builder.append("  ]\n}\n");
-        Files.writeString(file, builder.toString(), StandardCharsets.UTF_8);
+        AtomicJsonFile.writeUtf8(file, builder.toString());
     }
 
     /**
