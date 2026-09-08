@@ -1,6 +1,6 @@
 # Post-formation routing into exact polynomial theory
 
-**Implementation status: 30 August 2026**
+**Implementation status: 8 September 2026**
 
 ## Purpose
 
@@ -43,6 +43,13 @@ best-of policy.
 The observer is injected through the existing
 `RuleCandidateFormationObserver` constructor parameter of `RuleCandidateMiner`.
 The miner itself needs no second event system, publisher or lifecycle.
+
+The observer now returns `RETAIN_FOR_REVIEW` or `DERIVED_CACHE_ONLY`.
+The miner excludes the latter from its ordinary promotion output. An optional
+verified handoff receives the exact positive classification after outcome
+retention. The application composition connects that authority to the same
+bounded executable cache used by search; see
+[exact polynomial search integration](exact-polynomial-search-integration.md).
 
 ## Formation evidence remains independent
 
@@ -208,6 +215,6 @@ only verifier-subsumed cases to a bounded theory-derived macro cache.
 
 It does not establish that enabling this route improves search, that the cache
 should be a product default, that a candidate is externally novel, that the
-factorization engine is complete, or that cached macro lookup is already an
-executable search transition. Those decisions require the frozen matched-work
-profile comparison under issue #748.
+factorization engine is complete. Executable occurrence replay is provided by
+the explicit search integration, while search utility and default decisions
+still require the frozen matched-work profile comparison under issue #748.

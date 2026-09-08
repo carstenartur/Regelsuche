@@ -581,6 +581,7 @@ public final class PolynomialTheorySubsumptionClassifier {
     /** Classifier-issued immutable theory evidence. */
     public static final class Classification {
         private final State state;
+        private final Optional<ExactFactorizationTransformationPipeline.Result> transformation;
 
         private Classification(
             Status status,
@@ -592,8 +593,15 @@ public final class PolynomialTheorySubsumptionClassifier {
             String applicationKey,
             long workUnits,
             ProjectInventoryNovelty projectInventoryNovelty,
-            RetentionDisposition retentionDisposition
+            RetentionDisposition retentionDisposition,
+            Optional<ExactFactorizationTransformationPipeline.Result> transformation
         ) {
+            this.transformation = Objects.requireNonNull(transformation, "transformation");
+            if ((status == Status.THEORY_SUBSUMED) != transformation.isPresent()
+                    || transformation.isPresent() && (!transformation.orElseThrow().transformed()
+                        || !transformation.orElseThrow().certificateHash().equals(applicationKey))) {
+                throw new IllegalArgumentException("classification must retain its original verifier authorization");
+            }
             Status checkedStatus = Objects.requireNonNull(
                 status,
                 "status");
@@ -659,7 +667,8 @@ public final class PolynomialTheorySubsumptionClassifier {
                 transformation.certificateHash(),
                 workUnits,
                 ProjectInventoryNovelty.NOT_EVALUATED,
-                RetentionDisposition.DERIVED_MACRO_CACHE_ONLY);
+                RetentionDisposition.DERIVED_MACRO_CACHE_ONLY,
+                Optional.of(transformation));
         }
 
         private static Classification failure(
@@ -677,7 +686,8 @@ public final class PolynomialTheorySubsumptionClassifier {
                 "",
                 workUnits,
                 ProjectInventoryNovelty.NOT_EVALUATED,
-                RetentionDisposition.NONE);
+                RetentionDisposition.NONE,
+                Optional.empty());
         }
 
         public Status status() {
@@ -722,6 +732,11 @@ public final class PolynomialTheorySubsumptionClassifier {
 
         public boolean subsumed() {
             return status() == Status.THEORY_SUBSUMED;
+        }
+
+        /** Executable primitive evidence, distinct from the canonical pattern display. */
+        public Optional<ExactFactorizationTransformationPipeline.Result> transformation() {
+            return transformation;
         }
 
         @Override

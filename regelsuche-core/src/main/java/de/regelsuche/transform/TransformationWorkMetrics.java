@@ -22,7 +22,8 @@ public record TransformationWorkMetrics(
     long alternativeSelections,
     long alternativesSkipped,
     long duplicateCandidatesDropped,
-    ExecutionWork candidateWork
+    ExecutionWork candidateWork,
+    long delegatedMechanicalWorkUnits
 ) {
     public static final TransformationWorkMetrics ZERO =
         new TransformationWorkMetrics(
@@ -31,6 +32,7 @@ public record TransformationWorkMetrics(
 
     public TransformationWorkMetrics {
         candidateWork = java.util.Objects.requireNonNull(candidateWork, "candidateWork");
+        requireNonNegative(delegatedMechanicalWorkUnits, "delegatedMechanicalWorkUnits");
         requireNonNegative(engineInvocations, "engineInvocations");
         requireNonNegative(programNodeVisits, "programNodeVisits");
         requireNonNegative(sourceInvocations, "sourceInvocations");
@@ -51,6 +53,18 @@ public record TransformationWorkMetrics(
             throw new IllegalArgumentException(
                 "requirementRejections must not exceed requirementEvaluations");
         }
+    }
+
+    /** Existing event-only observations retain their exact zero-delegation formula. */
+    public TransformationWorkMetrics(long engineInvocations, long programNodeVisits, long sourceInvocations,
+            long sourceCandidates, long composedCandidates, long requirementEvaluations,
+            long requirementRejections, long priorityCandidatesOrdered, long prunedCandidates,
+            long repeatIterations, long repeatEndpoints, long alternativeSelections,
+            long alternativesSkipped, long duplicateCandidatesDropped, ExecutionWork candidateWork) {
+        this(engineInvocations, programNodeVisits, sourceInvocations, sourceCandidates, composedCandidates,
+            requirementEvaluations, requirementRejections, priorityCandidatesOrdered, prunedCandidates,
+            repeatIterations, repeatEndpoints, alternativeSelections, alternativesSkipped,
+            duplicateCandidatesDropped, candidateWork, 0);
     }
 
     /** Frozen v1 constructor: historical mechanical reports retain their scalar formula. */
@@ -105,7 +119,8 @@ public record TransformationWorkMetrics(
             add(repeatEndpoints, other.repeatEndpoints),
             add(alternativeSelections, other.alternativeSelections),
             add(alternativesSkipped, other.alternativesSkipped),
-            add(duplicateCandidatesDropped, other.duplicateCandidatesDropped), candidateWork.plus(other.candidateWork));
+            add(duplicateCandidatesDropped, other.duplicateCandidatesDropped), candidateWork.plus(other.candidateWork),
+            add(delegatedMechanicalWorkUnits, other.delegatedMechanicalWorkUnits));
     }
 
     public TransformationWorkMetrics withDuplicateCandidatesDropped(
@@ -126,14 +141,21 @@ public record TransformationWorkMetrics(
             repeatEndpoints,
             alternativeSelections,
             alternativesSkipped,
-            add(duplicateCandidatesDropped, additional), candidateWork);
+            add(duplicateCandidatesDropped, additional), candidateWork, delegatedMechanicalWorkUnits);
     }
 
     public TransformationWorkMetrics withCandidateWork(ExecutionWork work) {
         return new TransformationWorkMetrics(engineInvocations, programNodeVisits, sourceInvocations,
             sourceCandidates, composedCandidates, requirementEvaluations, requirementRejections,
             priorityCandidatesOrdered, prunedCandidates, repeatIterations, repeatEndpoints,
-            alternativeSelections, alternativesSkipped, duplicateCandidatesDropped, work);
+            alternativeSelections, alternativesSkipped, duplicateCandidatesDropped, work, delegatedMechanicalWorkUnits);
+    }
+
+    public TransformationWorkMetrics withDelegatedMechanicalWork(long units) {
+        return new TransformationWorkMetrics(engineInvocations, programNodeVisits, sourceInvocations,
+            sourceCandidates, composedCandidates, requirementEvaluations, requirementRejections,
+            priorityCandidatesOrdered, prunedCandidates, repeatIterations, repeatEndpoints,
+            alternativeSelections, alternativesSkipped, duplicateCandidatesDropped, candidateWork, units);
     }
 
     /** v2 includes all observed mathematical candidate work, even if later discarded. */
@@ -142,8 +164,9 @@ public record TransformationWorkMetrics(
     }
 
     /**
-     * Frozen v1 scalar work formula. Every retained mechanical event contributes
-     * one unit. Individual fields remain authoritative for later analysis.
+     * Each retained event contributes one unit; separately measured delegated
+     * mechanics are added without relabeling them as fictitious invocations.
+     * Event-only historical observations retain exactly their frozen v1 total.
      */
     public long totalWorkUnits() {
         long total = 0;
@@ -160,7 +183,7 @@ public record TransformationWorkMetrics(
         total = add(total, repeatEndpoints);
         total = add(total, alternativeSelections);
         total = add(total, alternativesSkipped);
-        return add(total, duplicateCandidatesDropped);
+        return add(add(total, duplicateCandidatesDropped), delegatedMechanicalWorkUnits);
     }
 
     private static long add(long left, long right) {

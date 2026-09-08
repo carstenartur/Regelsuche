@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
  * <h3>Why does {@code TreePosition} carry {@code text}?</h3>
  * <p>The {@code text} field serves as a <em>staleness guard</em>: when a
  * {@code TreePosition} is created from an enumeration result and later handed
- * back to {@link de.regelsuche.moves.apply.LocalRewriteApplier}, the applier
+ * back to the application's {@code LocalRewriteApplier}, the applier
  * compares {@code text} against the formatted subtree it finds at {@code path}
  * in the live expression. If they differ (e.g. the expression was edited between
  * enumeration and application), the rewrite is rejected with a {@code "position
@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
  *
  * <p>Carrying text also makes positions self-describing for display in the Rule
  * Authoring IDE and for JSON serialisation: a client receives a
- * {@link de.regelsuche.ide.RuleInspectionDto.PositionResult} and can render the
+ * {@code RuleInspectionDto.PositionResult} and can render the
  * subtree label without an additional tree-walk.</p>
  *
  * <h3>Should {@code text} remain here long-term?</h3>

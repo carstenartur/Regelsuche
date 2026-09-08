@@ -162,11 +162,14 @@ This classifier migration does not itself:
 - select a production search policy;
 - establish performance utility.
 
-The next #748 slice must inject an explicitly configured observer at the merged
-`RuleCandidateFormationObserver` boundary, retain positive and negative
-classification outcomes separately, and give exactly one owner responsibility
-for any bounded cache handoff. Held-out utility and default-policy decisions
-remain later frozen experiments.
+The [post-formation observer](polynomial-theory-formation-routing.md) now
+provides that explicit classification and single-owner macro handoff, retaining
+positive and negative outcomes separately. The
+[application search integration](exact-polynomial-search-integration.md)
+connects the same issuer-owned result to an executable occurrence cache and
+diverts subsumed candidates from ordinary promotion. The classifier alone
+still does not activate these surfaces. Held-out utility and default-policy
+decisions remain later frozen experiments under #748.
 
 ## Claim boundary
 

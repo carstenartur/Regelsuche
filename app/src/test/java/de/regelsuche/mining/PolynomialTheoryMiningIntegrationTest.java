@@ -10,9 +10,49 @@ import de.regelsuche.transform.PolynomialDerivedMacroCache;
 import de.regelsuche.transform.PolynomialTheorySubsumptionClassifier;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class PolynomialTheoryMiningIntegrationTest {
+    @Test
+    void verifiedHandoffCanWaitForClassificationOnAnotherThread() {
+        var cache = new PolynomialDerivedMacroCache(4);
+        var ledger = new PolynomialTheoryFormationOutcomeLedger(8);
+        var observerReference = new AtomicReference<PolynomialTheoryCandidateObserver>();
+        var handoffs = new AtomicInteger();
+        var worker = Executors.newSingleThreadExecutor();
+        try {
+            var observer = new PolynomialTheoryCandidateObserver(
+                new PolynomialTheorySubsumptionClassifier(NativeUnivariateFactorizationEngine.boundedRationals()),
+                cache, ledger, (classification, evidence) -> {
+                    if (handoffs.incrementAndGet() != 1) return;
+                    var retained = ledger.entries().getFirst();
+                    assertEquals(classification, retained.classification());
+                    assertEquals(evidence, retained.formationEvidence());
+                    assertEquals(1, cache.size());
+                    var nested = worker.submit(() -> observerReference.get().onCandidateFormed(
+                        retained.candidate(), retained.formationEvidence()));
+                    try {
+                        assertEquals(RuleCandidateFormationObserver.Disposition.DERIVED_CACHE_ONLY,
+                            nested.get(5, TimeUnit.SECONDS));
+                    } catch (Exception failure) {
+                        throw new AssertionError("handoff prevented another classification from completing", failure);
+                    }
+                });
+            observerReference.set(observer);
+            assertTrue(miner(new KnownRuleRepository(), observer).mineFromSinglePathForValidatedSchema(
+                path("handoff:outer", "x", "observed-factorization")).isEmpty());
+            assertEquals(2, handoffs.get());
+            assertEquals(1, ledger.size());
+            assertEquals(1, ledger.stats().duplicates());
+        } finally {
+            worker.shutdownNow();
+        }
+    }
+
     @Test
     void minedFactorizationIsClassifiedAndRetainedAcrossGenerations() {
         PolynomialDerivedMacroCache macroCache =
@@ -28,12 +68,13 @@ class PolynomialTheoryMiningIntegrationTest {
                 ledger);
         KnownRuleRepository knownRules = new KnownRuleRepository();
 
-        RuleCandidate first = miner(knownRules, observer)
+        assertTrue(miner(knownRules, observer)
             .mineFromSinglePathForValidatedSchema(path(
                 "generation:1:path:x",
                 "x",
                 "observed-factorization-generation-1"))
-            .orElseThrow();
+            .isEmpty(), "theory-derived identities must not reach ordinary promotion");
+        RuleCandidate first = ledger.entries().getFirst().candidate();
 
         assertTrue(first.equivalenceVerified());
         assertEquals(1, macroCache.size());
@@ -70,12 +111,13 @@ class PolynomialTheoryMiningIntegrationTest {
             "the cached macro expands through the verifier-authorized "
                 + "theory method, not the mining path's source rule label");
 
-        RuleCandidate second = miner(knownRules, observer)
+        assertTrue(miner(knownRules, observer)
             .mineFromSinglePathForValidatedSchema(path(
                 "generation:2:path:y",
                 "y",
                 "observed-factorization-generation-2"))
-            .orElseThrow();
+            .isEmpty());
+        RuleCandidate second = ledger.entries().getLast().candidate();
 
         assertEquals(first.canonicalHash(), second.canonicalHash());
         assertEquals(1, macroCache.size());

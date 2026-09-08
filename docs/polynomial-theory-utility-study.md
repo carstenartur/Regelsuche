@@ -185,6 +185,14 @@ jeweiligen Ausgabeordner erscheint.
 
 ## Nächster Evidence-Slice
 
+Die [Produktintegration für Suche, Cache und Lernen](exact-polynomial-search-integration.md)
+ist inzwischen ausdrücklich konfigurierbar. Die Zulassungsdiagnose für ihre
+konservative Roharbeitsgrenze stoppt jedoch bei allen 360 eingefrorenen
+Eingaben der drei allgemeinen Profile vor einem Engine-Aufruf. Dies ist kein
+vollständiger Studienlauf und kein negatives mathematisches Ergebnis.
+Zunächst fehlt eine nachweislich budgettreue Laufzeitabbildung der kanonischen
+Arbeitsautorität; die eingefrorenen Grenzen werden nicht nachträglich erhöht.
+
 Als Nächstes werden die fünf ausführbaren Profiladapter gegen die 600
 unveränderlichen Eingabeumschläge implementiert. Sie dürfen ausschließlich
 einen versionierten zielblinden Candidate-Freeze erzeugen. Erst nachdem dessen

@@ -294,11 +294,12 @@ class RuleCandidateMinerFormationRoutingTest {
         private final List<Call> calls = new ArrayList<>();
 
         @Override
-        public void onCandidateFormed(
+        public Disposition onCandidateFormed(
             RuleCandidate candidate,
             Evidence evidence
         ) {
             calls.add(new Call(candidate, evidence));
+            return Disposition.RETAIN_FOR_REVIEW;
         }
     }
 

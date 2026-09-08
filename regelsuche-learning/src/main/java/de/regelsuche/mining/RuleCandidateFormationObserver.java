@@ -10,13 +10,20 @@ import java.util.Objects;
  * evidence that led to that formation.
  *
  * <p>The callback is deliberately positioned after candidate formation. It
- * must not mutate, promote or replace the candidate. A configured observer is
+ * must not mutate, promote or replace the candidate. It explicitly routes the
+ * unchanged candidate to ordinary review or exclusively to a derived cache.
+ * A configured observer is
  * part of the fail-closed formation lifecycle: if it rejects the evidence, the
  * mining call does not pretend that post-formation processing succeeded.</p>
  */
 @FunctionalInterface
 public interface RuleCandidateFormationObserver {
-    void onCandidateFormed(RuleCandidate candidate, Evidence evidence);
+    Disposition onCandidateFormed(RuleCandidate candidate, Evidence evidence);
+
+    enum Disposition {
+        RETAIN_FOR_REVIEW,
+        DERIVED_CACHE_ONLY
+    }
 
     /**
      * Formation evidence retained independently from any later theory
