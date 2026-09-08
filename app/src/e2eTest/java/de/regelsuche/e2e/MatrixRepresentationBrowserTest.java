@@ -57,6 +57,9 @@ class MatrixRepresentationBrowserTest {
     }
 
     @Test void navigatesSourceAndMatrixThenExportsAndReplaysAfterReload() throws Exception {
+        page.navigate(app.baseUrl());
+        page.locator("#openRepresentationWorkbench").click();
+        page.waitForURL("**/static/representations.html");
         analyze();
         var card = page.locator("[data-origin='REPEATED_SOURCE_LINEAR_FORMS']");
         assertEquals(1, card.count());
