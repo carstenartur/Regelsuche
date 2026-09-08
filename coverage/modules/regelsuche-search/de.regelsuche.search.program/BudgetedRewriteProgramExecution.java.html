@@ -43,9 +43,9 @@ public final class BudgetedRewriteProgramExecution {
         }
 
         public PathBudget after(de.regelsuche.transform.ExecutionWork work) {
-<span class="nc bnc" id="L46" title="All 2 branches missed.">            if (!admits(work)) throw new IllegalArgumentException(&quot;path exceeds its primitive/theory authority&quot;);</span>
-<span class="nc" id="L47">            return new PathBudget(primitiveRewriteUnits - work.primitiveRewrites(),</span>
-<span class="nc" id="L48">                exactTheoryWorkUnits - work.exactTheoryWorkUnits());</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">            if (!admits(work)) throw new IllegalArgumentException(&quot;path exceeds its primitive/theory authority&quot;);</span>
+<span class="fc" id="L47">            return new PathBudget(primitiveRewriteUnits - work.primitiveRewrites(),</span>
+<span class="fc" id="L48">                exactTheoryWorkUnits - work.exactTheoryWorkUnits());</span>
         }
     }
 

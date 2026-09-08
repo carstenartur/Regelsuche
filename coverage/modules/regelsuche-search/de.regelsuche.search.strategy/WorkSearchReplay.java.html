@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WorkSearchReplay.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.strategy</a> &gt; <span class="el_source">WorkSearchReplay.java</span></div><h1>WorkSearchReplay.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.strategy;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.search.program.BudgetedRewriteProgramExecution.PathBudget;
+import de.regelsuche.search.program.RewriteCandidate;
+import de.regelsuche.search.program.RewriteExecution;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Metrics;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Problem;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Result;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.State;
+import de.regelsuche.transform.ExecutionWork;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationProvenance;
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.util.List;
+import java.util.Objects;
+
+/** Canonical observation and replay comparison; JSON never creates executable evidence. */
+public final class WorkSearchReplay {
+    public static final String SCHEMA = &quot;regelsuche.work-search-replay/v1&quot;;
+
+    private WorkSearchReplay() {}
+
+    /**
+     * Re-executes trusted sources and compares every retained work/provenance field.
+     * The caller must reconstruct theory sources through their full verifier
+     * pipeline; this method does not turn serialized evidence into authority.
+     */
+    public static Result verify(String expectedCanonicalJson, Problem independentlyVerifiedProblem) {
+<span class="nc" id="L30">        Objects.requireNonNull(expectedCanonicalJson, &quot;expectedCanonicalJson&quot;);</span>
+<span class="nc" id="L31">        var replay = new WorkBudgetBestFirstSearchStrategy().search(independentlyVerifiedProblem);</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">        if (!replay.toCanonicalJson().equals(expectedCanonicalJson)) {</span>
+<span class="nc" id="L33">            throw new IllegalArgumentException(&quot;search replay differs in state, provenance, work or decisions&quot;);</span>
+        }
+<span class="nc" id="L35">        return replay;</span>
+    }
+
+    public static String toCanonicalJson(Result result) {
+<span class="nc" id="L39">        var json = new JsonWriter().beginObject().property(&quot;schema&quot;, SCHEMA)</span>
+<span class="nc" id="L40">            .property(&quot;workRevision&quot;, result.metrics().workRevision().schema())</span>
+<span class="nc" id="L41">            .object(&quot;configuration&quot;, item -&gt; writeConfiguration(item, result))</span>
+<span class="nc" id="L42">            .property(&quot;status&quot;, result.status().name())</span>
+<span class="nc" id="L43">            .property(&quot;expansionsComplete&quot;, result.expansionsComplete())</span>
+<span class="nc" id="L44">            .object(&quot;metrics&quot;, item -&gt; writeMetrics(item, result.metrics()))</span>
+<span class="nc" id="L45">            .array(&quot;exploredStates&quot;, array -&gt; result.exploredStates().forEach(</span>
+<span class="nc" id="L46">                state -&gt; array.objectValue(item -&gt; writeState(item, state))))</span>
+<span class="nc" id="L47">            .object(&quot;bestState&quot;, item -&gt; writeState(item, result.bestState()));</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        if (result.reachedState() == null) json.nullProperty(&quot;reachedState&quot;);</span>
+<span class="nc" id="L49">        else json.object(&quot;reachedState&quot;, item -&gt; writeState(item, result.reachedState()));</span>
+<span class="nc" id="L50">        json.array(&quot;expansions&quot;, array -&gt; result.expansions().forEach(call -&gt; array.objectValue(item -&gt; {</span>
+<span class="nc" id="L51">            item.object(&quot;source&quot;, state -&gt; writeState(state, call.source()));</span>
+<span class="nc" id="L52">            item.object(&quot;execution&quot;, execution -&gt; writeExecution(execution, call.execution()));</span>
+<span class="nc" id="L53">        })));</span>
+<span class="nc" id="L54">        json.array(&quot;candidateDecisions&quot;, array -&gt; result.candidateDecisions().forEach(decision -&gt; array.objectValue(item -&gt; {</span>
+<span class="nc" id="L55">            item.object(&quot;source&quot;, state -&gt; writeState(state, decision.source())).property(&quot;outcome&quot;, decision.outcome().name());</span>
+<span class="nc" id="L56">            writePath(item, decision.source().expression(), List.of(decision.transformation()));</span>
+<span class="nc" id="L57">        })));</span>
+<span class="nc" id="L58">        return json.endObject().toString();</span>
+    }
+
+    private static void writeConfiguration(JsonWriter json, Result result) {
+<span class="nc" id="L62">        var configuration = result.configuration();</span>
+<span class="nc" id="L63">        var budget = configuration.budget();</span>
+<span class="nc" id="L64">        json.property(&quot;inputExpression&quot;, configuration.inputExpression()).property(&quot;targetExpression&quot;, configuration.targetExpression())</span>
+<span class="nc" id="L65">            .property(&quot;workRevision&quot;, configuration.workRevision().schema())</span>
+<span class="nc" id="L66">            .property(&quot;maxPrimitiveSteps&quot;, budget.maxPrimitiveSteps()).property(&quot;maxExactTheoryWorkUnits&quot;, budget.maxExactTheoryWorkUnits())</span>
+<span class="nc" id="L67">            .property(&quot;maxExploredStates&quot;, budget.maxExploredStates()).property(&quot;maxCandidatesPerState&quot;, budget.maxCandidatesPerState())</span>
+<span class="nc" id="L68">            .property(&quot;maxExpandingSteps&quot;, budget.maxExpandingSteps()).property(&quot;maxWorkUnits&quot;, budget.maxWorkUnits());</span>
+<span class="nc" id="L69">    }</span>
+
+    private static void writeState(JsonWriter json, State state) {
+<span class="nc" id="L72">        json.property(&quot;expression&quot;, state.expression()).property(&quot;edgeDepth&quot;, state.edgeDepth())</span>
+<span class="nc" id="L73">            .property(&quot;primitiveDepth&quot;, state.primitiveDepth()).property(&quot;canonicalHash&quot;, state.canonicalHash())</span>
+<span class="nc" id="L74">            .object(&quot;score&quot;, item -&gt; item.property(&quot;stringLength&quot;, state.score().stringLength())</span>
+<span class="nc" id="L75">                .property(&quot;astNodeCount&quot;, state.score().astNodeCount()).property(&quot;operatorCount&quot;, state.score().operatorCount())</span>
+<span class="nc" id="L76">                .property(&quot;nestingDepth&quot;, state.score().nestingDepth()).property(&quot;recognizedPatternBonus&quot;, state.score().recognizedPatternBonus()))</span>
+<span class="nc" id="L77">            .property(&quot;expandingSteps&quot;, state.expandingSteps())</span>
+<span class="nc" id="L78">            .stringArray(&quot;path&quot;, state.path()).stringArray(&quot;appliedRuleIds&quot;, state.appliedRuleIds())</span>
+<span class="nc" id="L79">            .stringArray(&quot;primitiveRuleIds&quot;, state.primitiveRuleIds())</span>
+<span class="nc" id="L80">            .stringArray(&quot;applicationKeys&quot;, state.appliedRuleApplications().stream().sorted().toList())</span>
+<span class="nc" id="L81">            .stringArray(&quot;assumptions&quot;, state.assumptions())</span>
+<span class="nc" id="L82">            .object(&quot;executionWork&quot;, item -&gt; writeWork(item, state.executionWork()));</span>
+<span class="nc" id="L83">        writePath(json, state.path().getFirst(), state.transformations());</span>
+<span class="nc" id="L84">    }</span>
+
+    private static void writePath(JsonWriter json, String input, List&lt;Transformation&gt; steps) {
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        if (steps.isEmpty()) json.nullProperty(&quot;provenance&quot;);</span>
+<span class="nc" id="L88">        else json.property(&quot;provenance&quot;, new TransformationProvenance.Sequence(input, steps).toCanonicalJson());</span>
+<span class="nc" id="L89">    }</span>
+
+    private static void writeCandidate(JsonWriter json, RewriteCandidate candidate) {
+<span class="nc" id="L92">        json.property(&quot;originNodeId&quot;, candidate.originNodeId()).property(&quot;input&quot;, candidate.inputExpression())</span>
+<span class="nc" id="L93">            .property(&quot;output&quot;, candidate.outputExpression());</span>
+<span class="nc" id="L94">        writePath(json, candidate.inputExpression(), candidate.steps());</span>
+<span class="nc" id="L95">    }</span>
+
+    private static void writeExecution(JsonWriter json, RewriteExecution execution) {
+<span class="nc" id="L98">        json.property(&quot;workRevision&quot;, execution.workRevision()).property(&quot;complete&quot;, execution.complete())</span>
+<span class="nc" id="L99">            .object(&quot;work&quot;, item -&gt; writeTransformationWork(item, execution.workMetrics()));</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (execution.pathBudget() == null) json.nullProperty(&quot;pathBudget&quot;);</span>
+<span class="nc" id="L101">        else json.object(&quot;pathBudget&quot;, item -&gt; writeBudget(item, execution.pathBudget()));</span>
+<span class="nc" id="L102">        json.array(&quot;candidates&quot;, array -&gt; execution.candidates().forEach(candidate -&gt;</span>
+<span class="nc" id="L103">            array.objectValue(item -&gt; writeCandidate(item, candidate))));</span>
+<span class="nc" id="L104">        json.array(&quot;sourceObservations&quot;, array -&gt; execution.sourceObservations().forEach(observation -&gt;</span>
+<span class="nc" id="L105">            array.objectValue(item -&gt; {</span>
+<span class="nc" id="L106">                item.property(&quot;admitted&quot;, observation.admitted())</span>
+<span class="nc" id="L107">                    .object(&quot;availableBudget&quot;, budget -&gt; writeBudget(budget, observation.availableBudget()))</span>
+<span class="nc" id="L108">                    .object(&quot;candidate&quot;, candidate -&gt; writeCandidate(candidate, observation.candidate()));</span>
+<span class="nc" id="L109">            })));</span>
+<span class="nc" id="L110">    }</span>
+
+    private static void writeBudget(JsonWriter json, PathBudget budget) {
+<span class="nc" id="L113">        json.property(&quot;primitiveRewriteUnits&quot;, budget.primitiveRewriteUnits())</span>
+<span class="nc" id="L114">            .property(&quot;exactTheoryWorkUnits&quot;, budget.exactTheoryWorkUnits());</span>
+<span class="nc" id="L115">    }</span>
+
+    private static void writeWork(JsonWriter json, ExecutionWork work) {
+<span class="nc" id="L118">        json.property(&quot;primitiveRewrites&quot;, work.primitiveRewrites()).property(&quot;exactTheorySteps&quot;, work.exactTheorySteps())</span>
+<span class="nc" id="L119">            .property(&quot;exactTheoryWorkUnits&quot;, work.exactTheoryWorkUnits()).property(&quot;canonicalWorkUnits&quot;, work.canonicalWorkUnits());</span>
+<span class="nc" id="L120">    }</span>
+
+    private static void writeMetrics(JsonWriter json, Metrics metrics) {
+<span class="nc" id="L123">        json.property(&quot;exploredStates&quot;, metrics.exploredStates()).property(&quot;expandedStates&quot;, metrics.expandedStates())</span>
+<span class="nc" id="L124">            .property(&quot;generatedTransformations&quot;, metrics.generatedTransformations()).property(&quot;enqueuedStates&quot;, metrics.enqueuedStates())</span>
+<span class="nc" id="L125">            .property(&quot;duplicatePrunes&quot;, metrics.duplicatePrunes()).property(&quot;repeatedApplicationPrunes&quot;, metrics.repeatedApplicationPrunes())</span>
+<span class="nc" id="L126">            .property(&quot;sameExpressionPrunes&quot;, metrics.sameExpressionPrunes()).property(&quot;expansionBudgetPrunes&quot;, metrics.expansionBudgetPrunes())</span>
+<span class="nc" id="L127">            .property(&quot;primitiveBudgetPrunes&quot;, metrics.primitiveBudgetPrunes()).property(&quot;candidateBudgetPrunes&quot;, metrics.candidateBudgetPrunes())</span>
+<span class="nc" id="L128">            .property(&quot;statesWithoutTransformations&quot;, metrics.statesWithoutTransformations()).property(&quot;engineBatches&quot;, metrics.engineBatches())</span>
+<span class="nc" id="L129">            .property(&quot;pathWorkBudgetPrunes&quot;, metrics.pathWorkBudgetPrunes()).property(&quot;frontierAdmissionChecks&quot;, metrics.frontierAdmissionChecks())</span>
+<span class="nc" id="L130">            .property(&quot;primitiveStepBudget&quot;, metrics.primitiveStepBudget()).property(&quot;exactTheoryWorkBudget&quot;, metrics.exactTheoryWorkBudget())</span>
+<span class="nc" id="L131">            .property(&quot;workUnitBudget&quot;, metrics.workUnitBudget()).property(&quot;exactPathAuditReserve&quot;, metrics.exactPathAuditReserve())</span>
+<span class="nc" id="L132">            .property(&quot;outerSearchWorkUnits&quot;, metrics.outerSearchWorkUnits()).property(&quot;chargedSearchWorkUnits&quot;, metrics.chargedSearchWorkUnits())</span>
+<span class="nc" id="L133">            .object(&quot;transformationWork&quot;, item -&gt; writeTransformationWork(item, metrics.transformationWork()));</span>
+<span class="nc" id="L134">    }</span>
+
+    private static void writeTransformationWork(JsonWriter json, TransformationWorkMetrics work) {
+<span class="nc" id="L137">        json.property(&quot;engineInvocations&quot;, work.engineInvocations()).property(&quot;programNodeVisits&quot;, work.programNodeVisits())</span>
+<span class="nc" id="L138">            .property(&quot;sourceInvocations&quot;, work.sourceInvocations()).property(&quot;sourceCandidates&quot;, work.sourceCandidates())</span>
+<span class="nc" id="L139">            .property(&quot;composedCandidates&quot;, work.composedCandidates()).property(&quot;requirementEvaluations&quot;, work.requirementEvaluations())</span>
+<span class="nc" id="L140">            .property(&quot;requirementRejections&quot;, work.requirementRejections()).property(&quot;priorityCandidatesOrdered&quot;, work.priorityCandidatesOrdered())</span>
+<span class="nc" id="L141">            .property(&quot;prunedCandidates&quot;, work.prunedCandidates()).property(&quot;repeatIterations&quot;, work.repeatIterations())</span>
+<span class="nc" id="L142">            .property(&quot;repeatEndpoints&quot;, work.repeatEndpoints()).property(&quot;alternativeSelections&quot;, work.alternativeSelections())</span>
+<span class="nc" id="L143">            .property(&quot;alternativesSkipped&quot;, work.alternativesSkipped()).property(&quot;duplicateCandidatesDropped&quot;, work.duplicateCandidatesDropped())</span>
+<span class="nc" id="L144">            .object(&quot;candidateWork&quot;, item -&gt; writeWork(item, work.candidateWork()));</span>
+<span class="nc" id="L145">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

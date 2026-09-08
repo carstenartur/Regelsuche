@@ -13,8 +13,8 @@ public record RewriteExecution(
     BudgetedRewriteProgramExecution.PathBudget pathBudget
 ) {
     public RewriteExecution(List&lt;RewriteCandidate&gt; candidates, boolean complete, TransformationWorkMetrics workMetrics) {
-<span class="nc" id="L16">        this(candidates, complete, workMetrics, List.of(), null);</span>
-<span class="nc" id="L17">    }</span>
+<span class="fc" id="L16">        this(candidates, complete, workMetrics, List.of(), null);</span>
+<span class="fc" id="L17">    }</span>
     public RewriteExecution(
         List&lt;RewriteCandidate&gt; candidates,
         boolean complete

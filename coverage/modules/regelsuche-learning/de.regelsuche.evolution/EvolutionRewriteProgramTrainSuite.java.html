@@ -5,7 +5,7 @@ import de.regelsuche.json.JsonWriter;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.search.SearchHeuristic;
-import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -108,7 +108,7 @@ public record EvolutionRewriteProgramTrainSuite(
             contentHash);
     }
 
-    public PrimitiveWorkBestFirstSearchStrategy.Budget searchBudget() {
+    public WorkBudgetBestFirstSearchStrategy.Budget searchBudget() {
 <span class="nc" id="L112">        return primitiveWorkBudget.toSearchBudget();</span>
     }
 
@@ -194,7 +194,7 @@ public record EvolutionRewriteProgramTrainSuite(
         long maxWorkUnits
     ) {
 <span class="fc" id="L196">        public PrimitiveWorkBudget {</span>
-<span class="fc" id="L197">            new PrimitiveWorkBestFirstSearchStrategy.Budget(</span>
+<span class="fc" id="L197">            WorkBudgetBestFirstSearchStrategy.Budget.primitive(</span>
                 maxPrimitiveSteps,
                 maxExploredStates,
                 maxCandidatesPerState,
@@ -255,8 +255,8 @@ public record EvolutionRewriteProgramTrainSuite(
 <span class="nc" id="L255">            return maxWorkUnits - exactPathAuditReserve();</span>
         }
 
-        PrimitiveWorkBestFirstSearchStrategy.Budget toSearchBudget() {
-<span class="nc" id="L259">            return new PrimitiveWorkBestFirstSearchStrategy.Budget(</span>
+        WorkBudgetBestFirstSearchStrategy.Budget toSearchBudget() {
+<span class="nc" id="L259">            return WorkBudgetBestFirstSearchStrategy.Budget.primitive(</span>
                 maxPrimitiveSteps,
                 maxExploredStates,
                 maxCandidatesPerState,
