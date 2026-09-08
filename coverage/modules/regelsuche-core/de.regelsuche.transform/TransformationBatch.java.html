@@ -18,6 +18,10 @@ public record TransformationBatch(
 <span class="nc bnc" id="L18" title="All 2 branches missed.">        workMetrics = workMetrics == null</span>
 <span class="nc" id="L19">            ? TransformationWorkMetrics.ZERO</span>
 <span class="nc" id="L20">            : workMetrics;</span>
-<span class="nc" id="L21">    }</span>
+<span class="nc" id="L21">        Transformation.requirePrimitiveOnly(transformations);</span>
+<span class="nc bnc" id="L22" title="All 2 branches missed.">        if (workMetrics.candidateWork().exactTheorySteps() &gt; 0) {</span>
+<span class="nc" id="L23">            throw new IllegalArgumentException(&quot;legacy transformation batches cannot erase exact theory work&quot;);</span>
+        }
+<span class="nc" id="L25">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

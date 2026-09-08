@@ -91,7 +91,7 @@ import java.util.Set;
         Set&lt;String&gt; visited
     ) {
 <span class="nc" id="L93">        List&lt;Transformation&gt; transformations = new ArrayList&lt;&gt;(</span>
-<span class="nc" id="L94">            problem.engine().transform(current.expression()));</span>
+<span class="nc" id="L94">            problem.transformations(current.expression()));</span>
 <span class="nc" id="L95">        transformations.sort(Comparator</span>
 <span class="nc" id="L96">            .comparing(Transformation::rule)</span>
 <span class="nc" id="L97">            .thenComparing(Transformation::transformedExpression)</span>

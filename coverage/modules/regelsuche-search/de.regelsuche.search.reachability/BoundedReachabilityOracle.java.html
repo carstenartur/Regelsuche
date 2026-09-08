@@ -553,139 +553,140 @@ import java.util.TreeSet;
 <span class="nc" id="L553">                throw new IllegalStateException(</span>
                     &quot;transformation engine returned null&quot;);
             }
-<span class="fc" id="L556">            List&lt;Candidate&gt; result = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L557" title="All 2 branches covered.">            for (Transformation transformation : transformations) {</span>
-<span class="fc" id="L558">                Objects.requireNonNull(</span>
+<span class="fc" id="L556">            Transformation.requirePrimitiveOnly(transformations);</span>
+<span class="fc" id="L557">            List&lt;Candidate&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L558" title="All 2 branches covered.">            for (Transformation transformation : transformations) {</span>
+<span class="fc" id="L559">                Objects.requireNonNull(</span>
                     transformation,
                     &quot;transformation entry&quot;);
-<span class="fc" id="L561">                AssumptionSignature assumptions = AssumptionSignature.merge(</span>
-<span class="fc" id="L562">                    current.assumptions(),</span>
-<span class="fc" id="L563">                    AssumptionSignature.ofExpressions(</span>
-<span class="fc" id="L564">                        transformation.assumptions()));</span>
-<span class="fc" id="L565">                result.add(new Candidate(</span>
+<span class="fc" id="L562">                AssumptionSignature assumptions = AssumptionSignature.merge(</span>
+<span class="fc" id="L563">                    current.assumptions(),</span>
+<span class="fc" id="L564">                    AssumptionSignature.ofExpressions(</span>
+<span class="fc" id="L565">                        transformation.assumptions()));</span>
+<span class="fc" id="L566">                result.add(new Candidate(</span>
                     transformation,
-<span class="fc" id="L567">                    normalizeGenerated(</span>
-<span class="fc" id="L568">                        transformation.transformedExpression()),</span>
+<span class="fc" id="L568">                    normalizeGenerated(</span>
+<span class="fc" id="L569">                        transformation.transformedExpression()),</span>
                     assumptions));
-<span class="fc" id="L570">            }</span>
-<span class="fc" id="L571">            result.sort(CANDIDATE_ORDER);</span>
-<span class="fc" id="L572">            return List.copyOf(result);</span>
+<span class="fc" id="L571">            }</span>
+<span class="fc" id="L572">            result.sort(CANDIDATE_ORDER);</span>
+<span class="fc" id="L573">            return List.copyOf(result);</span>
         }
 
         private Result processCandidates(
             Node current,
             List&lt;Candidate&gt; candidates
         ) {
-<span class="fc bfc" id="L579" title="All 2 branches covered.">            for (Candidate candidate : candidates) {</span>
-<span class="fc" id="L580">                if (generatedTransitions</span>
-<span class="fc bfc" id="L581" title="All 2 branches covered.">                        &gt;= budget.maxGeneratedTransitions()) {</span>
-<span class="fc" id="L582">                    generatedTransitionLimitReached = true;</span>
-<span class="fc" id="L583">                    return budgetInconclusive(</span>
+<span class="fc bfc" id="L580" title="All 2 branches covered.">            for (Candidate candidate : candidates) {</span>
+<span class="fc" id="L581">                if (generatedTransitions</span>
+<span class="fc bfc" id="L582" title="All 2 branches covered.">                        &gt;= budget.maxGeneratedTransitions()) {</span>
+<span class="fc" id="L583">                    generatedTransitionLimitReached = true;</span>
+<span class="fc" id="L584">                    return budgetInconclusive(</span>
                         &quot;GENERATED_TRANSITION_LIMIT_REACHED&quot;);
                 }
-<span class="fc" id="L586">                Result interrupted = processCandidate(current, candidate);</span>
-<span class="fc bfc" id="L587" title="All 2 branches covered.">                if (interrupted != null) {</span>
-<span class="fc" id="L588">                    return interrupted;</span>
+<span class="fc" id="L587">                Result interrupted = processCandidate(current, candidate);</span>
+<span class="fc bfc" id="L588" title="All 2 branches covered.">                if (interrupted != null) {</span>
+<span class="fc" id="L589">                    return interrupted;</span>
                 }
-<span class="fc" id="L590">            }</span>
-<span class="fc" id="L591">            return null;</span>
+<span class="fc" id="L591">            }</span>
+<span class="fc" id="L592">            return null;</span>
         }
 
         private Result processCandidate(
             Node current,
             Candidate candidate
         ) {
-<span class="fc" id="L598">            generatedTransitions++;</span>
-<span class="fc" id="L599">            int depth = current.depth() + 1;</span>
-<span class="fc" id="L600">            int stepCount = candidate.transformation().primitiveStepCount();</span>
-<span class="fc" id="L601">            long primitiveWork = primitiveWorkTotal(</span>
-<span class="fc" id="L602">                current.primitivePathWork(),</span>
+<span class="fc" id="L599">            generatedTransitions++;</span>
+<span class="fc" id="L600">            int depth = current.depth() + 1;</span>
+<span class="fc" id="L601">            int stepCount = candidate.transformation().primitiveStepCount();</span>
+<span class="fc" id="L602">            long primitiveWork = primitiveWorkTotal(</span>
+<span class="fc" id="L603">                current.primitivePathWork(),</span>
                 stepCount);
-<span class="fc bfc" id="L604" title="All 2 branches covered.">            if (exceedsPrimitiveWorkBound(</span>
-<span class="fc" id="L605">                    current.primitivePathWork(),</span>
+<span class="fc bfc" id="L605" title="All 2 branches covered.">            if (exceedsPrimitiveWorkBound(</span>
+<span class="fc" id="L606">                    current.primitivePathWork(),</span>
                     stepCount,
-<span class="fc" id="L607">                    budget.maxPrimitivePathWork())) {</span>
-<span class="fc" id="L608">                outsidePrimitiveWorkTransitions++;</span>
-<span class="fc" id="L609">                retainEdge(</span>
+<span class="fc" id="L608">                    budget.maxPrimitivePathWork())) {</span>
+<span class="fc" id="L609">                outsidePrimitiveWorkTransitions++;</span>
+<span class="fc" id="L610">                retainEdge(</span>
                     current,
-<span class="fc" id="L611">                    stateId(</span>
-<span class="fc" id="L612">                        candidate.expression(),</span>
-<span class="fc" id="L613">                        candidate.assumptions(),</span>
+<span class="fc" id="L612">                    stateId(</span>
+<span class="fc" id="L613">                        candidate.expression(),</span>
+<span class="fc" id="L614">                        candidate.assumptions(),</span>
                         depth,
                         primitiveWork),
-<span class="fc" id="L616">                    candidate.expression(),</span>
-<span class="fc" id="L617">                    candidate.assumptions(),</span>
-<span class="fc" id="L618">                    candidate.transformation(),</span>
+<span class="fc" id="L617">                    candidate.expression(),</span>
+<span class="fc" id="L618">                    candidate.assumptions(),</span>
+<span class="fc" id="L619">                    candidate.transformation(),</span>
                     EdgeDisposition.OUTSIDE_PRIMITIVE_WORK_BOUND);
-<span class="fc" id="L620">                return null;</span>
+<span class="fc" id="L621">                return null;</span>
             }
 
-<span class="fc" id="L623">            Node proposed = node(</span>
-<span class="fc" id="L624">                candidate.expression(),</span>
-<span class="fc" id="L625">                candidate.assumptions(),</span>
+<span class="fc" id="L624">            Node proposed = node(</span>
+<span class="fc" id="L625">                candidate.expression(),</span>
+<span class="fc" id="L626">                candidate.assumptions(),</span>
                 depth,
-<span class="fc" id="L627">                Math.toIntExact(primitiveWork));</span>
-<span class="fc" id="L628">            List&lt;Node&gt; labels = labelsByKey.computeIfAbsent(</span>
-<span class="fc" id="L629">                proposed.mathematicalKey(),</span>
-<span class="fc" id="L630">                ignored -&gt; new ArrayList&lt;&gt;());</span>
-<span class="pc bpc" id="L631" title="1 of 2 branches missed.">            if (isDominated(proposed, labels)) {</span>
-<span class="nc" id="L632">                dominatedTransitions++;</span>
-<span class="nc" id="L633">                retainEdge(</span>
+<span class="fc" id="L628">                Math.toIntExact(primitiveWork));</span>
+<span class="fc" id="L629">            List&lt;Node&gt; labels = labelsByKey.computeIfAbsent(</span>
+<span class="fc" id="L630">                proposed.mathematicalKey(),</span>
+<span class="fc" id="L631">                ignored -&gt; new ArrayList&lt;&gt;());</span>
+<span class="pc bpc" id="L632" title="1 of 2 branches missed.">            if (isDominated(proposed, labels)) {</span>
+<span class="nc" id="L633">                dominatedTransitions++;</span>
+<span class="nc" id="L634">                retainEdge(</span>
                     current,
                     proposed,
-<span class="nc" id="L636">                    candidate.transformation(),</span>
+<span class="nc" id="L637">                    candidate.transformation(),</span>
                     EdgeDisposition.DOMINATED_BY_EXISTING_LABEL);
-<span class="nc" id="L638">                return null;</span>
+<span class="nc" id="L639">                return null;</span>
             }
-<span class="fc bfc" id="L640" title="All 2 branches covered.">            if (statesById.size() &gt;= budget.maxVisitedStates()) {</span>
-<span class="fc" id="L641">                visitedStateLimitTransitions++;</span>
-<span class="fc" id="L642">                visitedStateLimitReached = true;</span>
-<span class="fc" id="L643">                retainEdge(</span>
+<span class="fc bfc" id="L641" title="All 2 branches covered.">            if (statesById.size() &gt;= budget.maxVisitedStates()) {</span>
+<span class="fc" id="L642">                visitedStateLimitTransitions++;</span>
+<span class="fc" id="L643">                visitedStateLimitReached = true;</span>
+<span class="fc" id="L644">                retainEdge(</span>
                     current,
                     proposed,
-<span class="fc" id="L646">                    candidate.transformation(),</span>
+<span class="fc" id="L647">                    candidate.transformation(),</span>
                     EdgeDisposition.VISITED_STATE_LIMIT);
-<span class="fc" id="L648">                return budgetInconclusive(</span>
+<span class="fc" id="L649">                return budgetInconclusive(</span>
                     &quot;VISITED_STATE_LIMIT_REACHED&quot;);
             }
-<span class="fc" id="L651">            removeDominatedLabels(proposed, labels);</span>
-<span class="fc" id="L652">            labels.add(proposed);</span>
-<span class="fc" id="L653">            activeStateIds.add(proposed.id());</span>
-<span class="fc" id="L654">            statesById.put(proposed.id(), proposed);</span>
-<span class="fc" id="L655">            frontier.add(proposed);</span>
-<span class="fc" id="L656">            maxFrontierSize = Math.max(maxFrontierSize, frontier.size());</span>
-<span class="fc" id="L657">            Edge edge = retainEdge(</span>
+<span class="fc" id="L652">            removeDominatedLabels(proposed, labels);</span>
+<span class="fc" id="L653">            labels.add(proposed);</span>
+<span class="fc" id="L654">            activeStateIds.add(proposed.id());</span>
+<span class="fc" id="L655">            statesById.put(proposed.id(), proposed);</span>
+<span class="fc" id="L656">            frontier.add(proposed);</span>
+<span class="fc" id="L657">            maxFrontierSize = Math.max(maxFrontierSize, frontier.size());</span>
+<span class="fc" id="L658">            Edge edge = retainEdge(</span>
                 current,
                 proposed,
-<span class="fc" id="L660">                candidate.transformation(),</span>
+<span class="fc" id="L661">                candidate.transformation(),</span>
                 EdgeDisposition.ENQUEUED);
-<span class="fc" id="L662">            parentEdgeByStateId.put(proposed.id(), edge);</span>
-<span class="fc" id="L663">            enqueuedTransitions++;</span>
-<span class="fc" id="L664">            return null;</span>
+<span class="fc" id="L663">            parentEdgeByStateId.put(proposed.id(), edge);</span>
+<span class="fc" id="L664">            enqueuedTransitions++;</span>
+<span class="fc" id="L665">            return null;</span>
         }
 
         private boolean isDominated(Node proposed, List&lt;Node&gt; labels) {
-<span class="fc" id="L668">            return labels.stream().anyMatch(existing -&gt;</span>
-<span class="pc bpc" id="L669" title="1 of 2 branches missed.">                existing.depth() &lt;= proposed.depth()</span>
-<span class="fc" id="L670">                    &amp;&amp; existing.primitivePathWork()</span>
-<span class="pc bpc" id="L671" title="1 of 2 branches missed.">                        &lt;= proposed.primitivePathWork());</span>
+<span class="fc" id="L669">            return labels.stream().anyMatch(existing -&gt;</span>
+<span class="pc bpc" id="L670" title="1 of 2 branches missed.">                existing.depth() &lt;= proposed.depth()</span>
+<span class="fc" id="L671">                    &amp;&amp; existing.primitivePathWork()</span>
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">                        &lt;= proposed.primitivePathWork());</span>
         }
 
         private void removeDominatedLabels(
             Node proposed,
             List&lt;Node&gt; labels
         ) {
-<span class="fc" id="L678">            List&lt;Node&gt; dominated = labels.stream()</span>
-<span class="fc" id="L679">                .filter(existing -&gt;</span>
-<span class="pc bpc" id="L680" title="1 of 2 branches missed.">                    proposed.depth() &lt;= existing.depth()</span>
-<span class="nc" id="L681">                        &amp;&amp; proposed.primitivePathWork()</span>
-<span class="pc bnc" id="L682" title="All 2 branches missed.">                            &lt;= existing.primitivePathWork())</span>
-<span class="fc" id="L683">                .toList();</span>
-<span class="fc" id="L684">            labels.removeAll(dominated);</span>
-<span class="fc" id="L685">            dominated.forEach(existing -&gt;</span>
-<span class="nc" id="L686">                activeStateIds.remove(existing.id()));</span>
-<span class="fc" id="L687">            supersededStates += dominated.size();</span>
-<span class="fc" id="L688">        }</span>
+<span class="fc" id="L679">            List&lt;Node&gt; dominated = labels.stream()</span>
+<span class="fc" id="L680">                .filter(existing -&gt;</span>
+<span class="pc bpc" id="L681" title="1 of 2 branches missed.">                    proposed.depth() &lt;= existing.depth()</span>
+<span class="nc" id="L682">                        &amp;&amp; proposed.primitivePathWork()</span>
+<span class="pc bnc" id="L683" title="All 2 branches missed.">                            &lt;= existing.primitivePathWork())</span>
+<span class="fc" id="L684">                .toList();</span>
+<span class="fc" id="L685">            labels.removeAll(dominated);</span>
+<span class="fc" id="L686">            dominated.forEach(existing -&gt;</span>
+<span class="nc" id="L687">                activeStateIds.remove(existing.id()));</span>
+<span class="fc" id="L688">            supersededStates += dominated.size();</span>
+<span class="fc" id="L689">        }</span>
 
         private Edge retainEdge(
             Node from,
@@ -693,11 +694,11 @@ import java.util.TreeSet;
             Transformation transformation,
             EdgeDisposition disposition
         ) {
-<span class="fc" id="L696">            return retainEdge(</span>
+<span class="fc" id="L697">            return retainEdge(</span>
                 from,
-<span class="fc" id="L698">                proposed.id(),</span>
-<span class="fc" id="L699">                proposed.expression(),</span>
-<span class="fc" id="L700">                proposed.assumptions(),</span>
+<span class="fc" id="L699">                proposed.id(),</span>
+<span class="fc" id="L700">                proposed.expression(),</span>
+<span class="fc" id="L701">                proposed.assumptions(),</span>
                 transformation,
                 disposition);
         }
@@ -710,54 +711,54 @@ import java.util.TreeSet;
             Transformation transformation,
             EdgeDisposition disposition
         ) {
-<span class="fc" id="L713">            int ordinal = edges.size();</span>
-<span class="fc" id="L714">            String id = sha256(String.join(</span>
+<span class="fc" id="L714">            int ordinal = edges.size();</span>
+<span class="fc" id="L715">            String id = sha256(String.join(</span>
                 &quot;\n&quot;,
                 &quot;schema=regelsuche.reachability-edge/v1&quot;,
                 &quot;ordinal=&quot; + ordinal,
-<span class="fc" id="L718">                &quot;from=&quot; + from.id(),</span>
+<span class="fc" id="L719">                &quot;from=&quot; + from.id(),</span>
                 &quot;to=&quot; + proposedStateId,
-<span class="fc" id="L720">                &quot;rule=&quot; + transformation.rule(),</span>
-<span class="fc" id="L721">                &quot;application=&quot; + transformation.applicationKey(),</span>
-<span class="fc" id="L722">                &quot;disposition=&quot; + disposition.name()));</span>
-<span class="fc" id="L723">            Edge edge = new Edge(</span>
+<span class="fc" id="L721">                &quot;rule=&quot; + transformation.rule(),</span>
+<span class="fc" id="L722">                &quot;application=&quot; + transformation.applicationKey(),</span>
+<span class="fc" id="L723">                &quot;disposition=&quot; + disposition.name()));</span>
+<span class="fc" id="L724">            Edge edge = new Edge(</span>
                 id,
-<span class="fc" id="L725">                from.id(),</span>
+<span class="fc" id="L726">                from.id(),</span>
                 proposedStateId,
-<span class="fc" id="L727">                transformation.rule(),</span>
+<span class="fc" id="L728">                transformation.rule(),</span>
                 transformedExpression,
                 resultingAssumptions,
-<span class="fc" id="L730">                transformation.primitiveRuleIds(),</span>
-<span class="fc" id="L731">                transformation.primitiveStepCount(),</span>
+<span class="fc" id="L731">                transformation.primitiveRuleIds(),</span>
+<span class="fc" id="L732">                transformation.primitiveStepCount(),</span>
                 disposition);
-<span class="fc" id="L733">            edges.add(edge);</span>
-<span class="fc" id="L734">            return edge;</span>
+<span class="fc" id="L734">            edges.add(edge);</span>
+<span class="fc" id="L735">            return edge;</span>
         }
 
         private Result budgetInconclusive(String detailCode) {
             Optional&lt;Witness&gt; provisional =
-<span class="fc bfc" id="L739" title="All 2 branches covered.">                bestConditionalTarget == null</span>
-<span class="fc" id="L740">                    ? Optional.empty()</span>
-<span class="fc" id="L741">                    : Optional.of(witness(bestConditionalTarget));</span>
-<span class="fc" id="L742">            return result(</span>
+<span class="fc bfc" id="L740" title="All 2 branches covered.">                bestConditionalTarget == null</span>
+<span class="fc" id="L741">                    ? Optional.empty()</span>
+<span class="fc" id="L742">                    : Optional.of(witness(bestConditionalTarget));</span>
+<span class="fc" id="L743">            return result(</span>
                 Status.BUDGET_INCONCLUSIVE,
                 provisional,
-<span class="fc bfc" id="L745" title="All 2 branches covered.">                bestConditionalTarget == null</span>
-<span class="fc" id="L746">                    ? detailCode</span>
-<span class="fc" id="L747">                    : detailCode + &quot;_AFTER_CONDITIONAL_WITNESS&quot;,</span>
+<span class="fc bfc" id="L746" title="All 2 branches covered.">                bestConditionalTarget == null</span>
+<span class="fc" id="L747">                    ? detailCode</span>
+<span class="fc" id="L748">                    : detailCode + &quot;_AFTER_CONDITIONAL_WITNESS&quot;,</span>
                 &quot;&quot;);
         }
 
         private Result technicalFailure(RuntimeException exception) {
-<span class="pc bpc" id="L752" title="1 of 2 branches missed.">            String message = exception.getMessage() == null</span>
-<span class="pc" id="L753">                ? &quot;&quot; : exception.getMessage().trim();</span>
-<span class="fc" id="L754">            String detail = exception.getClass().getName()</span>
-<span class="pc bpc" id="L755" title="1 of 2 branches missed.">                + (message.isBlank() ? &quot;&quot; : &quot;: &quot; + message);</span>
+<span class="pc bpc" id="L753" title="1 of 2 branches missed.">            String message = exception.getMessage() == null</span>
+<span class="pc" id="L754">                ? &quot;&quot; : exception.getMessage().trim();</span>
+<span class="fc" id="L755">            String detail = exception.getClass().getName()</span>
+<span class="pc bpc" id="L756" title="1 of 2 branches missed.">                + (message.isBlank() ? &quot;&quot; : &quot;: &quot; + message);</span>
             Optional&lt;Witness&gt; provisional =
-<span class="pc bpc" id="L757" title="1 of 2 branches missed.">                bestConditionalTarget == null</span>
-<span class="fc" id="L758">                    ? Optional.empty()</span>
-<span class="pc" id="L759">                    : Optional.of(witness(bestConditionalTarget));</span>
-<span class="fc" id="L760">            return result(</span>
+<span class="pc bpc" id="L758" title="1 of 2 branches missed.">                bestConditionalTarget == null</span>
+<span class="fc" id="L759">                    ? Optional.empty()</span>
+<span class="pc" id="L760">                    : Optional.of(witness(bestConditionalTarget));</span>
+<span class="fc" id="L761">            return result(</span>
                 Status.TECHNICAL_FAILURE,
                 provisional,
                 &quot;TRANSFORMATION_ENGINE_OR_OUTPUT_FAILURE&quot;,
@@ -770,13 +771,13 @@ import java.util.TreeSet;
             String detailCode,
             String technicalDetail
         ) {
-<span class="fc" id="L773">            List&lt;RetainedState&gt; retainedStates = statesById.values().stream()</span>
-<span class="fc" id="L774">                .map(this::retainedState)</span>
-<span class="fc" id="L775">                .toList();</span>
-<span class="fc" id="L776">            List&lt;RetainedEdge&gt; retainedEdges = edges.stream()</span>
-<span class="fc" id="L777">                .map(Edge::retained)</span>
-<span class="fc" id="L778">                .toList();</span>
-<span class="fc" id="L779">            return new Result(</span>
+<span class="fc" id="L774">            List&lt;RetainedState&gt; retainedStates = statesById.values().stream()</span>
+<span class="fc" id="L775">                .map(this::retainedState)</span>
+<span class="fc" id="L776">                .toList();</span>
+<span class="fc" id="L777">            List&lt;RetainedEdge&gt; retainedEdges = edges.stream()</span>
+<span class="fc" id="L778">                .map(Edge::retained)</span>
+<span class="fc" id="L779">                .toList();</span>
+<span class="fc" id="L780">            return new Result(</span>
                 ORACLE_ID,
                 status,
                 source,
@@ -786,16 +787,16 @@ import java.util.TreeSet;
                 retainedStates,
                 retainedEdges,
                 witness,
-<span class="fc" id="L789">                workLedger(),</span>
+<span class="fc" id="L790">                workLedger(),</span>
                 detailCode,
                 technicalDetail);
         }
 
         private WorkLedger workLedger() {
-<span class="fc" id="L795">            return new WorkLedger(</span>
+<span class="fc" id="L796">            return new WorkLedger(</span>
                 expandedStates,
                 generatedTransitions,
-<span class="fc" id="L798">                statesById.size(),</span>
+<span class="fc" id="L799">                statesById.size(),</span>
                 enqueuedTransitions,
                 dominatedTransitions,
                 outsidePrimitiveWorkTransitions,
@@ -809,56 +810,56 @@ import java.util.TreeSet;
         }
 
         private Witness witness(Node targetNode) {
-<span class="fc" id="L812">            List&lt;Node&gt; reverseStates = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L813">            List&lt;Edge&gt; reverseEdges = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L814">            Node current = targetNode;</span>
-<span class="fc" id="L815">            reverseStates.add(current);</span>
-<span class="fc bfc" id="L816" title="All 2 branches covered.">            while (current.depth() &gt; 0) {</span>
-<span class="fc" id="L817">                Edge edge = parentEdgeByStateId.get(current.id());</span>
-<span class="pc bpc" id="L818" title="1 of 2 branches missed.">                if (edge == null) {</span>
-<span class="nc" id="L819">                    throw new IllegalStateException(</span>
+<span class="fc" id="L813">            List&lt;Node&gt; reverseStates = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L814">            List&lt;Edge&gt; reverseEdges = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L815">            Node current = targetNode;</span>
+<span class="fc" id="L816">            reverseStates.add(current);</span>
+<span class="fc bfc" id="L817" title="All 2 branches covered.">            while (current.depth() &gt; 0) {</span>
+<span class="fc" id="L818">                Edge edge = parentEdgeByStateId.get(current.id());</span>
+<span class="pc bpc" id="L819" title="1 of 2 branches missed.">                if (edge == null) {</span>
+<span class="nc" id="L820">                    throw new IllegalStateException(</span>
                         &quot;missing parent edge for witness state &quot;
-<span class="nc" id="L821">                            + current.id());</span>
+<span class="nc" id="L822">                            + current.id());</span>
                 }
-<span class="fc" id="L823">                reverseEdges.add(edge);</span>
-<span class="fc" id="L824">                current = statesById.get(edge.fromStateId());</span>
-<span class="pc bpc" id="L825" title="1 of 2 branches missed.">                if (current == null) {</span>
-<span class="nc" id="L826">                    throw new IllegalStateException(</span>
+<span class="fc" id="L824">                reverseEdges.add(edge);</span>
+<span class="fc" id="L825">                current = statesById.get(edge.fromStateId());</span>
+<span class="pc bpc" id="L826" title="1 of 2 branches missed.">                if (current == null) {</span>
+<span class="nc" id="L827">                    throw new IllegalStateException(</span>
                         &quot;missing parent state for witness edge &quot;
-<span class="nc" id="L828">                            + edge.id());</span>
+<span class="nc" id="L829">                            + edge.id());</span>
                 }
-<span class="fc" id="L830">                reverseStates.add(current);</span>
-<span class="fc" id="L831">            }</span>
-<span class="fc" id="L832">            Collections.reverse(reverseStates);</span>
-<span class="fc" id="L833">            Collections.reverse(reverseEdges);</span>
-<span class="fc" id="L834">            List&lt;String&gt; primitiveRuleIds = reverseEdges.stream()</span>
-<span class="fc" id="L835">                .flatMap(edge -&gt; edge.primitiveRuleIds().stream())</span>
-<span class="fc" id="L836">                .toList();</span>
-<span class="fc" id="L837">            return new Witness(</span>
-<span class="fc" id="L838">                reverseStates.stream().map(this::retainedState).toList(),</span>
-<span class="fc" id="L839">                reverseEdges.stream().map(Edge::retained).toList(),</span>
+<span class="fc" id="L831">                reverseStates.add(current);</span>
+<span class="fc" id="L832">            }</span>
+<span class="fc" id="L833">            Collections.reverse(reverseStates);</span>
+<span class="fc" id="L834">            Collections.reverse(reverseEdges);</span>
+<span class="fc" id="L835">            List&lt;String&gt; primitiveRuleIds = reverseEdges.stream()</span>
+<span class="fc" id="L836">                .flatMap(edge -&gt; edge.primitiveRuleIds().stream())</span>
+<span class="fc" id="L837">                .toList();</span>
+<span class="fc" id="L838">            return new Witness(</span>
+<span class="fc" id="L839">                reverseStates.stream().map(this::retainedState).toList(),</span>
+<span class="fc" id="L840">                reverseEdges.stream().map(Edge::retained).toList(),</span>
                 primitiveRuleIds,
-<span class="fc" id="L841">                additionalAssumptions(targetNode),</span>
-<span class="fc" id="L842">                reverseEdges.size(),</span>
-<span class="fc" id="L843">                primitiveRuleIds.size());</span>
+<span class="fc" id="L842">                additionalAssumptions(targetNode),</span>
+<span class="fc" id="L843">                reverseEdges.size(),</span>
+<span class="fc" id="L844">                primitiveRuleIds.size());</span>
         }
 
         private List&lt;String&gt; additionalAssumptions(Node state) {
-<span class="fc" id="L847">            TreeSet&lt;String&gt; additional = new TreeSet&lt;&gt;(</span>
-<span class="fc" id="L848">                state.assumptions().normalizedAssumptions());</span>
-<span class="fc" id="L849">            additional.removeAll(</span>
-<span class="fc" id="L850">                initialAssumptions.normalizedAssumptions());</span>
-<span class="fc" id="L851">            return List.copyOf(additional);</span>
+<span class="fc" id="L848">            TreeSet&lt;String&gt; additional = new TreeSet&lt;&gt;(</span>
+<span class="fc" id="L849">                state.assumptions().normalizedAssumptions());</span>
+<span class="fc" id="L850">            additional.removeAll(</span>
+<span class="fc" id="L851">                initialAssumptions.normalizedAssumptions());</span>
+<span class="fc" id="L852">            return List.copyOf(additional);</span>
         }
 
         private RetainedState retainedState(Node state) {
-<span class="fc" id="L855">            return new RetainedState(</span>
-<span class="fc" id="L856">                state.id(),</span>
-<span class="fc" id="L857">                state.expression(),</span>
-<span class="fc" id="L858">                state.assumptions(),</span>
-<span class="fc" id="L859">                state.depth(),</span>
-<span class="fc" id="L860">                state.primitivePathWork(),</span>
-<span class="fc" id="L861">                activeStateIds.contains(state.id()));</span>
+<span class="fc" id="L856">            return new RetainedState(</span>
+<span class="fc" id="L857">                state.id(),</span>
+<span class="fc" id="L858">                state.expression(),</span>
+<span class="fc" id="L859">                state.assumptions(),</span>
+<span class="fc" id="L860">                state.depth(),</span>
+<span class="fc" id="L861">                state.primitivePathWork(),</span>
+<span class="fc" id="L862">                activeStateIds.contains(state.id()));</span>
         }
 
         private Node node(
@@ -867,8 +868,8 @@ import java.util.TreeSet;
             int depth,
             int primitivePathWork
         ) {
-<span class="fc" id="L870">            return new Node(</span>
-<span class="fc" id="L871">                stateId(</span>
+<span class="fc" id="L871">            return new Node(</span>
+<span class="fc" id="L872">                stateId(</span>
                     expression,
                     assumptions,
                     depth,
@@ -885,11 +886,11 @@ import java.util.TreeSet;
             int depth,
             long primitivePathWork
         ) {
-<span class="fc" id="L888">            return sha256(String.join(</span>
+<span class="fc" id="L889">            return sha256(String.join(</span>
                 &quot;\n&quot;,
                 &quot;schema=regelsuche.reachability-state/v1&quot;,
                 &quot;expression=&quot; + expression,
-<span class="fc" id="L892">                &quot;assumptions=&quot; + assumptions.fingerprint(),</span>
+<span class="fc" id="L893">                &quot;assumptions=&quot; + assumptions.fingerprint(),</span>
                 &quot;depth=&quot; + depth,
                 &quot;primitivePathWork=&quot; + primitivePathWork));
         }
@@ -899,11 +900,11 @@ import java.util.TreeSet;
         String expression,
         String assumptionFingerprint
     ) {
-<span class="fc" id="L902">        private MathematicalKey {</span>
-<span class="fc" id="L903">            requireText(expression, &quot;mathematical expression&quot;);</span>
-<span class="pc bpc" id="L904" title="1 of 2 branches missed.">            assumptionFingerprint = assumptionFingerprint == null</span>
-<span class="pc" id="L905">                ? &quot;&quot; : assumptionFingerprint;</span>
-<span class="fc" id="L906">        }</span>
+<span class="fc" id="L903">        private MathematicalKey {</span>
+<span class="fc" id="L904">            requireText(expression, &quot;mathematical expression&quot;);</span>
+<span class="pc bpc" id="L905" title="1 of 2 branches missed.">            assumptionFingerprint = assumptionFingerprint == null</span>
+<span class="pc" id="L906">                ? &quot;&quot; : assumptionFingerprint;</span>
+<span class="fc" id="L907">        }</span>
     }
 
     private record Node(
@@ -913,20 +914,20 @@ import java.util.TreeSet;
         int depth,
         int primitivePathWork
     ) {
-<span class="fc" id="L916">        private Node {</span>
-<span class="fc" id="L917">            requireHash(id, &quot;node id&quot;);</span>
-<span class="fc" id="L918">            requireText(expression, &quot;node expression&quot;);</span>
-<span class="fc" id="L919">            assumptions = Objects.requireNonNull(assumptions, &quot;assumptions&quot;);</span>
-<span class="pc bpc" id="L920" title="2 of 4 branches missed.">            if (depth &lt; 0 || primitivePathWork &lt; 0) {</span>
-<span class="nc" id="L921">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L917">        private Node {</span>
+<span class="fc" id="L918">            requireHash(id, &quot;node id&quot;);</span>
+<span class="fc" id="L919">            requireText(expression, &quot;node expression&quot;);</span>
+<span class="fc" id="L920">            assumptions = Objects.requireNonNull(assumptions, &quot;assumptions&quot;);</span>
+<span class="pc bpc" id="L921" title="2 of 4 branches missed.">            if (depth &lt; 0 || primitivePathWork &lt; 0) {</span>
+<span class="nc" id="L922">                throw new IllegalArgumentException(</span>
                     &quot;node depth/work must not be negative&quot;);
             }
-<span class="fc" id="L924">        }</span>
+<span class="fc" id="L925">        }</span>
 
         private MathematicalKey mathematicalKey() {
-<span class="fc" id="L927">            return new MathematicalKey(</span>
+<span class="fc" id="L928">            return new MathematicalKey(</span>
                 expression,
-<span class="fc" id="L929">                assumptions.fingerprint());</span>
+<span class="fc" id="L930">                assumptions.fingerprint());</span>
         }
     }
 
@@ -935,13 +936,13 @@ import java.util.TreeSet;
         String expression,
         AssumptionSignature assumptions
     ) {
-<span class="fc" id="L938">        private Candidate {</span>
-<span class="fc" id="L939">            transformation = Objects.requireNonNull(</span>
+<span class="fc" id="L939">        private Candidate {</span>
+<span class="fc" id="L940">            transformation = Objects.requireNonNull(</span>
                 transformation,
                 &quot;transformation&quot;);
-<span class="fc" id="L942">            requireText(expression, &quot;candidate expression&quot;);</span>
-<span class="fc" id="L943">            assumptions = Objects.requireNonNull(assumptions, &quot;assumptions&quot;);</span>
-<span class="fc" id="L944">        }</span>
+<span class="fc" id="L943">            requireText(expression, &quot;candidate expression&quot;);</span>
+<span class="fc" id="L944">            assumptions = Objects.requireNonNull(assumptions, &quot;assumptions&quot;);</span>
+<span class="fc" id="L945">        }</span>
     }
 
     private record Edge(
@@ -955,12 +956,12 @@ import java.util.TreeSet;
         int primitiveStepCount,
         EdgeDisposition disposition
     ) {
-<span class="fc" id="L958">        private Edge {</span>
-<span class="fc" id="L959">            primitiveRuleIds = List.copyOf(primitiveRuleIds);</span>
-<span class="fc" id="L960">        }</span>
+<span class="fc" id="L959">        private Edge {</span>
+<span class="fc" id="L960">            primitiveRuleIds = List.copyOf(primitiveRuleIds);</span>
+<span class="fc" id="L961">        }</span>
 
         private RetainedEdge retained() {
-<span class="fc" id="L963">            return new RetainedEdge(</span>
+<span class="fc" id="L964">            return new RetainedEdge(</span>
                 id,
                 fromStateId,
                 proposedStateId,

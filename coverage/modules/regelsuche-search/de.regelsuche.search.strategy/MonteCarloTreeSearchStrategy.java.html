@@ -183,7 +183,7 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
 
     private List&lt;SearchState&gt; expand(SearchProblem problem, SearchState parent) {
 <span class="fc" id="L185">        List&lt;SearchState&gt; children = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L186" title="All 2 branches covered.">        for (Transformation transformation : problem.engine().transform(parent.expression())) {</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        for (Transformation transformation : problem.transformations(parent.expression())) {</span>
 <span class="fc bfc" id="L187" title="All 2 branches covered.">            if (parent.appliedRuleApplications().contains(transformation.applicationKey())) {</span>
 <span class="fc" id="L188">                continue;</span>
             }
@@ -238,7 +238,7 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
 <span class="fc" id="L238">        SearchState current = start;</span>
 <span class="fc" id="L239">        double bestImprovement = current.improvement();</span>
 <span class="fc bfc" id="L240" title="All 2 branches covered.">        for (int step = 0; step &lt; rolloutDepth; step++) {</span>
-<span class="fc" id="L241">            List&lt;Transformation&gt; options = problem.engine().transform(current.expression());</span>
+<span class="fc" id="L241">            List&lt;Transformation&gt; options = problem.transformations(current.expression());</span>
 <span class="pc bpc" id="L242" title="1 of 2 branches missed.">            if (options.isEmpty()) {</span>
 <span class="nc" id="L243">                break;</span>
             }

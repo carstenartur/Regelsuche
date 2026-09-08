@@ -54,7 +54,7 @@ import java.util.Set;
 <span class="fc" id="L54">                    continue;</span>
                 }
 <span class="fc" id="L56">                int generated = 0;</span>
-<span class="fc" id="L57">                List&lt;Transformation&gt; transformations = new ArrayList&lt;&gt;(problem.engine().transform(current.expression()));</span>
+<span class="fc" id="L57">                List&lt;Transformation&gt; transformations = new ArrayList&lt;&gt;(problem.transformations(current.expression()));</span>
 <span class="fc" id="L58">                transformations.sort(Comparator</span>
 <span class="fc" id="L59">                    .comparing(Transformation::rule)</span>
 <span class="fc" id="L60">                    .thenComparing(Transformation::transformedExpression)</span>

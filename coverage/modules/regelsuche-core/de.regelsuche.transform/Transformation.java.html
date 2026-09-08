@@ -14,10 +14,11 @@ public record Transformation(
     List&lt;String&gt; assumptions,
     String packId,
     String license,
-    List&lt;String&gt; primitiveRuleIds
+    List&lt;String&gt; primitiveRuleIds,
+    TransformationProvenance provenance
 ) {
     public Transformation(String rule, String transformedExpression) {
-<span class="fc" id="L20">        this(</span>
+<span class="fc" id="L21">        this(</span>
             rule,
             transformedExpression,
             RewriteKind.NORMALIZE,
@@ -25,7 +26,7 @@ public record Transformation(
             0,
             true,
             rule + &quot;:&quot; + transformedExpression);
-<span class="fc" id="L28">    }</span>
+<span class="fc" id="L29">    }</span>
 
     public Transformation(
         String rule,
@@ -36,7 +37,7 @@ public record Transformation(
         boolean equivalencePreservingByConstruction,
         String applicationKey
     ) {
-<span class="fc" id="L39">        this(</span>
+<span class="fc" id="L40">        this(</span>
             rule,
             transformedExpression,
             kind,
@@ -44,8 +45,8 @@ public record Transformation(
             estimatedCostDelta,
             equivalencePreservingByConstruction,
             applicationKey,
-<span class="fc" id="L47">            List.of());</span>
-<span class="fc" id="L48">    }</span>
+<span class="fc" id="L48">            List.of());</span>
+<span class="fc" id="L49">    }</span>
 
     public Transformation(
         String rule,
@@ -57,7 +58,7 @@ public record Transformation(
         String applicationKey,
         List&lt;String&gt; assumptions
     ) {
-<span class="fc" id="L60">        this(</span>
+<span class="fc" id="L61">        this(</span>
             rule,
             transformedExpression,
             kind,
@@ -68,7 +69,7 @@ public record Transformation(
             assumptions,
             &quot;core&quot;,
             &quot;PROJECT&quot;);
-<span class="fc" id="L71">    }</span>
+<span class="fc" id="L72">    }</span>
 
     /** Compatibility constructor: one ordinary transformation is one primitive. */
     public Transformation(
@@ -83,7 +84,7 @@ public record Transformation(
         String packId,
         String license
     ) {
-<span class="fc" id="L86">        this(</span>
+<span class="fc" id="L87">        this(</span>
             rule,
             transformedExpression,
             kind,
@@ -94,42 +95,117 @@ public record Transformation(
             assumptions,
             packId,
             license,
-<span class="fc" id="L97">            List.of(rule));</span>
-<span class="fc" id="L98">    }</span>
+<span class="fc" id="L98">            List.of(rule));</span>
+<span class="fc" id="L99">    }</span>
 
-<span class="fc" id="L100">    public Transformation {</span>
-<span class="pc bpc" id="L101" title="3 of 6 branches missed.">        if (rule == null || rule.isBlank()</span>
+    public Transformation(String rule, String transformedExpression, RewriteKind kind,
+                          boolean mayIncreaseComplexity, int estimatedCostDelta,
+                          boolean equivalencePreservingByConstruction, String applicationKey,
+                          List&lt;String&gt; assumptions, String packId, String license, List&lt;String&gt; primitiveRuleIds) {
+<span class="fc" id="L105">        this(rule, transformedExpression, kind, mayIncreaseComplexity, estimatedCostDelta,</span>
+            equivalencePreservingByConstruction, applicationKey, assumptions, packId, license, primitiveRuleIds,
+            new TransformationProvenance.PrimitiveRewriteSequence(primitiveRuleIds, applicationKey));
+<span class="fc" id="L108">    }</span>
+
+    public static Transformation exactTheory(ExactTheoryEvidence evidence) {
+<span class="nc" id="L111">        var provenance = new TransformationProvenance.ExactTheoryStep(evidence);</span>
+<span class="nc" id="L112">        var binding = evidence.binding();</span>
+<span class="nc" id="L113">        return new Transformation(binding.theoryStepId(), binding.transformedExpression(), RewriteKind.NORMALIZE,</span>
+<span class="nc" id="L114">            true, 0, true, &quot;execution:&quot; + provenance.contentHash(), List.of(), &quot;exact-theory&quot;, &quot;PROJECT&quot;,</span>
+<span class="nc" id="L115">            List.of(), provenance);</span>
+    }
+
+<span class="fc" id="L118">    public Transformation {</span>
+<span class="pc bpc" id="L119" title="3 of 6 branches missed.">        if (rule == null || rule.isBlank()</span>
                 || transformedExpression == null
-<span class="pc bpc" id="L103" title="3 of 6 branches missed.">                || transformedExpression.isBlank()</span>
+<span class="pc bpc" id="L121" title="3 of 6 branches missed.">                || transformedExpression.isBlank()</span>
                 || kind == null
                 || applicationKey == null
-<span class="pc bpc" id="L106" title="1 of 2 branches missed.">                || applicationKey.isBlank()) {</span>
-<span class="nc" id="L107">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">                || applicationKey.isBlank()) {</span>
+<span class="nc" id="L125">            throw new IllegalArgumentException(</span>
                 &quot;rule, kind, applicationKey and transformedExpression &quot;
                     + &quot;must not be blank&quot;);
         }
-<span class="fc" id="L111">        assumptions = AssumptionSignature.ofExpressions(assumptions)</span>
-<span class="fc" id="L112">            .normalizedAssumptions();</span>
-<span class="pc bpc" id="L113" title="2 of 4 branches missed.">        packId = packId == null || packId.isBlank() ? &quot;core&quot; : packId;</span>
-<span class="pc bpc" id="L114" title="2 of 4 branches missed.">        license = license == null || license.isBlank() ? &quot;PROJECT&quot; : license;</span>
-<span class="pc bpc" id="L115" title="1 of 4 branches missed.">        if (primitiveRuleIds == null || primitiveRuleIds.isEmpty()) {</span>
-<span class="fc" id="L116">            throw new IllegalArgumentException(</span>
-                &quot;primitiveRuleIds must contain at least one retained step&quot;);
+<span class="fc" id="L129">        assumptions = AssumptionSignature.ofExpressions(assumptions)</span>
+<span class="fc" id="L130">            .normalizedAssumptions();</span>
+<span class="pc bpc" id="L131" title="2 of 4 branches missed.">        packId = packId == null || packId.isBlank() ? &quot;core&quot; : packId;</span>
+<span class="pc bpc" id="L132" title="2 of 4 branches missed.">        license = license == null || license.isBlank() ? &quot;PROJECT&quot; : license;</span>
+<span class="pc bpc" id="L133" title="2 of 4 branches missed.">        if (primitiveRuleIds == null || provenance == null) {</span>
+<span class="nc" id="L134">            throw new IllegalArgumentException(</span>
+                &quot;primitiveRuleIds and provenance must be present&quot;);
         }
-<span class="fc" id="L119">        primitiveRuleIds = primitiveRuleIds.stream()</span>
-<span class="fc" id="L120">            .map(value -&gt; {</span>
-<span class="pc bpc" id="L121" title="1 of 4 branches missed.">                if (value == null || value.isBlank()) {</span>
-<span class="fc" id="L122">                    throw new IllegalArgumentException(</span>
+<span class="fc" id="L137">        List&lt;String&gt; retainedRules = provenance.primitiveRuleIds();</span>
+        // The common constructor already normalized and froze this list in
+        // primitive provenance. Reuse it instead of allocating another stream/list.
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        primitiveRuleIds = primitiveRuleIds.equals(retainedRules) ? retainedRules : primitiveRuleIds.stream()</span>
+<span class="nc" id="L141">            .map(value -&gt; {</span>
+<span class="nc bnc" id="L142" title="All 4 branches missed.">                if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L143">                    throw new IllegalArgumentException(</span>
                         &quot;primitive rule IDs must not be blank&quot;);
                 }
-<span class="fc" id="L125">                return value.trim();</span>
+<span class="nc" id="L146">                return value.trim();</span>
             })
-<span class="fc" id="L127">            .toList();</span>
-<span class="fc" id="L128">    }</span>
+<span class="pc" id="L148">            .toList();</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (!primitiveRuleIds.equals(retainedRules)) {</span>
+<span class="nc" id="L150">            throw new IllegalArgumentException(&quot;primitive rule list differs from provenance&quot;);</span>
+        }
+<span class="fc" id="L152">        requireBoundProvenance(provenance, transformedExpression, applicationKey, assumptions,</span>
+            equivalencePreservingByConstruction);
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (!(provenance instanceof TransformationProvenance.PrimitiveRewriteSequence)</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">                &amp;&amp; provenance.work().exactTheorySteps() &gt; 0) {</span>
+<span class="nc" id="L156">            applicationKey = &quot;execution:&quot; + provenance.contentHash();</span>
+        }
+<span class="fc" id="L158">    }</span>
+
+    private static void requireBoundProvenance(TransformationProvenance provenance,
+            String transformedExpression, String applicationKey, List&lt;String&gt; assumptions,
+            boolean equivalencePreservingByConstruction) {
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        if (provenance instanceof TransformationProvenance.PrimitiveRewriteSequence primitive</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">                &amp;&amp; !primitive.applicationKey().equals(applicationKey)) {</span>
+<span class="nc" id="L165">            throw new IllegalArgumentException(&quot;primitive application identity differs from provenance&quot;);</span>
+        }
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (provenance instanceof TransformationProvenance.ExactTheoryStep theory) {</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">            if (!transformedExpression.equals(theory.evidence().binding().transformedExpression())</span>
+<span class="nc bnc" id="L169" title="All 4 branches missed.">                    || !assumptions.isEmpty() || !equivalencePreservingByConstruction) {</span>
+<span class="nc" id="L170">                throw new IllegalArgumentException(&quot;transformation differs from its verified theory evidence&quot;);</span>
+            }
+        }
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (provenance instanceof TransformationProvenance.Sequence sequence) {</span>
+<span class="nc" id="L174">            var boundAssumptions = AssumptionSignature.ofExpressions(sequence.steps().stream()</span>
+<span class="nc" id="L175">                .flatMap(step -&gt; step.assumptions().stream()).toList()).normalizedAssumptions();</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">            if (!transformedExpression.equals(sequence.steps().getLast().transformedExpression())</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">                    || !assumptions.equals(boundAssumptions)</span>
+<span class="nc" id="L178">                    || equivalencePreservingByConstruction != sequence.steps().stream()</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">                        .allMatch(Transformation::equivalencePreservingByConstruction)) {</span>
+<span class="nc" id="L180">                throw new IllegalArgumentException(&quot;transformation differs from its retained sequence&quot;);</span>
+            }
+        }
+<span class="fc" id="L183">    }</span>
 
     /** Number of actual primitive rewrites represented by this search edge. */
     public int primitiveStepCount() {
-<span class="fc" id="L132">        return primitiveRuleIds.size();</span>
+<span class="fc" id="L187">        return primitiveRuleIds.size();</span>
+    }
+
+<span class="fc" id="L190">    public ExecutionWork executionWork() { return provenance.work(); }</span>
+
+    public long exactTheoryStepCount() {
+<span class="pc bpc" id="L193" title="2 of 3 branches missed.">        return switch (provenance) {</span>
+<span class="fc" id="L194">            case TransformationProvenance.PrimitiveRewriteSequence ignored -&gt; 0L;</span>
+<span class="nc" id="L195">            case TransformationProvenance.ExactTheoryStep ignored -&gt; 1L;</span>
+<span class="nc" id="L196">            case TransformationProvenance.Sequence sequence -&gt; sequence.steps().stream()</span>
+<span class="nc" id="L197">                .mapToLong(Transformation::exactTheoryStepCount).reduce(0L, Math::addExact);</span>
+        };
+    }
+
+    /** Guard for legacy consumers whose budgets and replay understand only primitives. */
+    public static List&lt;Transformation&gt; requirePrimitiveOnly(List&lt;Transformation&gt; transformations) {
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        for (Transformation transformation : transformations) {</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">            if (transformation.exactTheoryStepCount() != 0) {</span>
+<span class="nc" id="L205">                throw new IllegalArgumentException(&quot;exact theory requires an explicitly work-aware execution boundary&quot;);</span>
+            }
+<span class="fc" id="L207">        }</span>
+<span class="fc" id="L208">        return transformations;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

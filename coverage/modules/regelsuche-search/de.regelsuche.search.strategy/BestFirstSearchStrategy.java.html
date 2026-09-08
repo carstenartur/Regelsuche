@@ -201,7 +201,7 @@ import java.util.function.ToIntFunction;
 <span class="fc" id="L201">        return orderTransformations(</span>
             problem,
             current,
-<span class="fc" id="L204">            new ArrayList&lt;&gt;(problem.engine().transform(current.expression())),</span>
+<span class="fc" id="L204">            new ArrayList&lt;&gt;(problem.transformations(current.expression())),</span>
 <span class="fc" id="L205">            target.enabled(),</span>
 <span class="fc" id="L206">            transformation -&gt; target.distance(transformation.transformedExpression()));</span>
     }

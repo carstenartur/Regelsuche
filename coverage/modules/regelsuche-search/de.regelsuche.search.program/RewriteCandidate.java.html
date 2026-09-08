@@ -2,6 +2,8 @@
 
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationProvenance;
+import de.regelsuche.transform.ExecutionWork;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -18,50 +20,67 @@ public record RewriteCandidate(
     String outputExpression,
     List&lt;Transformation&gt; steps
 ) {
-<span class="fc" id="L21">    public RewriteCandidate {</span>
-<span class="fc" id="L22">        originNodeId = requireText(originNodeId, &quot;originNodeId&quot;);</span>
-<span class="fc" id="L23">        inputExpression = requireText(inputExpression, &quot;inputExpression&quot;);</span>
-<span class="fc" id="L24">        outputExpression = requireText(outputExpression, &quot;outputExpression&quot;);</span>
-<span class="fc" id="L25">        steps = List.copyOf(Objects.requireNonNull(steps, &quot;steps&quot;));</span>
-<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (steps.isEmpty()) {</span>
-<span class="nc" id="L27">            throw new IllegalArgumentException(&quot;steps must not be empty&quot;);</span>
+<span class="fc" id="L23">    public RewriteCandidate {</span>
+<span class="fc" id="L24">        originNodeId = requireText(originNodeId, &quot;originNodeId&quot;);</span>
+<span class="fc" id="L25">        inputExpression = requireText(inputExpression, &quot;inputExpression&quot;);</span>
+<span class="fc" id="L26">        outputExpression = requireText(outputExpression, &quot;outputExpression&quot;);</span>
+<span class="fc" id="L27">        steps = List.copyOf(Objects.requireNonNull(steps, &quot;steps&quot;));</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        if (steps.isEmpty()) {</span>
+<span class="nc" id="L29">            throw new IllegalArgumentException(&quot;steps must not be empty&quot;);</span>
         }
-<span class="fc" id="L29">    }</span>
+<span class="fc" id="L31">        String current = inputExpression;</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        for (Transformation step : steps) {</span>
+<span class="fc" id="L33">            step.provenance().requireSource(current);</span>
+<span class="fc" id="L34">            current = step.transformedExpression();</span>
+<span class="fc" id="L35">        }</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (!current.equals(outputExpression)) {</span>
+<span class="nc" id="L37">            throw new IllegalArgumentException(&quot;candidate output differs from its final step&quot;);</span>
+        }
+<span class="fc" id="L39">    }</span>
 
     public List&lt;String&gt; ruleIds() {
-<span class="fc" id="L32">        return steps.stream().map(Transformation::rule).toList();</span>
+<span class="fc" id="L42">        return steps.stream().map(Transformation::rule).toList();</span>
     }
 
     /** Ordered primitive lineage, including repeated applications. */
     public List&lt;String&gt; primitiveRuleIds() {
-<span class="fc" id="L37">        return steps.stream()</span>
-<span class="fc" id="L38">            .flatMap(step -&gt; step.primitiveRuleIds().stream())</span>
-<span class="fc" id="L39">            .toList();</span>
+<span class="fc" id="L47">        return steps.stream()</span>
+<span class="fc" id="L48">            .flatMap(step -&gt; step.primitiveRuleIds().stream())</span>
+<span class="fc" id="L49">            .toList();</span>
     }
 
     public Transformation lastStep() {
-<span class="fc" id="L43">        return steps.get(steps.size() - 1);</span>
+<span class="fc" id="L53">        return steps.get(steps.size() - 1);</span>
+    }
+
+    public ExecutionWork executionWork() {
+<span class="fc" id="L57">        return steps.stream().map(Transformation::executionWork).reduce(ExecutionWork.ZERO, ExecutionWork::plus);</span>
+    }
+
+    public TransformationProvenance provenance() {
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        return steps.size() == 1 ? steps.getFirst().provenance()</span>
+<span class="fc" id="L62">            : new TransformationProvenance.Sequence(inputExpression, steps);</span>
     }
 
     public RewriteCandidate append(RewriteCandidate suffix, String newOriginNodeId) {
-<span class="fc" id="L47">        Objects.requireNonNull(suffix, &quot;suffix&quot;);</span>
-<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (!outputExpression.equals(suffix.inputExpression())) {</span>
-<span class="nc" id="L49">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L66">        Objects.requireNonNull(suffix, &quot;suffix&quot;);</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (!outputExpression.equals(suffix.inputExpression())) {</span>
+<span class="nc" id="L68">            throw new IllegalArgumentException(</span>
                 &quot;candidate chain is discontinuous: &quot; + outputExpression
-<span class="nc" id="L51">                    + &quot; != &quot; + suffix.inputExpression());</span>
+<span class="nc" id="L70">                    + &quot; != &quot; + suffix.inputExpression());</span>
         }
-<span class="fc" id="L53">        List&lt;Transformation&gt; combined = new ArrayList&lt;&gt;(steps);</span>
-<span class="fc" id="L54">        combined.addAll(suffix.steps());</span>
-<span class="fc" id="L55">        return new RewriteCandidate(</span>
-<span class="fc" id="L56">            requireText(newOriginNodeId, &quot;newOriginNodeId&quot;),</span>
+<span class="fc" id="L72">        List&lt;Transformation&gt; combined = new ArrayList&lt;&gt;(steps);</span>
+<span class="fc" id="L73">        combined.addAll(suffix.steps());</span>
+<span class="fc" id="L74">        return new RewriteCandidate(</span>
+<span class="fc" id="L75">            requireText(newOriginNodeId, &quot;newOriginNodeId&quot;),</span>
             inputExpression,
-<span class="fc" id="L58">            suffix.outputExpression(),</span>
+<span class="fc" id="L77">            suffix.outputExpression(),</span>
             combined
         );
     }
 
     public RewriteCandidate withOriginNodeId(String newOriginNodeId) {
-<span class="fc" id="L64">        return new RewriteCandidate(</span>
+<span class="fc" id="L83">        return new RewriteCandidate(</span>
             newOriginNodeId,
             inputExpression,
             outputExpression,
@@ -69,36 +88,35 @@ public record RewriteCandidate(
     }
 
     /**
-     * Converts the path into the ordinary transformation model consumed by all
-     * existing search strategies. Primitive candidates are preserved exactly;
-     * multi-step candidates become explicit macro-like transformations whose
-     * structured primitive lineage remains visible to work-aware search.
+     * Converts the path into the canonical transformation model. Single steps
+     * are preserved exactly; compositions retain every intermediate application.
+     * A mixed transformation requires a consumer with explicit theory authority.
      */
     public Transformation toTransformation() {
-<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (steps.size() == 1) {</span>
-<span class="fc" id="L79">            return steps.get(0);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (steps.size() == 1) {</span>
+<span class="fc" id="L97">            return steps.get(0);</span>
         }
 
-<span class="fc" id="L82">        RewriteKind kind = combinedKind();</span>
-<span class="fc" id="L83">        boolean mayIncreaseComplexity = steps.stream()</span>
-<span class="fc" id="L84">            .anyMatch(Transformation::mayIncreaseComplexity);</span>
-<span class="fc" id="L85">        boolean equivalencePreserving = steps.stream()</span>
-<span class="fc" id="L86">            .allMatch(Transformation::equivalencePreservingByConstruction);</span>
-<span class="fc" id="L87">        int estimatedCostDelta = steps.stream()</span>
-<span class="fc" id="L88">            .mapToInt(Transformation::estimatedCostDelta)</span>
-<span class="fc" id="L89">            .reduce(0, RewriteCandidate::saturatedAdd);</span>
-<span class="fc" id="L90">        List&lt;String&gt; assumptions = steps.stream()</span>
-<span class="fc" id="L91">            .flatMap(step -&gt; step.assumptions().stream())</span>
-<span class="fc" id="L92">            .toList();</span>
+<span class="fc" id="L100">        RewriteKind kind = combinedKind();</span>
+<span class="fc" id="L101">        boolean mayIncreaseComplexity = steps.stream()</span>
+<span class="fc" id="L102">            .anyMatch(Transformation::mayIncreaseComplexity);</span>
+<span class="fc" id="L103">        boolean equivalencePreserving = steps.stream()</span>
+<span class="fc" id="L104">            .allMatch(Transformation::equivalencePreservingByConstruction);</span>
+<span class="fc" id="L105">        int estimatedCostDelta = steps.stream()</span>
+<span class="fc" id="L106">            .mapToInt(Transformation::estimatedCostDelta)</span>
+<span class="fc" id="L107">            .reduce(0, RewriteCandidate::saturatedAdd);</span>
+<span class="fc" id="L108">        List&lt;String&gt; assumptions = steps.stream()</span>
+<span class="fc" id="L109">            .flatMap(step -&gt; step.assumptions().stream())</span>
+<span class="fc" id="L110">            .toList();</span>
 
-<span class="fc" id="L94">        String rule = &quot;program:&quot; + originNodeId + &quot;[&quot;</span>
-<span class="fc" id="L95">            + String.join(&quot; -&gt; &quot;, ruleIds()) + &quot;]&quot;;</span>
-<span class="fc" id="L96">        String applicationKey = &quot;program:&quot; + originNodeId + &quot;:&quot;</span>
-<span class="fc" id="L97">            + steps.stream().map(Transformation::applicationKey)</span>
-<span class="fc" id="L98">                .reduce((left, right) -&gt; left + &quot;-&gt;&quot; + right)</span>
-<span class="fc" id="L99">                .orElseThrow();</span>
+<span class="fc" id="L112">        String rule = &quot;program:&quot; + originNodeId + &quot;[&quot;</span>
+<span class="fc" id="L113">            + String.join(&quot; -&gt; &quot;, ruleIds()) + &quot;]&quot;;</span>
+<span class="fc" id="L114">        String applicationKey = &quot;program:&quot; + originNodeId + &quot;:&quot;</span>
+<span class="fc" id="L115">            + steps.stream().map(Transformation::applicationKey)</span>
+<span class="fc" id="L116">                .reduce((left, right) -&gt; left + &quot;-&gt;&quot; + right)</span>
+<span class="fc" id="L117">                .orElseThrow();</span>
 
-<span class="fc" id="L101">        return new Transformation(</span>
+<span class="fc" id="L119">        return new Transformation(</span>
             rule,
             outputExpression,
             kind,
@@ -107,47 +125,56 @@ public record RewriteCandidate(
             equivalencePreserving,
             applicationKey,
             assumptions,
-<span class="fc" id="L110">            combinedValue(steps.stream().map(Transformation::packId).toList()),</span>
-<span class="fc" id="L111">            combinedValue(steps.stream().map(Transformation::license).toList()),</span>
-<span class="fc" id="L112">            primitiveRuleIds()</span>
+<span class="fc" id="L128">            combinedValue(steps.stream().map(Transformation::packId).toList()),</span>
+<span class="fc" id="L129">            combinedValue(steps.stream().map(Transformation::license).toList()),</span>
+<span class="fc" id="L130">            primitiveRuleIds(),</span>
+<span class="fc" id="L131">            provenance()</span>
         );
     }
 
-    String fingerprint() {
-<span class="fc" id="L117">        return outputExpression + &quot;\u0000&quot;</span>
-<span class="fc" id="L118">            + steps.stream().map(Transformation::applicationKey)</span>
-<span class="fc" id="L119">                .reduce((left, right) -&gt; left + &quot;\u0001&quot; + right)</span>
-<span class="fc" id="L120">                .orElse(&quot;&quot;);</span>
+    Identity identity() {
+<span class="fc" id="L136">        return new Identity(inputExpression, outputExpression, provenance());</span>
+    }
+
+<span class="fc" id="L139">    record Identity(String inputExpression, String outputExpression, TransformationProvenance provenance) {}</span>
+
+    String orderingKey() {
+<span class="nc" id="L142">        return outputExpression + &quot;\u0000&quot;</span>
+<span class="nc" id="L143">            + steps.stream().map(Transformation::applicationKey)</span>
+<span class="nc" id="L144">                .reduce((left, right) -&gt; left + &quot;\u0001&quot; + right)</span>
+<span class="nc" id="L145">                .orElse(&quot;&quot;)</span>
+<span class="nc bnc" id="L146" title="All 4 branches missed.">            + (steps.stream().noneMatch(step -&gt; step.exactTheoryStepCount() &gt; 0)</span>
+<span class="nc" id="L147">                ? &quot;&quot; : &quot;\u0000&quot; + provenance().contentHash());</span>
     }
 
     private RewriteKind combinedKind() {
-<span class="fc" id="L124">        RewriteKind first = steps.get(0).kind();</span>
-<span class="pc bpc" id="L125" title="2 of 4 branches missed.">        return steps.stream().allMatch(step -&gt; step.kind() == first)</span>
-<span class="fc" id="L126">            ? first</span>
-<span class="nc" id="L127">            : RewriteKind.NORMALIZE;</span>
+<span class="fc" id="L151">        RewriteKind first = steps.get(0).kind();</span>
+<span class="pc bpc" id="L152" title="2 of 4 branches missed.">        return steps.stream().allMatch(step -&gt; step.kind() == first)</span>
+<span class="fc" id="L153">            ? first</span>
+<span class="nc" id="L154">            : RewriteKind.NORMALIZE;</span>
     }
 
     private static int saturatedAdd(int left, int right) {
-<span class="fc" id="L131">        long sum = (long) left + right;</span>
-<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (sum &gt; Integer.MAX_VALUE) {</span>
-<span class="nc" id="L133">            return Integer.MAX_VALUE;</span>
+<span class="fc" id="L158">        long sum = (long) left + right;</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        if (sum &gt; Integer.MAX_VALUE) {</span>
+<span class="nc" id="L160">            return Integer.MAX_VALUE;</span>
         }
-<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (sum &lt; Integer.MIN_VALUE) {</span>
-<span class="nc" id="L136">            return Integer.MIN_VALUE;</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (sum &lt; Integer.MIN_VALUE) {</span>
+<span class="nc" id="L163">            return Integer.MIN_VALUE;</span>
         }
-<span class="fc" id="L138">        return (int) sum;</span>
+<span class="fc" id="L165">        return (int) sum;</span>
     }
 
     private static String combinedValue(List&lt;String&gt; values) {
-<span class="fc" id="L142">        Set&lt;String&gt; distinct = new LinkedHashSet&lt;&gt;(values);</span>
-<span class="fc" id="L143">        return String.join(&quot;+&quot;, distinct);</span>
+<span class="fc" id="L169">        Set&lt;String&gt; distinct = new LinkedHashSet&lt;&gt;(values);</span>
+<span class="fc" id="L170">        return String.join(&quot;+&quot;, distinct);</span>
     }
 
     private static String requireText(String value, String name) {
-<span class="pc bpc" id="L147" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L148">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+<span class="pc bpc" id="L174" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L175">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
         }
-<span class="fc" id="L150">        return value;</span>
+<span class="fc" id="L177">        return value;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

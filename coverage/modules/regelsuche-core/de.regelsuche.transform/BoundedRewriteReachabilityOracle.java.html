@@ -65,7 +65,7 @@ public final class BoundedRewriteReachabilityOracle {
 <span class="fc" id="L65">            Node current = frontier.removeFirst();</span>
 <span class="fc" id="L66">            maximumDepthReached = Math.max(maximumDepthReached, current.depth());</span>
 <span class="fc" id="L67">            List&lt;Transformation&gt; transformations = new ArrayList&lt;&gt;(</span>
-<span class="fc" id="L68">                engine.transform(current.expression()));</span>
+<span class="fc" id="L68">                Transformation.requirePrimitiveOnly(engine.transform(current.expression())));</span>
 <span class="fc" id="L69">            transformations.sort(TRANSFORMATION_ORDER);</span>
 
 <span class="fc bfc" id="L71" title="All 2 branches covered.">            for (Transformation transformation : transformations) {</span>

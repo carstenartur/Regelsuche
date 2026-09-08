@@ -215,3 +215,11 @@ Die Zweischrittkette und ihre Ansatzgrammatik sind handgeschriebene
 Entwicklungsfälle. Die Integration belegt weder das Lernen dieser Strategie
 noch eine historische Wiederentdeckungsstudie. Sie erweitert keine
 Produktionsschnittstelle und verändert weder Inventar noch FINAL TEST.
+
+## Mixed ordinary-source execution
+
+The canonical `Transformation` provenance and explicit `executeWithWorkBudget`
+entry now support mixed primitive/verified-theory paths through ordinary `Source`
+nodes. See [the mixed execution contract](mixed-rewrite-program-execution.md).
+This does not change the frozen theory-only protocol above or grant its public
+hash-bound records verifier authority. Search-frontier migration remains open.
