@@ -383,28 +383,12 @@ public class BestFirstSearchStrategy implements SearchStrategy {
     }
 
     protected int priority(SearchState state) {
-        int depthPenalty = state.depth() * 2;
-        int expansionPenalty = state.expandedStepCount() * 5;
-        int noImprovementPenalty = state.improvement() <= 0 && state.depth() > 0 ? 4 : 0;
-        return state.score().weightedTotal() + depthPenalty + expansionPenalty + noImprovementPenalty;
+        return SearchPriority.bestFirst(state, state.score().weightedTotal());
     }
 
-    /**
-     * Transformation-objective-aware priority. Target distance is applied by
-     * the queue wrapper so subclasses such as A* inherit the same target signal.
-     */
+    /** Target distance is applied by the queue wrapper after objective and path costs. */
     protected int priority(SearchState state, SearchProblem problem) {
-        if (problem.costModel() == null) {
-            return priority(state);
-        }
-        int depthPenalty = state.depth() * 2;
-        int expansionPenalty = state.expandedStepCount() * 5;
-        int noImprovementPenalty = state.improvement() <= 0 && state.depth() > 0 ? 4 : 0;
-        int modelCost = problem.costModel().cost(state.expression(), problem.canonicalizer(), state.score());
-        if (modelCost == Integer.MAX_VALUE) {
-            return Integer.MAX_VALUE / 2;
-        }
-        return modelCost + depthPenalty + expansionPenalty + noImprovementPenalty;
+        return problem.costModel() == null ? priority(state) : SearchPriority.bestFirst(state, problem);
     }
 
     private String stateKey(SearchState state) {
@@ -644,9 +628,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             }
             long adjusted = (long) basePriority
                 + (long) target.distanceWeight() * distance(expression);
-            return adjusted >= Integer.MAX_VALUE / 2
-                ? Integer.MAX_VALUE / 2
-                : (int) adjusted;
+            return SearchPriority.saturate(adjusted);
         }
 
         private static int semanticDistance(

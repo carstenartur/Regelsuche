@@ -210,19 +210,7 @@ public final class StructuralDiversitySearchStrategy implements SearchStrategy {
     }
 
     private int priority(SearchState state, SearchProblem problem) {
-        int modelCost = problem.costModel() == null
-            ? state.score().weightedTotal()
-            : problem.costModel().cost(
-                state.expression(),
-                problem.canonicalizer(),
-                state.score());
-        if (modelCost == Integer.MAX_VALUE) {
-            return Integer.MAX_VALUE / 2;
-        }
-        return modelCost
-            + state.depth() * 2
-            + state.expandedStepCount() * 5
-            + (state.improvement() <= 0 && state.depth() > 0 ? 4 : 0);
+        return SearchPriority.bestFirst(state, problem);
     }
 
     private String stateKey(SearchState state) {

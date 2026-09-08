@@ -8,6 +8,9 @@ import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.scoring.ExpressionScorer;
 import org.junit.jupiter.api.Test;
+import de.regelsuche.parse.ExpressionParser;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * For every {@link TransformationGoal} this class pins one
@@ -87,11 +90,36 @@ class TransformationGoalTest {
     void costModelIdsAreStableAndDistinct() {
         // The UI dropdown and JSON exports key off model.id(); these strings
         // must therefore be stable across versions.
-        assertEquals("operator-count", new OperatorCountCost().id());
-        assertEquals("depth", new DepthCost().id());
-        assertEquals("factored-form", new FactoredFormCost().id());
+        assertEquals("operator-count", StructuralCostModel.OPERATOR_COUNT.id());
+        assertEquals("depth", StructuralCostModel.DEPTH.id());
+        assertEquals("factored-form", StructuralCostModel.FACTORED_FORM.id());
         assertEquals("numeric-stability", new NumericStabilityCost().id());
         assertEquals("teaching-friendly", new TeachingFriendlinessCost().id());
-        assertEquals("symmetry", new SymmetryCost().id());
+        assertEquals("symmetry", StructuralCostModel.SYMMETRY.id());
+    }
+    private int cost(CostModel model, String expression) {
+        return model.cost(expression, new ExpressionParser().parseTerm(expression), new ExpressionScorer().score(expression));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"x ^ 2147483651", "x ^ 9999999999999999999999999999", "x ^ 2000000000 + y ^ 2000000000"})
+    void hugePowersCannotBecomeNegativeOrCheap(String expression) {
+        assertEquals(Integer.MAX_VALUE, cost(new NumericStabilityCost(), expression));
+    }
+
+    @Test
+    void factorizationBonusesDoNotCreateNegativeCosts() {
+        assertTrue(cost(StructuralCostModel.FACTORED_FORM, "((x + 1) ^ 2) ^ 2") >= 0);
+    }
+
+    @Test
+    void symmetryBonusesDoNotCreateNegativeCosts() {
+        assertTrue(cost(StructuralCostModel.SYMMETRY, "a + b + a") >= 0);
+    }
+
+    @Test
+    void ordinaryPowerCostsRemainOrdered() {
+        assertEquals(2, cost(new NumericStabilityCost(), "x ^ 4"));
+        assertEquals(3, cost(new NumericStabilityCost(), "x ^ 5"));
     }
 }

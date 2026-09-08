@@ -25,7 +25,7 @@ final class UnivariatePolynomial {
     private static final int MAX_EXPONENT = 8;
     /** Highest degree accepted, keeping the rule a local, cheap decision. */
     private static final int MAX_DEGREE = 16;
-    /** Largest coefficient that can be represented exactly by the AST number type. */
+    /** Finite coefficient work bound for this local polynomial algorithm; the AST itself is exact. */
     private static final BigInteger MAX_ABSOLUTE_COEFFICIENT =
         BigInteger.valueOf(1_000_000_000_000L);
 

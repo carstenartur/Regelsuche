@@ -1,5 +1,6 @@
 package de.regelsuche.search.memory;
 
+import de.regelsuche.util.AtomicJsonFile;
 import de.regelsuche.json.MiniJson;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -116,7 +117,7 @@ public final class JsonFileTranspositionTable extends InMemoryTranspositionTable
         }
         builder.append("  ]\n}\n");
         try {
-            Files.writeString(file, builder.toString(), StandardCharsets.UTF_8);
+            AtomicJsonFile.writeUtf8(file, builder.toString());
         } catch (IOException ex) {
             throw new RuntimeException("Failed to persist transposition table to " + file, ex);
         }

@@ -9,16 +9,16 @@ package de.regelsuche.scoring.cost;
  */
 public enum TransformationGoal {
     /** Minimise expression size — the historical default. */
-    SIMPLIFY(new OperatorCountCost()),
+    SIMPLIFY(StructuralCostModel.OPERATOR_COUNT),
 
     /** Prefer factored form over expanded polynomials. */
-    FACTORIZE(new FactoredFormCost()),
+    FACTORIZE(StructuralCostModel.FACTORED_FORM),
 
     /** Prefer numerically stable form (Horner over expanded, etc.). */
     NUMERICALLY_STABLE(new NumericStabilityCost()),
 
     /** Prefer shallow, symmetric forms that ease case analysis in a proof. */
-    PROOF_FRIENDLY(new SymmetryCost()),
+    PROOF_FRIENDLY(StructuralCostModel.SYMMETRY),
 
     /**
      * Prefer school-book-style notation: small coefficients, shallow

@@ -5,12 +5,13 @@ import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.scoring.ExpressionScore;
 
 /**
  * Penalises operations that are known to amplify floating-point error:
  * subtraction of similar quantities (catastrophic cancellation), division
- * by potentially small numbers, and integer powers above two computed via
+ * by potentially small numbers, and constant powers above three computed via
  * repeated multiplication of large coefficients.
  *
  * <p>The model is intentionally heuristic — it operates on the symbolic
@@ -24,9 +25,9 @@ public final class NumericStabilityCost implements CostModel {
     @Override
     public int cost(String expression, Expr parsedAst, ExpressionScore score) {
         if (parsedAst == null) {
-            return Math.max(0, score.operatorCount() + score.nestingDepth());
+            return boundedCost((long) score.operatorCount() + score.nestingDepth());
         }
-        return baseCost(parsedAst) + instabilityPenalty(parsedAst);
+        return boundedCost((long) StructuralCostModel.countOperators(parsedAst) + instabilityPenalty(parsedAst));
     }
 
     @Override
@@ -34,22 +35,8 @@ public final class NumericStabilityCost implements CostModel {
         return "numeric-stability";
     }
 
-    private int baseCost(Expr expression) {
-        if (expression instanceof BinaryExpr binary) {
-            return 1 + baseCost(binary.left()) + baseCost(binary.right());
-        }
-        if (expression instanceof FunctionExpr function) {
-            int total = 1;
-            for (Expr argument : function.arguments()) {
-                total += baseCost(argument);
-            }
-            return total;
-        }
-        return 0;
-    }
-
     private int instabilityPenalty(Expr expression) {
-        int penalty = 0;
+        long penalty = 0;
         if (expression instanceof BinaryExpr binary) {
             switch (binary.operator()) {
                 case SUB -> {
@@ -71,8 +58,8 @@ public final class NumericStabilityCost implements CostModel {
                 }
                 case POW -> {
                     // High constant powers expanded raise instability vs. Horner
-                    if (binary.right() instanceof NumberExpr number && number.value().compareTo(de.regelsuche.scalar.ExactRational.integer(3)) > 0) {
-                        penalty += (int) (number.value().toBigDecimal(java.math.MathContext.DECIMAL128).doubleValue() - 3);
+                    if (binary.right() instanceof NumberExpr number) {
+                        penalty += powerPenalty(number.value());
                     }
                 }
                 default -> {
@@ -86,6 +73,21 @@ public final class NumericStabilityCost implements CostModel {
                 penalty += instabilityPenalty(argument);
             }
         }
-        return penalty;
+        return boundedCost(penalty);
+    }
+
+    private static int powerPenalty(ExactRational exponent) {
+        ExactRational excess = exponent.subtract(ExactRational.integer(3));
+        if (excess.signum() <= 0) {
+            return 0;
+        }
+        if (excess.compareTo(ExactRational.integer(Integer.MAX_VALUE)) >= 0) {
+            return Integer.MAX_VALUE;
+        }
+        return excess.numerator().divide(excess.denominator()).intValueExact();
+    }
+
+    private static int boundedCost(long value) {
+        return (int) Math.clamp(value, 0, Integer.MAX_VALUE);
     }
 }

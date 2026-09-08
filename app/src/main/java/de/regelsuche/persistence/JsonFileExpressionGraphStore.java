@@ -1,5 +1,6 @@
 package de.regelsuche.persistence;
 
+import de.regelsuche.util.AtomicJsonFile;
 import de.regelsuche.discovery.DiscoveredTransformation;
 import de.regelsuche.export.DefaultTransformationExportService;
 import de.regelsuche.export.DefaultTransformationImportService;
@@ -88,7 +89,7 @@ public class JsonFileExpressionGraphStore extends InMemoryExpressionGraphStore {
                 super.ruleCandidates(),
                 super.reusableRules()
             );
-            Files.writeString(file, json, StandardCharsets.UTF_8);
+            AtomicJsonFile.writeUtf8(file, json);
         } catch (IOException ex) {
             throw new RuntimeException("Failed to persist graph store to " + file, ex);
         }
