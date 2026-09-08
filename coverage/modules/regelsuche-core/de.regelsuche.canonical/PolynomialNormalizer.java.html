@@ -6,7 +6,6 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.scalar.ExactRational;
-import de.regelsuche.scalar.ExactRationalDomain;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -22,59 +21,57 @@ import java.util.TreeMap;
  * variables, addition, subtraction, multiplication and non-negative integer
  * powers.
  *
- * &lt;p&gt;Legacy {@link NumberExpr} nodes still expose {@code double}; conversion
- * of that already-rounded value is isolated in the shared
- * {@link ExactRationalDomain} migration bridge. All normalization arithmetic
- * itself uses the authoritative {@link ExactRational} contract. Exact results
- * are converted back only when the legacy AST can represent the same rational
- * value without rounding.&lt;/p&gt;
+ * &lt;p&gt;Numeric leaves and normalization arithmetic use the authoritative
+ * {@link ExactRational} contract. Expansion and coefficient bit budgets bound
+ * normalization work; accepted coefficients are emitted without rounding.&lt;/p&gt;
  */
 public final class PolynomialNormalizer {
     private static final int MAX_EXPANDED_TERMS = 1_000;
+    private static final int MAX_COEFFICIENT_BITS = 4_096;
 
     private final boolean expandCompositePolynomials;
 
     public PolynomialNormalizer() {
-<span class="fc" id="L38">        this(true);</span>
-<span class="fc" id="L39">    }</span>
+<span class="fc" id="L35">        this(true);</span>
+<span class="fc" id="L36">    }</span>
 
-<span class="fc" id="L41">    private PolynomialNormalizer(boolean expandCompositePolynomials) {</span>
-<span class="fc" id="L42">        this.expandCompositePolynomials = expandCompositePolynomials;</span>
-<span class="fc" id="L43">    }</span>
+<span class="fc" id="L38">    private PolynomialNormalizer(boolean expandCompositePolynomials) {</span>
+<span class="fc" id="L39">        this.expandCompositePolynomials = expandCompositePolynomials;</span>
+<span class="fc" id="L40">    }</span>
 
     public static PolynomialNormalizer monomialOnly() {
-<span class="fc" id="L46">        return new PolynomialNormalizer(false);</span>
+<span class="fc" id="L43">        return new PolynomialNormalizer(false);</span>
     }
 
     public Optional&lt;Expr&gt; normalize(Expr expression) {
-<span class="fc" id="L50">        Polynomial polynomial = toPolynomial(expression);</span>
-<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (polynomial == null) {</span>
-<span class="fc" id="L52">            return Optional.empty();</span>
+<span class="fc" id="L47">        Polynomial polynomial = toPolynomial(expression);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (polynomial == null) {</span>
+<span class="fc" id="L49">            return Optional.empty();</span>
         }
-<span class="fc" id="L54">        Expr normalized = polynomial.toExpr();</span>
-<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        return normalized == null</span>
-<span class="nc" id="L56">            ? Optional.empty()</span>
-<span class="fc" id="L57">            : Optional.of(normalized);</span>
+<span class="fc" id="L51">        Expr normalized = polynomial.toExpr();</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        return normalized == null</span>
+<span class="nc" id="L53">            ? Optional.empty()</span>
+<span class="fc" id="L54">            : Optional.of(normalized);</span>
     }
 
     private Polynomial toPolynomial(Expr expression) {
-<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
-<span class="fc" id="L62">            return Polynomial.constant(number.value());</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L59">            return Polynomial.constant(number.value());</span>
         }
-<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
-<span class="fc" id="L65">            return Polynomial.monomial(</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L62">            return Polynomial.monomial(</span>
                 1,
-<span class="fc" id="L67">                Monomial.variable(variable.name()));</span>
+<span class="fc" id="L64">                Monomial.variable(variable.name()));</span>
         }
-<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (!(expression instanceof BinaryExpr binary)) {</span>
-<span class="fc" id="L70">            return null;</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (!(expression instanceof BinaryExpr binary)) {</span>
+<span class="fc" id="L67">            return null;</span>
         }
-<span class="fc bfc" id="L72" title="All 5 branches covered.">        return switch (binary.operator()) {</span>
-<span class="fc" id="L73">            case ADD -&gt; combine(binary.left(), binary.right(), 1);</span>
-<span class="fc" id="L74">            case SUB -&gt; combine(binary.left(), binary.right(), -1);</span>
-<span class="fc" id="L75">            case MUL -&gt; multiply(binary.left(), binary.right());</span>
-<span class="fc" id="L76">            case POW -&gt; power(binary.left(), binary.right());</span>
-<span class="fc" id="L77">            case DIV -&gt; null;</span>
+<span class="fc bfc" id="L69" title="All 5 branches covered.">        return switch (binary.operator()) {</span>
+<span class="fc" id="L70">            case ADD -&gt; combine(binary.left(), binary.right(), 1);</span>
+<span class="fc" id="L71">            case SUB -&gt; combine(binary.left(), binary.right(), -1);</span>
+<span class="fc" id="L72">            case MUL -&gt; multiply(binary.left(), binary.right());</span>
+<span class="fc" id="L73">            case POW -&gt; power(binary.left(), binary.right());</span>
+<span class="fc" id="L74">            case DIV -&gt; null;</span>
         };
     }
 
@@ -83,183 +80,177 @@ public final class PolynomialNormalizer {
         Expr right,
         int rightSign
     ) {
-<span class="fc" id="L86">        Polynomial leftPolynomial = toPolynomial(left);</span>
-<span class="fc" id="L87">        Polynomial rightPolynomial = toPolynomial(right);</span>
-<span class="fc bfc" id="L88" title="All 4 branches covered.">        if (leftPolynomial == null || rightPolynomial == null) {</span>
-<span class="fc" id="L89">            return null;</span>
+<span class="fc" id="L83">        Polynomial leftPolynomial = toPolynomial(left);</span>
+<span class="fc" id="L84">        Polynomial rightPolynomial = toPolynomial(right);</span>
+<span class="fc bfc" id="L85" title="All 4 branches covered.">        if (leftPolynomial == null || rightPolynomial == null) {</span>
+<span class="fc" id="L86">            return null;</span>
         }
-<span class="fc" id="L91">        return leftPolynomial.add(</span>
-<span class="fc" id="L92">            rightPolynomial.scale(rightSign));</span>
+<span class="fc" id="L88">        return leftPolynomial.add(</span>
+<span class="fc" id="L89">            rightPolynomial.scale(rightSign));</span>
     }
 
     private Polynomial multiply(Expr left, Expr right) {
-<span class="fc" id="L96">        Polynomial leftPolynomial = toPolynomial(left);</span>
-<span class="fc" id="L97">        Polynomial rightPolynomial = toPolynomial(right);</span>
-<span class="fc bfc" id="L98" title="All 4 branches covered.">        if (leftPolynomial == null || rightPolynomial == null) {</span>
-<span class="fc" id="L99">            return null;</span>
+<span class="fc" id="L93">        Polynomial leftPolynomial = toPolynomial(left);</span>
+<span class="fc" id="L94">        Polynomial rightPolynomial = toPolynomial(right);</span>
+<span class="fc bfc" id="L95" title="All 4 branches covered.">        if (leftPolynomial == null || rightPolynomial == null) {</span>
+<span class="fc" id="L96">            return null;</span>
         }
-<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (!expandCompositePolynomials</span>
-<span class="fc bfc" id="L102" title="All 2 branches covered.">                &amp;&amp; (!leftPolynomial.isMonomial()</span>
-<span class="fc bfc" id="L103" title="All 2 branches covered.">                    || !rightPolynomial.isMonomial())) {</span>
-<span class="fc" id="L104">            return null;</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (!expandCompositePolynomials</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                &amp;&amp; (!leftPolynomial.isMonomial()</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">                    || !rightPolynomial.isMonomial())) {</span>
+<span class="fc" id="L101">            return null;</span>
         }
-<span class="fc" id="L106">        return leftPolynomial.multiply(rightPolynomial);</span>
+<span class="fc" id="L103">        return leftPolynomial.multiply(rightPolynomial);</span>
     }
 
     private Polynomial power(Expr base, Expr exponent) {
-<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (!(exponent instanceof NumberExpr number)</span>
-<span class="fc bfc" id="L111" title="All 2 branches covered.">                || !isNonNegativeInteger(number.value())) {</span>
-<span class="fc" id="L112">            return null;</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (!(exponent instanceof NumberExpr number)</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">                || !isNonNegativeInteger(number.value())) {</span>
+<span class="fc" id="L109">            return null;</span>
         }
-<span class="fc" id="L114">        int exponentValue = (int) number.value();</span>
+<span class="fc" id="L111">        int exponentValue = number.value().intValueExact();</span>
         // In expression semantics A^0 removes A and is therefore only sound
         // after A is known to be defined and non-zero. Leave this case to the
         // assumption-aware expression canonicalizer instead of folding it as
         // a formal-polynomial identity here.
-<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (exponentValue == 0) {</span>
-<span class="fc" id="L120">            return null;</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        if (exponentValue == 0) {</span>
+<span class="fc" id="L117">            return null;</span>
         }
-<span class="fc" id="L122">        Polynomial basePolynomial = toPolynomial(base);</span>
-<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (basePolynomial == null) {</span>
-<span class="fc" id="L124">            return null;</span>
+<span class="fc" id="L119">        Polynomial basePolynomial = toPolynomial(base);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (basePolynomial == null) {</span>
+<span class="fc" id="L121">            return null;</span>
         }
-<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (!expandCompositePolynomials</span>
-<span class="fc bfc" id="L127" title="All 2 branches covered.">                &amp;&amp; !basePolynomial.isMonomial()) {</span>
-<span class="fc" id="L128">            return null;</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (!expandCompositePolynomials</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">                &amp;&amp; !basePolynomial.isMonomial()) {</span>
+<span class="fc" id="L125">            return null;</span>
         }
-<span class="fc" id="L130">        return basePolynomial.pow(exponentValue);</span>
+<span class="fc" id="L127">        return basePolynomial.pow(exponentValue);</span>
     }
 
-    private boolean isNonNegativeInteger(double value) {
-<span class="pc bpc" id="L134" title="2 of 4 branches missed.">        return value &gt;= 0</span>
-            &amp;&amp; value &lt;= Integer.MAX_VALUE
-<span class="fc bfc" id="L136" title="All 2 branches covered.">            &amp;&amp; Math.rint(value) == value;</span>
+    private boolean isNonNegativeInteger(ExactRational value) {
+<span class="pc bpc" id="L131" title="1 of 4 branches missed.">        return value.isInteger() &amp;&amp; value.signum() &gt;= 0</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">            &amp;&amp; value.numerator().bitLength() &lt;= 31;</span>
     }
 
     private record Monomial(Map&lt;String, Integer&gt; powers) {
-<span class="fc" id="L140">        private Monomial {</span>
-<span class="fc" id="L141">            powers = Collections.unmodifiableMap(</span>
+<span class="fc" id="L136">        private Monomial {</span>
+<span class="fc" id="L137">            powers = Collections.unmodifiableMap(</span>
                 new TreeMap&lt;&gt;(powers));
-<span class="fc" id="L143">        }</span>
+<span class="fc" id="L139">        }</span>
 
         private static Monomial constant() {
-<span class="fc" id="L146">            return new Monomial(Map.of());</span>
+<span class="fc" id="L142">            return new Monomial(Map.of());</span>
         }
 
         private static Monomial variable(String name) {
-<span class="fc" id="L150">            return new Monomial(Map.of(name, 1));</span>
+<span class="fc" id="L146">            return new Monomial(Map.of(name, 1));</span>
         }
 
         private Monomial multiply(Monomial other) {
-<span class="fc" id="L154">            Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;(powers);</span>
+<span class="fc" id="L150">            Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;(powers);</span>
             for (Map.Entry&lt;String, Integer&gt; entry
-<span class="fc bfc" id="L156" title="All 2 branches covered.">                    : other.powers.entrySet()) {</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">                    : other.powers.entrySet()) {</span>
                 try {
-<span class="fc" id="L158">                    result.merge(</span>
-<span class="fc" id="L159">                        entry.getKey(),</span>
-<span class="fc" id="L160">                        entry.getValue(),</span>
+<span class="fc" id="L154">                    result.merge(</span>
+<span class="fc" id="L155">                        entry.getKey(),</span>
+<span class="fc" id="L156">                        entry.getValue(),</span>
                         Math::addExact);
-<span class="fc" id="L162">                } catch (ArithmeticException exception) {</span>
-<span class="fc" id="L163">                    return null;</span>
-<span class="fc" id="L164">                }</span>
-<span class="fc" id="L165">            }</span>
-<span class="pc bpc" id="L166" title="1 of 2 branches missed.">            result.values().removeIf(value -&gt; value == 0);</span>
-<span class="fc" id="L167">            return new Monomial(result);</span>
+<span class="fc" id="L158">                } catch (ArithmeticException exception) {</span>
+<span class="fc" id="L159">                    return null;</span>
+<span class="fc" id="L160">                }</span>
+<span class="fc" id="L161">            }</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            result.values().removeIf(value -&gt; value == 0);</span>
+<span class="fc" id="L163">            return new Monomial(result);</span>
         }
 
         private Monomial pow(int exponent) {
-<span class="nc" id="L171">            Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;();</span>
+<span class="nc" id="L167">            Map&lt;String, Integer&gt; result = new TreeMap&lt;&gt;();</span>
             for (Map.Entry&lt;String, Integer&gt; entry
-<span class="nc bnc" id="L173" title="All 2 branches missed.">                    : powers.entrySet()) {</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">                    : powers.entrySet()) {</span>
                 try {
-<span class="nc" id="L175">                    result.put(</span>
-<span class="nc" id="L176">                        entry.getKey(),</span>
-<span class="nc" id="L177">                        Math.multiplyExact(</span>
-<span class="nc" id="L178">                            entry.getValue(),</span>
+<span class="nc" id="L171">                    result.put(</span>
+<span class="nc" id="L172">                        entry.getKey(),</span>
+<span class="nc" id="L173">                        Math.multiplyExact(</span>
+<span class="nc" id="L174">                            entry.getValue(),</span>
                             exponent));
-<span class="nc" id="L180">                } catch (ArithmeticException exception) {</span>
-<span class="nc" id="L181">                    return null;</span>
-<span class="nc" id="L182">                }</span>
-<span class="nc" id="L183">            }</span>
-<span class="nc" id="L184">            return new Monomial(result);</span>
+<span class="nc" id="L176">                } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L177">                    return null;</span>
+<span class="nc" id="L178">                }</span>
+<span class="nc" id="L179">            }</span>
+<span class="nc" id="L180">            return new Monomial(result);</span>
         }
 
         private long degree() {
-<span class="fc" id="L188">            long degree = 0;</span>
-<span class="fc bfc" id="L189" title="All 2 branches covered.">            for (int exponent : powers.values()) {</span>
-<span class="fc" id="L190">                degree += exponent;</span>
-<span class="fc" id="L191">            }</span>
-<span class="fc" id="L192">            return degree;</span>
+<span class="fc" id="L184">            long degree = 0;</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            for (int exponent : powers.values()) {</span>
+<span class="fc" id="L186">                degree += exponent;</span>
+<span class="fc" id="L187">            }</span>
+<span class="fc" id="L188">            return degree;</span>
         }
 
         private Expr toExpr() {
-<span class="fc bfc" id="L196" title="All 2 branches covered.">            if (powers.isEmpty()) {</span>
-<span class="fc" id="L197">                return new NumberExpr(1);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">            if (powers.isEmpty()) {</span>
+<span class="fc" id="L193">                return new NumberExpr(1);</span>
             }
-<span class="fc" id="L199">            List&lt;Expr&gt; factors = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L195">            List&lt;Expr&gt; factors = new ArrayList&lt;&gt;();</span>
             for (Map.Entry&lt;String, Integer&gt; entry
-<span class="fc bfc" id="L201" title="All 2 branches covered.">                    : powers.entrySet()) {</span>
-<span class="fc" id="L202">                Expr variable = new VariableExpr(entry.getKey());</span>
-<span class="fc bfc" id="L203" title="All 2 branches covered.">                factors.add(entry.getValue() == 1</span>
-<span class="fc" id="L204">                    ? variable</span>
-<span class="fc" id="L205">                    : new BinaryExpr(</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">                    : powers.entrySet()) {</span>
+<span class="fc" id="L198">                Expr variable = new VariableExpr(entry.getKey());</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">                factors.add(entry.getValue() == 1</span>
+<span class="fc" id="L200">                    ? variable</span>
+<span class="fc" id="L201">                    : new BinaryExpr(</span>
                         variable,
                         BinaryOperator.POW,
-<span class="fc" id="L208">                        new NumberExpr(entry.getValue())));</span>
-<span class="fc" id="L209">            }</span>
-<span class="fc" id="L210">            return leftAssociate(factors, BinaryOperator.MUL);</span>
+<span class="fc" id="L204">                        new NumberExpr(entry.getValue())));</span>
+<span class="fc" id="L205">            }</span>
+<span class="fc" id="L206">            return leftAssociate(factors, BinaryOperator.MUL);</span>
         }
 
         private String sortKey() {
-<span class="pc bpc" id="L214" title="1 of 2 branches missed.">            if (powers.isEmpty()) {</span>
-<span class="nc" id="L215">                return &quot;&quot;;</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">            if (powers.isEmpty()) {</span>
+<span class="nc" id="L211">                return &quot;&quot;;</span>
             }
-<span class="fc" id="L217">            StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L213">            StringBuilder builder = new StringBuilder();</span>
             for (Map.Entry&lt;String, Integer&gt; entry
-<span class="fc bfc" id="L219" title="All 2 branches covered.">                    : powers.entrySet()) {</span>
-<span class="fc bfc" id="L220" title="All 2 branches covered.">                if (!builder.isEmpty()) {</span>
-<span class="fc" id="L221">                    builder.append('*');</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">                    : powers.entrySet()) {</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">                if (!builder.isEmpty()) {</span>
+<span class="fc" id="L217">                    builder.append('*');</span>
                 }
-<span class="fc" id="L223">                builder.append(entry.getKey());</span>
-<span class="fc bfc" id="L224" title="All 2 branches covered.">                if (entry.getValue() != 1) {</span>
-<span class="fc" id="L225">                    builder.append('^').append(entry.getValue());</span>
+<span class="fc" id="L219">                builder.append(entry.getKey());</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">                if (entry.getValue() != 1) {</span>
+<span class="fc" id="L221">                    builder.append('^').append(entry.getValue());</span>
                 }
-<span class="fc" id="L227">            }</span>
-<span class="fc" id="L228">            return builder.toString();</span>
+<span class="fc" id="L223">            }</span>
+<span class="fc" id="L224">            return builder.toString();</span>
         }
     }
 
     private static final class Polynomial {
         private static final Comparator&lt;
-<span class="fc" id="L234">            Map.Entry&lt;Monomial, ExactRational&gt;&gt; TERM_ORDER =</span>
+<span class="fc" id="L230">            Map.Entry&lt;Monomial, ExactRational&gt;&gt; TERM_ORDER =</span>
                 Comparator
-<span class="fc" id="L236">                    .&lt;Map.Entry&lt;Monomial, ExactRational&gt;&gt;comparingLong(</span>
-<span class="fc" id="L237">                        entry -&gt; entry.getKey().degree())</span>
-<span class="fc" id="L238">                    .reversed()</span>
-<span class="fc" id="L239">                    .thenComparing(</span>
-<span class="fc" id="L240">                        entry -&gt; entry.getKey().sortKey());</span>
+<span class="fc" id="L232">                    .&lt;Map.Entry&lt;Monomial, ExactRational&gt;&gt;comparingLong(</span>
+<span class="fc" id="L233">                        entry -&gt; entry.getKey().degree())</span>
+<span class="fc" id="L234">                    .reversed()</span>
+<span class="fc" id="L235">                    .thenComparing(</span>
+<span class="fc" id="L236">                        entry -&gt; entry.getKey().sortKey());</span>
 
         private final Map&lt;Monomial, ExactRational&gt; terms;
 
-<span class="fc" id="L244">        private Polynomial(Map&lt;Monomial, ExactRational&gt; terms) {</span>
-<span class="fc" id="L245">            this.terms = normalizedTerms(terms);</span>
-<span class="fc" id="L246">        }</span>
+<span class="fc" id="L240">        private Polynomial(Map&lt;Monomial, ExactRational&gt; terms) {</span>
+<span class="fc" id="L241">            this.terms = normalizedTerms(terms);</span>
+<span class="fc" id="L242">        }</span>
 
-        private static Polynomial constant(double value) {
-<span class="fc" id="L249">            ExactRational coefficient = legacyExact(value);</span>
-<span class="pc bpc" id="L250" title="1 of 2 branches missed.">            return coefficient == null</span>
-<span class="nc" id="L251">                ? null</span>
-<span class="fc" id="L252">                : monomial(</span>
-                    coefficient,
-<span class="fc" id="L254">                    Monomial.constant());</span>
+        private static Polynomial constant(ExactRational value) {
+<span class="fc" id="L245">            return monomial(value, Monomial.constant());</span>
         }
 
         private static Polynomial monomial(
             long coefficient,
             Monomial monomial
         ) {
-<span class="fc" id="L261">            return monomial(</span>
-<span class="fc" id="L262">                ExactRational.integer(coefficient),</span>
+<span class="fc" id="L252">            return monomial(</span>
+<span class="fc" id="L253">                ExactRational.integer(coefficient),</span>
                 monomial);
         }
 
@@ -267,205 +258,177 @@ public final class PolynomialNormalizer {
             ExactRational coefficient,
             Monomial monomial
         ) {
-<span class="fc" id="L270">            Map&lt;Monomial, ExactRational&gt; result =</span>
+<span class="fc" id="L261">            Map&lt;Monomial, ExactRational&gt; result =</span>
                 new LinkedHashMap&lt;&gt;();
-<span class="fc" id="L272">            result.put(monomial, coefficient);</span>
-<span class="fc" id="L273">            return new Polynomial(result);</span>
+<span class="fc" id="L263">            result.put(monomial, coefficient);</span>
+<span class="fc" id="L264">            return new Polynomial(result);</span>
         }
 
         private Polynomial add(Polynomial other) {
-<span class="fc" id="L277">            Map&lt;Monomial, ExactRational&gt; result =</span>
+<span class="fc" id="L268">            Map&lt;Monomial, ExactRational&gt; result =</span>
                 new LinkedHashMap&lt;&gt;(terms);
             for (Map.Entry&lt;Monomial, ExactRational&gt; entry
-<span class="fc bfc" id="L280" title="All 2 branches covered.">                    : other.terms.entrySet()) {</span>
-<span class="fc" id="L281">                result.merge(</span>
-<span class="fc" id="L282">                    entry.getKey(),</span>
-<span class="fc" id="L283">                    entry.getValue(),</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">                    : other.terms.entrySet()) {</span>
+<span class="fc" id="L272">                result.merge(</span>
+<span class="fc" id="L273">                    entry.getKey(),</span>
+<span class="fc" id="L274">                    entry.getValue(),</span>
                     ExactRational::add);
-<span class="pc bpc" id="L285" title="1 of 2 branches missed.">                if (result.size() &gt; MAX_EXPANDED_TERMS) {</span>
-<span class="nc" id="L286">                    return null;</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">                if (result.size() &gt; MAX_EXPANDED_TERMS) {</span>
+<span class="nc" id="L277">                    return null;</span>
                 }
-<span class="fc" id="L288">            }</span>
-<span class="fc" id="L289">            return new Polynomial(result);</span>
+<span class="fc" id="L279">            }</span>
+<span class="fc" id="L280">            return new Polynomial(result);</span>
         }
 
         private Polynomial multiply(Polynomial other) {
-<span class="fc" id="L293">            Map&lt;Monomial, ExactRational&gt; result =</span>
+<span class="fc" id="L284">            Map&lt;Monomial, ExactRational&gt; result =</span>
                 new LinkedHashMap&lt;&gt;();
             for (Map.Entry&lt;Monomial, ExactRational&gt; left
-<span class="fc bfc" id="L296" title="All 2 branches covered.">                    : terms.entrySet()) {</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">                    : terms.entrySet()) {</span>
                 for (Map.Entry&lt;Monomial, ExactRational&gt; right
-<span class="fc bfc" id="L298" title="All 2 branches covered.">                        : other.terms.entrySet()) {</span>
-<span class="fc" id="L299">                    Monomial monomial = left.getKey().multiply(</span>
-<span class="fc" id="L300">                        right.getKey());</span>
-<span class="fc bfc" id="L301" title="All 2 branches covered.">                    if (monomial == null) {</span>
-<span class="fc" id="L302">                        return null;</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">                        : other.terms.entrySet()) {</span>
+<span class="fc" id="L290">                    Monomial monomial = left.getKey().multiply(</span>
+<span class="fc" id="L291">                        right.getKey());</span>
+<span class="fc bfc" id="L292" title="All 2 branches covered.">                    if (monomial == null) {</span>
+<span class="fc" id="L293">                        return null;</span>
                     }
-<span class="fc" id="L304">                    ExactRational coefficient =</span>
-<span class="fc" id="L305">                        left.getValue().multiply(right.getValue());</span>
-<span class="fc" id="L306">                    result.merge(</span>
+<span class="fc" id="L295">                    ExactRational coefficient =</span>
+<span class="fc" id="L296">                        left.getValue().multiply(right.getValue());</span>
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">                    if (!withinCoefficientBudget(coefficient)) {</span>
+<span class="nc" id="L298">                        return null;</span>
+                    }
+<span class="fc" id="L300">                    result.merge(</span>
                         monomial,
                         coefficient,
                         ExactRational::add);
-<span class="pc bpc" id="L310" title="1 of 2 branches missed.">                    if (result.size() &gt; MAX_EXPANDED_TERMS) {</span>
-<span class="nc" id="L311">                        return null;</span>
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">                    if (result.size() &gt; MAX_EXPANDED_TERMS) {</span>
+<span class="nc" id="L305">                        return null;</span>
                     }
-<span class="fc" id="L313">                }</span>
-<span class="fc" id="L314">            }</span>
-<span class="fc" id="L315">            return new Polynomial(result);</span>
+<span class="fc" id="L307">                }</span>
+<span class="fc" id="L308">            }</span>
+<span class="fc" id="L309">            return new Polynomial(result);</span>
         }
 
         private Polynomial scale(long factor) {
-<span class="fc bfc" id="L319" title="All 2 branches covered.">            return factor == 1</span>
-<span class="fc" id="L320">                ? this</span>
-<span class="fc" id="L321">                : multiply(monomial(</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">            return factor == 1</span>
+<span class="fc" id="L314">                ? this</span>
+<span class="fc" id="L315">                : multiply(monomial(</span>
                     factor,
-<span class="fc" id="L323">                    Monomial.constant()));</span>
+<span class="fc" id="L317">                    Monomial.constant()));</span>
         }
 
         private boolean isMonomial() {
-<span class="fc bfc" id="L327" title="All 2 branches covered.">            return terms.size() &lt;= 1;</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">            return terms.size() &lt;= 1;</span>
         }
 
         private Polynomial pow(int exponent) {
-<span class="fc" id="L331">            Polynomial result = monomial(</span>
+<span class="fc" id="L325">            Polynomial result = monomial(</span>
                 1,
-<span class="fc" id="L333">                Monomial.constant());</span>
-<span class="fc" id="L334">            Polynomial factor = this;</span>
-<span class="fc" id="L335">            int remaining = exponent;</span>
-<span class="fc bfc" id="L336" title="All 2 branches covered.">            while (remaining &gt; 0) {</span>
-<span class="fc bfc" id="L337" title="All 2 branches covered.">                if ((remaining &amp; 1) == 1) {</span>
-<span class="fc" id="L338">                    result = result.multiply(factor);</span>
-<span class="pc bpc" id="L339" title="1 of 2 branches missed.">                    if (result == null) {</span>
-<span class="nc" id="L340">                        return null;</span>
+<span class="fc" id="L327">                Monomial.constant());</span>
+<span class="fc" id="L328">            Polynomial factor = this;</span>
+<span class="fc" id="L329">            int remaining = exponent;</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">            while (remaining &gt; 0) {</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">                if ((remaining &amp; 1) == 1) {</span>
+<span class="fc" id="L332">                    result = result.multiply(factor);</span>
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">                    if (result == null) {</span>
+<span class="nc" id="L334">                        return null;</span>
                     }
                 }
-<span class="fc" id="L343">                remaining &gt;&gt;= 1;</span>
-<span class="fc bfc" id="L344" title="All 2 branches covered.">                if (remaining &gt; 0) {</span>
-<span class="fc" id="L345">                    factor = factor.multiply(factor);</span>
-<span class="pc bpc" id="L346" title="1 of 2 branches missed.">                    if (factor == null) {</span>
-<span class="nc" id="L347">                        return null;</span>
+<span class="fc" id="L337">                remaining &gt;&gt;= 1;</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">                if (remaining &gt; 0) {</span>
+<span class="fc" id="L339">                    factor = factor.multiply(factor);</span>
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">                    if (factor == null) {</span>
+<span class="nc" id="L341">                        return null;</span>
                     }
                 }
             }
-<span class="fc" id="L351">            return result;</span>
+<span class="fc" id="L345">            return result;</span>
+        }
+
+        private static boolean withinCoefficientBudget(ExactRational value) {
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">            return value.numerator().abs().bitLength() &lt;= MAX_COEFFICIENT_BITS</span>
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">                &amp;&amp; value.denominator().bitLength() &lt;= MAX_COEFFICIENT_BITS;</span>
         }
 
         private Expr toExpr() {
-<span class="fc bfc" id="L355" title="All 2 branches covered.">            if (terms.isEmpty()) {</span>
-<span class="fc" id="L356">                return new NumberExpr(0);</span>
+<span class="fc bfc" id="L354" title="All 2 branches covered.">            if (terms.isEmpty()) {</span>
+<span class="fc" id="L355">                return new NumberExpr(0);</span>
             }
-<span class="fc" id="L358">            Expr result = null;</span>
+<span class="fc" id="L357">            Expr result = null;</span>
             for (Map.Entry&lt;Monomial, ExactRational&gt; entry
-<span class="fc bfc" id="L360" title="All 2 branches covered.">                    : orderedTerms()) {</span>
-<span class="fc" id="L361">                ExactRational coefficient = entry.getValue();</span>
-<span class="fc" id="L362">                Expr term = withCoefficient(</span>
-<span class="fc" id="L363">                    coefficient.abs(),</span>
-<span class="fc" id="L364">                    entry.getKey().toExpr());</span>
-<span class="pc bpc" id="L365" title="1 of 2 branches missed.">                if (term == null) {</span>
-<span class="nc" id="L366">                    return null;</span>
+<span class="fc bfc" id="L359" title="All 2 branches covered.">                    : orderedTerms()) {</span>
+<span class="fc" id="L360">                ExactRational coefficient = entry.getValue();</span>
+<span class="fc" id="L361">                Expr term = withCoefficient(</span>
+<span class="fc" id="L362">                    coefficient.abs(),</span>
+<span class="fc" id="L363">                    entry.getKey().toExpr());</span>
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">                if (term == null) {</span>
+<span class="nc" id="L365">                    return null;</span>
                 }
-<span class="fc bfc" id="L368" title="All 2 branches covered.">                if (result == null) {</span>
-<span class="fc bfc" id="L369" title="All 2 branches covered.">                    result = coefficient.signum() &lt; 0</span>
-<span class="fc" id="L370">                        ? new BinaryExpr(</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">                if (result == null) {</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">                    result = coefficient.signum() &lt; 0</span>
+<span class="fc" id="L369">                        ? new BinaryExpr(</span>
                             new NumberExpr(0),
                             BinaryOperator.SUB,
                             term)
-<span class="fc" id="L374">                        : term;</span>
-<span class="fc bfc" id="L375" title="All 2 branches covered.">                } else if (coefficient.signum() &lt; 0) {</span>
-<span class="fc" id="L376">                    result = new BinaryExpr(</span>
+<span class="fc" id="L373">                        : term;</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">                } else if (coefficient.signum() &lt; 0) {</span>
+<span class="fc" id="L375">                    result = new BinaryExpr(</span>
                         result,
                         BinaryOperator.SUB,
                         term);
                 } else {
-<span class="fc" id="L381">                    result = new BinaryExpr(</span>
+<span class="fc" id="L380">                    result = new BinaryExpr(</span>
                         result,
                         BinaryOperator.ADD,
                         term);
                 }
-<span class="fc" id="L386">            }</span>
-<span class="fc" id="L387">            return result;</span>
+<span class="fc" id="L385">            }</span>
+<span class="fc" id="L386">            return result;</span>
         }
 
         private List&lt;Map.Entry&lt;Monomial, ExactRational&gt;&gt;
                 orderedTerms() {
-<span class="fc" id="L392">            return terms.entrySet().stream()</span>
-<span class="fc" id="L393">                .sorted(TERM_ORDER)</span>
-<span class="fc" id="L394">                .toList();</span>
+<span class="fc" id="L391">            return terms.entrySet().stream()</span>
+<span class="fc" id="L392">                .sorted(TERM_ORDER)</span>
+<span class="fc" id="L393">                .toList();</span>
         }
 
         private static Map&lt;Monomial, ExactRational&gt; normalizedTerms(
             Map&lt;Monomial, ExactRational&gt; source
         ) {
-<span class="fc" id="L400">            Map&lt;Monomial, ExactRational&gt; normalized =</span>
+<span class="fc" id="L399">            Map&lt;Monomial, ExactRational&gt; normalized =</span>
                 new LinkedHashMap&lt;&gt;();
             for (Map.Entry&lt;Monomial, ExactRational&gt; entry
-<span class="fc bfc" id="L403" title="All 2 branches covered.">                    : source.entrySet()) {</span>
-<span class="fc bfc" id="L404" title="All 2 branches covered.">                if (!entry.getValue().isZero()) {</span>
-<span class="fc" id="L405">                    normalized.put(</span>
-<span class="fc" id="L406">                        entry.getKey(),</span>
-<span class="fc" id="L407">                        entry.getValue());</span>
+<span class="fc bfc" id="L402" title="All 2 branches covered.">                    : source.entrySet()) {</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">                if (!entry.getValue().isZero()) {</span>
+<span class="fc" id="L404">                    normalized.put(</span>
+<span class="fc" id="L405">                        entry.getKey(),</span>
+<span class="fc" id="L406">                        entry.getValue());</span>
                 }
-<span class="fc" id="L409">            }</span>
-<span class="fc" id="L410">            return normalized;</span>
+<span class="fc" id="L408">            }</span>
+<span class="fc" id="L409">            return normalized;</span>
         }
     }
 
-    /** Temporary convenience for canonical-package callers. */
-    static ExactRational legacyExact(double value) {
-<span class="fc" id="L416">        return ExactRationalDomain.legacyDecimalValue(value)</span>
-<span class="fc" id="L417">            .orElse(null);</span>
-    }
-
-    /**
-     * Returns an AST expression for exactly the same rational, or {@code null}
-     * when the legacy Double-backed AST cannot encode it without rounding.
-     */
     static Expr exactRationalExpression(ExactRational value) {
-<span class="fc" id="L425">        var legacy = ExactRationalDomain.exactLegacyDecimalDouble(value);</span>
-<span class="pc bpc" id="L426" title="1 of 2 branches missed.">        if (legacy.isPresent()) {</span>
-<span class="fc" id="L427">            return new NumberExpr(legacy.getAsDouble());</span>
-        }
-
-<span class="nc" id="L430">        NumberExpr numerator = exactIntegerLeaf(value.numerator());</span>
-<span class="nc bnc" id="L431" title="All 2 branches missed.">        if (numerator == null) {</span>
-<span class="nc" id="L432">            return null;</span>
-        }
-<span class="nc bnc" id="L434" title="All 2 branches missed.">        if (value.isInteger()) {</span>
-<span class="nc" id="L435">            return numerator;</span>
-        }
-<span class="nc" id="L437">        NumberExpr denominator = exactIntegerLeaf(value.denominator());</span>
-<span class="nc bnc" id="L438" title="All 2 branches missed.">        return denominator == null</span>
-<span class="nc" id="L439">            ? null</span>
-<span class="nc" id="L440">            : new BinaryExpr(</span>
-                numerator,
-                BinaryOperator.DIV,
-                denominator);
-    }
-
-    private static NumberExpr exactIntegerLeaf(BigInteger value) {
-<span class="nc" id="L447">        var legacy = ExactRationalDomain.exactLegacyDecimalDouble(</span>
-<span class="nc" id="L448">            ExactRational.integer(value));</span>
-<span class="nc bnc" id="L449" title="All 2 branches missed.">        return legacy.isPresent()</span>
-<span class="nc" id="L450">            ? new NumberExpr(legacy.getAsDouble())</span>
-<span class="nc" id="L451">            : null;</span>
+<span class="fc" id="L414">        return new NumberExpr(value);</span>
     }
 
     private static Expr withCoefficient(
         ExactRational coefficient,
         Expr term
     ) {
-<span class="fc bfc" id="L458" title="All 2 branches covered.">        if (term instanceof NumberExpr number</span>
-<span class="pc bpc" id="L459" title="1 of 2 branches missed.">                &amp;&amp; number.value() == 1) {</span>
-<span class="fc" id="L460">            return exactRationalExpression(coefficient);</span>
+<span class="fc bfc" id="L421" title="All 2 branches covered.">        if (term instanceof NumberExpr number</span>
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">                &amp;&amp; number.value().equalsInteger(1)) {</span>
+<span class="fc" id="L423">            return exactRationalExpression(coefficient);</span>
         }
-<span class="fc bfc" id="L462" title="All 2 branches covered.">        if (coefficient.isOne()) {</span>
-<span class="fc" id="L463">            return term;</span>
+<span class="fc bfc" id="L425" title="All 2 branches covered.">        if (coefficient.isOne()) {</span>
+<span class="fc" id="L426">            return term;</span>
         }
-<span class="fc" id="L465">        Expr exactCoefficient = exactRationalExpression(coefficient);</span>
-<span class="pc bpc" id="L466" title="1 of 2 branches missed.">        return exactCoefficient == null</span>
-<span class="nc" id="L467">            ? null</span>
-<span class="fc" id="L468">            : new BinaryExpr(</span>
+<span class="fc" id="L428">        Expr exactCoefficient = exactRationalExpression(coefficient);</span>
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">        return exactCoefficient == null</span>
+<span class="nc" id="L430">            ? null</span>
+<span class="fc" id="L431">            : new BinaryExpr(</span>
                 exactCoefficient,
                 BinaryOperator.MUL,
                 term);
@@ -475,14 +438,14 @@ public final class PolynomialNormalizer {
         List&lt;Expr&gt; expressions,
         BinaryOperator operator
     ) {
-<span class="fc" id="L478">        Expr result = expressions.getFirst();</span>
-<span class="fc bfc" id="L479" title="All 2 branches covered.">        for (int index = 1; index &lt; expressions.size(); index++) {</span>
-<span class="fc" id="L480">            result = new BinaryExpr(</span>
+<span class="fc" id="L441">        Expr result = expressions.getFirst();</span>
+<span class="fc bfc" id="L442" title="All 2 branches covered.">        for (int index = 1; index &lt; expressions.size(); index++) {</span>
+<span class="fc" id="L443">            result = new BinaryExpr(</span>
                 result,
                 operator,
-<span class="fc" id="L483">                expressions.get(index));</span>
+<span class="fc" id="L446">                expressions.get(index));</span>
         }
-<span class="fc" id="L485">        return result;</span>
+<span class="fc" id="L448">        return result;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

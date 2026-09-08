@@ -145,7 +145,7 @@ public final class RationalRules {
         }
 
         private boolean isZero(Expr expr) {
-<span class="pc bpc" id="L148" title="1 of 4 branches missed.">            return expr instanceof NumberExpr number &amp;&amp; number.value() == 0;</span>
+<span class="pc bpc" id="L148" title="1 of 4 branches missed.">            return expr instanceof NumberExpr number &amp;&amp; number.value().equalsInteger(0);</span>
         }
 
 <span class="fc" id="L151">        private record Cancellable(</span>
@@ -237,7 +237,7 @@ public final class RationalRules {
         }
 
         private boolean isExplicitZero(Expr expr) {
-<span class="pc bpc" id="L240" title="3 of 4 branches missed.">            return expr instanceof NumberExpr number &amp;&amp; number.value() == 0;</span>
+<span class="pc bpc" id="L240" title="3 of 4 branches missed.">            return expr instanceof NumberExpr number &amp;&amp; number.value().equalsInteger(0);</span>
         }
 
 <span class="fc" id="L243">        private record Pair(Expr leftNumerator, Expr leftDenominator, Expr rightNumerator, Expr rightDenominator) {</span>
@@ -317,10 +317,10 @@ public final class RationalRules {
 <span class="pc bpc" id="L317" title="2 of 4 branches missed.">            if (!(outer.right() instanceof BinaryExpr inner) || inner.operator() != BinaryOperator.DIV) {</span>
 <span class="nc" id="L318">                return null;</span>
             }
-<span class="pc bpc" id="L320" title="3 of 4 branches missed.">            if (inner.right() instanceof NumberExpr n &amp;&amp; n.value() == 0) {</span>
+<span class="pc bpc" id="L320" title="3 of 4 branches missed.">            if (inner.right() instanceof NumberExpr n &amp;&amp; n.value().equalsInteger(0)) {</span>
 <span class="nc" id="L321">                return null;</span>
             }
-<span class="pc bpc" id="L323" title="3 of 4 branches missed.">            if (inner.left() instanceof NumberExpr leftNumber &amp;&amp; leftNumber.value() == 0) {</span>
+<span class="pc bpc" id="L323" title="3 of 4 branches missed.">            if (inner.left() instanceof NumberExpr leftNumber &amp;&amp; leftNumber.value().equalsInteger(0)) {</span>
 <span class="nc" id="L324">                return null;</span>
             }
 <span class="fc" id="L326">            return new Parts(outer.left(), inner.left(), inner.right());</span>

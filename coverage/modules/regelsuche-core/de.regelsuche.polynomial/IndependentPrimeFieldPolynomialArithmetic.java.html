@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IndependentPrimeFieldPolynomialArithmetic.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.polynomial</a> &gt; <span class="el_source">IndependentPrimeFieldPolynomialArithmetic.java</span></div><h1>IndependentPrimeFieldPolynomialArithmetic.java</h1><pre class="source lang-java linenums">package de.regelsuche.polynomial;
+
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+/**
+ * Dense modular arithmetic used only by the independent original-domain
+ * verifier.
+ *
+ * &lt;p&gt;Keeping this implementation in core and separate from the native
+ * factorization module prevents accidental reuse of Berlekamp, suitable-prime
+ * or backend evidence at the trust boundary.&lt;/p&gt;
+ */
+final class IndependentPrimeFieldPolynomialArithmetic {
+    private IndependentPrimeFieldPolynomialArithmetic() {
+    }
+
+    static int[] reduce(
+        List&lt;BigInteger&gt; coefficients,
+        int prime,
+        PolynomialWorkSink work
+    ) {
+<span class="fc" id="L25">        int[] result = new int[coefficients.size()];</span>
+<span class="fc" id="L26">        BigInteger modulus = BigInteger.valueOf(prime);</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        for (int index = 0; index &lt; result.length; index++) {</span>
+<span class="fc" id="L28">            work.consume(</span>
+                &quot;independent-irreducibility.prime-reduction&quot;,
+                1);
+<span class="fc" id="L31">            result[index] = coefficients.get(index)</span>
+<span class="fc" id="L32">                .mod(modulus)</span>
+<span class="fc" id="L33">                .intValueExact();</span>
+        }
+<span class="fc" id="L35">        return trim(result);</span>
+    }
+
+    static int[] monic(
+        int[] polynomial,
+        int prime,
+        PolynomialWorkSink work
+    ) {
+<span class="fc" id="L43">        int inverse = inverse(</span>
+            polynomial[polynomial.length - 1],
+            prime,
+            work);
+<span class="fc" id="L47">        int[] result = polynomial.clone();</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        for (int index = 0; index &lt; result.length; index++) {</span>
+<span class="fc" id="L49">            work.consume(</span>
+                &quot;independent-irreducibility.monic-scaling&quot;,
+                1);
+<span class="fc" id="L52">            result[index] = mod((long) result[index] * inverse, prime);</span>
+        }
+<span class="fc" id="L54">        return trim(result);</span>
+    }
+
+    static int[] frobenius(
+        int[] x,
+        int iterations,
+        int prime,
+        int[] modulus,
+        PolynomialWorkSink work
+    ) {
+<span class="fc" id="L64">        int[] result = x;</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        for (int iteration = 0; iteration &lt; iterations; iteration++) {</span>
+<span class="fc" id="L66">            result = powMod(result, prime, modulus, prime, work);</span>
+        }
+<span class="fc" id="L68">        return result;</span>
+    }
+
+    static int[] subtract(
+        int[] left,
+        int[] right,
+        int prime,
+        PolynomialWorkSink work
+    ) {
+<span class="fc" id="L77">        int[] result = new int[Math.max(left.length, right.length)];</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        for (int index = 0; index &lt; result.length; index++) {</span>
+<span class="fc" id="L79">            work.consume(</span>
+                &quot;independent-irreducibility.polynomial-subtractions&quot;,
+                1);
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            int leftCoefficient = index &lt; left.length ? left[index] : 0;</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            int rightCoefficient = index &lt; right.length ? right[index] : 0;</span>
+<span class="fc" id="L84">            result[index] = mod(</span>
+                (long) leftCoefficient - rightCoefficient,
+                prime);
+        }
+<span class="fc" id="L88">        return trim(result);</span>
+    }
+
+    static int[] gcd(
+        int[] left,
+        int[] right,
+        int prime,
+        PolynomialWorkSink work
+    ) {
+<span class="fc" id="L97">        int[] first = trim(left);</span>
+<span class="fc" id="L98">        int[] second = trim(right);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        while (second.length != 0) {</span>
+<span class="fc" id="L100">            int[] remainder = remainder(</span>
+                first,
+                second,
+                prime,
+                work);
+<span class="fc" id="L105">            first = second;</span>
+<span class="fc" id="L106">            second = remainder;</span>
+<span class="fc" id="L107">        }</span>
+<span class="fc" id="L108">        return first;</span>
+    }
+
+    static List&lt;Integer&gt; distinctPrimeDivisors(int value) {
+<span class="fc" id="L112">        ArrayList&lt;Integer&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L113">        int remaining = value;</span>
+<span class="fc" id="L114">        for (int candidate = 2;</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                (long) candidate * candidate &lt;= remaining;</span>
+<span class="fc" id="L116">                candidate++) {</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">            if (remaining % candidate != 0) {</span>
+<span class="nc" id="L118">                continue;</span>
+            }
+<span class="fc" id="L120">            result.add(candidate);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            while (remaining % candidate == 0) {</span>
+<span class="fc" id="L122">                remaining /= candidate;</span>
+            }
+        }
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (remaining &gt; 1) {</span>
+<span class="fc" id="L126">            result.add(remaining);</span>
+        }
+<span class="fc" id="L128">        return List.copyOf(result);</span>
+    }
+
+    static int degree(int[] polynomial) {
+<span class="fc" id="L132">        return trim(polynomial).length - 1;</span>
+    }
+
+    private static int[] powMod(
+        int[] base,
+        int exponent,
+        int[] modulus,
+        int prime,
+        PolynomialWorkSink work
+    ) {
+<span class="fc" id="L142">        int[] result = {1};</span>
+<span class="fc" id="L143">        int[] factor = base;</span>
+<span class="fc" id="L144">        int remaining = exponent;</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        while (remaining &gt; 0) {</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            if ((remaining &amp; 1) == 1) {</span>
+<span class="fc" id="L147">                result = multiplyMod(</span>
+                    result,
+                    factor,
+                    modulus,
+                    prime,
+                    work);
+            }
+<span class="fc" id="L154">            remaining &gt;&gt;&gt;= 1;</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            if (remaining &gt; 0) {</span>
+<span class="fc" id="L156">                factor = multiplyMod(</span>
+                    factor,
+                    factor,
+                    modulus,
+                    prime,
+                    work);
+            }
+        }
+<span class="fc" id="L164">        return result;</span>
+    }
+
+    private static int[] multiplyMod(
+        int[] left,
+        int[] right,
+        int[] modulus,
+        int prime,
+        PolynomialWorkSink work
+    ) {
+<span class="pc bpc" id="L174" title="2 of 4 branches missed.">        if (left.length == 0 || right.length == 0) {</span>
+<span class="nc" id="L175">            return new int[0];</span>
+        }
+<span class="fc" id="L177">        int[] product = new int[left.length + right.length - 1];</span>
+<span class="fc" id="L178">        for (int leftIndex = 0;</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">                leftIndex &lt; left.length;</span>
+<span class="fc" id="L180">                leftIndex++) {</span>
+<span class="fc" id="L181">            for (int rightIndex = 0;</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">                    rightIndex &lt; right.length;</span>
+<span class="fc" id="L183">                    rightIndex++) {</span>
+<span class="fc" id="L184">                work.consume(</span>
+                    &quot;independent-irreducibility.frobenius-multiplications&quot;,
+                    1);
+<span class="fc" id="L187">                int index = leftIndex + rightIndex;</span>
+<span class="fc" id="L188">                product[index] = mod(</span>
+                    product[index]
+                        + (long) left[leftIndex] * right[rightIndex],
+                    prime);
+            }
+        }
+<span class="fc" id="L194">        int modulusDegree = degree(modulus);</span>
+<span class="fc" id="L195">        for (int exponent = product.length - 1;</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">                exponent &gt;= modulusDegree;</span>
+<span class="fc" id="L197">                exponent--) {</span>
+<span class="fc" id="L198">            int coefficient = product[exponent];</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">            if (coefficient == 0) {</span>
+<span class="fc" id="L200">                continue;</span>
+            }
+<span class="fc" id="L202">            int offset = exponent - modulusDegree;</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">            for (int index = 0; index &lt; modulusDegree; index++) {</span>
+<span class="fc" id="L204">                work.consume(</span>
+                    &quot;independent-irreducibility.frobenius-reductions&quot;,
+                    1);
+<span class="fc" id="L207">                product[offset + index] = mod(</span>
+                    product[offset + index]
+                        - (long) coefficient * modulus[index],
+                    prime);
+            }
+<span class="fc" id="L212">            product[exponent] = 0;</span>
+        }
+<span class="fc" id="L214">        return trim(Arrays.copyOf(product, modulusDegree));</span>
+    }
+
+    private static int[] remainder(
+        int[] dividend,
+        int[] divisor,
+        int prime,
+        PolynomialWorkSink work
+    ) {
+<span class="fc" id="L223">        int[] result = trim(dividend).clone();</span>
+<span class="fc" id="L224">        int divisorDegree = degree(divisor);</span>
+<span class="fc" id="L225">        int inverse = inverse(</span>
+            divisor[divisorDegree],
+            prime,
+            work);
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        while (degree(result) &gt;= divisorDegree) {</span>
+<span class="fc" id="L230">            int resultDegree = degree(result);</span>
+<span class="fc" id="L231">            int factor = mod(</span>
+                (long) result[resultDegree] * inverse,
+                prime);
+<span class="fc" id="L234">            int offset = resultDegree - divisorDegree;</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">            for (int index = 0; index &lt;= divisorDegree; index++) {</span>
+<span class="fc" id="L236">                work.consume(</span>
+                    &quot;independent-irreducibility.gcd-remainder-steps&quot;,
+                    1);
+<span class="fc" id="L239">                result[offset + index] = mod(</span>
+                    result[offset + index]
+                        - (long) factor * divisor[index],
+                    prime);
+            }
+<span class="fc" id="L244">            result = trim(result);</span>
+<span class="fc" id="L245">        }</span>
+<span class="fc" id="L246">        return result;</span>
+    }
+
+    private static int inverse(
+        int value,
+        int prime,
+        PolynomialWorkSink work
+    ) {
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">        for (int candidate = 1; candidate &lt; prime; candidate++) {</span>
+<span class="fc" id="L255">            work.consume(</span>
+                &quot;independent-irreducibility.modular-inverse-trials&quot;,
+                1);
+<span class="fc bfc" id="L258" title="All 2 branches covered.">            if (mod((long) value * candidate, prime) == 1) {</span>
+<span class="fc" id="L259">                return candidate;</span>
+            }
+        }
+<span class="nc" id="L262">        throw new ArithmeticException(</span>
+            &quot;nonzero field element has no inverse&quot;);
+    }
+
+    private static int[] trim(int[] polynomial) {
+<span class="fc" id="L267">        int size = polynomial.length;</span>
+<span class="fc bfc" id="L268" title="All 4 branches covered.">        while (size &gt; 0 &amp;&amp; polynomial[size - 1] == 0) {</span>
+<span class="fc" id="L269">            size--;</span>
+        }
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        return size == polynomial.length</span>
+<span class="fc" id="L272">            ? polynomial</span>
+<span class="fc" id="L273">            : Arrays.copyOf(polynomial, size);</span>
+    }
+
+    private static int mod(long value, int prime) {
+<span class="fc" id="L277">        int result = (int) (value % prime);</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        return result &lt; 0 ? result + prime : result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

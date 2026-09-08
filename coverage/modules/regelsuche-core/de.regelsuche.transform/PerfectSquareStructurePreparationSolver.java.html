@@ -315,7 +315,7 @@ public final class PerfectSquareStructurePreparationSolver {
 <span class="fc" id="L315">        return expression instanceof BinaryExpr power</span>
 <span class="fc bfc" id="L316" title="All 2 branches covered.">            &amp;&amp; power.operator() == BinaryOperator.POW</span>
 <span class="pc bpc" id="L317" title="1 of 2 branches missed.">            &amp;&amp; power.right() instanceof NumberExpr exponent</span>
-<span class="fc bfc" id="L318" title="All 4 branches covered.">            &amp;&amp; exponent.value() == 2;</span>
+<span class="fc bfc" id="L318" title="All 4 branches covered.">            &amp;&amp; exponent.value().equalsInteger(2);</span>
     }
 
     private static ResidualObligation residualObligation(

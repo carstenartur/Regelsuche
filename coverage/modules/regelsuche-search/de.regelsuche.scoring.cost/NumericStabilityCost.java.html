@@ -63,7 +63,7 @@ import de.regelsuche.scoring.ExpressionScore;
                 }
                 case DIV -&gt; {
                     // division by a small or potentially zero denominator
-<span class="nc bnc" id="L66" title="All 4 branches missed.">                    if (binary.right() instanceof NumberExpr number &amp;&amp; Math.abs(number.value()) &lt; 1) {</span>
+<span class="nc bnc" id="L66" title="All 4 branches missed.">                    if (binary.right() instanceof NumberExpr number &amp;&amp; number.value().abs().compareTo(de.regelsuche.scalar.ExactRational.ONE) &lt; 0) {</span>
 <span class="nc" id="L67">                        penalty += 5;</span>
 <span class="nc bnc" id="L68" title="All 2 branches missed.">                    } else if (!(binary.right() instanceof NumberExpr)) {</span>
 <span class="nc" id="L69">                        penalty += 2;</span>
@@ -71,8 +71,8 @@ import de.regelsuche.scoring.ExpressionScore;
                 }
                 case POW -&gt; {
                     // High constant powers expanded raise instability vs. Horner
-<span class="pc bpc" id="L74" title="2 of 4 branches missed.">                    if (binary.right() instanceof NumberExpr number &amp;&amp; number.value() &gt; 3) {</span>
-<span class="fc" id="L75">                        penalty += (int) (number.value() - 3);</span>
+<span class="pc bpc" id="L74" title="2 of 4 branches missed.">                    if (binary.right() instanceof NumberExpr number &amp;&amp; number.value().compareTo(de.regelsuche.scalar.ExactRational.integer(3)) &gt; 0) {</span>
+<span class="fc" id="L75">                        penalty += (int) (number.value().toBigDecimal(java.math.MathContext.DECIMAL128).doubleValue() - 3);</span>
                     }
 <span class="fc" id="L77">                }</span>
                 default -&gt; {

@@ -23,10 +23,10 @@ import java.util.Map;
 
     private NormalizedNode normalize(Expr expression, Map&lt;String, String&gt; variables) {
 <span class="fc bfc" id="L25" title="All 2 branches covered.">        if (expression instanceof NumberExpr numberExpr) {</span>
-<span class="pc bpc" id="L26" title="1 of 2 branches missed.">            if (Math.rint(numberExpr.value()) != numberExpr.value()) {</span>
-<span class="nc" id="L27">                throw new IllegalArgumentException(&quot;Only integer literals can be generalized: &quot; + numberExpr.value());</span>
+<span class="pc bpc" id="L26" title="2 of 4 branches missed.">            if (!numberExpr.value().isInteger() || numberExpr.value().numerator().bitLength() &gt; 31) {</span>
+<span class="nc" id="L27">                throw new IllegalArgumentException(&quot;Only 32-bit integer literals can be generalized: &quot; + numberExpr.value());</span>
             }
-<span class="fc" id="L29">            return NormalizedNode.number((int) numberExpr.value());</span>
+<span class="fc" id="L29">            return NormalizedNode.number(numberExpr.value().intValueExact());</span>
         }
 <span class="fc bfc" id="L31" title="All 2 branches covered.">        if (expression instanceof VariableExpr variableExpr) {</span>
 <span class="fc bfc" id="L32" title="All 2 branches covered.">            String canonicalName = variables.computeIfAbsent(variableExpr.name(), key -&gt; variables.isEmpty() ? &quot;x&quot; : &quot;v&quot; + variables.size());</span>

@@ -324,11 +324,8 @@ public final class EGraphPatternMatcher {
 <span class="fc" id="L324">        return builder.toString();</span>
     }
 
-    private static String formatNumber(double value) {
-<span class="pc bpc" id="L328" title="2 of 4 branches missed.">        if (value == Math.floor(value) &amp;&amp; !Double.isInfinite(value)) {</span>
-<span class="fc" id="L329">            return Long.toString((long) value);</span>
-        }
-<span class="nc" id="L331">        return Double.toString(value);</span>
+    private static String formatNumber(de.regelsuche.scalar.ExactRational value) {
+<span class="fc" id="L328">        return value.canonicalText();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -148,7 +148,7 @@ import java.util.Map;
 
     private List&lt;String&gt; nonZeroAssumptions(Expr expression) {
 <span class="fc bfc" id="L150" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
-<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            return number.value() == 0</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            return number.value().equalsInteger(0)</span>
 <span class="nc" id="L152">                ? List.of(&quot;0 != 0&quot;)</span>
 <span class="fc" id="L153">                : List.of();</span>
         }
@@ -156,7 +156,7 @@ import java.util.Map;
     }
 
     private boolean isExplicitZero(Expr expression) {
-<span class="fc bfc" id="L159" title="All 4 branches covered.">        return expression instanceof NumberExpr number &amp;&amp; number.value() == 0;</span>
+<span class="fc bfc" id="L159" title="All 4 branches covered.">        return expression instanceof NumberExpr number &amp;&amp; number.value().equalsInteger(0);</span>
     }
 
     private boolean same(Expr left, Expr right) {

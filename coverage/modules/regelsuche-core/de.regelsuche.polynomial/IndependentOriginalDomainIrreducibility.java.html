@@ -1,0 +1,664 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IndependentOriginalDomainIrreducibility.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.polynomial</a> &gt; <span class="el_source">IndependentOriginalDomainIrreducibility.java</span></div><h1>IndependentOriginalDomainIrreducibility.java</h1><pre class="source lang-java linenums">package de.regelsuche.polynomial;
+
+import static de.regelsuche.polynomial.IndependentPrimeFieldPolynomialArithmetic.degree;
+import static de.regelsuche.polynomial.IndependentPrimeFieldPolynomialArithmetic.distinctPrimeDivisors;
+import static de.regelsuche.polynomial.IndependentPrimeFieldPolynomialArithmetic.frobenius;
+import static de.regelsuche.polynomial.IndependentPrimeFieldPolynomialArithmetic.gcd;
+import static de.regelsuche.polynomial.IndependentPrimeFieldPolynomialArithmetic.monic;
+import static de.regelsuche.polynomial.IndependentPrimeFieldPolynomialArithmetic.reduce;
+import static de.regelsuche.polynomial.IndependentPrimeFieldPolynomialArithmetic.subtract;
+
+import de.regelsuche.polynomial.FactorizationVerifier.FrobeniusCheckpoint;
+import de.regelsuche.polynomial.FactorizationVerifier.IndependentIrreducibilityOutcome;
+import de.regelsuche.polynomial.FactorizationVerifier.IrreducibilityProofMethod;
+import de.regelsuche.polynomial.FactorizationVerifier.PrimeAttempt;
+import de.regelsuche.polynomial.FactorizationVerifier.PrimeAttemptOutcome;
+import de.regelsuche.scalar.ExactRational;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Independent sufficient irreducibility verifier for univariate Z/Q inputs.
+ *
+ * &lt;p&gt;This implementation deliberately does not call the factorization
+ * backend, suitable-prime selection, Berlekamp factorization, Hensel lifting
+ * or Zassenhaus recombination. It proves only the sufficient direction:
+ * one degree-preserving irreducible reduction implies irreducibility of the
+ * primitive integer associate over Q, by Gauss' lemma.&lt;/p&gt;
+ */
+final class IndependentOriginalDomainIrreducibility {
+    static final String METHOD_ID =
+        &quot;regelsuche.original-domain-irreducibility/v1&quot;;
+    private static final int MAX_DEGREE = 256;
+    private static final int MAX_NORMALIZED_COEFFICIENT_BITS = 16_384;
+<span class="fc" id="L38">    private static final int[] PRIME_POLICY = {</span>
+        2, 3, 5, 7, 11, 13, 17, 19,
+        23, 29, 31, 37, 41, 43, 47
+    };
+
+    private IndependentOriginalDomainIrreducibility() {
+    }
+
+    static &lt;C&gt; Result verify(
+        FactorizationRequest&lt;C&gt; request,
+        long maxWorkUnits
+    ) {
+<span class="fc" id="L50">        String requestHash = PolynomialEvidence.sha256(</span>
+<span class="fc" id="L51">            request.canonicalMaterial());</span>
+<span class="fc" id="L52">        return verifyPolynomial(</span>
+<span class="fc" id="L53">            request.source(),</span>
+            requestHash,
+<span class="fc" id="L55">            request.structuralLimits().maxCoefficientBitLength(),</span>
+            maxWorkUnits);
+    }
+
+    static &lt;C&gt; Result verifyFactor(
+        FactorizationRequest&lt;?&gt; authorityRequest,
+        SparsePolynomial&lt;C&gt; factor,
+        long maxWorkUnits
+    ) {
+<span class="fc" id="L64">        return verifyPolynomial(</span>
+            factor,
+<span class="fc" id="L66">            PolynomialEvidence.sha256(</span>
+<span class="fc" id="L67">                authorityRequest.canonicalMaterial()),</span>
+<span class="fc" id="L68">            authorityRequest.structuralLimits()</span>
+<span class="fc" id="L69">                .maxCoefficientBitLength(),</span>
+            maxWorkUnits);
+    }
+
+    private static &lt;C&gt; Result verifyPolynomial(
+        SparsePolynomial&lt;C&gt; source,
+        String requestHash,
+        int requestCoefficientLimit,
+        long maxWorkUnits
+    ) {
+<span class="fc" id="L79">        String sourceHash = PolynomialEvidence.sha256(</span>
+<span class="fc" id="L80">            source.canonicalMaterial());</span>
+<span class="fc" id="L81">        WorkBudget work = new WorkBudget(maxWorkUnits);</span>
+<span class="fc" id="L82">        ArrayList&lt;PrimeAttempt&gt; attempts = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L83">        List&lt;BigInteger&gt; normalized = List.of();</span>
+<span class="fc" id="L84">        int degree = -1;</span>
+        try {
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            if (source.ring().variableCount() != 1</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                    || source.isConstant()) {</span>
+<span class="nc" id="L88">                return result(</span>
+                    requestHash,
+                    sourceHash,
+                    IndependentIrreducibilityOutcome.UNSUPPORTED_SHAPE,
+                    IrreducibilityProofMethod.NONE,
+                    &quot;INDEPENDENT_IRREDUCIBILITY_REQUIRES_NONCONSTANT_UNIVARIATE_SOURCE&quot;,
+                    normalized,
+                    degree,
+                    attempts,
+                    0,
+<span class="nc" id="L98">                    work.ledger());</span>
+            }
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">            if (!supportedDomain(source)) {</span>
+<span class="nc" id="L101">                return result(</span>
+                    requestHash,
+                    sourceHash,
+                    IndependentIrreducibilityOutcome.UNSUPPORTED_DOMAIN,
+                    IrreducibilityProofMethod.NONE,
+                    &quot;INDEPENDENT_IRREDUCIBILITY_REQUIRES_INTEGER_OR_RATIONAL_DOMAIN&quot;,
+                    normalized,
+                    degree,
+                    attempts,
+                    0,
+<span class="nc" id="L111">                    work.ledger());</span>
+            }
+<span class="fc" id="L113">            degree = source.degree(0);</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            if (degree &gt; MAX_DEGREE) {</span>
+<span class="fc" id="L115">                return result(</span>
+                    requestHash,
+                    sourceHash,
+                    IndependentIrreducibilityOutcome.DEGREE_LIMIT_EXCEEDED,
+                    IrreducibilityProofMethod.NONE,
+                    &quot;INDEPENDENT_IRREDUCIBILITY_DEGREE_LIMIT_EXCEEDED&quot;,
+                    normalized,
+                    degree,
+                    attempts,
+                    0,
+<span class="fc" id="L125">                    work.ledger());</span>
+            }
+
+<span class="fc" id="L128">            normalized = normalize(</span>
+                source,
+                requestCoefficientLimit,
+                work);
+<span class="fc" id="L132">            degree = normalized.size() - 1;</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            if (degree == 1) {</span>
+<span class="fc" id="L134">                return result(</span>
+                    requestHash,
+                    sourceHash,
+                    IndependentIrreducibilityOutcome.CERTIFIED,
+                    IrreducibilityProofMethod.LINEAR_DEGREE,
+                    &quot;INDEPENDENT_LINEAR_IRREDUCIBILITY_CERTIFIED&quot;,
+                    normalized,
+                    degree,
+                    attempts,
+                    0,
+<span class="fc" id="L144">                    work.ledger());</span>
+            }
+
+<span class="fc" id="L147">            String normalizedHash = normalizedHash(normalized);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            for (int prime : PRIME_POLICY) {</span>
+<span class="fc" id="L149">                PrimeAttempt attempt = verifyPrime(</span>
+                    normalized,
+                    normalizedHash,
+                    prime,
+                    work);
+<span class="fc" id="L154">                attempts.add(attempt);</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">                if (attempt.outcome()</span>
+                        == PrimeAttemptOutcome.WORK_BUDGET_EXHAUSTED) {
+<span class="nc" id="L157">                    return result(</span>
+                        requestHash,
+                        sourceHash,
+                        IndependentIrreducibilityOutcome
+                            .WORK_BUDGET_EXHAUSTED,
+                        IrreducibilityProofMethod.MODULAR_RABIN,
+                        &quot;INDEPENDENT_IRREDUCIBILITY_WORK_BUDGET_EXCEEDED&quot;,
+                        normalized,
+                        degree,
+                        attempts,
+                        0,
+<span class="nc" id="L168">                        work.ledger());</span>
+                }
+<span class="fc bfc" id="L170" title="All 2 branches covered.">                if (attempt.outcome()</span>
+                        == PrimeAttemptOutcome.IRREDUCIBLE_WITNESS) {
+<span class="fc" id="L172">                    return result(</span>
+                        requestHash,
+                        sourceHash,
+                        IndependentIrreducibilityOutcome.CERTIFIED,
+                        IrreducibilityProofMethod.MODULAR_RABIN,
+                        &quot;INDEPENDENT_MODULAR_IRREDUCIBILITY_CERTIFIED&quot;,
+                        normalized,
+                        degree,
+                        attempts,
+                        prime,
+<span class="fc" id="L182">                        work.ledger());</span>
+                }
+            }
+<span class="fc" id="L185">            return result(</span>
+                requestHash,
+                sourceHash,
+                IndependentIrreducibilityOutcome.NO_WITNESS_WITHIN_POLICY,
+                IrreducibilityProofMethod.MODULAR_RABIN,
+                &quot;INDEPENDENT_IRREDUCIBILITY_WITNESS_NOT_FOUND_WITHIN_POLICY&quot;,
+                normalized,
+                degree,
+                attempts,
+                0,
+<span class="fc" id="L195">                work.ledger());</span>
+<span class="fc" id="L196">        } catch (WorkLimitReached exception) {</span>
+<span class="fc" id="L197">            return result(</span>
+                requestHash,
+                sourceHash,
+                IndependentIrreducibilityOutcome.WORK_BUDGET_EXHAUSTED,
+                IrreducibilityProofMethod.NONE,
+                &quot;INDEPENDENT_IRREDUCIBILITY_WORK_BUDGET_EXCEEDED&quot;,
+                normalized,
+                degree,
+                attempts,
+                0,
+<span class="fc" id="L207">                work.ledger());</span>
+<span class="fc" id="L208">        } catch (NormalizationLimitReached exception) {</span>
+<span class="fc" id="L209">            return result(</span>
+                requestHash,
+                sourceHash,
+                IndependentIrreducibilityOutcome
+                    .NORMALIZATION_LIMIT_EXCEEDED,
+                IrreducibilityProofMethod.NONE,
+<span class="fc" id="L215">                exception.detailCode(),</span>
+                normalized,
+                degree,
+                attempts,
+                0,
+<span class="fc" id="L220">                work.ledger());</span>
+<span class="nc" id="L221">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L222">            return result(</span>
+                requestHash,
+                sourceHash,
+                IndependentIrreducibilityOutcome.TECHNICAL_FAILURE,
+                IrreducibilityProofMethod.NONE,
+                &quot;INDEPENDENT_IRREDUCIBILITY_&quot;
+<span class="nc" id="L228">                    + exception.getClass().getSimpleName()</span>
+<span class="nc" id="L229">                        .toUpperCase(java.util.Locale.ROOT),</span>
+                normalized,
+                degree,
+                attempts,
+                0,
+<span class="nc" id="L234">                work.ledger());</span>
+        }
+    }
+
+    private static boolean supportedDomain(SparsePolynomial&lt;?&gt; source) {
+<span class="fc" id="L239">        Object domain = source.ring().coefficientDomain();</span>
+<span class="pc bpc" id="L240" title="1 of 4 branches missed.">        return domain == BigIntegerDomain.INSTANCE</span>
+            || domain == ExactRationalField.INSTANCE;
+    }
+
+    private static &lt;C&gt; List&lt;BigInteger&gt; normalize(
+        SparsePolynomial&lt;C&gt; source,
+        int requestCoefficientLimit,
+        WorkBudget work
+    ) {
+<span class="fc" id="L249">        int coefficientLimit = Math.min(</span>
+            requestCoefficientLimit,
+            MAX_NORMALIZED_COEFFICIENT_BITS);
+<span class="fc" id="L252">        BigInteger[] integers = new BigInteger[source.degree(0) + 1];</span>
+<span class="fc" id="L253">        Arrays.fill(integers, BigInteger.ZERO);</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">        if (source.ring().coefficientDomain()</span>
+                == BigIntegerDomain.INSTANCE) {
+<span class="fc bfc" id="L256" title="All 2 branches covered.">            for (Map.Entry&lt;Monomial, C&gt; term : source.terms().entrySet()) {</span>
+<span class="fc" id="L257">                work.consume(</span>
+                    &quot;independent-irreducibility.normalization.coefficients&quot;,
+                    1);
+<span class="fc" id="L260">                BigInteger coefficient = (BigInteger) term.getValue();</span>
+<span class="fc" id="L261">                requireBitLength(coefficient, coefficientLimit);</span>
+<span class="fc" id="L262">                integers[term.getKey().exponent(0)] = coefficient;</span>
+<span class="fc" id="L263">            }</span>
+        } else {
+<span class="fc" id="L265">            ExactRational[] rationals =</span>
+                new ExactRational[integers.length];
+<span class="fc" id="L267">            Arrays.fill(rationals, ExactRational.ZERO);</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">            for (Map.Entry&lt;Monomial, C&gt; term : source.terms().entrySet()) {</span>
+<span class="fc" id="L269">                work.consume(</span>
+                    &quot;independent-irreducibility.normalization.coefficients&quot;,
+                    1);
+<span class="fc" id="L272">                ExactRational coefficient =</span>
+<span class="fc" id="L273">                    (ExactRational) term.getValue();</span>
+<span class="fc" id="L274">                requireBitLength(</span>
+<span class="fc" id="L275">                    coefficient.numerator(),</span>
+                    coefficientLimit);
+<span class="fc" id="L277">                requireBitLength(</span>
+<span class="fc" id="L278">                    coefficient.denominator(),</span>
+                    coefficientLimit);
+<span class="fc" id="L280">                rationals[term.getKey().exponent(0)] = coefficient;</span>
+<span class="fc" id="L281">            }</span>
+<span class="fc" id="L282">            BigInteger denominatorLcm = BigInteger.ONE;</span>
+<span class="fc bfc" id="L283" title="All 2 branches covered.">            for (ExactRational coefficient : rationals) {</span>
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">                if (coefficient.isZero()) {</span>
+<span class="nc" id="L285">                    continue;</span>
+                }
+<span class="fc" id="L287">                work.consume(</span>
+                    &quot;independent-irreducibility.normalization.denominator-lcm&quot;,
+                    1);
+<span class="fc" id="L290">                BigInteger gcd = denominatorLcm.gcd(</span>
+<span class="fc" id="L291">                    coefficient.denominator());</span>
+<span class="fc" id="L292">                denominatorLcm = denominatorLcm.divide(gcd)</span>
+<span class="fc" id="L293">                    .multiply(coefficient.denominator());</span>
+<span class="fc" id="L294">                requireBitLength(denominatorLcm, coefficientLimit);</span>
+            }
+<span class="fc bfc" id="L296" title="All 2 branches covered.">            for (int index = 0; index &lt; rationals.length; index++) {</span>
+<span class="fc" id="L297">                ExactRational coefficient = rationals[index];</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">                if (coefficient.isZero()) {</span>
+<span class="nc" id="L299">                    continue;</span>
+                }
+<span class="fc" id="L301">                work.consume(</span>
+                    &quot;independent-irreducibility.normalization.integer-scaling&quot;,
+                    1);
+<span class="fc" id="L304">                integers[index] = coefficient.numerator().multiply(</span>
+<span class="fc" id="L305">                    denominatorLcm.divide(coefficient.denominator()));</span>
+<span class="fc" id="L306">                requireBitLength(integers[index], coefficientLimit);</span>
+            }
+        }
+
+<span class="fc" id="L310">        BigInteger content = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        for (BigInteger coefficient : integers) {</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">            if (coefficient.signum() == 0) {</span>
+<span class="fc" id="L313">                continue;</span>
+            }
+<span class="fc" id="L315">            work.consume(</span>
+                &quot;independent-irreducibility.normalization.content-gcd&quot;,
+                1);
+<span class="fc" id="L318">            content = content.gcd(coefficient.abs());</span>
+        }
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">        if (content.signum() == 0) {</span>
+<span class="nc" id="L321">            throw new IllegalArgumentException(</span>
+                &quot;nonzero source normalized to zero&quot;);
+        }
+<span class="fc bfc" id="L324" title="All 2 branches covered.">        if (!content.equals(BigInteger.ONE)) {</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">            for (int index = 0; index &lt; integers.length; index++) {</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">                if (integers[index].signum() != 0) {</span>
+<span class="fc" id="L327">                    work.consume(</span>
+                        &quot;independent-irreducibility.normalization.primitive-division&quot;,
+                        1);
+<span class="fc" id="L330">                    integers[index] = integers[index].divide(content);</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L334" title="All 2 branches covered.">        if (integers[integers.length - 1].signum() &lt; 0) {</span>
+<span class="fc bfc" id="L335" title="All 2 branches covered.">            for (int index = 0; index &lt; integers.length; index++) {</span>
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">                if (integers[index].signum() != 0) {</span>
+<span class="fc" id="L337">                    work.consume(</span>
+                        &quot;independent-irreducibility.normalization.sign&quot;,
+                        1);
+<span class="fc" id="L340">                    integers[index] = integers[index].negate();</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        for (BigInteger coefficient : integers) {</span>
+<span class="fc" id="L345">            requireBitLength(coefficient, coefficientLimit);</span>
+        }
+<span class="fc" id="L347">        return List.copyOf(Arrays.asList(integers));</span>
+    }
+
+    private static void requireBitLength(
+        BigInteger value,
+        int maximum
+    ) {
+<span class="fc bfc" id="L354" title="All 2 branches covered.">        if (value.abs().bitLength() &gt; maximum) {</span>
+<span class="fc" id="L355">            throw new NormalizationLimitReached(</span>
+                &quot;INDEPENDENT_IRREDUCIBILITY_NORMALIZATION_LIMIT_EXCEEDED&quot;);
+        }
+<span class="fc" id="L358">    }</span>
+
+    private static PrimeAttempt verifyPrime(
+        List&lt;BigInteger&gt; normalized,
+        String normalizedHash,
+        int prime,
+        WorkBudget work
+    ) {
+<span class="fc" id="L366">        PrimeProgress progress = new PrimeProgress(</span>
+            prime,
+            normalizedHash,
+<span class="fc" id="L369">            work.total());</span>
+        try {
+<span class="fc" id="L371">            int sourceDegree = normalized.size() - 1;</span>
+<span class="fc" id="L372">            int[] reduction = reduce(normalized, prime, work);</span>
+<span class="fc" id="L373">            progress.reducedDegree = degree(reduction);</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">            if (progress.reducedDegree != sourceDegree) {</span>
+<span class="fc" id="L375">                return progress.finish(</span>
+                    PrimeAttemptOutcome.DEGREE_LOSS,
+<span class="fc" id="L377">                    work.total());</span>
+            }
+<span class="fc" id="L379">            int[] modulus = monic(reduction, prime, work);</span>
+<span class="fc" id="L380">            int[] x = {0, 1};</span>
+<span class="fc bfc" id="L381" title="All 2 branches covered.">            for (int divisor : distinctPrimeDivisors(sourceDegree)) {</span>
+<span class="fc" id="L382">                int iterations = sourceDegree / divisor;</span>
+<span class="fc" id="L383">                int[] residue = frobenius(</span>
+                    x,
+                    iterations,
+                    prime,
+                    modulus,
+                    work);
+<span class="fc" id="L389">                int[] difference = subtract(</span>
+                    residue,
+                    x,
+                    prime,
+                    work);
+<span class="fc" id="L394">                int gcdDegree = degree(gcd(</span>
+                    modulus,
+                    difference,
+                    prime,
+                    work));
+<span class="fc" id="L399">                progress.checkpoints.add(new FrobeniusCheckpoint(</span>
+                    iterations,
+                    gcdDegree,
+<span class="fc" id="L402">                    residueHash(prime, residue)));</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">                if (gcdDegree != 0) {</span>
+<span class="fc" id="L404">                    return progress.finish(</span>
+                        PrimeAttemptOutcome.REDUCIBLE_REDUCTION,
+<span class="fc" id="L406">                        work.total());</span>
+                }
+<span class="fc" id="L408">            }</span>
+<span class="fc" id="L409">            int[] finalResidue = frobenius(</span>
+                x,
+                sourceDegree,
+                prime,
+                modulus,
+                work);
+<span class="fc" id="L415">            progress.finalResidueHash = residueHash(</span>
+                prime,
+                finalResidue);
+<span class="fc" id="L418">            work.consume(</span>
+                &quot;independent-irreducibility.polynomial-comparisons&quot;,
+<span class="fc" id="L420">                Math.max(finalResidue.length, x.length));</span>
+<span class="fc" id="L421">            progress.finalCongruence = Arrays.equals(</span>
+                finalResidue,
+                x);
+<span class="fc" id="L424">            return progress.finish(</span>
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">                progress.finalCongruence</span>
+<span class="fc" id="L426">                    ? PrimeAttemptOutcome.IRREDUCIBLE_WITNESS</span>
+<span class="pc" id="L427">                    : PrimeAttemptOutcome.REDUCIBLE_REDUCTION,</span>
+<span class="fc" id="L428">                work.total());</span>
+<span class="nc" id="L429">        } catch (WorkLimitReached exception) {</span>
+<span class="nc" id="L430">            return progress.finish(</span>
+                PrimeAttemptOutcome.WORK_BUDGET_EXHAUSTED,
+<span class="nc" id="L432">                work.total());</span>
+        }
+    }
+
+    private static String normalizedHash(
+        List&lt;BigInteger&gt; coefficients
+    ) {
+<span class="fc" id="L439">        StringBuilder material = new StringBuilder(METHOD_ID);</span>
+<span class="fc" id="L440">        PolynomialEvidence.append(</span>
+            material,
+<span class="fc" id="L442">            Integer.toString(coefficients.size()));</span>
+<span class="fc" id="L443">        coefficients.forEach(coefficient -&gt;</span>
+<span class="fc" id="L444">            PolynomialEvidence.append(</span>
+                material,
+<span class="fc" id="L446">                coefficient.toString()));</span>
+<span class="fc" id="L447">        return PolynomialEvidence.sha256(material.toString());</span>
+    }
+
+    private static String residueHash(int prime, int[] polynomial) {
+<span class="fc" id="L451">        StringBuilder material = new StringBuilder(METHOD_ID);</span>
+<span class="fc" id="L452">        PolynomialEvidence.append(material, Integer.toString(prime));</span>
+<span class="fc" id="L453">        PolynomialEvidence.append(</span>
+            material,
+<span class="fc" id="L455">            Integer.toString(polynomial.length));</span>
+<span class="fc bfc" id="L456" title="All 2 branches covered.">        for (int coefficient : polynomial) {</span>
+<span class="fc" id="L457">            PolynomialEvidence.append(</span>
+                material,
+<span class="fc" id="L459">                Integer.toString(coefficient));</span>
+        }
+<span class="fc" id="L461">        return PolynomialEvidence.sha256(material.toString());</span>
+    }
+
+    private static String attemptHash(
+        String normalizedHash,
+        int prime,
+        PrimeAttemptOutcome outcome,
+        int reducedDegree,
+        List&lt;FrobeniusCheckpoint&gt; checkpoints,
+        boolean finalCongruence,
+        String finalResidueHash,
+        long workUnits
+    ) {
+<span class="fc" id="L474">        StringBuilder material = new StringBuilder(METHOD_ID);</span>
+<span class="fc" id="L475">        PolynomialEvidence.append(material, normalizedHash);</span>
+<span class="fc" id="L476">        PolynomialEvidence.append(material, Integer.toString(prime));</span>
+<span class="fc" id="L477">        PolynomialEvidence.append(material, outcome.name());</span>
+<span class="fc" id="L478">        PolynomialEvidence.append(</span>
+            material,
+<span class="fc" id="L480">            Integer.toString(reducedDegree));</span>
+<span class="fc" id="L481">        PolynomialEvidence.append(</span>
+            material,
+<span class="fc" id="L483">            Integer.toString(checkpoints.size()));</span>
+<span class="fc" id="L484">        checkpoints.forEach(checkpoint -&gt;</span>
+<span class="fc" id="L485">            PolynomialEvidence.append(</span>
+                material,
+<span class="fc" id="L487">                checkpoint.canonicalMaterial()));</span>
+<span class="fc" id="L488">        PolynomialEvidence.append(</span>
+            material,
+<span class="fc" id="L490">            Boolean.toString(finalCongruence));</span>
+<span class="fc" id="L491">        PolynomialEvidence.append(material, finalResidueHash);</span>
+<span class="fc" id="L492">        PolynomialEvidence.append(material, Long.toString(workUnits));</span>
+<span class="fc" id="L493">        return PolynomialEvidence.sha256(material.toString());</span>
+    }
+
+    private static Result result(
+        String requestHash,
+        String sourceHash,
+        IndependentIrreducibilityOutcome outcome,
+        IrreducibilityProofMethod proofMethod,
+        String detailCode,
+        List&lt;BigInteger&gt; normalized,
+        int degree,
+        List&lt;PrimeAttempt&gt; attempts,
+        int selectedPrime,
+        PolynomialWorkLedger work
+    ) {
+<span class="fc" id="L508">        List&lt;BigInteger&gt; retainedNormalized = List.copyOf(normalized);</span>
+<span class="fc" id="L509">        List&lt;PrimeAttempt&gt; retainedAttempts = List.copyOf(attempts);</span>
+<span class="fc" id="L510">        StringBuilder material = new StringBuilder(METHOD_ID);</span>
+<span class="fc" id="L511">        PolynomialEvidence.append(material, requestHash);</span>
+<span class="fc" id="L512">        PolynomialEvidence.append(material, sourceHash);</span>
+<span class="fc" id="L513">        PolynomialEvidence.append(material, outcome.name());</span>
+<span class="fc" id="L514">        PolynomialEvidence.append(material, proofMethod.name());</span>
+<span class="fc" id="L515">        PolynomialEvidence.append(material, detailCode);</span>
+<span class="fc" id="L516">        PolynomialEvidence.append(</span>
+            material,
+<span class="fc" id="L518">            Integer.toString(retainedNormalized.size()));</span>
+<span class="fc" id="L519">        retainedNormalized.forEach(coefficient -&gt;</span>
+<span class="fc" id="L520">            PolynomialEvidence.append(</span>
+                material,
+<span class="fc" id="L522">                coefficient.toString()));</span>
+<span class="fc" id="L523">        PolynomialEvidence.append(material, Integer.toString(degree));</span>
+<span class="fc" id="L524">        PolynomialEvidence.append(</span>
+            material,
+<span class="fc" id="L526">            Integer.toString(retainedAttempts.size()));</span>
+<span class="fc" id="L527">        retainedAttempts.forEach(attempt -&gt;</span>
+<span class="fc" id="L528">            PolynomialEvidence.append(</span>
+                material,
+<span class="fc" id="L530">                attempt.canonicalMaterial()));</span>
+<span class="fc" id="L531">        PolynomialEvidence.append(</span>
+            material,
+<span class="fc" id="L533">            Integer.toString(selectedPrime));</span>
+<span class="fc" id="L534">        PolynomialEvidence.append(material, work.canonicalMaterial());</span>
+<span class="fc" id="L535">        return new Result(</span>
+            METHOD_ID,
+            requestHash,
+            sourceHash,
+            outcome,
+            proofMethod,
+            detailCode,
+            retainedNormalized,
+            degree,
+            retainedAttempts,
+            selectedPrime,
+            work,
+<span class="fc" id="L547">            PolynomialEvidence.sha256(material.toString()));</span>
+    }
+
+<span class="fc" id="L550">    record Result(</span>
+        String methodId,
+        String requestHash,
+        String sourceHash,
+        IndependentIrreducibilityOutcome outcome,
+        IrreducibilityProofMethod proofMethod,
+        String detailCode,
+        List&lt;BigInteger&gt; normalizedPrimitiveCoefficients,
+        int degree,
+        List&lt;PrimeAttempt&gt; primeAttempts,
+        int selectedPrime,
+        PolynomialWorkLedger work,
+        String traceHash
+    ) {
+    }
+
+    private static final class PrimeProgress {
+        private final int prime;
+        private final String normalizedHash;
+        private final long workAtStart;
+<span class="fc" id="L570">        private final List&lt;FrobeniusCheckpoint&gt; checkpoints =</span>
+            new ArrayList&lt;&gt;();
+<span class="fc" id="L572">        private int reducedDegree = -1;</span>
+        private boolean finalCongruence;
+<span class="fc" id="L574">        private String finalResidueHash = &quot;&quot;;</span>
+
+        private PrimeProgress(
+            int prime,
+            String normalizedHash,
+            long workAtStart
+<span class="fc" id="L580">        ) {</span>
+<span class="fc" id="L581">            this.prime = prime;</span>
+<span class="fc" id="L582">            this.normalizedHash = normalizedHash;</span>
+<span class="fc" id="L583">            this.workAtStart = workAtStart;</span>
+<span class="fc" id="L584">        }</span>
+
+        private PrimeAttempt finish(
+            PrimeAttemptOutcome outcome,
+            long currentWork
+        ) {
+<span class="fc" id="L590">            long workUnits = currentWork - workAtStart;</span>
+<span class="fc" id="L591">            String hash = attemptHash(</span>
+                normalizedHash,
+                prime,
+                outcome,
+                reducedDegree,
+                checkpoints,
+                finalCongruence,
+                finalResidueHash,
+                workUnits);
+<span class="fc" id="L600">            return new PrimeAttempt(</span>
+                prime,
+                outcome,
+                reducedDegree,
+                checkpoints,
+                finalCongruence,
+                finalResidueHash,
+                workUnits,
+                hash);
+        }
+    }
+
+    private static final class WorkBudget implements PolynomialWorkSink {
+        private final long limit;
+<span class="fc" id="L614">        private final Map&lt;String, Long&gt; stages = new LinkedHashMap&lt;&gt;();</span>
+        private long total;
+
+<span class="fc" id="L617">        private WorkBudget(long limit) {</span>
+<span class="pc bpc" id="L618" title="1 of 2 branches missed.">            if (limit &lt; 0) {</span>
+<span class="nc" id="L619">                throw new IllegalArgumentException(</span>
+                    &quot;independent verification budget must not be negative&quot;);
+            }
+<span class="fc" id="L622">            this.limit = limit;</span>
+<span class="fc" id="L623">        }</span>
+
+        @Override
+        public void consume(String stage, long units) {
+<span class="pc bpc" id="L627" title="1 of 4 branches missed.">            if (units &lt; 0 || total &gt; limit - units) {</span>
+<span class="fc" id="L628">                throw new WorkLimitReached();</span>
+            }
+<span class="pc bpc" id="L630" title="1 of 2 branches missed.">            if (units == 0) {</span>
+<span class="nc" id="L631">                return;</span>
+            }
+<span class="fc" id="L633">            total += units;</span>
+<span class="fc" id="L634">            stages.merge(stage, units, Math::addExact);</span>
+<span class="fc" id="L635">        }</span>
+
+        private long total() {
+<span class="fc" id="L638">            return total;</span>
+        }
+
+        private PolynomialWorkLedger ledger() {
+<span class="fc" id="L642">            return new PolynomialWorkLedger(stages);</span>
+        }
+    }
+
+    private static final class WorkLimitReached extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
+
+    private static final class NormalizationLimitReached
+            extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        private final String detailCode;
+
+<span class="fc" id="L655">        private NormalizationLimitReached(String detailCode) {</span>
+<span class="fc" id="L656">            this.detailCode = detailCode;</span>
+<span class="fc" id="L657">        }</span>
+
+        private String detailCode() {
+<span class="fc" id="L660">            return detailCode;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

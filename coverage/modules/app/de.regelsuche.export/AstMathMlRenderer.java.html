@@ -83,52 +83,55 @@ import java.util.List;
 
     private String render(Expr expr) {
 <span class="fc bfc" id="L85" title="All 2 branches covered.">        if (expr instanceof NumberExpr number) {</span>
-<span class="fc" id="L86">            double value = number.value();</span>
-<span class="pc bpc" id="L87" title="1 of 2 branches missed.">            return &quot;&lt;mn&gt;&quot; + (value == (long) value ? Long.toString((long) value) : Double.toString(value)) + &quot;&lt;/mn&gt;&quot;;</span>
+<span class="fc" id="L86">            var value = number.value();</span>
+<span class="fc" id="L87">            String formatted = de.regelsuche.parse.ExpressionFormatter.format(number);</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            return formatted.contains(&quot;/&quot;)</span>
+<span class="nc" id="L89">                ? &quot;&lt;mfrac&gt;&lt;mn&gt;&quot; + value.numerator() + &quot;&lt;/mn&gt;&lt;mn&gt;&quot; + value.denominator() + &quot;&lt;/mn&gt;&lt;/mfrac&gt;&quot;</span>
+<span class="fc" id="L90">                : &quot;&lt;mn&gt;&quot; + formatted + &quot;&lt;/mn&gt;&quot;;</span>
         }
-<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (expr instanceof VariableExpr variable) {</span>
-<span class="fc" id="L90">            return &quot;&lt;mi&gt;&quot; + escape(variable.name()) + &quot;&lt;/mi&gt;&quot;;</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (expr instanceof VariableExpr variable) {</span>
+<span class="fc" id="L93">            return &quot;&lt;mi&gt;&quot; + escape(variable.name()) + &quot;&lt;/mi&gt;&quot;;</span>
         }
-<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (expr instanceof FunctionExpr fn) {</span>
-<span class="nc" id="L93">            return renderFunction(fn);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (expr instanceof FunctionExpr fn) {</span>
+<span class="nc" id="L96">            return renderFunction(fn);</span>
         }
-<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (expr instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L96">            return renderBinary(binary);</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (expr instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L99">            return renderBinary(binary);</span>
         }
-<span class="nc" id="L98">        return &quot;&quot;;</span>
+<span class="nc" id="L101">        return &quot;&quot;;</span>
     }
 
     private String renderBinary(BinaryExpr binary) {
-<span class="fc" id="L102">        BinaryOperator op = binary.operator();</span>
-<span class="pc bpc" id="L103" title="3 of 5 branches missed.">        return switch (op) {</span>
-<span class="fc" id="L104">            case ADD -&gt; &quot;&lt;mrow&gt;&quot; + render(binary.left()) + &quot;&lt;mo&gt;+&lt;/mo&gt;&quot; + render(binary.right()) + &quot;&lt;/mrow&gt;&quot;;</span>
-<span class="nc" id="L105">            case SUB -&gt; &quot;&lt;mrow&gt;&quot; + render(binary.left()) + &quot;&lt;mo&gt;-&lt;/mo&gt;&quot; + render(binary.right()) + &quot;&lt;/mrow&gt;&quot;;</span>
-<span class="nc" id="L106">            case MUL -&gt; &quot;&lt;mrow&gt;&quot; + render(binary.left()) + &quot;&lt;mo&gt;&amp;#x22C5;&lt;/mo&gt;&quot; + render(binary.right()) + &quot;&lt;/mrow&gt;&quot;;</span>
-<span class="fc" id="L107">            case DIV -&gt; &quot;&lt;mfrac&gt;&quot; + render(binary.left()) + render(binary.right()) + &quot;&lt;/mfrac&gt;&quot;;</span>
-<span class="nc" id="L108">            case POW -&gt; &quot;&lt;msup&gt;&quot; + render(binary.left()) + render(binary.right()) + &quot;&lt;/msup&gt;&quot;;</span>
+<span class="fc" id="L105">        BinaryOperator op = binary.operator();</span>
+<span class="pc bpc" id="L106" title="3 of 5 branches missed.">        return switch (op) {</span>
+<span class="fc" id="L107">            case ADD -&gt; &quot;&lt;mrow&gt;&quot; + render(binary.left()) + &quot;&lt;mo&gt;+&lt;/mo&gt;&quot; + render(binary.right()) + &quot;&lt;/mrow&gt;&quot;;</span>
+<span class="nc" id="L108">            case SUB -&gt; &quot;&lt;mrow&gt;&quot; + render(binary.left()) + &quot;&lt;mo&gt;-&lt;/mo&gt;&quot; + render(binary.right()) + &quot;&lt;/mrow&gt;&quot;;</span>
+<span class="nc" id="L109">            case MUL -&gt; &quot;&lt;mrow&gt;&quot; + render(binary.left()) + &quot;&lt;mo&gt;&amp;#x22C5;&lt;/mo&gt;&quot; + render(binary.right()) + &quot;&lt;/mrow&gt;&quot;;</span>
+<span class="fc" id="L110">            case DIV -&gt; &quot;&lt;mfrac&gt;&quot; + render(binary.left()) + render(binary.right()) + &quot;&lt;/mfrac&gt;&quot;;</span>
+<span class="nc" id="L111">            case POW -&gt; &quot;&lt;msup&gt;&quot; + render(binary.left()) + render(binary.right()) + &quot;&lt;/msup&gt;&quot;;</span>
         };
     }
 
     private String renderFunction(FunctionExpr fn) {
-<span class="nc" id="L113">        String name = fn.name().toLowerCase();</span>
-<span class="nc bnc" id="L114" title="All 4 branches missed.">        if (&quot;sqrt&quot;.equals(name) &amp;&amp; fn.arguments().size() == 1) {</span>
-<span class="nc" id="L115">            return &quot;&lt;msqrt&gt;&quot; + render(fn.arguments().get(0)) + &quot;&lt;/msqrt&gt;&quot;;</span>
+<span class="nc" id="L116">        String name = fn.name().toLowerCase();</span>
+<span class="nc bnc" id="L117" title="All 4 branches missed.">        if (&quot;sqrt&quot;.equals(name) &amp;&amp; fn.arguments().size() == 1) {</span>
+<span class="nc" id="L118">            return &quot;&lt;msqrt&gt;&quot; + render(fn.arguments().get(0)) + &quot;&lt;/msqrt&gt;&quot;;</span>
         }
-<span class="nc bnc" id="L117" title="All 4 branches missed.">        if (&quot;abs&quot;.equals(name) &amp;&amp; fn.arguments().size() == 1) {</span>
-<span class="nc" id="L118">            return &quot;&lt;mrow&gt;&lt;mo&gt;|&lt;/mo&gt;&quot; + render(fn.arguments().get(0)) + &quot;&lt;mo&gt;|&lt;/mo&gt;&lt;/mrow&gt;&quot;;</span>
+<span class="nc bnc" id="L120" title="All 4 branches missed.">        if (&quot;abs&quot;.equals(name) &amp;&amp; fn.arguments().size() == 1) {</span>
+<span class="nc" id="L121">            return &quot;&lt;mrow&gt;&lt;mo&gt;|&lt;/mo&gt;&quot; + render(fn.arguments().get(0)) + &quot;&lt;mo&gt;|&lt;/mo&gt;&lt;/mrow&gt;&quot;;</span>
         }
-<span class="nc" id="L120">        StringBuilder sb = new StringBuilder(&quot;&lt;mrow&gt;&lt;mi&gt;&quot;).append(escape(name)).append(&quot;&lt;/mi&gt;&lt;mo&gt;(&lt;/mo&gt;&quot;);</span>
-<span class="nc bnc" id="L121" title="All 2 branches missed.">        for (int i = 0; i &lt; fn.arguments().size(); i++) {</span>
-<span class="nc bnc" id="L122" title="All 2 branches missed.">            if (i &gt; 0) {</span>
-<span class="nc" id="L123">                sb.append(&quot;&lt;mo&gt;,&lt;/mo&gt;&quot;);</span>
+<span class="nc" id="L123">        StringBuilder sb = new StringBuilder(&quot;&lt;mrow&gt;&lt;mi&gt;&quot;).append(escape(name)).append(&quot;&lt;/mi&gt;&lt;mo&gt;(&lt;/mo&gt;&quot;);</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        for (int i = 0; i &lt; fn.arguments().size(); i++) {</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">            if (i &gt; 0) {</span>
+<span class="nc" id="L126">                sb.append(&quot;&lt;mo&gt;,&lt;/mo&gt;&quot;);</span>
             }
-<span class="nc" id="L125">            sb.append(render(fn.arguments().get(i)));</span>
+<span class="nc" id="L128">            sb.append(render(fn.arguments().get(i)));</span>
         }
-<span class="nc" id="L127">        return sb.append(&quot;&lt;mo&gt;)&lt;/mo&gt;&lt;/mrow&gt;&quot;).toString();</span>
+<span class="nc" id="L130">        return sb.append(&quot;&lt;mo&gt;)&lt;/mo&gt;&lt;/mrow&gt;&quot;).toString();</span>
     }
 
     private static String escape(String value) {
-<span class="fc" id="L131">        return value.replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;).replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;).replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;);</span>
+<span class="fc" id="L134">        return value.replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;).replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;).replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

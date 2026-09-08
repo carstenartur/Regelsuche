@@ -31,75 +31,75 @@ import java.util.Objects;
     public Expression toIr(Expr expression) {
 <span class="fc" id="L32">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
 <span class="fc bfc" id="L33" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
-<span class="fc" id="L34">            return new Literal(numberLiteral(number.value()));</span>
+            try {
+<span class="fc" id="L35">                return new Literal(number.value().toBigDecimal(java.math.MathContext.UNLIMITED).toPlainString());</span>
+<span class="fc" id="L36">            } catch (ArithmeticException repeatingDecimal) {</span>
+<span class="fc" id="L37">                return new Binary(SolverIr.BinaryOperator.DIVIDE,</span>
+<span class="fc" id="L38">                    new Literal(number.value().numerator().toString()),</span>
+<span class="fc" id="L39">                    new Literal(number.value().denominator().toString()));</span>
+            }
         }
-<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
-<span class="fc" id="L37">            return new Symbol(variable.name());</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L43">            return new Symbol(variable.name());</span>
         }
-<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L40">            return new Binary(</span>
-<span class="fc" id="L41">                toIrOperator(binary.operator()),</span>
-<span class="fc" id="L42">                toIr(binary.left()),</span>
-<span class="fc" id="L43">                toIr(binary.right()));</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L46">            return new Binary(</span>
+<span class="fc" id="L47">                toIrOperator(binary.operator()),</span>
+<span class="fc" id="L48">                toIr(binary.left()),</span>
+<span class="fc" id="L49">                toIr(binary.right()));</span>
         }
-<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
-<span class="fc" id="L46">            return new Call(</span>
-<span class="fc" id="L47">                function.name(),</span>
-<span class="fc" id="L48">                function.arguments().stream().map(this::toIr).toList());</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L52">            return new Call(</span>
+<span class="fc" id="L53">                function.name(),</span>
+<span class="fc" id="L54">                function.arguments().stream().map(this::toIr).toList());</span>
         }
-<span class="nc" id="L50">        throw new IllegalArgumentException(&quot;unsupported core expression: &quot; + expression);</span>
+<span class="nc" id="L56">        throw new IllegalArgumentException(&quot;unsupported core expression: &quot; + expression);</span>
     }
 
     public Expr toCore(Expression expression) {
-<span class="fc" id="L54">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
-<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (expression instanceof Literal literal) {</span>
-<span class="fc" id="L56">            return new NumberExpr(Double.parseDouble(literal.value()));</span>
+<span class="fc" id="L60">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (expression instanceof Literal literal) {</span>
+<span class="fc" id="L62">            return new NumberExpr(de.regelsuche.scalar.ExactRational.fromDecimal(new BigDecimal(literal.value())));</span>
         }
-<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (expression instanceof Symbol symbol) {</span>
-<span class="fc" id="L59">            return new VariableExpr(symbol.name());</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (expression instanceof Symbol symbol) {</span>
+<span class="fc" id="L65">            return new VariableExpr(symbol.name());</span>
         }
-<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (expression instanceof Binary binary) {</span>
-<span class="fc" id="L62">            return new BinaryExpr(</span>
-<span class="fc" id="L63">                toCore(binary.left()),</span>
-<span class="fc" id="L64">                toCoreOperator(binary.operator()),</span>
-<span class="fc" id="L65">                toCore(binary.right()));</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (expression instanceof Binary binary) {</span>
+<span class="fc" id="L68">            return new BinaryExpr(</span>
+<span class="fc" id="L69">                toCore(binary.left()),</span>
+<span class="fc" id="L70">                toCoreOperator(binary.operator()),</span>
+<span class="fc" id="L71">                toCore(binary.right()));</span>
         }
-<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (expression instanceof Call call) {</span>
-<span class="fc" id="L68">            List&lt;Expr&gt; arguments = call.arguments().stream().map(this::toCore).toList();</span>
-<span class="fc" id="L69">            return new FunctionExpr(call.function(), arguments);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (expression instanceof Call call) {</span>
+<span class="fc" id="L74">            List&lt;Expr&gt; arguments = call.arguments().stream().map(this::toCore).toList();</span>
+<span class="fc" id="L75">            return new FunctionExpr(call.function(), arguments);</span>
         }
-<span class="nc" id="L71">        throw new IllegalArgumentException(&quot;unsupported solver expression: &quot; + expression);</span>
+<span class="nc" id="L77">        throw new IllegalArgumentException(&quot;unsupported solver expression: &quot; + expression);</span>
     }
 
     public String render(Expression expression) {
-<span class="fc" id="L75">        return ExpressionFormatter.format(toCore(expression));</span>
+<span class="fc" id="L81">        return ExpressionFormatter.format(toCore(expression));</span>
     }
 
     private static SolverIr.BinaryOperator toIrOperator(BinaryOperator operator) {
-<span class="pc bpc" id="L79" title="1 of 5 branches missed.">        return switch (operator) {</span>
-<span class="fc" id="L80">            case ADD -&gt; SolverIr.BinaryOperator.ADD;</span>
-<span class="nc" id="L81">            case SUB -&gt; SolverIr.BinaryOperator.SUBTRACT;</span>
-<span class="fc" id="L82">            case MUL -&gt; SolverIr.BinaryOperator.MULTIPLY;</span>
-<span class="fc" id="L83">            case DIV -&gt; SolverIr.BinaryOperator.DIVIDE;</span>
-<span class="fc" id="L84">            case POW -&gt; SolverIr.BinaryOperator.POWER;</span>
+<span class="pc bpc" id="L85" title="1 of 5 branches missed.">        return switch (operator) {</span>
+<span class="fc" id="L86">            case ADD -&gt; SolverIr.BinaryOperator.ADD;</span>
+<span class="nc" id="L87">            case SUB -&gt; SolverIr.BinaryOperator.SUBTRACT;</span>
+<span class="fc" id="L88">            case MUL -&gt; SolverIr.BinaryOperator.MULTIPLY;</span>
+<span class="fc" id="L89">            case DIV -&gt; SolverIr.BinaryOperator.DIVIDE;</span>
+<span class="fc" id="L90">            case POW -&gt; SolverIr.BinaryOperator.POWER;</span>
         };
     }
 
     private static BinaryOperator toCoreOperator(SolverIr.BinaryOperator operator) {
-<span class="pc bpc" id="L89" title="1 of 5 branches missed.">        return switch (operator) {</span>
-<span class="fc" id="L90">            case ADD -&gt; BinaryOperator.ADD;</span>
-<span class="nc" id="L91">            case SUBTRACT -&gt; BinaryOperator.SUB;</span>
-<span class="fc" id="L92">            case MULTIPLY -&gt; BinaryOperator.MUL;</span>
-<span class="fc" id="L93">            case DIVIDE -&gt; BinaryOperator.DIV;</span>
-<span class="fc" id="L94">            case POWER -&gt; BinaryOperator.POW;</span>
+<span class="pc bpc" id="L95" title="1 of 5 branches missed.">        return switch (operator) {</span>
+<span class="fc" id="L96">            case ADD -&gt; BinaryOperator.ADD;</span>
+<span class="nc" id="L97">            case SUBTRACT -&gt; BinaryOperator.SUB;</span>
+<span class="fc" id="L98">            case MULTIPLY -&gt; BinaryOperator.MUL;</span>
+<span class="fc" id="L99">            case DIVIDE -&gt; BinaryOperator.DIV;</span>
+<span class="fc" id="L100">            case POWER -&gt; BinaryOperator.POW;</span>
         };
     }
 
-    private static String numberLiteral(double value) {
-<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (!Double.isFinite(value)) {</span>
-<span class="nc" id="L100">            throw new IllegalArgumentException(&quot;non-finite numbers are not supported&quot;);</span>
-        }
-<span class="fc" id="L102">        return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();</span>
-    }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

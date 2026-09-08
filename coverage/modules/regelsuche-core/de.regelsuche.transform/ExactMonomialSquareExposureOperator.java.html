@@ -172,7 +172,7 @@ public final class ExactMonomialSquareExposureOperator
 <span class="fc" id="L172">        return expression instanceof BinaryExpr power</span>
 <span class="fc bfc" id="L173" title="All 2 branches covered.">            &amp;&amp; power.operator() == BinaryOperator.POW</span>
 <span class="pc bpc" id="L174" title="1 of 2 branches missed.">            &amp;&amp; power.right() instanceof NumberExpr exponent</span>
-<span class="fc bfc" id="L175" title="All 4 branches covered.">            &amp;&amp; Double.compare(exponent.value(), 2.0) == 0;</span>
+<span class="fc bfc" id="L175" title="All 4 branches covered.">            &amp;&amp; exponent.value().equalsInteger(2);</span>
     }
 
     private static void pushChildren(

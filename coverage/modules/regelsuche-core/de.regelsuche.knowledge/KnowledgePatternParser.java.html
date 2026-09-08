@@ -103,7 +103,7 @@ final class KnowledgePatternParser {
         }
 <span class="fc" id="L104">        String number = readNumber();</span>
 <span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (!number.isBlank()) {</span>
-<span class="fc" id="L106">            return PatternExpr.num(Double.parseDouble(number));</span>
+<span class="fc" id="L106">            return PatternExpr.num(number);</span>
         }
 <span class="nc" id="L108">        throw new IllegalArgumentException(</span>
             &quot;Expected expression at position &quot; + pos + &quot; in &quot; + input

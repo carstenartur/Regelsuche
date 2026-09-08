@@ -321,84 +321,82 @@ import java.util.Set;
 <span class="fc" id="L321">            return placeholder.name();</span>
         }
 <span class="fc bfc" id="L323" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.LiteralNumber number) {</span>
-<span class="pc bpc" id="L324" title="1 of 2 branches missed.">            return number.value() == Math.rint(number.value())</span>
-<span class="fc" id="L325">                ? Long.toString((long) number.value())</span>
-<span class="nc" id="L326">                : Double.toString(number.value());</span>
+<span class="fc" id="L324">            return de.regelsuche.parse.ExpressionFormatter.format(new de.regelsuche.ast.NumberExpr(number.value()));</span>
         }
-<span class="pc bpc" id="L328" title="1 of 2 branches missed.">        if (pattern instanceof PatternExpr.LiteralVariable variable) {</span>
-<span class="nc" id="L329">            return variable.name();</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">        if (pattern instanceof PatternExpr.LiteralVariable variable) {</span>
+<span class="nc" id="L327">            return variable.name();</span>
         }
-<span class="pc bpc" id="L331" title="1 of 2 branches missed.">        if (pattern instanceof PatternExpr.Operation operation) {</span>
-<span class="fc" id="L332">            return &quot;(&quot; + patternText(operation.left()) + &quot; &quot; + operation.operator().symbol()</span>
-<span class="fc" id="L333">                + &quot; &quot; + patternText(operation.right()) + &quot;)&quot;;</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">        if (pattern instanceof PatternExpr.Operation operation) {</span>
+<span class="fc" id="L330">            return &quot;(&quot; + patternText(operation.left()) + &quot; &quot; + operation.operator().symbol()</span>
+<span class="fc" id="L331">                + &quot; &quot; + patternText(operation.right()) + &quot;)&quot;;</span>
         }
-<span class="nc" id="L335">        PatternExpr.Function function = (PatternExpr.Function) pattern;</span>
-<span class="nc" id="L336">        return function.name() + &quot;(&quot; + function.arguments().stream()</span>
-<span class="nc" id="L337">            .map(HiddenRulePilotEvaluator::patternText)</span>
-<span class="nc" id="L338">            .reduce((left, right) -&gt; left + &quot;, &quot; + right)</span>
-<span class="nc" id="L339">            .orElse(&quot;&quot;) + &quot;)&quot;;</span>
+<span class="nc" id="L333">        PatternExpr.Function function = (PatternExpr.Function) pattern;</span>
+<span class="nc" id="L334">        return function.name() + &quot;(&quot; + function.arguments().stream()</span>
+<span class="nc" id="L335">            .map(HiddenRulePilotEvaluator::patternText)</span>
+<span class="nc" id="L336">            .reduce((left, right) -&gt; left + &quot;, &quot; + right)</span>
+<span class="nc" id="L337">            .orElse(&quot;&quot;) + &quot;)&quot;;</span>
     }
 
     private static String syntaxForm(String expression) {
         try {
-<span class="fc" id="L344">            return ExpressionFormatter.format(new ExpressionParser().parseTerm(expression));</span>
-<span class="nc" id="L345">        } catch (IllegalArgumentException exception) {</span>
-<span class="nc" id="L346">            return normalized(expression);</span>
+<span class="fc" id="L342">            return ExpressionFormatter.format(new ExpressionParser().parseTerm(expression));</span>
+<span class="nc" id="L343">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L344">            return normalized(expression);</span>
         }
     }
 
     private static String stripOuterGrouping(String expression) {
-<span class="pc bpc" id="L351" title="1 of 2 branches missed.">        String result = expression == null ? &quot;&quot; : expression.trim();</span>
-<span class="fc bfc" id="L352" title="All 2 branches covered.">        while (result.length() &gt;= 2</span>
-<span class="fc bfc" id="L353" title="All 2 branches covered.">                &amp;&amp; result.charAt(0) == '('</span>
-<span class="fc bfc" id="L354" title="All 2 branches covered.">                &amp;&amp; result.charAt(result.length() - 1) == ')'</span>
-<span class="fc bfc" id="L355" title="All 2 branches covered.">                &amp;&amp; outerParenthesesEncloseWholeExpression(result)) {</span>
-<span class="fc" id="L356">            result = result.substring(1, result.length() - 1).trim();</span>
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">        String result = expression == null ? &quot;&quot; : expression.trim();</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        while (result.length() &gt;= 2</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">                &amp;&amp; result.charAt(0) == '('</span>
+<span class="fc bfc" id="L352" title="All 2 branches covered.">                &amp;&amp; result.charAt(result.length() - 1) == ')'</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">                &amp;&amp; outerParenthesesEncloseWholeExpression(result)) {</span>
+<span class="fc" id="L354">            result = result.substring(1, result.length() - 1).trim();</span>
         }
-<span class="fc" id="L358">        return result;</span>
+<span class="fc" id="L356">        return result;</span>
     }
 
     private static boolean outerParenthesesEncloseWholeExpression(String expression) {
-<span class="fc" id="L362">        int depth = 0;</span>
-<span class="fc bfc" id="L363" title="All 2 branches covered.">        for (int index = 0; index &lt; expression.length(); index++) {</span>
-<span class="fc" id="L364">            char character = expression.charAt(index);</span>
-<span class="fc bfc" id="L365" title="All 2 branches covered.">            if (character == '(') {</span>
-<span class="fc" id="L366">                depth++;</span>
-<span class="fc bfc" id="L367" title="All 2 branches covered.">            } else if (character == ')') {</span>
-<span class="fc" id="L368">                depth--;</span>
-<span class="fc bfc" id="L369" title="All 4 branches covered.">                if (depth == 0 &amp;&amp; index &lt; expression.length() - 1) {</span>
-<span class="fc" id="L370">                    return false;</span>
+<span class="fc" id="L360">        int depth = 0;</span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">        for (int index = 0; index &lt; expression.length(); index++) {</span>
+<span class="fc" id="L362">            char character = expression.charAt(index);</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">            if (character == '(') {</span>
+<span class="fc" id="L364">                depth++;</span>
+<span class="fc bfc" id="L365" title="All 2 branches covered.">            } else if (character == ')') {</span>
+<span class="fc" id="L366">                depth--;</span>
+<span class="fc bfc" id="L367" title="All 4 branches covered.">                if (depth == 0 &amp;&amp; index &lt; expression.length() - 1) {</span>
+<span class="fc" id="L368">                    return false;</span>
                 }
             }
-<span class="pc bpc" id="L373" title="1 of 2 branches missed.">            if (depth &lt; 0) {</span>
-<span class="nc" id="L374">                return false;</span>
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">            if (depth &lt; 0) {</span>
+<span class="nc" id="L372">                return false;</span>
             }
         }
-<span class="pc bpc" id="L377" title="1 of 2 branches missed.">        return depth == 0;</span>
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">        return depth == 0;</span>
     }
 
     private static String normalized(String value) {
-<span class="pc bpc" id="L381" title="1 of 2 branches missed.">        return value == null</span>
-<span class="nc" id="L382">            ? &quot;&quot;</span>
-<span class="fc" id="L383">            : value.toLowerCase(Locale.ROOT).trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        return value == null</span>
+<span class="nc" id="L380">            ? &quot;&quot;</span>
+<span class="fc" id="L381">            : value.toLowerCase(Locale.ROOT).trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
     }
 
     private static String compact(String value) {
-<span class="fc" id="L387">        return normalized(value).replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+<span class="fc" id="L385">        return normalized(value).replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
     }
 
     private static String fingerprint(String value) {
-<span class="fc" id="L391">        return Integer.toHexString(compact(value).hashCode());</span>
+<span class="fc" id="L389">        return Integer.toHexString(compact(value).hashCode());</span>
     }
 
-<span class="fc" id="L394">    public enum CandidateRelation {</span>
-<span class="fc" id="L395">        NONE,</span>
-<span class="fc" id="L396">        EXACT,</span>
-<span class="fc" id="L397">        ALPHA_EQUIVALENT,</span>
-<span class="fc" id="L398">        SEMANTICALLY_EQUIVALENT,</span>
-<span class="fc" id="L399">        STRONGER,</span>
-<span class="fc" id="L400">        WEAKER,</span>
-<span class="fc" id="L401">        DIFFERENT</span>
+<span class="fc" id="L392">    public enum CandidateRelation {</span>
+<span class="fc" id="L393">        NONE,</span>
+<span class="fc" id="L394">        EXACT,</span>
+<span class="fc" id="L395">        ALPHA_EQUIVALENT,</span>
+<span class="fc" id="L396">        SEMANTICALLY_EQUIVALENT,</span>
+<span class="fc" id="L397">        STRONGER,</span>
+<span class="fc" id="L398">        WEAKER,</span>
+<span class="fc" id="L399">        DIFFERENT</span>
     }
 
     public record HiddenReference(
@@ -409,29 +407,29 @@ import java.util.Set;
         List&lt;String&gt; assumptions,
         List&lt;String&gt; forbiddenRuntimeTokens
     ) {
-<span class="fc" id="L412">        public HiddenReference {</span>
-<span class="fc" id="L413">            requireText(hiddenRuleId, &quot;hiddenRuleId&quot;);</span>
-<span class="fc" id="L414">            requireText(family, &quot;family&quot;);</span>
-<span class="fc" id="L415">            requireText(leftPattern, &quot;leftPattern&quot;);</span>
-<span class="fc" id="L416">            requireText(rightPattern, &quot;rightPattern&quot;);</span>
-<span class="fc" id="L417">            assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();</span>
-<span class="fc" id="L418">            List&lt;String&gt; tokens = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L419">            tokens.add(hiddenRuleId);</span>
-<span class="fc" id="L420">            tokens.add(family);</span>
-<span class="fc" id="L421">            tokens.add(leftPattern);</span>
-<span class="fc" id="L422">            tokens.add(rightPattern);</span>
-<span class="fc" id="L423">            tokens.addAll(assumptions);</span>
-<span class="pc bpc" id="L424" title="1 of 2 branches missed.">            if (forbiddenRuntimeTokens != null) {</span>
-<span class="fc" id="L425">                tokens.addAll(forbiddenRuntimeTokens);</span>
+<span class="fc" id="L410">        public HiddenReference {</span>
+<span class="fc" id="L411">            requireText(hiddenRuleId, &quot;hiddenRuleId&quot;);</span>
+<span class="fc" id="L412">            requireText(family, &quot;family&quot;);</span>
+<span class="fc" id="L413">            requireText(leftPattern, &quot;leftPattern&quot;);</span>
+<span class="fc" id="L414">            requireText(rightPattern, &quot;rightPattern&quot;);</span>
+<span class="fc" id="L415">            assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();</span>
+<span class="fc" id="L416">            List&lt;String&gt; tokens = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L417">            tokens.add(hiddenRuleId);</span>
+<span class="fc" id="L418">            tokens.add(family);</span>
+<span class="fc" id="L419">            tokens.add(leftPattern);</span>
+<span class="fc" id="L420">            tokens.add(rightPattern);</span>
+<span class="fc" id="L421">            tokens.addAll(assumptions);</span>
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">            if (forbiddenRuntimeTokens != null) {</span>
+<span class="fc" id="L423">                tokens.addAll(forbiddenRuntimeTokens);</span>
             }
-<span class="fc" id="L427">            forbiddenRuntimeTokens = tokens.stream()</span>
-<span class="pc bpc" id="L428" title="2 of 4 branches missed.">                .filter(token -&gt; token != null &amp;&amp; !token.isBlank())</span>
-<span class="fc" id="L429">                .distinct()</span>
-<span class="fc" id="L430">                .toList();</span>
-<span class="fc" id="L431">        }</span>
+<span class="fc" id="L425">            forbiddenRuntimeTokens = tokens.stream()</span>
+<span class="pc bpc" id="L426" title="2 of 4 branches missed.">                .filter(token -&gt; token != null &amp;&amp; !token.isBlank())</span>
+<span class="fc" id="L427">                .distinct()</span>
+<span class="fc" id="L428">                .toList();</span>
+<span class="fc" id="L429">        }</span>
     }
 
-<span class="fc" id="L434">    public record LeakageViolation(String location, String tokenFingerprint) {</span>
+<span class="fc" id="L432">    public record LeakageViolation(String location, String tokenFingerprint) {</span>
     }
 
     public record Evaluation(
@@ -446,16 +444,16 @@ import java.util.Set;
         boolean pilotAccepted,
         List&lt;String&gt; blockers
     ) {
-<span class="fc" id="L449">        public Evaluation {</span>
-<span class="fc" id="L450">            leakageViolations = List.copyOf(leakageViolations);</span>
-<span class="fc" id="L451">            blockers = List.copyOf(blockers);</span>
-<span class="fc" id="L452">        }</span>
+<span class="fc" id="L447">        public Evaluation {</span>
+<span class="fc" id="L448">            leakageViolations = List.copyOf(leakageViolations);</span>
+<span class="fc" id="L449">            blockers = List.copyOf(blockers);</span>
+<span class="fc" id="L450">        }</span>
     }
 
     private static void requireText(String value, String name) {
-<span class="pc bpc" id="L456" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L457">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+<span class="pc bpc" id="L454" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L455">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
         }
-<span class="fc" id="L459">    }</span>
+<span class="fc" id="L457">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -84,7 +84,7 @@ public final class RadicalRules {
 <span class="pc bpc" id="L84" title="1 of 2 branches missed.">            if (functionExpr.arguments().get(0) instanceof BinaryExpr power</span>
 <span class="pc bpc" id="L85" title="1 of 2 branches missed.">                &amp;&amp; power.operator() == BinaryOperator.POW</span>
 <span class="pc bpc" id="L86" title="1 of 2 branches missed.">                &amp;&amp; power.right() instanceof NumberExpr exponent</span>
-<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                &amp;&amp; exponent.value() == 2.0) {</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                &amp;&amp; exponent.value().equalsInteger(2)) {</span>
 <span class="fc" id="L88">                return power.left();</span>
             }
 <span class="nc" id="L90">            return null;</span>
@@ -199,7 +199,7 @@ public final class RadicalRules {
 <span class="nc" id="L199">            return subtree instanceof FunctionExpr fn</span>
 <span class="nc bnc" id="L200" title="All 2 branches missed.">                &amp;&amp; &quot;sqrt&quot;.equals(fn.name())</span>
 <span class="nc bnc" id="L201" title="All 2 branches missed.">                &amp;&amp; fn.arguments().size() == 1</span>
-<span class="nc bnc" id="L202" title="All 6 branches missed.">                &amp;&amp; fn.arguments().get(0) instanceof NumberExpr n &amp;&amp; n.value() == 0.0;</span>
+<span class="nc bnc" id="L202" title="All 6 branches missed.">                &amp;&amp; fn.arguments().get(0) instanceof NumberExpr n &amp;&amp; n.value().equalsInteger(0);</span>
         }
 
         @Override
@@ -243,7 +243,7 @@ public final class RadicalRules {
 <span class="nc" id="L243">            return subtree instanceof FunctionExpr fn</span>
 <span class="nc bnc" id="L244" title="All 2 branches missed.">                &amp;&amp; &quot;sqrt&quot;.equals(fn.name())</span>
 <span class="nc bnc" id="L245" title="All 2 branches missed.">                &amp;&amp; fn.arguments().size() == 1</span>
-<span class="nc bnc" id="L246" title="All 6 branches missed.">                &amp;&amp; fn.arguments().get(0) instanceof NumberExpr n &amp;&amp; n.value() == 1.0;</span>
+<span class="nc bnc" id="L246" title="All 6 branches missed.">                &amp;&amp; fn.arguments().get(0) instanceof NumberExpr n &amp;&amp; n.value().equalsInteger(1);</span>
         }
 
         @Override

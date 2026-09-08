@@ -323,7 +323,7 @@ public final class LogarithmicRules {
 <span class="nc bnc" id="L323" title="All 2 branches missed.">                &amp;&amp; fn.name().equals(name)</span>
 <span class="nc bnc" id="L324" title="All 2 branches missed.">                &amp;&amp; fn.arguments().size() == 1</span>
 <span class="nc bnc" id="L325" title="All 2 branches missed.">                &amp;&amp; fn.arguments().get(0) instanceof de.regelsuche.ast.NumberExpr n</span>
-<span class="nc bnc" id="L326" title="All 4 branches missed.">                &amp;&amp; n.value() == 1.0;</span>
+<span class="nc bnc" id="L326" title="All 4 branches missed.">                &amp;&amp; n.value().equalsInteger(1);</span>
         }
 
         @Override

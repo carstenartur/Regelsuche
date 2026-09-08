@@ -72,7 +72,7 @@ import java.util.Objects;
 <span class="fc" id="L72">            throw new IllegalArgumentException(</span>
                 &quot;multiplyBothSides requires a numeric literal factor&quot;);
         }
-<span class="pc bpc" id="L75" title="1 of 4 branches missed.">        if (factor instanceof NumberExpr number &amp;&amp; number.value() == 0.0) {</span>
+<span class="pc bpc" id="L75" title="1 of 4 branches missed.">        if (factor instanceof NumberExpr number &amp;&amp; number.value().equalsInteger(0)) {</span>
 <span class="fc" id="L76">            throw new IllegalArgumentException(&quot;Cannot multiply an inequality by zero&quot;);</span>
         }
 <span class="fc" id="L78">        Sign sign = signOf(factor);</span>
@@ -107,7 +107,7 @@ import java.util.Objects;
 <span class="fc" id="L107">            throw new IllegalArgumentException(</span>
                 &quot;divideBothSides requires a numeric literal divisor&quot;);
         }
-<span class="pc bpc" id="L110" title="2 of 4 branches missed.">        if (divisor instanceof NumberExpr number &amp;&amp; number.value() == 0.0) {</span>
+<span class="pc bpc" id="L110" title="2 of 4 branches missed.">        if (divisor instanceof NumberExpr number &amp;&amp; number.value().equalsInteger(0)) {</span>
 <span class="nc" id="L111">            throw new IllegalArgumentException(&quot;Cannot divide an inequality by zero&quot;);</span>
         }
 <span class="fc" id="L113">        Sign sign = signOf(divisor);</span>
@@ -154,10 +154,10 @@ import java.util.Objects;
 
     private static Sign signOf(Expr expr) {
 <span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (expr instanceof NumberExpr number) {</span>
-<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (number.value() &gt; 0) {</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (number.value().signum() &gt; 0) {</span>
 <span class="fc" id="L158">                return Sign.POSITIVE;</span>
             }
-<span class="pc bpc" id="L160" title="1 of 2 branches missed.">            if (number.value() &lt; 0) {</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">            if (number.value().signum() &lt; 0) {</span>
 <span class="fc" id="L161">                return Sign.NEGATIVE;</span>
             }
 <span class="nc" id="L163">            return Sign.UNKNOWN;</span>
@@ -166,10 +166,10 @@ import java.util.Objects;
 <span class="nc bnc" id="L166" title="All 2 branches missed.">        if (expr instanceof BinaryExpr binary</span>
 <span class="nc bnc" id="L167" title="All 2 branches missed.">            &amp;&amp; binary.operator() == BinaryOperator.SUB</span>
 <span class="nc bnc" id="L168" title="All 2 branches missed.">            &amp;&amp; binary.left() instanceof NumberExpr zero</span>
-<span class="nc bnc" id="L169" title="All 2 branches missed.">            &amp;&amp; zero.value() == 0.0) {</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">            &amp;&amp; zero.value().equalsInteger(0)) {</span>
             // Inner is treated as positive if it is a positive literal,
             // otherwise unknown.
-<span class="nc bnc" id="L172" title="All 4 branches missed.">            if (binary.right() instanceof NumberExpr inner &amp;&amp; inner.value() &gt; 0) {</span>
+<span class="nc bnc" id="L172" title="All 4 branches missed.">            if (binary.right() instanceof NumberExpr inner &amp;&amp; inner.value().signum() &gt; 0) {</span>
 <span class="nc" id="L173">                return Sign.NEGATIVE;</span>
             }
         }

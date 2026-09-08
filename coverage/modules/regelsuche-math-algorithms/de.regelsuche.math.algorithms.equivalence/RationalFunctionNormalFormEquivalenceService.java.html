@@ -135,7 +135,7 @@ import java.util.Optional;
     private RationalFunction convert(Expr expression) {
 <span class="fc bfc" id="L136" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
 <span class="fc" id="L137">            return RationalFunction.polynomial(</span>
-<span class="fc" id="L138">                Polynomial.constant(Rational.fromDouble(number.value())));</span>
+<span class="fc" id="L138">                Polynomial.constant(Rational.fromExact(number.value())));</span>
         }
 <span class="fc bfc" id="L140" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
 <span class="fc" id="L141">            return RationalFunction.polynomial(</span>
@@ -193,7 +193,7 @@ import java.util.Optional;
     private List&lt;Polynomial&gt; nonZeroValueFactors(Expr expression) {
 <span class="fc bfc" id="L194" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
 <span class="fc" id="L195">            Polynomial value = Polynomial.constant(</span>
-<span class="fc" id="L196">                Rational.fromDouble(number.value()));</span>
+<span class="fc" id="L196">                Rational.fromExact(number.value()));</span>
 <span class="pc bpc" id="L197" title="1 of 2 branches missed.">            return value.isZero() ? List.of(value) : List.of();</span>
         }
 <span class="fc bfc" id="L199" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
@@ -233,12 +233,12 @@ import java.util.Optional;
 <span class="nc" id="L233">            throw new UnsupportedExpression(</span>
                 &quot;rational powers require an explicit non-negative integer&quot;);
         }
-<span class="fc" id="L236">        double raw = exponentNumber.value();</span>
-<span class="pc bpc" id="L237" title="3 of 6 branches missed.">        if (raw != Math.rint(raw) || raw &lt; 0 || raw &gt; MAX_POWER) {</span>
+<span class="fc" id="L236">        var raw = exponentNumber.value();</span>
+<span class="pc bpc" id="L237" title="3 of 6 branches missed.">        if (!raw.isInteger() || raw.signum() &lt; 0 || raw.numerator().compareTo(java.math.BigInteger.valueOf(MAX_POWER)) &gt; 0) {</span>
 <span class="nc" id="L238">            throw new UnsupportedExpression(</span>
                 &quot;rational power exponent is outside 0..&quot; + MAX_POWER);
         }
-<span class="fc" id="L241">        return (int) raw;</span>
+<span class="fc" id="L241">        return raw.intValueExact();</span>
     }
 
     private List&lt;String&gt; requiredFactorKeys(

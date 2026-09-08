@@ -56,11 +56,11 @@ final class ExprMatcherEngine {
 <span class="fc bfc" id="L56" title="All 2 branches covered.">        if (matcher instanceof ExprMatcher.Any) {</span>
 <span class="fc" id="L57">            return List.of(state.traced(&quot;any&quot;));</span>
         }
-<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (matcher instanceof ExprMatcher.LiteralNumber literal) {</span>
-<span class="nc" id="L60">            return expression instanceof NumberExpr number</span>
-<span class="nc bnc" id="L61" title="All 4 branches missed.">                    &amp;&amp; Double.compare(number.value(), literal.value()) == 0</span>
-<span class="nc" id="L62">                ? List.of(state.traced(&quot;literal-number&quot;))</span>
-<span class="nc" id="L63">                : List.of();</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (matcher instanceof ExprMatcher.LiteralNumber literal) {</span>
+<span class="fc" id="L60">            return expression instanceof NumberExpr number</span>
+<span class="pc bpc" id="L61" title="1 of 4 branches missed.">                    &amp;&amp; number.value().equals(literal.value())</span>
+<span class="fc" id="L62">                ? List.of(state.traced(&quot;literal-number&quot;))</span>
+<span class="fc" id="L63">                : List.of();</span>
         }
 <span class="fc bfc" id="L65" title="All 2 branches covered.">        if (matcher instanceof ExprMatcher.LiteralVariable literal) {</span>
 <span class="fc" id="L66">            return expression instanceof VariableExpr variable</span>
@@ -558,58 +558,57 @@ final class ExprMatcherEngine {
         Expr expression,
         ExprMatcher.NumberPropertyKind kind
     ) {
-<span class="pc bpc" id="L561" title="1 of 2 branches missed.">        if (!(expression instanceof NumberExpr number)</span>
-<span class="pc bpc" id="L562" title="1 of 2 branches missed.">                || !Double.isFinite(number.value())) {</span>
-<span class="nc" id="L563">            return false;</span>
+<span class="pc bpc" id="L561" title="1 of 2 branches missed.">        if (!(expression instanceof NumberExpr number)) {</span>
+<span class="nc" id="L562">            return false;</span>
         }
-<span class="pc bpc" id="L565" title="1 of 3 branches missed.">        return switch (kind) {</span>
-<span class="fc" id="L566">            case NUMBER_LITERAL -&gt; true;</span>
-<span class="nc bnc" id="L567" title="All 2 branches missed.">            case INTEGER_LITERAL -&gt; number.value() == Math.rint(number.value());</span>
-<span class="fc bfc" id="L568" title="All 2 branches covered.">            case NON_ZERO_NUMBER_LITERAL -&gt; number.value() != 0.0;</span>
+<span class="pc bpc" id="L564" title="1 of 3 branches missed.">        return switch (kind) {</span>
+<span class="fc" id="L565">            case NUMBER_LITERAL -&gt; true;</span>
+<span class="nc" id="L566">            case INTEGER_LITERAL -&gt; number.value().isInteger();</span>
+<span class="fc bfc" id="L567" title="All 2 branches covered.">            case NON_ZERO_NUMBER_LITERAL -&gt; !number.value().equalsInteger(0);</span>
         };
     }
 
     private static List&lt;Integer&gt; append(List&lt;Integer&gt; path, int index) {
-<span class="fc" id="L573">        List&lt;Integer&gt; result = new ArrayList&lt;&gt;(path.size() + 1);</span>
-<span class="fc" id="L574">        result.addAll(path);</span>
-<span class="fc" id="L575">        result.add(index);</span>
-<span class="fc" id="L576">        return List.copyOf(result);</span>
+<span class="fc" id="L572">        List&lt;Integer&gt; result = new ArrayList&lt;&gt;(path.size() + 1);</span>
+<span class="fc" id="L573">        result.addAll(path);</span>
+<span class="fc" id="L574">        result.add(index);</span>
+<span class="fc" id="L575">        return List.copyOf(result);</span>
     }
 
     private static final class Session {
         private final ExprMatcher.MatchOptions options;
-<span class="fc" id="L581">        private final Set&lt;ExprMatcher.MatchDiagnostic&gt; diagnostics =</span>
+<span class="fc" id="L580">        private final Set&lt;ExprMatcher.MatchDiagnostic&gt; diagnostics =</span>
             new LinkedHashSet&lt;&gt;();
         private int steps;
         private int patternBranches;
         private boolean stepLimitReported;
 
-<span class="fc" id="L587">        private Session(ExprMatcher.MatchOptions options) {</span>
-<span class="fc" id="L588">            this.options = options;</span>
-<span class="fc" id="L589">        }</span>
+<span class="fc" id="L586">        private Session(ExprMatcher.MatchOptions options) {</span>
+<span class="fc" id="L587">            this.options = options;</span>
+<span class="fc" id="L588">        }</span>
 
         private boolean consumeStep(String descriptor) {
-<span class="pc bpc" id="L592" title="1 of 2 branches missed.">            if (steps &lt; options.maxSteps()) {</span>
-<span class="fc" id="L593">                steps++;</span>
-<span class="fc" id="L594">                return true;</span>
+<span class="pc bpc" id="L591" title="1 of 2 branches missed.">            if (steps &lt; options.maxSteps()) {</span>
+<span class="fc" id="L592">                steps++;</span>
+<span class="fc" id="L593">                return true;</span>
             }
-<span class="nc bnc" id="L596" title="All 2 branches missed.">            if (!stepLimitReported) {</span>
-<span class="nc" id="L597">                diagnostic(&quot;MATCH_STEP_LIMIT&quot;, descriptor);</span>
-<span class="nc" id="L598">                stepLimitReported = true;</span>
+<span class="nc bnc" id="L595" title="All 2 branches missed.">            if (!stepLimitReported) {</span>
+<span class="nc" id="L596">                diagnostic(&quot;MATCH_STEP_LIMIT&quot;, descriptor);</span>
+<span class="nc" id="L597">                stepLimitReported = true;</span>
             }
-<span class="nc" id="L600">            return false;</span>
+<span class="nc" id="L599">            return false;</span>
         }
 
         private void diagnostic(String code, String descriptor) {
-<span class="fc" id="L604">            diagnostics.add(new ExprMatcher.MatchDiagnostic(code, descriptor));</span>
-<span class="fc" id="L605">        }</span>
+<span class="fc" id="L603">            diagnostics.add(new ExprMatcher.MatchDiagnostic(code, descriptor));</span>
+<span class="fc" id="L604">        }</span>
 
         private List&lt;State&gt; limit(List&lt;State&gt; states, String descriptor) {
-<span class="pc bpc" id="L608" title="1 of 2 branches missed.">            if (states.size() &lt;= options.maxResults()) {</span>
-<span class="fc" id="L609">                return List.copyOf(states);</span>
+<span class="pc bpc" id="L607" title="1 of 2 branches missed.">            if (states.size() &lt;= options.maxResults()) {</span>
+<span class="fc" id="L608">                return List.copyOf(states);</span>
             }
-<span class="nc" id="L611">            diagnostic(&quot;MATCH_RESULT_LIMIT&quot;, descriptor);</span>
-<span class="nc" id="L612">            return List.copyOf(states.subList(0, options.maxResults()));</span>
+<span class="nc" id="L610">            diagnostic(&quot;MATCH_RESULT_LIMIT&quot;, descriptor);</span>
+<span class="nc" id="L611">            return List.copyOf(states.subList(0, options.maxResults()));</span>
         }
     }
 
@@ -620,17 +619,17 @@ final class ExprMatcherEngine {
         ExprMatcher.RecognitionStrength recognitionStrength,
         List&lt;String&gt; trace
     ) {
-<span class="fc" id="L623">        private State {</span>
-<span class="fc" id="L624">            bindings = Map.copyOf(bindings);</span>
-<span class="fc" id="L625">            representative = Objects.requireNonNull(</span>
+<span class="fc" id="L622">        private State {</span>
+<span class="fc" id="L623">            bindings = Map.copyOf(bindings);</span>
+<span class="fc" id="L624">            representative = Objects.requireNonNull(</span>
                 representative, &quot;representative&quot;);
-<span class="fc" id="L627">            recognitionStrength = Objects.requireNonNull(</span>
+<span class="fc" id="L626">            recognitionStrength = Objects.requireNonNull(</span>
                 recognitionStrength, &quot;recognitionStrength&quot;);
-<span class="fc" id="L629">            trace = List.copyOf(trace);</span>
-<span class="fc" id="L630">        }</span>
+<span class="fc" id="L628">            trace = List.copyOf(trace);</span>
+<span class="fc" id="L629">        }</span>
 
         private State withBindings(Map&lt;String, Expr&gt; replacements) {
-<span class="fc" id="L633">            return new State(</span>
+<span class="fc" id="L632">            return new State(</span>
                 replacements,
                 representative,
                 representativeIndex,
@@ -640,19 +639,19 @@ final class ExprMatcherEngine {
         }
 
         private State withBinding(String name, Expr expression) {
-<span class="fc" id="L643">            Map&lt;String, Expr&gt; updated = new HashMap&lt;&gt;(bindings);</span>
-<span class="fc" id="L644">            updated.put(name, expression);</span>
-<span class="fc" id="L645">            return withBindings(updated);</span>
+<span class="fc" id="L642">            Map&lt;String, Expr&gt; updated = new HashMap&lt;&gt;(bindings);</span>
+<span class="fc" id="L643">            updated.put(name, expression);</span>
+<span class="fc" id="L644">            return withBindings(updated);</span>
         }
 
         private State withStrength(
             ExprMatcher.RecognitionStrength strength
         ) {
-<span class="fc" id="L651">            return new State(</span>
+<span class="fc" id="L650">            return new State(</span>
                 bindings,
                 representative,
                 representativeIndex,
-<span class="fc" id="L655">                ExprMatcher.RecognitionStrength.strongest(</span>
+<span class="fc" id="L654">                ExprMatcher.RecognitionStrength.strongest(</span>
                     recognitionStrength, strength),
                 trace
             );
@@ -664,25 +663,25 @@ final class ExprMatcherEngine {
             int matchedRepresentativeIndex,
             boolean replaceRootRepresentative
         ) {
-<span class="fc" id="L667">            return new State(</span>
+<span class="fc" id="L666">            return new State(</span>
                 bindings,
-<span class="fc bfc" id="L669" title="All 2 branches covered.">                replaceRootRepresentative</span>
-<span class="fc" id="L670">                    ? matchedRepresentative</span>
-<span class="fc" id="L671">                    : representative,</span>
-<span class="fc bfc" id="L672" title="All 2 branches covered.">                replaceRootRepresentative</span>
-<span class="fc" id="L673">                    ? matchedRepresentativeIndex</span>
-<span class="fc" id="L674">                    : representativeIndex,</span>
-<span class="fc" id="L675">                ExprMatcher.RecognitionStrength.strongest(</span>
+<span class="fc bfc" id="L668" title="All 2 branches covered.">                replaceRootRepresentative</span>
+<span class="fc" id="L669">                    ? matchedRepresentative</span>
+<span class="fc" id="L670">                    : representative,</span>
+<span class="fc bfc" id="L671" title="All 2 branches covered.">                replaceRootRepresentative</span>
+<span class="fc" id="L672">                    ? matchedRepresentativeIndex</span>
+<span class="fc" id="L673">                    : representativeIndex,</span>
+<span class="fc" id="L674">                ExprMatcher.RecognitionStrength.strongest(</span>
                     recognitionStrength, strength),
                 trace
             );
         }
 
         private State traced(String entry) {
-<span class="fc" id="L682">            List&lt;String&gt; updated = new ArrayList&lt;&gt;(trace.size() + 1);</span>
-<span class="fc" id="L683">            updated.addAll(trace);</span>
-<span class="fc" id="L684">            updated.add(entry);</span>
-<span class="fc" id="L685">            return new State(</span>
+<span class="fc" id="L681">            List&lt;String&gt; updated = new ArrayList&lt;&gt;(trace.size() + 1);</span>
+<span class="fc" id="L682">            updated.addAll(trace);</span>
+<span class="fc" id="L683">            updated.add(entry);</span>
+<span class="fc" id="L684">            return new State(</span>
                 bindings,
                 representative,
                 representativeIndex,
@@ -692,7 +691,7 @@ final class ExprMatcherEngine {
         }
 
         private ExprMatcher.MatchResult toResult() {
-<span class="fc" id="L695">            return new ExprMatcher.MatchResult(</span>
+<span class="fc" id="L694">            return new ExprMatcher.MatchResult(</span>
                 bindings,
                 representative,
                 representativeIndex,
@@ -702,17 +701,17 @@ final class ExprMatcherEngine {
         }
     }
 
-<span class="fc" id="L705">    private record Comparison(</span>
+<span class="fc" id="L704">    private record Comparison(</span>
         boolean matched,
         ExprMatcher.RecognitionStrength strength
     ) {
         private static Comparison exact() {
-<span class="nc" id="L710">            return new Comparison(</span>
+<span class="nc" id="L709">            return new Comparison(</span>
                 true, ExprMatcher.RecognitionStrength.EXACT);
         }
 
         private static Comparison noMatch() {
-<span class="fc" id="L715">            return new Comparison(</span>
+<span class="fc" id="L714">            return new Comparison(</span>
                 false, ExprMatcher.RecognitionStrength.EXACT);
         }
     }

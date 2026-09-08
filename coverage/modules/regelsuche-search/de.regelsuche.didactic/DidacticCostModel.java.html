@@ -187,11 +187,11 @@ public final class DidacticCostModel implements CostModel {
 
     private static int largeCoefficientPenalty(Expr expression) {
 <span class="fc bfc" id="L189" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
-<span class="fc" id="L190">            double abs = Math.abs(number.value());</span>
-<span class="fc bfc" id="L191" title="All 2 branches covered.">            if (abs &gt; 1000) {</span>
+<span class="fc" id="L190">            var abs = number.value().abs();</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            if (abs.compareTo(de.regelsuche.scalar.ExactRational.integer(1000)) &gt; 0) {</span>
 <span class="fc" id="L192">                return 4;</span>
             }
-<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            if (abs &gt; 100) {</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            if (abs.compareTo(de.regelsuche.scalar.ExactRational.integer(100)) &gt; 0) {</span>
 <span class="nc" id="L195">                return 2;</span>
             }
 <span class="fc" id="L197">            return 0;</span>

@@ -214,7 +214,7 @@ public class SearchBenchmark {
             }
             Step step;
 <span class="fc bfc" id="L216" title="All 2 branches covered.">            if (value instanceof NumberValue number) {</span>
-<span class="fc" id="L217">                step = Step.number(number.value());</span>
+<span class="fc" id="L217">                step = Step.number(number.value().toBigDecimal(java.math.MathContext.DECIMAL128).doubleValue());</span>
 <span class="fc bfc" id="L218" title="All 2 branches covered.">            } else if (value instanceof VariableValue variable) {</span>
 <span class="fc" id="L219">                step = Step.variable(variable.name());</span>
 <span class="fc bfc" id="L220" title="All 2 branches covered.">            } else if (value instanceof OrderedValue ordered) {</span>

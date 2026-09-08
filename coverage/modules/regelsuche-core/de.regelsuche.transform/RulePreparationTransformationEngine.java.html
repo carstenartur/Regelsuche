@@ -431,36 +431,35 @@ public final class RulePreparationTransformationEngine
 <span class="fc" id="L431">        StringBuilder descriptor = new StringBuilder();</span>
 <span class="fc bfc" id="L432" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
 <span class="fc" id="L433">            appendToken(descriptor, &quot;number&quot;);</span>
-<span class="fc" id="L434">            appendToken(descriptor, Long.toHexString(</span>
-<span class="fc" id="L435">                Double.doubleToLongBits(number.value())));</span>
-<span class="fc bfc" id="L436" title="All 2 branches covered.">        } else if (expression instanceof VariableExpr variable) {</span>
-<span class="fc" id="L437">            appendToken(descriptor, &quot;variable&quot;);</span>
-<span class="fc" id="L438">            appendToken(descriptor, variable.name());</span>
-<span class="fc bfc" id="L439" title="All 2 branches covered.">        } else if (expression instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L440">            appendToken(descriptor, &quot;binary&quot;);</span>
-<span class="fc" id="L441">            appendToken(descriptor, binary.operator().name());</span>
-<span class="fc" id="L442">            appendToken(descriptor, fingerprint(binary.left(), retained));</span>
-<span class="fc" id="L443">            appendToken(descriptor, fingerprint(binary.right(), retained));</span>
-<span class="pc bpc" id="L444" title="1 of 2 branches missed.">        } else if (expression instanceof FunctionExpr function) {</span>
-<span class="fc" id="L445">            appendToken(descriptor, &quot;function&quot;);</span>
-<span class="fc" id="L446">            appendToken(descriptor, function.name());</span>
-<span class="fc" id="L447">            appendToken(descriptor, Integer.toString(</span>
-<span class="fc" id="L448">                function.arguments().size()));</span>
-<span class="fc" id="L449">            function.arguments().forEach(argument -&gt;</span>
-<span class="fc" id="L450">                appendToken(descriptor, fingerprint(argument, retained)));</span>
+<span class="fc" id="L434">            appendToken(descriptor, number.value().canonicalText());</span>
+<span class="fc bfc" id="L435" title="All 2 branches covered.">        } else if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L436">            appendToken(descriptor, &quot;variable&quot;);</span>
+<span class="fc" id="L437">            appendToken(descriptor, variable.name());</span>
+<span class="fc bfc" id="L438" title="All 2 branches covered.">        } else if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L439">            appendToken(descriptor, &quot;binary&quot;);</span>
+<span class="fc" id="L440">            appendToken(descriptor, binary.operator().name());</span>
+<span class="fc" id="L441">            appendToken(descriptor, fingerprint(binary.left(), retained));</span>
+<span class="fc" id="L442">            appendToken(descriptor, fingerprint(binary.right(), retained));</span>
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L444">            appendToken(descriptor, &quot;function&quot;);</span>
+<span class="fc" id="L445">            appendToken(descriptor, function.name());</span>
+<span class="fc" id="L446">            appendToken(descriptor, Integer.toString(</span>
+<span class="fc" id="L447">                function.arguments().size()));</span>
+<span class="fc" id="L448">            function.arguments().forEach(argument -&gt;</span>
+<span class="fc" id="L449">                appendToken(descriptor, fingerprint(argument, retained)));</span>
         } else {
-<span class="nc" id="L452">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L451">            throw new IllegalArgumentException(</span>
                 &quot;unsupported expression type: &quot;
-<span class="nc" id="L454">                    + expression.getClass().getName());</span>
+<span class="nc" id="L453">                    + expression.getClass().getName());</span>
         }
-<span class="fc" id="L456">        String fingerprint = sha256(descriptor.toString());</span>
-<span class="fc" id="L457">        retained.put(expression, fingerprint);</span>
-<span class="fc" id="L458">        return fingerprint;</span>
+<span class="fc" id="L455">        String fingerprint = sha256(descriptor.toString());</span>
+<span class="fc" id="L456">        retained.put(expression, fingerprint);</span>
+<span class="fc" id="L457">        return fingerprint;</span>
     }
 
     private static void appendToken(StringBuilder target, String value) {
-<span class="fc" id="L462">        target.append(value.length()).append(':').append(value);</span>
-<span class="fc" id="L463">    }</span>
+<span class="fc" id="L461">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L462">    }</span>
 
     private static void collect(
         Expr expression,
@@ -468,35 +467,35 @@ public final class RulePreparationTransformationEngine
         IdentityHashMap&lt;Expr, String&gt; subtreeHashes,
         List&lt;PositionedNode&gt; result
     ) {
-<span class="fc" id="L471">        result.add(new PositionedNode(</span>
+<span class="fc" id="L470">        result.add(new PositionedNode(</span>
             expression,
             path,
-<span class="fc" id="L474">            Objects.requireNonNull(</span>
-<span class="fc" id="L475">                subtreeHashes.get(expression),</span>
+<span class="fc" id="L473">            Objects.requireNonNull(</span>
+<span class="fc" id="L474">                subtreeHashes.get(expression),</span>
                 &quot;subtree fingerprint&quot;)));
-<span class="fc bfc" id="L477" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L478">            collect(binary.left(), append(path, 0), subtreeHashes, result);</span>
-<span class="fc" id="L479">            collect(binary.right(), append(path, 1), subtreeHashes, result);</span>
-<span class="fc bfc" id="L480" title="All 2 branches covered.">        } else if (expression instanceof FunctionExpr function) {</span>
-<span class="fc" id="L481">            for (int index = 0;</span>
-<span class="fc bfc" id="L482" title="All 2 branches covered.">                    index &lt; function.arguments().size();</span>
-<span class="fc" id="L483">                    index++) {</span>
-<span class="fc" id="L484">                collect(</span>
-<span class="fc" id="L485">                    function.arguments().get(index),</span>
-<span class="fc" id="L486">                    append(path, index),</span>
+<span class="fc bfc" id="L476" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L477">            collect(binary.left(), append(path, 0), subtreeHashes, result);</span>
+<span class="fc" id="L478">            collect(binary.right(), append(path, 1), subtreeHashes, result);</span>
+<span class="fc bfc" id="L479" title="All 2 branches covered.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L480">            for (int index = 0;</span>
+<span class="fc bfc" id="L481" title="All 2 branches covered.">                    index &lt; function.arguments().size();</span>
+<span class="fc" id="L482">                    index++) {</span>
+<span class="fc" id="L483">                collect(</span>
+<span class="fc" id="L484">                    function.arguments().get(index),</span>
+<span class="fc" id="L485">                    append(path, index),</span>
                     subtreeHashes,
                     result);
             }
         }
-<span class="fc" id="L491">    }</span>
+<span class="fc" id="L490">    }</span>
 
     private static List&lt;Integer&gt; append(
         List&lt;Integer&gt; path,
         int component
     ) {
-<span class="fc" id="L497">        List&lt;Integer&gt; appended = new ArrayList&lt;&gt;(path);</span>
-<span class="fc" id="L498">        appended.add(component);</span>
-<span class="fc" id="L499">        return List.copyOf(appended);</span>
+<span class="fc" id="L496">        List&lt;Integer&gt; appended = new ArrayList&lt;&gt;(path);</span>
+<span class="fc" id="L497">        appended.add(component);</span>
+<span class="fc" id="L498">        return List.copyOf(appended);</span>
     }
 
     private static Expr replaceAt(
@@ -505,84 +504,84 @@ public final class RulePreparationTransformationEngine
         int pathIndex,
         Expr replacement
     ) {
-<span class="fc bfc" id="L508" title="All 2 branches covered.">        if (pathIndex == path.size()) {</span>
-<span class="fc" id="L509">            return replacement;</span>
+<span class="fc bfc" id="L507" title="All 2 branches covered.">        if (pathIndex == path.size()) {</span>
+<span class="fc" id="L508">            return replacement;</span>
         }
-<span class="fc" id="L511">        int component = path.get(pathIndex);</span>
-<span class="fc bfc" id="L512" title="All 2 branches covered.">        if (current instanceof BinaryExpr binary) {</span>
-<span class="fc bfc" id="L513" title="All 2 branches covered.">            if (component == 0) {</span>
-<span class="fc" id="L514">                return new BinaryExpr(</span>
-<span class="fc" id="L515">                    replaceAt(</span>
-<span class="fc" id="L516">                        binary.left(),</span>
+<span class="fc" id="L510">        int component = path.get(pathIndex);</span>
+<span class="fc bfc" id="L511" title="All 2 branches covered.">        if (current instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L512" title="All 2 branches covered.">            if (component == 0) {</span>
+<span class="fc" id="L513">                return new BinaryExpr(</span>
+<span class="fc" id="L514">                    replaceAt(</span>
+<span class="fc" id="L515">                        binary.left(),</span>
                         path,
                         pathIndex + 1,
                         replacement),
-<span class="fc" id="L520">                    binary.operator(),</span>
-<span class="fc" id="L521">                    binary.right());</span>
+<span class="fc" id="L519">                    binary.operator(),</span>
+<span class="fc" id="L520">                    binary.right());</span>
             }
-<span class="pc bpc" id="L523" title="1 of 2 branches missed.">            if (component == 1) {</span>
-<span class="fc" id="L524">                return new BinaryExpr(</span>
-<span class="fc" id="L525">                    binary.left(),</span>
-<span class="fc" id="L526">                    binary.operator(),</span>
-<span class="fc" id="L527">                    replaceAt(</span>
-<span class="fc" id="L528">                        binary.right(),</span>
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">            if (component == 1) {</span>
+<span class="fc" id="L523">                return new BinaryExpr(</span>
+<span class="fc" id="L524">                    binary.left(),</span>
+<span class="fc" id="L525">                    binary.operator(),</span>
+<span class="fc" id="L526">                    replaceAt(</span>
+<span class="fc" id="L527">                        binary.right(),</span>
                         path,
                         pathIndex + 1,
                         replacement));
             }
-<span class="nc" id="L533">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L532">            throw new IllegalArgumentException(</span>
                 &quot;binary path component must be 0 or 1&quot;);
         }
-<span class="pc bpc" id="L536" title="1 of 2 branches missed.">        if (current instanceof FunctionExpr function) {</span>
-<span class="pc bpc" id="L537" title="1 of 2 branches missed.">            if (component &lt; 0</span>
-<span class="pc bpc" id="L538" title="1 of 2 branches missed.">                    || component &gt;= function.arguments().size()) {</span>
-<span class="nc" id="L539">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L535" title="1 of 2 branches missed.">        if (current instanceof FunctionExpr function) {</span>
+<span class="pc bpc" id="L536" title="1 of 2 branches missed.">            if (component &lt; 0</span>
+<span class="pc bpc" id="L537" title="1 of 2 branches missed.">                    || component &gt;= function.arguments().size()) {</span>
+<span class="nc" id="L538">                throw new IllegalArgumentException(</span>
                     &quot;function path component out of bounds&quot;);
             }
-<span class="fc" id="L542">            List&lt;Expr&gt; arguments = new ArrayList&lt;&gt;(function.arguments());</span>
-<span class="fc" id="L543">            arguments.set(</span>
+<span class="fc" id="L541">            List&lt;Expr&gt; arguments = new ArrayList&lt;&gt;(function.arguments());</span>
+<span class="fc" id="L542">            arguments.set(</span>
                 component,
-<span class="fc" id="L545">                replaceAt(</span>
-<span class="fc" id="L546">                    arguments.get(component),</span>
+<span class="fc" id="L544">                replaceAt(</span>
+<span class="fc" id="L545">                    arguments.get(component),</span>
                     path,
                     pathIndex + 1,
                     replacement));
-<span class="fc" id="L550">            return new FunctionExpr(function.name(), arguments);</span>
+<span class="fc" id="L549">            return new FunctionExpr(function.name(), arguments);</span>
         }
-<span class="nc" id="L552">        throw new IllegalArgumentException(</span>
+<span class="nc" id="L551">        throw new IllegalArgumentException(</span>
             &quot;path descends through a leaf expression&quot;);
     }
 
     private static String positionKey(List&lt;Integer&gt; path) {
-<span class="fc bfc" id="L557" title="All 2 branches covered.">        if (path.isEmpty()) {</span>
-<span class="fc" id="L558">            return &quot;root&quot;;</span>
+<span class="fc bfc" id="L556" title="All 2 branches covered.">        if (path.isEmpty()) {</span>
+<span class="fc" id="L557">            return &quot;root&quot;;</span>
         }
-<span class="fc" id="L560">        return path.stream()</span>
-<span class="fc" id="L561">            .map(String::valueOf)</span>
-<span class="fc" id="L562">            .collect(java.util.stream.Collectors.joining(&quot;.&quot;));</span>
+<span class="fc" id="L559">        return path.stream()</span>
+<span class="fc" id="L560">            .map(String::valueOf)</span>
+<span class="fc" id="L561">            .collect(java.util.stream.Collectors.joining(&quot;.&quot;));</span>
     }
 
     private static Set&lt;String&gt; ruleIds(List&lt;RewriteRule&gt; rules) {
-<span class="fc" id="L566">        Objects.requireNonNull(rules, &quot;rules&quot;);</span>
-<span class="fc" id="L567">        Set&lt;String&gt; ids = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L568" title="All 2 branches covered.">        for (RewriteRule rule : rules) {</span>
-<span class="fc" id="L569">            ids.add(Objects.requireNonNull(rule, &quot;rule&quot;).id());</span>
-<span class="fc" id="L570">        }</span>
-<span class="fc" id="L571">        return Set.copyOf(ids);</span>
+<span class="fc" id="L565">        Objects.requireNonNull(rules, &quot;rules&quot;);</span>
+<span class="fc" id="L566">        Set&lt;String&gt; ids = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L567" title="All 2 branches covered.">        for (RewriteRule rule : rules) {</span>
+<span class="fc" id="L568">            ids.add(Objects.requireNonNull(rule, &quot;rule&quot;).id());</span>
+<span class="fc" id="L569">        }</span>
+<span class="fc" id="L570">        return Set.copyOf(ids);</span>
     }
 
     private static String idOnlyInventoryHash(Set&lt;String&gt; ruleIds) {
-<span class="fc" id="L575">        Objects.requireNonNull(ruleIds, &quot;ruleIds&quot;);</span>
-<span class="fc" id="L576">        return sha256(ruleIds.stream().sorted().toList().toString());</span>
+<span class="fc" id="L574">        Objects.requireNonNull(ruleIds, &quot;ruleIds&quot;);</span>
+<span class="fc" id="L575">        return sha256(ruleIds.stream().sorted().toList().toString());</span>
     }
 
     private static String sha256(String payload) {
         try {
-<span class="fc" id="L581">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
-<span class="fc" id="L582">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
-<span class="fc" id="L583">                    .digest(payload.getBytes(StandardCharsets.UTF_8)));</span>
-<span class="nc" id="L584">        } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L585">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+<span class="fc" id="L580">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L581">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L582">                    .digest(payload.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L583">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L584">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
         }
     }
 
@@ -590,13 +589,13 @@ public final class RulePreparationTransformationEngine
         List&lt;Transformation&gt; transformations,
         CacheMetrics cacheMetrics
     ) {
-<span class="fc" id="L593">        public Execution {</span>
-<span class="fc" id="L594">            transformations = List.copyOf(</span>
-<span class="fc" id="L595">                Objects.requireNonNull(transformations, &quot;transformations&quot;));</span>
-<span class="fc" id="L596">            cacheMetrics = Objects.requireNonNull(</span>
+<span class="fc" id="L592">        public Execution {</span>
+<span class="fc" id="L593">            transformations = List.copyOf(</span>
+<span class="fc" id="L594">                Objects.requireNonNull(transformations, &quot;transformations&quot;));</span>
+<span class="fc" id="L595">            cacheMetrics = Objects.requireNonNull(</span>
                 cacheMetrics,
                 &quot;cacheMetrics&quot;);
-<span class="fc" id="L599">        }</span>
+<span class="fc" id="L598">        }</span>
     }
 
     public record CacheMetrics(
@@ -610,18 +609,18 @@ public final class RulePreparationTransformationEngine
         int preparedVerifications,
         int skippedUnverifiable
     ) {
-<span class="fc" id="L613">        public CacheMetrics {</span>
-<span class="pc bpc" id="L614" title="9 of 20 branches missed.">            if (lookups &lt; 0 || hits &lt; 0 || misses &lt; 0</span>
+<span class="fc" id="L612">        public CacheMetrics {</span>
+<span class="pc bpc" id="L613" title="9 of 20 branches missed.">            if (lookups &lt; 0 || hits &lt; 0 || misses &lt; 0</span>
                     || retainedEntries &lt; 0 || evictions &lt; 0
                     || skippedInconclusive &lt; 0
                     || skippedZeroSolverWork &lt; 0
                     || preparedVerifications &lt; 0
                     || skippedUnverifiable &lt; 0
                     || lookups != hits + misses) {
-<span class="fc" id="L621">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L620">                throw new IllegalArgumentException(</span>
                     &quot;cache metrics must be non-negative and balanced&quot;);
             }
-<span class="fc" id="L624">        }</span>
+<span class="fc" id="L623">        }</span>
     }
 
     private record CacheKey(
@@ -632,21 +631,21 @@ public final class RulePreparationTransformationEngine
         String ruleInventoryHash,
         String budgetIdentity
     ) {
-<span class="fc" id="L635">        private CacheKey {</span>
-<span class="fc" id="L636">            Objects.requireNonNull(plannerId, &quot;plannerId&quot;);</span>
-<span class="fc" id="L637">            Objects.requireNonNull(principalRuleId, &quot;principalRuleId&quot;);</span>
-<span class="fc" id="L638">            Objects.requireNonNull(subtreeHash, &quot;subtreeHash&quot;);</span>
-<span class="fc" id="L639">            Objects.requireNonNull(</span>
+<span class="fc" id="L634">        private CacheKey {</span>
+<span class="fc" id="L635">            Objects.requireNonNull(plannerId, &quot;plannerId&quot;);</span>
+<span class="fc" id="L636">            Objects.requireNonNull(principalRuleId, &quot;principalRuleId&quot;);</span>
+<span class="fc" id="L637">            Objects.requireNonNull(subtreeHash, &quot;subtreeHash&quot;);</span>
+<span class="fc" id="L638">            Objects.requireNonNull(</span>
                 assumptionFingerprint,
                 &quot;assumptionFingerprint&quot;);
-<span class="fc" id="L642">            Objects.requireNonNull(ruleInventoryHash, &quot;ruleInventoryHash&quot;);</span>
-<span class="fc" id="L643">            Objects.requireNonNull(budgetIdentity, &quot;budgetIdentity&quot;);</span>
-<span class="fc" id="L644">        }</span>
+<span class="fc" id="L641">            Objects.requireNonNull(ruleInventoryHash, &quot;ruleInventoryHash&quot;);</span>
+<span class="fc" id="L642">            Objects.requireNonNull(budgetIdentity, &quot;budgetIdentity&quot;);</span>
+<span class="fc" id="L643">        }</span>
     }
 
     private static final class PreparationMemoizer {
         private final int maxEntries;
-<span class="fc" id="L649">        private final Map&lt;CacheKey, RulePreparationPlanner.PlanAttempt&gt; entries =</span>
+<span class="fc" id="L648">        private final Map&lt;CacheKey, RulePreparationPlanner.PlanAttempt&gt; entries =</span>
             new LinkedHashMap&lt;&gt;();
         private int lookups;
         private int hits;
@@ -657,59 +656,59 @@ public final class RulePreparationTransformationEngine
         private int preparedVerifications;
         private int skippedUnverifiable;
 
-<span class="fc" id="L660">        private PreparationMemoizer(int maxEntries) {</span>
-<span class="fc" id="L661">            this.maxEntries = maxEntries;</span>
-<span class="fc" id="L662">        }</span>
+<span class="fc" id="L659">        private PreparationMemoizer(int maxEntries) {</span>
+<span class="fc" id="L660">            this.maxEntries = maxEntries;</span>
+<span class="fc" id="L661">        }</span>
 
         private RulePreparationPlanner.PlanAttempt find(CacheKey key) {
-<span class="fc" id="L665">            lookups++;</span>
-<span class="fc" id="L666">            RulePreparationPlanner.PlanAttempt attempt = entries.get(key);</span>
-<span class="fc bfc" id="L667" title="All 2 branches covered.">            if (attempt == null) {</span>
-<span class="fc" id="L668">                misses++;</span>
+<span class="fc" id="L664">            lookups++;</span>
+<span class="fc" id="L665">            RulePreparationPlanner.PlanAttempt attempt = entries.get(key);</span>
+<span class="fc bfc" id="L666" title="All 2 branches covered.">            if (attempt == null) {</span>
+<span class="fc" id="L667">                misses++;</span>
             } else {
-<span class="fc" id="L670">                hits++;</span>
+<span class="fc" id="L669">                hits++;</span>
             }
-<span class="fc" id="L672">            return attempt;</span>
+<span class="fc" id="L671">            return attempt;</span>
         }
 
         private void retain(
             CacheKey key,
             RulePreparationPlanner.PlanAttempt attempt
         ) {
-<span class="fc bfc" id="L679" title="All 2 branches covered.">            if (attempt.status()</span>
+<span class="fc bfc" id="L678" title="All 2 branches covered.">            if (attempt.status()</span>
                     == RulePreparationPlanner.Status.BUDGET_INCONCLUSIVE) {
-<span class="fc" id="L681">                skippedInconclusive++;</span>
-<span class="fc" id="L682">                return;</span>
+<span class="fc" id="L680">                skippedInconclusive++;</span>
+<span class="fc" id="L681">                return;</span>
             }
-<span class="fc bfc" id="L684" title="All 2 branches covered.">            if (attempt.work().consumedSolverAttempts() == 0) {</span>
-<span class="fc" id="L685">                skippedZeroSolverWork++;</span>
-<span class="fc" id="L686">                return;</span>
+<span class="fc bfc" id="L683" title="All 2 branches covered.">            if (attempt.work().consumedSolverAttempts() == 0) {</span>
+<span class="fc" id="L684">                skippedZeroSolverWork++;</span>
+<span class="fc" id="L685">                return;</span>
             }
-<span class="pc bpc" id="L688" title="1 of 4 branches missed.">            if (maxEntries == 0 || entries.containsKey(key)) {</span>
-<span class="fc" id="L689">                return;</span>
+<span class="pc bpc" id="L687" title="1 of 4 branches missed.">            if (maxEntries == 0 || entries.containsKey(key)) {</span>
+<span class="fc" id="L688">                return;</span>
             }
-<span class="fc bfc" id="L691" title="All 2 branches covered.">            if (entries.size() &gt;= maxEntries) {</span>
-<span class="fc" id="L692">                CacheKey oldest = entries.keySet().iterator().next();</span>
-<span class="fc" id="L693">                entries.remove(oldest);</span>
-<span class="fc" id="L694">                evictions++;</span>
+<span class="fc bfc" id="L690" title="All 2 branches covered.">            if (entries.size() &gt;= maxEntries) {</span>
+<span class="fc" id="L691">                CacheKey oldest = entries.keySet().iterator().next();</span>
+<span class="fc" id="L692">                entries.remove(oldest);</span>
+<span class="fc" id="L693">                evictions++;</span>
             }
-<span class="fc" id="L696">            entries.put(key, attempt);</span>
-<span class="fc" id="L697">        }</span>
+<span class="fc" id="L695">            entries.put(key, attempt);</span>
+<span class="fc" id="L696">        }</span>
 
         private void recordPreparedVerification() {
-<span class="fc" id="L700">            preparedVerifications++;</span>
-<span class="fc" id="L701">        }</span>
+<span class="fc" id="L699">            preparedVerifications++;</span>
+<span class="fc" id="L700">        }</span>
 
         private void recordUnverifiable() {
-<span class="nc" id="L704">            skippedUnverifiable++;</span>
-<span class="nc" id="L705">        }</span>
+<span class="nc" id="L703">            skippedUnverifiable++;</span>
+<span class="nc" id="L704">        }</span>
 
         private CacheMetrics metrics() {
-<span class="fc" id="L708">            return new CacheMetrics(</span>
+<span class="fc" id="L707">            return new CacheMetrics(</span>
                 lookups,
                 hits,
                 misses,
-<span class="fc" id="L712">                entries.size(),</span>
+<span class="fc" id="L711">                entries.size(),</span>
                 evictions,
                 skippedInconclusive,
                 skippedZeroSolverWork,
@@ -723,14 +722,14 @@ public final class RulePreparationTransformationEngine
         List&lt;Integer&gt; path,
         String subtreeHash
     ) {
-<span class="fc" id="L726">        private PositionedNode {</span>
-<span class="fc" id="L727">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
-<span class="fc" id="L728">            path = List.copyOf(Objects.requireNonNull(path, &quot;path&quot;));</span>
-<span class="pc bpc" id="L729" title="2 of 4 branches missed.">            if (subtreeHash == null || subtreeHash.isBlank()) {</span>
-<span class="nc" id="L730">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L725">        private PositionedNode {</span>
+<span class="fc" id="L726">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L727">            path = List.copyOf(Objects.requireNonNull(path, &quot;path&quot;));</span>
+<span class="pc bpc" id="L728" title="2 of 4 branches missed.">            if (subtreeHash == null || subtreeHash.isBlank()) {</span>
+<span class="nc" id="L729">                throw new IllegalArgumentException(</span>
                     &quot;subtreeHash must not be blank&quot;);
             }
-<span class="fc" id="L733">        }</span>
+<span class="fc" id="L732">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

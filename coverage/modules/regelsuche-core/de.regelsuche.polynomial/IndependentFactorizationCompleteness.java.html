@@ -1,0 +1,375 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IndependentFactorizationCompleteness.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.polynomial</a> &gt; <span class="el_source">IndependentFactorizationCompleteness.java</span></div><h1>IndependentFactorizationCompleteness.java</h1><pre class="source lang-java linenums">package de.regelsuche.polynomial;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Bounded independent completeness campaign for exact decompositions.
+ *
+ * &lt;p&gt;The campaign trusts neither a backend completeness claim nor its
+ * irreducibility evidence. It starts only after the enclosing verifier has
+ * reconstructed the exact source product. A candidate is complete precisely
+ * when its unresolved remainder is one and every distinct nonconstant factor
+ * receives an independent original-domain irreducibility certificate.&lt;/p&gt;
+ */
+final class IndependentFactorizationCompleteness {
+    static final String METHOD_ID =
+        &quot;regelsuche.factorization-completeness/v1&quot;;
+
+    private IndependentFactorizationCompleteness() {
+    }
+
+    static &lt;C&gt; Result verify(
+        FactorizationRequest&lt;C&gt; request,
+        List&lt;FactorizationVerifier.VerifiedCandidate&lt;C&gt;&gt; candidates,
+        long maxWorkUnits
+    ) {
+<span class="fc" id="L29">        String requestHash = PolynomialEvidence.sha256(</span>
+<span class="fc" id="L30">            request.canonicalMaterial());</span>
+<span class="fc" id="L31">        String sourceHash = PolynomialEvidence.sha256(</span>
+<span class="fc" id="L32">            request.source().canonicalMaterial());</span>
+<span class="fc" id="L33">        Budget work = new Budget(maxWorkUnits);</span>
+<span class="fc" id="L34">        ArrayList&lt;CandidateAttempt&gt; attempts = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L35">        String lastInconclusiveDetail =</span>
+            &quot;INDEPENDENT_COMPLETENESS_REQUIRES_REMAINDER_ONE&quot;;
+<span class="fc" id="L37">        boolean sawRemainderOne = false;</span>
+
+<span class="fc" id="L39">        for (int candidateIndex = 0;</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">                candidateIndex &lt; candidates.size();</span>
+<span class="fc" id="L41">                candidateIndex++) {</span>
+<span class="fc" id="L42">            FactorizationVerifier.VerifiedCandidate&lt;C&gt; candidate =</span>
+<span class="fc" id="L43">                candidates.get(candidateIndex);</span>
+<span class="fc" id="L44">            CandidateEvaluation evaluation = verifyCandidate(</span>
+                request,
+                candidate,
+                candidateIndex,
+                work);
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            if (evaluation.attempt() != null) {</span>
+<span class="fc" id="L50">                attempts.add(evaluation.attempt());</span>
+            }
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            if (evaluation.outcome() == Outcome.CERTIFIED) {</span>
+<span class="fc" id="L53">                return result(</span>
+                    requestHash,
+                    sourceHash,
+                    Outcome.CERTIFIED,
+<span class="fc" id="L57">                    evaluation.detailCode(),</span>
+                    attempts,
+                    candidateIndex,
+<span class="fc" id="L60">                    candidate.verificationCertificateHash(),</span>
+<span class="fc" id="L61">                    work.ledger());</span>
+            }
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            if (evaluation.outcome()</span>
+                    == Outcome.NO_REMAINDER_ONE_CANDIDATE) {
+<span class="fc" id="L65">                continue;</span>
+            }
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            if (evaluation.outcome()</span>
+                    == Outcome.FACTOR_CERTIFICATE_INCONCLUSIVE) {
+<span class="fc" id="L69">                sawRemainderOne = true;</span>
+<span class="fc" id="L70">                lastInconclusiveDetail = evaluation.detailCode();</span>
+<span class="fc" id="L71">                continue;</span>
+            }
+<span class="fc" id="L73">            return result(</span>
+                requestHash,
+                sourceHash,
+<span class="fc" id="L76">                evaluation.outcome(),</span>
+<span class="fc" id="L77">                evaluation.detailCode(),</span>
+                attempts,
+                -1,
+                &quot;&quot;,
+<span class="fc" id="L81">                work.ledger());</span>
+        }
+
+<span class="fc" id="L84">        return result(</span>
+            requestHash,
+            sourceHash,
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            sawRemainderOne</span>
+<span class="fc" id="L88">                ? Outcome.FACTOR_CERTIFICATE_INCONCLUSIVE</span>
+<span class="fc" id="L89">                : Outcome.NO_REMAINDER_ONE_CANDIDATE,</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            sawRemainderOne</span>
+<span class="fc" id="L91">                ? lastInconclusiveDetail</span>
+<span class="fc" id="L92">                : &quot;INDEPENDENT_COMPLETENESS_REQUIRES_REMAINDER_ONE&quot;,</span>
+            attempts,
+            -1,
+            &quot;&quot;,
+<span class="fc" id="L96">            work.ledger());</span>
+    }
+
+    private static &lt;C&gt; CandidateEvaluation verifyCandidate(
+        FactorizationRequest&lt;C&gt; request,
+        FactorizationVerifier.VerifiedCandidate&lt;C&gt; candidate,
+        int candidateIndex,
+        Budget work
+    ) {
+<span class="fc" id="L105">        long workAtStart = work.total();</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (!work.consume(</span>
+                &quot;independent-completeness.candidate-checks&quot;,
+                1)) {
+<span class="fc" id="L109">            return new CandidateEvaluation(</span>
+                null,
+                Outcome.WORK_BUDGET_EXHAUSTED,
+                &quot;INDEPENDENT_COMPLETENESS_WORK_BUDGET_EXCEEDED&quot;);
+        }
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (!candidate.unresolvedRemainder().isOne()) {</span>
+<span class="fc" id="L115">            return new CandidateEvaluation(</span>
+<span class="fc" id="L116">                candidateAttempt(</span>
+                    candidate,
+                    candidateIndex,
+                    false,
+<span class="fc" id="L120">                    List.of(),</span>
+                    CandidateOutcome.REMAINDER_NOT_ONE,
+                    &quot;INDEPENDENT_COMPLETENESS_REMAINDER_NOT_ONE&quot;,
+<span class="fc" id="L123">                    work.total() - workAtStart),</span>
+                Outcome.NO_REMAINDER_ONE_CANDIDATE,
+                &quot;INDEPENDENT_COMPLETENESS_REMAINDER_NOT_ONE&quot;);
+        }
+
+<span class="fc" id="L128">        ArrayList&lt;FactorAttempt&gt; factorAttempts = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L129">        for (int factorIndex = 0;</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">                factorIndex &lt; candidate.factors().size();</span>
+<span class="fc" id="L131">                factorIndex++) {</span>
+<span class="fc" id="L132">            PolynomialFactor&lt;C&gt; factor =</span>
+<span class="fc" id="L133">                candidate.factors().get(factorIndex);</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">            if (!work.consume(</span>
+                    &quot;independent-completeness.factor-dispatches&quot;,
+                    1)) {
+<span class="nc" id="L137">                return failedFactorEvaluation(</span>
+                    candidate,
+                    candidateIndex,
+                    factorAttempts,
+                    Outcome.WORK_BUDGET_EXHAUSTED,
+                    &quot;INDEPENDENT_COMPLETENESS_WORK_BUDGET_EXCEEDED&quot;,
+<span class="nc" id="L143">                    work.total() - workAtStart);</span>
+            }
+<span class="fc" id="L145">            IndependentOriginalDomainIrreducibility.Result evidence =</span>
+<span class="fc" id="L146">                IndependentOriginalDomainIrreducibility.verifyFactor(</span>
+                    request,
+<span class="fc" id="L148">                    factor.polynomial(),</span>
+<span class="fc" id="L149">                    work.remaining());</span>
+<span class="fc" id="L150">            work.absorb(evidence.work());</span>
+<span class="fc" id="L151">            factorAttempts.add(new FactorAttempt(</span>
+                factorIndex,
+<span class="fc" id="L153">                factor.multiplicity(),</span>
+<span class="fc" id="L154">                PolynomialEvidence.sha256(</span>
+<span class="fc" id="L155">                    factor.polynomial().canonicalMaterial()),</span>
+                evidence));
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (evidence.outcome()</span>
+                    != FactorizationVerifier
+                        .IndependentIrreducibilityOutcome.CERTIFIED) {
+<span class="fc" id="L160">                return failedFactorEvaluation(</span>
+                    candidate,
+                    candidateIndex,
+                    factorAttempts,
+<span class="fc" id="L164">                    terminalOutcome(evidence.outcome()),</span>
+<span class="fc" id="L165">                    evidence.detailCode(),</span>
+<span class="fc" id="L166">                    work.total() - workAtStart);</span>
+            }
+        }
+<span class="fc" id="L169">        String detail =</span>
+            &quot;INDEPENDENT_FACTORIZATION_COMPLETENESS_CERTIFIED&quot;;
+<span class="fc" id="L171">        return new CandidateEvaluation(</span>
+<span class="fc" id="L172">            candidateAttempt(</span>
+                candidate,
+                candidateIndex,
+                true,
+                factorAttempts,
+                CandidateOutcome.CERTIFIED,
+                detail,
+<span class="fc" id="L179">                work.total() - workAtStart),</span>
+            Outcome.CERTIFIED,
+            detail);
+    }
+
+    private static &lt;C&gt; CandidateEvaluation failedFactorEvaluation(
+        FactorizationVerifier.VerifiedCandidate&lt;C&gt; candidate,
+        int candidateIndex,
+        List&lt;FactorAttempt&gt; factorAttempts,
+        Outcome outcome,
+        String detailCode,
+        long workUnits
+    ) {
+<span class="fc" id="L192">        return new CandidateEvaluation(</span>
+<span class="fc" id="L193">            candidateAttempt(</span>
+                candidate,
+                candidateIndex,
+                true,
+                factorAttempts,
+                CandidateOutcome.FACTOR_NOT_CERTIFIED,
+                detailCode,
+                workUnits),
+            outcome,
+            detailCode);
+    }
+
+    private static CandidateAttempt candidateAttempt(
+        FactorizationVerifier.VerifiedCandidate&lt;?&gt; candidate,
+        int candidateIndex,
+        boolean remainderOne,
+        List&lt;FactorAttempt&gt; factorAttempts,
+        CandidateOutcome outcome,
+        String detailCode,
+        long workUnits
+    ) {
+<span class="fc" id="L214">        return new CandidateAttempt(</span>
+            candidateIndex,
+<span class="fc" id="L216">            candidate.verificationCertificateHash(),</span>
+            remainderOne,
+<span class="fc" id="L218">            candidate.factors().size(),</span>
+            factorAttempts,
+            outcome,
+            detailCode,
+            workUnits);
+    }
+
+    private static Outcome terminalOutcome(
+        FactorizationVerifier.IndependentIrreducibilityOutcome outcome
+    ) {
+<span class="pc bpc" id="L228" title="5 of 6 branches missed.">        return switch (outcome) {</span>
+<span class="nc" id="L229">            case CERTIFIED -&gt; throw new IllegalArgumentException(</span>
+                &quot;certified factor is not a terminal failure&quot;);
+            case NO_WITNESS_WITHIN_POLICY,
+                    DEGREE_LIMIT_EXCEEDED,
+                    NORMALIZATION_LIMIT_EXCEEDED -&gt;
+<span class="fc" id="L234">                Outcome.FACTOR_CERTIFICATE_INCONCLUSIVE;</span>
+            case WORK_BUDGET_EXHAUSTED -&gt;
+<span class="nc" id="L236">                Outcome.WORK_BUDGET_EXHAUSTED;</span>
+<span class="nc" id="L237">            case UNSUPPORTED_DOMAIN -&gt; Outcome.UNSUPPORTED_DOMAIN;</span>
+<span class="nc" id="L238">            case UNSUPPORTED_SHAPE -&gt; Outcome.UNSUPPORTED_SHAPE;</span>
+<span class="nc" id="L239">            case TECHNICAL_FAILURE -&gt; Outcome.TECHNICAL_FAILURE;</span>
+        };
+    }
+
+    private static Result result(
+        String requestHash,
+        String sourceHash,
+        Outcome outcome,
+        String detailCode,
+        List&lt;CandidateAttempt&gt; attempts,
+        int selectedCandidateIndex,
+        String selectedCandidateCertificateHash,
+        PolynomialWorkLedger work
+    ) {
+<span class="fc" id="L253">        return new Result(</span>
+            METHOD_ID,
+            requestHash,
+            sourceHash,
+            outcome,
+            detailCode,
+<span class="fc" id="L259">            List.copyOf(attempts),</span>
+            selectedCandidateIndex,
+            selectedCandidateCertificateHash,
+            work);
+    }
+
+<span class="fc" id="L265">    enum Outcome {</span>
+<span class="fc" id="L266">        CERTIFIED,</span>
+<span class="fc" id="L267">        NO_REMAINDER_ONE_CANDIDATE,</span>
+<span class="fc" id="L268">        FACTOR_CERTIFICATE_INCONCLUSIVE,</span>
+<span class="fc" id="L269">        WORK_BUDGET_EXHAUSTED,</span>
+<span class="fc" id="L270">        UNSUPPORTED_DOMAIN,</span>
+<span class="fc" id="L271">        UNSUPPORTED_SHAPE,</span>
+<span class="fc" id="L272">        TECHNICAL_FAILURE</span>
+    }
+
+<span class="fc" id="L275">    enum CandidateOutcome {</span>
+<span class="fc" id="L276">        CERTIFIED,</span>
+<span class="fc" id="L277">        REMAINDER_NOT_ONE,</span>
+<span class="fc" id="L278">        FACTOR_NOT_CERTIFIED</span>
+    }
+
+<span class="fc" id="L281">    private record CandidateEvaluation(</span>
+        CandidateAttempt attempt,
+        Outcome outcome,
+        String detailCode
+    ) {
+    }
+
+<span class="fc" id="L288">    record FactorAttempt(</span>
+        int factorIndex,
+        int multiplicity,
+        String factorHash,
+        IndependentOriginalDomainIrreducibility.Result evidence
+    ) {
+    }
+
+    record CandidateAttempt(
+        int candidateIndex,
+        String candidateCertificateHash,
+        boolean remainderOne,
+        int factorCount,
+        List&lt;FactorAttempt&gt; factorAttempts,
+        CandidateOutcome outcome,
+        String detailCode,
+        long workUnits
+    ) {
+<span class="fc" id="L306">        CandidateAttempt {</span>
+<span class="fc" id="L307">            factorAttempts = List.copyOf(factorAttempts);</span>
+<span class="fc" id="L308">        }</span>
+    }
+
+<span class="fc" id="L311">    record Result(</span>
+        String methodId,
+        String requestHash,
+        String sourceHash,
+        Outcome outcome,
+        String detailCode,
+        List&lt;CandidateAttempt&gt; candidateAttempts,
+        int selectedCandidateIndex,
+        String selectedCandidateCertificateHash,
+        PolynomialWorkLedger work
+    ) {
+    }
+
+    private static final class Budget {
+        private final long limit;
+<span class="fc" id="L326">        private final Map&lt;String, Long&gt; stages = new LinkedHashMap&lt;&gt;();</span>
+        private long total;
+
+<span class="fc" id="L329">        private Budget(long limit) {</span>
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">            if (limit &lt; 0) {</span>
+<span class="nc" id="L331">                throw new IllegalArgumentException(</span>
+                    &quot;independent completeness budget must not be negative&quot;);
+            }
+<span class="fc" id="L334">            this.limit = limit;</span>
+<span class="fc" id="L335">        }</span>
+
+        private boolean consume(String stage, long units) {
+<span class="pc bpc" id="L338" title="1 of 4 branches missed.">            if (units &lt; 0 || total &gt; limit - units) {</span>
+<span class="fc" id="L339">                return false;</span>
+            }
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">            if (units == 0) {</span>
+<span class="nc" id="L342">                return true;</span>
+            }
+<span class="fc" id="L344">            total += units;</span>
+<span class="fc" id="L345">            stages.merge(stage, units, Math::addExact);</span>
+<span class="fc" id="L346">            return true;</span>
+        }
+
+        private void absorb(PolynomialWorkLedger additional) {
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">            if (!additional.within(remaining())) {</span>
+<span class="nc" id="L351">                throw new IllegalStateException(</span>
+                    &quot;independent factor verifier exceeded shared budget&quot;);
+            }
+<span class="fc" id="L354">            additional.stages().forEach((stage, units) -&gt; {</span>
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">                if (!consume(stage, units)) {</span>
+<span class="nc" id="L356">                    throw new IllegalStateException(</span>
+                        &quot;independent factor verifier exceeded shared budget&quot;);
+                }
+<span class="fc" id="L359">            });</span>
+<span class="fc" id="L360">        }</span>
+
+        private long remaining() {
+<span class="fc" id="L363">            return limit - total;</span>
+        }
+
+        private long total() {
+<span class="fc" id="L367">            return total;</span>
+        }
+
+        private PolynomialWorkLedger ledger() {
+<span class="fc" id="L371">            return new PolynomialWorkLedger(stages);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -75,14 +75,14 @@ import java.util.List;
 
     private static boolean isTwo(Expr expression) {
 <span class="fc" id="L77">        return expression instanceof NumberExpr number</span>
-<span class="pc bpc" id="L78" title="1 of 4 branches missed.">            &amp;&amp; Double.compare(number.value(), 2.0) == 0;</span>
+<span class="pc bpc" id="L78" title="1 of 4 branches missed.">            &amp;&amp; number.value().equalsInteger(2);</span>
     }
 
     private static boolean isExplicitNegation(Expr expression) {
 <span class="fc" id="L82">        return expression instanceof BinaryExpr subtraction</span>
 <span class="fc bfc" id="L83" title="All 2 branches covered.">            &amp;&amp; subtraction.operator() == BinaryOperator.SUB</span>
 <span class="pc bpc" id="L84" title="1 of 2 branches missed.">            &amp;&amp; subtraction.left() instanceof NumberExpr zero</span>
-<span class="pc bpc" id="L85" title="1 of 4 branches missed.">            &amp;&amp; Double.compare(zero.value(), 0.0) == 0;</span>
+<span class="pc bpc" id="L85" title="1 of 4 branches missed.">            &amp;&amp; zero.value().equalsInteger(0);</span>
     }
 
     private static String syntaxHash(String expression) {

@@ -188,49 +188,46 @@ final class NoveltyChecker {
 <span class="nc" id="L188">        return &quot;unknown(&quot; + expression + &quot;)&quot;;</span>
     }
 
-    private static String formatNumber(double value) {
-<span class="pc bpc" id="L192" title="2 of 4 branches missed.">        if (Double.isFinite(value) &amp;&amp; Math.rint(value) == value) {</span>
-<span class="fc" id="L193">            return Long.toString((long) value);</span>
+    private static String formatNumber(de.regelsuche.scalar.ExactRational value) {
+<span class="fc" id="L192">            return value.canonicalText();</span>
         }
-<span class="nc" id="L195">        return Double.toString(value);</span>
-    }
 
     private static String normalizeExpression(String expression) {
-<span class="nc bnc" id="L199" title="All 2 branches missed.">        return expression == null ? &quot;&quot; : expression.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">        return expression == null ? &quot;&quot; : expression.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
     }
 
     private static String alphaNormalizeLexically(String expression, Map&lt;String, String&gt; variableMap) {
-<span class="nc" id="L203">        String normalized = normalizeExpression(expression);</span>
-<span class="nc" id="L204">        Matcher matcher = IDENTIFIER.matcher(normalized);</span>
-<span class="nc" id="L205">        StringBuilder out = new StringBuilder();</span>
-<span class="nc bnc" id="L206" title="All 2 branches missed.">        while (matcher.find()) {</span>
-<span class="nc" id="L207">            String identifier = matcher.group();</span>
-<span class="nc bnc" id="L208" title="All 2 branches missed.">            String replacement = isFunctionCall(normalized, matcher.end())</span>
-<span class="nc" id="L209">                ? identifier.toLowerCase(Locale.ROOT)</span>
-<span class="nc" id="L210">                : variableMap.computeIfAbsent(identifier, ignored -&gt; &quot;v&quot; + variableMap.size());</span>
-<span class="nc" id="L211">            matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));</span>
-<span class="nc" id="L212">        }</span>
-<span class="nc" id="L213">        matcher.appendTail(out);</span>
-<span class="nc" id="L214">        return out.toString();</span>
+<span class="nc" id="L200">        String normalized = normalizeExpression(expression);</span>
+<span class="nc" id="L201">        Matcher matcher = IDENTIFIER.matcher(normalized);</span>
+<span class="nc" id="L202">        StringBuilder out = new StringBuilder();</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        while (matcher.find()) {</span>
+<span class="nc" id="L204">            String identifier = matcher.group();</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">            String replacement = isFunctionCall(normalized, matcher.end())</span>
+<span class="nc" id="L206">                ? identifier.toLowerCase(Locale.ROOT)</span>
+<span class="nc" id="L207">                : variableMap.computeIfAbsent(identifier, ignored -&gt; &quot;v&quot; + variableMap.size());</span>
+<span class="nc" id="L208">            matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));</span>
+<span class="nc" id="L209">        }</span>
+<span class="nc" id="L210">        matcher.appendTail(out);</span>
+<span class="nc" id="L211">        return out.toString();</span>
     }
 
     private static boolean isFunctionCall(String expression, int endIndex) {
-<span class="nc bnc" id="L218" title="All 4 branches missed.">        return endIndex &lt; expression.length() &amp;&amp; expression.charAt(endIndex) == '(';</span>
+<span class="nc bnc" id="L215" title="All 4 branches missed.">        return endIndex &lt; expression.length() &amp;&amp; expression.charAt(endIndex) == '(';</span>
     }
 
     private static Set&lt;String&gt; normalizeSet(Set&lt;String&gt; values) {
-<span class="fc" id="L222">        LinkedHashSet&lt;String&gt; normalized = new LinkedHashSet&lt;&gt;();</span>
-<span class="pc bpc" id="L223" title="1 of 4 branches missed.">        for (String value : values == null ? Set.&lt;String&gt;of() : values) {</span>
-<span class="fc" id="L224">            String token = normalizeToken(value);</span>
-<span class="pc bpc" id="L225" title="1 of 2 branches missed.">            if (!token.isBlank()) {</span>
-<span class="fc" id="L226">                normalized.add(token);</span>
+<span class="fc" id="L219">        LinkedHashSet&lt;String&gt; normalized = new LinkedHashSet&lt;&gt;();</span>
+<span class="pc bpc" id="L220" title="1 of 4 branches missed.">        for (String value : values == null ? Set.&lt;String&gt;of() : values) {</span>
+<span class="fc" id="L221">            String token = normalizeToken(value);</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">            if (!token.isBlank()) {</span>
+<span class="fc" id="L223">                normalized.add(token);</span>
             }
-<span class="fc" id="L228">        }</span>
-<span class="fc" id="L229">        return Set.copyOf(normalized);</span>
+<span class="fc" id="L225">        }</span>
+<span class="fc" id="L226">        return Set.copyOf(normalized);</span>
     }
 
     private static String normalizeToken(String value) {
-<span class="pc bpc" id="L233" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.trim().toLowerCase(Locale.ROOT);</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.trim().toLowerCase(Locale.ROOT);</span>
     }
 
     record Candidate(
@@ -241,22 +238,22 @@ final class NoveltyChecker {
         String operatorId,
         List&lt;String&gt; rulePath
     ) {
-<span class="fc" id="L244">        Candidate {</span>
-<span class="pc bpc" id="L245" title="1 of 2 branches missed.">            id = id == null ? &quot;&quot; : id;</span>
-<span class="pc bpc" id="L246" title="1 of 2 branches missed.">            family = family == null ? &quot;&quot; : family;</span>
-<span class="pc bpc" id="L247" title="1 of 2 branches missed.">            inputExpression = inputExpression == null ? &quot;&quot; : inputExpression;</span>
-<span class="pc bpc" id="L248" title="1 of 2 branches missed.">            targetExpression = targetExpression == null ? &quot;&quot; : targetExpression;</span>
-<span class="pc bpc" id="L249" title="1 of 2 branches missed.">            operatorId = operatorId == null ? &quot;&quot; : operatorId;</span>
-<span class="pc bpc" id="L250" title="1 of 2 branches missed.">            rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
-<span class="fc" id="L251">        }</span>
+<span class="fc" id="L241">        Candidate {</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">            id = id == null ? &quot;&quot; : id;</span>
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">            family = family == null ? &quot;&quot; : family;</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">            inputExpression = inputExpression == null ? &quot;&quot; : inputExpression;</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">            targetExpression = targetExpression == null ? &quot;&quot; : targetExpression;</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">            operatorId = operatorId == null ? &quot;&quot; : operatorId;</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">            rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
+<span class="fc" id="L248">        }</span>
     }
 
     record NoveltyResult(NoveltyStatus status, String matchedCandidateId, String reason) {
-<span class="fc" id="L255">        NoveltyResult {</span>
-<span class="pc bpc" id="L256" title="1 of 2 branches missed.">            status = status == null ? NoveltyStatus.UNKNOWN : status;</span>
-<span class="pc bpc" id="L257" title="1 of 2 branches missed.">            matchedCandidateId = matchedCandidateId == null ? &quot;&quot; : matchedCandidateId;</span>
-<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            reason = reason == null ? &quot;&quot; : reason;</span>
-<span class="fc" id="L259">        }</span>
+<span class="fc" id="L252">        NoveltyResult {</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">            status = status == null ? NoveltyStatus.UNKNOWN : status;</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">            matchedCandidateId = matchedCandidateId == null ? &quot;&quot; : matchedCandidateId;</span>
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">            reason = reason == null ? &quot;&quot; : reason;</span>
+<span class="fc" id="L256">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

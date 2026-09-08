@@ -305,7 +305,7 @@ import java.util.Set;
 
     private Evaluation evaluate(Expr expression, Map&lt;String, RuntimeValue&gt; variables) {
 <span class="fc bfc" id="L307" title="All 2 branches covered.">        if (expression instanceof NumberExpr numberExpr) {</span>
-<span class="fc" id="L308">            return Evaluation.defined(RuntimeValue.scalar(numberExpr.value()));</span>
+<span class="fc" id="L308">            return Evaluation.defined(RuntimeValue.scalar(numberExpr.value().toBigDecimal(java.math.MathContext.DECIMAL128).doubleValue()));</span>
         }
 <span class="fc bfc" id="L310" title="All 2 branches covered.">        if (expression instanceof VariableExpr variableExpr) {</span>
 <span class="fc" id="L311">            RuntimeValue value = variables.get(variableExpr.name());</span>
@@ -602,44 +602,47 @@ import java.util.Set;
 
     private String toSmt(Expr expression) {
 <span class="fc bfc" id="L604" title="All 2 branches covered.">        if (expression instanceof NumberExpr numberExpr) {</span>
-<span class="fc" id="L605">            return trimDouble(numberExpr.value());</span>
+<span class="fc" id="L605">            var value = numberExpr.value();</span>
+<span class="pc bpc" id="L606" title="1 of 2 branches missed.">            String numerator = value.signum() &lt; 0 ? &quot;(- &quot; + value.numerator().abs() + &quot;)&quot;</span>
+<span class="fc" id="L607">                : value.numerator().toString();</span>
+<span class="pc bpc" id="L608" title="1 of 2 branches missed.">            return value.isInteger() ? numerator : &quot;(/ &quot; + numerator + &quot; &quot; + value.denominator() + &quot;)&quot;;</span>
         }
-<span class="fc bfc" id="L607" title="All 2 branches covered.">        if (expression instanceof VariableExpr variableExpr) {</span>
-<span class="fc" id="L608">            return variableExpr.name();</span>
+<span class="fc bfc" id="L610" title="All 2 branches covered.">        if (expression instanceof VariableExpr variableExpr) {</span>
+<span class="fc" id="L611">            return variableExpr.name();</span>
         }
-<span class="pc bpc" id="L610" title="3 of 4 branches missed.">        if (expression instanceof FunctionExpr functionExpr &amp;&amp; functionExpr.arguments().size() == 1) {</span>
-<span class="nc" id="L611">            return &quot;(&quot; + functionExpr.name() + &quot; &quot; + toSmt(functionExpr.arguments().getFirst()) + &quot;)&quot;;</span>
+<span class="pc bpc" id="L613" title="3 of 4 branches missed.">        if (expression instanceof FunctionExpr functionExpr &amp;&amp; functionExpr.arguments().size() == 1) {</span>
+<span class="nc" id="L614">            return &quot;(&quot; + functionExpr.name() + &quot; &quot; + toSmt(functionExpr.arguments().getFirst()) + &quot;)&quot;;</span>
         }
-<span class="pc bpc" id="L613" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binaryExpr) {</span>
-<span class="pc bpc" id="L614" title="3 of 5 branches missed.">            String operator = switch (binaryExpr.operator()) {</span>
-<span class="nc" id="L615">                case ADD -&gt; &quot;+&quot;;</span>
-<span class="fc" id="L616">                case SUB -&gt; &quot;-&quot;;</span>
-<span class="nc" id="L617">                case MUL -&gt; &quot;*&quot;;</span>
-<span class="nc" id="L618">                case DIV -&gt; &quot;/&quot;;</span>
-<span class="fc" id="L619">                case POW -&gt; &quot;pow&quot;;</span>
+<span class="pc bpc" id="L616" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binaryExpr) {</span>
+<span class="pc bpc" id="L617" title="3 of 5 branches missed.">            String operator = switch (binaryExpr.operator()) {</span>
+<span class="nc" id="L618">                case ADD -&gt; &quot;+&quot;;</span>
+<span class="fc" id="L619">                case SUB -&gt; &quot;-&quot;;</span>
+<span class="nc" id="L620">                case MUL -&gt; &quot;*&quot;;</span>
+<span class="nc" id="L621">                case DIV -&gt; &quot;/&quot;;</span>
+<span class="fc" id="L622">                case POW -&gt; &quot;pow&quot;;</span>
             };
-<span class="fc" id="L621">            return &quot;(&quot; + operator + &quot; &quot; + toSmt(binaryExpr.left()) + &quot; &quot; + toSmt(binaryExpr.right()) + &quot;)&quot;;</span>
+<span class="fc" id="L624">            return &quot;(&quot; + operator + &quot; &quot; + toSmt(binaryExpr.left()) + &quot; &quot; + toSmt(binaryExpr.right()) + &quot;)&quot;;</span>
         }
-<span class="nc" id="L623">        return &quot;&quot;;</span>
+<span class="nc" id="L626">        return &quot;&quot;;</span>
     }
 
     private List&lt;String&gt; inferredAssumptionExpressions(Map&lt;String, CounterexampleSearchService.TypedAssumption&gt; assumptions) {
-<span class="fc" id="L627">        return assumptions.values().stream()</span>
-<span class="fc" id="L628">            .map(CounterexampleSearchService.TypedAssumption::normalizedPredicate)</span>
-<span class="fc" id="L629">            .toList();</span>
+<span class="fc" id="L630">        return assumptions.values().stream()</span>
+<span class="fc" id="L631">            .map(CounterexampleSearchService.TypedAssumption::normalizedPredicate)</span>
+<span class="fc" id="L632">            .toList();</span>
     }
 
     private List&lt;CounterexampleSearchService.TypedAssumption&gt; typedAssumptions(
         Map&lt;String, CounterexampleSearchService.TypedAssumption&gt; assumptions
     ) {
-<span class="fc" id="L635">        return List.copyOf(assumptions.values());</span>
+<span class="fc" id="L638">        return List.copyOf(assumptions.values());</span>
     }
 
     private static String trimDouble(double value) {
-<span class="pc bpc" id="L639" title="1 of 4 branches missed.">        if (value == Math.floor(value) &amp;&amp; !Double.isInfinite(value)) {</span>
-<span class="fc" id="L640">            return Long.toString((long) value);</span>
+<span class="pc bpc" id="L642" title="1 of 4 branches missed.">        if (value == Math.floor(value) &amp;&amp; !Double.isInfinite(value)) {</span>
+<span class="fc" id="L643">            return Long.toString((long) value);</span>
         }
-<span class="fc" id="L642">        return Double.toString(value);</span>
+<span class="fc" id="L645">        return Double.toString(value);</span>
     }
 
     private record Evaluation(
@@ -647,20 +650,20 @@ import java.util.Set;
         boolean defined,
         Set&lt;InferenceCandidate&gt; inferredAssumptions
     ) {
-<span class="fc" id="L650">        private Evaluation {</span>
-<span class="pc bpc" id="L651" title="1 of 2 branches missed.">            inferredAssumptions = inferredAssumptions == null ? Set.of() : Set.copyOf(inferredAssumptions);</span>
-<span class="fc" id="L652">        }</span>
+<span class="fc" id="L653">        private Evaluation {</span>
+<span class="pc bpc" id="L654" title="1 of 2 branches missed.">            inferredAssumptions = inferredAssumptions == null ? Set.of() : Set.copyOf(inferredAssumptions);</span>
+<span class="fc" id="L655">        }</span>
 
         static Evaluation defined(RuntimeValue value) {
-<span class="fc" id="L655">            return new Evaluation(value, true, Set.of());</span>
+<span class="fc" id="L658">            return new Evaluation(value, true, Set.of());</span>
         }
 
         static Evaluation undefined(Set&lt;InferenceCandidate&gt; inferredAssumptions) {
-<span class="fc" id="L659">            return new Evaluation(RuntimeValue.scalar(Double.NaN), false, inferredAssumptions);</span>
+<span class="fc" id="L662">            return new Evaluation(RuntimeValue.scalar(Double.NaN), false, inferredAssumptions);</span>
         }
     }
 
-<span class="fc" id="L663">    private record InferenceCandidate(</span>
+<span class="fc" id="L666">    private record InferenceCandidate(</span>
         CounterexampleSearchService.AssumptionKind kind,
         String subjectExpression,
         String normalizedPredicate,
@@ -668,136 +671,136 @@ import java.util.Set;
     ) {
     }
 
-<span class="fc" id="L671">    private enum Relation {</span>
-<span class="fc" id="L672">        NON_ZERO,</span>
-<span class="fc" id="L673">        POSITIVE,</span>
-<span class="fc" id="L674">        NON_NEGATIVE</span>
+<span class="fc" id="L674">    private enum Relation {</span>
+<span class="fc" id="L675">        NON_ZERO,</span>
+<span class="fc" id="L676">        POSITIVE,</span>
+<span class="fc" id="L677">        NON_NEGATIVE</span>
     }
 
-<span class="fc" id="L677">    private record AssumptionGuard(String symbol, Relation relation) {</span>
+<span class="fc" id="L680">    private record AssumptionGuard(String symbol, Relation relation) {</span>
     }
 
-<span class="fc" id="L680">    private record RuntimeValue(Kind kind, double scalar, Matrix matrix, Complex complex) {</span>
-<span class="fc" id="L681">        enum Kind {</span>
-<span class="fc" id="L682">            SCALAR,</span>
-<span class="fc" id="L683">            MATRIX,</span>
-<span class="fc" id="L684">            COMPLEX</span>
+<span class="fc" id="L683">    private record RuntimeValue(Kind kind, double scalar, Matrix matrix, Complex complex) {</span>
+<span class="fc" id="L684">        enum Kind {</span>
+<span class="fc" id="L685">            SCALAR,</span>
+<span class="fc" id="L686">            MATRIX,</span>
+<span class="fc" id="L687">            COMPLEX</span>
         }
 
         static RuntimeValue scalar(double value) {
-<span class="fc" id="L688">            return new RuntimeValue(Kind.SCALAR, value, null, null);</span>
+<span class="fc" id="L691">            return new RuntimeValue(Kind.SCALAR, value, null, null);</span>
         }
 
         static RuntimeValue matrix(Matrix value) {
-<span class="fc" id="L692">            return new RuntimeValue(Kind.MATRIX, 0.0, value, null);</span>
+<span class="fc" id="L695">            return new RuntimeValue(Kind.MATRIX, 0.0, value, null);</span>
         }
 
         static RuntimeValue complex(Complex value) {
-<span class="fc" id="L696">            return new RuntimeValue(Kind.COMPLEX, 0.0, null, value);</span>
+<span class="fc" id="L699">            return new RuntimeValue(Kind.COMPLEX, 0.0, null, value);</span>
         }
 
         boolean isNumeric() {
-<span class="fc bfc" id="L700" title="All 4 branches covered.">            return kind == Kind.SCALAR || kind == Kind.COMPLEX;</span>
+<span class="fc bfc" id="L703" title="All 4 branches covered.">            return kind == Kind.SCALAR || kind == Kind.COMPLEX;</span>
         }
 
         Complex asComplex() {
-<span class="pc bpc" id="L704" title="1 of 2 branches missed.">            return kind == Kind.COMPLEX ? complex : new Complex(scalar, 0.0);</span>
+<span class="pc bpc" id="L707" title="1 of 2 branches missed.">            return kind == Kind.COMPLEX ? complex : new Complex(scalar, 0.0);</span>
         }
 
         boolean approximatelyEquals(RuntimeValue other) {
-<span class="pc bpc" id="L708" title="1 of 2 branches missed.">            if (kind != other.kind) {</span>
-<span class="nc" id="L709">                return false;</span>
+<span class="pc bpc" id="L711" title="1 of 2 branches missed.">            if (kind != other.kind) {</span>
+<span class="nc" id="L712">                return false;</span>
             }
-<span class="fc bfc" id="L711" title="All 2 branches covered.">            if (kind == Kind.SCALAR) {</span>
-<span class="pc bpc" id="L712" title="2 of 4 branches missed.">                if (!Double.isFinite(scalar) || !Double.isFinite(other.scalar)) {</span>
-<span class="nc" id="L713">                    return false;</span>
+<span class="fc bfc" id="L714" title="All 2 branches covered.">            if (kind == Kind.SCALAR) {</span>
+<span class="pc bpc" id="L715" title="2 of 4 branches missed.">                if (!Double.isFinite(scalar) || !Double.isFinite(other.scalar)) {</span>
+<span class="nc" id="L716">                    return false;</span>
                 }
-<span class="fc bfc" id="L715" title="All 2 branches covered.">                return Math.abs(scalar - other.scalar) &lt;= EPS;</span>
+<span class="fc bfc" id="L718" title="All 2 branches covered.">                return Math.abs(scalar - other.scalar) &lt;= EPS;</span>
             }
-<span class="fc bfc" id="L717" title="All 2 branches covered.">            if (kind == Kind.COMPLEX) {</span>
-<span class="fc bfc" id="L718" title="All 2 branches covered.">                return complex.subtract(other.complex).abs() &lt;= EPS;</span>
+<span class="fc bfc" id="L720" title="All 2 branches covered.">            if (kind == Kind.COMPLEX) {</span>
+<span class="fc bfc" id="L721" title="All 2 branches covered.">                return complex.subtract(other.complex).abs() &lt;= EPS;</span>
             }
-<span class="fc" id="L720">            return matrix.equals(other.matrix);</span>
+<span class="fc" id="L723">            return matrix.equals(other.matrix);</span>
         }
 
         String asText() {
-<span class="fc bfc" id="L724" title="All 2 branches covered.">            if (kind == Kind.SCALAR) {</span>
-<span class="fc" id="L725">                return trimDouble(scalar);</span>
+<span class="fc bfc" id="L727" title="All 2 branches covered.">            if (kind == Kind.SCALAR) {</span>
+<span class="fc" id="L728">                return trimDouble(scalar);</span>
             }
-<span class="fc bfc" id="L727" title="All 2 branches covered.">            if (kind == Kind.COMPLEX) {</span>
-<span class="fc" id="L728">                return complex.asText();</span>
+<span class="fc bfc" id="L730" title="All 2 branches covered.">            if (kind == Kind.COMPLEX) {</span>
+<span class="fc" id="L731">                return complex.asText();</span>
             }
-<span class="fc" id="L730">            StringBuilder builder = new StringBuilder(&quot;[&quot;);</span>
-<span class="fc bfc" id="L731" title="All 2 branches covered.">            for (int i = 0; i &lt; matrix.rows(); i++) {</span>
-<span class="fc bfc" id="L732" title="All 2 branches covered.">                if (i &gt; 0) {</span>
-<span class="fc" id="L733">                    builder.append(&quot;;&quot;);</span>
+<span class="fc" id="L733">            StringBuilder builder = new StringBuilder(&quot;[&quot;);</span>
+<span class="fc bfc" id="L734" title="All 2 branches covered.">            for (int i = 0; i &lt; matrix.rows(); i++) {</span>
+<span class="fc bfc" id="L735" title="All 2 branches covered.">                if (i &gt; 0) {</span>
+<span class="fc" id="L736">                    builder.append(&quot;;&quot;);</span>
                 }
-<span class="fc bfc" id="L735" title="All 2 branches covered.">                for (int j = 0; j &lt; matrix.columns(); j++) {</span>
-<span class="fc bfc" id="L736" title="All 2 branches covered.">                    if (j &gt; 0) {</span>
-<span class="fc" id="L737">                        builder.append(&quot;,&quot;);</span>
+<span class="fc bfc" id="L738" title="All 2 branches covered.">                for (int j = 0; j &lt; matrix.columns(); j++) {</span>
+<span class="fc bfc" id="L739" title="All 2 branches covered.">                    if (j &gt; 0) {</span>
+<span class="fc" id="L740">                        builder.append(&quot;,&quot;);</span>
                     }
-<span class="fc" id="L739">                    builder.append(trimDouble(matrix.get(i, j)));</span>
+<span class="fc" id="L742">                    builder.append(trimDouble(matrix.get(i, j)));</span>
                 }
             }
-<span class="fc" id="L742">            return builder.append(&quot;]&quot;).toString();</span>
+<span class="fc" id="L745">            return builder.append(&quot;]&quot;).toString();</span>
         }
     }
 
-<span class="fc" id="L746">    private record Complex(double real, double imaginary) {</span>
+<span class="fc" id="L749">    private record Complex(double real, double imaginary) {</span>
         Complex add(Complex other) {
-<span class="nc" id="L748">            return new Complex(real + other.real, imaginary + other.imaginary);</span>
+<span class="nc" id="L751">            return new Complex(real + other.real, imaginary + other.imaginary);</span>
         }
 
         Complex subtract(Complex other) {
-<span class="fc" id="L752">            return new Complex(real - other.real, imaginary - other.imaginary);</span>
+<span class="fc" id="L755">            return new Complex(real - other.real, imaginary - other.imaginary);</span>
         }
 
         Complex multiply(Complex other) {
-<span class="fc" id="L756">            return new Complex(</span>
+<span class="fc" id="L759">            return new Complex(</span>
                 real * other.real - imaginary * other.imaginary,
                 real * other.imaginary + imaginary * other.real
             );
         }
 
         Complex divide(Complex other) {
-<span class="nc" id="L763">            double denominator = other.real * other.real + other.imaginary * other.imaginary;</span>
-<span class="nc" id="L764">            return new Complex(</span>
+<span class="nc" id="L766">            double denominator = other.real * other.real + other.imaginary * other.imaginary;</span>
+<span class="nc" id="L767">            return new Complex(</span>
                 (real * other.real + imaginary * other.imaginary) / denominator,
                 (imaginary * other.real - real * other.imaginary) / denominator
             );
         }
 
         Complex pow(int exponent) {
-<span class="pc bpc" id="L771" title="1 of 2 branches missed.">            if (exponent == 0) {</span>
-<span class="nc" id="L772">                return new Complex(1.0, 0.0);</span>
+<span class="pc bpc" id="L774" title="1 of 2 branches missed.">            if (exponent == 0) {</span>
+<span class="nc" id="L775">                return new Complex(1.0, 0.0);</span>
             }
-<span class="fc" id="L774">            Complex result = new Complex(1.0, 0.0);</span>
-<span class="fc" id="L775">            int count = Math.abs(exponent);</span>
-<span class="fc bfc" id="L776" title="All 2 branches covered.">            for (int i = 0; i &lt; count; i++) {</span>
-<span class="fc" id="L777">                result = result.multiply(this);</span>
+<span class="fc" id="L777">            Complex result = new Complex(1.0, 0.0);</span>
+<span class="fc" id="L778">            int count = Math.abs(exponent);</span>
+<span class="fc bfc" id="L779" title="All 2 branches covered.">            for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L780">                result = result.multiply(this);</span>
             }
-<span class="pc bpc" id="L779" title="1 of 2 branches missed.">            return exponent &lt; 0 ? new Complex(1.0, 0.0).divide(result) : result;</span>
+<span class="pc bpc" id="L782" title="1 of 2 branches missed.">            return exponent &lt; 0 ? new Complex(1.0, 0.0).divide(result) : result;</span>
         }
 
         Complex sqrt() {
-<span class="fc" id="L783">            double magnitude = abs();</span>
-<span class="fc" id="L784">            double realPart = Math.sqrt((magnitude + real) / 2.0);</span>
-<span class="fc" id="L785">            double imaginaryPart = Math.copySign(Math.sqrt((magnitude - real) / 2.0), imaginary);</span>
-<span class="fc" id="L786">            return new Complex(realPart, imaginaryPart);</span>
+<span class="fc" id="L786">            double magnitude = abs();</span>
+<span class="fc" id="L787">            double realPart = Math.sqrt((magnitude + real) / 2.0);</span>
+<span class="fc" id="L788">            double imaginaryPart = Math.copySign(Math.sqrt((magnitude - real) / 2.0), imaginary);</span>
+<span class="fc" id="L789">            return new Complex(realPart, imaginaryPart);</span>
         }
 
         double abs() {
-<span class="fc" id="L790">            return Math.hypot(real, imaginary);</span>
+<span class="fc" id="L793">            return Math.hypot(real, imaginary);</span>
         }
 
         String asText() {
-<span class="pc bpc" id="L794" title="1 of 2 branches missed.">            if (Math.abs(imaginary) &lt;= EPS) {</span>
-<span class="nc" id="L795">                return trimDouble(real);</span>
+<span class="pc bpc" id="L797" title="1 of 2 branches missed.">            if (Math.abs(imaginary) &lt;= EPS) {</span>
+<span class="nc" id="L798">                return trimDouble(real);</span>
             }
-<span class="fc bfc" id="L797" title="All 2 branches covered.">            if (Math.abs(real) &lt;= EPS) {</span>
-<span class="fc" id="L798">                return trimDouble(imaginary) + &quot;i&quot;;</span>
+<span class="fc bfc" id="L800" title="All 2 branches covered.">            if (Math.abs(real) &lt;= EPS) {</span>
+<span class="fc" id="L801">                return trimDouble(imaginary) + &quot;i&quot;;</span>
             }
-<span class="fc bfc" id="L800" title="All 2 branches covered.">            return trimDouble(real) + (imaginary &lt; 0 ? &quot;&quot; : &quot;+&quot;) + trimDouble(imaginary) + &quot;i&quot;;</span>
+<span class="fc bfc" id="L803" title="All 2 branches covered.">            return trimDouble(real) + (imaginary &lt; 0 ? &quot;&quot; : &quot;+&quot;) + trimDouble(imaginary) + &quot;i&quot;;</span>
         }
     }
 }

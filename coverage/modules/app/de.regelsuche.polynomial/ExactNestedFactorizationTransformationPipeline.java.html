@@ -37,7 +37,7 @@ import java.util.OptionalInt;
  */
 public final class ExactNestedFactorizationTransformationPipeline {
     public static final String PIPELINE_ID =
-        &quot;regelsuche.exact-nested-factorization-transformation/v1&quot;;
+        &quot;regelsuche.exact-nested-factorization-transformation/v2&quot;;
     public static final int MAX_PATH_DEPTH = 4_096;
     public static final int MAX_ROOT_NODES = 65_536;
     public static final int MAX_REPLACEMENT_NODES = 65_536;
@@ -908,7 +908,7 @@ public final class ExactNestedFactorizationTransformationPipeline {
                     digest,
                     work,
                     stage,
-<span class="fc" id="L911">                    Double.toHexString(number.value()));</span>
+<span class="fc" id="L911">                    number.value().canonicalText());</span>
             } else {
 <span class="nc" id="L913">                throw invariant(&quot;UNSUPPORTED_AST_NODE_IN_STRUCTURAL_HASH&quot;);</span>
             }

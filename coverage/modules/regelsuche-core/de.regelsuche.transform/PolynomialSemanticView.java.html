@@ -276,7 +276,7 @@ public final class PolynomialSemanticView {
 <span class="fc" id="L276">            .map(ExactParsedTerm.LiteralOccurrence::exactValue)</span>
 <span class="fc" id="L277">            .map(PolynomialSemanticView::requireInteger)</span>
 <span class="fc" id="L278">            .orElseGet(() -&gt; {</span>
-<span class="nc bnc" id="L279" title="All 2 branches missed.">                if (number.value() == 0.0d) {</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">                if (number.value().equalsInteger(0)) {</span>
 <span class="nc" id="L280">                    return BigInteger.ZERO;</span>
                 }
 <span class="nc" id="L282">                throw unsupported(</span>

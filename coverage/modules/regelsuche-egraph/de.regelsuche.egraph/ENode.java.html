@@ -216,11 +216,8 @@ public record ENode(String symbol, List&lt;EClassId&gt; children) {
             }
         }
 
-        private static String format(double value) {
-<span class="nc bnc" id="L220" title="All 4 branches missed.">            if (value == Math.floor(value) &amp;&amp; !Double.isInfinite(value)) {</span>
-<span class="nc" id="L221">                return Long.toString((long) value);</span>
-            }
-<span class="nc" id="L223">            return Double.toString(value);</span>
+        private static String format(de.regelsuche.scalar.ExactRational value) {
+<span class="nc" id="L220">            return value.canonicalText();</span>
         }
     }
 }

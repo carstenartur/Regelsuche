@@ -126,7 +126,7 @@ import java.util.Set;
 <span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (!(expression instanceof BinaryExpr div)</span>
 <span class="fc bfc" id="L127" title="All 2 branches covered.">            || div.operator() != BinaryOperator.DIV</span>
 <span class="pc bpc" id="L128" title="1 of 2 branches missed.">            || !(div.left() instanceof NumberExpr numerator)</span>
-<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            || Double.compare(numerator.value(), 1.0) != 0) {</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            || !numerator.value().equalsInteger(1)) {</span>
 <span class="fc" id="L130">            return List.of();</span>
         }
 <span class="fc" id="L132">        List&lt;Expr&gt; factors = flattenMultiplication(div.right());</span>
@@ -182,8 +182,8 @@ import java.util.Set;
 <span class="fc bfc" id="L182" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
 <span class="fc bfc" id="L183" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.POW</span>
 <span class="pc bpc" id="L184" title="1 of 2 branches missed.">                &amp;&amp; binary.right() instanceof NumberExpr exponent</span>
-<span class="pc bpc" id="L185" title="1 of 2 branches missed.">                &amp;&amp; exponent.value() &gt;= 2.0</span>
-<span class="pc bpc" id="L186" title="1 of 2 branches missed.">                &amp;&amp; Math.rint(exponent.value()) == exponent.value()) {</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">                &amp;&amp; exponent.value().compareTo(de.regelsuche.scalar.ExactRational.integer(2)) &gt;= 0</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">                &amp;&amp; exponent.value().isInteger()) {</span>
 <span class="fc" id="L187">                counts.merge(binary.left(), 1, Integer::sum);</span>
             }
 <span class="fc" id="L189">            collectPowerBases(binary.left(), counts);</span>

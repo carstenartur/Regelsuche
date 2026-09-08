@@ -1674,11 +1674,8 @@ import java.util.stream.Collectors;
 <span class="pc bpc" id="L1674" title="1 of 2 branches missed.">            return expression == null ? &quot;&quot; : expression.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
         }
 
-        private static String formatNumber(double value) {
-<span class="pc bpc" id="L1678" title="2 of 4 branches missed.">            if (Double.isFinite(value) &amp;&amp; Math.rint(value) == value) {</span>
-<span class="fc" id="L1679">                return Long.toString((long) value);</span>
-            }
-<span class="nc" id="L1681">            return Double.toString(value);</span>
+        private static String formatNumber(de.regelsuche.scalar.ExactRational value) {
+<span class="fc" id="L1678">            return value.canonicalText();</span>
         }
     }
 }

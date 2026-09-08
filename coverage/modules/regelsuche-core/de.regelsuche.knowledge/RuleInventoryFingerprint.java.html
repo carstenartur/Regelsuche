@@ -160,112 +160,111 @@ public final class RuleInventoryFingerprint {
 <span class="fc" id="L160">            append(descriptor, placeholder.name());</span>
 <span class="fc bfc" id="L161" title="All 2 branches covered.">        } else if (pattern instanceof PatternExpr.LiteralNumber number) {</span>
 <span class="fc" id="L162">            append(descriptor, &quot;number&quot;);</span>
-<span class="fc" id="L163">            append(descriptor, Long.toHexString(</span>
-<span class="fc" id="L164">                Double.doubleToLongBits(number.value())));</span>
-<span class="fc bfc" id="L165" title="All 2 branches covered.">        } else if (pattern instanceof PatternExpr.LiteralVariable variable) {</span>
-<span class="fc" id="L166">            append(descriptor, &quot;variable&quot;);</span>
-<span class="fc" id="L167">            append(descriptor, variable.name());</span>
-<span class="fc bfc" id="L168" title="All 2 branches covered.">        } else if (pattern instanceof PatternExpr.Operation operation) {</span>
-<span class="fc" id="L169">            append(descriptor, &quot;operation&quot;);</span>
-<span class="fc" id="L170">            append(descriptor, operation.operator().name());</span>
-<span class="fc" id="L171">            append(descriptor, canonicalPattern(operation.left()));</span>
-<span class="fc" id="L172">            append(descriptor, canonicalPattern(operation.right()));</span>
-<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        } else if (pattern instanceof PatternExpr.Function function) {</span>
-<span class="fc" id="L174">            append(descriptor, &quot;function&quot;);</span>
-<span class="fc" id="L175">            append(descriptor, function.name());</span>
-<span class="fc" id="L176">            append(descriptor, Integer.toString(function.arguments().size()));</span>
-<span class="fc" id="L177">            function.arguments().forEach(argument -&gt;</span>
-<span class="fc" id="L178">                append(descriptor, canonicalPattern(argument)));</span>
+<span class="fc" id="L163">            append(descriptor, number.value().canonicalText());</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        } else if (pattern instanceof PatternExpr.LiteralVariable variable) {</span>
+<span class="fc" id="L165">            append(descriptor, &quot;variable&quot;);</span>
+<span class="fc" id="L166">            append(descriptor, variable.name());</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        } else if (pattern instanceof PatternExpr.Operation operation) {</span>
+<span class="fc" id="L168">            append(descriptor, &quot;operation&quot;);</span>
+<span class="fc" id="L169">            append(descriptor, operation.operator().name());</span>
+<span class="fc" id="L170">            append(descriptor, canonicalPattern(operation.left()));</span>
+<span class="fc" id="L171">            append(descriptor, canonicalPattern(operation.right()));</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        } else if (pattern instanceof PatternExpr.Function function) {</span>
+<span class="fc" id="L173">            append(descriptor, &quot;function&quot;);</span>
+<span class="fc" id="L174">            append(descriptor, function.name());</span>
+<span class="fc" id="L175">            append(descriptor, Integer.toString(function.arguments().size()));</span>
+<span class="fc" id="L176">            function.arguments().forEach(argument -&gt;</span>
+<span class="fc" id="L177">                append(descriptor, canonicalPattern(argument)));</span>
         } else {
-<span class="nc" id="L180">            throw new IllegalArgumentException(</span>
-<span class="nc" id="L181">                &quot;Unsupported pattern type: &quot; + pattern.getClass().getName());</span>
+<span class="nc" id="L179">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L180">                &quot;Unsupported pattern type: &quot; + pattern.getClass().getName());</span>
         }
-<span class="fc" id="L183">        return descriptor.toString();</span>
+<span class="fc" id="L182">        return descriptor.toString();</span>
     }
 
     private static String canonicalRecognition(
         RecognitionProfile profile
     ) {
-<span class="fc" id="L189">        Objects.requireNonNull(profile, &quot;profile&quot;);</span>
-<span class="fc" id="L190">        StringBuilder descriptor = new StringBuilder();</span>
-<span class="fc" id="L191">        appendStrings(descriptor, profile.associativeOperators().stream()</span>
-<span class="fc" id="L192">            .map(Enum::name)</span>
-<span class="fc" id="L193">            .sorted()</span>
-<span class="fc" id="L194">            .toList());</span>
-<span class="fc" id="L195">        appendStrings(descriptor, profile.commutativeOperators().stream()</span>
-<span class="fc" id="L196">            .map(Enum::name)</span>
-<span class="fc" id="L197">            .sorted()</span>
-<span class="fc" id="L198">            .toList());</span>
-<span class="fc" id="L199">        append(descriptor, Boolean.toString(profile.inferAlgebraicBindings()));</span>
-<span class="fc" id="L200">        appendStrings(descriptor, profile.recognitionRuleIds().stream()</span>
-<span class="fc" id="L201">            .sorted()</span>
-<span class="fc" id="L202">            .toList());</span>
-<span class="fc" id="L203">        append(descriptor, Integer.toString(profile.maxEquivalenceDepth()));</span>
-<span class="fc" id="L204">        return descriptor.toString();</span>
+<span class="fc" id="L188">        Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="fc" id="L189">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L190">        appendStrings(descriptor, profile.associativeOperators().stream()</span>
+<span class="fc" id="L191">            .map(Enum::name)</span>
+<span class="fc" id="L192">            .sorted()</span>
+<span class="fc" id="L193">            .toList());</span>
+<span class="fc" id="L194">        appendStrings(descriptor, profile.commutativeOperators().stream()</span>
+<span class="fc" id="L195">            .map(Enum::name)</span>
+<span class="fc" id="L196">            .sorted()</span>
+<span class="fc" id="L197">            .toList());</span>
+<span class="fc" id="L198">        append(descriptor, Boolean.toString(profile.inferAlgebraicBindings()));</span>
+<span class="fc" id="L199">        appendStrings(descriptor, profile.recognitionRuleIds().stream()</span>
+<span class="fc" id="L200">            .sorted()</span>
+<span class="fc" id="L201">            .toList());</span>
+<span class="fc" id="L202">        append(descriptor, Integer.toString(profile.maxEquivalenceDepth()));</span>
+<span class="fc" id="L203">        return descriptor.toString();</span>
     }
 
     private static String canonicalDescriptor(RuleDescriptor rule) {
-<span class="fc" id="L208">        Objects.requireNonNull(rule, &quot;rule descriptor&quot;);</span>
-<span class="fc" id="L209">        StringBuilder descriptor = new StringBuilder();</span>
-<span class="fc" id="L210">        append(descriptor, rule.ruleId());</span>
-<span class="fc" id="L211">        append(descriptor, rule.packId());</span>
-<span class="fc" id="L212">        append(descriptor, rule.originProject());</span>
-<span class="fc" id="L213">        append(descriptor, rule.license());</span>
-<span class="fc" id="L214">        append(descriptor, rule.sourceVersion());</span>
-<span class="fc" id="L215">        append(descriptor, rule.sourceReference());</span>
-<span class="fc" id="L216">        append(descriptor, rule.derivationType().name());</span>
-<span class="fc" id="L217">        append(descriptor, rule.status().name());</span>
-<span class="fc" id="L218">        append(descriptor, rule.riskLevel());</span>
-<span class="fc" id="L219">        appendStrings(descriptor, rule.categories().stream()</span>
-<span class="fc" id="L220">            .sorted()</span>
-<span class="fc" id="L221">            .toList());</span>
-<span class="fc" id="L222">        appendStrings(descriptor, rule.searchEffects().stream()</span>
-<span class="fc" id="L223">            .map(Enum::name)</span>
-<span class="fc" id="L224">            .sorted()</span>
-<span class="fc" id="L225">            .toList());</span>
-<span class="fc" id="L226">        appendExamples(descriptor, rule.validationExamples());</span>
-<span class="fc" id="L227">        appendExamples(descriptor, rule.counterExamples());</span>
-<span class="fc" id="L228">        return descriptor.toString();</span>
+<span class="fc" id="L207">        Objects.requireNonNull(rule, &quot;rule descriptor&quot;);</span>
+<span class="fc" id="L208">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L209">        append(descriptor, rule.ruleId());</span>
+<span class="fc" id="L210">        append(descriptor, rule.packId());</span>
+<span class="fc" id="L211">        append(descriptor, rule.originProject());</span>
+<span class="fc" id="L212">        append(descriptor, rule.license());</span>
+<span class="fc" id="L213">        append(descriptor, rule.sourceVersion());</span>
+<span class="fc" id="L214">        append(descriptor, rule.sourceReference());</span>
+<span class="fc" id="L215">        append(descriptor, rule.derivationType().name());</span>
+<span class="fc" id="L216">        append(descriptor, rule.status().name());</span>
+<span class="fc" id="L217">        append(descriptor, rule.riskLevel());</span>
+<span class="fc" id="L218">        appendStrings(descriptor, rule.categories().stream()</span>
+<span class="fc" id="L219">            .sorted()</span>
+<span class="fc" id="L220">            .toList());</span>
+<span class="fc" id="L221">        appendStrings(descriptor, rule.searchEffects().stream()</span>
+<span class="fc" id="L222">            .map(Enum::name)</span>
+<span class="fc" id="L223">            .sorted()</span>
+<span class="fc" id="L224">            .toList());</span>
+<span class="fc" id="L225">        appendExamples(descriptor, rule.validationExamples());</span>
+<span class="fc" id="L226">        appendExamples(descriptor, rule.counterExamples());</span>
+<span class="fc" id="L227">        return descriptor.toString();</span>
     }
 
     private static void appendExamples(
         StringBuilder descriptor,
         List&lt;ValidationExample&gt; examples
     ) {
-<span class="fc" id="L235">        List&lt;String&gt; canonical = examples.stream()</span>
-<span class="fc" id="L236">            .map(example -&gt; {</span>
-<span class="fc" id="L237">                StringBuilder value = new StringBuilder();</span>
-<span class="fc" id="L238">                append(value, example.from());</span>
-<span class="fc" id="L239">                append(value, example.to());</span>
-<span class="fc" id="L240">                return value.toString();</span>
+<span class="fc" id="L234">        List&lt;String&gt; canonical = examples.stream()</span>
+<span class="fc" id="L235">            .map(example -&gt; {</span>
+<span class="fc" id="L236">                StringBuilder value = new StringBuilder();</span>
+<span class="fc" id="L237">                append(value, example.from());</span>
+<span class="fc" id="L238">                append(value, example.to());</span>
+<span class="fc" id="L239">                return value.toString();</span>
             })
-<span class="fc" id="L242">            .sorted(Comparator.naturalOrder())</span>
-<span class="fc" id="L243">            .toList();</span>
-<span class="fc" id="L244">        appendStrings(descriptor, canonical);</span>
-<span class="fc" id="L245">    }</span>
+<span class="fc" id="L241">            .sorted(Comparator.naturalOrder())</span>
+<span class="fc" id="L242">            .toList();</span>
+<span class="fc" id="L243">        appendStrings(descriptor, canonical);</span>
+<span class="fc" id="L244">    }</span>
 
     private static void appendStrings(
         StringBuilder descriptor,
         List&lt;String&gt; values
     ) {
-<span class="fc" id="L251">        append(descriptor, Integer.toString(values.size()));</span>
-<span class="fc" id="L252">        values.forEach(value -&gt; append(descriptor, value));</span>
-<span class="fc" id="L253">    }</span>
+<span class="fc" id="L250">        append(descriptor, Integer.toString(values.size()));</span>
+<span class="fc" id="L251">        values.forEach(value -&gt; append(descriptor, value));</span>
+<span class="fc" id="L252">    }</span>
 
     private static void append(StringBuilder descriptor, String value) {
-<span class="fc" id="L256">        Objects.requireNonNull(descriptor, &quot;descriptor&quot;);</span>
-<span class="fc" id="L257">        Objects.requireNonNull(value, &quot;value&quot;);</span>
-<span class="fc" id="L258">        descriptor.append(value.length()).append(':').append(value);</span>
-<span class="fc" id="L259">    }</span>
+<span class="fc" id="L255">        Objects.requireNonNull(descriptor, &quot;descriptor&quot;);</span>
+<span class="fc" id="L256">        Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc" id="L257">        descriptor.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L258">    }</span>
 
     private static String sha256(String value) {
         try {
-<span class="fc" id="L263">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
-<span class="fc" id="L264">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
-<span class="fc" id="L265">                    .digest(value.getBytes(StandardCharsets.UTF_8))</span>
+<span class="fc" id="L262">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L263">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L264">                    .digest(value.getBytes(StandardCharsets.UTF_8))</span>
             );
-<span class="nc" id="L267">        } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L268">            throw new IllegalStateException(&quot;SHA-256 is unavailable&quot;, exception);</span>
+<span class="nc" id="L266">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L267">            throw new IllegalStateException(&quot;SHA-256 is unavailable&quot;, exception);</span>
         }
     }
 }

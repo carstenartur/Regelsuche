@@ -18,10 +18,10 @@ import java.util.List;
 
     private RulePatternNode convert(Expr expression) {
 <span class="fc bfc" id="L20" title="All 2 branches covered.">        if (expression instanceof NumberExpr numberExpr) {</span>
-<span class="pc bpc" id="L21" title="1 of 2 branches missed.">            if (Math.rint(numberExpr.value()) != numberExpr.value()) {</span>
-<span class="nc" id="L22">                throw new IllegalArgumentException(&quot;Only integer pattern numbers are supported: &quot; + numberExpr.value());</span>
+<span class="pc bpc" id="L21" title="2 of 4 branches missed.">            if (!numberExpr.value().isInteger() || numberExpr.value().numerator().bitLength() &gt; 31) {</span>
+<span class="nc" id="L22">                throw new IllegalArgumentException(&quot;Only 32-bit integer pattern numbers are supported: &quot; + numberExpr.value());</span>
             }
-<span class="fc" id="L24">            return new PatternNumber((int) numberExpr.value());</span>
+<span class="fc" id="L24">            return new PatternNumber(numberExpr.value().intValueExact());</span>
         }
 <span class="fc bfc" id="L26" title="All 2 branches covered.">        if (expression instanceof VariableExpr variableExpr) {</span>
 <span class="fc" id="L27">            return new PatternVariable(variableExpr.name());</span>

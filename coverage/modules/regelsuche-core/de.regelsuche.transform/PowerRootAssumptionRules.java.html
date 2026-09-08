@@ -35,7 +35,7 @@ import java.util.Locale;
 <span class="pc bpc" id="L35" title="2 of 4 branches missed.">        if (!(argument instanceof BinaryExpr power) || power.operator() != BinaryOperator.POW) {</span>
 <span class="nc" id="L36">            return List.of();</span>
         }
-<span class="pc bpc" id="L38" title="2 of 4 branches missed.">        if (!(power.right() instanceof NumberExpr exponent) || Double.compare(exponent.value(), 2.0) != 0) {</span>
+<span class="pc bpc" id="L38" title="2 of 4 branches missed.">        if (!(power.right() instanceof NumberExpr exponent) || !exponent.value().equalsInteger(2)) {</span>
 <span class="nc" id="L39">            return List.of();</span>
         }
 <span class="fc" id="L41">        String base = ExpressionFormatter.format(power.left());</span>

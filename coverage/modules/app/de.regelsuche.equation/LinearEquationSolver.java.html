@@ -8,6 +8,7 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.scalar.ExactRational;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -28,107 +29,107 @@ import java.util.Optional;
  * equations (e.g. with a {@code x^2} or {@code sin(x)} term) yield
  * {@link Optional#empty()} rather than producing an incorrect rewrite.&lt;/p&gt;
  */
-<span class="fc" id="L31">public final class LinearEquationSolver {</span>
+<span class="fc" id="L32">public final class LinearEquationSolver {</span>
 
     public Optional&lt;Solution&gt; solve(Equation equation, String variable) {
-<span class="fc" id="L34">        Objects.requireNonNull(equation, &quot;equation&quot;);</span>
-<span class="fc" id="L35">        Objects.requireNonNull(variable, &quot;variable&quot;);</span>
-<span class="fc" id="L36">        Optional&lt;LinearForm&gt; leftForm = LinearForm.of(equation.left(), variable);</span>
-<span class="fc" id="L37">        Optional&lt;LinearForm&gt; rightForm = LinearForm.of(equation.right(), variable);</span>
-<span class="pc bpc" id="L38" title="1 of 4 branches missed.">        if (leftForm.isEmpty() || rightForm.isEmpty()) {</span>
-<span class="fc" id="L39">            return Optional.empty();</span>
+<span class="fc" id="L35">        Objects.requireNonNull(equation, &quot;equation&quot;);</span>
+<span class="fc" id="L36">        Objects.requireNonNull(variable, &quot;variable&quot;);</span>
+<span class="fc" id="L37">        Optional&lt;LinearForm&gt; leftForm = LinearForm.of(equation.left(), variable);</span>
+<span class="fc" id="L38">        Optional&lt;LinearForm&gt; rightForm = LinearForm.of(equation.right(), variable);</span>
+<span class="pc bpc" id="L39" title="1 of 4 branches missed.">        if (leftForm.isEmpty() || rightForm.isEmpty()) {</span>
+<span class="fc" id="L40">            return Optional.empty();</span>
         }
-<span class="fc" id="L41">        double aCoeff = leftForm.get().coefficient() - rightForm.get().coefficient();</span>
-<span class="fc" id="L42">        double bConst = rightForm.get().constant() - leftForm.get().constant();</span>
+<span class="fc" id="L42">        ExactRational aCoeff = leftForm.get().coefficient().subtract(rightForm.get().coefficient());</span>
+<span class="fc" id="L43">        ExactRational bConst = rightForm.get().constant().subtract(leftForm.get().constant());</span>
 
-<span class="fc" id="L44">        List&lt;EquationStep&gt; steps = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L45">        List&lt;Assumption&gt; assumptions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L45">        List&lt;EquationStep&gt; steps = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L46">        List&lt;Assumption&gt; assumptions = new ArrayList&lt;&gt;();</span>
 
         // Subtract the right-hand side variable term (if any) so the variable
         // only appears on the left.
-<span class="fc" id="L49">        Expr currentLeft = equation.left();</span>
-<span class="fc" id="L50">        Expr currentRight = equation.right();</span>
-<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (rightForm.get().coefficient() != 0.0) {</span>
-<span class="fc" id="L52">            Expr term = makeTerm(rightForm.get().coefficient(), variable);</span>
-<span class="fc" id="L53">            Equation next = new Equation(</span>
+<span class="fc" id="L50">        Expr currentLeft = equation.left();</span>
+<span class="fc" id="L51">        Expr currentRight = equation.right();</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (!rightForm.get().coefficient().isZero()) {</span>
+<span class="fc" id="L53">            Expr term = makeTerm(rightForm.get().coefficient(), variable);</span>
+<span class="fc" id="L54">            Equation next = new Equation(</span>
                 new BinaryExpr(currentLeft, BinaryOperator.SUB, term),
                 new BinaryExpr(currentRight, BinaryOperator.SUB, term)
             );
-<span class="fc" id="L57">            steps.add(new EquationStep(</span>
+<span class="fc" id="L58">            steps.add(new EquationStep(</span>
                 &quot;equation_subtract_both_sides&quot;,
                 next,
-<span class="fc" id="L60">                &quot;Subtrahiere &quot; + ExpressionFormatter.format(term) + &quot; auf beiden Seiten&quot;,</span>
-<span class="fc" id="L61">                List.of()</span>
+<span class="fc" id="L61">                &quot;Subtrahiere &quot; + ExpressionFormatter.format(term) + &quot; auf beiden Seiten&quot;,</span>
+<span class="fc" id="L62">                List.of()</span>
             ));
-<span class="fc" id="L63">            currentLeft = next.left();</span>
-<span class="fc" id="L64">            currentRight = next.right();</span>
+<span class="fc" id="L64">            currentLeft = next.left();</span>
+<span class="fc" id="L65">            currentRight = next.right();</span>
         }
 
         // Subtract the left-hand-side constant so the variable side becomes a*x.
-<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (leftForm.get().constant() != 0.0) {</span>
-<span class="fc" id="L69">            Expr constant = number(leftForm.get().constant());</span>
-<span class="fc" id="L70">            Equation next = new Equation(</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (!leftForm.get().constant().isZero()) {</span>
+<span class="fc" id="L70">            Expr constant = number(leftForm.get().constant());</span>
+<span class="fc" id="L71">            Equation next = new Equation(</span>
                 new BinaryExpr(currentLeft, BinaryOperator.SUB, constant),
                 new BinaryExpr(currentRight, BinaryOperator.SUB, constant)
             );
-<span class="fc" id="L74">            steps.add(new EquationStep(</span>
+<span class="fc" id="L75">            steps.add(new EquationStep(</span>
                 &quot;equation_subtract_both_sides&quot;,
                 next,
-<span class="fc" id="L77">                &quot;Subtrahiere &quot; + ExpressionFormatter.format(constant) + &quot; auf beiden Seiten&quot;,</span>
-<span class="fc" id="L78">                List.of()</span>
+<span class="fc" id="L78">                &quot;Subtrahiere &quot; + ExpressionFormatter.format(constant) + &quot; auf beiden Seiten&quot;,</span>
+<span class="fc" id="L79">                List.of()</span>
             ));
         }
 
         // At this point the equation is a*x = b.
-<span class="fc" id="L83">        Equation isolated = new Equation(</span>
-<span class="fc" id="L84">            makeTerm(aCoeff, variable),</span>
-<span class="fc" id="L85">            number(bConst)</span>
+<span class="fc" id="L84">        Equation isolated = new Equation(</span>
+<span class="fc" id="L85">            makeTerm(aCoeff, variable),</span>
+<span class="fc" id="L86">            number(bConst)</span>
         );
 
-<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (aCoeff == 0.0) {</span>
-<span class="fc bfc" id="L89" title="All 2 branches covered.">            if (bConst == 0.0) {</span>
-<span class="fc" id="L90">                return Optional.of(new Solution(Status.IDENTITY, equation, isolated, null, List.copyOf(steps), List.copyOf(assumptions)));</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (aCoeff.isZero()) {</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            if (bConst.isZero()) {</span>
+<span class="fc" id="L91">                return Optional.of(new Solution(Status.IDENTITY, equation, isolated, null, List.copyOf(steps), List.copyOf(assumptions)));</span>
             }
-<span class="fc" id="L92">            return Optional.of(new Solution(Status.NO_SOLUTION, equation, isolated, null, List.copyOf(steps), List.copyOf(assumptions)));</span>
+<span class="fc" id="L93">            return Optional.of(new Solution(Status.NO_SOLUTION, equation, isolated, null, List.copyOf(steps), List.copyOf(assumptions)));</span>
         }
 
         // Divide both sides by aCoeff.
-<span class="fc" id="L96">        Expr divisor = number(aCoeff);</span>
-<span class="fc" id="L97">        Equation divided = new Equation(</span>
+<span class="fc" id="L97">        Expr divisor = number(aCoeff);</span>
+<span class="fc" id="L98">        Equation divided = new Equation(</span>
             new VariableExpr(variable),
-<span class="fc" id="L99">            number(bConst / aCoeff)</span>
+<span class="fc" id="L100">            number(bConst.divide(aCoeff))</span>
         );
-<span class="fc" id="L101">        Assumption divisorAssumption = Assumption.nonZero(ExpressionFormatter.format(divisor));</span>
-<span class="fc" id="L102">        assumptions.add(divisorAssumption);</span>
-<span class="fc" id="L103">        steps.add(new EquationStep(</span>
+<span class="fc" id="L102">        Assumption divisorAssumption = Assumption.nonZero(ExpressionFormatter.format(divisor));</span>
+<span class="fc" id="L103">        assumptions.add(divisorAssumption);</span>
+<span class="fc" id="L104">        steps.add(new EquationStep(</span>
             &quot;equation_divide_both_sides&quot;,
             divided,
-<span class="fc" id="L106">            &quot;Dividiere beide Seiten durch &quot; + ExpressionFormatter.format(divisor),</span>
-<span class="fc" id="L107">            List.of(divisorAssumption)</span>
+<span class="fc" id="L107">            &quot;Dividiere beide Seiten durch &quot; + ExpressionFormatter.format(divisor),</span>
+<span class="fc" id="L108">            List.of(divisorAssumption)</span>
         ));
 
-<span class="fc" id="L110">        return Optional.of(new Solution(</span>
+<span class="fc" id="L111">        return Optional.of(new Solution(</span>
             Status.UNIQUE,
             equation,
             divided,
-<span class="fc" id="L114">            bConst / aCoeff,</span>
-<span class="fc" id="L115">            List.copyOf(steps),</span>
-<span class="fc" id="L116">            List.copyOf(assumptions)</span>
+<span class="fc" id="L115">            bConst.divide(aCoeff),</span>
+<span class="fc" id="L116">            List.copyOf(steps),</span>
+<span class="fc" id="L117">            List.copyOf(assumptions)</span>
         ));
     }
 
-    private static Expr makeTerm(double coefficient, String variable) {
-<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (coefficient == 0.0) {</span>
-<span class="fc" id="L122">            return new NumberExpr(0);</span>
+    private static Expr makeTerm(ExactRational coefficient, String variable) {
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (coefficient.isZero()) {</span>
+<span class="fc" id="L123">            return new NumberExpr(0);</span>
         }
-<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (coefficient == 1.0) {</span>
-<span class="fc" id="L125">            return new VariableExpr(variable);</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (coefficient.isOne()) {</span>
+<span class="fc" id="L126">            return new VariableExpr(variable);</span>
         }
-<span class="fc" id="L127">        return new BinaryExpr(new NumberExpr(coefficient), BinaryOperator.MUL, new VariableExpr(variable));</span>
+<span class="fc" id="L128">        return new BinaryExpr(new NumberExpr(coefficient), BinaryOperator.MUL, new VariableExpr(variable));</span>
     }
 
-    private static Expr number(double value) {
-<span class="fc" id="L131">        return new NumberExpr(value);</span>
+    private static Expr number(ExactRational value) {
+<span class="fc" id="L132">        return new NumberExpr(value);</span>
     }
 
     /** Outcome of {@link LinearEquationSolver#solve}. */
@@ -136,26 +137,26 @@ import java.util.Optional;
         Status status,
         Equation original,
         Equation solved,
-        Double value,
+        ExactRational value,
         List&lt;EquationStep&gt; steps,
         List&lt;Assumption&gt; assumptions
     ) {
-<span class="fc" id="L143">        public Solution {</span>
-<span class="fc" id="L144">            Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="fc" id="L145">            Objects.requireNonNull(original, &quot;original&quot;);</span>
-<span class="fc" id="L146">            Objects.requireNonNull(solved, &quot;solved&quot;);</span>
-<span class="pc bpc" id="L147" title="1 of 2 branches missed.">            steps = List.copyOf(steps == null ? List.of() : steps);</span>
-<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            assumptions = List.copyOf(assumptions == null ? List.of() : assumptions);</span>
-<span class="fc" id="L149">        }</span>
+<span class="fc" id="L144">        public Solution {</span>
+<span class="fc" id="L145">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L146">            Objects.requireNonNull(original, &quot;original&quot;);</span>
+<span class="fc" id="L147">            Objects.requireNonNull(solved, &quot;solved&quot;);</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            steps = List.copyOf(steps == null ? List.of() : steps);</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">            assumptions = List.copyOf(assumptions == null ? List.of() : assumptions);</span>
+<span class="fc" id="L150">        }</span>
     }
 
-<span class="fc" id="L152">    public enum Status {</span>
+<span class="fc" id="L153">    public enum Status {</span>
         /** Single solution: {@code x = value}. */
-<span class="fc" id="L154">        UNIQUE,</span>
+<span class="fc" id="L155">        UNIQUE,</span>
         /** Both sides reduce to the same expression — every {@code x} satisfies it. */
-<span class="fc" id="L156">        IDENTITY,</span>
+<span class="fc" id="L157">        IDENTITY,</span>
         /** Coefficients cancel but constants differ — no solution. */
-<span class="fc" id="L158">        NO_SOLUTION</span>
+<span class="fc" id="L159">        NO_SOLUTION</span>
     }
 
     /**
@@ -163,51 +164,51 @@ import java.util.Optional;
      * from an expression tree. Returns {@link Optional#empty()} when the
      * expression is not linear in {@code variable}.
      */
-<span class="fc" id="L166">    public record LinearForm(double coefficient, double constant) {</span>
+<span class="fc" id="L167">    public record LinearForm(ExactRational coefficient, ExactRational constant) {</span>
         public static Optional&lt;LinearForm&gt; of(Expr expr, String variable) {
-<span class="fc bfc" id="L168" title="All 2 branches covered.">            if (expr instanceof NumberExpr number) {</span>
-<span class="fc" id="L169">                return Optional.of(new LinearForm(0.0, number.value()));</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            if (expr instanceof NumberExpr number) {</span>
+<span class="fc" id="L170">                return Optional.of(new LinearForm(ExactRational.ZERO, number.value()));</span>
             }
-<span class="fc bfc" id="L171" title="All 2 branches covered.">            if (expr instanceof VariableExpr variableExpr) {</span>
-<span class="pc bpc" id="L172" title="1 of 2 branches missed.">                if (variableExpr.name().equals(variable)) {</span>
-<span class="fc" id="L173">                    return Optional.of(new LinearForm(1.0, 0.0));</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">            if (expr instanceof VariableExpr variableExpr) {</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">                if (variableExpr.name().equals(variable)) {</span>
+<span class="fc" id="L174">                    return Optional.of(new LinearForm(ExactRational.ONE, ExactRational.ZERO));</span>
                 }
-<span class="nc" id="L175">                return Optional.empty();</span>
+<span class="nc" id="L176">                return Optional.empty();</span>
             }
-<span class="pc bpc" id="L177" title="1 of 2 branches missed.">            if (expr instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L178">                Optional&lt;LinearForm&gt; left = of(binary.left(), variable);</span>
-<span class="fc" id="L179">                Optional&lt;LinearForm&gt; right = of(binary.right(), variable);</span>
-<span class="pc bpc" id="L180" title="2 of 4 branches missed.">                if (left.isEmpty() || right.isEmpty()) {</span>
-<span class="nc" id="L181">                    return Optional.empty();</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">            if (expr instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L179">                Optional&lt;LinearForm&gt; left = of(binary.left(), variable);</span>
+<span class="fc" id="L180">                Optional&lt;LinearForm&gt; right = of(binary.right(), variable);</span>
+<span class="pc bpc" id="L181" title="2 of 4 branches missed.">                if (left.isEmpty() || right.isEmpty()) {</span>
+<span class="nc" id="L182">                    return Optional.empty();</span>
                 }
-<span class="fc" id="L183">                LinearForm l = left.get();</span>
-<span class="fc" id="L184">                LinearForm r = right.get();</span>
-<span class="pc bpc" id="L185" title="1 of 5 branches missed.">                return switch (binary.operator()) {</span>
-<span class="fc" id="L186">                    case ADD -&gt; Optional.of(new LinearForm(l.coefficient + r.coefficient, l.constant + r.constant));</span>
-<span class="fc" id="L187">                    case SUB -&gt; Optional.of(new LinearForm(l.coefficient - r.coefficient, l.constant - r.constant));</span>
+<span class="fc" id="L184">                LinearForm l = left.get();</span>
+<span class="fc" id="L185">                LinearForm r = right.get();</span>
+<span class="pc bpc" id="L186" title="1 of 5 branches missed.">                return switch (binary.operator()) {</span>
+<span class="fc" id="L187">                    case ADD -&gt; Optional.of(new LinearForm(l.coefficient.add(r.coefficient), l.constant.add(r.constant)));</span>
+<span class="fc" id="L188">                    case SUB -&gt; Optional.of(new LinearForm(l.coefficient.subtract(r.coefficient), l.constant.subtract(r.constant)));</span>
                     case MUL -&gt; {
-<span class="pc bpc" id="L189" title="1 of 2 branches missed.">                        if (l.coefficient == 0.0) {</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">                        if (l.coefficient.isZero()) {</span>
                             // l is a pure constant, multiply r by it
-<span class="fc" id="L191">                            yield Optional.of(new LinearForm(l.constant * r.coefficient, l.constant * r.constant));</span>
+<span class="fc" id="L192">                            yield Optional.of(new LinearForm(l.constant.multiply(r.coefficient), l.constant.multiply(r.constant)));</span>
                         }
-<span class="nc bnc" id="L193" title="All 2 branches missed.">                        if (r.coefficient == 0.0) {</span>
-<span class="nc" id="L194">                            yield Optional.of(new LinearForm(r.constant * l.coefficient, r.constant * l.constant));</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">                        if (r.coefficient.isZero()) {</span>
+<span class="nc" id="L195">                            yield Optional.of(new LinearForm(r.constant.multiply(l.coefficient), r.constant.multiply(l.constant)));</span>
                         }
                         // x * x or similar — non-linear.
-<span class="nc" id="L197">                        yield Optional.empty();</span>
+<span class="nc" id="L198">                        yield Optional.empty();</span>
                     }
                     case DIV -&gt; {
-<span class="nc bnc" id="L200" title="All 4 branches missed.">                        if (r.coefficient != 0.0 || r.constant == 0.0) {</span>
+<span class="nc bnc" id="L201" title="All 4 branches missed.">                        if (!r.coefficient.isZero() || r.constant.isZero()) {</span>
                             // Division by anything containing the variable, or by zero, is rejected.
-<span class="nc" id="L202">                            yield Optional.empty();</span>
+<span class="nc" id="L203">                            yield Optional.empty();</span>
                         }
-<span class="nc" id="L204">                        yield Optional.of(new LinearForm(l.coefficient / r.constant, l.constant / r.constant));</span>
+<span class="nc" id="L205">                        yield Optional.of(new LinearForm(l.coefficient.divide(r.constant), l.constant.divide(r.constant)));</span>
                     }
-<span class="fc" id="L206">                    case POW -&gt; Optional.empty();</span>
+<span class="fc" id="L207">                    case POW -&gt; Optional.empty();</span>
                 };
             }
             // Function calls (sin, cos, ...) are non-linear in the variable.
-<span class="nc" id="L210">            return Optional.empty();</span>
+<span class="nc" id="L211">            return Optional.empty();</span>
         }
     }
 }

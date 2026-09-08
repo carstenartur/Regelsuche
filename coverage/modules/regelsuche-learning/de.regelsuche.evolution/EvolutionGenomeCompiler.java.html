@@ -64,32 +64,30 @@ public final class EvolutionGenomeCompiler {
 <span class="fc" id="L64">            return &quot;?&quot; + placeholder.name();</span>
         }
 <span class="fc bfc" id="L66" title="All 2 branches covered.">        if (expression instanceof PatternExpr.LiteralNumber number) {</span>
-<span class="fc" id="L67">            double value = number.value();</span>
-<span class="pc bpc" id="L68" title="1 of 2 branches missed.">            return value == Math.rint(value)</span>
-<span class="fc" id="L69">                ? Long.toString((long) value)</span>
-<span class="nc" id="L70">                : Double.toString(value);</span>
+<span class="fc" id="L67">            return de.regelsuche.parse.ExpressionFormatter.format(</span>
+<span class="fc" id="L68">                new de.regelsuche.ast.NumberExpr(number.value()));</span>
         }
-<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (expression instanceof PatternExpr.LiteralVariable variable) {</span>
-<span class="fc" id="L73">            return variable.name();</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (expression instanceof PatternExpr.LiteralVariable variable) {</span>
+<span class="fc" id="L71">            return variable.name();</span>
         }
-<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (expression instanceof PatternExpr.Operation operation) {</span>
-<span class="fc" id="L76">            return &quot;(&quot; + renderPattern(operation.left())</span>
-<span class="fc" id="L77">                + operatorSymbol(operation.operator())</span>
-<span class="fc" id="L78">                + renderPattern(operation.right()) + &quot;)&quot;;</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (expression instanceof PatternExpr.Operation operation) {</span>
+<span class="fc" id="L74">            return &quot;(&quot; + renderPattern(operation.left())</span>
+<span class="fc" id="L75">                + operatorSymbol(operation.operator())</span>
+<span class="fc" id="L76">                + renderPattern(operation.right()) + &quot;)&quot;;</span>
         }
-<span class="fc" id="L80">        PatternExpr.Function function = (PatternExpr.Function) expression;</span>
-<span class="fc" id="L81">        return function.name() + &quot;(&quot; + function.arguments().stream()</span>
-<span class="fc" id="L82">            .map(EvolutionGenomeCompiler::renderPattern)</span>
-<span class="fc" id="L83">            .collect(java.util.stream.Collectors.joining(&quot;,&quot;)) + &quot;)&quot;;</span>
+<span class="fc" id="L78">        PatternExpr.Function function = (PatternExpr.Function) expression;</span>
+<span class="fc" id="L79">        return function.name() + &quot;(&quot; + function.arguments().stream()</span>
+<span class="fc" id="L80">            .map(EvolutionGenomeCompiler::renderPattern)</span>
+<span class="fc" id="L81">            .collect(java.util.stream.Collectors.joining(&quot;,&quot;)) + &quot;)&quot;;</span>
     }
 
     private static String operatorSymbol(BinaryOperator operator) {
-<span class="fc bfc" id="L87" title="All 5 branches covered.">        return switch (operator) {</span>
-<span class="fc" id="L88">            case ADD -&gt; &quot;+&quot;;</span>
-<span class="fc" id="L89">            case SUB -&gt; &quot;-&quot;;</span>
-<span class="fc" id="L90">            case MUL -&gt; &quot;*&quot;;</span>
-<span class="fc" id="L91">            case DIV -&gt; &quot;/&quot;;</span>
-<span class="fc" id="L92">            case POW -&gt; &quot;^&quot;;</span>
+<span class="fc bfc" id="L85" title="All 5 branches covered.">        return switch (operator) {</span>
+<span class="fc" id="L86">            case ADD -&gt; &quot;+&quot;;</span>
+<span class="fc" id="L87">            case SUB -&gt; &quot;-&quot;;</span>
+<span class="fc" id="L88">            case MUL -&gt; &quot;*&quot;;</span>
+<span class="fc" id="L89">            case DIV -&gt; &quot;/&quot;;</span>
+<span class="fc" id="L90">            case POW -&gt; &quot;^&quot;;</span>
         };
     }
 
@@ -100,16 +98,16 @@ public final class EvolutionGenomeCompiler {
         EvolutionGenome.ResourceBudget budget,
         List&lt;RewriteRule&gt; rules
     ) {
-<span class="fc" id="L103">        public CompiledProgram {</span>
-<span class="fc" id="L104">            EvolutionGenome.requireSha256(genomeHash, &quot;genomeHash&quot;);</span>
-<span class="fc" id="L105">            EvolutionGenome.requireSha256(alphaStructuralHash, &quot;alphaStructuralHash&quot;);</span>
-<span class="fc" id="L106">            Objects.requireNonNull(objective, &quot;objective&quot;);</span>
-<span class="fc" id="L107">            Objects.requireNonNull(budget, &quot;budget&quot;);</span>
-<span class="fc" id="L108">            rules = List.copyOf(rules);</span>
-<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            if (rules.isEmpty()) {</span>
-<span class="nc" id="L110">                throw new IllegalArgumentException(&quot;compiled program must contain rules&quot;);</span>
+<span class="fc" id="L101">        public CompiledProgram {</span>
+<span class="fc" id="L102">            EvolutionGenome.requireSha256(genomeHash, &quot;genomeHash&quot;);</span>
+<span class="fc" id="L103">            EvolutionGenome.requireSha256(alphaStructuralHash, &quot;alphaStructuralHash&quot;);</span>
+<span class="fc" id="L104">            Objects.requireNonNull(objective, &quot;objective&quot;);</span>
+<span class="fc" id="L105">            Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L106">            rules = List.copyOf(rules);</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            if (rules.isEmpty()) {</span>
+<span class="nc" id="L108">                throw new IllegalArgumentException(&quot;compiled program must contain rules&quot;);</span>
             }
-<span class="fc" id="L112">        }</span>
+<span class="fc" id="L110">        }</span>
     }
 
     private static final class CompiledGenomeRule implements RewriteRule {
@@ -121,87 +119,87 @@ public final class EvolutionGenomeCompiler {
         private CompiledGenomeRule(
             EvolutionGenome genome,
             EvolutionGenome.RewriteGene gene
-<span class="fc" id="L124">        ) {</span>
-<span class="fc" id="L125">            this.id = &quot;evo_&quot;</span>
-<span class="fc" id="L126">                + genome.alphaStructuralHash().substring(&quot;sha256:&quot;.length(), 19)</span>
-<span class="fc" id="L127">                + &quot;_&quot; + gene.geneId();</span>
-<span class="fc" id="L128">            this.gene = gene;</span>
-<span class="fc" id="L129">            this.source = parsePattern(gene.sourcePattern());</span>
-<span class="fc" id="L130">            this.target = parsePattern(gene.targetPattern());</span>
-<span class="fc" id="L131">        }</span>
+<span class="fc" id="L122">        ) {</span>
+<span class="fc" id="L123">            this.id = &quot;evo_&quot;</span>
+<span class="fc" id="L124">                + genome.alphaStructuralHash().substring(&quot;sha256:&quot;.length(), 19)</span>
+<span class="fc" id="L125">                + &quot;_&quot; + gene.geneId();</span>
+<span class="fc" id="L126">            this.gene = gene;</span>
+<span class="fc" id="L127">            this.source = parsePattern(gene.sourcePattern());</span>
+<span class="fc" id="L128">            this.target = parsePattern(gene.targetPattern());</span>
+<span class="fc" id="L129">        }</span>
 
         @Override
         public String id() {
-<span class="fc" id="L135">            return id;</span>
+<span class="fc" id="L133">            return id;</span>
         }
 
         @Override
         public RewriteKind kind() {
-<span class="fc" id="L140">            return gene.kind();</span>
+<span class="fc" id="L138">            return gene.kind();</span>
         }
 
         @Override
         public boolean mayIncreaseComplexity() {
-<span class="pc bpc" id="L145" title="1 of 2 branches missed.">            return gene.maxAstGrowth() &gt; 0;</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">            return gene.maxAstGrowth() &gt; 0;</span>
         }
 
         @Override
         public int estimatedCostDelta() {
-<span class="fc" id="L150">            return gene.estimatedCostDelta();</span>
+<span class="fc" id="L148">            return gene.estimatedCostDelta();</span>
         }
 
         @Override
         public boolean isEquivalencePreservingByConstruction() {
-<span class="fc" id="L155">            return false;</span>
+<span class="fc" id="L153">            return false;</span>
         }
 
         @Override
         public boolean matches(Expr subtree) {
-<span class="fc" id="L160">            return source.match(subtree, new HashMap&lt;&gt;());</span>
+<span class="fc" id="L158">            return source.match(subtree, new HashMap&lt;&gt;());</span>
         }
 
         @Override
         public Expr apply(Expr subtree) {
-<span class="fc" id="L165">            Map&lt;String, Expr&gt; bindings = new HashMap&lt;&gt;();</span>
-<span class="pc bpc" id="L166" title="1 of 2 branches missed.">            if (!source.match(subtree, bindings)) {</span>
-<span class="nc" id="L167">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+<span class="fc" id="L163">            Map&lt;String, Expr&gt; bindings = new HashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">            if (!source.match(subtree, bindings)) {</span>
+<span class="nc" id="L165">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
             }
-<span class="fc" id="L169">            return target.instantiate(bindings);</span>
+<span class="fc" id="L167">            return target.instantiate(bindings);</span>
         }
 
         @Override
         public List&lt;Assumption&gt; assumptions(Expr subtree) {
-<span class="fc bfc" id="L174" title="All 2 branches covered.">            if (gene.assumptions().isEmpty()) {</span>
-<span class="fc" id="L175">                return List.of();</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">            if (gene.assumptions().isEmpty()) {</span>
+<span class="fc" id="L173">                return List.of();</span>
             }
-<span class="fc" id="L177">            Map&lt;String, Expr&gt; bindings = new HashMap&lt;&gt;();</span>
-<span class="pc bpc" id="L178" title="1 of 2 branches missed.">            if (!source.match(subtree, bindings)) {</span>
-<span class="nc" id="L179">                return List.of();</span>
+<span class="fc" id="L175">            Map&lt;String, Expr&gt; bindings = new HashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">            if (!source.match(subtree, bindings)) {</span>
+<span class="nc" id="L177">                return List.of();</span>
             }
-<span class="fc" id="L181">            return gene.assumptions().stream()</span>
-<span class="fc" id="L182">                .map(template -&gt; instantiate(template, bindings))</span>
-<span class="fc" id="L183">                .toList();</span>
+<span class="fc" id="L179">            return gene.assumptions().stream()</span>
+<span class="fc" id="L180">                .map(template -&gt; instantiate(template, bindings))</span>
+<span class="fc" id="L181">                .toList();</span>
         }
 
         private static Assumption instantiate(
             EvolutionGenome.AssumptionTemplate template,
             Map&lt;String, Expr&gt; bindings
         ) {
-<span class="fc" id="L190">            String expression = substitute(template.expression(), bindings);</span>
-<span class="fc" id="L191">            List&lt;String&gt; symbols = template.symbols().stream()</span>
-<span class="fc" id="L192">                .map(symbol -&gt; substitute(symbol, bindings))</span>
-<span class="fc" id="L193">                .toList();</span>
-<span class="fc" id="L194">            return new Assumption(template.kind(), expression, symbols);</span>
+<span class="fc" id="L188">            String expression = substitute(template.expression(), bindings);</span>
+<span class="fc" id="L189">            List&lt;String&gt; symbols = template.symbols().stream()</span>
+<span class="fc" id="L190">                .map(symbol -&gt; substitute(symbol, bindings))</span>
+<span class="fc" id="L191">                .toList();</span>
+<span class="fc" id="L192">            return new Assumption(template.kind(), expression, symbols);</span>
         }
 
         private static String substitute(String value, Map&lt;String, Expr&gt; bindings) {
-<span class="fc" id="L198">            return EvolutionGenome.transformPlaceholders(value, token -&gt; {</span>
-<span class="fc" id="L199">                Expr binding = bindings.get(token.substring(1));</span>
-<span class="pc bpc" id="L200" title="1 of 2 branches missed.">                if (binding == null) {</span>
-<span class="nc" id="L201">                    throw new IllegalArgumentException(</span>
+<span class="fc" id="L196">            return EvolutionGenome.transformPlaceholders(value, token -&gt; {</span>
+<span class="fc" id="L197">                Expr binding = bindings.get(token.substring(1));</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">                if (binding == null) {</span>
+<span class="nc" id="L199">                    throw new IllegalArgumentException(</span>
                         &quot;Missing binding for assumption placeholder &quot; + token);
                 }
-<span class="fc" id="L204">                return ExpressionFormatter.format(binding);</span>
+<span class="fc" id="L202">                return ExpressionFormatter.format(binding);</span>
             });
         }
     }
@@ -210,177 +208,173 @@ public final class EvolutionGenomeCompiler {
         private final String input;
         private int position;
 
-<span class="fc" id="L213">        private PatternParser(String input) {</span>
-<span class="fc" id="L214">            this.input = EvolutionGenome.normalizePattern(input);</span>
-<span class="fc" id="L215">        }</span>
+<span class="fc" id="L211">        private PatternParser(String input) {</span>
+<span class="fc" id="L212">            this.input = EvolutionGenome.normalizePattern(input);</span>
+<span class="fc" id="L213">        }</span>
 
         private PatternExpr parse() {
-<span class="fc" id="L218">            PatternExpr expression = parseExpression();</span>
-<span class="pc bpc" id="L219" title="1 of 2 branches missed.">            if (!isAtEnd()) {</span>
-<span class="nc" id="L220">                throw error(&quot;Unexpected token&quot;);</span>
+<span class="fc" id="L216">            PatternExpr expression = parseExpression();</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">            if (!isAtEnd()) {</span>
+<span class="nc" id="L218">                throw error(&quot;Unexpected token&quot;);</span>
             }
-<span class="fc" id="L222">            return expression;</span>
+<span class="fc" id="L220">            return expression;</span>
         }
 
         private PatternExpr parseExpression() {
-<span class="fc" id="L226">            PatternExpr expression = parseTerm();</span>
-<span class="fc bfc" id="L227" title="All 4 branches covered.">            while (peek('+') || peek('-')) {</span>
-<span class="fc" id="L228">                char operator = consume();</span>
-<span class="fc" id="L229">                PatternExpr right = parseTerm();</span>
-<span class="fc" id="L230">                expression = PatternExpr.op(</span>
-<span class="fc bfc" id="L231" title="All 2 branches covered.">                    operator == '+' ? BinaryOperator.ADD : BinaryOperator.SUB,</span>
+<span class="fc" id="L224">            PatternExpr expression = parseTerm();</span>
+<span class="fc bfc" id="L225" title="All 4 branches covered.">            while (peek('+') || peek('-')) {</span>
+<span class="fc" id="L226">                char operator = consume();</span>
+<span class="fc" id="L227">                PatternExpr right = parseTerm();</span>
+<span class="fc" id="L228">                expression = PatternExpr.op(</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">                    operator == '+' ? BinaryOperator.ADD : BinaryOperator.SUB,</span>
                     expression,
                     right);
-<span class="fc" id="L234">            }</span>
-<span class="fc" id="L235">            return expression;</span>
+<span class="fc" id="L232">            }</span>
+<span class="fc" id="L233">            return expression;</span>
         }
 
         private PatternExpr parseTerm() {
-<span class="fc" id="L239">            PatternExpr expression = parseUnary();</span>
-<span class="fc bfc" id="L240" title="All 4 branches covered.">            while (peek('*') || peek('/')) {</span>
-<span class="fc" id="L241">                char operator = consume();</span>
-<span class="fc" id="L242">                PatternExpr right = parseUnary();</span>
-<span class="fc" id="L243">                expression = PatternExpr.op(</span>
-<span class="fc bfc" id="L244" title="All 2 branches covered.">                    operator == '*' ? BinaryOperator.MUL : BinaryOperator.DIV,</span>
+<span class="fc" id="L237">            PatternExpr expression = parseUnary();</span>
+<span class="fc bfc" id="L238" title="All 4 branches covered.">            while (peek('*') || peek('/')) {</span>
+<span class="fc" id="L239">                char operator = consume();</span>
+<span class="fc" id="L240">                PatternExpr right = parseUnary();</span>
+<span class="fc" id="L241">                expression = PatternExpr.op(</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">                    operator == '*' ? BinaryOperator.MUL : BinaryOperator.DIV,</span>
                     expression,
                     right);
-<span class="fc" id="L247">            }</span>
-<span class="fc" id="L248">            return expression;</span>
+<span class="fc" id="L245">            }</span>
+<span class="fc" id="L246">            return expression;</span>
         }
 
         private PatternExpr parseUnary() {
-<span class="pc bpc" id="L252" title="1 of 2 branches missed.">            if (peek('-')) {</span>
-<span class="nc" id="L253">                consume();</span>
-<span class="nc" id="L254">                return PatternExpr.op(</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">            if (peek('-')) {</span>
+<span class="nc" id="L251">                consume();</span>
+<span class="nc" id="L252">                return PatternExpr.op(</span>
                     BinaryOperator.SUB,
-<span class="nc" id="L256">                    PatternExpr.num(0),</span>
-<span class="nc" id="L257">                    parseUnary());</span>
+<span class="nc" id="L254">                    PatternExpr.num(0),</span>
+<span class="nc" id="L255">                    parseUnary());</span>
             }
-<span class="fc" id="L259">            return parsePower();</span>
+<span class="fc" id="L257">            return parsePower();</span>
         }
 
         private PatternExpr parsePower() {
-<span class="fc" id="L263">            PatternExpr expression = parsePrimary();</span>
-<span class="fc bfc" id="L264" title="All 2 branches covered.">            if (peek('^')) {</span>
-<span class="fc" id="L265">                consume();</span>
-<span class="fc" id="L266">                return PatternExpr.op(BinaryOperator.POW, expression, parseUnary());</span>
+<span class="fc" id="L261">            PatternExpr expression = parsePrimary();</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">            if (peek('^')) {</span>
+<span class="fc" id="L263">                consume();</span>
+<span class="fc" id="L264">                return PatternExpr.op(BinaryOperator.POW, expression, parseUnary());</span>
             }
-<span class="fc" id="L268">            return expression;</span>
+<span class="fc" id="L266">            return expression;</span>
         }
 
         private PatternExpr parsePrimary() {
-<span class="fc bfc" id="L272" title="All 2 branches covered.">            if (peek('(')) {</span>
-<span class="fc" id="L273">                consume();</span>
-<span class="fc" id="L274">                PatternExpr expression = parseExpression();</span>
-<span class="fc" id="L275">                expect(')');</span>
-<span class="fc" id="L276">                return expression;</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">            if (peek('(')) {</span>
+<span class="fc" id="L271">                consume();</span>
+<span class="fc" id="L272">                PatternExpr expression = parseExpression();</span>
+<span class="fc" id="L273">                expect(')');</span>
+<span class="fc" id="L274">                return expression;</span>
             }
-<span class="fc bfc" id="L278" title="All 2 branches covered.">            if (peek('?')) {</span>
-<span class="fc" id="L279">                consume();</span>
-<span class="fc" id="L280">                String name = readIdentifier();</span>
-<span class="pc bpc" id="L281" title="1 of 2 branches missed.">                if (name.isEmpty()) {</span>
-<span class="nc" id="L282">                    throw error(&quot;Expected placeholder name&quot;);</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">            if (peek('?')) {</span>
+<span class="fc" id="L277">                consume();</span>
+<span class="fc" id="L278">                String name = readIdentifier();</span>
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">                if (name.isEmpty()) {</span>
+<span class="nc" id="L280">                    throw error(&quot;Expected placeholder name&quot;);</span>
                 }
-<span class="fc" id="L284">                return PatternExpr.var(name);</span>
+<span class="fc" id="L282">                return PatternExpr.var(name);</span>
             }
-<span class="pc bpc" id="L286" title="1 of 4 branches missed.">            if (peekDigit() || peek('.')) {</span>
-<span class="fc" id="L287">                return PatternExpr.num(readNumber());</span>
+<span class="pc bpc" id="L284" title="1 of 4 branches missed.">            if (peekDigit() || peek('.')) {</span>
+<span class="fc" id="L285">                return PatternExpr.num(readNumber());</span>
             }
-<span class="fc" id="L289">            String identifier = readIdentifier();</span>
-<span class="pc bpc" id="L290" title="1 of 2 branches missed.">            if (!identifier.isEmpty()) {</span>
-<span class="pc bpc" id="L291" title="1 of 2 branches missed.">                if (peek('(')) {</span>
-<span class="nc" id="L292">                    consume();</span>
-<span class="nc" id="L293">                    List&lt;PatternExpr&gt; arguments = new ArrayList&lt;&gt;();</span>
-<span class="nc bnc" id="L294" title="All 2 branches missed.">                    if (!peek(')')) {</span>
+<span class="fc" id="L287">            String identifier = readIdentifier();</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">            if (!identifier.isEmpty()) {</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">                if (peek('(')) {</span>
+<span class="nc" id="L290">                    consume();</span>
+<span class="nc" id="L291">                    List&lt;PatternExpr&gt; arguments = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L292" title="All 2 branches missed.">                    if (!peek(')')) {</span>
                         do {
-<span class="nc" id="L296">                            arguments.add(parseExpression());</span>
-<span class="nc bnc" id="L297" title="All 2 branches missed.">                        } while (consumeIf(','));</span>
+<span class="nc" id="L294">                            arguments.add(parseExpression());</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">                        } while (consumeIf(','));</span>
                     }
-<span class="nc" id="L299">                    expect(')');</span>
-<span class="nc" id="L300">                    return PatternExpr.fn(</span>
+<span class="nc" id="L297">                    expect(')');</span>
+<span class="nc" id="L298">                    return PatternExpr.fn(</span>
                         identifier,
-<span class="nc" id="L302">                        arguments.toArray(PatternExpr[]::new));</span>
+<span class="nc" id="L300">                        arguments.toArray(PatternExpr[]::new));</span>
                 }
-<span class="fc" id="L304">                return PatternExpr.variable(identifier);</span>
+<span class="fc" id="L302">                return PatternExpr.variable(identifier);</span>
             }
-<span class="nc" id="L306">            throw error(&quot;Expected expression&quot;);</span>
+<span class="nc" id="L304">            throw error(&quot;Expected expression&quot;);</span>
         }
 
         private String readIdentifier() {
-<span class="fc" id="L310">            int start = position;</span>
-<span class="pc bpc" id="L311" title="1 of 2 branches missed.">            if (!isAtEnd()</span>
-<span class="pc bpc" id="L312" title="1 of 2 branches missed.">                    &amp;&amp; (Character.isLetter(input.charAt(position))</span>
-<span class="nc bnc" id="L313" title="All 2 branches missed.">                        || input.charAt(position) == '_')) {</span>
-<span class="fc" id="L314">                position++;</span>
-<span class="fc bfc" id="L315" title="All 2 branches covered.">                while (!isAtEnd()</span>
-<span class="fc bfc" id="L316" title="All 2 branches covered.">                        &amp;&amp; (Character.isLetterOrDigit(input.charAt(position))</span>
-<span class="pc bpc" id="L317" title="1 of 2 branches missed.">                            || input.charAt(position) == '_')) {</span>
-<span class="fc" id="L318">                    position++;</span>
+<span class="fc" id="L308">            int start = position;</span>
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">            if (!isAtEnd()</span>
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">                    &amp;&amp; (Character.isLetter(input.charAt(position))</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">                        || input.charAt(position) == '_')) {</span>
+<span class="fc" id="L312">                position++;</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">                while (!isAtEnd()</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">                        &amp;&amp; (Character.isLetterOrDigit(input.charAt(position))</span>
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">                            || input.charAt(position) == '_')) {</span>
+<span class="fc" id="L316">                    position++;</span>
                 }
             }
-<span class="fc" id="L321">            return input.substring(start, position);</span>
+<span class="fc" id="L319">            return input.substring(start, position);</span>
         }
 
-        private double readNumber() {
-<span class="fc" id="L325">            int start = position;</span>
-<span class="fc" id="L326">            boolean decimal = false;</span>
-<span class="fc bfc" id="L327" title="All 2 branches covered.">            while (!isAtEnd()) {</span>
-<span class="fc" id="L328">                char current = input.charAt(position);</span>
-<span class="fc bfc" id="L329" title="All 2 branches covered.">                if (Character.isDigit(current)) {</span>
-<span class="fc" id="L330">                    position++;</span>
-<span class="pc bpc" id="L331" title="3 of 4 branches missed.">                } else if (current == '.' &amp;&amp; !decimal) {</span>
-<span class="nc" id="L332">                    decimal = true;</span>
-<span class="nc" id="L333">                    position++;</span>
+        private String readNumber() {
+<span class="fc" id="L323">            int start = position;</span>
+<span class="fc" id="L324">            boolean decimal = false;</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">            while (!isAtEnd()) {</span>
+<span class="fc" id="L326">                char current = input.charAt(position);</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">                if (Character.isDigit(current)) {</span>
+<span class="fc" id="L328">                    position++;</span>
+<span class="pc bpc" id="L329" title="3 of 4 branches missed.">                } else if (current == '.' &amp;&amp; !decimal) {</span>
+<span class="nc" id="L330">                    decimal = true;</span>
+<span class="nc" id="L331">                    position++;</span>
                 } else {
                     break;
                 }
-<span class="fc" id="L337">            }</span>
-<span class="fc" id="L338">            String token = input.substring(start, position);</span>
-<span class="pc bpc" id="L339" title="1 of 2 branches missed.">            if (token.equals(&quot;.&quot;)) {</span>
-<span class="nc" id="L340">                throw error(&quot;Invalid number&quot;);</span>
+<span class="fc" id="L335">            }</span>
+<span class="fc" id="L336">            String token = input.substring(start, position);</span>
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">            if (token.equals(&quot;.&quot;)) {</span>
+<span class="nc" id="L338">                throw error(&quot;Invalid number&quot;);</span>
             }
-            try {
-<span class="fc" id="L343">                return Double.parseDouble(token);</span>
-<span class="nc" id="L344">            } catch (NumberFormatException exception) {</span>
-<span class="nc" id="L345">                throw error(&quot;Invalid number&quot;);</span>
-            }
+<span class="fc" id="L340">            return token;</span>
         }
 
         private boolean consumeIf(char expected) {
-<span class="pc bpc" id="L350" title="1 of 2 branches missed.">            if (peek(expected)) {</span>
-<span class="fc" id="L351">                consume();</span>
-<span class="fc" id="L352">                return true;</span>
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">            if (peek(expected)) {</span>
+<span class="fc" id="L345">                consume();</span>
+<span class="fc" id="L346">                return true;</span>
             }
-<span class="nc" id="L354">            return false;</span>
+<span class="nc" id="L348">            return false;</span>
         }
 
         private void expect(char expected) {
-<span class="pc bpc" id="L358" title="1 of 2 branches missed.">            if (!consumeIf(expected)) {</span>
-<span class="nc" id="L359">                throw error(&quot;Expected '&quot; + expected + &quot;'&quot;);</span>
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">            if (!consumeIf(expected)) {</span>
+<span class="nc" id="L353">                throw error(&quot;Expected '&quot; + expected + &quot;'&quot;);</span>
             }
-<span class="fc" id="L361">        }</span>
+<span class="fc" id="L355">        }</span>
 
         private char consume() {
-<span class="pc bpc" id="L364" title="1 of 2 branches missed.">            if (isAtEnd()) {</span>
-<span class="nc" id="L365">                throw error(&quot;Unexpected end of pattern&quot;);</span>
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">            if (isAtEnd()) {</span>
+<span class="nc" id="L359">                throw error(&quot;Unexpected end of pattern&quot;);</span>
             }
-<span class="fc" id="L367">            return input.charAt(position++);</span>
+<span class="fc" id="L361">            return input.charAt(position++);</span>
         }
 
         private boolean peek(char expected) {
-<span class="fc bfc" id="L371" title="All 4 branches covered.">            return !isAtEnd() &amp;&amp; input.charAt(position) == expected;</span>
+<span class="fc bfc" id="L365" title="All 4 branches covered.">            return !isAtEnd() &amp;&amp; input.charAt(position) == expected;</span>
         }
 
         private boolean peekDigit() {
-<span class="pc bpc" id="L375" title="1 of 4 branches missed.">            return !isAtEnd() &amp;&amp; Character.isDigit(input.charAt(position));</span>
+<span class="pc bpc" id="L369" title="1 of 4 branches missed.">            return !isAtEnd() &amp;&amp; Character.isDigit(input.charAt(position));</span>
         }
 
         private boolean isAtEnd() {
-<span class="fc bfc" id="L379" title="All 2 branches covered.">            return position &gt;= input.length();</span>
+<span class="fc bfc" id="L373" title="All 2 branches covered.">            return position &gt;= input.length();</span>
         }
 
         private IllegalArgumentException error(String message) {
-<span class="nc" id="L383">            return new IllegalArgumentException(</span>
+<span class="nc" id="L377">            return new IllegalArgumentException(</span>
                 message + &quot; at position &quot; + position + &quot; in &quot; + input);
         }
     }

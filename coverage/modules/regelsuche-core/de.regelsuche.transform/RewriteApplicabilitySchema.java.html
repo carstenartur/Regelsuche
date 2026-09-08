@@ -117,7 +117,7 @@ public record RewriteApplicabilitySchema(
         Set&lt;PatternExpr&gt; denominators
     ) {
 <span class="fc bfc" id="L119" title="All 2 branches covered.">        if (expression instanceof PatternExpr.LiteralNumber number) {</span>
-<span class="pc bpc" id="L120" title="1 of 2 branches missed.">            if (number.value() == 0.0d) {</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">            if (number.value().equalsInteger(0)) {</span>
 <span class="fc" id="L121">                throw new IllegalArgumentException(</span>
                     &quot;applicability schema contains division by zero&quot;);
             }
@@ -133,8 +133,8 @@ public record RewriteApplicabilitySchema(
 <span class="pc bpc" id="L133" title="1 of 2 branches missed.">                &amp;&amp; operation.operator() == BinaryOperator.POW</span>
 <span class="nc bnc" id="L134" title="All 2 branches missed.">                &amp;&amp; operation.right()</span>
 <span class="nc" id="L135">                    instanceof PatternExpr.LiteralNumber exponent</span>
-<span class="nc bnc" id="L136" title="All 2 branches missed.">                &amp;&amp; exponent.value() &gt; 0.0d</span>
-<span class="nc bnc" id="L137" title="All 2 branches missed.">                &amp;&amp; exponent.value() == Math.rint(exponent.value())) {</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">                &amp;&amp; exponent.value().signum() &gt; 0</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">                &amp;&amp; exponent.value().isInteger()) {</span>
 <span class="nc" id="L138">            collectNonZeroFactors(operation.left(), denominators);</span>
 <span class="nc" id="L139">            return;</span>
         }

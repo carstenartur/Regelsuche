@@ -951,7 +951,7 @@ public final class SemanticSearchGraphAssembler {
 <span class="nc" id="L951">            return new BinaryExpr(left, binary.operator(), right);</span>
         }
 <span class="fc bfc" id="L953" title="All 4 branches covered.">        if (left instanceof NumberExpr leftNumber &amp;&amp; right instanceof NumberExpr rightNumber) {</span>
-<span class="fc" id="L954">            return new NumberExpr(leftNumber.value() * rightNumber.value());</span>
+<span class="fc" id="L954">            return new NumberExpr(leftNumber.value().multiply(rightNumber.value()));</span>
         }
 <span class="fc bfc" id="L956" title="All 2 branches covered.">        if (left.equals(right)) {</span>
 <span class="fc" id="L957">            return new BinaryExpr(left, BinaryOperator.POW, new NumberExpr(2));</span>

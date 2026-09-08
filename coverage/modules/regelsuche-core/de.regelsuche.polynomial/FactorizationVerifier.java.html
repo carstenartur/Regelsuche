@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FactorizationVerifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.polynomial</a> &gt; <span class="el_source">FactorizationVerifier.java</span></div><h1>FactorizationVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.polynomial;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalInt;
 
 /**
  * Executes one factorization engine and issues trusted evidence only after
@@ -21,28 +24,28 @@ public final class FactorizationVerifier {
         FactorizationEngine&lt;C&gt; engine,
         FactorizationRequest&lt;C&gt; request
     ) {
-<span class="fc" id="L24">        Objects.requireNonNull(engine, &quot;engine&quot;);</span>
-<span class="fc" id="L25">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L27">        Objects.requireNonNull(engine, &quot;engine&quot;);</span>
+<span class="fc" id="L28">        Objects.requireNonNull(request, &quot;request&quot;);</span>
 
-<span class="fc" id="L27">        String structuralViolation =</span>
-<span class="fc" id="L28">            request.structuralViolation().orElse(null);</span>
-<span class="fc bfc" id="L29" title="All 2 branches covered.">        if (structuralViolation != null) {</span>
-<span class="fc" id="L30">            return failure(</span>
-<span class="fc" id="L31">                engine.engineId(),</span>
+<span class="fc" id="L30">        String structuralViolation =</span>
+<span class="fc" id="L31">            request.structuralViolation().orElse(null);</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        if (structuralViolation != null) {</span>
+<span class="fc" id="L33">            return failure(</span>
+<span class="fc" id="L34">                engine.engineId(),</span>
                 Status.BUDGET_INCONCLUSIVE,
                 structuralViolation,
-<span class="fc" id="L34">                PolynomialWorkLedger.empty(),</span>
+<span class="fc" id="L37">                PolynomialWorkLedger.empty(),</span>
                 ClaimStrength.NONE,
                 &quot;&quot;,
                 request);
         }
-<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (!engine.coefficientDomainId().equals(</span>
-<span class="fc" id="L40">                request.source().ring().coefficientDomain().id())) {</span>
-<span class="nc" id="L41">            return failure(</span>
-<span class="nc" id="L42">                engine.engineId(),</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (!engine.coefficientDomainId().equals(</span>
+<span class="fc" id="L43">                request.source().ring().coefficientDomain().id())) {</span>
+<span class="nc" id="L44">            return failure(</span>
+<span class="nc" id="L45">                engine.engineId(),</span>
                 Status.UNSUPPORTED_DOMAIN,
                 &quot;ENGINE_COEFFICIENT_DOMAIN_MISMATCH&quot;,
-<span class="nc" id="L45">                PolynomialWorkLedger.empty(),</span>
+<span class="nc" id="L48">                PolynomialWorkLedger.empty(),</span>
                 ClaimStrength.NONE,
                 &quot;&quot;,
                 request);
@@ -50,61 +53,61 @@ public final class FactorizationVerifier {
 
         FactorizationEngine.EngineResult&lt;C&gt; raw;
         try {
-<span class="fc" id="L53">            raw = Objects.requireNonNull(</span>
-<span class="fc" id="L54">                engine.propose(request),</span>
+<span class="fc" id="L56">            raw = Objects.requireNonNull(</span>
+<span class="fc" id="L57">                engine.propose(request),</span>
                 &quot;factorization engine result&quot;);
-<span class="fc" id="L56">        } catch (RuntimeException exception) {</span>
-<span class="fc" id="L57">            return failure(</span>
-<span class="fc" id="L58">                engine.engineId(),</span>
+<span class="fc" id="L59">        } catch (RuntimeException exception) {</span>
+<span class="fc" id="L60">            return failure(</span>
+<span class="fc" id="L61">                engine.engineId(),</span>
                 Status.TECHNICAL_FAILURE,
-<span class="fc" id="L60">                technicalDetail(exception),</span>
-<span class="fc" id="L61">                PolynomialWorkLedger.empty(),</span>
+<span class="fc" id="L63">                technicalDetail(exception),</span>
+<span class="fc" id="L64">                PolynomialWorkLedger.empty(),</span>
                 ClaimStrength.NONE,
                 &quot;&quot;,
                 request);
-<span class="fc" id="L65">        }</span>
+<span class="fc" id="L68">        }</span>
 
-<span class="fc" id="L67">        Report&lt;C&gt; invalid = validateEngineContract(</span>
+<span class="fc" id="L70">        Report&lt;C&gt; invalid = validateEngineContract(</span>
             engine,
             request,
             raw);
-<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        if (invalid != null) {</span>
-<span class="nc" id="L72">            return invalid;</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (invalid != null) {</span>
+<span class="nc" id="L75">            return invalid;</span>
         }
-<span class="pc bpc" id="L74" title="2 of 6 branches missed.">        return switch (raw.outcome()) {</span>
-<span class="fc" id="L75">            case CANDIDATES -&gt; verifyCandidates(request, raw);</span>
-<span class="fc" id="L76">            case NO_CANDIDATE -&gt; noCandidate(request, raw);</span>
-<span class="nc" id="L77">            case UNSUPPORTED_DOMAIN -&gt; failure(</span>
-<span class="nc" id="L78">                raw.engineId(),</span>
+<span class="pc bpc" id="L77" title="2 of 6 branches missed.">        return switch (raw.outcome()) {</span>
+<span class="fc" id="L78">            case CANDIDATES -&gt; verifyCandidates(request, raw);</span>
+<span class="fc" id="L79">            case NO_CANDIDATE -&gt; noCandidate(request, raw);</span>
+<span class="nc" id="L80">            case UNSUPPORTED_DOMAIN -&gt; failure(</span>
+<span class="nc" id="L81">                raw.engineId(),</span>
                 Status.UNSUPPORTED_DOMAIN,
-<span class="nc" id="L80">                raw.detailCode(),</span>
-<span class="nc" id="L81">                raw.work(),</span>
+<span class="nc" id="L83">                raw.detailCode(),</span>
+<span class="nc" id="L84">                raw.work(),</span>
                 ClaimStrength.NONE,
-<span class="nc" id="L83">                raw.engineResultHash(),</span>
+<span class="nc" id="L86">                raw.engineResultHash(),</span>
                 request);
-<span class="fc" id="L85">            case UNSUPPORTED_REQUEST -&gt; failure(</span>
-<span class="fc" id="L86">                raw.engineId(),</span>
+<span class="fc" id="L88">            case UNSUPPORTED_REQUEST -&gt; failure(</span>
+<span class="fc" id="L89">                raw.engineId(),</span>
                 Status.UNSUPPORTED_REQUEST,
-<span class="fc" id="L88">                raw.detailCode(),</span>
-<span class="fc" id="L89">                raw.work(),</span>
+<span class="fc" id="L91">                raw.detailCode(),</span>
+<span class="fc" id="L92">                raw.work(),</span>
                 ClaimStrength.NONE,
-<span class="fc" id="L91">                raw.engineResultHash(),</span>
+<span class="fc" id="L94">                raw.engineResultHash(),</span>
                 request);
-<span class="fc" id="L93">            case BUDGET_INCONCLUSIVE -&gt; failure(</span>
-<span class="fc" id="L94">                raw.engineId(),</span>
+<span class="fc" id="L96">            case BUDGET_INCONCLUSIVE -&gt; failure(</span>
+<span class="fc" id="L97">                raw.engineId(),</span>
                 Status.BUDGET_INCONCLUSIVE,
-<span class="fc" id="L96">                raw.detailCode(),</span>
-<span class="fc" id="L97">                raw.work(),</span>
+<span class="fc" id="L99">                raw.detailCode(),</span>
+<span class="fc" id="L100">                raw.work(),</span>
                 ClaimStrength.NONE,
-<span class="fc" id="L99">                raw.engineResultHash(),</span>
+<span class="fc" id="L102">                raw.engineResultHash(),</span>
                 request);
-<span class="nc" id="L101">            case TECHNICAL_FAILURE -&gt; failure(</span>
-<span class="nc" id="L102">                raw.engineId(),</span>
+<span class="nc" id="L104">            case TECHNICAL_FAILURE -&gt; failure(</span>
+<span class="nc" id="L105">                raw.engineId(),</span>
                 Status.TECHNICAL_FAILURE,
-<span class="nc" id="L104">                raw.detailCode(),</span>
-<span class="nc" id="L105">                raw.work(),</span>
+<span class="nc" id="L107">                raw.detailCode(),</span>
+<span class="nc" id="L108">                raw.work(),</span>
                 ClaimStrength.NONE,
-<span class="nc" id="L107">                raw.engineResultHash(),</span>
+<span class="nc" id="L110">                raw.engineResultHash(),</span>
                 request);
         };
     }
@@ -114,104 +117,102 @@ public final class FactorizationVerifier {
         FactorizationRequest&lt;C&gt; request,
         FactorizationEngine.EngineResult&lt;C&gt; raw
     ) {
-<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (!engine.engineId().equals(raw.engineId())) {</span>
-<span class="nc" id="L118">            return failure(</span>
-<span class="nc" id="L119">                engine.engineId(),</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (!engine.engineId().equals(raw.engineId())) {</span>
+<span class="nc" id="L121">            return failure(</span>
+<span class="nc" id="L122">                engine.engineId(),</span>
                 Status.TECHNICAL_FAILURE,
                 &quot;ENGINE_RESULT_ID_MISMATCH&quot;,
-<span class="nc" id="L122">                raw.work(),</span>
+<span class="nc" id="L125">                raw.work(),</span>
                 ClaimStrength.NONE,
-<span class="nc" id="L124">                raw.engineResultHash(),</span>
+<span class="nc" id="L127">                raw.engineResultHash(),</span>
                 request);
         }
-<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (!raw.work().within(request.maxWorkUnits())) {</span>
-<span class="nc" id="L128">            return failure(</span>
-<span class="nc" id="L129">                raw.engineId(),</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (!raw.work().within(request.maxWorkUnits())) {</span>
+<span class="nc" id="L131">            return failure(</span>
+<span class="nc" id="L132">                raw.engineId(),</span>
                 Status.TECHNICAL_FAILURE,
                 &quot;ENGINE_EXCEEDED_REQUEST_WORK_BUDGET&quot;,
-<span class="nc" id="L132">                raw.work(),</span>
+<span class="nc" id="L135">                raw.work(),</span>
                 ClaimStrength.NONE,
-<span class="nc" id="L134">                raw.engineResultHash(),</span>
+<span class="nc" id="L137">                raw.engineResultHash(),</span>
                 request);
         }
-<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (raw.proposals().size() &gt; request.maxCandidates()) {</span>
-<span class="nc" id="L138">            return failure(</span>
-<span class="nc" id="L139">                raw.engineId(),</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (raw.proposals().size() &gt; request.maxCandidates()) {</span>
+<span class="nc" id="L141">            return failure(</span>
+<span class="nc" id="L142">                raw.engineId(),</span>
                 Status.TECHNICAL_FAILURE,
                 &quot;ENGINE_EXCEEDED_REQUEST_CANDIDATE_BUDGET&quot;,
-<span class="nc" id="L142">                raw.work(),</span>
+<span class="nc" id="L145">                raw.work(),</span>
                 ClaimStrength.NONE,
-<span class="nc" id="L144">                raw.engineResultHash(),</span>
+<span class="nc" id="L147">                raw.engineResultHash(),</span>
                 request);
         }
-<span class="fc" id="L147">        return null;</span>
+<span class="fc" id="L150">        return null;</span>
     }
 
     private static &lt;C&gt; Report&lt;C&gt; verifyCandidates(
         FactorizationRequest&lt;C&gt; request,
         FactorizationEngine.EngineResult&lt;C&gt; raw
     ) {
-<span class="fc" id="L154">        long remaining = request.maxWorkUnits()</span>
-<span class="fc" id="L155">            - raw.work().totalWorkUnits();</span>
-<span class="fc" id="L156">        WorkCounter verificationWork = new WorkCounter(remaining);</span>
-<span class="fc" id="L157">        List&lt;VerifiedCandidate&lt;C&gt;&gt; candidates = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L158" title="All 2 branches covered.">        for (FactorizationEngine.Proposal&lt;C&gt; proposal : raw.proposals()) {</span>
+<span class="fc" id="L157">        long remaining = request.maxWorkUnits()</span>
+<span class="fc" id="L158">            - raw.work().totalWorkUnits();</span>
+<span class="fc" id="L159">        WorkCounter verificationWork = new WorkCounter(remaining);</span>
+<span class="fc" id="L160">        List&lt;VerifiedCandidate&lt;C&gt;&gt; candidates = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        for (FactorizationEngine.Proposal&lt;C&gt; proposal : raw.proposals()) {</span>
             VerificationOutcome&lt;C&gt; outcome;
             try {
-<span class="fc" id="L161">                outcome = verifyProposal(</span>
-<span class="fc" id="L162">                    request.source(),</span>
+<span class="fc" id="L164">                outcome = verifyProposal(</span>
+<span class="fc" id="L165">                    request.source(),</span>
                     proposal,
                     verificationWork);
-<span class="nc" id="L165">            } catch (WorkLimitReached exception) {</span>
-<span class="nc" id="L166">                return failure(</span>
-<span class="nc" id="L167">                    raw.engineId(),</span>
+<span class="nc" id="L168">            } catch (WorkLimitReached exception) {</span>
+<span class="nc" id="L169">                return failure(</span>
+<span class="nc" id="L170">                    raw.engineId(),</span>
                     Status.BUDGET_INCONCLUSIVE,
                     &quot;INDEPENDENT_PRODUCT_VERIFICATION_BUDGET_EXCEEDED&quot;,
-<span class="nc" id="L170">                    merge(raw.work(), verificationWork.ledger()),</span>
+<span class="nc" id="L173">                    merge(raw.work(), verificationWork.ledger()),</span>
                     ClaimStrength.NONE,
-<span class="nc" id="L172">                    raw.engineResultHash(),</span>
+<span class="nc" id="L175">                    raw.engineResultHash(),</span>
                     request);
-<span class="fc" id="L174">            }</span>
-<span class="fc bfc" id="L175" title="All 2 branches covered.">            if (!outcome.verified()) {</span>
-<span class="fc" id="L176">                return failure(</span>
-<span class="fc" id="L177">                    raw.engineId(),</span>
+<span class="fc" id="L177">            }</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            if (!outcome.verified()) {</span>
+<span class="fc" id="L179">                return failure(</span>
+<span class="fc" id="L180">                    raw.engineId(),</span>
                     Status.TECHNICAL_FAILURE,
-<span class="fc" id="L179">                    outcome.detailCode(),</span>
-<span class="fc" id="L180">                    merge(raw.work(), verificationWork.ledger()),</span>
+<span class="fc" id="L182">                    outcome.detailCode(),</span>
+<span class="fc" id="L183">                    merge(raw.work(), verificationWork.ledger()),</span>
                     ClaimStrength.NONE,
-<span class="fc" id="L182">                    raw.engineResultHash(),</span>
+<span class="fc" id="L185">                    raw.engineResultHash(),</span>
                     request);
             }
-<span class="fc" id="L185">            candidates.add(issueVerifiedCandidate(</span>
+<span class="fc" id="L188">            candidates.add(issueVerifiedCandidate(</span>
                 proposal,
-<span class="fc" id="L187">                raw.backendClaim(),</span>
-<span class="fc" id="L188">                outcome.reconstructed(),</span>
-<span class="fc" id="L189">                request.source()));</span>
-<span class="fc" id="L190">        }</span>
+<span class="fc" id="L190">                raw.backendClaim(),</span>
+<span class="fc" id="L191">                outcome.reconstructed(),</span>
+<span class="fc" id="L192">                request.source()));</span>
+<span class="fc" id="L193">        }</span>
 
-<span class="fc" id="L192">        PolynomialWorkLedger combined =</span>
-<span class="fc" id="L193">            merge(raw.work(), verificationWork.ledger());</span>
-<span class="fc" id="L194">        ClaimStrength claim = claimFor(raw.backendClaim());</span>
-<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (request.evidenceRequirement()</span>
+<span class="fc" id="L195">        PolynomialWorkLedger combined =</span>
+<span class="fc" id="L196">            merge(raw.work(), verificationWork.ledger());</span>
+<span class="fc" id="L197">        ClaimStrength claim = claimFor(raw.backendClaim());</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        if (request.evidenceRequirement()</span>
                 == FactorizationRequest.EvidenceRequirement
                     .INDEPENDENT_COMPLETE) {
-<span class="nc" id="L198">            return failure(</span>
-<span class="nc" id="L199">                raw.engineId(),</span>
-                Status.UNSUPPORTED_REQUEST,
-                &quot;INDEPENDENT_COMPLETENESS_VERIFIER_REQUIRED&quot;,
+<span class="fc" id="L201">            return independentlyVerifyCandidates(</span>
+                request,
+                raw,
+                candidates,
                 combined,
-                claim,
-<span class="nc" id="L204">                raw.engineResultHash(),</span>
-                request);
+                claim);
         }
-<span class="fc" id="L207">        return success(</span>
-<span class="fc" id="L208">            raw.engineId(),</span>
+<span class="fc" id="L208">        return success(</span>
+<span class="fc" id="L209">            raw.engineId(),</span>
             Status.PARTIAL_FACTORIZATION,
-<span class="fc" id="L210">            raw.detailCode(),</span>
+<span class="fc" id="L211">            raw.detailCode(),</span>
             combined,
             claim,
             candidates,
-<span class="fc" id="L214">            raw.engineResultHash(),</span>
+<span class="fc" id="L215">            raw.engineResultHash(),</span>
             request);
     }
 
@@ -220,31 +221,196 @@ public final class FactorizationVerifier {
         FactorizationEngine.EngineResult&lt;C&gt; raw
     ) {
         ClaimStrength claim =
-<span class="fc bfc" id="L223" title="All 2 branches covered.">            raw.backendClaim() == FactorizationEngine.BackendClaim.IRREDUCIBLE</span>
-<span class="fc" id="L224">                ? ClaimStrength.BACKEND_CLAIMED_IRREDUCIBLE</span>
-<span class="fc" id="L225">                : ClaimStrength.NONE;</span>
-<span class="pc bpc" id="L226" title="3 of 4 branches missed.">        if (request.evidenceRequirement()</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">            raw.backendClaim() == FactorizationEngine.BackendClaim.IRREDUCIBLE</span>
+<span class="fc" id="L225">                ? ClaimStrength.BACKEND_CLAIMED_IRREDUCIBLE</span>
+<span class="fc" id="L226">                : ClaimStrength.NONE;</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (request.evidenceRequirement()</span>
                 == FactorizationRequest.EvidenceRequirement
-                    .INDEPENDENT_COMPLETE
-                &amp;&amp; claim
-                    == ClaimStrength.BACKEND_CLAIMED_IRREDUCIBLE) {
-<span class="nc" id="L231">            return failure(</span>
-<span class="nc" id="L232">                raw.engineId(),</span>
-                Status.UNSUPPORTED_REQUEST,
-                &quot;INDEPENDENT_IRREDUCIBILITY_VERIFIER_REQUIRED&quot;,
-<span class="nc" id="L235">                raw.work(),</span>
-                claim,
-<span class="nc" id="L237">                raw.engineResultHash(),</span>
-                request);
+                    .INDEPENDENT_COMPLETE) {
+<span class="fc" id="L230">            return independentlyVerifySource(request, raw, claim);</span>
         }
-<span class="fc" id="L240">        return failure(</span>
-<span class="fc" id="L241">            raw.engineId(),</span>
+<span class="fc" id="L232">        return failure(</span>
+<span class="fc" id="L233">            raw.engineId(),</span>
             Status.NO_FACTORIZATION_FOUND,
-<span class="fc" id="L243">            raw.detailCode(),</span>
-<span class="fc" id="L244">            raw.work(),</span>
+<span class="fc" id="L235">            raw.detailCode(),</span>
+<span class="fc" id="L236">            raw.work(),</span>
             claim,
-<span class="fc" id="L246">            raw.engineResultHash(),</span>
+<span class="fc" id="L238">            raw.engineResultHash(),</span>
             request);
+    }
+
+    private static &lt;C&gt; Report&lt;C&gt; independentlyVerifySource(
+        FactorizationRequest&lt;C&gt; request,
+        FactorizationEngine.EngineResult&lt;C&gt; raw,
+        ClaimStrength backendClaim
+    ) {
+<span class="fc" id="L247">        long remaining = request.maxWorkUnits()</span>
+<span class="fc" id="L248">            - raw.work().totalWorkUnits();</span>
+<span class="fc" id="L249">        IndependentOriginalDomainIrreducibility.Result evidence =</span>
+<span class="fc" id="L250">            IndependentOriginalDomainIrreducibility.verify(</span>
+                request,
+                remaining);
+<span class="fc" id="L253">        IndependentIrreducibilityTrace trace =</span>
+<span class="fc" id="L254">            issueIndependentTrace(evidence);</span>
+<span class="fc" id="L255">        PolynomialWorkLedger combined = merge(</span>
+<span class="fc" id="L256">            raw.work(),</span>
+<span class="fc" id="L257">            evidence.work());</span>
+<span class="pc bpc" id="L258" title="3 of 5 branches missed.">        return switch (evidence.outcome()) {</span>
+<span class="fc" id="L259">            case CERTIFIED -&gt; report(</span>
+<span class="fc" id="L260">                raw.engineId(),</span>
+                Status.IRREDUCIBLE,
+<span class="fc" id="L262">                evidence.detailCode(),</span>
+                combined,
+                ClaimStrength.INDEPENDENTLY_CERTIFIED_IRREDUCIBLE,
+<span class="fc" id="L265">                List.of(),</span>
+<span class="fc" id="L266">                raw.engineResultHash(),</span>
+                request,
+<span class="fc" id="L268">                Optional.of(trace));</span>
+<span class="nc" id="L269">            case UNSUPPORTED_DOMAIN -&gt; report(</span>
+<span class="nc" id="L270">                raw.engineId(),</span>
+                Status.UNSUPPORTED_DOMAIN,
+<span class="nc" id="L272">                evidence.detailCode(),</span>
+                combined,
+                backendClaim,
+<span class="nc" id="L275">                List.of(),</span>
+<span class="nc" id="L276">                raw.engineResultHash(),</span>
+                request,
+<span class="nc" id="L278">                Optional.of(trace));</span>
+<span class="nc" id="L279">            case UNSUPPORTED_SHAPE -&gt; report(</span>
+<span class="nc" id="L280">                raw.engineId(),</span>
+                Status.UNSUPPORTED_REQUEST,
+<span class="nc" id="L282">                evidence.detailCode(),</span>
+                combined,
+                backendClaim,
+<span class="nc" id="L285">                List.of(),</span>
+<span class="nc" id="L286">                raw.engineResultHash(),</span>
+                request,
+<span class="nc" id="L288">                Optional.of(trace));</span>
+            case NO_WITNESS_WITHIN_POLICY,
+                    WORK_BUDGET_EXHAUSTED,
+                    DEGREE_LIMIT_EXCEEDED,
+<span class="fc" id="L292">                    NORMALIZATION_LIMIT_EXCEEDED -&gt; report(</span>
+<span class="fc" id="L293">                raw.engineId(),</span>
+                Status.BUDGET_INCONCLUSIVE,
+<span class="fc" id="L295">                evidence.detailCode(),</span>
+                combined,
+                backendClaim,
+<span class="fc" id="L298">                List.of(),</span>
+<span class="fc" id="L299">                raw.engineResultHash(),</span>
+                request,
+<span class="fc" id="L301">                Optional.of(trace));</span>
+<span class="nc" id="L302">            case TECHNICAL_FAILURE -&gt; report(</span>
+<span class="nc" id="L303">                raw.engineId(),</span>
+                Status.TECHNICAL_FAILURE,
+<span class="nc" id="L305">                evidence.detailCode(),</span>
+                combined,
+                backendClaim,
+<span class="nc" id="L308">                List.of(),</span>
+<span class="nc" id="L309">                raw.engineResultHash(),</span>
+                request,
+<span class="nc" id="L311">                Optional.of(trace));</span>
+        };
+    }
+
+    private static IndependentIrreducibilityTrace issueIndependentTrace(
+        IndependentOriginalDomainIrreducibility.Result evidence
+    ) {
+<span class="fc" id="L318">        return new IndependentIrreducibilityTrace(</span>
+<span class="fc" id="L319">            evidence.methodId(),</span>
+<span class="fc" id="L320">            evidence.requestHash(),</span>
+<span class="fc" id="L321">            evidence.sourceHash(),</span>
+<span class="fc" id="L322">            evidence.outcome(),</span>
+<span class="fc" id="L323">            evidence.proofMethod(),</span>
+<span class="fc" id="L324">            evidence.detailCode(),</span>
+<span class="fc" id="L325">            evidence.normalizedPrimitiveCoefficients(),</span>
+<span class="fc" id="L326">            evidence.degree(),</span>
+<span class="fc" id="L327">            evidence.primeAttempts(),</span>
+<span class="fc" id="L328">            evidence.selectedPrime(),</span>
+<span class="fc" id="L329">            evidence.work(),</span>
+<span class="fc" id="L330">            evidence.traceHash());</span>
+    }
+
+    private static &lt;C&gt; Report&lt;C&gt; independentlyVerifyCandidates(
+        FactorizationRequest&lt;C&gt; request,
+        FactorizationEngine.EngineResult&lt;C&gt; raw,
+        List&lt;VerifiedCandidate&lt;C&gt;&gt; candidates,
+        PolynomialWorkLedger completedWork,
+        ClaimStrength backendClaim
+    ) {
+<span class="fc" id="L340">        long remaining = request.maxWorkUnits()</span>
+<span class="fc" id="L341">            - completedWork.totalWorkUnits();</span>
+<span class="fc" id="L342">        IndependentFactorizationCompleteness.Result evidence =</span>
+<span class="fc" id="L343">            IndependentFactorizationCompleteness.verify(</span>
+                request,
+                candidates,
+                remaining);
+<span class="fc" id="L347">        IndependentCompletenessTrace trace =</span>
+<span class="fc" id="L348">            IndependentCompletenessTrace.issue(</span>
+                evidence,
+                FactorizationVerifier::issueIndependentTrace);
+<span class="fc" id="L351">        PolynomialWorkLedger combined = merge(</span>
+            completedWork,
+<span class="fc" id="L353">            evidence.work());</span>
+<span class="pc bpc" id="L354" title="3 of 5 branches missed.">        return switch (evidence.outcome()) {</span>
+<span class="fc" id="L355">            case CERTIFIED -&gt; report(</span>
+<span class="fc" id="L356">                raw.engineId(),</span>
+                Status.COMPLETE_FACTORIZATION,
+<span class="fc" id="L358">                evidence.detailCode(),</span>
+                combined,
+                ClaimStrength.INDEPENDENTLY_CERTIFIED_COMPLETE,
+<span class="fc" id="L361">                List.of(candidates.get(</span>
+<span class="fc" id="L362">                    evidence.selectedCandidateIndex())),</span>
+<span class="fc" id="L363">                raw.engineResultHash(),</span>
+                request,
+<span class="fc" id="L365">                Optional.empty(),</span>
+<span class="fc" id="L366">                Optional.of(trace));</span>
+            case NO_REMAINDER_ONE_CANDIDATE,
+                    FACTOR_CERTIFICATE_INCONCLUSIVE,
+<span class="fc" id="L369">                    WORK_BUDGET_EXHAUSTED -&gt; report(</span>
+<span class="fc" id="L370">                raw.engineId(),</span>
+                Status.BUDGET_INCONCLUSIVE,
+<span class="fc" id="L372">                evidence.detailCode(),</span>
+                combined,
+                backendClaim,
+<span class="fc" id="L375">                List.of(),</span>
+<span class="fc" id="L376">                raw.engineResultHash(),</span>
+                request,
+<span class="fc" id="L378">                Optional.empty(),</span>
+<span class="fc" id="L379">                Optional.of(trace));</span>
+<span class="nc" id="L380">            case UNSUPPORTED_DOMAIN -&gt; report(</span>
+<span class="nc" id="L381">                raw.engineId(),</span>
+                Status.UNSUPPORTED_DOMAIN,
+<span class="nc" id="L383">                evidence.detailCode(),</span>
+                combined,
+                backendClaim,
+<span class="nc" id="L386">                List.of(),</span>
+<span class="nc" id="L387">                raw.engineResultHash(),</span>
+                request,
+<span class="nc" id="L389">                Optional.empty(),</span>
+<span class="nc" id="L390">                Optional.of(trace));</span>
+<span class="nc" id="L391">            case UNSUPPORTED_SHAPE -&gt; report(</span>
+<span class="nc" id="L392">                raw.engineId(),</span>
+                Status.UNSUPPORTED_REQUEST,
+<span class="nc" id="L394">                evidence.detailCode(),</span>
+                combined,
+                backendClaim,
+<span class="nc" id="L397">                List.of(),</span>
+<span class="nc" id="L398">                raw.engineResultHash(),</span>
+                request,
+<span class="nc" id="L400">                Optional.empty(),</span>
+<span class="nc" id="L401">                Optional.of(trace));</span>
+<span class="nc" id="L402">            case TECHNICAL_FAILURE -&gt; report(</span>
+<span class="nc" id="L403">                raw.engineId(),</span>
+                Status.TECHNICAL_FAILURE,
+<span class="nc" id="L405">                evidence.detailCode(),</span>
+                combined,
+                backendClaim,
+<span class="nc" id="L408">                List.of(),</span>
+<span class="nc" id="L409">                raw.engineResultHash(),</span>
+                request,
+<span class="nc" id="L411">                Optional.empty(),</span>
+<span class="nc" id="L412">                Optional.of(trace));</span>
+        };
     }
 
     private static &lt;C&gt; VerificationOutcome&lt;C&gt; verifyProposal(
@@ -252,61 +418,61 @@ public final class FactorizationVerifier {
         FactorizationEngine.Proposal&lt;C&gt; proposal,
         WorkCounter work
     ) {
-<span class="pc bpc" id="L255" title="1 of 2 branches missed.">        if (!source.ring().equals(</span>
-<span class="fc" id="L256">                proposal.unresolvedRemainder().ring())</span>
-<span class="pc bpc" id="L257" title="1 of 2 branches missed.">                || proposal.factors().stream().anyMatch(factor -&gt;</span>
-<span class="pc bpc" id="L258" title="1 of 2 branches missed.">                    !source.ring().equals(</span>
-<span class="fc" id="L259">                        factor.polynomial().ring()))) {</span>
-<span class="nc" id="L260">            return new VerificationOutcome&lt;&gt;(</span>
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">        if (!source.ring().equals(</span>
+<span class="fc" id="L422">                proposal.unresolvedRemainder().ring())</span>
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">                || proposal.factors().stream().anyMatch(factor -&gt;</span>
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">                    !source.ring().equals(</span>
+<span class="fc" id="L425">                        factor.polynomial().ring()))) {</span>
+<span class="nc" id="L426">            return new VerificationOutcome&lt;&gt;(</span>
                 false,
                 &quot;FACTORIZATION_PROPOSAL_RING_MISMATCH&quot;,
                 null);
         }
-<span class="fc" id="L265">        SparsePolynomial&lt;C&gt; reconstructed = SparsePolynomial.constant(</span>
-<span class="fc" id="L266">            source.ring(),</span>
-<span class="fc" id="L267">            proposal.unit());</span>
-<span class="fc bfc" id="L268" title="All 2 branches covered.">        for (PolynomialFactor&lt;C&gt; factor : proposal.factors()) {</span>
-<span class="fc" id="L269">            work.consume(</span>
+<span class="fc" id="L431">        SparsePolynomial&lt;C&gt; reconstructed = SparsePolynomial.constant(</span>
+<span class="fc" id="L432">            source.ring(),</span>
+<span class="fc" id="L433">            proposal.unit());</span>
+<span class="fc bfc" id="L434" title="All 2 branches covered.">        for (PolynomialFactor&lt;C&gt; factor : proposal.factors()) {</span>
+<span class="fc" id="L435">            work.consume(</span>
                 &quot;verify.factor-power-multiplications&quot;,
-<span class="fc" id="L271">                powerMultiplications(factor.multiplicity()));</span>
-<span class="fc" id="L272">            SparsePolynomial&lt;C&gt; powered =</span>
-<span class="fc" id="L273">                factor.polynomial().pow(factor.multiplicity());</span>
-<span class="fc" id="L274">            work.consume(</span>
+<span class="fc" id="L437">                powerMultiplications(factor.multiplicity()));</span>
+<span class="fc" id="L438">            SparsePolynomial&lt;C&gt; powered =</span>
+<span class="fc" id="L439">                factor.polynomial().pow(factor.multiplicity());</span>
+<span class="fc" id="L440">            work.consume(</span>
                 &quot;verify.factor-product-multiplications&quot;,
                 1);
-<span class="fc" id="L277">            reconstructed = reconstructed.multiply(powered);</span>
-<span class="fc" id="L278">        }</span>
-<span class="fc bfc" id="L279" title="All 2 branches covered.">        if (!proposal.unresolvedRemainder().isOne()) {</span>
-<span class="fc" id="L280">            work.consume(&quot;verify.remainder-multiplications&quot;, 1);</span>
-<span class="fc" id="L281">            reconstructed = reconstructed.multiply(</span>
-<span class="fc" id="L282">                proposal.unresolvedRemainder());</span>
+<span class="fc" id="L443">            reconstructed = reconstructed.multiply(powered);</span>
+<span class="fc" id="L444">        }</span>
+<span class="fc bfc" id="L445" title="All 2 branches covered.">        if (!proposal.unresolvedRemainder().isOne()) {</span>
+<span class="fc" id="L446">            work.consume(&quot;verify.remainder-multiplications&quot;, 1);</span>
+<span class="fc" id="L447">            reconstructed = reconstructed.multiply(</span>
+<span class="fc" id="L448">                proposal.unresolvedRemainder());</span>
         }
-<span class="fc" id="L284">        work.consume(&quot;verify.product-comparisons&quot;, 1);</span>
-<span class="fc bfc" id="L285" title="All 2 branches covered.">        if (!source.equals(reconstructed)) {</span>
-<span class="fc" id="L286">            return new VerificationOutcome&lt;&gt;(</span>
+<span class="fc" id="L450">        work.consume(&quot;verify.product-comparisons&quot;, 1);</span>
+<span class="fc bfc" id="L451" title="All 2 branches covered.">        if (!source.equals(reconstructed)) {</span>
+<span class="fc" id="L452">            return new VerificationOutcome&lt;&gt;(</span>
                 false,
                 &quot;FACTORIZATION_PROPOSAL_PRODUCT_MISMATCH&quot;,
                 reconstructed);
         }
-<span class="fc" id="L291">        return new VerificationOutcome&lt;&gt;(</span>
+<span class="fc" id="L457">        return new VerificationOutcome&lt;&gt;(</span>
             true,
             &quot;FACTORIZATION_PRODUCT_RECONSTRUCTED&quot;,
             reconstructed);
     }
 
     private static long powerMultiplications(int exponent) {
-<span class="fc" id="L298">        int remaining = exponent;</span>
-<span class="fc" id="L299">        long result = 0;</span>
-<span class="fc bfc" id="L300" title="All 2 branches covered.">        while (remaining &gt; 0) {</span>
-<span class="fc bfc" id="L301" title="All 2 branches covered.">            if ((remaining &amp; 1) == 1) {</span>
-<span class="fc" id="L302">                result++;</span>
+<span class="fc" id="L464">        int remaining = exponent;</span>
+<span class="fc" id="L465">        long result = 0;</span>
+<span class="fc bfc" id="L466" title="All 2 branches covered.">        while (remaining &gt; 0) {</span>
+<span class="fc bfc" id="L467" title="All 2 branches covered.">            if ((remaining &amp; 1) == 1) {</span>
+<span class="fc" id="L468">                result++;</span>
             }
-<span class="fc" id="L304">            remaining &gt;&gt;&gt;= 1;</span>
-<span class="fc bfc" id="L305" title="All 2 branches covered.">            if (remaining &gt; 0) {</span>
-<span class="fc" id="L306">                result++;</span>
+<span class="fc" id="L470">            remaining &gt;&gt;&gt;= 1;</span>
+<span class="fc bfc" id="L471" title="All 2 branches covered.">            if (remaining &gt; 0) {</span>
+<span class="fc" id="L472">                result++;</span>
             }
         }
-<span class="fc" id="L309">        return result;</span>
+<span class="fc" id="L475">        return result;</span>
     }
 
     private static &lt;C&gt; VerifiedCandidate&lt;C&gt; issueVerifiedCandidate(
@@ -315,45 +481,45 @@ public final class FactorizationVerifier {
         SparsePolynomial&lt;C&gt; reconstructed,
         SparsePolynomial&lt;C&gt; source
     ) {
-<span class="fc" id="L318">        StringBuilder material = new StringBuilder(VERIFIER_ID);</span>
-<span class="fc" id="L319">        PolynomialEvidence.append(</span>
+<span class="fc" id="L484">        StringBuilder material = new StringBuilder(VERIFIER_ID);</span>
+<span class="fc" id="L485">        PolynomialEvidence.append(</span>
             material,
-<span class="fc" id="L321">            source.canonicalMaterial());</span>
-<span class="fc" id="L322">        PolynomialEvidence.append(</span>
+<span class="fc" id="L487">            source.canonicalMaterial());</span>
+<span class="fc" id="L488">        PolynomialEvidence.append(</span>
             material,
-<span class="fc" id="L324">            proposal.canonicalMaterial());</span>
-<span class="fc" id="L325">        PolynomialEvidence.append(</span>
+<span class="fc" id="L490">            proposal.canonicalMaterial());</span>
+<span class="fc" id="L491">        PolynomialEvidence.append(</span>
             material,
-<span class="fc" id="L327">            backendClaim.name());</span>
-<span class="fc" id="L328">        PolynomialEvidence.append(</span>
+<span class="fc" id="L493">            backendClaim.name());</span>
+<span class="fc" id="L494">        PolynomialEvidence.append(</span>
             material,
-<span class="fc" id="L330">            reconstructed.canonicalMaterial());</span>
-<span class="fc" id="L331">        return new VerifiedCandidate&lt;&gt;(</span>
+<span class="fc" id="L496">            reconstructed.canonicalMaterial());</span>
+<span class="fc" id="L497">        return new VerifiedCandidate&lt;&gt;(</span>
             proposal,
             backendClaim,
-<span class="fc" id="L334">            PolynomialEvidence.sha256(material.toString()));</span>
+<span class="fc" id="L500">            PolynomialEvidence.sha256(material.toString()));</span>
     }
 
     private static ClaimStrength claimFor(
         FactorizationEngine.BackendClaim backendClaim
     ) {
-<span class="fc" id="L340">        return backendClaim</span>
-<span class="fc bfc" id="L341" title="All 2 branches covered.">                == FactorizationEngine.BackendClaim.COMPLETE_FACTORIZATION</span>
-<span class="fc" id="L342">            ? ClaimStrength.BACKEND_CLAIMED_COMPLETE</span>
-<span class="fc" id="L343">            : ClaimStrength.VERIFIED_DECOMPOSITION;</span>
+<span class="fc" id="L506">        return backendClaim</span>
+<span class="fc bfc" id="L507" title="All 2 branches covered.">                == FactorizationEngine.BackendClaim.COMPLETE_FACTORIZATION</span>
+<span class="fc" id="L508">            ? ClaimStrength.BACKEND_CLAIMED_COMPLETE</span>
+<span class="fc" id="L509">            : ClaimStrength.VERIFIED_DECOMPOSITION;</span>
     }
 
     private static PolynomialWorkLedger merge(
         PolynomialWorkLedger first,
         PolynomialWorkLedger second
     ) {
-<span class="fc" id="L350">        Map&lt;String, Long&gt; merged =</span>
-<span class="fc" id="L351">            new LinkedHashMap&lt;&gt;(first.stages());</span>
-<span class="fc" id="L352">        second.stages().forEach((stage, units) -&gt; merged.merge(</span>
+<span class="fc" id="L516">        Map&lt;String, Long&gt; merged =</span>
+<span class="fc" id="L517">            new LinkedHashMap&lt;&gt;(first.stages());</span>
+<span class="fc" id="L518">        second.stages().forEach((stage, units) -&gt; merged.merge(</span>
             stage,
             units,
             Math::addExact));
-<span class="fc" id="L356">        return new PolynomialWorkLedger(merged);</span>
+<span class="fc" id="L522">        return new PolynomialWorkLedger(merged);</span>
     }
 
     private static &lt;C&gt; Report&lt;C&gt; success(
@@ -366,7 +532,7 @@ public final class FactorizationVerifier {
         String engineResultHash,
         FactorizationRequest&lt;C&gt; request
     ) {
-<span class="fc" id="L369">        String verificationHash = reportHash(</span>
+<span class="fc" id="L535">        return report(</span>
             engineId,
             status,
             detailCode,
@@ -374,16 +540,8 @@ public final class FactorizationVerifier {
             claimStrength,
             candidates,
             engineResultHash,
-            request);
-<span class="fc" id="L378">        return new Report&lt;&gt;(</span>
-            engineId,
-            status,
-            detailCode,
-            work,
-            claimStrength,
-            candidates,
-            engineResultHash,
-            verificationHash);
+            request,
+<span class="fc" id="L544">            Optional.empty());</span>
     }
 
     private static &lt;C&gt; Report&lt;C&gt; failure(
@@ -395,24 +553,80 @@ public final class FactorizationVerifier {
         String engineResultHash,
         FactorizationRequest&lt;C&gt; request
     ) {
-<span class="fc" id="L398">        String verificationHash = reportHash(</span>
+<span class="fc" id="L556">        return report(</span>
             engineId,
             status,
             detailCode,
             work,
             claimStrength,
-<span class="fc" id="L404">            List.of(),</span>
+<span class="fc" id="L562">            List.of(),</span>
             engineResultHash,
-            request);
-<span class="fc" id="L407">        return new Report&lt;&gt;(</span>
+            request,
+<span class="fc" id="L565">            Optional.empty());</span>
+    }
+
+    private static &lt;C&gt; Report&lt;C&gt; report(
+        String engineId,
+        Status status,
+        String detailCode,
+        PolynomialWorkLedger work,
+        ClaimStrength claimStrength,
+        List&lt;VerifiedCandidate&lt;C&gt;&gt; candidates,
+        String engineResultHash,
+        FactorizationRequest&lt;C&gt; request,
+        Optional&lt;IndependentIrreducibilityTrace&gt; independentTrace
+    ) {
+<span class="fc" id="L579">        return report(</span>
             engineId,
             status,
             detailCode,
             work,
             claimStrength,
-<span class="fc" id="L413">            List.of(),</span>
+            candidates,
             engineResultHash,
-            verificationHash);
+            request,
+            independentTrace,
+<span class="fc" id="L589">            Optional.empty());</span>
+    }
+
+    private static &lt;C&gt; Report&lt;C&gt; report(
+        String engineId,
+        Status status,
+        String detailCode,
+        PolynomialWorkLedger work,
+        ClaimStrength claimStrength,
+        List&lt;VerifiedCandidate&lt;C&gt;&gt; candidates,
+        String engineResultHash,
+        FactorizationRequest&lt;C&gt; request,
+        Optional&lt;IndependentIrreducibilityTrace&gt; independentTrace,
+        Optional&lt;IndependentCompletenessTrace&gt; completenessTrace
+    ) {
+<span class="fc" id="L604">        validateTraceBindings(</span>
+            request,
+            independentTrace,
+            completenessTrace);
+<span class="fc" id="L608">        String verificationHash = reportHash(</span>
+            engineId,
+            status,
+            detailCode,
+            work,
+            claimStrength,
+            candidates,
+            engineResultHash,
+            request,
+            independentTrace,
+            completenessTrace);
+<span class="fc" id="L619">        return new Report&lt;&gt;(</span>
+            engineId,
+            status,
+            detailCode,
+            work,
+            claimStrength,
+            candidates,
+            engineResultHash,
+            verificationHash,
+            independentTrace,
+            completenessTrace);
     }
 
     private static &lt;C&gt; String reportHash(
@@ -423,56 +637,528 @@ public final class FactorizationVerifier {
         ClaimStrength claimStrength,
         List&lt;VerifiedCandidate&lt;C&gt;&gt; candidates,
         String engineResultHash,
-        FactorizationRequest&lt;C&gt; request
+        FactorizationRequest&lt;C&gt; request,
+        Optional&lt;IndependentIrreducibilityTrace&gt; independentTrace,
+        Optional&lt;IndependentCompletenessTrace&gt; completenessTrace
     ) {
-<span class="fc" id="L428">        StringBuilder material = new StringBuilder(VERIFIER_ID);</span>
-<span class="fc" id="L429">        PolynomialEvidence.append(material, engineId);</span>
-<span class="fc" id="L430">        PolynomialEvidence.append(material, status.name());</span>
-<span class="fc" id="L431">        PolynomialEvidence.append(material, detailCode);</span>
-<span class="fc" id="L432">        PolynomialEvidence.append(</span>
+<span class="fc" id="L644">        StringBuilder material = new StringBuilder(VERIFIER_ID);</span>
+<span class="fc" id="L645">        PolynomialEvidence.append(material, engineId);</span>
+<span class="fc" id="L646">        PolynomialEvidence.append(material, status.name());</span>
+<span class="fc" id="L647">        PolynomialEvidence.append(material, detailCode);</span>
+<span class="fc" id="L648">        PolynomialEvidence.append(</span>
             material,
-<span class="fc" id="L434">            work.canonicalMaterial());</span>
-<span class="fc" id="L435">        PolynomialEvidence.append(</span>
+<span class="fc" id="L650">            work.canonicalMaterial());</span>
+<span class="fc" id="L651">        PolynomialEvidence.append(</span>
             material,
-<span class="fc" id="L437">            claimStrength.name());</span>
-<span class="fc" id="L438">        PolynomialEvidence.append(material, engineResultHash);</span>
-<span class="fc" id="L439">        PolynomialEvidence.append(</span>
+<span class="fc" id="L653">            claimStrength.name());</span>
+<span class="fc" id="L654">        PolynomialEvidence.append(material, engineResultHash);</span>
+<span class="fc" id="L655">        PolynomialEvidence.append(</span>
             material,
-<span class="fc" id="L441">            request.canonicalMaterial());</span>
-<span class="fc" id="L442">        candidates.forEach(candidate -&gt;</span>
-<span class="fc" id="L443">            PolynomialEvidence.append(</span>
+<span class="fc" id="L657">            request.canonicalMaterial());</span>
+<span class="fc" id="L658">        candidates.forEach(candidate -&gt;</span>
+<span class="fc" id="L659">            PolynomialEvidence.append(</span>
                 material,
-<span class="fc" id="L445">                candidate.canonicalMaterial()));</span>
-<span class="fc" id="L446">        return PolynomialEvidence.sha256(material.toString());</span>
+<span class="fc" id="L661">                candidate.canonicalMaterial()));</span>
+<span class="fc" id="L662">        independentTrace.ifPresent(trace -&gt;</span>
+<span class="fc" id="L663">            PolynomialEvidence.append(</span>
+                material,
+<span class="fc" id="L665">                trace.canonicalMaterial()));</span>
+<span class="fc" id="L666">        completenessTrace.ifPresent(trace -&gt;</span>
+<span class="fc" id="L667">            PolynomialEvidence.append(</span>
+                material,
+<span class="fc" id="L669">                trace.canonicalMaterial()));</span>
+<span class="fc" id="L670">        return PolynomialEvidence.sha256(material.toString());</span>
     }
 
     private static String technicalDetail(
         RuntimeException exception
     ) {
-<span class="fc" id="L452">        String simple = exception.getClass().getSimpleName();</span>
-<span class="pc bpc" id="L453" title="1 of 2 branches missed.">        return &quot;ENGINE_EXCEPTION_&quot; + (simple.isBlank()</span>
-<span class="nc" id="L454">            ? &quot;RUNTIME&quot;</span>
-<span class="fc" id="L455">            : simple.toUpperCase(java.util.Locale.ROOT));</span>
+<span class="fc" id="L676">        String simple = exception.getClass().getSimpleName();</span>
+<span class="pc bpc" id="L677" title="1 of 2 branches missed.">        return &quot;ENGINE_EXCEPTION_&quot; + (simple.isBlank()</span>
+<span class="nc" id="L678">            ? &quot;RUNTIME&quot;</span>
+<span class="fc" id="L679">            : simple.toUpperCase(java.util.Locale.ROOT));</span>
     }
 
-<span class="fc" id="L458">    public enum Status {</span>
-<span class="fc" id="L459">        COMPLETE_FACTORIZATION,</span>
-<span class="fc" id="L460">        IRREDUCIBLE,</span>
-<span class="fc" id="L461">        PARTIAL_FACTORIZATION,</span>
-<span class="fc" id="L462">        NO_FACTORIZATION_FOUND,</span>
-<span class="fc" id="L463">        UNSUPPORTED_DOMAIN,</span>
-<span class="fc" id="L464">        UNSUPPORTED_REQUEST,</span>
-<span class="fc" id="L465">        BUDGET_INCONCLUSIVE,</span>
-<span class="fc" id="L466">        TECHNICAL_FAILURE</span>
+    private static boolean validHash(String value) {
+<span class="pc bpc" id="L683" title="1 of 2 branches missed.">        return value != null</span>
+<span class="pc bpc" id="L684" title="1 of 2 branches missed.">            &amp;&amp; value.matches(&quot;sha256:[0-9a-f]{64}&quot;);</span>
     }
 
-<span class="fc" id="L469">    public enum ClaimStrength {</span>
-<span class="fc" id="L470">        NONE,</span>
-<span class="fc" id="L471">        VERIFIED_DECOMPOSITION,</span>
-<span class="fc" id="L472">        BACKEND_CLAIMED_COMPLETE,</span>
-<span class="fc" id="L473">        BACKEND_CLAIMED_IRREDUCIBLE,</span>
-<span class="fc" id="L474">        INDEPENDENTLY_CERTIFIED_COMPLETE,</span>
-<span class="fc" id="L475">        INDEPENDENTLY_CERTIFIED_IRREDUCIBLE</span>
+    private static void requireEvidence(
+        boolean condition,
+        String message
+    ) {
+<span class="pc bpc" id="L691" title="1 of 2 branches missed.">        if (!condition) {</span>
+<span class="nc" id="L692">            throw new IllegalArgumentException(message);</span>
+        }
+<span class="fc" id="L694">    }</span>
+
+    private static &lt;C&gt; void validateReportEvidence(
+        Status status,
+        ClaimStrength claimStrength,
+        List&lt;VerifiedCandidate&lt;C&gt;&gt; candidates,
+        Optional&lt;IndependentIrreducibilityTrace&gt; irreducibilityTrace,
+        Optional&lt;IndependentCompletenessTrace&gt; completenessTrace
+    ) {
+<span class="fc" id="L703">        validateCompleteReport(</span>
+            status,
+            claimStrength,
+            candidates,
+            completenessTrace);
+<span class="fc" id="L708">        validateIrreducibleReport(</span>
+            status,
+            claimStrength,
+            irreducibilityTrace);
+<span class="fc" id="L712">    }</span>
+
+    private static void validateTraceBindings(
+        FactorizationRequest&lt;?&gt; request,
+        Optional&lt;IndependentIrreducibilityTrace&gt; irreducibilityTrace,
+        Optional&lt;IndependentCompletenessTrace&gt; completenessTrace
+    ) {
+<span class="fc bfc" id="L719" title="All 2 branches covered.">        if (irreducibilityTrace.isEmpty()</span>
+<span class="fc bfc" id="L720" title="All 2 branches covered.">                &amp;&amp; completenessTrace.isEmpty()) {</span>
+<span class="fc" id="L721">            return;</span>
+        }
+<span class="fc" id="L723">        String requestHash = PolynomialEvidence.sha256(</span>
+<span class="fc" id="L724">            request.canonicalMaterial());</span>
+<span class="fc" id="L725">        String sourceHash = PolynomialEvidence.sha256(</span>
+<span class="fc" id="L726">            request.source().canonicalMaterial());</span>
+<span class="fc" id="L727">        irreducibilityTrace.ifPresent(trace -&gt; {</span>
+<span class="fc" id="L728">            requireEvidence(</span>
+<span class="fc" id="L729">                trace.requestHash().equals(requestHash),</span>
+                &quot;irreducibility trace request hash mismatch&quot;);
+<span class="fc" id="L731">            requireEvidence(</span>
+<span class="fc" id="L732">                trace.sourceHash().equals(sourceHash),</span>
+                &quot;irreducibility trace source hash mismatch&quot;);
+<span class="fc" id="L734">        });</span>
+<span class="fc" id="L735">        completenessTrace.ifPresent(trace -&gt; {</span>
+<span class="fc" id="L736">            requireEvidence(</span>
+<span class="fc" id="L737">                trace.requestHash().equals(requestHash),</span>
+                &quot;completeness trace request hash mismatch&quot;);
+<span class="fc" id="L739">            requireEvidence(</span>
+<span class="fc" id="L740">                trace.sourceHash().equals(sourceHash),</span>
+                &quot;completeness trace source hash mismatch&quot;);
+<span class="fc" id="L742">        });</span>
+<span class="fc" id="L743">    }</span>
+
+    private static &lt;C&gt; void validateCompleteReport(
+        Status status,
+        ClaimStrength claimStrength,
+        List&lt;VerifiedCandidate&lt;C&gt;&gt; candidates,
+        Optional&lt;IndependentCompletenessTrace&gt; completenessTrace
+    ) {
+<span class="fc bfc" id="L751" title="All 2 branches covered.">        if (status != Status.COMPLETE_FACTORIZATION) {</span>
+<span class="fc" id="L752">            requireEvidence(</span>
+<span class="fc" id="L753">                completenessTrace.filter(</span>
+<span class="fc" id="L754">                    IndependentCompletenessTrace::certified).isEmpty(),</span>
+                &quot;certified completeness trace requires complete status&quot;);
+<span class="fc" id="L756">            return;</span>
+        }
+<span class="pc bpc" id="L758" title="1 of 2 branches missed.">        requireEvidence(</span>
+            claimStrength
+                == ClaimStrength.INDEPENDENTLY_CERTIFIED_COMPLETE,
+            &quot;complete factorization requires independent evidence&quot;);
+<span class="fc" id="L762">        IndependentCompletenessTrace trace = completenessTrace</span>
+<span class="fc" id="L763">            .filter(IndependentCompletenessTrace::certified)</span>
+<span class="pc" id="L764">            .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                &quot;complete factorization requires a certified trace&quot;));
+<span class="fc" id="L766">        requireEvidence(</span>
+<span class="pc bpc" id="L767" title="1 of 2 branches missed.">            candidates.size() == 1,</span>
+            &quot;complete report must expose exactly one candidate&quot;);
+<span class="fc" id="L769">        requireEvidence(</span>
+<span class="fc" id="L770">            trace.selectedCandidateCertificateHash().orElseThrow()</span>
+<span class="fc" id="L771">                .equals(candidates.getFirst()</span>
+<span class="fc" id="L772">                    .verificationCertificateHash()),</span>
+            &quot;complete report must expose its certified candidate&quot;);
+<span class="fc" id="L774">    }</span>
+
+    private static void validateIrreducibleReport(
+        Status status,
+        ClaimStrength claimStrength,
+        Optional&lt;IndependentIrreducibilityTrace&gt; irreducibilityTrace
+    ) {
+<span class="fc bfc" id="L781" title="All 2 branches covered.">        if (status != Status.IRREDUCIBLE) {</span>
+<span class="fc" id="L782">            requireEvidence(</span>
+<span class="fc" id="L783">                irreducibilityTrace.filter(</span>
+<span class="fc" id="L784">                    IndependentIrreducibilityTrace::certified).isEmpty(),</span>
+                &quot;certified trace requires irreducible status&quot;);
+<span class="fc" id="L786">            return;</span>
+        }
+<span class="pc bpc" id="L788" title="1 of 2 branches missed.">        requireEvidence(</span>
+            claimStrength
+                == ClaimStrength.INDEPENDENTLY_CERTIFIED_IRREDUCIBLE,
+            &quot;irreducibility requires independent evidence&quot;);
+<span class="fc" id="L792">        requireEvidence(</span>
+<span class="fc" id="L793">            irreducibilityTrace.filter(</span>
+<span class="fc" id="L794">                IndependentIrreducibilityTrace::certified).isPresent(),</span>
+            &quot;irreducibility requires a certified trace&quot;);
+<span class="fc" id="L796">    }</span>
+
+<span class="fc" id="L798">    public enum Status {</span>
+<span class="fc" id="L799">        COMPLETE_FACTORIZATION,</span>
+<span class="fc" id="L800">        IRREDUCIBLE,</span>
+<span class="fc" id="L801">        PARTIAL_FACTORIZATION,</span>
+<span class="fc" id="L802">        NO_FACTORIZATION_FOUND,</span>
+<span class="fc" id="L803">        UNSUPPORTED_DOMAIN,</span>
+<span class="fc" id="L804">        UNSUPPORTED_REQUEST,</span>
+<span class="fc" id="L805">        BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L806">        TECHNICAL_FAILURE</span>
+    }
+
+<span class="fc" id="L809">    public enum ClaimStrength {</span>
+<span class="fc" id="L810">        NONE,</span>
+<span class="fc" id="L811">        VERIFIED_DECOMPOSITION,</span>
+<span class="fc" id="L812">        BACKEND_CLAIMED_COMPLETE,</span>
+<span class="fc" id="L813">        BACKEND_CLAIMED_IRREDUCIBLE,</span>
+<span class="fc" id="L814">        INDEPENDENTLY_CERTIFIED_COMPLETE,</span>
+<span class="fc" id="L815">        INDEPENDENTLY_CERTIFIED_IRREDUCIBLE</span>
+    }
+
+    /** Result of the bounded original-domain irreducibility verifier. */
+<span class="fc" id="L819">    public enum IndependentIrreducibilityOutcome {</span>
+<span class="fc" id="L820">        CERTIFIED,</span>
+<span class="fc" id="L821">        NO_WITNESS_WITHIN_POLICY,</span>
+<span class="fc" id="L822">        WORK_BUDGET_EXHAUSTED,</span>
+<span class="fc" id="L823">        DEGREE_LIMIT_EXCEEDED,</span>
+<span class="fc" id="L824">        NORMALIZATION_LIMIT_EXCEEDED,</span>
+<span class="fc" id="L825">        UNSUPPORTED_DOMAIN,</span>
+<span class="fc" id="L826">        UNSUPPORTED_SHAPE,</span>
+<span class="fc" id="L827">        TECHNICAL_FAILURE</span>
+    }
+
+    /** Independently executed proof method, never an engine assertion. */
+<span class="fc" id="L831">    public enum IrreducibilityProofMethod {</span>
+<span class="fc" id="L832">        NONE,</span>
+<span class="fc" id="L833">        LINEAR_DEGREE,</span>
+<span class="fc" id="L834">        MODULAR_RABIN</span>
+    }
+
+    /** Outcome of one deterministic prime attempt. */
+<span class="fc" id="L838">    public enum PrimeAttemptOutcome {</span>
+<span class="fc" id="L839">        DEGREE_LOSS,</span>
+<span class="fc" id="L840">        REDUCIBLE_REDUCTION,</span>
+<span class="fc" id="L841">        IRREDUCIBLE_WITNESS,</span>
+<span class="fc" id="L842">        WORK_BUDGET_EXHAUSTED</span>
+    }
+
+    /** One independently recomputed Rabin gcd checkpoint. */
+    public record FrobeniusCheckpoint(
+        int iterations,
+        int gcdDegree,
+        String residueHash
+    ) {
+<span class="fc" id="L851">        public FrobeniusCheckpoint {</span>
+<span class="pc bpc" id="L852" title="2 of 4 branches missed.">            if (iterations &lt; 1</span>
+                    || gcdDegree &lt; 0
+<span class="pc bpc" id="L854" title="1 of 2 branches missed.">                    || !validHash(residueHash)) {</span>
+<span class="nc" id="L855">                throw new IllegalArgumentException(</span>
+                    &quot;invalid Frobenius checkpoint&quot;);
+            }
+<span class="fc" id="L858">        }</span>
+
+        public String canonicalMaterial() {
+<span class="fc" id="L861">            StringBuilder result = new StringBuilder();</span>
+<span class="fc" id="L862">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L864">                Integer.toString(iterations));</span>
+<span class="fc" id="L865">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L867">                Integer.toString(gcdDegree));</span>
+<span class="fc" id="L868">            PolynomialEvidence.append(result, residueHash);</span>
+<span class="fc" id="L869">            return result.toString();</span>
+        }
+    }
+
+    /** Audit data for one independently reduced prime. */
+    public record PrimeAttempt(
+        int prime,
+        PrimeAttemptOutcome outcome,
+        int reducedDegree,
+        List&lt;FrobeniusCheckpoint&gt; checkpoints,
+        boolean finalCongruence,
+        String finalResidueHash,
+        long workUnits,
+        String attemptHash
+    ) {
+<span class="fc" id="L884">        public PrimeAttempt {</span>
+<span class="pc bpc" id="L885" title="4 of 8 branches missed.">            if (prime &lt; 2</span>
+                    || outcome == null
+                    || reducedDegree &lt; -1
+                    || finalResidueHash == null
+<span class="fc bfc" id="L889" title="All 2 branches covered.">                    || !finalResidueHash.isEmpty()</span>
+<span class="pc bpc" id="L890" title="2 of 4 branches missed.">                        &amp;&amp; !validHash(finalResidueHash)</span>
+                    || workUnits &lt; 0
+<span class="pc bpc" id="L892" title="1 of 2 branches missed.">                    || !validHash(attemptHash)) {</span>
+<span class="nc" id="L893">                throw new IllegalArgumentException(</span>
+                    &quot;invalid independent prime attempt&quot;);
+            }
+<span class="fc" id="L896">            checkpoints = List.copyOf(checkpoints);</span>
+<span class="pc bpc" id="L897" title="1 of 4 branches missed.">            if (outcome == PrimeAttemptOutcome.IRREDUCIBLE_WITNESS</span>
+                    &amp;&amp; (!finalCongruence
+<span class="pc bpc" id="L899" title="1 of 2 branches missed.">                        || finalResidueHash.isEmpty())) {</span>
+<span class="nc" id="L900">                throw new IllegalArgumentException(</span>
+                    &quot;irreducible witness requires final congruence&quot;);
+            }
+<span class="fc" id="L903">        }</span>
+
+        public String canonicalMaterial() {
+<span class="fc" id="L906">            StringBuilder result = new StringBuilder();</span>
+<span class="fc" id="L907">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L909">                Integer.toString(prime));</span>
+<span class="fc" id="L910">            PolynomialEvidence.append(result, outcome.name());</span>
+<span class="fc" id="L911">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L913">                Integer.toString(reducedDegree));</span>
+<span class="fc" id="L914">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L916">                Integer.toString(checkpoints.size()));</span>
+<span class="fc" id="L917">            checkpoints.forEach(checkpoint -&gt;</span>
+<span class="fc" id="L918">                PolynomialEvidence.append(</span>
+                    result,
+<span class="fc" id="L920">                    checkpoint.canonicalMaterial()));</span>
+<span class="fc" id="L921">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L923">                Boolean.toString(finalCongruence));</span>
+<span class="fc" id="L924">            PolynomialEvidence.append(result, finalResidueHash);</span>
+<span class="fc" id="L925">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L927">                Long.toString(workUnits));</span>
+<span class="fc" id="L928">            PolynomialEvidence.append(result, attemptHash);</span>
+<span class="fc" id="L929">            return result.toString();</span>
+        }
+    }
+
+    /**
+     * Verifier-issued trace for a bounded original-domain proof attempt.
+     * Only the enclosing {@link Report} authorizes its mathematical status.
+     */
+    public static final class IndependentIrreducibilityTrace {
+        private final IndependentTraceState state;
+
+        private IndependentIrreducibilityTrace(
+            String methodId,
+            String requestHash,
+            String sourceHash,
+            IndependentIrreducibilityOutcome outcome,
+            IrreducibilityProofMethod proofMethod,
+            String detailCode,
+            List&lt;BigInteger&gt; normalizedPrimitiveCoefficients,
+            int degree,
+            List&lt;PrimeAttempt&gt; primeAttempts,
+            int selectedPrime,
+            PolynomialWorkLedger work,
+            String traceHash
+<span class="fc" id="L953">        ) {</span>
+<span class="fc" id="L954">            state = new IndependentTraceState(</span>
+                methodId,
+                requestHash,
+                sourceHash,
+                outcome,
+                proofMethod,
+                detailCode,
+                normalizedPrimitiveCoefficients,
+                degree,
+                primeAttempts,
+                selectedPrime,
+                work,
+                traceHash);
+<span class="fc" id="L967">        }</span>
+
+        public String methodId() {
+<span class="fc" id="L970">            return state.methodId();</span>
+        }
+
+        public String requestHash() {
+<span class="fc" id="L974">            return state.requestHash();</span>
+        }
+
+        public String sourceHash() {
+<span class="fc" id="L978">            return state.sourceHash();</span>
+        }
+
+        public IndependentIrreducibilityOutcome outcome() {
+<span class="fc" id="L982">            return state.outcome();</span>
+        }
+
+        public IrreducibilityProofMethod proofMethod() {
+<span class="fc" id="L986">            return state.proofMethod();</span>
+        }
+
+        public String detailCode() {
+<span class="fc" id="L990">            return state.detailCode();</span>
+        }
+
+        public List&lt;BigInteger&gt; normalizedPrimitiveCoefficients() {
+<span class="fc" id="L994">            return state.normalizedPrimitiveCoefficients();</span>
+        }
+
+        public int degree() {
+<span class="fc" id="L998">            return state.degree();</span>
+        }
+
+        public List&lt;PrimeAttempt&gt; primeAttempts() {
+<span class="fc" id="L1002">            return state.primeAttempts();</span>
+        }
+
+        public OptionalInt selectedPrime() {
+<span class="fc bfc" id="L1006" title="All 2 branches covered.">            return state.selectedPrime() == 0</span>
+<span class="fc" id="L1007">                ? OptionalInt.empty()</span>
+<span class="fc" id="L1008">                : OptionalInt.of(state.selectedPrime());</span>
+        }
+
+        public PolynomialWorkLedger work() {
+<span class="fc" id="L1012">            return state.work();</span>
+        }
+
+        public String traceHash() {
+<span class="fc" id="L1016">            return state.traceHash();</span>
+        }
+
+        public boolean certified() {
+<span class="fc bfc" id="L1020" title="All 2 branches covered.">            return outcome()</span>
+                == IndependentIrreducibilityOutcome.CERTIFIED;
+        }
+
+        public String canonicalMaterial() {
+<span class="fc" id="L1025">            StringBuilder result = new StringBuilder();</span>
+<span class="fc" id="L1026">            PolynomialEvidence.append(result, methodId());</span>
+<span class="fc" id="L1027">            PolynomialEvidence.append(result, requestHash());</span>
+<span class="fc" id="L1028">            PolynomialEvidence.append(result, sourceHash());</span>
+<span class="fc" id="L1029">            PolynomialEvidence.append(result, outcome().name());</span>
+<span class="fc" id="L1030">            PolynomialEvidence.append(result, proofMethod().name());</span>
+<span class="fc" id="L1031">            PolynomialEvidence.append(result, detailCode());</span>
+<span class="fc" id="L1032">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L1034">                Integer.toString(</span>
+<span class="fc" id="L1035">                    normalizedPrimitiveCoefficients().size()));</span>
+<span class="fc" id="L1036">            normalizedPrimitiveCoefficients().forEach(coefficient -&gt;</span>
+<span class="fc" id="L1037">                PolynomialEvidence.append(</span>
+                    result,
+<span class="fc" id="L1039">                    coefficient.toString()));</span>
+<span class="fc" id="L1040">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L1042">                Integer.toString(degree()));</span>
+<span class="fc" id="L1043">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L1045">                Integer.toString(primeAttempts().size()));</span>
+<span class="fc" id="L1046">            primeAttempts().forEach(attempt -&gt;</span>
+<span class="fc" id="L1047">                PolynomialEvidence.append(</span>
+                    result,
+<span class="fc" id="L1049">                    attempt.canonicalMaterial()));</span>
+<span class="fc" id="L1050">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L1052">                Integer.toString(state.selectedPrime()));</span>
+<span class="fc" id="L1053">            PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L1055">                work().canonicalMaterial());</span>
+<span class="fc" id="L1056">            PolynomialEvidence.append(result, traceHash());</span>
+<span class="fc" id="L1057">            return result.toString();</span>
+        }
+
+        @Override
+        public boolean equals(Object other) {
+<span class="fc" id="L1062">            return this == other</span>
+<span class="pc bpc" id="L1063" title="2 of 4 branches missed.">                || other instanceof IndependentIrreducibilityTrace trace</span>
+<span class="pc bpc" id="L1064" title="1 of 2 branches missed.">                    &amp;&amp; state.equals(trace.state);</span>
+        }
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L1069">            return state.hashCode();</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L1074">            return &quot;IndependentIrreducibilityTrace[&quot; + state + ']';</span>
+        }
+
+        private record IndependentTraceState(
+            String methodId,
+            String requestHash,
+            String sourceHash,
+            IndependentIrreducibilityOutcome outcome,
+            IrreducibilityProofMethod proofMethod,
+            String detailCode,
+            List&lt;BigInteger&gt; normalizedPrimitiveCoefficients,
+            int degree,
+            List&lt;PrimeAttempt&gt; primeAttempts,
+            int selectedPrime,
+            PolynomialWorkLedger work,
+            String traceHash
+        ) {
+<span class="fc" id="L1091">            private IndependentTraceState {</span>
+<span class="pc bpc" id="L1092" title="1 of 2 branches missed.">                if (methodId == null</span>
+<span class="pc bpc" id="L1093" title="1 of 2 branches missed.">                        || methodId.isBlank()</span>
+<span class="pc bpc" id="L1094" title="1 of 2 branches missed.">                        || !validHash(requestHash)</span>
+<span class="pc bpc" id="L1095" title="4 of 8 branches missed.">                        || !validHash(sourceHash)</span>
+                        || outcome == null
+                        || proofMethod == null
+                        || detailCode == null
+<span class="pc bpc" id="L1099" title="4 of 8 branches missed.">                        || detailCode.isBlank()</span>
+                        || degree &lt; -1
+                        || selectedPrime &lt; 0
+                        || work == null
+<span class="pc bpc" id="L1103" title="1 of 2 branches missed.">                        || !validHash(traceHash)) {</span>
+<span class="nc" id="L1104">                    throw new IllegalArgumentException(</span>
+                        &quot;invalid independent irreducibility trace&quot;);
+                }
+<span class="fc" id="L1107">                normalizedPrimitiveCoefficients = List.copyOf(</span>
+                    normalizedPrimitiveCoefficients);
+<span class="fc" id="L1109">                primeAttempts = List.copyOf(primeAttempts);</span>
+<span class="pc bpc" id="L1110" title="1 of 4 branches missed.">                if (outcome == IndependentIrreducibilityOutcome.CERTIFIED</span>
+                        &amp;&amp; proofMethod
+                            == IrreducibilityProofMethod.NONE) {
+<span class="nc" id="L1113">                    throw new IllegalArgumentException(</span>
+                        &quot;certified trace requires a proof method&quot;);
+                }
+<span class="fc bfc" id="L1116" title="All 2 branches covered.">                if (!normalizedPrimitiveCoefficients.isEmpty()</span>
+                        &amp;&amp; (degree
+<span class="pc bpc" id="L1118" title="1 of 2 branches missed.">                            != normalizedPrimitiveCoefficients.size() - 1</span>
+<span class="fc" id="L1119">                            || normalizedPrimitiveCoefficients.getLast()</span>
+<span class="pc bpc" id="L1120" title="1 of 2 branches missed.">                                .signum() &lt;= 0</span>
+<span class="fc" id="L1121">                            || coefficientContent(</span>
+                                normalizedPrimitiveCoefficients)
+<span class="pc bpc" id="L1123" title="1 of 2 branches missed.">                                .compareTo(BigInteger.ONE) != 0)) {</span>
+<span class="nc" id="L1124">                    throw new IllegalArgumentException(</span>
+                        &quot;trace polynomial must be primitive and canonical&quot;);
+                }
+<span class="fc bfc" id="L1127" title="All 4 branches covered.">                boolean modularCertificate = outcome</span>
+                        == IndependentIrreducibilityOutcome.CERTIFIED
+                    &amp;&amp; proofMethod
+                        == IrreducibilityProofMethod.MODULAR_RABIN;
+<span class="pc bpc" id="L1131" title="1 of 6 branches missed.">                if ((selectedPrime &gt; 0) != modularCertificate</span>
+                        || modularCertificate
+<span class="pc bpc" id="L1133" title="1 of 2 branches missed.">                            &amp;&amp; (primeAttempts.isEmpty()</span>
+<span class="pc bpc" id="L1134" title="1 of 2 branches missed.">                                || primeAttempts.getLast().prime()</span>
+                                    != selectedPrime
+<span class="pc bpc" id="L1136" title="1 of 2 branches missed.">                                || primeAttempts.getLast().outcome()</span>
+                                    != PrimeAttemptOutcome
+                                        .IRREDUCIBLE_WITNESS)) {
+<span class="nc" id="L1139">                    throw new IllegalArgumentException(</span>
+                        &quot;selected prime must identify the retained witness&quot;);
+                }
+<span class="pc bpc" id="L1142" title="2 of 6 branches missed.">                if (proofMethod == IrreducibilityProofMethod.LINEAR_DEGREE</span>
+                        &amp;&amp; (outcome
+                            != IndependentIrreducibilityOutcome.CERTIFIED
+                            || degree != 1
+<span class="pc bpc" id="L1146" title="1 of 2 branches missed.">                            || !primeAttempts.isEmpty())) {</span>
+<span class="nc" id="L1147">                    throw new IllegalArgumentException(</span>
+                        &quot;linear evidence must certify exactly degree one&quot;);
+                }
+<span class="fc" id="L1150">            }</span>
+        }
+    }
+
+    private static BigInteger coefficientContent(
+        List&lt;BigInteger&gt; coefficients
+    ) {
+<span class="fc" id="L1157">        BigInteger result = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L1158" title="All 2 branches covered.">        for (BigInteger coefficient : coefficients) {</span>
+<span class="fc" id="L1159">            result = result.gcd(coefficient.abs());</span>
+<span class="fc" id="L1160">        }</span>
+<span class="fc" id="L1161">        return result;</span>
     }
 
     /** Issuer-owned exact decomposition evidence. */
@@ -483,85 +1169,85 @@ public final class FactorizationVerifier {
             FactorizationEngine.Proposal&lt;C&gt; proposal,
             FactorizationEngine.BackendClaim backendClaim,
             String verificationCertificateHash
-<span class="fc" id="L486">        ) {</span>
-<span class="fc" id="L487">            state = new State&lt;&gt;(</span>
-<span class="fc" id="L488">                proposal.unit(),</span>
-<span class="fc" id="L489">                proposal.factors(),</span>
-<span class="fc" id="L490">                proposal.unresolvedRemainder(),</span>
+<span class="fc" id="L1172">        ) {</span>
+<span class="fc" id="L1173">            state = new State&lt;&gt;(</span>
+<span class="fc" id="L1174">                proposal.unit(),</span>
+<span class="fc" id="L1175">                proposal.factors(),</span>
+<span class="fc" id="L1176">                proposal.unresolvedRemainder(),</span>
                 backendClaim,
-<span class="fc" id="L492">                proposal.engineCertificateHash(),</span>
+<span class="fc" id="L1178">                proposal.engineCertificateHash(),</span>
                 verificationCertificateHash);
-<span class="fc" id="L494">        }</span>
+<span class="fc" id="L1180">        }</span>
 
         public C unit() {
-<span class="fc" id="L497">            return state.unit();</span>
+<span class="fc" id="L1183">            return state.unit();</span>
         }
 
         public List&lt;PolynomialFactor&lt;C&gt;&gt; factors() {
-<span class="fc" id="L501">            return state.factors();</span>
+<span class="fc" id="L1187">            return state.factors();</span>
         }
 
         public SparsePolynomial&lt;C&gt; unresolvedRemainder() {
-<span class="fc" id="L505">            return state.unresolvedRemainder();</span>
+<span class="fc" id="L1191">            return state.unresolvedRemainder();</span>
         }
 
         public FactorizationEngine.BackendClaim backendClaim() {
-<span class="fc" id="L509">            return state.backendClaim();</span>
+<span class="fc" id="L1195">            return state.backendClaim();</span>
         }
 
         public String engineCertificateHash() {
-<span class="fc" id="L513">            return state.engineCertificateHash();</span>
+<span class="fc" id="L1199">            return state.engineCertificateHash();</span>
         }
 
         public String verificationCertificateHash() {
-<span class="fc" id="L517">            return state.verificationCertificateHash();</span>
+<span class="fc" id="L1203">            return state.verificationCertificateHash();</span>
         }
 
         public String canonicalMaterial() {
-<span class="fc" id="L521">            StringBuilder result = new StringBuilder();</span>
-<span class="fc" id="L522">            PolynomialEvidence.append(</span>
+<span class="fc" id="L1207">            StringBuilder result = new StringBuilder();</span>
+<span class="fc" id="L1208">            PolynomialEvidence.append(</span>
                 result,
-<span class="fc" id="L524">                unresolvedRemainder().ring()</span>
-<span class="fc" id="L525">                    .coefficientDomain()</span>
-<span class="fc" id="L526">                    .canonicalText(unit()));</span>
-<span class="fc" id="L527">            factors().forEach(factor -&gt; {</span>
-<span class="fc" id="L528">                PolynomialEvidence.append(</span>
+<span class="fc" id="L1210">                unresolvedRemainder().ring()</span>
+<span class="fc" id="L1211">                    .coefficientDomain()</span>
+<span class="fc" id="L1212">                    .canonicalText(unit()));</span>
+<span class="fc" id="L1213">            factors().forEach(factor -&gt; {</span>
+<span class="fc" id="L1214">                PolynomialEvidence.append(</span>
                     result,
-<span class="fc" id="L530">                    Integer.toString(factor.multiplicity()));</span>
-<span class="fc" id="L531">                PolynomialEvidence.append(</span>
+<span class="fc" id="L1216">                    Integer.toString(factor.multiplicity()));</span>
+<span class="fc" id="L1217">                PolynomialEvidence.append(</span>
                     result,
-<span class="fc" id="L533">                    factor.polynomial().canonicalMaterial());</span>
-<span class="fc" id="L534">            });</span>
-<span class="fc" id="L535">            PolynomialEvidence.append(</span>
+<span class="fc" id="L1219">                    factor.polynomial().canonicalMaterial());</span>
+<span class="fc" id="L1220">            });</span>
+<span class="fc" id="L1221">            PolynomialEvidence.append(</span>
                 result,
-<span class="fc" id="L537">                unresolvedRemainder().canonicalMaterial());</span>
-<span class="fc" id="L538">            PolynomialEvidence.append(</span>
+<span class="fc" id="L1223">                unresolvedRemainder().canonicalMaterial());</span>
+<span class="fc" id="L1224">            PolynomialEvidence.append(</span>
                 result,
-<span class="fc" id="L540">                backendClaim().name());</span>
-<span class="fc" id="L541">            PolynomialEvidence.append(</span>
+<span class="fc" id="L1226">                backendClaim().name());</span>
+<span class="fc" id="L1227">            PolynomialEvidence.append(</span>
                 result,
-<span class="fc" id="L543">                engineCertificateHash());</span>
-<span class="fc" id="L544">            PolynomialEvidence.append(</span>
+<span class="fc" id="L1229">                engineCertificateHash());</span>
+<span class="fc" id="L1230">            PolynomialEvidence.append(</span>
                 result,
-<span class="fc" id="L546">                verificationCertificateHash());</span>
-<span class="fc" id="L547">            return result.toString();</span>
+<span class="fc" id="L1232">                verificationCertificateHash());</span>
+<span class="fc" id="L1233">            return result.toString();</span>
         }
 
         @Override
         public boolean equals(Object other) {
-<span class="fc" id="L552">            return this == other</span>
-<span class="pc bpc" id="L553" title="2 of 4 branches missed.">                || other instanceof VerifiedCandidate&lt;?&gt; candidate</span>
-<span class="pc bpc" id="L554" title="1 of 2 branches missed.">                    &amp;&amp; state.equals(candidate.state);</span>
+<span class="fc" id="L1238">            return this == other</span>
+<span class="pc bpc" id="L1239" title="2 of 4 branches missed.">                || other instanceof VerifiedCandidate&lt;?&gt; candidate</span>
+<span class="pc bpc" id="L1240" title="1 of 2 branches missed.">                    &amp;&amp; state.equals(candidate.state);</span>
         }
 
         @Override
         public int hashCode() {
-<span class="nc" id="L559">            return state.hashCode();</span>
+<span class="nc" id="L1245">            return state.hashCode();</span>
         }
 
         @Override
         public String toString() {
-<span class="fc" id="L564">            return &quot;VerifiedCandidate[&quot; + state + ']';</span>
+<span class="fc" id="L1250">            return &quot;VerifiedCandidate[&quot; + state + ']';</span>
         }
 
         private record State&lt;C&gt;(
@@ -572,23 +1258,23 @@ public final class FactorizationVerifier {
             String engineCertificateHash,
             String verificationCertificateHash
         ) {
-<span class="fc" id="L575">            private State {</span>
-<span class="fc" id="L576">                Objects.requireNonNull(unit, &quot;unit&quot;);</span>
-<span class="fc" id="L577">                factors = List.copyOf(factors);</span>
-<span class="fc" id="L578">                Objects.requireNonNull(</span>
+<span class="fc" id="L1261">            private State {</span>
+<span class="fc" id="L1262">                Objects.requireNonNull(unit, &quot;unit&quot;);</span>
+<span class="fc" id="L1263">                factors = List.copyOf(factors);</span>
+<span class="fc" id="L1264">                Objects.requireNonNull(</span>
                     unresolvedRemainder,
                     &quot;unresolvedRemainder&quot;);
-<span class="fc" id="L581">                Objects.requireNonNull(backendClaim, &quot;backendClaim&quot;);</span>
-<span class="pc bpc" id="L582" title="1 of 2 branches missed.">                if (engineCertificateHash == null</span>
-<span class="pc bpc" id="L583" title="2 of 4 branches missed.">                        || !engineCertificateHash.matches(</span>
+<span class="fc" id="L1267">                Objects.requireNonNull(backendClaim, &quot;backendClaim&quot;);</span>
+<span class="pc bpc" id="L1268" title="1 of 2 branches missed.">                if (engineCertificateHash == null</span>
+<span class="pc bpc" id="L1269" title="2 of 4 branches missed.">                        || !engineCertificateHash.matches(</span>
                             &quot;sha256:[0-9a-f]{64}&quot;)
                         || verificationCertificateHash == null
-<span class="pc bpc" id="L586" title="1 of 2 branches missed.">                        || !verificationCertificateHash.matches(</span>
+<span class="pc bpc" id="L1272" title="1 of 2 branches missed.">                        || !verificationCertificateHash.matches(</span>
                             &quot;sha256:[0-9a-f]{64}&quot;)) {
-<span class="nc" id="L588">                    throw new IllegalArgumentException(</span>
+<span class="nc" id="L1274">                    throw new IllegalArgumentException(</span>
                         &quot;verified factorization evidence is invalid&quot;);
                 }
-<span class="fc" id="L591">            }</span>
+<span class="fc" id="L1277">            }</span>
         }
     }
 
@@ -604,9 +1290,11 @@ public final class FactorizationVerifier {
             ClaimStrength claimStrength,
             List&lt;VerifiedCandidate&lt;C&gt;&gt; candidates,
             String engineResultHash,
-            String verificationHash
-<span class="fc" id="L608">        ) {</span>
-<span class="fc" id="L609">            state = new State&lt;&gt;(</span>
+            String verificationHash,
+            Optional&lt;IndependentIrreducibilityTrace&gt; independentTrace,
+            Optional&lt;IndependentCompletenessTrace&gt; completenessTrace
+<span class="fc" id="L1296">        ) {</span>
+<span class="fc" id="L1297">            state = new State&lt;&gt;(</span>
                 engineId,
                 status,
                 detailCode,
@@ -614,61 +1302,73 @@ public final class FactorizationVerifier {
                 claimStrength,
                 candidates,
                 engineResultHash,
-                verificationHash);
-<span class="fc" id="L618">        }</span>
+                verificationHash,
+                independentTrace,
+                completenessTrace);
+<span class="fc" id="L1308">        }</span>
 
         public String engineId() {
-<span class="nc" id="L621">            return state.engineId();</span>
+<span class="nc" id="L1311">            return state.engineId();</span>
         }
 
         public Status status() {
-<span class="fc" id="L625">            return state.status();</span>
+<span class="fc" id="L1315">            return state.status();</span>
         }
 
         public String detailCode() {
-<span class="fc" id="L629">            return state.detailCode();</span>
+<span class="fc" id="L1319">            return state.detailCode();</span>
         }
 
         public PolynomialWorkLedger work() {
-<span class="fc" id="L633">            return state.work();</span>
+<span class="fc" id="L1323">            return state.work();</span>
         }
 
         public ClaimStrength claimStrength() {
-<span class="fc" id="L637">            return state.claimStrength();</span>
+<span class="fc" id="L1327">            return state.claimStrength();</span>
         }
 
         public List&lt;VerifiedCandidate&lt;C&gt;&gt; candidates() {
-<span class="fc" id="L641">            return state.candidates();</span>
+<span class="fc" id="L1331">            return state.candidates();</span>
         }
 
         public String engineResultHash() {
-<span class="nc" id="L645">            return state.engineResultHash();</span>
+<span class="nc" id="L1335">            return state.engineResultHash();</span>
         }
 
         public String verificationHash() {
-<span class="fc" id="L649">            return state.verificationHash();</span>
+<span class="fc" id="L1339">            return state.verificationHash();</span>
+        }
+
+        public Optional&lt;IndependentIrreducibilityTrace&gt;
+                independentIrreducibilityTrace() {
+<span class="fc" id="L1344">            return state.independentTrace();</span>
+        }
+
+        public Optional&lt;IndependentCompletenessTrace&gt;
+                independentCompletenessTrace() {
+<span class="fc" id="L1349">            return state.completenessTrace();</span>
         }
 
         public boolean successful() {
-<span class="fc bfc" id="L653" title="All 2 branches covered.">            return status() == Status.PARTIAL_FACTORIZATION</span>
-<span class="pc bpc" id="L654" title="1 of 2 branches missed.">                || status() == Status.COMPLETE_FACTORIZATION;</span>
+<span class="fc bfc" id="L1353" title="All 2 branches covered.">            return status() == Status.PARTIAL_FACTORIZATION</span>
+<span class="pc bpc" id="L1354" title="1 of 2 branches missed.">                || status() == Status.COMPLETE_FACTORIZATION;</span>
         }
 
         @Override
         public boolean equals(Object other) {
-<span class="nc" id="L659">            return this == other</span>
-<span class="nc bnc" id="L660" title="All 4 branches missed.">                || other instanceof Report&lt;?&gt; report</span>
-<span class="nc bnc" id="L661" title="All 2 branches missed.">                    &amp;&amp; state.equals(report.state);</span>
+<span class="nc" id="L1359">            return this == other</span>
+<span class="nc bnc" id="L1360" title="All 4 branches missed.">                || other instanceof Report&lt;?&gt; report</span>
+<span class="nc bnc" id="L1361" title="All 2 branches missed.">                    &amp;&amp; state.equals(report.state);</span>
         }
 
         @Override
         public int hashCode() {
-<span class="nc" id="L666">            return state.hashCode();</span>
+<span class="nc" id="L1366">            return state.hashCode();</span>
         }
 
         @Override
         public String toString() {
-<span class="fc" id="L671">            return &quot;Report[&quot; + state + ']';</span>
+<span class="fc" id="L1371">            return &quot;Report[&quot; + state + ']';</span>
         }
 
         private record State&lt;C&gt;(
@@ -679,56 +1379,61 @@ public final class FactorizationVerifier {
             ClaimStrength claimStrength,
             List&lt;VerifiedCandidate&lt;C&gt;&gt; candidates,
             String engineResultHash,
-            String verificationHash
+            String verificationHash,
+            Optional&lt;IndependentIrreducibilityTrace&gt; independentTrace,
+            Optional&lt;IndependentCompletenessTrace&gt; completenessTrace
         ) {
-<span class="fc" id="L684">            private State {</span>
-<span class="pc bpc" id="L685" title="1 of 2 branches missed.">                if (engineId == null</span>
-<span class="pc bpc" id="L686" title="3 of 6 branches missed.">                        || engineId.isBlank()</span>
+<span class="fc" id="L1386">            private State {</span>
+<span class="pc bpc" id="L1387" title="1 of 2 branches missed.">                if (engineId == null</span>
+<span class="pc bpc" id="L1388" title="3 of 6 branches missed.">                        || engineId.isBlank()</span>
                         || status == null
                         || detailCode == null
-<span class="pc bpc" id="L689" title="4 of 8 branches missed.">                        || detailCode.isBlank()</span>
+<span class="pc bpc" id="L1391" title="6 of 12 branches missed.">                        || detailCode.isBlank()</span>
                         || work == null
                         || claimStrength == null
+                        || independentTrace == null
+                        || completenessTrace == null
                         || verificationHash == null
-<span class="pc bpc" id="L693" title="1 of 2 branches missed.">                        || !verificationHash.matches(</span>
+<span class="pc bpc" id="L1397" title="1 of 2 branches missed.">                        || !verificationHash.matches(</span>
                             &quot;sha256:[0-9a-f]{64}&quot;)) {
-<span class="nc" id="L695">                    throw new IllegalArgumentException(</span>
+<span class="nc" id="L1399">                    throw new IllegalArgumentException(</span>
                         &quot;factorization verification report is invalid&quot;);
                 }
-<span class="fc" id="L698">                candidates = List.copyOf(candidates);</span>
-<span class="pc bpc" id="L699" title="1 of 4 branches missed.">                boolean success =</span>
+<span class="fc" id="L1402">                candidates = List.copyOf(candidates);</span>
+<span class="fc" id="L1403">                independentTrace = independentTrace.map(</span>
+                    Objects::requireNonNull);
+<span class="fc" id="L1405">                completenessTrace = completenessTrace.map(</span>
+                    Objects::requireNonNull);
+<span class="fc bfc" id="L1407" title="All 2 branches covered.">                if (independentTrace.isPresent()</span>
+<span class="pc bpc" id="L1408" title="1 of 2 branches missed.">                        &amp;&amp; completenessTrace.isPresent()) {</span>
+<span class="nc" id="L1409">                    throw new IllegalArgumentException(</span>
+                        &quot;factorization report cannot mix independent traces&quot;);
+                }
+<span class="fc bfc" id="L1412" title="All 4 branches covered.">                boolean success =</span>
                     status == Status.PARTIAL_FACTORIZATION
                         || status == Status.COMPLETE_FACTORIZATION;
-<span class="pc bpc" id="L702" title="1 of 2 branches missed.">                if (success == candidates.isEmpty()) {</span>
-<span class="nc" id="L703">                    throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L1415" title="1 of 2 branches missed.">                if (success == candidates.isEmpty()) {</span>
+<span class="nc" id="L1416">                    throw new IllegalArgumentException(</span>
                         &quot;factorization report candidate/status mismatch&quot;);
                 }
-<span class="pc bpc" id="L706" title="3 of 4 branches missed.">                if (status == Status.COMPLETE_FACTORIZATION</span>
-                        &amp;&amp; claimStrength
-                            != ClaimStrength
-                                .INDEPENDENTLY_CERTIFIED_COMPLETE) {
-<span class="nc" id="L710">                    throw new IllegalArgumentException(</span>
-                        &quot;complete factorization requires independent evidence&quot;);
-                }
-<span class="pc bpc" id="L713" title="3 of 4 branches missed.">                if (status == Status.IRREDUCIBLE</span>
-                        &amp;&amp; claimStrength
-                            != ClaimStrength
-                                .INDEPENDENTLY_CERTIFIED_IRREDUCIBLE) {
-<span class="nc" id="L717">                    throw new IllegalArgumentException(</span>
-                        &quot;irreducibility requires independent evidence&quot;);
-                }
-<span class="pc bpc" id="L720" title="1 of 2 branches missed.">                if (engineResultHash == null</span>
-<span class="fc bfc" id="L721" title="All 2 branches covered.">                        || !engineResultHash.isEmpty()</span>
-<span class="pc bpc" id="L722" title="1 of 2 branches missed.">                        &amp;&amp; !engineResultHash.matches(</span>
+<span class="fc" id="L1419">                validateReportEvidence(</span>
+                    status,
+                    claimStrength,
+                    candidates,
+                    independentTrace,
+                    completenessTrace);
+<span class="pc bpc" id="L1425" title="1 of 2 branches missed.">                if (engineResultHash == null</span>
+<span class="fc bfc" id="L1426" title="All 2 branches covered.">                        || !engineResultHash.isEmpty()</span>
+<span class="pc bpc" id="L1427" title="1 of 2 branches missed.">                        &amp;&amp; !engineResultHash.matches(</span>
                             &quot;sha256:[0-9a-f]{64}&quot;)) {
-<span class="nc" id="L724">                    throw new IllegalArgumentException(</span>
+<span class="nc" id="L1429">                    throw new IllegalArgumentException(</span>
                         &quot;engine result hash is invalid&quot;);
                 }
-<span class="fc" id="L727">            }</span>
+<span class="fc" id="L1432">            }</span>
         }
     }
 
-<span class="fc" id="L731">    private record VerificationOutcome&lt;C&gt;(</span>
+<span class="fc" id="L1436">    private record VerificationOutcome&lt;C&gt;(</span>
         boolean verified,
         String detailCode,
         SparsePolynomial&lt;C&gt; reconstructed
@@ -737,31 +1442,31 @@ public final class FactorizationVerifier {
 
     private static final class WorkCounter {
         private final long limit;
-<span class="fc" id="L740">        private final Map&lt;String, Long&gt; stages =</span>
+<span class="fc" id="L1445">        private final Map&lt;String, Long&gt; stages =</span>
             new LinkedHashMap&lt;&gt;();
         private long total;
 
-<span class="fc" id="L744">        private WorkCounter(long limit) {</span>
-<span class="pc bpc" id="L745" title="1 of 2 branches missed.">            if (limit &lt; 0) {</span>
-<span class="nc" id="L746">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L1449">        private WorkCounter(long limit) {</span>
+<span class="pc bpc" id="L1450" title="1 of 2 branches missed.">            if (limit &lt; 0) {</span>
+<span class="nc" id="L1451">                throw new IllegalArgumentException(</span>
                     &quot;verification work limit must not be negative&quot;);
             }
-<span class="fc" id="L749">            this.limit = limit;</span>
-<span class="fc" id="L750">        }</span>
+<span class="fc" id="L1454">            this.limit = limit;</span>
+<span class="fc" id="L1455">        }</span>
 
         private void consume(String stage, long units) {
-<span class="pc bpc" id="L753" title="2 of 4 branches missed.">            if (units &lt; 0 || total &gt; limit - units) {</span>
-<span class="nc" id="L754">                throw new WorkLimitReached();</span>
+<span class="pc bpc" id="L1458" title="2 of 4 branches missed.">            if (units &lt; 0 || total &gt; limit - units) {</span>
+<span class="nc" id="L1459">                throw new WorkLimitReached();</span>
             }
-<span class="pc bpc" id="L756" title="1 of 2 branches missed.">            if (units == 0) {</span>
-<span class="nc" id="L757">                return;</span>
+<span class="pc bpc" id="L1461" title="1 of 2 branches missed.">            if (units == 0) {</span>
+<span class="nc" id="L1462">                return;</span>
             }
-<span class="fc" id="L759">            total += units;</span>
-<span class="fc" id="L760">            stages.merge(stage, units, Math::addExact);</span>
-<span class="fc" id="L761">        }</span>
+<span class="fc" id="L1464">            total += units;</span>
+<span class="fc" id="L1465">            stages.merge(stage, units, Math::addExact);</span>
+<span class="fc" id="L1466">        }</span>
 
         private PolynomialWorkLedger ledger() {
-<span class="fc" id="L764">            return new PolynomialWorkLedger(stages);</span>
+<span class="fc" id="L1469">            return new PolynomialWorkLedger(stages);</span>
         }
     }
 

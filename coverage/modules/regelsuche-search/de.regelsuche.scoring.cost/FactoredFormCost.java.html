@@ -75,7 +75,7 @@ import de.regelsuche.scoring.ExpressionScore;
 <span class="fc bfc" id="L75" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.POW</span>
 <span class="fc bfc" id="L76" title="All 2 branches covered.">                &amp;&amp; isNonTrivial(binary.left())</span>
 <span class="pc bpc" id="L77" title="1 of 2 branches missed.">                &amp;&amp; binary.right() instanceof NumberExpr number</span>
-<span class="pc bpc" id="L78" title="1 of 2 branches missed.">                &amp;&amp; number.value() &gt;= 2) {</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">                &amp;&amp; number.value().compareTo(de.regelsuche.scalar.ExactRational.integer(2)) &gt;= 0) {</span>
 <span class="fc" id="L79">                bonus += 2;</span>
             }
 <span class="fc" id="L81">            bonus += factorizationBonus(binary.left());</span>

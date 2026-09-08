@@ -409,7 +409,7 @@ public final class DeterministicGenomeMutator {
         }
 <span class="nc bnc" id="L410" title="All 2 branches missed.">        if (pattern instanceof PatternExpr.LiteralNumber number) {</span>
 <span class="nc" id="L411">            return value instanceof PatternExpr.LiteralNumber other</span>
-<span class="nc bnc" id="L412" title="All 4 branches missed.">                &amp;&amp; number.value() == other.value();</span>
+<span class="nc bnc" id="L412" title="All 4 branches missed.">                &amp;&amp; number.value().equals(other.value());</span>
         }
 <span class="nc bnc" id="L414" title="All 2 branches missed.">        if (pattern instanceof PatternExpr.LiteralVariable variable) {</span>
 <span class="nc" id="L415">            return value instanceof PatternExpr.LiteralVariable other</span>

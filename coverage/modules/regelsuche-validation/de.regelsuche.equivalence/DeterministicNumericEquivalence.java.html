@@ -61,7 +61,7 @@ import java.util.Set;
 
     private double evaluate(Expr expression, Map&lt;String, Double&gt; variables) {
 <span class="fc bfc" id="L63" title="All 2 branches covered.">        if (expression instanceof NumberExpr numberExpr) {</span>
-<span class="fc" id="L64">            return numberExpr.value();</span>
+<span class="fc" id="L64">            return numberExpr.value().toBigDecimal(java.math.MathContext.DECIMAL128).doubleValue();</span>
         }
 <span class="fc bfc" id="L66" title="All 2 branches covered.">        if (expression instanceof VariableExpr variableExpr) {</span>
 <span class="fc" id="L67">            return variables.getOrDefault(variableExpr.name(), 0.0);</span>

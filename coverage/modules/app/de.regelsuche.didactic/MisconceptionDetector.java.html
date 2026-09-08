@@ -149,14 +149,14 @@ public final class MisconceptionDetector {
 <span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr sub</span>
 <span class="fc bfc" id="L150" title="All 2 branches covered.">            &amp;&amp; sub.operator() == BinaryOperator.SUB</span>
 <span class="pc bpc" id="L151" title="1 of 2 branches missed.">            &amp;&amp; sub.left() instanceof NumberExpr zero</span>
-<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            &amp;&amp; zero.value() == 0.0) {</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            &amp;&amp; zero.value().equalsInteger(0)) {</span>
 <span class="fc" id="L153">            return sub.right();</span>
         }
         // Pattern: (-1) * X
 <span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr mul</span>
 <span class="pc bpc" id="L157" title="1 of 2 branches missed.">            &amp;&amp; mul.operator() == BinaryOperator.MUL</span>
 <span class="nc bnc" id="L158" title="All 2 branches missed.">            &amp;&amp; mul.left() instanceof NumberExpr minusOne</span>
-<span class="nc bnc" id="L159" title="All 2 branches missed.">            &amp;&amp; minusOne.value() == -1.0) {</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">            &amp;&amp; minusOne.value().equalsInteger(-1)) {</span>
 <span class="nc" id="L160">            return mul.right();</span>
         }
 <span class="fc" id="L162">        return null;</span>
@@ -180,7 +180,7 @@ public final class MisconceptionDetector {
 <span class="nc" id="L180">            return false;</span>
         }
 <span class="pc bpc" id="L182" title="3 of 4 branches missed.">        if (a instanceof NumberExpr na &amp;&amp; b instanceof NumberExpr nb) {</span>
-<span class="nc bnc" id="L183" title="All 2 branches missed.">            return Double.compare(na.value(), nb.value()) == 0;</span>
+<span class="nc" id="L183">            return na.value().equals(nb.value());</span>
         }
 <span class="pc bpc" id="L185" title="2 of 4 branches missed.">        if (a instanceof VariableExpr va &amp;&amp; b instanceof VariableExpr vb) {</span>
 <span class="fc" id="L186">            return va.name().equals(vb.name());</span>

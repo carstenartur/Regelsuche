@@ -79,101 +79,93 @@ public final class SemanticDescriptionMeasurer {
         }
 <span class="fc" id="L80">    }</span>
 
-    private static int numericBitLength(double value) {
-<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (!Double.isFinite(value)) {</span>
-<span class="nc" id="L84">            throw new IllegalArgumentException(&quot;non-finite numbers are not measurable&quot;);</span>
-        }
-<span class="fc" id="L86">        BigDecimal decimal = BigDecimal.valueOf(value).stripTrailingZeros();</span>
-<span class="fc" id="L87">        int bits = Math.max(1, decimal.unscaledValue().abs().bitLength());</span>
-<span class="fc bfc" id="L88" title="All 2 branches covered.">        return decimal.scale() == 0</span>
-<span class="fc" id="L89">            ? bits</span>
-<span class="fc" id="L90">            : Math.addExact(</span>
-                bits,
-<span class="fc" id="L92">                BigInteger.TEN.pow(Math.abs(decimal.scale())).bitLength());</span>
+    private static int numericBitLength(de.regelsuche.scalar.ExactRational value) {
+<span class="fc" id="L83">        int bits = Math.max(1, value.numerator().abs().bitLength());</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        return value.isInteger() ? bits : Math.addExact(bits, value.denominator().bitLength());</span>
     }
 
     private static int tokenCount(String expression) {
-<span class="fc" id="L96">        int tokens = 0;</span>
-<span class="fc" id="L97">        int index = 0;</span>
-<span class="fc bfc" id="L98" title="All 2 branches covered.">        while (index &lt; expression.length()) {</span>
-<span class="fc" id="L99">            char current = expression.charAt(index);</span>
-<span class="fc bfc" id="L100" title="All 2 branches covered.">            if (Character.isWhitespace(current)) {</span>
+<span class="fc" id="L88">        int tokens = 0;</span>
+<span class="fc" id="L89">        int index = 0;</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        while (index &lt; expression.length()) {</span>
+<span class="fc" id="L91">            char current = expression.charAt(index);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (Character.isWhitespace(current)) {</span>
+<span class="fc" id="L93">                index++;</span>
+<span class="pc bpc" id="L94" title="1 of 4 branches missed.">            } else if (Character.isLetter(current) || current == '_') {</span>
+<span class="fc" id="L95">                index = scanIdentifier(expression, index);</span>
+<span class="fc" id="L96">                tokens++;</span>
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">            } else if (Character.isDigit(current) || current == '.') {</span>
+<span class="fc" id="L98">                index = scanNumber(expression, index);</span>
+<span class="fc" id="L99">                tokens++;</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">            } else if (&quot;+-*/^(),&quot;.indexOf(current) &gt;= 0) {</span>
 <span class="fc" id="L101">                index++;</span>
-<span class="pc bpc" id="L102" title="1 of 4 branches missed.">            } else if (Character.isLetter(current) || current == '_') {</span>
-<span class="fc" id="L103">                index = scanIdentifier(expression, index);</span>
-<span class="fc" id="L104">                tokens++;</span>
-<span class="pc bpc" id="L105" title="1 of 4 branches missed.">            } else if (Character.isDigit(current) || current == '.') {</span>
-<span class="fc" id="L106">                index = scanNumber(expression, index);</span>
-<span class="fc" id="L107">                tokens++;</span>
-<span class="pc bpc" id="L108" title="1 of 2 branches missed.">            } else if (&quot;+-*/^(),&quot;.indexOf(current) &gt;= 0) {</span>
-<span class="fc" id="L109">                index++;</span>
-<span class="fc" id="L110">                tokens++;</span>
+<span class="fc" id="L102">                tokens++;</span>
             } else {
-<span class="nc" id="L112">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L104">                throw new IllegalArgumentException(</span>
                     &quot;unsupported formatted token at position &quot; + index);
             }
-<span class="fc" id="L115">        }</span>
-<span class="fc" id="L116">        return Math.max(1, tokens);</span>
+<span class="fc" id="L107">        }</span>
+<span class="fc" id="L108">        return Math.max(1, tokens);</span>
     }
 
     private static int scanIdentifier(String expression, int index) {
-<span class="fc" id="L120">        int cursor = index + 1;</span>
-<span class="fc bfc" id="L121" title="All 2 branches covered.">        while (cursor &lt; expression.length()) {</span>
-<span class="fc" id="L122">            char current = expression.charAt(cursor);</span>
-<span class="pc bpc" id="L123" title="1 of 4 branches missed.">            if (!Character.isLetterOrDigit(current) &amp;&amp; current != '_') {</span>
-<span class="fc" id="L124">                break;</span>
+<span class="fc" id="L112">        int cursor = index + 1;</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        while (cursor &lt; expression.length()) {</span>
+<span class="fc" id="L114">            char current = expression.charAt(cursor);</span>
+<span class="pc bpc" id="L115" title="1 of 4 branches missed.">            if (!Character.isLetterOrDigit(current) &amp;&amp; current != '_') {</span>
+<span class="fc" id="L116">                break;</span>
             }
-<span class="fc" id="L126">            cursor++;</span>
-<span class="fc" id="L127">        }</span>
-<span class="fc" id="L128">        return cursor;</span>
+<span class="fc" id="L118">            cursor++;</span>
+<span class="fc" id="L119">        }</span>
+<span class="fc" id="L120">        return cursor;</span>
     }
 
     private static int scanNumber(String expression, int index) {
-<span class="fc" id="L132">        int cursor = index;</span>
-<span class="fc bfc" id="L133" title="All 2 branches covered.">        while (cursor &lt; expression.length()</span>
-<span class="fc bfc" id="L134" title="All 2 branches covered.">                &amp;&amp; Character.isDigit(expression.charAt(cursor))) {</span>
-<span class="fc" id="L135">            cursor++;</span>
+<span class="fc" id="L124">        int cursor = index;</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        while (cursor &lt; expression.length()</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">                &amp;&amp; Character.isDigit(expression.charAt(cursor))) {</span>
+<span class="fc" id="L127">            cursor++;</span>
         }
-<span class="fc bfc" id="L137" title="All 4 branches covered.">        if (cursor &lt; expression.length() &amp;&amp; expression.charAt(cursor) == '.') {</span>
-<span class="fc" id="L138">            cursor++;</span>
-<span class="pc bpc" id="L139" title="1 of 2 branches missed.">            while (cursor &lt; expression.length()</span>
-<span class="fc bfc" id="L140" title="All 2 branches covered.">                    &amp;&amp; Character.isDigit(expression.charAt(cursor))) {</span>
-<span class="fc" id="L141">                cursor++;</span>
+<span class="fc bfc" id="L129" title="All 4 branches covered.">        if (cursor &lt; expression.length() &amp;&amp; expression.charAt(cursor) == '.') {</span>
+<span class="fc" id="L130">            cursor++;</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">            while (cursor &lt; expression.length()</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">                    &amp;&amp; Character.isDigit(expression.charAt(cursor))) {</span>
+<span class="fc" id="L133">                cursor++;</span>
             }
         }
-<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (cursor &lt; expression.length()</span>
-<span class="pc bpc" id="L145" title="1 of 2 branches missed.">                &amp;&amp; (expression.charAt(cursor) == 'e'</span>
-<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                    || expression.charAt(cursor) == 'E')) {</span>
-<span class="nc" id="L147">            cursor++;</span>
-<span class="nc bnc" id="L148" title="All 2 branches missed.">            if (cursor &lt; expression.length()</span>
-<span class="nc bnc" id="L149" title="All 2 branches missed.">                    &amp;&amp; (expression.charAt(cursor) == '+'</span>
-<span class="nc bnc" id="L150" title="All 2 branches missed.">                        || expression.charAt(cursor) == '-')) {</span>
-<span class="nc" id="L151">                cursor++;</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (cursor &lt; expression.length()</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">                &amp;&amp; (expression.charAt(cursor) == 'e'</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">                    || expression.charAt(cursor) == 'E')) {</span>
+<span class="nc" id="L139">            cursor++;</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">            if (cursor &lt; expression.length()</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">                    &amp;&amp; (expression.charAt(cursor) == '+'</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                        || expression.charAt(cursor) == '-')) {</span>
+<span class="nc" id="L143">                cursor++;</span>
             }
-<span class="nc" id="L153">            int exponentStart = cursor;</span>
-<span class="nc bnc" id="L154" title="All 2 branches missed.">            while (cursor &lt; expression.length()</span>
-<span class="nc bnc" id="L155" title="All 2 branches missed.">                    &amp;&amp; Character.isDigit(expression.charAt(cursor))) {</span>
-<span class="nc" id="L156">                cursor++;</span>
+<span class="nc" id="L145">            int exponentStart = cursor;</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">            while (cursor &lt; expression.length()</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">                    &amp;&amp; Character.isDigit(expression.charAt(cursor))) {</span>
+<span class="nc" id="L148">                cursor++;</span>
             }
-<span class="nc bnc" id="L158" title="All 2 branches missed.">            if (cursor == exponentStart) {</span>
-<span class="nc" id="L159">                throw new IllegalArgumentException(</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">            if (cursor == exponentStart) {</span>
+<span class="nc" id="L151">                throw new IllegalArgumentException(</span>
                     &quot;invalid formatted exponent at position &quot; + index);
             }
         }
-<span class="pc bpc" id="L163" title="1 of 4 branches missed.">        if (cursor == index</span>
-<span class="pc bpc" id="L164" title="1 of 2 branches missed.">                || cursor == index + 1 &amp;&amp; expression.charAt(index) == '.') {</span>
-<span class="nc" id="L165">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L155" title="1 of 4 branches missed.">        if (cursor == index</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">                || cursor == index + 1 &amp;&amp; expression.charAt(index) == '.') {</span>
+<span class="nc" id="L157">            throw new IllegalArgumentException(</span>
                 &quot;invalid formatted number at position &quot; + index);
         }
-<span class="fc" id="L168">        return cursor;</span>
+<span class="fc" id="L160">        return cursor;</span>
     }
 
-<span class="fc" id="L171">    private static final class SyntaxStatistics {</span>
+<span class="fc" id="L163">    private static final class SyntaxStatistics {</span>
         private int astNodeCount;
         private int operatorCount;
         private int numericBitLength;
-<span class="fc" id="L175">        private final Set&lt;String&gt; variables = new TreeSet&lt;&gt;();</span>
-<span class="fc" id="L176">        private final Set&lt;String&gt; functions = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L167">        private final Set&lt;String&gt; variables = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L168">        private final Set&lt;String&gt; functions = new TreeSet&lt;&gt;();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

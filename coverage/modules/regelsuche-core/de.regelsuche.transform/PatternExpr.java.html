@@ -6,6 +6,7 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.scalar.ExactRational;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -26,15 +27,23 @@ public sealed interface PatternExpr extends ExprTemplate
         PatternExpr.LiteralVariable, PatternExpr.Operation,
         PatternExpr.Function {
     static PatternExpr var(String name) {
-<span class="fc" id="L29">        return new Placeholder(name);</span>
+<span class="fc" id="L30">        return new Placeholder(name);</span>
     }
 
-    static PatternExpr num(double value) {
-<span class="fc" id="L33">        return new LiteralNumber(value);</span>
+    static PatternExpr num(ExactRational value) {
+<span class="fc" id="L34">        return new LiteralNumber(value);</span>
+    }
+
+    static PatternExpr num(long value) {
+<span class="fc" id="L38">        return num(ExactRational.integer(value));</span>
+    }
+
+    static PatternExpr num(String literal) {
+<span class="fc" id="L42">        return num(NumberExpr.exact(literal).value());</span>
     }
 
     static PatternExpr variable(String name) {
-<span class="fc" id="L37">        return new LiteralVariable(name);</span>
+<span class="fc" id="L46">        return new LiteralVariable(name);</span>
     }
 
     static PatternExpr op(
@@ -42,11 +51,11 @@ public sealed interface PatternExpr extends ExprTemplate
         PatternExpr left,
         PatternExpr right
     ) {
-<span class="fc" id="L45">        return new Operation(operator, left, right);</span>
+<span class="fc" id="L54">        return new Operation(operator, left, right);</span>
     }
 
     static PatternExpr fn(String name, PatternExpr... arguments) {
-<span class="fc" id="L49">        return new Function(name, List.of(arguments));</span>
+<span class="fc" id="L58">        return new Function(name, List.of(arguments));</span>
     }
 
     /**
@@ -62,62 +71,66 @@ public sealed interface PatternExpr extends ExprTemplate
     Expr instantiate(Map&lt;String, Expr&gt; bindings);
 
     record Placeholder(String name) implements PatternExpr {
-<span class="fc" id="L65">        public Placeholder {</span>
-<span class="pc bpc" id="L66" title="2 of 4 branches missed.">            if (name == null || name.isBlank()) {</span>
-<span class="nc" id="L67">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L74">        public Placeholder {</span>
+<span class="pc bpc" id="L75" title="2 of 4 branches missed.">            if (name == null || name.isBlank()) {</span>
+<span class="nc" id="L76">                throw new IllegalArgumentException(</span>
                     &quot;placeholder name must not be blank&quot;);
             }
-<span class="fc" id="L70">        }</span>
+<span class="fc" id="L79">        }</span>
 
         @Override
         public boolean match(Expr expression, Map&lt;String, Expr&gt; bindings) {
-<span class="nc" id="L74">            Expr bound = bindings.get(name);</span>
-<span class="nc bnc" id="L75" title="All 2 branches missed.">            if (bound == null) {</span>
-<span class="nc" id="L76">                bindings.put(name, expression);</span>
-<span class="nc" id="L77">                return true;</span>
+<span class="nc" id="L83">            Expr bound = bindings.get(name);</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">            if (bound == null) {</span>
+<span class="nc" id="L85">                bindings.put(name, expression);</span>
+<span class="nc" id="L86">                return true;</span>
             }
-<span class="nc" id="L79">            return bound.equals(expression);</span>
+<span class="nc" id="L88">            return bound.equals(expression);</span>
         }
 
         @Override
         public Expr instantiate(Map&lt;String, Expr&gt; bindings) {
-<span class="fc" id="L84">            return Optional.ofNullable(bindings.get(name))</span>
-<span class="pc" id="L85">                .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+<span class="fc" id="L93">            return Optional.ofNullable(bindings.get(name))</span>
+<span class="pc" id="L94">                .orElseThrow(() -&gt; new IllegalArgumentException(</span>
                     &quot;Missing binding for &quot; + name));
         }
     }
 
-<span class="fc" id="L90">    record LiteralNumber(double value) implements PatternExpr {</span>
+    record LiteralNumber(ExactRational value) implements PatternExpr {
+<span class="fc" id="L100">        public LiteralNumber {</span>
+<span class="fc" id="L101">            Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc" id="L102">        }</span>
+
         @Override
         public boolean match(Expr expression, Map&lt;String, Expr&gt; bindings) {
-<span class="nc" id="L93">            return expression instanceof NumberExpr numberExpr</span>
-<span class="nc bnc" id="L94" title="All 4 branches missed.">                &amp;&amp; numberExpr.value() == value;</span>
+<span class="fc" id="L106">            return expression instanceof NumberExpr numberExpr</span>
+<span class="pc bpc" id="L107" title="1 of 4 branches missed.">                &amp;&amp; numberExpr.value().equals(value);</span>
         }
 
         @Override
         public Expr instantiate(Map&lt;String, Expr&gt; bindings) {
-<span class="fc" id="L99">            return new NumberExpr(value);</span>
+<span class="fc" id="L112">            return new NumberExpr(value);</span>
         }
     }
 
     record LiteralVariable(String name) implements PatternExpr {
-<span class="fc" id="L104">        public LiteralVariable {</span>
-<span class="fc" id="L105">            Objects.requireNonNull(name, &quot;name&quot;);</span>
-<span class="pc bpc" id="L106" title="1 of 2 branches missed.">            if (name.isBlank()) {</span>
-<span class="nc" id="L107">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L117">        public LiteralVariable {</span>
+<span class="fc" id="L118">            Objects.requireNonNull(name, &quot;name&quot;);</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">            if (name.isBlank()) {</span>
+<span class="nc" id="L120">                throw new IllegalArgumentException(</span>
                     &quot;variable name must not be blank&quot;);
             }
-<span class="fc" id="L110">        }</span>
+<span class="fc" id="L123">        }</span>
 
         @Override
         public boolean match(Expr expression, Map&lt;String, Expr&gt; bindings) {
-<span class="nc" id="L114">            return expression instanceof VariableExpr variableExpr</span>
-<span class="nc bnc" id="L115" title="All 4 branches missed.">                &amp;&amp; variableExpr.name().equals(name);</span>
+<span class="nc" id="L127">            return expression instanceof VariableExpr variableExpr</span>
+<span class="nc bnc" id="L128" title="All 4 branches missed.">                &amp;&amp; variableExpr.name().equals(name);</span>
         }
 
         @Override
         public Expr instantiate(Map&lt;String, Expr&gt; bindings) {
-<span class="nc" id="L120">            return new VariableExpr(name);</span>
+<span class="nc" id="L133">            return new VariableExpr(name);</span>
         }
     }
 
@@ -126,29 +139,29 @@ public sealed interface PatternExpr extends ExprTemplate
         PatternExpr left,
         PatternExpr right
     ) implements PatternExpr {
-<span class="fc" id="L129">        public Operation {</span>
-<span class="pc bpc" id="L130" title="3 of 6 branches missed.">            if (operator == null || left == null || right == null) {</span>
-<span class="nc" id="L131">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L142">        public Operation {</span>
+<span class="pc bpc" id="L143" title="3 of 6 branches missed.">            if (operator == null || left == null || right == null) {</span>
+<span class="nc" id="L144">                throw new IllegalArgumentException(</span>
                     &quot;operator, left and right must not be null&quot;);
             }
-<span class="fc" id="L134">        }</span>
+<span class="fc" id="L147">        }</span>
 
         @Override
         public boolean match(Expr expression, Map&lt;String, Expr&gt; bindings) {
-<span class="nc bnc" id="L138" title="All 2 branches missed.">            if (!(expression instanceof BinaryExpr binaryExpr)</span>
-<span class="nc bnc" id="L139" title="All 2 branches missed.">                    || binaryExpr.operator() != operator) {</span>
-<span class="nc" id="L140">                return false;</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">            if (!(expression instanceof BinaryExpr binaryExpr)</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                    || binaryExpr.operator() != operator) {</span>
+<span class="nc" id="L153">                return false;</span>
             }
-<span class="nc bnc" id="L142" title="All 2 branches missed.">            return left.match(binaryExpr.left(), bindings)</span>
-<span class="nc bnc" id="L143" title="All 2 branches missed.">                &amp;&amp; right.match(binaryExpr.right(), bindings);</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">            return left.match(binaryExpr.left(), bindings)</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                &amp;&amp; right.match(binaryExpr.right(), bindings);</span>
         }
 
         @Override
         public Expr instantiate(Map&lt;String, Expr&gt; bindings) {
-<span class="fc" id="L148">            return new BinaryExpr(</span>
-<span class="fc" id="L149">                left.instantiate(bindings),</span>
+<span class="fc" id="L161">            return new BinaryExpr(</span>
+<span class="fc" id="L162">                left.instantiate(bindings),</span>
                 operator,
-<span class="fc" id="L151">                right.instantiate(bindings)</span>
+<span class="fc" id="L164">                right.instantiate(bindings)</span>
             );
         }
     }
@@ -158,41 +171,41 @@ public sealed interface PatternExpr extends ExprTemplate
         String name,
         List&lt;PatternExpr&gt; arguments
     ) implements PatternExpr {
-<span class="fc" id="L161">        public Function {</span>
-<span class="fc" id="L162">            Objects.requireNonNull(name, &quot;name&quot;);</span>
-<span class="pc bpc" id="L163" title="1 of 2 branches missed.">            if (name.isBlank()) {</span>
-<span class="nc" id="L164">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L174">        public Function {</span>
+<span class="fc" id="L175">            Objects.requireNonNull(name, &quot;name&quot;);</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">            if (name.isBlank()) {</span>
+<span class="nc" id="L177">                throw new IllegalArgumentException(</span>
                     &quot;function name must not be blank&quot;);
             }
-<span class="fc" id="L167">            Objects.requireNonNull(arguments, &quot;arguments&quot;);</span>
-<span class="fc" id="L168">            arguments = List.copyOf(arguments);</span>
-<span class="fc" id="L169">        }</span>
+<span class="fc" id="L180">            Objects.requireNonNull(arguments, &quot;arguments&quot;);</span>
+<span class="fc" id="L181">            arguments = List.copyOf(arguments);</span>
+<span class="fc" id="L182">        }</span>
 
         @Override
         public boolean match(Expr expression, Map&lt;String, Expr&gt; bindings) {
-<span class="nc bnc" id="L173" title="All 2 branches missed.">            if (!(expression instanceof FunctionExpr functionExpr)) {</span>
-<span class="nc" id="L174">                return false;</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">            if (!(expression instanceof FunctionExpr functionExpr)) {</span>
+<span class="nc" id="L187">                return false;</span>
             }
-<span class="nc bnc" id="L176" title="All 2 branches missed.">            if (!functionExpr.name().equals(name)</span>
-<span class="nc bnc" id="L177" title="All 2 branches missed.">                    || functionExpr.arguments().size() != arguments.size()) {</span>
-<span class="nc" id="L178">                return false;</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            if (!functionExpr.name().equals(name)</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">                    || functionExpr.arguments().size() != arguments.size()) {</span>
+<span class="nc" id="L191">                return false;</span>
             }
-<span class="nc bnc" id="L180" title="All 2 branches missed.">            for (int index = 0; index &lt; arguments.size(); index++) {</span>
-<span class="nc bnc" id="L181" title="All 2 branches missed.">                if (!arguments.get(index).match(</span>
-<span class="nc" id="L182">                        functionExpr.arguments().get(index), bindings)) {</span>
-<span class="nc" id="L183">                    return false;</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">            for (int index = 0; index &lt; arguments.size(); index++) {</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">                if (!arguments.get(index).match(</span>
+<span class="nc" id="L195">                        functionExpr.arguments().get(index), bindings)) {</span>
+<span class="nc" id="L196">                    return false;</span>
                 }
             }
-<span class="nc" id="L186">            return true;</span>
+<span class="nc" id="L199">            return true;</span>
         }
 
         @Override
         public Expr instantiate(Map&lt;String, Expr&gt; bindings) {
-<span class="nc" id="L191">            List&lt;Expr&gt; args = new ArrayList&lt;&gt;(arguments.size());</span>
-<span class="nc bnc" id="L192" title="All 2 branches missed.">            for (PatternExpr argument : arguments) {</span>
-<span class="nc" id="L193">                args.add(argument.instantiate(bindings));</span>
-<span class="nc" id="L194">            }</span>
-<span class="nc" id="L195">            return new FunctionExpr(name, args);</span>
+<span class="nc" id="L204">            List&lt;Expr&gt; args = new ArrayList&lt;&gt;(arguments.size());</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">            for (PatternExpr argument : arguments) {</span>
+<span class="nc" id="L206">                args.add(argument.instantiate(bindings));</span>
+<span class="nc" id="L207">            }</span>
+<span class="nc" id="L208">            return new FunctionExpr(name, args);</span>
         }
     }
 }

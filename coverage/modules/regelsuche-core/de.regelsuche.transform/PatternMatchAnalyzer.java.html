@@ -241,157 +241,155 @@ import java.util.TreeSet;
             }
 <span class="fc bfc" id="L242" title="All 2 branches covered.">            if (required instanceof PatternExpr.LiteralNumber literal) {</span>
 <span class="pc bpc" id="L243" title="1 of 2 branches missed.">                if (actual instanceof NumberExpr number</span>
-<span class="pc bpc" id="L244" title="1 of 2 branches missed.">                        &amp;&amp; Double.compare(</span>
-<span class="fc" id="L245">                            number.value(),</span>
-<span class="fc" id="L246">                            literal.value()) == 0) {</span>
-<span class="nc" id="L247">                    state.matchedPatternNodes++;</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">                        &amp;&amp; number.value().equals(literal.value())) {</span>
+<span class="nc" id="L245">                    state.matchedPatternNodes++;</span>
                 } else {
-<span class="fc" id="L249">                    state.mismatch(</span>
+<span class="fc" id="L247">                    state.mismatch(</span>
                         ResidualKind.LITERAL_MISMATCH,
                         frame,
                         required,
                         actual);
                 }
-<span class="fc" id="L255">                continue;</span>
+<span class="fc" id="L253">                continue;</span>
             }
-<span class="pc bpc" id="L257" title="1 of 2 branches missed.">            if (required instanceof PatternExpr.LiteralVariable literal) {</span>
-<span class="nc bnc" id="L258" title="All 2 branches missed.">                if (actual instanceof VariableExpr variable</span>
-<span class="nc bnc" id="L259" title="All 2 branches missed.">                        &amp;&amp; variable.name().equals(literal.name())) {</span>
-<span class="nc" id="L260">                    state.matchedPatternNodes++;</span>
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">            if (required instanceof PatternExpr.LiteralVariable literal) {</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">                if (actual instanceof VariableExpr variable</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">                        &amp;&amp; variable.name().equals(literal.name())) {</span>
+<span class="nc" id="L258">                    state.matchedPatternNodes++;</span>
                 } else {
-<span class="nc" id="L262">                    state.mismatch(</span>
+<span class="nc" id="L260">                    state.mismatch(</span>
                         ResidualKind.LITERAL_MISMATCH,
                         frame,
                         required,
                         actual);
                 }
-<span class="nc" id="L268">                continue;</span>
+<span class="nc" id="L266">                continue;</span>
             }
-<span class="fc bfc" id="L270" title="All 2 branches covered.">            if (required instanceof PatternExpr.Operation operation) {</span>
-<span class="pc bpc" id="L271" title="1 of 2 branches missed.">                if (!(actual instanceof BinaryExpr binary)</span>
-<span class="fc bfc" id="L272" title="All 2 branches covered.">                        || binary.operator() != operation.operator()) {</span>
-<span class="fc" id="L273">                    state.mismatch(</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">            if (required instanceof PatternExpr.Operation operation) {</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">                if (!(actual instanceof BinaryExpr binary)</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">                        || binary.operator() != operation.operator()) {</span>
+<span class="fc" id="L271">                    state.mismatch(</span>
                         ResidualKind.SHAPE_MISMATCH,
                         frame,
                         required,
                         actual);
-<span class="fc" id="L278">                    continue;</span>
+<span class="fc" id="L276">                    continue;</span>
                 }
-<span class="fc" id="L280">                state.matchedPatternNodes++;</span>
-<span class="fc" id="L281">                pending.push(new Frame(</span>
-<span class="fc" id="L282">                    operation.right(),</span>
-<span class="fc" id="L283">                    binary.right(),</span>
-<span class="fc" id="L284">                    append(frame.path(), 1)));</span>
-<span class="fc" id="L285">                pending.push(new Frame(</span>
-<span class="fc" id="L286">                    operation.left(),</span>
-<span class="fc" id="L287">                    binary.left(),</span>
-<span class="fc" id="L288">                    append(frame.path(), 0)));</span>
-<span class="fc" id="L289">                continue;</span>
+<span class="fc" id="L278">                state.matchedPatternNodes++;</span>
+<span class="fc" id="L279">                pending.push(new Frame(</span>
+<span class="fc" id="L280">                    operation.right(),</span>
+<span class="fc" id="L281">                    binary.right(),</span>
+<span class="fc" id="L282">                    append(frame.path(), 1)));</span>
+<span class="fc" id="L283">                pending.push(new Frame(</span>
+<span class="fc" id="L284">                    operation.left(),</span>
+<span class="fc" id="L285">                    binary.left(),</span>
+<span class="fc" id="L286">                    append(frame.path(), 0)));</span>
+<span class="fc" id="L287">                continue;</span>
             }
 
-<span class="fc" id="L292">            PatternExpr.Function function = (PatternExpr.Function) required;</span>
-<span class="fc bfc" id="L293" title="All 2 branches covered.">            if (!(actual instanceof FunctionExpr candidate)</span>
-<span class="fc bfc" id="L294" title="All 2 branches covered.">                    || !candidate.name().equals(function.name())</span>
-<span class="fc" id="L295">                    || candidate.arguments().size()</span>
-<span class="pc bpc" id="L296" title="1 of 2 branches missed.">                        != function.arguments().size()) {</span>
-<span class="fc" id="L297">                state.mismatch(</span>
+<span class="fc" id="L290">            PatternExpr.Function function = (PatternExpr.Function) required;</span>
+<span class="fc bfc" id="L291" title="All 2 branches covered.">            if (!(actual instanceof FunctionExpr candidate)</span>
+<span class="fc bfc" id="L292" title="All 2 branches covered.">                    || !candidate.name().equals(function.name())</span>
+<span class="fc" id="L293">                    || candidate.arguments().size()</span>
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">                        != function.arguments().size()) {</span>
+<span class="fc" id="L295">                state.mismatch(</span>
                     ResidualKind.FUNCTION_SHAPE_MISMATCH,
                     frame,
                     required,
                     actual);
-<span class="fc" id="L302">                continue;</span>
+<span class="fc" id="L300">                continue;</span>
             }
-<span class="fc" id="L304">            state.matchedPatternNodes++;</span>
-<span class="fc" id="L305">            for (int index = function.arguments().size() - 1;</span>
-<span class="fc bfc" id="L306" title="All 2 branches covered.">                    index &gt;= 0;</span>
-<span class="fc" id="L307">                    index--) {</span>
-<span class="fc" id="L308">                pending.push(new Frame(</span>
-<span class="fc" id="L309">                    function.arguments().get(index),</span>
-<span class="fc" id="L310">                    candidate.arguments().get(index),</span>
-<span class="fc" id="L311">                    append(frame.path(), index)));</span>
+<span class="fc" id="L302">            state.matchedPatternNodes++;</span>
+<span class="fc" id="L303">            for (int index = function.arguments().size() - 1;</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">                    index &gt;= 0;</span>
+<span class="fc" id="L305">                    index--) {</span>
+<span class="fc" id="L306">                pending.push(new Frame(</span>
+<span class="fc" id="L307">                    function.arguments().get(index),</span>
+<span class="fc" id="L308">                    candidate.arguments().get(index),</span>
+<span class="fc" id="L309">                    append(frame.path(), index)));</span>
             }
-<span class="fc" id="L313">        }</span>
-<span class="fc" id="L314">        return state;</span>
+<span class="fc" id="L311">        }</span>
+<span class="fc" id="L312">        return state;</span>
     }
 
     private static List&lt;Integer&gt; append(List&lt;Integer&gt; path, int component) {
-<span class="fc" id="L318">        List&lt;Integer&gt; result = new ArrayList&lt;&gt;(path);</span>
-<span class="fc" id="L319">        result.add(component);</span>
-<span class="fc" id="L320">        return List.copyOf(result);</span>
+<span class="fc" id="L316">        List&lt;Integer&gt; result = new ArrayList&lt;&gt;(path);</span>
+<span class="fc" id="L317">        result.add(component);</span>
+<span class="fc" id="L318">        return List.copyOf(result);</span>
     }
 
     private static int patternNodeCount(PatternExpr pattern) {
-<span class="fc" id="L324">        int count = 0;</span>
-<span class="fc" id="L325">        Deque&lt;PatternExpr&gt; pending = new ArrayDeque&lt;&gt;();</span>
-<span class="fc" id="L326">        pending.push(pattern);</span>
-<span class="fc bfc" id="L327" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
-<span class="pc bpc" id="L328" title="1 of 2 branches missed.">            if (count == Integer.MAX_VALUE) {</span>
-<span class="nc" id="L329">                throw new IllegalArgumentException(&quot;pattern is too large&quot;);</span>
+<span class="fc" id="L322">        int count = 0;</span>
+<span class="fc" id="L323">        Deque&lt;PatternExpr&gt; pending = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L324">        pending.push(pattern);</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">            if (count == Integer.MAX_VALUE) {</span>
+<span class="nc" id="L327">                throw new IllegalArgumentException(&quot;pattern is too large&quot;);</span>
             }
-<span class="fc" id="L331">            PatternExpr current = pending.pop();</span>
-<span class="fc" id="L332">            count++;</span>
-<span class="fc bfc" id="L333" title="All 2 branches covered.">            if (current instanceof PatternExpr.Operation operation) {</span>
-<span class="fc" id="L334">                pending.push(operation.right());</span>
-<span class="fc" id="L335">                pending.push(operation.left());</span>
-<span class="fc bfc" id="L336" title="All 2 branches covered.">            } else if (current instanceof PatternExpr.Function function) {</span>
-<span class="fc" id="L337">                for (int index = function.arguments().size() - 1;</span>
-<span class="fc bfc" id="L338" title="All 2 branches covered.">                        index &gt;= 0;</span>
-<span class="fc" id="L339">                        index--) {</span>
-<span class="fc" id="L340">                    pending.push(function.arguments().get(index));</span>
+<span class="fc" id="L329">            PatternExpr current = pending.pop();</span>
+<span class="fc" id="L330">            count++;</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">            if (current instanceof PatternExpr.Operation operation) {</span>
+<span class="fc" id="L332">                pending.push(operation.right());</span>
+<span class="fc" id="L333">                pending.push(operation.left());</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">            } else if (current instanceof PatternExpr.Function function) {</span>
+<span class="fc" id="L335">                for (int index = function.arguments().size() - 1;</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">                        index &gt;= 0;</span>
+<span class="fc" id="L337">                        index--) {</span>
+<span class="fc" id="L338">                    pending.push(function.arguments().get(index));</span>
                 }
             }
-<span class="fc" id="L343">        }</span>
-<span class="fc" id="L344">        return count;</span>
+<span class="fc" id="L341">        }</span>
+<span class="fc" id="L342">        return count;</span>
     }
 
     private static Set&lt;String&gt; placeholderNames(PatternExpr pattern) {
-<span class="fc" id="L348">        Set&lt;String&gt; names = new TreeSet&lt;&gt;();</span>
-<span class="fc" id="L349">        Deque&lt;PatternExpr&gt; pending = new ArrayDeque&lt;&gt;();</span>
-<span class="fc" id="L350">        pending.push(pattern);</span>
-<span class="fc bfc" id="L351" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
-<span class="fc" id="L352">            PatternExpr current = pending.pop();</span>
-<span class="fc bfc" id="L353" title="All 2 branches covered.">            if (current instanceof PatternExpr.Placeholder placeholder) {</span>
-<span class="fc" id="L354">                names.add(placeholder.name());</span>
-<span class="fc bfc" id="L355" title="All 2 branches covered.">            } else if (current instanceof PatternExpr.Operation operation) {</span>
-<span class="fc" id="L356">                pending.push(operation.right());</span>
-<span class="fc" id="L357">                pending.push(operation.left());</span>
-<span class="fc bfc" id="L358" title="All 2 branches covered.">            } else if (current instanceof PatternExpr.Function function) {</span>
-<span class="fc" id="L359">                for (int index = function.arguments().size() - 1;</span>
-<span class="fc bfc" id="L360" title="All 2 branches covered.">                        index &gt;= 0;</span>
-<span class="fc" id="L361">                        index--) {</span>
-<span class="fc" id="L362">                    pending.push(function.arguments().get(index));</span>
+<span class="fc" id="L346">        Set&lt;String&gt; names = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L347">        Deque&lt;PatternExpr&gt; pending = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L348">        pending.push(pattern);</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L350">            PatternExpr current = pending.pop();</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">            if (current instanceof PatternExpr.Placeholder placeholder) {</span>
+<span class="fc" id="L352">                names.add(placeholder.name());</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">            } else if (current instanceof PatternExpr.Operation operation) {</span>
+<span class="fc" id="L354">                pending.push(operation.right());</span>
+<span class="fc" id="L355">                pending.push(operation.left());</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">            } else if (current instanceof PatternExpr.Function function) {</span>
+<span class="fc" id="L357">                for (int index = function.arguments().size() - 1;</span>
+<span class="fc bfc" id="L358" title="All 2 branches covered.">                        index &gt;= 0;</span>
+<span class="fc" id="L359">                        index--) {</span>
+<span class="fc" id="L360">                    pending.push(function.arguments().get(index));</span>
                 }
             }
-<span class="fc" id="L365">        }</span>
-<span class="fc" id="L366">        return Set.copyOf(names);</span>
+<span class="fc" id="L363">        }</span>
+<span class="fc" id="L364">        return Set.copyOf(names);</span>
     }
 
     private static String pathKey(List&lt;Integer&gt; path) {
-<span class="pc bpc" id="L370" title="1 of 2 branches missed.">        return path.isEmpty()</span>
-<span class="nc" id="L371">            ? &quot;root&quot;</span>
-<span class="fc" id="L372">            : path.stream()</span>
-<span class="fc" id="L373">                .map(String::valueOf)</span>
-<span class="fc" id="L374">                .collect(java.util.stream.Collectors.joining(&quot;.&quot;));</span>
+<span class="pc bpc" id="L368" title="1 of 2 branches missed.">        return path.isEmpty()</span>
+<span class="nc" id="L369">            ? &quot;root&quot;</span>
+<span class="fc" id="L370">            : path.stream()</span>
+<span class="fc" id="L371">                .map(String::valueOf)</span>
+<span class="fc" id="L372">                .collect(java.util.stream.Collectors.joining(&quot;.&quot;));</span>
     }
 
     private static boolean fullMatchStatus(Status status) {
-<span class="fc bfc" id="L378" title="All 4 branches covered.">        return status == Status.EXACT_MATCH</span>
+<span class="fc bfc" id="L376" title="All 4 branches covered.">        return status == Status.EXACT_MATCH</span>
             || status == Status.MATCH_MODULO_THEORY;
     }
 
-<span class="fc" id="L382">    public enum Status {</span>
-<span class="fc" id="L383">        EXACT_MATCH,</span>
-<span class="fc" id="L384">        MATCH_MODULO_THEORY,</span>
-<span class="fc" id="L385">        RESIDUAL,</span>
-<span class="fc" id="L386">        NOT_MATCHED,</span>
-<span class="fc" id="L387">        INCONCLUSIVE</span>
+<span class="fc" id="L380">    public enum Status {</span>
+<span class="fc" id="L381">        EXACT_MATCH,</span>
+<span class="fc" id="L382">        MATCH_MODULO_THEORY,</span>
+<span class="fc" id="L383">        RESIDUAL,</span>
+<span class="fc" id="L384">        NOT_MATCHED,</span>
+<span class="fc" id="L385">        INCONCLUSIVE</span>
     }
 
-<span class="fc" id="L390">    public enum ResidualKind {</span>
-<span class="fc" id="L391">        SHAPE_MISMATCH,</span>
-<span class="fc" id="L392">        FUNCTION_SHAPE_MISMATCH,</span>
-<span class="fc" id="L393">        LITERAL_MISMATCH,</span>
-<span class="fc" id="L394">        BINDING_CONFLICT</span>
+<span class="fc" id="L388">    public enum ResidualKind {</span>
+<span class="fc" id="L389">        SHAPE_MISMATCH,</span>
+<span class="fc" id="L390">        FUNCTION_SHAPE_MISMATCH,</span>
+<span class="fc" id="L391">        LITERAL_MISMATCH,</span>
+<span class="fc" id="L392">        BINDING_CONFLICT</span>
     }
 
     public record ResidualObligation(
@@ -401,23 +399,23 @@ import java.util.TreeSet;
         Expr actualExpression,
         Set&lt;String&gt; unboundPlaceholders
     ) {
-<span class="fc" id="L404">        public ResidualObligation {</span>
-<span class="fc" id="L405">            kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
-<span class="pc bpc" id="L406" title="2 of 4 branches missed.">            if (path == null || path.isBlank()) {</span>
-<span class="nc" id="L407">                throw new IllegalArgumentException(&quot;path must not be blank&quot;);</span>
+<span class="fc" id="L402">        public ResidualObligation {</span>
+<span class="fc" id="L403">            kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="pc bpc" id="L404" title="2 of 4 branches missed.">            if (path == null || path.isBlank()) {</span>
+<span class="nc" id="L405">                throw new IllegalArgumentException(&quot;path must not be blank&quot;);</span>
             }
-<span class="fc" id="L409">            requiredPattern = Objects.requireNonNull(</span>
+<span class="fc" id="L407">            requiredPattern = Objects.requireNonNull(</span>
                 requiredPattern,
                 &quot;requiredPattern&quot;);
-<span class="fc" id="L412">            actualExpression = Objects.requireNonNull(</span>
+<span class="fc" id="L410">            actualExpression = Objects.requireNonNull(</span>
                 actualExpression,
                 &quot;actualExpression&quot;);
-<span class="fc" id="L415">            unboundPlaceholders = Collections.unmodifiableSet(</span>
+<span class="fc" id="L413">            unboundPlaceholders = Collections.unmodifiableSet(</span>
                 new LinkedHashSet&lt;&gt;(new TreeSet&lt;&gt;(
-<span class="fc" id="L417">                    Objects.requireNonNull(</span>
+<span class="fc" id="L415">                    Objects.requireNonNull(</span>
                         unboundPlaceholders,
                         &quot;unboundPlaceholders&quot;))));
-<span class="fc" id="L420">        }</span>
+<span class="fc" id="L418">        }</span>
     }
 
     public record Analysis(
@@ -433,64 +431,64 @@ import java.util.TreeSet;
         int totalPatternNodes,
         String detailCode
     ) {
-<span class="fc" id="L436">        public Analysis {</span>
-<span class="fc" id="L437">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="fc" id="L438">            matches = List.copyOf(Objects.requireNonNull(matches, &quot;matches&quot;));</span>
-<span class="fc" id="L439">            bindings = Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(</span>
-<span class="fc" id="L440">                new TreeMap&lt;&gt;(Objects.requireNonNull(bindings, &quot;bindings&quot;))));</span>
-<span class="fc" id="L441">            residualObligations = List.copyOf(Objects.requireNonNull(</span>
+<span class="fc" id="L434">        public Analysis {</span>
+<span class="fc" id="L435">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L436">            matches = List.copyOf(Objects.requireNonNull(matches, &quot;matches&quot;));</span>
+<span class="fc" id="L437">            bindings = Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(</span>
+<span class="fc" id="L438">                new TreeMap&lt;&gt;(Objects.requireNonNull(bindings, &quot;bindings&quot;))));</span>
+<span class="fc" id="L439">            residualObligations = List.copyOf(Objects.requireNonNull(</span>
                 residualObligations,
                 &quot;residualObligations&quot;));
-<span class="fc" id="L444">            diagnostics = List.copyOf(Objects.requireNonNull(</span>
+<span class="fc" id="L442">            diagnostics = List.copyOf(Objects.requireNonNull(</span>
                 diagnostics,
                 &quot;diagnostics&quot;));
-<span class="pc bpc" id="L447" title="6 of 12 branches missed.">            if (evaluatedSteps &lt; 0 || patternBranches &lt; 0</span>
+<span class="pc bpc" id="L445" title="6 of 12 branches missed.">            if (evaluatedSteps &lt; 0 || patternBranches &lt; 0</span>
                     || structuralComparisons &lt; 0 || matchedPatternNodes &lt; 0
                     || totalPatternNodes &lt; 1
                     || matchedPatternNodes &gt; totalPatternNodes) {
-<span class="nc" id="L451">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L449">                throw new IllegalArgumentException(</span>
                     &quot;match-analysis work and node counts are invalid&quot;);
             }
-<span class="pc bpc" id="L454" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
-<span class="nc" id="L455">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L452" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L453">                throw new IllegalArgumentException(</span>
                     &quot;detailCode must not be blank&quot;);
             }
-<span class="fc" id="L458">            boolean fullMatch = fullMatchStatus(status);</span>
-<span class="pc bpc" id="L459" title="1 of 4 branches missed.">            if (fullMatch != !matches.isEmpty()) {</span>
-<span class="nc" id="L460">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L456">            boolean fullMatch = fullMatchStatus(status);</span>
+<span class="pc bpc" id="L457" title="1 of 4 branches missed.">            if (fullMatch != !matches.isEmpty()) {</span>
+<span class="nc" id="L458">                throw new IllegalArgumentException(</span>
                     &quot;only full-match statuses may retain matches&quot;);
             }
-<span class="fc bfc" id="L463" title="All 2 branches covered.">            boolean residual = status == Status.RESIDUAL;</span>
-<span class="pc bpc" id="L464" title="1 of 4 branches missed.">            if (residual != !residualObligations.isEmpty()) {</span>
-<span class="nc" id="L465">                throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L461" title="All 2 branches covered.">            boolean residual = status == Status.RESIDUAL;</span>
+<span class="pc bpc" id="L462" title="1 of 4 branches missed.">            if (residual != !residualObligations.isEmpty()) {</span>
+<span class="nc" id="L463">                throw new IllegalArgumentException(</span>
                     &quot;only residual status may retain obligations&quot;);
             }
-<span class="fc bfc" id="L468" title="All 4 branches covered.">            if (status == Status.INCONCLUSIVE &amp;&amp; diagnostics.isEmpty()) {</span>
-<span class="fc" id="L469">                throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L466" title="All 4 branches covered.">            if (status == Status.INCONCLUSIVE &amp;&amp; diagnostics.isEmpty()) {</span>
+<span class="fc" id="L467">                throw new IllegalArgumentException(</span>
                     &quot;inconclusive analysis requires diagnostics&quot;);
             }
-<span class="fc bfc" id="L472" title="All 6 branches covered.">            if (!fullMatch &amp;&amp; !residual &amp;&amp; !bindings.isEmpty()) {</span>
-<span class="fc" id="L473">                throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L470" title="All 6 branches covered.">            if (!fullMatch &amp;&amp; !residual &amp;&amp; !bindings.isEmpty()) {</span>
+<span class="fc" id="L471">                throw new IllegalArgumentException(</span>
                     &quot;only matched or residual analyses may retain bindings&quot;);
             }
-<span class="fc" id="L476">        }</span>
+<span class="fc" id="L474">        }</span>
 
         public boolean matched() {
-<span class="fc" id="L479">            return fullMatchStatus(status);</span>
+<span class="fc" id="L477">            return fullMatchStatus(status);</span>
         }
 
         public boolean residual() {
-<span class="pc bpc" id="L483" title="1 of 2 branches missed.">            return status == Status.RESIDUAL;</span>
+<span class="pc bpc" id="L481" title="1 of 2 branches missed.">            return status == Status.RESIDUAL;</span>
         }
 
         public boolean inconclusive() {
-<span class="pc bpc" id="L487" title="1 of 2 branches missed.">            return status == Status.INCONCLUSIVE;</span>
+<span class="pc bpc" id="L485" title="1 of 2 branches missed.">            return status == Status.INCONCLUSIVE;</span>
         }
     }
 
-<span class="fc" id="L491">    private static final class PartialState {</span>
-<span class="fc" id="L492">        private final Map&lt;String, Expr&gt; bindings = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L493">        private final List&lt;DraftObligation&gt; obligations = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L489">    private static final class PartialState {</span>
+<span class="fc" id="L490">        private final Map&lt;String, Expr&gt; bindings = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L491">        private final List&lt;DraftObligation&gt; obligations = new ArrayList&lt;&gt;();</span>
         private int structuralComparisons;
         private int matchedPatternNodes;
         private boolean exhausted;
@@ -501,12 +499,12 @@ import java.util.TreeSet;
             PatternExpr requiredPattern,
             Expr actualExpression
         ) {
-<span class="fc" id="L504">            obligations.add(new DraftObligation(</span>
+<span class="fc" id="L502">            obligations.add(new DraftObligation(</span>
                 kind,
-<span class="fc" id="L506">                frame.path(),</span>
+<span class="fc" id="L504">                frame.path(),</span>
                 requiredPattern,
                 actualExpression));
-<span class="fc" id="L509">        }</span>
+<span class="fc" id="L507">        }</span>
     }
 
     private record Frame(
@@ -514,11 +512,11 @@ import java.util.TreeSet;
         Expr expression,
         List&lt;Integer&gt; path
     ) {
-<span class="fc" id="L517">        private Frame {</span>
-<span class="fc" id="L518">            pattern = Objects.requireNonNull(pattern, &quot;pattern&quot;);</span>
-<span class="fc" id="L519">            expression = Objects.requireNonNull(expression, &quot;expression&quot;);</span>
-<span class="fc" id="L520">            path = List.copyOf(Objects.requireNonNull(path, &quot;path&quot;));</span>
-<span class="fc" id="L521">        }</span>
+<span class="fc" id="L515">        private Frame {</span>
+<span class="fc" id="L516">            pattern = Objects.requireNonNull(pattern, &quot;pattern&quot;);</span>
+<span class="fc" id="L517">            expression = Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L518">            path = List.copyOf(Objects.requireNonNull(path, &quot;path&quot;));</span>
+<span class="fc" id="L519">        }</span>
     }
 
     private record DraftObligation(
@@ -527,24 +525,24 @@ import java.util.TreeSet;
         PatternExpr requiredPattern,
         Expr actualExpression
     ) {
-<span class="fc" id="L530">        private DraftObligation {</span>
-<span class="fc" id="L531">            kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
-<span class="fc" id="L532">            path = List.copyOf(Objects.requireNonNull(path, &quot;path&quot;));</span>
-<span class="fc" id="L533">            requiredPattern = Objects.requireNonNull(</span>
+<span class="fc" id="L528">        private DraftObligation {</span>
+<span class="fc" id="L529">            kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L530">            path = List.copyOf(Objects.requireNonNull(path, &quot;path&quot;));</span>
+<span class="fc" id="L531">            requiredPattern = Objects.requireNonNull(</span>
                 requiredPattern,
                 &quot;requiredPattern&quot;);
-<span class="fc" id="L536">            actualExpression = Objects.requireNonNull(</span>
+<span class="fc" id="L534">            actualExpression = Objects.requireNonNull(</span>
                 actualExpression,
                 &quot;actualExpression&quot;);
-<span class="fc" id="L539">        }</span>
+<span class="fc" id="L537">        }</span>
 
         private ResidualObligation finish(Set&lt;String&gt; boundNames) {
-<span class="fc" id="L542">            Set&lt;String&gt; unbound = new TreeSet&lt;&gt;(</span>
-<span class="fc" id="L543">                placeholderNames(requiredPattern));</span>
-<span class="fc" id="L544">            unbound.removeAll(boundNames);</span>
-<span class="fc" id="L545">            return new ResidualObligation(</span>
+<span class="fc" id="L540">            Set&lt;String&gt; unbound = new TreeSet&lt;&gt;(</span>
+<span class="fc" id="L541">                placeholderNames(requiredPattern));</span>
+<span class="fc" id="L542">            unbound.removeAll(boundNames);</span>
+<span class="fc" id="L543">            return new ResidualObligation(</span>
                 kind,
-<span class="fc" id="L547">                pathKey(path),</span>
+<span class="fc" id="L545">                pathKey(path),</span>
                 requiredPattern,
                 actualExpression,
                 unbound);

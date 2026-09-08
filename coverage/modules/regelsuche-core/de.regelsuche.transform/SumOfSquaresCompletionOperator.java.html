@@ -73,7 +73,7 @@ import java.util.List;
 <span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr power</span>
 <span class="fc bfc" id="L74" title="All 2 branches covered.">                &amp;&amp; power.operator() == BinaryOperator.POW</span>
 <span class="pc bpc" id="L75" title="1 of 2 branches missed.">                &amp;&amp; power.right() instanceof NumberExpr exponent</span>
-<span class="fc bfc" id="L76" title="All 2 branches covered.">                &amp;&amp; Double.compare(exponent.value(), 2.0) == 0) {</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">                &amp;&amp; exponent.value().equalsInteger(2)) {</span>
 <span class="fc" id="L77">            return power.left();</span>
         }
 <span class="fc" id="L79">        return null;</span>

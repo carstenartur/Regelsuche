@@ -112,92 +112,94 @@ import java.util.List;
     /** Render an arbitrary {@link Expr} with parent precedence context. */
     public String render(Expr expr, int parentPrecedence) {
 <span class="fc bfc" id="L114" title="All 2 branches covered.">        if (expr instanceof NumberExpr number) {</span>
-<span class="fc" id="L115">            return formatNumber(number.value());</span>
+<span class="fc" id="L115">            String formatted = formatNumber(number.value());</span>
+<span class="pc bpc" id="L116" title="1 of 4 branches missed.">            return number.value().signum() &lt; 0 &amp;&amp; parentPrecedence &gt; 0</span>
+<span class="fc" id="L117">                ? &quot;\\left(&quot; + formatted + &quot;\\right)&quot; : formatted;</span>
         }
-<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (expr instanceof VariableExpr variable) {</span>
-<span class="fc" id="L118">            return variable.name();</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (expr instanceof VariableExpr variable) {</span>
+<span class="fc" id="L120">            return variable.name();</span>
         }
-<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (expr instanceof FunctionExpr fn) {</span>
-<span class="fc" id="L121">            return renderFunction(fn);</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (expr instanceof FunctionExpr fn) {</span>
+<span class="fc" id="L123">            return renderFunction(fn);</span>
         }
-<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (expr instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L124">            return renderBinary(binary, parentPrecedence);</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (expr instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L126">            return renderBinary(binary, parentPrecedence);</span>
         }
-<span class="nc" id="L126">        return &quot;&quot;;</span>
+<span class="nc" id="L128">        return &quot;&quot;;</span>
     }
 
     private String renderBinary(BinaryExpr binary, int parentPrecedence) {
-<span class="fc" id="L130">        BinaryOperator op = binary.operator();</span>
-<span class="fc bfc" id="L131" title="All 5 branches covered.">        String result = switch (op) {</span>
-<span class="fc" id="L132">            case ADD -&gt; render(binary.left(), op.precedence()) + &quot; + &quot; + render(binary.right(), op.precedence());</span>
-<span class="fc" id="L133">            case SUB -&gt; render(binary.left(), op.precedence()) + &quot; - &quot; + render(binary.right(), op.precedence() + 1);</span>
-<span class="fc" id="L134">            case MUL -&gt; render(binary.left(), op.precedence()) + &quot; \\cdot &quot; + render(binary.right(), op.precedence());</span>
-<span class="fc" id="L135">            case DIV -&gt; &quot;\\frac{&quot; + render(binary.left(), 0) + &quot;}{&quot; + render(binary.right(), 0) + &quot;}&quot;;</span>
+<span class="fc" id="L132">        BinaryOperator op = binary.operator();</span>
+<span class="fc bfc" id="L133" title="All 5 branches covered.">        String result = switch (op) {</span>
+<span class="fc" id="L134">            case ADD -&gt; render(binary.left(), op.precedence()) + &quot; + &quot; + render(binary.right(), op.precedence());</span>
+<span class="fc" id="L135">            case SUB -&gt; render(binary.left(), op.precedence()) + &quot; - &quot; + render(binary.right(), op.precedence() + 1);</span>
+<span class="fc" id="L136">            case MUL -&gt; render(binary.left(), op.precedence()) + &quot; \\cdot &quot; + render(binary.right(), op.precedence());</span>
+<span class="fc" id="L137">            case DIV -&gt; &quot;\\frac{&quot; + render(binary.left(), 0) + &quot;}{&quot; + render(binary.right(), 0) + &quot;}&quot;;</span>
             case POW -&gt; {
-<span class="fc" id="L137">                String base = render(binary.left(), op.precedence() + 1);</span>
-<span class="fc" id="L138">                String exponent = render(binary.right(), 0);</span>
-<span class="fc" id="L139">                yield &quot;{&quot; + base + &quot;}^{&quot; + exponent + &quot;}&quot;;</span>
+<span class="fc" id="L139">                String base = render(binary.left(), op.precedence() + 1);</span>
+<span class="fc" id="L140">                String exponent = render(binary.right(), 0);</span>
+<span class="fc" id="L141">                yield &quot;{&quot; + base + &quot;}^{&quot; + exponent + &quot;}&quot;;</span>
             }
         };
         // Division renders as \frac{} which is self-bracketing; no extra parens.
-<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (op == BinaryOperator.DIV) {</span>
-<span class="fc" id="L144">            return result;</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (op == BinaryOperator.DIV) {</span>
+<span class="fc" id="L146">            return result;</span>
         }
-<span class="fc bfc" id="L146" title="All 2 branches covered.">        if (op.precedence() &lt; parentPrecedence) {</span>
-<span class="fc" id="L147">            return &quot;\\left(&quot; + result + &quot;\\right)&quot;;</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (op.precedence() &lt; parentPrecedence) {</span>
+<span class="fc" id="L149">            return &quot;\\left(&quot; + result + &quot;\\right)&quot;;</span>
         }
-<span class="fc" id="L149">        return result;</span>
+<span class="fc" id="L151">        return result;</span>
     }
 
     private String renderFunction(FunctionExpr fn) {
-<span class="fc" id="L153">        String name = fn.name().toLowerCase();</span>
-<span class="pc bpc" id="L154" title="1 of 4 branches missed.">        String latexName = switch (name) {</span>
-<span class="fc" id="L155">            case &quot;sin&quot;, &quot;cos&quot;, &quot;tan&quot;, &quot;log&quot;, &quot;ln&quot;, &quot;exp&quot; -&gt; &quot;\\&quot; + name;</span>
-<span class="fc" id="L156">            case &quot;sqrt&quot; -&gt; &quot;\\sqrt&quot;;</span>
-<span class="nc" id="L157">            case &quot;abs&quot; -&gt; &quot;\\left|&quot;;</span>
-<span class="fc" id="L158">            default -&gt; &quot;\\operatorname{&quot; + name + &quot;}&quot;;</span>
+<span class="fc" id="L155">        String name = fn.name().toLowerCase();</span>
+<span class="pc bpc" id="L156" title="1 of 4 branches missed.">        String latexName = switch (name) {</span>
+<span class="fc" id="L157">            case &quot;sin&quot;, &quot;cos&quot;, &quot;tan&quot;, &quot;log&quot;, &quot;ln&quot;, &quot;exp&quot; -&gt; &quot;\\&quot; + name;</span>
+<span class="fc" id="L158">            case &quot;sqrt&quot; -&gt; &quot;\\sqrt&quot;;</span>
+<span class="nc" id="L159">            case &quot;abs&quot; -&gt; &quot;\\left|&quot;;</span>
+<span class="fc" id="L160">            default -&gt; &quot;\\operatorname{&quot; + name + &quot;}&quot;;</span>
         };
-<span class="pc bpc" id="L160" title="1 of 4 branches missed.">        if (&quot;sqrt&quot;.equals(name) &amp;&amp; fn.arguments().size() == 1) {</span>
-<span class="fc" id="L161">            return &quot;\\sqrt{&quot; + render(fn.arguments().get(0), 0) + &quot;}&quot;;</span>
+<span class="pc bpc" id="L162" title="1 of 4 branches missed.">        if (&quot;sqrt&quot;.equals(name) &amp;&amp; fn.arguments().size() == 1) {</span>
+<span class="fc" id="L163">            return &quot;\\sqrt{&quot; + render(fn.arguments().get(0), 0) + &quot;}&quot;;</span>
         }
-<span class="pc bpc" id="L163" title="3 of 4 branches missed.">        if (&quot;abs&quot;.equals(name) &amp;&amp; fn.arguments().size() == 1) {</span>
-<span class="nc" id="L164">            return &quot;\\left|&quot; + render(fn.arguments().get(0), 0) + &quot;\\right|&quot;;</span>
+<span class="pc bpc" id="L165" title="3 of 4 branches missed.">        if (&quot;abs&quot;.equals(name) &amp;&amp; fn.arguments().size() == 1) {</span>
+<span class="nc" id="L166">            return &quot;\\left|&quot; + render(fn.arguments().get(0), 0) + &quot;\\right|&quot;;</span>
         }
-<span class="fc" id="L166">        StringBuilder sb = new StringBuilder(latexName).append(&quot;\\left(&quot;);</span>
-<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (int i = 0; i &lt; fn.arguments().size(); i++) {</span>
-<span class="fc bfc" id="L168" title="All 2 branches covered.">            if (i &gt; 0) {</span>
-<span class="fc" id="L169">                sb.append(&quot;, &quot;);</span>
+<span class="fc" id="L168">        StringBuilder sb = new StringBuilder(latexName).append(&quot;\\left(&quot;);</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        for (int i = 0; i &lt; fn.arguments().size(); i++) {</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L171">                sb.append(&quot;, &quot;);</span>
             }
-<span class="fc" id="L171">            sb.append(render(fn.arguments().get(i), 0));</span>
+<span class="fc" id="L173">            sb.append(render(fn.arguments().get(i), 0));</span>
         }
-<span class="fc" id="L173">        return sb.append(&quot;\\right)&quot;).toString();</span>
+<span class="fc" id="L175">        return sb.append(&quot;\\right)&quot;).toString();</span>
     }
 
     private String renderEquation(Equation equation) {
-<span class="fc" id="L177">        return render(equation.left(), 0) + &quot; = &quot; + render(equation.right(), 0);</span>
+<span class="fc" id="L179">        return render(equation.left(), 0) + &quot; = &quot; + render(equation.right(), 0);</span>
     }
 
     private String renderSystem(List&lt;Equation&gt; equations) {
-<span class="fc" id="L181">        StringBuilder sb = new StringBuilder(&quot;\\begin{cases}\n&quot;);</span>
-<span class="fc bfc" id="L182" title="All 2 branches covered.">        for (int i = 0; i &lt; equations.size(); i++) {</span>
-<span class="fc" id="L183">            sb.append(renderEquation(equations.get(i)));</span>
-<span class="fc bfc" id="L184" title="All 2 branches covered.">            if (i + 1 &lt; equations.size()) {</span>
-<span class="fc" id="L185">                sb.append(&quot; \\\\&quot;);</span>
+<span class="fc" id="L183">        StringBuilder sb = new StringBuilder(&quot;\\begin{cases}\n&quot;);</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        for (int i = 0; i &lt; equations.size(); i++) {</span>
+<span class="fc" id="L185">            sb.append(renderEquation(equations.get(i)));</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">            if (i + 1 &lt; equations.size()) {</span>
+<span class="fc" id="L187">                sb.append(&quot; \\\\&quot;);</span>
             }
-<span class="fc" id="L187">            sb.append('\n');</span>
+<span class="fc" id="L189">            sb.append('\n');</span>
         }
-<span class="fc" id="L189">        return sb.append(&quot;\\end{cases}&quot;).toString();</span>
+<span class="fc" id="L191">        return sb.append(&quot;\\end{cases}&quot;).toString();</span>
     }
 
-    private static String formatNumber(double value) {
-<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        if (value == (long) value) {</span>
-<span class="fc" id="L194">            return Long.toString((long) value);</span>
-        }
-<span class="nc" id="L196">        return Double.toString(value);</span>
+    private static String formatNumber(de.regelsuche.scalar.ExactRational value) {
+<span class="fc" id="L195">        String formatted = de.regelsuche.parse.ExpressionFormatter.format(new NumberExpr(value));</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        return formatted.contains(&quot;/&quot;)</span>
+<span class="fc" id="L197">            ? &quot;\\frac{&quot; + value.numerator() + &quot;}{&quot; + value.denominator() + &quot;}&quot;</span>
+<span class="fc" id="L198">            : formatted;</span>
     }
 
     private static String escapeText(String value) {
-<span class="fc" id="L200">        return value.replace(&quot;_&quot;, &quot;\\_&quot;);</span>
+<span class="fc" id="L202">        return value.replace(&quot;_&quot;, &quot;\\_&quot;);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

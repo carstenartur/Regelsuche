@@ -275,7 +275,7 @@ public final class RulePreparationPlanner {
 
     private static boolean isExplicitZero(Expr expression) {
 <span class="fc" id="L277">        return expression instanceof NumberExpr number</span>
-<span class="fc bfc" id="L278" title="All 4 branches covered.">            &amp;&amp; number.value() == 0;</span>
+<span class="fc bfc" id="L278" title="All 4 branches covered.">            &amp;&amp; number.value().equalsInteger(0);</span>
     }
 
     private static String sha256(String value) {

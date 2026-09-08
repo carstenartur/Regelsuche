@@ -71,8 +71,8 @@ import de.regelsuche.scoring.ExpressionScore;
 
     private int largeCoefficientPenalty(Expr expression) {
 <span class="fc bfc" id="L73" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
-<span class="fc" id="L74">            double absValue = Math.abs(number.value());</span>
-<span class="fc bfc" id="L75" title="All 2 branches covered.">            return absValue &gt; LARGE_COEFFICIENT_THRESHOLD ? 2 : 0;</span>
+<span class="fc" id="L74">            var absValue = number.value().abs();</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            return absValue.compareTo(de.regelsuche.scalar.ExactRational.integer(LARGE_COEFFICIENT_THRESHOLD)) &gt; 0 ? 2 : 0;</span>
         }
 <span class="fc bfc" id="L77" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
 <span class="fc" id="L78">            return largeCoefficientPenalty(binary.left()) + largeCoefficientPenalty(binary.right());</span>

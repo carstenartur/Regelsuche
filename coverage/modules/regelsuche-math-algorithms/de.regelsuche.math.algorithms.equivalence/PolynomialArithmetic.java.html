@@ -41,8 +41,8 @@ final class PolynomialArithmetic {
 <span class="fc" id="L41">        Optional&lt;Polynomial&gt; parsed = parseUncached(expression);</span>
 <span class="fc" id="L42">        synchronized (parseCache) {</span>
 <span class="fc" id="L43">            Optional&lt;Polynomial&gt; cached = parseCache.get(expression);</span>
-<span class="fc bfc" id="L44" title="All 2 branches covered.">            if (cached != null) {</span>
-<span class="fc" id="L45">                return cached;</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">            if (cached != null) {</span>
+<span class="nc" id="L45">                return cached;</span>
             }
 <span class="fc" id="L47">            parseCache.put(expression, parsed);</span>
 <span class="fc bfc" id="L48" title="All 2 branches covered.">            while (parseCache.size() &gt; parseCacheCapacity) {</span>
@@ -74,7 +74,7 @@ final class PolynomialArithmetic {
 
     private Optional&lt;Polynomial&gt; asPolynomial(Expr expression) {
 <span class="fc bfc" id="L76" title="All 2 branches covered.">        if (expression instanceof NumberExpr numberExpr) {</span>
-<span class="fc" id="L77">            return Optional.of(Polynomial.constant(Rational.fromDouble(numberExpr.value())));</span>
+<span class="fc" id="L77">            return Optional.of(Polynomial.constant(Rational.fromExact(numberExpr.value())));</span>
         }
 <span class="fc bfc" id="L79" title="All 2 branches covered.">        if (expression instanceof VariableExpr variableExpr) {</span>
 <span class="fc" id="L80">            return Optional.of(Polynomial.variable(variableExpr.name()));</span>
@@ -101,15 +101,14 @@ final class PolynomialArithmetic {
 <span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (!(expression instanceof NumberExpr numberExpr)) {</span>
 <span class="nc" id="L102">            return Optional.empty();</span>
         }
-<span class="fc" id="L104">        double value = numberExpr.value();</span>
-<span class="fc" id="L105">        int exponent = (int) value;</span>
-<span class="pc bpc" id="L106" title="3 of 6 branches missed.">        if (Math.abs(value - exponent) &gt; 1e-9 || exponent &lt; 0 || exponent &gt; 20) {</span>
-<span class="nc" id="L107">            return Optional.empty();</span>
+<span class="fc" id="L104">        var value = numberExpr.value();</span>
+<span class="pc bpc" id="L105" title="3 of 6 branches missed.">        if (!value.isInteger() || value.signum() &lt; 0 || value.numerator().compareTo(java.math.BigInteger.valueOf(20)) &gt; 0) {</span>
+<span class="nc" id="L106">            return Optional.empty();</span>
         }
-<span class="fc" id="L109">        return Optional.of(exponent);</span>
+<span class="fc" id="L108">        return Optional.of(value.intValueExact());</span>
     }
 
-<span class="fc" id="L112">    record LinearEquation(Rational coefficient, Polynomial rest) {</span>
+<span class="fc" id="L111">    record LinearEquation(Rational coefficient, Polynomial rest) {</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

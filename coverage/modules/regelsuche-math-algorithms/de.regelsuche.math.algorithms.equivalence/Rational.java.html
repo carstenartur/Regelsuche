@@ -57,9 +57,9 @@ public record Rational(
 <span class="fc" id="L57">            BigDecimal.valueOf(value).stripTrailingZeros();</span>
 <span class="fc" id="L58">        BigInteger numerator = decimal.unscaledValue();</span>
 <span class="fc" id="L59">        BigInteger denominator = BigInteger.ONE;</span>
-<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (decimal.scale() &gt; 0) {</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (decimal.scale() &gt; 0) {</span>
 <span class="fc" id="L61">            denominator = BigInteger.TEN.pow(decimal.scale());</span>
-<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        } else if (decimal.scale() &lt; 0) {</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        } else if (decimal.scale() &lt; 0) {</span>
 <span class="nc" id="L63">            numerator = numerator.multiply(</span>
 <span class="nc" id="L64">                BigInteger.TEN.pow(-decimal.scale()));</span>
         }

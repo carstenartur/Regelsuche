@@ -53,11 +53,8 @@ public final class EGraphPatternApplier {
 <span class="nc" id="L53">        throw new IllegalArgumentException(&quot;Unsupported pattern: &quot; + target.getClass());</span>
     }
 
-    private static String formatNumber(double value) {
-<span class="pc bpc" id="L57" title="2 of 4 branches missed.">        if (value == Math.floor(value) &amp;&amp; !Double.isInfinite(value)) {</span>
-<span class="fc" id="L58">            return Long.toString((long) value);</span>
-        }
-<span class="nc" id="L60">        return Double.toString(value);</span>
+    private static String formatNumber(de.regelsuche.scalar.ExactRational value) {
+<span class="fc" id="L57">        return value.canonicalText();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

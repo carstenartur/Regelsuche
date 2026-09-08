@@ -28,7 +28,7 @@ public final class PerfectSquareAstPredicate {
 <span class="fc" id="L28">        return expression instanceof BinaryExpr binary</span>
 <span class="pc bpc" id="L29" title="1 of 2 branches missed.">            &amp;&amp; binary.operator() == BinaryOperator.POW</span>
 <span class="pc bpc" id="L30" title="1 of 2 branches missed.">            &amp;&amp; binary.right() instanceof NumberExpr exponent</span>
-<span class="pc bpc" id="L31" title="2 of 4 branches missed.">            &amp;&amp; Double.compare(exponent.value(), 2.0) == 0;</span>
+<span class="pc bpc" id="L31" title="2 of 4 branches missed.">            &amp;&amp; exponent.value().equalsInteger(2);</span>
     }
 
     private static boolean containsPerfectSquare(Expr expression) {

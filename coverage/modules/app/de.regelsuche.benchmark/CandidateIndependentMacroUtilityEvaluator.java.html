@@ -212,7 +212,7 @@ final class CandidateIndependentMacroUtilityEvaluator {
         }
 <span class="fc bfc" id="L213" title="All 4 branches covered.">        if (pattern instanceof NumberExpr left</span>
 <span class="fc" id="L214">                &amp;&amp; concrete instanceof NumberExpr right) {</span>
-<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            return Double.compare(left.value(), right.value()) == 0;</span>
+<span class="fc" id="L215">            return left.value().equals(right.value());</span>
         }
 <span class="pc bpc" id="L217" title="3 of 4 branches missed.">        if (pattern instanceof VariableExpr left</span>
 <span class="nc" id="L218">                &amp;&amp; concrete instanceof VariableExpr right) {</span>
@@ -252,7 +252,7 @@ final class CandidateIndependentMacroUtilityEvaluator {
 
     private Expr negate(Expr expression) {
 <span class="pc bpc" id="L254" title="1 of 2 branches missed.">        if (expression instanceof NumberExpr number) {</span>
-<span class="fc" id="L255">            return new NumberExpr(-number.value());</span>
+<span class="fc" id="L255">            return new NumberExpr(number.value().negate());</span>
         }
 <span class="nc" id="L257">        return new BinaryExpr(</span>
             new NumberExpr(0),

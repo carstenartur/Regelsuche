@@ -181,20 +181,23 @@ Faktorisierung des ursprünglichen Polynoms in `Z[x]` oder `Q[x]`.
 Details stehen unter
 [Deterministische Auswahl einer geeigneten Primzahl](suitable-prime-selection.md).
 
-#### Noch offene vollständige `Z[x]`-/`Q[x]`-Pipeline
+#### Begrenzte vollständige `Z[x]`-/`Q[x]`-Engine
 
-Primkörperfaktorisierung und geeignete Primzahlauswahl sind notwendige
-Bausteine, aber noch keine vollständige Faktorisierungsengine für ganzzahlige
-oder rationale Quellen. Weiterhin offen sind:
+`NativeUnivariateFactorizationEngine` integriert inzwischen Inhalts- und
+Primitivteilnormalisierung, quadratfreie Zerlegung, geeignete Primzahlauswahl,
+lineares Multifaktor-Hensel-Lifting, deterministische
+Zassenhaus-Rekombination und exakte rationale Reassemblierung. Innerhalb der
+expliziten Struktur-, Kandidaten-, Zwischenwert- und Arbeitsgrenzen liefert sie
+eine vollständige Backend-Zerlegung oder einen fail-closed Ausgang.
 
-- Hensel-Lifting der modularen Faktoren;
-- ganzzahlige Faktorrekomposition, zunächst etwa Zassenhaus;
-- spätere LLL-/van-Hoeij-Rekombination, wenn sie qualifiziert ist;
-- exakte rationale Faktorreassemblierung;
-- Integration der vollständigen `Z[x]`-/`Q[x]`-Evidence in den allgemeinen
-  Engine-/Verifier-Vertrag;
-- beliebige unterstützte Grade und Faktorgradpartitionen unter eingefrorenen
-  Qualifikationsbudgets;
+Weiterhin offen oder bewusst begrenzt sind:
+
+- die entscheidungsvollständige Zertifizierung von Faktoren, für die das
+  feste unabhängige Primzahlenpräfix keinen modularen Zeugen liefert;
+- spätere LLL-/van-Hoeij-Rekombination für Fälle mit vielen modularen
+  Faktoren;
+- breitere Grade, Faktorgradpartitionen und Koeffizientengrößen unter jeweils
+  explizit qualifizierten Budgets;
 - multivariate Faktorisierung.
 
 Die weiterhin integrierte `BinaryQuarticFactorizationEngine` unterstützt
@@ -213,14 +216,31 @@ Daraus folgt eine verifizierte Zerlegung, aber ohne zusätzliche Evidence noch
 kein Nachweis, dass alle Faktoren irreduzibel oder die Zerlegung vollständig
 ist. Insbesondere gilt:
 
-- `NO_CANDIDATE` ist kein Irreduzibilitätsbeweis;
-- ein Backend-Claim erfüllt keinen `INDEPENDENT_COMPLETE`-Request;
+- `NO_CANDIDATE` allein ist kein Irreduzibilitätsbeweis; nur der getrennte,
+  request-gebundene Originaldomänen-Prüfer darf daraus bei einem eigenen
+  gradtreuen modularen Zeugen `IRREDUCIBLE` autorisieren;
+- ein Backend-Claim erfüllt keinen `INDEPENDENT_COMPLETE`-Request; eine
+  vorgeschlagene vollständige Zerlegung benötigt zusätzlich Rest-Eins und
+  einen unabhängigen Nachweis für jeden unterschiedlichen nichtkonstanten
+  Faktor;
 - die Quartikengine autorisiert keinen Claim für andere Grade oder
   Faktorgradaufteilungen;
-- die allgemeine rationale Inhaltsnormalisierung ist implementiert, eine
-  vollständige `Q[x]`-Faktorisierungsengine jedoch noch nicht;
-- ein vollständiger Abschluss in `F_p[x]` darf nicht als Abschluss in `Z[x]`
-  oder `Q[x]` umetikettiert werden.
+- die allgemeine `Z[x]`-/`Q[x]`-Engine ist begrenzt; Budget- oder Policy-Misses
+  werden nicht zu Vollständigkeits- oder Irreduzibilitätsclaims;
+- ein Engine-Abschluss in `F_p[x]` darf nicht als Abschluss in `Z[x]` oder
+  `Q[x]` umetikettiert werden; der unabhängige Prüfer verwendet stattdessen
+  eine selbst berechnete gradtreue Reduktion ausschließlich als hinreichenden
+  Irreduzibilitätszeugen.
+
+Der unabhängige Originaldomänen-Prüfer ist zusätzlich auf Grad 256,
+normalisierte Zwischenkoeffizienten bis 16.384 Bit und die feste Primzahlenfolge
+bis 47 begrenzt. Eine gradverlierende oder reduzierbare Reduktion sowie ein
+erschöpftes Präfix bleiben inkonklusiv. Die Vollständigkeitskampagne verwendet
+dieselben Grenzen für jeden Faktor, beginnt erst nach exakter
+Produktrückprüfung und teilt das verbleibende Request-Budget. Nur Rest-Eins und
+ausschließlich zertifizierte Faktoren autorisieren
+`INDEPENDENTLY_CERTIFIED_COMPLETE`; jeder fehlende Faktorzeuge bleibt
+`BUDGET_INCONCLUSIVE`.
 
 Weiterführende Seiten:
 

@@ -198,7 +198,7 @@ public final class CalculusBasicRules {
 <span class="nc" id="L198">            return subtree instanceof FunctionExpr fn</span>
 <span class="nc bnc" id="L199" title="All 2 branches missed.">                &amp;&amp; &quot;exp&quot;.equals(fn.name())</span>
 <span class="nc bnc" id="L200" title="All 2 branches missed.">                &amp;&amp; fn.arguments().size() == 1</span>
-<span class="nc bnc" id="L201" title="All 6 branches missed.">                &amp;&amp; fn.arguments().get(0) instanceof NumberExpr n &amp;&amp; n.value() == 0.0;</span>
+<span class="nc bnc" id="L201" title="All 6 branches missed.">                &amp;&amp; fn.arguments().get(0) instanceof NumberExpr n &amp;&amp; n.value().equalsInteger(0);</span>
         }
 
         @Override

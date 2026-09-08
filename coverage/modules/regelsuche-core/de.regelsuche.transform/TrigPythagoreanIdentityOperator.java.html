@@ -85,7 +85,7 @@ import java.util.List;
 <span class="pc bpc" id="L85" title="2 of 4 branches missed.">        if (!(expression instanceof BinaryExpr power) || power.operator() != BinaryOperator.POW) {</span>
 <span class="nc" id="L86">            return false;</span>
         }
-<span class="pc bpc" id="L88" title="2 of 4 branches missed.">        if (!(power.right() instanceof NumberExpr exponent) || Double.compare(exponent.value(), 2.0) != 0) {</span>
+<span class="pc bpc" id="L88" title="2 of 4 branches missed.">        if (!(power.right() instanceof NumberExpr exponent) || !exponent.value().equalsInteger(2)) {</span>
 <span class="nc" id="L89">            return false;</span>
         }
 <span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (!(power.left() instanceof FunctionExpr function)) {</span>
@@ -95,7 +95,7 @@ import java.util.List;
     }
 
     private boolean isOne(Expr expression) {
-<span class="pc bpc" id="L98" title="2 of 4 branches missed.">        return expression instanceof NumberExpr number &amp;&amp; Double.compare(number.value(), 1.0) == 0;</span>
+<span class="pc bpc" id="L98" title="2 of 4 branches missed.">        return expression instanceof NumberExpr number &amp;&amp; number.value().equalsInteger(1);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

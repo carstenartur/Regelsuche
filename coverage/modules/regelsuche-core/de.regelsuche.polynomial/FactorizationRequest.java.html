@@ -45,34 +45,48 @@ public record FactorizationRequest&lt;C&gt;(
             maxWorkUnits);
     }
 
+    public static &lt;C&gt; FactorizationRequest&lt;C&gt; independentComplete(
+        SparsePolynomial&lt;C&gt; source,
+        StructuralLimits structuralLimits,
+        int maxCandidates,
+        long maxWorkUnits
+    ) {
+<span class="fc" id="L54">        return new FactorizationRequest&lt;&gt;(</span>
+            source,
+            EvidenceRequirement.INDEPENDENT_COMPLETE,
+            structuralLimits,
+            maxCandidates,
+            maxWorkUnits);
+    }
+
     public Optional&lt;String&gt; structuralViolation() {
-<span class="fc" id="L49">        return structuralLimits.firstViolation(source);</span>
+<span class="fc" id="L63">        return structuralLimits.firstViolation(source);</span>
     }
 
     public String canonicalMaterial() {
-<span class="fc" id="L53">        StringBuilder result = new StringBuilder();</span>
-<span class="fc" id="L54">        append(result, source.canonicalMaterial());</span>
-<span class="fc" id="L55">        append(result, evidenceRequirement.name());</span>
-<span class="fc" id="L56">        append(result, structuralLimits.canonicalMaterial());</span>
-<span class="fc" id="L57">        append(result, Integer.toString(maxCandidates));</span>
-<span class="fc" id="L58">        append(result, Long.toString(maxWorkUnits));</span>
-<span class="fc" id="L59">        return result.toString();</span>
+<span class="fc" id="L67">        StringBuilder result = new StringBuilder();</span>
+<span class="fc" id="L68">        append(result, source.canonicalMaterial());</span>
+<span class="fc" id="L69">        append(result, evidenceRequirement.name());</span>
+<span class="fc" id="L70">        append(result, structuralLimits.canonicalMaterial());</span>
+<span class="fc" id="L71">        append(result, Integer.toString(maxCandidates));</span>
+<span class="fc" id="L72">        append(result, Long.toString(maxWorkUnits));</span>
+<span class="fc" id="L73">        return result.toString();</span>
     }
 
     private static void append(
         StringBuilder target,
         String value
     ) {
-<span class="fc" id="L66">        target.append('|')</span>
-<span class="fc" id="L67">            .append(value.length())</span>
-<span class="fc" id="L68">            .append(':')</span>
-<span class="fc" id="L69">            .append(value);</span>
-<span class="fc" id="L70">    }</span>
+<span class="fc" id="L80">        target.append('|')</span>
+<span class="fc" id="L81">            .append(value.length())</span>
+<span class="fc" id="L82">            .append(':')</span>
+<span class="fc" id="L83">            .append(value);</span>
+<span class="fc" id="L84">    }</span>
 
     /** Required authority after independent processing of an engine result. */
-<span class="fc" id="L73">    public enum EvidenceRequirement {</span>
-<span class="fc" id="L74">        VERIFIED_DECOMPOSITION,</span>
-<span class="fc" id="L75">        INDEPENDENT_COMPLETE</span>
+<span class="fc" id="L87">    public enum EvidenceRequirement {</span>
+<span class="fc" id="L88">        VERIFIED_DECOMPOSITION,</span>
+<span class="fc" id="L89">        INDEPENDENT_COMPLETE</span>
     }
 
     /** Request-wide bounds checked before an engine can inspect the source. */
@@ -82,39 +96,39 @@ public record FactorizationRequest&lt;C&gt;(
         int maxTerms,
         int maxCoefficientBitLength
     ) {
-<span class="fc" id="L85">        public StructuralLimits {</span>
-<span class="pc bpc" id="L86" title="4 of 8 branches missed.">            if (maxVariables &lt; 1</span>
+<span class="fc" id="L99">        public StructuralLimits {</span>
+<span class="pc bpc" id="L100" title="4 of 8 branches missed.">            if (maxVariables &lt; 1</span>
                     || maxTotalDegree &lt; 0
                     || maxTerms &lt; 1
                     || maxCoefficientBitLength &lt; 1) {
-<span class="nc" id="L90">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L104">                throw new IllegalArgumentException(</span>
                     &quot;factorization structural limits are invalid&quot;);
             }
-<span class="fc" id="L93">        }</span>
+<span class="fc" id="L107">        }</span>
 
         public Optional&lt;String&gt; firstViolation(
             SparsePolynomial&lt;?&gt; polynomial
         ) {
-<span class="fc" id="L98">            Objects.requireNonNull(polynomial, &quot;polynomial&quot;);</span>
-<span class="pc bpc" id="L99" title="1 of 2 branches missed.">            if (polynomial.ring().variableCount() &gt; maxVariables) {</span>
-<span class="nc" id="L100">                return Optional.of(&quot;MAX_VARIABLES_EXCEEDED&quot;);</span>
+<span class="fc" id="L112">            Objects.requireNonNull(polynomial, &quot;polynomial&quot;);</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (polynomial.ring().variableCount() &gt; maxVariables) {</span>
+<span class="nc" id="L114">                return Optional.of(&quot;MAX_VARIABLES_EXCEEDED&quot;);</span>
             }
-<span class="fc bfc" id="L102" title="All 2 branches covered.">            if (polynomial.totalDegree() &gt; maxTotalDegree) {</span>
-<span class="fc" id="L103">                return Optional.of(&quot;MAX_TOTAL_DEGREE_EXCEEDED&quot;);</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (polynomial.totalDegree() &gt; maxTotalDegree) {</span>
+<span class="fc" id="L117">                return Optional.of(&quot;MAX_TOTAL_DEGREE_EXCEEDED&quot;);</span>
             }
-<span class="pc bpc" id="L105" title="1 of 2 branches missed.">            if (polynomial.termCount() &gt; maxTerms) {</span>
-<span class="nc" id="L106">                return Optional.of(&quot;MAX_TERMS_EXCEEDED&quot;);</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">            if (polynomial.termCount() &gt; maxTerms) {</span>
+<span class="nc" id="L120">                return Optional.of(&quot;MAX_TERMS_EXCEEDED&quot;);</span>
             }
-<span class="pc bpc" id="L108" title="1 of 2 branches missed.">            if (polynomial.maxCoefficientBitLength()</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">            if (polynomial.maxCoefficientBitLength()</span>
                     &gt; maxCoefficientBitLength) {
-<span class="nc" id="L110">                return Optional.of(</span>
+<span class="nc" id="L124">                return Optional.of(</span>
                     &quot;MAX_COEFFICIENT_BIT_LENGTH_EXCEEDED&quot;);
             }
-<span class="fc" id="L113">            return Optional.empty();</span>
+<span class="fc" id="L127">            return Optional.empty();</span>
         }
 
         public String canonicalMaterial() {
-<span class="fc" id="L117">            return maxVariables</span>
+<span class="fc" id="L131">            return maxVariables</span>
                 + &quot;:&quot; + maxTotalDegree
                 + &quot;:&quot; + maxTerms
                 + &quot;:&quot; + maxCoefficientBitLength;

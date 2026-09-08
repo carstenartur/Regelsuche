@@ -361,7 +361,7 @@ import java.util.Set;
 <span class="fc bfc" id="L361" title="All 4 branches covered.">            if (!(node instanceof BinaryExpr outer) || outer.operator() != BinaryOperator.POW) {</span>
 <span class="fc" id="L362">                return false;</span>
             }
-<span class="pc bpc" id="L364" title="2 of 4 branches missed.">            if (!(outer.right() instanceof de.regelsuche.ast.NumberExpr exponent) || exponent.value() != 2) {</span>
+<span class="pc bpc" id="L364" title="2 of 4 branches missed.">            if (!(outer.right() instanceof de.regelsuche.ast.NumberExpr exponent) || !exponent.value().equalsInteger(2)) {</span>
 <span class="nc" id="L365">                return false;</span>
             }
 <span class="fc bfc" id="L367" title="All 2 branches covered.">            return outer.left() instanceof BinaryExpr inner</span>

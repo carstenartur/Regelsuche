@@ -187,7 +187,7 @@ public final class RepresentationCorrespondenceClassifier {
 
     private String signature(Expr expression) {
 <span class="fc bfc" id="L189" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
-<span class="fc" id="L190">            return atom(&quot;number&quot;, Double.toHexString(number.value()));</span>
+<span class="fc" id="L190">            return atom(&quot;number&quot;, number.value().canonicalText());</span>
         }
 <span class="fc bfc" id="L192" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
 <span class="fc" id="L193">            return atom(&quot;variable&quot;, variable.name());</span>

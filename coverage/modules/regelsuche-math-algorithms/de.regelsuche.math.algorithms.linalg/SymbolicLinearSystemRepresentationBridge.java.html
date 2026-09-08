@@ -159,33 +159,31 @@ import java.util.TreeSet;
     ) {
 <span class="fc" id="L160">        work.consume();</span>
 <span class="fc bfc" id="L161" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
-<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            if (!Double.isFinite(number.value())) {</span>
-<span class="nc" id="L163">                throw new UnsupportedExpression(&quot;NON_FINITE_NUMBER&quot;);</span>
-            }
-<span class="fc" id="L165">            return Polynomial.constant(Rational.fromDouble(number.value()));</span>
+
+<span class="fc" id="L163">            return Polynomial.constant(Rational.fromExact(number.value()));</span>
         }
-<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
-<span class="fc" id="L168">            return Polynomial.variable(variable.name());</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L166">            return Polynomial.variable(variable.name());</span>
         }
-<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (expression instanceof FunctionExpr) {</span>
-<span class="fc" id="L171">            throw new UnsupportedExpression(</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        if (expression instanceof FunctionExpr) {</span>
+<span class="fc" id="L169">            throw new UnsupportedExpression(</span>
                 &quot;FUNCTION_OUTSIDE_SYMBOLIC_POLYNOMIAL_FRAGMENT&quot;);
         }
-<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (!(expression instanceof BinaryExpr binary)) {</span>
-<span class="nc" id="L175">            throw new UnsupportedExpression(&quot;UNKNOWN_EXPRESSION_NODE&quot;);</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (!(expression instanceof BinaryExpr binary)) {</span>
+<span class="nc" id="L173">            throw new UnsupportedExpression(&quot;UNKNOWN_EXPRESSION_NODE&quot;);</span>
         }
-<span class="fc bfc" id="L177" title="All 2 branches covered.">        if (binary.operator() == BinaryOperator.POW) {</span>
-<span class="fc" id="L178">            Polynomial base = polynomial(binary.left(), work);</span>
-<span class="fc" id="L179">            return base.pow(integerExponent(binary.right(), work));</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        if (binary.operator() == BinaryOperator.POW) {</span>
+<span class="fc" id="L176">            Polynomial base = polynomial(binary.left(), work);</span>
+<span class="fc" id="L177">            return base.pow(integerExponent(binary.right(), work));</span>
         }
-<span class="fc" id="L181">        Polynomial left = polynomial(binary.left(), work);</span>
-<span class="fc" id="L182">        Polynomial right = polynomial(binary.right(), work);</span>
-<span class="pc bpc" id="L183" title="3 of 5 branches missed.">        return switch (binary.operator()) {</span>
-<span class="fc" id="L184">            case ADD -&gt; left.add(right);</span>
-<span class="nc" id="L185">            case SUB -&gt; left.subtract(right);</span>
-<span class="fc" id="L186">            case MUL -&gt; left.multiply(right);</span>
-<span class="nc" id="L187">            case DIV -&gt; divideByConstant(left, right);</span>
-<span class="nc" id="L188">            case POW -&gt; throw new IllegalStateException(</span>
+<span class="fc" id="L179">        Polynomial left = polynomial(binary.left(), work);</span>
+<span class="fc" id="L180">        Polynomial right = polynomial(binary.right(), work);</span>
+<span class="pc bpc" id="L181" title="3 of 5 branches missed.">        return switch (binary.operator()) {</span>
+<span class="fc" id="L182">            case ADD -&gt; left.add(right);</span>
+<span class="nc" id="L183">            case SUB -&gt; left.subtract(right);</span>
+<span class="fc" id="L184">            case MUL -&gt; left.multiply(right);</span>
+<span class="nc" id="L185">            case DIV -&gt; divideByConstant(left, right);</span>
+<span class="nc" id="L186">            case POW -&gt; throw new IllegalStateException(</span>
                 &quot;power handled before binary recursion&quot;);
         };
     }
@@ -194,50 +192,47 @@ import java.util.TreeSet;
         Polynomial numerator,
         Polynomial denominator
     ) {
-<span class="fc" id="L197">        Optional&lt;Rational&gt; constant = constantValue(denominator);</span>
-<span class="pc bpc" id="L198" title="1 of 2 branches missed.">        if (constant.isEmpty()) {</span>
-<span class="fc" id="L199">            throw new UnsupportedExpression(</span>
+<span class="fc" id="L195">        Optional&lt;Rational&gt; constant = constantValue(denominator);</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        if (constant.isEmpty()) {</span>
+<span class="fc" id="L197">            throw new UnsupportedExpression(</span>
                 &quot;SYMBOLIC_OR_NON_CONSTANT_DENOMINATOR&quot;);
         }
-<span class="nc bnc" id="L202" title="All 2 branches missed.">        if (constant.orElseThrow().isZero()) {</span>
-<span class="nc" id="L203">            throw new UnsupportedExpression(&quot;EXPLICIT_DIVISION_BY_ZERO&quot;);</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        if (constant.orElseThrow().isZero()) {</span>
+<span class="nc" id="L201">            throw new UnsupportedExpression(&quot;EXPLICIT_DIVISION_BY_ZERO&quot;);</span>
         }
-<span class="nc" id="L205">        return numerator.multiply(</span>
-<span class="nc" id="L206">            Rational.ONE.divide(constant.orElseThrow()));</span>
+<span class="nc" id="L203">        return numerator.multiply(</span>
+<span class="nc" id="L204">            Rational.ONE.divide(constant.orElseThrow()));</span>
     }
 
     private static Optional&lt;Rational&gt; constantValue(Polynomial polynomial) {
-<span class="pc bpc" id="L210" title="1 of 2 branches missed.">        if (polynomial.isZero()) {</span>
-<span class="nc" id="L211">            return Optional.of(Rational.ZERO);</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        if (polynomial.isZero()) {</span>
+<span class="nc" id="L209">            return Optional.of(Rational.ZERO);</span>
         }
-<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        if (polynomial.terms().size() != 1) {</span>
-<span class="nc" id="L214">            return Optional.empty();</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        if (polynomial.terms().size() != 1) {</span>
+<span class="nc" id="L212">            return Optional.empty();</span>
         }
-<span class="fc" id="L216">        Map.Entry&lt;Monomial, Rational&gt; entry = polynomial.terms()</span>
-<span class="fc" id="L217">            .entrySet()</span>
-<span class="fc" id="L218">            .iterator()</span>
-<span class="fc" id="L219">            .next();</span>
-<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        return entry.getKey().powers().isEmpty()</span>
-<span class="nc" id="L221">            ? Optional.of(entry.getValue())</span>
-<span class="fc" id="L222">            : Optional.empty();</span>
+<span class="fc" id="L214">        Map.Entry&lt;Monomial, Rational&gt; entry = polynomial.terms()</span>
+<span class="fc" id="L215">            .entrySet()</span>
+<span class="fc" id="L216">            .iterator()</span>
+<span class="fc" id="L217">            .next();</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">        return entry.getKey().powers().isEmpty()</span>
+<span class="nc" id="L219">            ? Optional.of(entry.getValue())</span>
+<span class="fc" id="L220">            : Optional.empty();</span>
     }
 
     private static int integerExponent(Expr expression, WorkCounter work) {
-<span class="fc" id="L226">        work.consume();</span>
-<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (!(expression instanceof NumberExpr number)</span>
-<span class="pc bpc" id="L228" title="1 of 2 branches missed.">                || !Double.isFinite(number.value())) {</span>
-<span class="nc" id="L229">            throw new UnsupportedExpression(</span>
+<span class="fc" id="L224">        work.consume();</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        if (!(expression instanceof NumberExpr number)) {</span>
+<span class="nc" id="L226">            throw new UnsupportedExpression(</span>
                 &quot;NON_LITERAL_SYMBOLIC_POLYNOMIAL_EXPONENT&quot;);
         }
-<span class="fc" id="L232">        double value = number.value();</span>
-<span class="fc" id="L233">        int exponent = (int) value;</span>
-<span class="pc bpc" id="L234" title="3 of 6 branches missed.">        if (Math.abs(value - exponent) &gt; 1e-9</span>
-                || exponent &lt; 0
-                || exponent &gt; MAX_EXPONENT) {
-<span class="nc" id="L237">            throw new UnsupportedExpression(</span>
+<span class="fc" id="L229">        var value = number.value();</span>
+<span class="pc bpc" id="L230" title="2 of 4 branches missed.">        if (!value.isInteger() || value.signum() &lt; 0</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">                || value.numerator().compareTo(java.math.BigInteger.valueOf(MAX_EXPONENT)) &gt; 0) {</span>
+<span class="nc" id="L232">            throw new UnsupportedExpression(</span>
                 &quot;EXPONENT_OUTSIDE_SYMBOLIC_POLYNOMIAL_FRAGMENT&quot;);
         }
-<span class="fc" id="L240">        return exponent;</span>
+<span class="fc" id="L235">        return value.intValueExact();</span>
     }
 
     private static LinearRow splitLinear(
@@ -246,48 +241,48 @@ import java.util.TreeSet;
         Set&lt;String&gt; unknownSet,
         WorkCounter work
     ) {
-<span class="fc" id="L249">        Map&lt;String, Polynomial&gt; coefficients = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L250">        unknowns.forEach(unknown -&gt;</span>
-<span class="fc" id="L251">            coefficients.put(unknown, Polynomial.zero()));</span>
-<span class="fc" id="L252">        Polynomial constant = Polynomial.zero();</span>
+<span class="fc" id="L244">        Map&lt;String, Polynomial&gt; coefficients = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L245">        unknowns.forEach(unknown -&gt;</span>
+<span class="fc" id="L246">            coefficients.put(unknown, Polynomial.zero()));</span>
+<span class="fc" id="L247">        Polynomial constant = Polynomial.zero();</span>
         for (Map.Entry&lt;Monomial, Rational&gt; term
-<span class="fc bfc" id="L254" title="All 2 branches covered.">                : polynomial.terms().entrySet()) {</span>
-<span class="fc" id="L255">            work.consume();</span>
-<span class="fc" id="L256">            Monomial monomial = term.getKey();</span>
-<span class="fc" id="L257">            int unknownDegree = 0;</span>
-<span class="fc" id="L258">            String selectedUnknown = null;</span>
-<span class="fc bfc" id="L259" title="All 2 branches covered.">            for (String unknown : unknownSet) {</span>
-<span class="fc" id="L260">                work.consume();</span>
-<span class="fc" id="L261">                int exponent = monomial.exponentOf(unknown);</span>
-<span class="fc" id="L262">                unknownDegree = Math.addExact(unknownDegree, exponent);</span>
-<span class="fc bfc" id="L263" title="All 2 branches covered.">                if (exponent &gt; 0) {</span>
-<span class="fc" id="L264">                    selectedUnknown = unknown;</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">                : polynomial.terms().entrySet()) {</span>
+<span class="fc" id="L250">            work.consume();</span>
+<span class="fc" id="L251">            Monomial monomial = term.getKey();</span>
+<span class="fc" id="L252">            int unknownDegree = 0;</span>
+<span class="fc" id="L253">            String selectedUnknown = null;</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">            for (String unknown : unknownSet) {</span>
+<span class="fc" id="L255">                work.consume();</span>
+<span class="fc" id="L256">                int exponent = monomial.exponentOf(unknown);</span>
+<span class="fc" id="L257">                unknownDegree = Math.addExact(unknownDegree, exponent);</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">                if (exponent &gt; 0) {</span>
+<span class="fc" id="L259">                    selectedUnknown = unknown;</span>
                 }
-<span class="fc" id="L266">            }</span>
-<span class="fc bfc" id="L267" title="All 2 branches covered.">            if (unknownDegree == 0) {</span>
-<span class="fc" id="L268">                constant = constant.add(Polynomial.term(</span>
+<span class="fc" id="L261">            }</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">            if (unknownDegree == 0) {</span>
+<span class="fc" id="L263">                constant = constant.add(Polynomial.term(</span>
                     monomial,
-<span class="fc" id="L270">                    term.getValue()));</span>
-<span class="fc" id="L271">                continue;</span>
+<span class="fc" id="L265">                    term.getValue()));</span>
+<span class="fc" id="L266">                continue;</span>
             }
-<span class="pc bpc" id="L273" title="1 of 4 branches missed.">            if (unknownDegree != 1 || selectedUnknown == null) {</span>
-<span class="fc" id="L274">                throw new NonlinearExpression(</span>
+<span class="pc bpc" id="L268" title="1 of 4 branches missed.">            if (unknownDegree != 1 || selectedUnknown == null) {</span>
+<span class="fc" id="L269">                throw new NonlinearExpression(</span>
                     &quot;NONLINEAR_IN_DECLARED_UNKNOWNS&quot;);
             }
-<span class="fc" id="L277">            Monomial parameterMonomial = monomial.without(selectedUnknown);</span>
-<span class="fc" id="L278">            Polynomial coefficientTerm = Polynomial.term(</span>
+<span class="fc" id="L272">            Monomial parameterMonomial = monomial.without(selectedUnknown);</span>
+<span class="fc" id="L273">            Polynomial coefficientTerm = Polynomial.term(</span>
                 parameterMonomial,
-<span class="fc" id="L280">                term.getValue());</span>
-<span class="fc" id="L281">            coefficients.put(</span>
+<span class="fc" id="L275">                term.getValue());</span>
+<span class="fc" id="L276">            coefficients.put(</span>
                 selectedUnknown,
-<span class="fc" id="L283">                coefficients.get(selectedUnknown).add(coefficientTerm));</span>
-<span class="fc" id="L284">        }</span>
-<span class="fc" id="L285">        List&lt;Polynomial&gt; orderedCoefficients = unknowns.stream()</span>
-<span class="fc" id="L286">            .map(coefficients::get)</span>
-<span class="fc" id="L287">            .toList();</span>
-<span class="fc" id="L288">        return new LinearRow(</span>
+<span class="fc" id="L278">                coefficients.get(selectedUnknown).add(coefficientTerm));</span>
+<span class="fc" id="L279">        }</span>
+<span class="fc" id="L280">        List&lt;Polynomial&gt; orderedCoefficients = unknowns.stream()</span>
+<span class="fc" id="L281">            .map(coefficients::get)</span>
+<span class="fc" id="L282">            .toList();</span>
+<span class="fc" id="L283">        return new LinearRow(</span>
             orderedCoefficients,
-<span class="fc" id="L290">            constant.multiply(Rational.NEGATIVE_ONE));</span>
+<span class="fc" id="L285">            constant.multiply(Rational.NEGATIVE_ONE));</span>
     }
 
     private static boolean roundTripMatches(
@@ -295,84 +290,84 @@ import java.util.TreeSet;
         SymbolicLinearSystem represented,
         WorkCounter work
     ) {
-<span class="fc bfc" id="L298" title="All 2 branches covered.">        for (int row = 0; row &lt; represented.equationCount(); row++) {</span>
-<span class="fc" id="L299">            Polynomial reconstructed = Polynomial.zero();</span>
-<span class="fc" id="L300">            for (int column = 0;</span>
-<span class="fc bfc" id="L301" title="All 2 branches covered.">                    column &lt; represented.unknownCount();</span>
-<span class="fc" id="L302">                    column++) {</span>
-<span class="fc" id="L303">                work.consume();</span>
-<span class="fc" id="L304">                reconstructed = reconstructed.add(</span>
-<span class="fc" id="L305">                    represented.coefficients().get(row, column)</span>
-<span class="fc" id="L306">                        .multiply(Polynomial.variable(</span>
-<span class="fc" id="L307">                            represented.unknowns().get(column))));</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        for (int row = 0; row &lt; represented.equationCount(); row++) {</span>
+<span class="fc" id="L294">            Polynomial reconstructed = Polynomial.zero();</span>
+<span class="fc" id="L295">            for (int column = 0;</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">                    column &lt; represented.unknownCount();</span>
+<span class="fc" id="L297">                    column++) {</span>
+<span class="fc" id="L298">                work.consume();</span>
+<span class="fc" id="L299">                reconstructed = reconstructed.add(</span>
+<span class="fc" id="L300">                    represented.coefficients().get(row, column)</span>
+<span class="fc" id="L301">                        .multiply(Polynomial.variable(</span>
+<span class="fc" id="L302">                            represented.unknowns().get(column))));</span>
             }
-<span class="fc" id="L309">            reconstructed = reconstructed.subtract(</span>
-<span class="fc" id="L310">                represented.rightHandSide().get(row));</span>
-<span class="pc bpc" id="L311" title="1 of 2 branches missed.">            if (!reconstructed.equals(normalizedRows.get(row))) {</span>
-<span class="nc" id="L312">                return false;</span>
+<span class="fc" id="L304">            reconstructed = reconstructed.subtract(</span>
+<span class="fc" id="L305">                represented.rightHandSide().get(row));</span>
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">            if (!reconstructed.equals(normalizedRows.get(row))) {</span>
+<span class="nc" id="L307">                return false;</span>
             }
         }
-<span class="fc" id="L315">        return true;</span>
+<span class="fc" id="L310">        return true;</span>
     }
 
     private static Certificate certificate(
         Source source,
         SymbolicLinearSystem represented
     ) {
-<span class="fc" id="L322">        List&lt;String&gt; sourceEquations = source.equations().stream()</span>
-<span class="fc" id="L323">            .map(ExpressionFormatter::format)</span>
-<span class="fc" id="L324">            .toList();</span>
-<span class="fc" id="L325">        List&lt;List&lt;String&gt;&gt; coefficientRows = represented.coefficients()</span>
-<span class="fc" id="L326">            .entries()</span>
-<span class="fc" id="L327">            .stream()</span>
-<span class="fc" id="L328">            .map(row -&gt; row.stream()</span>
-<span class="fc" id="L329">                .map(Polynomial::toCanonicalString)</span>
-<span class="fc" id="L330">                .toList())</span>
+<span class="fc" id="L317">        List&lt;String&gt; sourceEquations = source.equations().stream()</span>
+<span class="fc" id="L318">            .map(ExpressionFormatter::format)</span>
+<span class="fc" id="L319">            .toList();</span>
+<span class="fc" id="L320">        List&lt;List&lt;String&gt;&gt; coefficientRows = represented.coefficients()</span>
+<span class="fc" id="L321">            .entries()</span>
+<span class="fc" id="L322">            .stream()</span>
+<span class="fc" id="L323">            .map(row -&gt; row.stream()</span>
+<span class="fc" id="L324">                .map(Polynomial::toCanonicalString)</span>
+<span class="fc" id="L325">                .toList())</span>
+<span class="fc" id="L326">            .toList();</span>
+<span class="fc" id="L327">        List&lt;String&gt; rightHandSide = represented.rightHandSide()</span>
+<span class="fc" id="L328">            .values()</span>
+<span class="fc" id="L329">            .stream()</span>
+<span class="fc" id="L330">            .map(Polynomial::toCanonicalString)</span>
 <span class="fc" id="L331">            .toList();</span>
-<span class="fc" id="L332">        List&lt;String&gt; rightHandSide = represented.rightHandSide()</span>
-<span class="fc" id="L333">            .values()</span>
-<span class="fc" id="L334">            .stream()</span>
-<span class="fc" id="L335">            .map(Polynomial::toCanonicalString)</span>
-<span class="fc" id="L336">            .toList();</span>
-<span class="fc" id="L337">        StringBuilder payload = new StringBuilder();</span>
-<span class="fc" id="L338">        append(payload, CERTIFICATE_SCHEMA);</span>
-<span class="fc" id="L339">        append(payload, BRIDGE_ID);</span>
-<span class="fc" id="L340">        append(payload, RELATION.name());</span>
-<span class="fc" id="L341">        append(payload, Integer.toString(sourceEquations.size()));</span>
-<span class="fc" id="L342">        sourceEquations.forEach(value -&gt; append(payload, value));</span>
-<span class="fc" id="L343">        append(payload, Integer.toString(represented.unknowns().size()));</span>
-<span class="fc" id="L344">        represented.unknowns().forEach(value -&gt; append(payload, value));</span>
-<span class="fc" id="L345">        append(payload, Integer.toString(</span>
-<span class="fc" id="L346">            represented.scalarParameters().size()));</span>
-<span class="fc" id="L347">        represented.scalarParameters().forEach(value -&gt; append(payload, value));</span>
-<span class="fc bfc" id="L348" title="All 2 branches covered.">        for (List&lt;String&gt; row : coefficientRows) {</span>
-<span class="fc" id="L349">            append(payload, Integer.toString(row.size()));</span>
-<span class="fc" id="L350">            row.forEach(value -&gt; append(payload, value));</span>
-<span class="fc" id="L351">        }</span>
-<span class="fc" id="L352">        rightHandSide.forEach(value -&gt; append(payload, value));</span>
-<span class="fc" id="L353">        return new Certificate(</span>
+<span class="fc" id="L332">        StringBuilder payload = new StringBuilder();</span>
+<span class="fc" id="L333">        append(payload, CERTIFICATE_SCHEMA);</span>
+<span class="fc" id="L334">        append(payload, BRIDGE_ID);</span>
+<span class="fc" id="L335">        append(payload, RELATION.name());</span>
+<span class="fc" id="L336">        append(payload, Integer.toString(sourceEquations.size()));</span>
+<span class="fc" id="L337">        sourceEquations.forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L338">        append(payload, Integer.toString(represented.unknowns().size()));</span>
+<span class="fc" id="L339">        represented.unknowns().forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L340">        append(payload, Integer.toString(</span>
+<span class="fc" id="L341">            represented.scalarParameters().size()));</span>
+<span class="fc" id="L342">        represented.scalarParameters().forEach(value -&gt; append(payload, value));</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        for (List&lt;String&gt; row : coefficientRows) {</span>
+<span class="fc" id="L344">            append(payload, Integer.toString(row.size()));</span>
+<span class="fc" id="L345">            row.forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L346">        }</span>
+<span class="fc" id="L347">        rightHandSide.forEach(value -&gt; append(payload, value));</span>
+<span class="fc" id="L348">        return new Certificate(</span>
             CERTIFICATE_SCHEMA,
             BRIDGE_ID,
             RELATION,
             sourceEquations,
-<span class="fc" id="L358">            represented.unknowns(),</span>
-<span class="fc" id="L359">            represented.scalarParameters(),</span>
+<span class="fc" id="L353">            represented.unknowns(),</span>
+<span class="fc" id="L354">            represented.scalarParameters(),</span>
             coefficientRows,
             rightHandSide,
-<span class="fc" id="L362">            sha256(payload.toString()));</span>
+<span class="fc" id="L357">            sha256(payload.toString()));</span>
     }
 
     private static void append(StringBuilder target, String value) {
-<span class="fc" id="L366">        target.append(value.length()).append(':').append(value);</span>
-<span class="fc" id="L367">    }</span>
+<span class="fc" id="L361">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L362">    }</span>
 
     private static String sha256(String value) {
         try {
-<span class="fc" id="L371">            return java.util.HexFormat.of().formatHex(</span>
-<span class="fc" id="L372">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(</span>
-<span class="fc" id="L373">                    value.getBytes(StandardCharsets.UTF_8)));</span>
-<span class="nc" id="L374">        } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L375">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+<span class="fc" id="L366">            return java.util.HexFormat.of().formatHex(</span>
+<span class="fc" id="L367">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(</span>
+<span class="fc" id="L368">                    value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L369">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L370">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
         }
     }
 
@@ -380,35 +375,35 @@ import java.util.TreeSet;
         List&lt;Equation&gt; equations,
         List&lt;String&gt; unknowns
     ) {
-<span class="fc" id="L383">        public Source {</span>
-<span class="fc" id="L384">            equations = List.copyOf(Objects.requireNonNull(</span>
+<span class="fc" id="L378">        public Source {</span>
+<span class="fc" id="L379">            equations = List.copyOf(Objects.requireNonNull(</span>
                 equations,
                 &quot;equations&quot;));
-<span class="fc" id="L387">            unknowns = validatedUnknowns(unknowns);</span>
-<span class="fc bfc" id="L388" title="All 2 branches covered.">            if (equations.isEmpty()) {</span>
-<span class="fc" id="L389">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L382">            unknowns = validatedUnknowns(unknowns);</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">            if (equations.isEmpty()) {</span>
+<span class="fc" id="L384">                throw new IllegalArgumentException(</span>
                     &quot;symbolic system requires at least one equation&quot;);
             }
-<span class="fc" id="L392">        }</span>
+<span class="fc" id="L387">        }</span>
 
         private static List&lt;String&gt; validatedUnknowns(List&lt;String&gt; values) {
-<span class="fc" id="L395">            Objects.requireNonNull(values, &quot;unknowns&quot;);</span>
-<span class="fc bfc" id="L396" title="All 2 branches covered.">            if (values.isEmpty()) {</span>
-<span class="fc" id="L397">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L390">            Objects.requireNonNull(values, &quot;unknowns&quot;);</span>
+<span class="fc bfc" id="L391" title="All 2 branches covered.">            if (values.isEmpty()) {</span>
+<span class="fc" id="L392">                throw new IllegalArgumentException(</span>
                     &quot;at least one unknown must be declared&quot;);
             }
-<span class="fc" id="L400">            Set&lt;String&gt; unique = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L401" title="All 2 branches covered.">            for (String value : values) {</span>
-<span class="pc bpc" id="L402" title="2 of 4 branches missed.">                if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L403">                    throw new IllegalArgumentException(</span>
+<span class="fc" id="L395">            Set&lt;String&gt; unique = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">            for (String value : values) {</span>
+<span class="pc bpc" id="L397" title="2 of 4 branches missed.">                if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L398">                    throw new IllegalArgumentException(</span>
                         &quot;unknown names must not be blank&quot;);
                 }
-<span class="fc bfc" id="L406" title="All 2 branches covered.">                if (!unique.add(value.trim())) {</span>
-<span class="fc" id="L407">                    throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L401" title="All 2 branches covered.">                if (!unique.add(value.trim())) {</span>
+<span class="fc" id="L402">                    throw new IllegalArgumentException(</span>
                         &quot;unknown names must be unique&quot;);
                 }
-<span class="fc" id="L410">            }</span>
-<span class="fc" id="L411">            return List.copyOf(unique);</span>
+<span class="fc" id="L405">            }</span>
+<span class="fc" id="L406">            return List.copyOf(unique);</span>
         }
     }
 
@@ -423,68 +418,68 @@ import java.util.TreeSet;
         List&lt;String&gt; rightHandSide,
         String contentHash
     ) {
-<span class="fc" id="L426">        public Certificate {</span>
-<span class="fc bfc" id="L427" title="All 2 branches covered.">            if (!CERTIFICATE_SCHEMA.equals(schema)</span>
-<span class="pc bpc" id="L428" title="1 of 4 branches missed.">                    || !BRIDGE_ID.equals(bridgeId)</span>
+<span class="fc" id="L421">        public Certificate {</span>
+<span class="fc bfc" id="L422" title="All 2 branches covered.">            if (!CERTIFICATE_SCHEMA.equals(schema)</span>
+<span class="pc bpc" id="L423" title="1 of 4 branches missed.">                    || !BRIDGE_ID.equals(bridgeId)</span>
                     || contentHash == null
-<span class="fc bfc" id="L430" title="All 2 branches covered.">                    || !contentHash.matches(&quot;[0-9a-f]{64}&quot;)) {</span>
-<span class="fc" id="L431">                throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L425" title="All 2 branches covered.">                    || !contentHash.matches(&quot;[0-9a-f]{64}&quot;)) {</span>
+<span class="fc" id="L426">                throw new IllegalArgumentException(</span>
                     &quot;certificate identities are invalid&quot;);
             }
-<span class="fc" id="L434">            relation = Objects.requireNonNull(relation, &quot;relation&quot;);</span>
-<span class="fc bfc" id="L435" title="All 2 branches covered.">            if (relation != RELATION) {</span>
-<span class="fc" id="L436">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L429">            relation = Objects.requireNonNull(relation, &quot;relation&quot;);</span>
+<span class="fc bfc" id="L430" title="All 2 branches covered.">            if (relation != RELATION) {</span>
+<span class="fc" id="L431">                throw new IllegalArgumentException(</span>
                     &quot;certificate relation is invalid&quot;);
             }
-<span class="fc" id="L439">            sourceEquations = textList(sourceEquations, &quot;sourceEquations&quot;);</span>
-<span class="fc" id="L440">            unknownOrder = textList(unknownOrder, &quot;unknownOrder&quot;);</span>
-<span class="fc" id="L441">            int unknownCount = unknownOrder.size();</span>
-<span class="fc" id="L442">            scalarParameters = textListAllowEmpty(</span>
+<span class="fc" id="L434">            sourceEquations = textList(sourceEquations, &quot;sourceEquations&quot;);</span>
+<span class="fc" id="L435">            unknownOrder = textList(unknownOrder, &quot;unknownOrder&quot;);</span>
+<span class="fc" id="L436">            int unknownCount = unknownOrder.size();</span>
+<span class="fc" id="L437">            scalarParameters = textListAllowEmpty(</span>
                 scalarParameters,
                 &quot;scalarParameters&quot;);
-<span class="fc" id="L445">            coefficientRows = matrixText(coefficientRows);</span>
-<span class="fc" id="L446">            rightHandSide = textList(rightHandSide, &quot;rightHandSide&quot;);</span>
-<span class="pc bpc" id="L447" title="1 of 2 branches missed.">            if (sourceEquations.size() != coefficientRows.size()</span>
-<span class="pc bpc" id="L448" title="1 of 2 branches missed.">                    || sourceEquations.size() != rightHandSide.size()</span>
-<span class="fc" id="L449">                    || coefficientRows.stream()</span>
-<span class="pc bpc" id="L450" title="2 of 4 branches missed.">                        .anyMatch(row -&gt; row.size() != unknownCount)) {</span>
-<span class="nc" id="L451">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L440">            coefficientRows = matrixText(coefficientRows);</span>
+<span class="fc" id="L441">            rightHandSide = textList(rightHandSide, &quot;rightHandSide&quot;);</span>
+<span class="pc bpc" id="L442" title="1 of 2 branches missed.">            if (sourceEquations.size() != coefficientRows.size()</span>
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">                    || sourceEquations.size() != rightHandSide.size()</span>
+<span class="fc" id="L444">                    || coefficientRows.stream()</span>
+<span class="pc bpc" id="L445" title="2 of 4 branches missed.">                        .anyMatch(row -&gt; row.size() != unknownCount)) {</span>
+<span class="nc" id="L446">                throw new IllegalArgumentException(</span>
                     &quot;certificate dimensions are inconsistent&quot;);
             }
-<span class="fc" id="L454">        }</span>
+<span class="fc" id="L449">        }</span>
 
         private static List&lt;String&gt; textList(
             List&lt;String&gt; values,
             String field
         ) {
-<span class="fc" id="L460">            List&lt;String&gt; retained = textListAllowEmpty(values, field);</span>
-<span class="pc bpc" id="L461" title="1 of 2 branches missed.">            if (retained.isEmpty()) {</span>
-<span class="nc" id="L462">                throw new IllegalArgumentException(field + &quot; must not be empty&quot;);</span>
+<span class="fc" id="L455">            List&lt;String&gt; retained = textListAllowEmpty(values, field);</span>
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">            if (retained.isEmpty()) {</span>
+<span class="nc" id="L457">                throw new IllegalArgumentException(field + &quot; must not be empty&quot;);</span>
             }
-<span class="fc" id="L464">            return retained;</span>
+<span class="fc" id="L459">            return retained;</span>
         }
 
         private static List&lt;String&gt; textListAllowEmpty(
             List&lt;String&gt; values,
             String field
         ) {
-<span class="fc" id="L471">            Objects.requireNonNull(values, field);</span>
-<span class="fc" id="L472">            return values.stream().map(value -&gt; {</span>
-<span class="pc bpc" id="L473" title="2 of 4 branches missed.">                if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L474">                    throw new IllegalArgumentException(</span>
+<span class="fc" id="L466">            Objects.requireNonNull(values, field);</span>
+<span class="fc" id="L467">            return values.stream().map(value -&gt; {</span>
+<span class="pc bpc" id="L468" title="2 of 4 branches missed.">                if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L469">                    throw new IllegalArgumentException(</span>
                         field + &quot; entries must not be blank&quot;);
                 }
-<span class="fc" id="L477">                return value;</span>
-<span class="fc" id="L478">            }).toList();</span>
+<span class="fc" id="L472">                return value;</span>
+<span class="fc" id="L473">            }).toList();</span>
         }
 
         private static List&lt;List&lt;String&gt;&gt; matrixText(
             List&lt;List&lt;String&gt;&gt; rows
         ) {
-<span class="fc" id="L484">            Objects.requireNonNull(rows, &quot;coefficientRows&quot;);</span>
-<span class="fc" id="L485">            return rows.stream()</span>
-<span class="fc" id="L486">                .map(row -&gt; textList(row, &quot;coefficient row&quot;))</span>
-<span class="fc" id="L487">                .toList();</span>
+<span class="fc" id="L479">            Objects.requireNonNull(rows, &quot;coefficientRows&quot;);</span>
+<span class="fc" id="L480">            return rows.stream()</span>
+<span class="fc" id="L481">                .map(row -&gt; textList(row, &quot;coefficient row&quot;))</span>
+<span class="fc" id="L482">                .toList();</span>
         }
     }
 
@@ -492,31 +487,31 @@ import java.util.TreeSet;
         List&lt;Polynomial&gt; coefficients,
         Polynomial rightHandSide
     ) {
-<span class="fc" id="L495">        private LinearRow {</span>
-<span class="fc" id="L496">            coefficients = List.copyOf(coefficients);</span>
-<span class="fc" id="L497">            rightHandSide = Objects.requireNonNull(</span>
+<span class="fc" id="L490">        private LinearRow {</span>
+<span class="fc" id="L491">            coefficients = List.copyOf(coefficients);</span>
+<span class="fc" id="L492">            rightHandSide = Objects.requireNonNull(</span>
                 rightHandSide,
                 &quot;rightHandSide&quot;);
-<span class="fc" id="L500">        }</span>
+<span class="fc" id="L495">        }</span>
     }
 
     private static final class WorkCounter {
         private final int configured;
         private int consumed;
 
-<span class="fc" id="L507">        private WorkCounter(int configured) {</span>
-<span class="fc" id="L508">            this.configured = configured;</span>
-<span class="fc" id="L509">        }</span>
+<span class="fc" id="L502">        private WorkCounter(int configured) {</span>
+<span class="fc" id="L503">            this.configured = configured;</span>
+<span class="fc" id="L504">        }</span>
 
         private void consume() {
-<span class="fc bfc" id="L512" title="All 2 branches covered.">            if (consumed &gt;= configured) {</span>
-<span class="fc" id="L513">                throw new BudgetExceeded();</span>
+<span class="fc bfc" id="L507" title="All 2 branches covered.">            if (consumed &gt;= configured) {</span>
+<span class="fc" id="L508">                throw new BudgetExceeded();</span>
             }
-<span class="fc" id="L515">            consumed++;</span>
-<span class="fc" id="L516">        }</span>
+<span class="fc" id="L510">            consumed++;</span>
+<span class="fc" id="L511">        }</span>
 
         private WorkLedger ledger() {
-<span class="fc" id="L519">            return WorkLedger.of(configured, consumed);</span>
+<span class="fc" id="L514">            return WorkLedger.of(configured, consumed);</span>
         }
     }
 
@@ -528,12 +523,12 @@ import java.util.TreeSet;
         private static final long serialVersionUID = 1L;
         private final String detailCode;
 
-<span class="fc" id="L531">        private NonlinearExpression(String detailCode) {</span>
-<span class="fc" id="L532">            this.detailCode = detailCode;</span>
-<span class="fc" id="L533">        }</span>
+<span class="fc" id="L526">        private NonlinearExpression(String detailCode) {</span>
+<span class="fc" id="L527">            this.detailCode = detailCode;</span>
+<span class="fc" id="L528">        }</span>
 
         private String detailCode() {
-<span class="fc" id="L536">            return detailCode;</span>
+<span class="fc" id="L531">            return detailCode;</span>
         }
     }
 
@@ -541,12 +536,12 @@ import java.util.TreeSet;
         private static final long serialVersionUID = 1L;
         private final String detailCode;
 
-<span class="fc" id="L544">        private UnsupportedExpression(String detailCode) {</span>
-<span class="fc" id="L545">            this.detailCode = detailCode;</span>
-<span class="fc" id="L546">        }</span>
+<span class="fc" id="L539">        private UnsupportedExpression(String detailCode) {</span>
+<span class="fc" id="L540">            this.detailCode = detailCode;</span>
+<span class="fc" id="L541">        }</span>
 
         private String detailCode() {
-<span class="fc" id="L549">            return detailCode;</span>
+<span class="fc" id="L544">            return detailCode;</span>
         }
     }
 }

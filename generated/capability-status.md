@@ -5,8 +5,8 @@
 
 - Policy: `EVIDENCE_DERIVED_FAIL_CLOSED`
 - Repository revision mode: `WORKTREE`
-- Status content hash: `sha256:6fc3cd293b99a6859858aa3c0794b91bd1c5bbc1d2317b9c79d1bd5b3253a0df`
-- Release run: `sha256:633708a3add391b8ec3c49272188fc04bc6c4268c27e5bf2fb19cd88dbdc6b94`
+- Status content hash: `sha256:1985ba6843f05a99998d714f18c6d7a6c15219efccea4f41b4820816d54da11a`
+- Release run: `sha256:e549f6ada671c13fc38f84377a07638244d6ff037142d46a4955929e6b8c4326`
 - Domain-generic run: `sha256:7ed14645710b106744376191f8a6426a6ed53bcb813f68a92c92810d799f3282`
 
 | Capability | Status | Bounded claim |

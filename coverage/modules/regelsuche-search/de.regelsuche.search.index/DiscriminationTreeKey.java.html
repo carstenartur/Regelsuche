@@ -70,11 +70,8 @@ import java.util.Set;
 <span class="pc bpc" id="L70" title="1 of 4 branches missed.">        return name.length() == 1 &amp;&amp; Character.isUpperCase(name.charAt(0));</span>
     }
 
-    private static String formatNumber(double value) {
-<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (value == Math.rint(value)) {</span>
-<span class="fc" id="L75">            return Long.toString((long) value);</span>
-        }
-<span class="nc" id="L77">        return Double.toString(value);</span>
+    private static String formatNumber(de.regelsuche.scalar.ExactRational value) {
+<span class="fc" id="L74">        return value.canonicalText();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
