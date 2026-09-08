@@ -7,7 +7,6 @@ import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationBatch;
 import de.regelsuche.transform.TransformationWorkMetrics;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 
@@ -18,8 +17,6 @@ import java.util.List;
  */
 public final class CompiledLinearRewriteEngine implements MeasuredTransformationEngine {
     public static final String REVISION = "regelsuche.compiled-linear-rewrite/v1";
-    private static final Comparator<Transformation> ORDER = Comparator.comparing(Transformation::rule)
-        .thenComparing(Transformation::transformedExpression).thenComparing(Transformation::applicationKey);
     private final String programId;
     private final List<RewriteProgram.Source> sources;
     private final int maximumCandidates;
@@ -56,7 +53,7 @@ public final class CompiledLinearRewriteEngine implements MeasuredTransformation
                 String input = index == 0 ? expression : current.get(p).outputExpression();
                 var steps = new ArrayList<>(source.engine().transform(input));
                 Transformation.requirePrimitiveOnly(steps);
-                steps.sort(ORDER);
+                steps.sort(RewriteProgramInterpreter.TRANSFORMATION_ORDER);
                 calls++;
                 emitted = Math.addExact(emitted, steps.size());
                 for (var step : steps) {
@@ -66,13 +63,19 @@ public final class CompiledLinearRewriteEngine implements MeasuredTransformation
                     if (index != 0) composed++;
                 }
             }
-            var distinct = new LinkedHashMap<RewriteCandidate.Identity, RewriteCandidate>();
-            next.forEach(candidate -> distinct.putIfAbsent(candidate.identity(), candidate));
-            duplicates = Math.addExact(duplicates, next.size() - distinct.size());
-            current = List.copyOf(distinct.values());
+            current = retainStageCandidates(next, index);
+            duplicates = Math.addExact(duplicates, next.size() - current.size());
             if (current.isEmpty()) break;
         }
         return new TransformationBatch(current.stream().map(candidate -> candidate.withOriginNodeId(programId).toTransformation()).toList(),
             new TransformationWorkMetrics(1, 0, calls, emitted, composed, 0, 0, 0, 0, 0, 0, 0, 0, duplicates));
+    }
+
+    private List<RewriteCandidate> retainStageCandidates(List<RewriteCandidate> candidates, int index) {
+        // The interpreter composes every first-Source prefix before deduplicating a Sequence stage.
+        if (index == 0 && sources.size() > 1) return List.copyOf(candidates);
+        var distinct = new LinkedHashMap<RewriteCandidate.Identity, RewriteCandidate>();
+        candidates.forEach(candidate -> distinct.putIfAbsent(candidate.identity(), candidate));
+        return List.copyOf(distinct.values());
     }
 }
