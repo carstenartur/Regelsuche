@@ -21,7 +21,8 @@ import java.util.Objects;
  * exact theory. The frozen BudgetedSource protocol retains its separate entry.</p>
  */
 public final class RewriteProgramInterpreter {
-    private static final Comparator<Transformation> TRANSFORMATION_ORDER =
+    // Shared with compiled Source/Sequence execution, including the final kind tie-breaker.
+    static final Comparator<Transformation> TRANSFORMATION_ORDER =
         Comparator.comparing(Transformation::rule)
             .thenComparing(Transformation::transformedExpression)
             .thenComparing(Transformation::applicationKey)
