@@ -379,6 +379,45 @@
     - regelsuche-math-sympy/src/jmh/**/*Factorization*
   tags: [polynomial, factorization, hensel, zassenhaus, sympy]
 
+- id: exact-matrix-representation
+  label: "Exact matrix preparation and representation replay"
+  description: "Forms exact affine systems with explicit coordinate roles, prepares bounded source/catalog matrix products and blocks, verifies ordered operator identities and concrete vector replay, and exposes separately profiled Workbench/CLI evidence with exact RREF and guarded eigenproblem consequences."
+  modules: [regelsuche-core, regelsuche-math-algorithms, regelsuche-search, app]
+  ownerModules: [regelsuche-math-algorithms]
+  typePatterns:
+    - 'RepresentationBridge'
+    - 'RepresentationPreparation'
+    - 'MatrixPreparation*'
+    - 'MatrixRepresentationBridge*'
+    - 'ExactMatrix*'
+    - 'MatrixOperatorRules'
+    - 'ExactLinearSystem*'
+    - 'ExactLinearSolutionConsequence'
+    - 'ExactRrefSolver'
+    - 'LinearSystemRepresentationBridge'
+    - 'SymbolicLinearSystem*'
+    - 'EigenproblemRepresentation*'
+    - 'BoundedCharacteristicPolynomialSolver'
+    - 'DirectScalarEliminationSolver'
+  testPatterns:
+    - 'MatrixPreparationTest'
+    - 'MatrixRepresentation*Test'
+    - 'TypedRepresentationPreparationTest'
+    - 'ExactLinearSystem*Test'
+    - 'ExactRrefSolverTest'
+    - 'SymbolicLinearSystem*Test'
+    - 'EigenproblemRepresentation*Test'
+    - 'BoundedCharacteristicPolynomialSolverTest'
+    - 'DirectScalarEliminationSolverTest'
+  docPatterns:
+    - docs/matrix-operator-preparation.md
+    - docs/equation-system-matrix-representation.md
+    - docs/symbolic-eigenproblem-representation.md
+  evidenceTypes:
+    - validation-evidence
+    - ui-evidence
+  tags: [matrix, linear-algebra, representation, ordered-operators, replay, reproducibility]
+
 - id: schematic-exact-plan-replay
   label: "Schematic exact-plan resolution, replay and budgeted source"
   description: "Creates content-addressed schematic proof plans, resolves finite polynomial coefficient and sign holes exhaustively, replays complete plan runs under bound solver and resolver revisions, and exposes one explicitly selected verifier-owned result through a non-primitive budgeted exact-theory source."

@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "unknowns"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.matrix-preparation-request/v1"
+    },
+    "equations": {
+      "type": "string",
+      "maxLength": 65536
+    },
+    "unknowns": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$"
+      }
+    },
+    "profile": {
+      "type": "string",
+      "enum": [
+        "RECOGNITION_ONLY_V1",
+        "SAFE_PREPARED_REPRESENTATION_V1",
+        "EXPERIMENTAL_OPERATOR_V1"
+      ],
+      "default": "SAFE_PREPARED_REPRESENTATION_V1"
+    },
+    "maxWorkUnits": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000,
+      "default": 200000
+    },
+    "catalog": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "entries"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$"
+          },
+          "entries": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              }
+            }
+          },
+          "inverseWitness": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 16,
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              }
+            }
+          }
+        }
+      }
+    },
+    "operatorExpressions": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      }
+    },
+    "eigenvalueParameter": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "nonZeroVector": {
+      "type": "boolean",
+      "default": false
+    },
+    "matrixExpression": {
+      "type": "string",
+      "maxLength": 4096
+    },
+    "rightHandSide": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "required": [
+        "equations"
+      ],
+      "properties": {
+        "equations": {
+          "minLength": 1
+        },
+        "matrixExpression": {
+          "maxLength": 0
+        },
+        "rightHandSide": {
+          "maxItems": 0
+        }
+      }
+    },
+    {
+      "required": [
+        "matrixExpression",
+        "rightHandSide"
+      ],
+      "properties": {
+        "matrixExpression": {
+          "minLength": 1
+        },
+        "equations": {
+          "maxLength": 0
+        },
+        "rightHandSide": {
+          "minItems": 1
+        }
+      }
+    }
+  ]
+}

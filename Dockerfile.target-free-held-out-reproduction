@@ -4,7 +4,8 @@ WORKDIR /workspace
 COPY . .
 RUN chmod +x ./gradlew \
     && ./gradlew --no-daemon --no-configuration-cache \
-        :regelsuche-discovery:classes --console=plain
+        :regelsuche-discovery:classes \
+        :regelsuche-math-algorithms:classes --console=plain
 
 FROM build AS target-free-held-out-reproduction
 ARG REGELSUCHE_REPOSITORY_REVISION

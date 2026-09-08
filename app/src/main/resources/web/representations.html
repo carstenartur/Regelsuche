@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Alternative Darstellungen – Regelsuche</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="representations.css">
+    <script defer src="representations.js"></script>
+</head>
+<body class="representation-workbench">
+<header><div class="brand"><a href="/">← Regelsuche Workbench</a>
+    <h1>Alternative Darstellungen</h1>
+    <p>Matrixstrukturen erkennen, ihre Zuordnung prüfen und den Rechenweg erneut ausführen.</p>
+</div></header>
+<main>
+    <form id="representationForm" class="card">
+        <div class="representation-grid">
+            <label class="field"><span>Beispiel</span><select id="representationExample">
+                <option value="hidden">Wiederverwendete lineare Teilausdrücke</option>
+                <option value="blocks">Unabhängige Blöcke</option>
+                <option value="identity">Identität plus Operator</option>
+                <option value="eigen">Eigenproblem mit Parametern</option>
+                <option value="matrix">Explizite Matrixgleichung</option>
+                <option value="operator">Geordnete Distributivität (experimentell)</option>
+            </select></label>
+            <label class="field"><span>Eingabe</span><select id="representationInputKind">
+                <option value="scalar">Skalare Gleichungen</option><option value="matrix">Matrixgleichung aus dem Katalog</option>
+            </select></label>
+            <label class="field"><span>Vorbereitung</span><select id="representationProfile">
+                <option value="RECOGNITION_ONLY_V1">Nur erkennen</option>
+                <option value="SAFE_PREPARED_REPRESENTATION_V1" selected>Exakte Vorbereitung</option>
+                <option value="EXPERIMENTAL_OPERATOR_V1">Operator-Experimente</option>
+            </select></label>
+        </div>
+        <label class="field"><span id="representationSourceLabel">Gleichungen, getrennt durch Semikolon oder Zeilenumbruch</span>
+            <textarea id="representationSource" rows="3" required>2*(x+y)+3*(x-y)=5;
+(x+y)+4*(x-y)=6</textarea>
+        </label>
+        <div class="representation-grid">
+            <label class="field"><span>Unbekannte in der gewünschten Reihenfolge</span><input id="representationCoordinates" value="x, y" required></label>
+            <label class="field" id="representationRhsField" hidden><span>Rechte Seite, mit Semikolon getrennt</span><input id="representationRhs" value="5; 6"></label>
+            <label class="field"><span>Arbeitsbudget</span><input id="representationBudget" type="number" min="0" max="1000000" value="200000" required></label>
+        </div>
+        <details id="representationDeclarations">
+            <summary>Parameter, bekannte Matrizen und Operatoren</summary>
+            <p>Alle nicht als Unbekannte deklarierten Symbole sind skalare Parameter. Namen begründen keine physikalische Bedeutung.</p>
+            <div class="representation-grid">
+                <label class="field"><span>Eigenwertparameter (optional)</span><input id="representationEigenvalue" placeholder="lambda"></label>
+                <label class="field"><span>Eigenvektor-Annahme</span><span><input id="representationNonzero" type="checkbox"> Der gesamte Vektor ist ungleich null.</span></label>
+            </div>
+            <label class="field"><span>Sichtbarer Matrixkatalog (JSON, exakte Einträge als Zeichenketten)</span><textarea id="representationCatalog" rows="4" spellcheck="false">[]</textarea></label>
+            <p class="hint">Beispiel: [{"name":"P","entries":[["2","3"],["1","4"]]}]. Eine inverse Matrix benötigt zusätzlich einen exakt geprüften <code>inverseWitness</code>.</p>
+            <label class="field"><span>Operator-Ausdrücke, eine Zeile je Vorschlag (experimentelles Profil)</span><textarea id="representationOperators" rows="2" placeholder="P*(Q+I(2))"></textarea></label>
+        </details>
+        <button type="submit" id="representationAnalyze">Darstellungen prüfen</button>
+    </form>
+    <p id="representationStatus" role="status" aria-live="polite"></p>
+    <div class="representation-actions">
+        <button id="representationReplay" disabled>Gesamten Replay erneut prüfen</button>
+        <button id="representationExport" disabled>Nachweise als JSON speichern</button>
+        <label class="field"><span>Gespeicherte Nachweise laden und prüfen</span><input id="representationImport" type="file" accept=".json,application/json"></label>
+    </div>
+    <section id="representationResults" aria-label="Geprüfte Darstellungen"></section>
+</main>
+</body>
+</html>

@@ -40,6 +40,17 @@ import java.util.Set;
  * rather than ordinary non-applicability.</p>
  */
 public final class UnifiedRulePreparationCoordinator {
+    /** Typed matrix/system principals retain their relation through concrete replay. */
+    public static <S, T, C, R, D> de.regelsuche.representation.RepresentationPreparation.Outcome<T, C, R, D>
+            prepareRepresentation(S source,
+                de.regelsuche.representation.RepresentationBridge<S, T, C> bridge,
+                Set<de.regelsuche.representation.RepresentationBridge.Relation> acceptedRelations,
+                de.regelsuche.representation.RepresentationBridge<T, R, D> principal,
+                de.regelsuche.representation.RepresentationBridge.Budget budget) {
+        return de.regelsuche.representation.RepresentationPreparation.analyze(
+            source, bridge, acceptedRelations, principal, budget);
+    }
+
     public static final String COORDINATOR_ID =
         "regelsuche.unified-safe-rule-preparation-coordinator/v1";
     private static final String EXACT_REGISTRY_INVENTORY_REVISION =

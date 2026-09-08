@@ -19,6 +19,15 @@ import java.util.Objects;
  * token by token and are never assembled into a generic request map.</p>
  */
 final class WorkbenchRequestBodies {
+    de.regelsuche.math.algorithms.linalg.MatrixPreparation.Request readMatrixPreparation(HttpExchange exchange)
+            throws IOException {
+        return de.regelsuche.math.algorithms.linalg.MatrixPreparationJson.readRequest(json.readObject(exchange));
+    }
+
+    java.util.Map<String, Object> readMatrixRepresentationArtifact(HttpExchange exchange) throws IOException {
+        return json.readObject(exchange);
+    }
+
     private final StreamingJsonRequestBody json;
 
     WorkbenchRequestBodies(StreamingJsonRequestBody json) {

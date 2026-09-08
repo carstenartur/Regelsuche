@@ -1,0 +1,27 @@
+.representation-workbench main { max-width: 1160px; margin: 0 auto; padding: 1.5rem; }
+.representation-workbench header { position: static; }
+.representation-workbench textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace; line-height: 1.6; }
+.representation-workbench .field { min-width: 0; margin-bottom: 1rem; }
+.representation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+.representation-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin: 1rem 0; }
+.representation-card { margin: 1.2rem 0; padding: 1.4rem; }
+.representation-card h2, .representation-card h3 { margin-top: 0; }
+.representation-card pre { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
+.representation-card .formula { font-size: 1.1rem; font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+.representation-card dl { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, 3fr); gap: .5rem 1rem; }
+.representation-card dt { font-weight: 600; }
+.representation-card dd { margin: 0; overflow-wrap: anywhere; }
+.representation-matrix { overflow: auto; padding: .4rem 0; max-width: 100%; }
+.representation-matrix-panel { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 1.5rem; }
+.representation-matrix-panel > dl { flex-basis: 100%; }
+.representation-matrix table { width: auto; border-left: 2px solid currentColor; border-right: 2px solid currentColor; }
+.representation-matrix td { padding: .45rem .8rem; text-align: center; font-family: ui-monospace, monospace; white-space: nowrap; }
+.representation-mapping { overflow: auto; }
+.representation-mapping table { width: 100%; }
+.representation-mapping td, .representation-mapping th { padding: .6rem; text-align: left; vertical-align: top; }
+.representation-mapping td { overflow-wrap: anywhere; }
+.representation-badge { display: inline-block; padding: .2rem .5rem; background: #e1f4eb; color: #155b3c; border-radius: .3rem; margin: 0 .5rem .5rem 0; }
+.representation-workbench [hidden] { display: none !important; }
+.representation-card details { margin-top: .8rem; }
+.representation-card summary { cursor: pointer; }
+@media (max-width: 560px) { .representation-workbench main { padding: .7rem; } .representation-card dl { grid-template-columns: 1fr; } }
