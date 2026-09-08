@@ -25,48 +25,21 @@ public final class TeachingFriendlinessCost implements CostModel {
     @Override
     public int cost(String expression, Expr parsedAst, ExpressionScore score) {
         if (parsedAst == null) {
-            return Math.max(0, score.operatorCount() + score.nestingDepth());
+            return (int) Math.clamp((long) score.operatorCount() + score.nestingDepth(), 0, Integer.MAX_VALUE);
         }
-        int base = baseCost(parsedAst);
-        int depth = depth(parsedAst);
+        int base = StructuralCostModel.countOperators(parsedAst);
+        int depth = StructuralCostModel.depth(parsedAst, 0);
         int largeCoefficients = largeCoefficientPenalty(parsedAst);
         int divisionPenalty = divisionPenalty(parsedAst);
         int advancedFunctionPenalty = advancedFunctionPenalty(parsedAst);
         // depth is squared-ish so small step from 2 → 5 hurts a lot
-        return base + depth * 2 + largeCoefficients + divisionPenalty + advancedFunctionPenalty;
+        return (int) Math.min(Integer.MAX_VALUE, (long) base + depth * 2L
+            + largeCoefficients + divisionPenalty + advancedFunctionPenalty);
     }
 
     @Override
     public String id() {
         return "teaching-friendly";
-    }
-
-    private int baseCost(Expr expression) {
-        if (expression instanceof BinaryExpr binary) {
-            return 1 + baseCost(binary.left()) + baseCost(binary.right());
-        }
-        if (expression instanceof FunctionExpr function) {
-            int total = 1;
-            for (Expr argument : function.arguments()) {
-                total += baseCost(argument);
-            }
-            return total;
-        }
-        return 0;
-    }
-
-    private int depth(Expr expression) {
-        if (expression instanceof BinaryExpr binary) {
-            return 1 + Math.max(depth(binary.left()), depth(binary.right()));
-        }
-        if (expression instanceof FunctionExpr function) {
-            int max = 0;
-            for (Expr argument : function.arguments()) {
-                max = Math.max(max, depth(argument));
-            }
-            return 1 + max;
-        }
-        return 0;
     }
 
     private int largeCoefficientPenalty(Expr expression) {

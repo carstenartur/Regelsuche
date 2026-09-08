@@ -329,29 +329,7 @@ public final class EGraph {
             changed = false;
             for (EClass eclass : classes()) {
                 for (ENode node : eclass.nodes()) {
-                    int nodeCost = costOfNode.applyAsInt(node);
-                    if (nodeCost == Integer.MAX_VALUE) {
-                        continue;
-                    }
-                    long total = nodeCost;
-                    boolean unresolved = false;
-                    for (EClassId childRaw : node.children()) {
-                        EClassId child = unionFind.find(childRaw);
-                        Integer childCost = bestCost.get(child);
-                        if (childCost == null || childCost == Integer.MAX_VALUE) {
-                            unresolved = true;
-                            break;
-                        }
-                        total += childCost;
-                        if (total >= Integer.MAX_VALUE) {
-                            unresolved = true;
-                            break;
-                        }
-                    }
-                    if (unresolved) {
-                        continue;
-                    }
-                    int totalInt = (int) Math.min(total, Integer.MAX_VALUE - 1);
+                    int totalInt = extractionCost(node, costOfNode, bestCost);
                     if (totalInt < bestCost.get(eclass.id())) {
                         bestCost.put(eclass.id(), totalInt);
                         bestNode.put(eclass.id(), node);
@@ -367,6 +345,25 @@ public final class EGraph {
                 + " — every node has unresolved children (cyclic class with no base case?)");
         }
         return buildExpression(canonical, bestNode);
+    }
+
+    private int extractionCost(ENode node, java.util.function.ToIntFunction<ENode> costOfNode,
+            Map<EClassId, Integer> bestCost) {
+        long total = costOfNode.applyAsInt(node);
+        if (total == Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        for (EClassId child : node.children()) {
+            Integer cost = bestCost.get(unionFind.find(child));
+            if (cost == null || cost == Integer.MAX_VALUE) {
+                return Integer.MAX_VALUE;
+            }
+            total += cost;
+            if (total >= Integer.MAX_VALUE) {
+                return Integer.MAX_VALUE;
+            }
+        }
+        return (int) Math.min(total, Integer.MAX_VALUE - 1);
     }
 
     // --- internal -----------------------------------------------------------

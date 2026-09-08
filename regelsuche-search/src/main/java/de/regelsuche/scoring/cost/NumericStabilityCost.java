@@ -27,26 +27,12 @@ public final class NumericStabilityCost implements CostModel {
         if (parsedAst == null) {
             return boundedCost((long) score.operatorCount() + score.nestingDepth());
         }
-        return boundedCost((long) baseCost(parsedAst) + instabilityPenalty(parsedAst));
+        return boundedCost((long) StructuralCostModel.countOperators(parsedAst) + instabilityPenalty(parsedAst));
     }
 
     @Override
     public String id() {
         return "numeric-stability";
-    }
-
-    private int baseCost(Expr expression) {
-        if (expression instanceof BinaryExpr binary) {
-            return boundedCost(1L + baseCost(binary.left()) + baseCost(binary.right()));
-        }
-        if (expression instanceof FunctionExpr function) {
-            long total = 1;
-            for (Expr argument : function.arguments()) {
-                total += baseCost(argument);
-            }
-            return boundedCost(total);
-        }
-        return 0;
     }
 
     private int instabilityPenalty(Expr expression) {
