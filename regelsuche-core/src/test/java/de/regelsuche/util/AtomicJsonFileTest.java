@@ -100,4 +100,17 @@ class AtomicJsonFileTest {
         AtomicJsonFile.writeUtf8(relative, "relative payload");
         assertEquals("relative payload", Files.readString(target));
     }
+
+    @Test
+    void usesNormalFileCreationPermissions(@TempDir Path tmp) throws IOException {
+        Path reference = tmp.resolve("ordinary.json");
+        Path target = tmp.resolve("atomic.json");
+        Files.writeString(reference, "ordinary payload");
+        AtomicJsonFile.writeUtf8(target, "atomic payload");
+        assertEquals("atomic payload", Files.readString(target));
+        if (Files.getFileStore(tmp).supportsFileAttributeView("posix")) {
+            assertEquals(Files.getPosixFilePermissions(reference), Files.getPosixFilePermissions(target),
+                "container reports must retain the normal creation permissions for host readers");
+        }
+    }
 }

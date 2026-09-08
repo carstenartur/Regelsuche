@@ -6,6 +6,7 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.UUID;
 
 /**
  * Small helper that centralises the "write-tmp-then-atomic-move" idiom used
@@ -37,7 +38,10 @@ public final class AtomicJsonFile {
     public static void writeUtf8(Path target, String contents) throws IOException {
         Path destination = target.toAbsolutePath();
         Files.createDirectories(destination.getParent());
-        Path tmp = Files.createTempFile(destination.getParent(), ".json-write-", ".tmp");
+        // A regular CREATE_NEW file retains the filesystem's usual permissions
+        // and umask. createTempFile defaults to owner-only access on POSIX,
+        // which makes container-produced reports unreadable to host consumers.
+        Path tmp = Files.createFile(destination.getParent().resolve(".json-write-" + UUID.randomUUID() + ".tmp"));
         try {
             Files.writeString(tmp, contents, StandardCharsets.UTF_8);
             replace(tmp, destination);
