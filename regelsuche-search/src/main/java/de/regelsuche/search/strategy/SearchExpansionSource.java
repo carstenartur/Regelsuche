@@ -13,6 +13,7 @@ import de.regelsuche.transform.ExecutionWork;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationWorkMetrics;
 import de.regelsuche.transform.MeasuredTransformationEngine;
+import de.regelsuche.transform.PrimitiveBudgetedTransformationEngine;
 import java.util.List;
 import java.util.Objects;
 
@@ -41,7 +42,9 @@ public sealed interface SearchExpansionSource {
             if (engine instanceof ProgrammedTransformationEngine programmed) {
                 return programmed.execute(expression);
             }
-            var batch = engine.transformMeasured(expression);
+            var batch = engine instanceof PrimitiveBudgetedTransformationEngine budgeted
+                ? budgeted.transformMeasured(expression, remainingPathBudget.primitiveRewriteUnits())
+                : engine.transformMeasured(expression);
             var candidates = batch.transformations().stream()
                 .map(step -> new RewriteCandidate("search-source", expression,
                     step.transformedExpression(), List.of(step))).toList();

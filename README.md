@@ -17,6 +17,7 @@ können als neue Strategien wiederverwendet werden.
 [Workbench](docs/web-workbench.md) ·
 [Discovery Gallery](docs/demo-gallery.md) ·
 [Java Discovery SDK](docs/java-discovery-sdk.md) ·
+[Strategien lernen und vergleichen](docs/trace-strategy-transfer.md) ·
 [Aktueller Forschungsstand](docs/discovery-status.md) ·
 [Architektur](docs/architecture.md) ·
 [Unabhängig reproduzieren](docs/independent-reproduction.md)
@@ -94,6 +95,26 @@ Jede spätere Anwendung löst ihre Koeffizienten neu und prüft die erzeugten
 Schritte erneut. Die gemeinsamen Vorlagen bewahren Herkunft, Anwendbarkeit und
 Trainingsausschlüsse. Die Beispiele derselben quadratischen Familie belegen
 noch keine Übertragung auf andere Familien oder einen allgemeinen Effizienzgewinn.
+
+Der [ausführbare Strategievergleich](docs/trace-strategy-transfer.md) lernt
+auch verzweigende Regelfolgen aus zielausdrucksfreien Suchwegen. Er vergleicht
+deren Anwendung auf neue Zusammensetzungen mit denselben Einzelregeln und
+einer veränderten Regelreihenfolge. Die HTML-Demo zeigt jeden primitiven Schritt.
+Der aktuelle Entwicklungsbestand liefert gleiche Ergebnisse bei **mehr
+Sucharbeit** mit dem gelernten Programm; alle Vergleichszeilen bleiben sichtbar.
+
+Die [gezielte Fortsetzung gelernter Strategien](docs/conditional-strategy-dispatch.md)
+behebt einen Teil dieser Mehrarbeit: Sie nutzt bereits erzeugte erste Schritte,
+kompiliert lineare Fortsetzungen einmal und lernt auf getrenntem TRAIN, wann
+diese nützlich sind. Auf 288 neuen Entwicklungsaufgaben benötigt sie bei gleicher
+Ergebnisqualität insgesamt **1,4 % weniger gezählte Arbeit als die starke
+Greedy-Kontrolle**. Die einmaligen Lernkosten sind auf diesem Bestand noch nicht
+eingespielt. Die neue Demo zeigt auch irreführende Hinweise und teurere Einzelfälle.
+
+Die [Regelbildung prüft kürzere primitive Wege](docs/primitive-trace-minimality.md),
+bevor sie eine Umformungsfolge übernimmt. Ein beobachteter 20-Schritt-Umweg darf
+dadurch keinen Wert von 20 erhalten, wenn zwei Schritte genügen. Ungeklärte
+Minimalität führt zur Ablehnung; Nachweise und Prüfkosten werden gespeichert.
 
 ## Workbench statt Konsolenausgabe
 

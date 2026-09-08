@@ -48,6 +48,24 @@ tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport')
 }
 
+tasks.register('strategyTransferDemo', JavaExec) {
+    group = 'application'
+    description = 'Learns a bounded rule schedule and writes a replayable development comparison with HTML.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.evolution.TraceStrategyTransferExample'
+    args layout.buildDirectory.dir('reports/strategy-transfer').get().asFile.absolutePath
+}
+
+tasks.register('strategyDispatchDemo', JavaExec) {
+    group = 'application'
+    description = 'Writes the fixed comparison of trained conditional continuations with strong primitive controls.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.evolution.TraceStrategyDispatchExample'
+    args layout.buildDirectory.dir('reports/strategy-dispatch').get().asFile.absolutePath
+}
+
 def evolutionStudyOutput = layout.buildDirectory.dir('reports/evolution-study-plan')
 def writeEvolutionStudyPlan = tasks.register('writeEvolutionStudyPlan', JavaExec) {
     group = 'verification'
