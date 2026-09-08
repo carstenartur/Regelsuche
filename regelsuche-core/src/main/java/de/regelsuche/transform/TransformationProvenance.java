@@ -55,10 +55,13 @@ public sealed interface TransformationProvenance permits TransformationProvenanc
             if (primitiveRuleIds == null || primitiveRuleIds.isEmpty()) {
                 throw new IllegalArgumentException("primitive provenance requires a real nonempty rule sequence");
             }
-            primitiveRuleIds = primitiveRuleIds.stream().map(value -> {
+            boolean needsTrimming = false;
+            for (String value : primitiveRuleIds) {
                 if (value == null || value.isBlank()) throw new IllegalArgumentException("blank primitive rule");
-                return value.trim();
-            }).toList();
+                needsTrimming |= !value.equals(value.trim());
+            }
+            primitiveRuleIds = needsTrimming ? primitiveRuleIds.stream().map(String::trim).toList()
+                : List.copyOf(primitiveRuleIds);
             if (applicationKey == null || applicationKey.isBlank()) {
                 throw new IllegalArgumentException("blank primitive application identity");
             }

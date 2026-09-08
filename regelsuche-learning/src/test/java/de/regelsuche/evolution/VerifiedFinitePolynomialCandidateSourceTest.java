@@ -564,6 +564,22 @@ class VerifiedFinitePolynomialCandidateSourceTest {
         assertEquals(work(evidence), result.workMetrics().candidateWork().exactTheoryWorkUnits());
     }
 
+    @Test
+    void primitiveTextKeyCannotCollideWithExactTheoryProvenanceDuringDeduplication() {
+        var evidence = unitEvidence("mixed-kind-collision");
+        var theory = new VerifiedFinitePolynomialTransformationEngine(evidence)
+            .verifiedTransformations(evidence.data().sourceExpression()).getFirst();
+        var collidingTextKey = theory.applicationKey() + "\u0000" + theory.provenance().contentHash();
+        var primitive = new Transformation("primitive", theory.transformedExpression(), theory.kind(),
+            false, 0, true, collidingTextKey);
+        var program = choice("structural-identities", ordinaryTheory("theory", evidence),
+            RewritePrograms.source("primitive", input -> List.of(primitive)));
+        var result = interpreter.executeWithWorkBudget(program, evidence.data().sourceExpression(),
+            new PathBudget(1, work(evidence)));
+        assertEquals(2, result.candidates().size());
+        assertEquals(0L, result.workMetrics().duplicateCandidatesDropped());
+    }
+
     private static VerifiedCandidateEvidence unitEvidence(String id) {
         return prepare(id, "x*x", "(${unit}*x)^2",
             List.of(HoleDomain.integerRange("unit", 1, 1)), 1).evidence().getFirst();

@@ -132,7 +132,13 @@ public record RewriteCandidate(
         );
     }
 
-    String fingerprint() {
+    Identity identity() {
+        return new Identity(inputExpression, outputExpression, provenance());
+    }
+
+    record Identity(String inputExpression, String outputExpression, TransformationProvenance provenance) {}
+
+    String orderingKey() {
         return outputExpression + "\u0000"
             + steps.stream().map(Transformation::applicationKey)
                 .reduce((left, right) -> left + "\u0001" + right)

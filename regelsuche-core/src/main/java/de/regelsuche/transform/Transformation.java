@@ -134,7 +134,10 @@ public record Transformation(
             throw new IllegalArgumentException(
                 "primitiveRuleIds and provenance must be present");
         }
-        primitiveRuleIds = primitiveRuleIds.stream()
+        List<String> retainedRules = provenance.primitiveRuleIds();
+        // The common constructor already normalized and froze this list in
+        // primitive provenance. Reuse it instead of allocating another stream/list.
+        primitiveRuleIds = primitiveRuleIds.equals(retainedRules) ? retainedRules : primitiveRuleIds.stream()
             .map(value -> {
                 if (value == null || value.isBlank()) {
                     throw new IllegalArgumentException(
@@ -143,9 +146,20 @@ public record Transformation(
                 return value.trim();
             })
             .toList();
-        if (!primitiveRuleIds.equals(provenance.primitiveRuleIds())) {
+        if (!primitiveRuleIds.equals(retainedRules)) {
             throw new IllegalArgumentException("primitive rule list differs from provenance");
         }
+        requireBoundProvenance(provenance, transformedExpression, applicationKey, assumptions,
+            equivalencePreservingByConstruction);
+        if (!(provenance instanceof TransformationProvenance.PrimitiveRewriteSequence)
+                && provenance.work().exactTheorySteps() > 0) {
+            applicationKey = "execution:" + provenance.contentHash();
+        }
+    }
+
+    private static void requireBoundProvenance(TransformationProvenance provenance,
+            String transformedExpression, String applicationKey, List<String> assumptions,
+            boolean equivalencePreservingByConstruction) {
         if (provenance instanceof TransformationProvenance.PrimitiveRewriteSequence primitive
                 && !primitive.applicationKey().equals(applicationKey)) {
             throw new IllegalArgumentException("primitive application identity differs from provenance");
@@ -165,10 +179,6 @@ public record Transformation(
                         .allMatch(Transformation::equivalencePreservingByConstruction)) {
                 throw new IllegalArgumentException("transformation differs from its retained sequence");
             }
-        }
-        if (!(provenance instanceof TransformationProvenance.PrimitiveRewriteSequence)
-                && provenance.work().exactTheorySteps() > 0) {
-            applicationKey = "execution:" + provenance.contentHash();
         }
     }
 

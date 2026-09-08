@@ -446,7 +446,7 @@ public final class RewriteProgramInterpreter {
         context.priorityCandidatesOrdered(candidates.size());
         candidates.sort(
             prioritize.comparator()
-                .thenComparing(RewriteCandidate::fingerprint)
+                .thenComparing(RewriteCandidate::orderingKey)
         );
         return new Evaluation(candidates, evaluated.complete());
     }
@@ -522,9 +522,9 @@ public final class RewriteProgramInterpreter {
         List<RewriteCandidate> candidates,
         Context context
     ) {
-        Map<String, RewriteCandidate> distinct = new LinkedHashMap<>();
+        Map<RewriteCandidate.Identity, RewriteCandidate> distinct = new LinkedHashMap<>();
         for (RewriteCandidate candidate : candidates) {
-            distinct.putIfAbsent(candidate.fingerprint(), candidate);
+            distinct.putIfAbsent(candidate.identity(), candidate);
         }
         context.duplicateCandidatesDropped(candidates.size() - distinct.size());
         return List.copyOf(distinct.values());
