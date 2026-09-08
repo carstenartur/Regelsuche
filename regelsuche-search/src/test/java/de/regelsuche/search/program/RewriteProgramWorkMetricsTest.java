@@ -98,6 +98,22 @@ class RewriteProgramWorkMetricsTest {
         assertEquals(2, execution.workMetrics().prunedCandidates());
     }
 
+    @Test
+    void workAwareSourceKeepsDelegatedMechanicsAndTheFrozenPrimitiveScalar() {
+        var engine = de.regelsuche.transform.MeasuredTransformationEngines.counting(
+            exact("a", transformation("r", "b")));
+        var program = RewritePrograms.source("measured", engine);
+        var interpreter = new RewriteProgramInterpreter();
+        var ordinary = interpreter.execute(program, "a");
+        var budgeted = interpreter.executeWithWorkBudget(program, "a",
+            new BudgetedRewriteProgramExecution.PathBudget(1, 0));
+        assertEquals(ordinary.candidates(), budgeted.candidates());
+        assertEquals(ordinary.workMetrics().totalWorkUnits() + 3, budgeted.workMetrics().totalWorkUnits());
+        assertEquals(new de.regelsuche.transform.ExecutionWork(1, 0, 0), budgeted.workMetrics().candidateWork());
+        assertEquals(de.regelsuche.transform.ExecutionWork.ZERO, ordinary.workMetrics().candidateWork());
+        assertEquals(ordinary.workMetrics().totalWorkUnits(), ordinary.workMetrics().totalWorkUnitsV2());
+    }
+
     private static TransformationEngine exact(
         String input,
         Transformation output

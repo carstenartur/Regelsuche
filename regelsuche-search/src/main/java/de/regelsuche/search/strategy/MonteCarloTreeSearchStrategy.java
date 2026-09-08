@@ -183,7 +183,7 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
 
     private List<SearchState> expand(SearchProblem problem, SearchState parent) {
         List<SearchState> children = new ArrayList<>();
-        for (Transformation transformation : problem.engine().transform(parent.expression())) {
+        for (Transformation transformation : problem.transformations(parent.expression())) {
             if (parent.appliedRuleApplications().contains(transformation.applicationKey())) {
                 continue;
             }
@@ -238,7 +238,7 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
         SearchState current = start;
         double bestImprovement = current.improvement();
         for (int step = 0; step < rolloutDepth; step++) {
-            List<Transformation> options = problem.engine().transform(current.expression());
+            List<Transformation> options = problem.transformations(current.expression());
             if (options.isEmpty()) {
                 break;
             }

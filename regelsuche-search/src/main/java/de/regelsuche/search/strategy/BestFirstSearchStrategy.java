@@ -201,7 +201,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         return orderTransformations(
             problem,
             current,
-            new ArrayList<>(problem.engine().transform(current.expression())),
+            new ArrayList<>(problem.transformations(current.expression())),
             target.enabled(),
             transformation -> target.distance(transformation.transformedExpression()));
     }

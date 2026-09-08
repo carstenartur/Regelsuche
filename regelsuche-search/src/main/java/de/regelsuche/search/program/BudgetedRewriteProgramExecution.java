@@ -36,6 +36,17 @@ public final class BudgetedRewriteProgramExecution {
             }
             return new PathBudget(primitiveRewriteUnits, exactTheoryWorkUnits - used);
         }
+
+        public boolean admits(de.regelsuche.transform.ExecutionWork work) {
+            return work.primitiveRewrites() <= primitiveRewriteUnits
+                && work.exactTheoryWorkUnits() <= exactTheoryWorkUnits;
+        }
+
+        public PathBudget after(de.regelsuche.transform.ExecutionWork work) {
+            if (!admits(work)) throw new IllegalArgumentException("path exceeds its primitive/theory authority");
+            return new PathBudget(primitiveRewriteUnits - work.primitiveRewrites(),
+                exactTheoryWorkUnits - work.exactTheoryWorkUnits());
+        }
     }
 
     /** Explicit interpreter ceilings; not a watchdog for arbitrary source code. */

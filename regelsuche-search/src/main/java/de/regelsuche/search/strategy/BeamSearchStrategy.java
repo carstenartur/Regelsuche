@@ -54,7 +54,7 @@ public class BeamSearchStrategy implements SearchStrategy {
                     continue;
                 }
                 int generated = 0;
-                List<Transformation> transformations = new ArrayList<>(problem.engine().transform(current.expression()));
+                List<Transformation> transformations = new ArrayList<>(problem.transformations(current.expression()));
                 transformations.sort(Comparator
                     .comparing(Transformation::rule)
                     .thenComparing(Transformation::transformedExpression)

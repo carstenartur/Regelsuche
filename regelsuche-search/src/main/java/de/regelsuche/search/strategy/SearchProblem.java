@@ -9,6 +9,7 @@ import de.regelsuche.search.memory.SearchMemory;
 import de.regelsuche.search.telemetry.NoOpSearchObserver;
 import de.regelsuche.search.telemetry.SearchObserver;
 import de.regelsuche.transform.TransformationEngine;
+import de.regelsuche.transform.Transformation;
 import java.util.Objects;
 
 public record SearchProblem(
@@ -22,6 +23,10 @@ public record SearchProblem(
     SearchObserver observer,
     SearchTarget target
 ) {
+    /** These legacy strategies have primitive-only budgets and replay. */
+    public java.util.List<Transformation> transformations(String expression) {
+        return Transformation.requirePrimitiveOnly(engine.transform(expression));
+    }
     public SearchProblem {
         Objects.requireNonNull(rootExpression, "rootExpression");
         Objects.requireNonNull(engine, "engine");

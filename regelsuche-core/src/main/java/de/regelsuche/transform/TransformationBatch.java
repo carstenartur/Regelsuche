@@ -18,5 +18,9 @@ public record TransformationBatch(
         workMetrics = workMetrics == null
             ? TransformationWorkMetrics.ZERO
             : workMetrics;
+        Transformation.requirePrimitiveOnly(transformations);
+        if (workMetrics.candidateWork().exactTheorySteps() > 0) {
+            throw new IllegalArgumentException("legacy transformation batches cannot erase exact theory work");
+        }
     }
 }

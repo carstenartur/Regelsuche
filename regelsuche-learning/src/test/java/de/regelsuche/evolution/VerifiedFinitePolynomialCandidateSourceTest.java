@@ -24,6 +24,21 @@ import de.regelsuche.search.program.BudgetedTransformationSource;
 import de.regelsuche.search.program.BudgetedTransformationSourceExecutor;
 import de.regelsuche.search.program.RewriteProgram;
 import de.regelsuche.search.program.RewriteProgramInterpreter;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.ExactTheoryEvidence;
+import de.regelsuche.transform.ExecutionWork;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationProvenance;
+import de.regelsuche.transform.TransformationBatch;
+import de.regelsuche.transform.TransformationWorkMetrics;
+import de.regelsuche.search.program.RewriteCandidate;
+import de.regelsuche.search.program.RewriteExecution;
+import de.regelsuche.search.program.RewriteTraceEvent;
+import de.regelsuche.search.program.RewriteTraceEventType;
+import de.regelsuche.search.program.RewriteTraceLevel;
+import de.regelsuche.search.program.RewritePrograms;
+import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.List;
@@ -338,6 +353,238 @@ class VerifiedFinitePolynomialCandidateSourceTest {
                 .minimumRequiredMathematicalWorkUnits());
         assertEquals(2,
             insufficient.sourceResult().mechanicalWorkUnits());
+    }
+
+
+    @Test
+    void executesRealPrimitiveTheoryPrimitivePathWithCanonicalProvenance() {
+        var evidence = unitEvidence("mixed-path");
+        var result = mixed(evidence, new PathBudget(2, work(evidence)));
+        assertTrue(result.complete());
+        var candidate = result.candidates().getFirst();
+        assertEquals("x ^ 2", candidate.outputExpression());
+        assertEquals(List.of("ast_add_zero_right", "ast_multiply_one_left"), candidate.primitiveRuleIds());
+        assertEquals(new ExecutionWork(2, 1, work(evidence)), candidate.executionWork());
+        var transformation = candidate.toTransformation();
+        assertEquals(candidate.provenance(), transformation.provenance());
+        assertEquals(2, transformation.primitiveStepCount());
+        assertEquals(1L, transformation.exactTheoryStepCount());
+        var sequence = (TransformationProvenance.Sequence) transformation.provenance();
+        var theory = (TransformationProvenance.ExactTheoryStep) sequence.steps().get(1).provenance();
+        assertEquals(evidence.evidenceHash(), theory.evidence().binding().evidenceHash());
+        assertEquals(evidence.toCanonicalJson(), theory.evidence().binding().canonicalEvidenceJson());
+        assertEquals(evidence.data().receiptReference().artifactId(), theory.evidence().binding().receiptArtifactId());
+        assertEquals(evidence.data().planRunReference().artifactId(), theory.evidence().binding().runArtifactId());
+        assertEquals(new PathBudget(1, 0), result.sourceObservations().getLast().availableBudget());
+        assertEquals(candidate.executionWork(), result.workMetrics().candidateWork());
+        assertEquals(result.workMetrics().totalWorkUnits() + 2 + work(evidence), result.workMetrics().totalWorkUnitsV2());
+        assertEquals("regelsuche.rewrite-program-work/v2", result.workRevision());
+    }
+
+    @Test
+    void rejectsBothInsufficientDimensionsBeforeAcceptingAMixedEndpoint() {
+        var evidence = unitEvidence("mixed-short");
+        for (PathBudget budget : List.of(new PathBudget(1, work(evidence)), new PathBudget(2, work(evidence) - 1))) {
+            var result = mixed(evidence, budget);
+            assertFalse(result.complete());
+            assertTrue(result.candidates().isEmpty());
+            var block = result.sourceObservations().getLast();
+            assertFalse(block.admitted());
+            assertFalse(block.availableBudget().admits(block.candidate().executionWork()));
+            assertEquals(work(evidence), result.workMetrics().candidateWork().exactTheoryWorkUnits());
+        }
+    }
+
+    @Test
+    void mixedRepeatRetainsEndpointsAndDoesNotResetEitherWorkDimension() {
+        var evidence = unitEvidence("mixed-repeat");
+        var body = choice("route", primitive("pre", "ast_add_zero_right"), ordinaryTheory("theory", evidence),
+            primitive("post", "ast_multiply_one_left"));
+        var result = interpreter.executeWithWorkBudget(repeat("repeat-mixed", 1, 4, body),
+            "x*x + 0", new PathBudget(1, work(evidence)));
+        assertFalse(result.complete());
+        assertEquals(2, result.candidates().size());
+        assertEquals(new ExecutionWork(1, 1, work(evidence)), result.candidates().getLast().executionWork());
+        var block = result.sourceObservations().getLast();
+        assertEquals("post", block.candidate().originNodeId());
+        assertEquals(new PathBudget(0, 0), block.availableBudget());
+        assertFalse(block.admitted());
+    }
+
+    @Test
+    void mixedFirstApplicableCannotHideAnUnresolvedTheoryAlternative() {
+        var evidence = unitEvidence("mixed-first");
+        var calls = new AtomicInteger();
+        var fallback = RewritePrograms.source("fallback", input -> {
+            calls.incrementAndGet();
+            return List.of(new Transformation("fallback", "x ^ 2"));
+        });
+        var result = interpreter.executeWithWorkBudget(firstApplicable("first-mixed",
+            ordinaryTheory("theory", evidence), fallback), evidence.data().sourceExpression(),
+            new PathBudget(10, work(evidence) - 1));
+        assertFalse(result.complete());
+        assertTrue(result.candidates().isEmpty());
+        assertEquals(0, calls.get());
+    }
+
+    @Test
+    void identicalOutputsKeepDistinctVerifiedEvidenceAndPruningKeepsAllObservedWork() {
+        var first = unitEvidence("mixed-identity-a");
+        var second = unitEvidence("mixed-identity-b");
+        assertEquals(first.data().transformedExpression(), second.data().transformedExpression());
+        assertNotEquals(first.evidenceHash(), second.evidenceHash());
+        var alternatives = choice("two-proofs", ordinaryTheory("a", first), ordinaryTheory("b", second));
+        var budget = new PathBudget(0, Math.max(work(first), work(second)));
+        var all = interpreter.executeWithWorkBudget(alternatives, first.data().sourceExpression(), budget);
+        assertEquals(2, all.candidates().size());
+        assertNotEquals(all.transformations().getFirst().applicationKey(), all.transformations().getLast().applicationKey());
+        var result = interpreter.executeWithWorkBudget(prune("one", alternatives, 1, "declared first"),
+            first.data().sourceExpression(), budget);
+        assertFalse(result.complete());
+        assertEquals(1, result.candidates().size());
+        assertEquals(2, result.sourceObservations().size());
+        assertEquals(work(first) + work(second), result.workMetrics().candidateWork().exactTheoryWorkUnits());
+        assertEquals(List.of(budget, budget), result.sourceObservations().stream()
+            .map(RewriteExecution.SourceObservation::availableBudget).toList());
+        var repeated = choice("same-proof", ordinaryTheory("a", first), ordinaryTheory("b", first));
+        var deduplicated = interpreter.executeWithWorkBudget(repeated, first.data().sourceExpression(), budget);
+        assertEquals(1, deduplicated.candidates().size());
+        assertEquals(2 * work(first), deduplicated.workMetrics().candidateWork().exactTheoryWorkUnits());
+        assertEquals(1L, deduplicated.workMetrics().duplicateCandidatesDropped());
+    }
+
+    @Test
+    void requirementAndOrderingCannotDiscardEvidenceOrResetCandidateWork() {
+        var evidence = unitEvidence("mixed-filter");
+        var ordered = RewritePrograms.prioritize("order", ordinaryTheory("theory", evidence),
+            "output", Comparator.comparing(RewriteCandidate::outputExpression));
+        var filtered = RewritePrograms.require("reject", ordered, "development rejection", candidate -> false);
+        var result = interpreter.executeWithWorkBudget(filtered, evidence.data().sourceExpression(),
+            new PathBudget(0, work(evidence)));
+        assertTrue(result.complete());
+        assertTrue(result.candidates().isEmpty());
+        assertEquals(1, result.sourceObservations().size());
+        assertEquals(work(evidence), result.workMetrics().candidateWork().exactTheoryWorkUnits());
+        assertEquals(1L, result.workMetrics().requirementRejections());
+    }
+
+    @Test
+    void mixedTraceLevelsAreObservationalAndNameExactTheorySeparately() {
+        var evidence = unitEvidence("mixed-trace");
+        RewriteExecution expected = null;
+        for (RewriteTraceLevel level : RewriteTraceLevel.values()) {
+            var events = new ArrayList<RewriteTraceEvent>();
+            var result = interpreter.executeWithWorkBudget(mixedProgram(evidence), "x*x + 0",
+                new PathBudget(2, work(evidence)), level, events::add);
+            if (expected == null) expected = result;
+            assertEquals(expected, result);
+            if (level == RewriteTraceLevel.OFF) assertTrue(events.isEmpty());
+            if (level == RewriteTraceLevel.FULL) {
+                var event = events.stream().filter(value -> value.type() == RewriteTraceEventType.EXACT_THEORY_CANDIDATE)
+                    .findFirst().orElseThrow();
+                assertTrue(event.ruleIds().isEmpty());
+                assertTrue(event.detail().contains(evidence.evidenceHash()));
+                assertTrue(event.detail().contains("EXACT_THEORY_STEP"));
+            }
+        }
+    }
+
+    @Test
+    void evidenceDescriptionsAndCorrectlyHashedProtocolValuesCannotIssueCoreCapabilities() {
+        var evidence = unitEvidence("mixed-forgery");
+        var verified = ExactTheoryEvidence.fromVerified(evidence);
+        for (Object unverified : List.of(evidence.data(), evidence.toCanonicalJson(), evidence.evidenceHash(),
+                verified.binding(), new VerifiedFinitePolynomialCandidateSource(evidence)
+                    .transform(evidence.data().sourceExpression(), work(evidence)).candidates().getFirst())) {
+            assertThrows(IllegalArgumentException.class, () -> ExactTheoryEvidence.fromVerified(unverified));
+        }
+        assertThrows(NullPointerException.class, () -> ExactTheoryEvidence.fromVerified(null));
+        var transformation = Transformation.exactTheory(verified);
+        assertThrows(IllegalArgumentException.class, () -> new RewriteCandidate("forged-source", "y",
+            transformation.transformedExpression(), List.of(transformation)));
+        assertThrows(IllegalArgumentException.class, () -> new Transformation(transformation.rule(), "y",
+            transformation.kind(), true, 0, true, transformation.applicationKey(), List.of(), "exact-theory",
+            "PROJECT", List.of(), transformation.provenance()));
+        assertThrows(IllegalArgumentException.class, () -> new Transformation(transformation.rule(),
+            transformation.transformedExpression(), transformation.kind(), true, 0, true,
+            transformation.applicationKey(), List.of(), "exact-theory", "PROJECT", List.of()));
+    }
+
+    @Test
+    void legacyExecutionAndBatchesCannotTurnVerifiedWorkIntoAFreePrimitiveEdge() {
+        var evidence = unitEvidence("mixed-legacy");
+        var source = new VerifiedFinitePolynomialTransformationEngine(evidence);
+        assertThrows(IllegalArgumentException.class, () -> source.transform(evidence.data().sourceExpression()));
+        var calls = new AtomicInteger();
+        var program = choice("preflight", RewritePrograms.source("ordinary", input -> {
+            calls.incrementAndGet();
+            return List.of();
+        }), ordinaryTheory("theory", evidence));
+        assertThrows(IllegalArgumentException.class, () -> interpreter.execute(program, evidence.data().sourceExpression()));
+        assertEquals(0, calls.get());
+        var result = mixed(evidence, new PathBudget(2, work(evidence)));
+        assertThrows(IllegalArgumentException.class, () -> new TransformationBatch(result.transformations(), result.workMetrics()));
+        assertThrows(IllegalArgumentException.class, () -> new RewriteExecution(result.candidates(), true));
+        assertThrows(IllegalArgumentException.class, () -> new RewriteExecution(result.candidates(), true,
+            TransformationWorkMetrics.ZERO, result.sourceObservations(), result.pathBudget()));
+        assertThrows(IllegalArgumentException.class, () -> new RewriteExecution(result.candidates(), true,
+            TransformationWorkMetrics.ZERO, List.of(), result.pathBudget()));
+    }
+
+    @Test
+    void freshReplayReproducesCanonicalMixedProvenanceAndSourceMismatchEmitsNothing() {
+        var first = unitEvidence("mixed-replay");
+        var replayed = unitEvidence("mixed-replay");
+        var before = mixed(first, new PathBudget(2, work(first))).transformations().getFirst();
+        var after = mixed(replayed, new PathBudget(2, work(replayed))).transformations().getFirst();
+        assertEquals(before, after);
+        assertEquals(before.provenance().contentHash(), after.provenance().contentHash());
+        assertEquals(before.provenance().toCanonicalJson(), after.provenance().toCanonicalJson());
+        var source = new VerifiedFinitePolynomialTransformationEngine(first);
+        assertTrue(source.verifiedTransformations("x^2").isEmpty());
+        assertTrue(source.verifiedTransformations("y*y").isEmpty());
+    }
+
+    @Test
+    void nestedProgramSourceRetainsIncompleteOutcomesEvidenceAndIncomingBudget() {
+        var evidence = unitEvidence("mixed-nested");
+        var nested = new de.regelsuche.search.program.ProgrammedTransformationEngine(
+            choice("nested-choice", ordinaryTheory("theory", evidence),
+                RewritePrograms.source("too-long", input -> List.of(new Transformation("macro", "y",
+                    de.regelsuche.transform.RewriteKind.NORMALIZE, false, 0, true, "macro@y", List.of(),
+                    "core", "PROJECT", List.of("one", "two"))))));
+        var program = sequence("outer", primitive("pre", "ast_add_zero_right"),
+            RewritePrograms.source("nested", nested), primitive("post", "ast_multiply_one_left"));
+        var result = interpreter.executeWithWorkBudget(program, "x*x + 0", new PathBudget(2, work(evidence)));
+        assertFalse(result.complete());
+        assertEquals("x ^ 2", result.candidates().getFirst().outputExpression());
+        assertEquals(new ExecutionWork(2, 1, work(evidence)), result.candidates().getFirst().executionWork());
+        assertTrue(result.sourceObservations().stream().anyMatch(observation -> !observation.admitted()
+            && observation.availableBudget().primitiveRewriteUnits() == 1));
+        assertEquals(work(evidence), result.workMetrics().candidateWork().exactTheoryWorkUnits());
+    }
+
+    private static VerifiedCandidateEvidence unitEvidence(String id) {
+        return prepare(id, "x*x", "(${unit}*x)^2",
+            List.of(HoleDomain.integerRange("unit", 1, 1)), 1).evidence().getFirst();
+    }
+
+    private static RewriteProgram ordinaryTheory(String id, VerifiedCandidateEvidence evidence) {
+        return RewritePrograms.source(id, new VerifiedFinitePolynomialTransformationEngine(evidence));
+    }
+
+    private static RewriteProgram primitive(String id, String ruleId) {
+        return RewritePrograms.source(id, new AstRewriteTransformationEngine(AstRewriteTransformationEngine.defaultRules()
+            .stream().filter(rule -> rule.id().equals(ruleId)).toList()));
+    }
+
+    private static RewriteProgram mixedProgram(VerifiedCandidateEvidence evidence) {
+        return sequence("mixed", primitive("pre", "ast_add_zero_right"), ordinaryTheory("theory", evidence),
+            primitive("post", "ast_multiply_one_left"));
+    }
+
+    private RewriteExecution mixed(VerifiedCandidateEvidence evidence, PathBudget budget) {
+        return interpreter.executeWithWorkBudget(mixedProgram(evidence), "x*x + 0", budget);
     }
 
     private static VerifiedCandidateEvidence signEvidence() {

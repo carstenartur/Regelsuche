@@ -61,7 +61,7 @@ public class RandomMonteCarloSearchStrategy implements SearchStrategy {
                 continue;
             }
             List<Transformation> transformations = new ArrayList<>(
-                problem.engine().transform(current.expression()));
+                problem.transformations(current.expression()));
             transformations.sort(Comparator
                 .comparing(Transformation::rule)
                 .thenComparing(Transformation::transformedExpression)

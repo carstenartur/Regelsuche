@@ -553,6 +553,7 @@ public final class BoundedReachabilityOracle {
                 throw new IllegalStateException(
                     "transformation engine returned null");
             }
+            Transformation.requirePrimitiveOnly(transformations);
             List<Candidate> result = new ArrayList<>();
             for (Transformation transformation : transformations) {
                 Objects.requireNonNull(
