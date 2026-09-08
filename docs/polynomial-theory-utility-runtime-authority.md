@@ -34,6 +34,15 @@ leerem Backend-Report bleibt so samt verbrauchter Arbeit messbar. Ohne genug
 Arbeit für Dispatch und mindestens eine rohe Backend-Einheit entsteht kein
 Request.
 
+Lehnt die gemeinsame Autorität bereits den Dispatch ab, liefert die Pipeline
+`BUDGET_INCONCLUSIVE` mit der vollständig erhaltenen Extraktionsarbeit; Engine
+und Verifier werden nicht aufgerufen. Eine Ablehnung der Ergebnisledger nach
+dem synchronen Aufruf ist dagegen ein Bruch der zugesicherten konservativen
+Obergrenze. Die Pipeline meldet dafür
+`OPAQUE_FACTORIZATION_WORK_REJECTED_BY_SHARED_AUTHORITY` als technischen
+Invariantenfehler mit der ursprünglichen Ursache. Bereits ausgeführte Arbeit
+darf dadurch nicht als gewöhnlicher Budgetabbruch ohne Request erscheinen.
+
 Die bisherigen Komponentenobergrenzen gelten zusätzlich als
 Repräsentationsschutz. Sie erteilen dem Studienadapter keine weitere
 kanonische Arbeit. Bestehende Aufrufer ohne zusätzliche Arbeitsautorität

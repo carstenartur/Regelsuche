@@ -133,7 +133,12 @@ public final class ExactParsedFactorizationPipeline {
                 extractionWork);
         }
 
-        authority.consume(dispatch);
+        try {
+            authority.consume(dispatch);
+        } catch (PolynomialWorkAuthority.LimitReached exception) {
+            return Result.failure(Status.BUDGET_INCONCLUSIVE, exception.getMessage(),
+                engineId, policy, extraction, extractionWork);
+        }
         remainingWork -= dispatch.totalWorkUnits();
 
         FactorizationRequest<ExactRational> request =
@@ -148,7 +153,12 @@ public final class ExactParsedFactorizationPipeline {
         if (!report.work().within(remainingWork)) {
             throw new IllegalStateException("OPAQUE_FACTORIZATION_EXCEEDED_ADMITTED_RAW_AUTHORITY");
         }
-        authority.consume(report.work());
+        try {
+            authority.consume(report.work());
+        } catch (PolynomialWorkAuthority.LimitReached exception) {
+            throw new IllegalStateException(
+                "OPAQUE_FACTORIZATION_WORK_REJECTED_BY_SHARED_AUTHORITY", exception);
+        }
         PolynomialWorkLedger totalWork = merge(
             merge(extractionWork, dispatch), report.work());
         if (!totalWork.within(policy.maxTotalWorkUnits())) {

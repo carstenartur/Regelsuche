@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.scalar.ExactRational;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -162,6 +163,78 @@ class ExactParsedFactorizationPipelineTest {
         assertEquals(5, result.totalWork().totalWorkUnits());
         assertEquals(0, invocations.get());
         assertFalse(result.executed());
+    }
+
+    @Test
+    void sharedDispatchRejectionRetainsExtractionWithoutInvokingTheEngine() {
+        var authority = new RejectingAuthority("factorization.request-dispatch");
+        var pipeline = new ExactParsedFactorizationPipeline(new ExactParsedUnivariatePolynomialView(),
+            ExactParsedFactorizationPipeline.Policy.boundedDefaults(), authority);
+        var invocations = new AtomicInteger();
+        var result = pipeline.factor(parser.parseExactTerm("x^2 - 1"),
+            engine(new AtomicReference<>(), invocations));
+
+        assertEquals(ExactParsedFactorizationPipeline.Status.BUDGET_INCONCLUSIVE, result.status());
+        assertEquals("SHARED_POLYNOMIAL_WORK_AUTHORITY_EXHAUSTED", result.detailCode());
+        assertEquals(0, invocations.get());
+        assertTrue(result.request().isEmpty());
+        assertTrue(result.report().isEmpty());
+        assertEquals(result.extraction().work().asPolynomialWorkLedger(), result.totalWork());
+        assertEquals(result.totalWork(), authority.ledger);
+        assertEquals(authority.opaqueInvocationOverhead(), authority.rejectedWork);
+        assertFalse(authority.ledger.stages().containsKey("factorization.request-dispatch"));
+    }
+
+    @Test
+    void rejectionOfAlreadyExecutedOpaqueWorkIsAnAuthorityInvariantFailure() {
+        var authority = new RejectingAuthority("test.engine");
+        var pipeline = new ExactParsedFactorizationPipeline(new ExactParsedUnivariatePolynomialView(),
+            ExactParsedFactorizationPipeline.Policy.boundedDefaults(), authority);
+        var invocations = new AtomicInteger();
+        var received = new AtomicReference<FactorizationRequest<ExactRational>>();
+
+        var exception = assertThrows(IllegalStateException.class, () -> pipeline.factor(
+            parser.parseExactTerm("x^2 - 1"), engine(received, invocations)));
+
+        assertEquals("OPAQUE_FACTORIZATION_WORK_REJECTED_BY_SHARED_AUTHORITY", exception.getMessage());
+        assertTrue(exception.getCause() instanceof PolynomialWorkAuthority.LimitReached);
+        assertEquals(1, invocations.get());
+        assertEquals(99, received.get().maxWorkUnits());
+        assertEquals(new PolynomialWorkLedger(Map.of("test.engine", 3L)), authority.rejectedWork);
+        assertTrue(authority.rejectedWork.within(received.get().maxWorkUnits()));
+        assertEquals(1L, authority.ledger.stages().get("factorization.request-dispatch"));
+        assertFalse(authority.ledger.stages().containsKey("test.engine"));
+    }
+
+    private static final class RejectingAuthority implements PolynomialWorkAuthority {
+        private final String rejectedStage;
+        private PolynomialWorkLedger ledger = PolynomialWorkLedger.empty();
+        private PolynomialWorkLedger rejectedWork;
+
+        private RejectingAuthority(String rejectedStage) {
+            this.rejectedStage = rejectedStage;
+        }
+
+        @Override
+        public void consume(PolynomialWorkLedger work) {
+            if (work.stages().containsKey(rejectedStage)) {
+                rejectedWork = work;
+                throw new LimitReached();
+            }
+            var stages = new LinkedHashMap<>(ledger.stages());
+            work.stages().forEach((stage, units) -> stages.merge(stage, units, Math::addExact));
+            ledger = new PolynomialWorkLedger(stages);
+        }
+
+        @Override
+        public long remainingOpaqueWorkUnits() {
+            return 100;
+        }
+
+        @Override
+        public PolynomialWorkLedger opaqueInvocationOverhead() {
+            return new PolynomialWorkLedger(Map.of("factorization.request-dispatch", 1L));
+        }
     }
 
     private static FactorizationEngine<ExactRational> engine(
