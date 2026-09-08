@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityWorkAuthority.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityWorkAuthority.java</span></div><h1>PolynomialTheoryUtilityWorkAuthority.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import de.regelsuche.polynomial.PolynomialWorkAuthority;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Pre-operation admission under the unchanged frozen v2 work projection.
+ * A row is confined to its creating thread, including synchronous opaque calls.
+ */
+public final class PolynomialTheoryUtilityWorkAuthority
+        implements PolynomialWorkAuthority {
+    private final PolynomialTheoryUtilityExecutionInput input;
+<span class="fc" id="L16">    private final Thread owner = Thread.currentThread();</span>
+<span class="fc" id="L17">    private PolynomialWorkLedger ledger = PolynomialWorkLedger.empty();</span>
+    private long primitiveWork;
+<span class="fc" id="L19">    private PolynomialTheoryUtilityWorkBreakdown work =</span>
+<span class="fc" id="L20">        PolynomialTheoryUtilityWorkBreakdown.zero();</span>
+
+    public PolynomialTheoryUtilityWorkAuthority(
+<span class="fc" id="L23">            PolynomialTheoryUtilityExecutionInput input) {</span>
+<span class="fc" id="L24">        this.input = Objects.requireNonNull(input, &quot;input&quot;);</span>
+<span class="fc" id="L25">    }</span>
+
+    @Override
+    public synchronized void consume(PolynomialWorkLedger charge) {
+<span class="fc" id="L29">        requireOwner();</span>
+<span class="fc" id="L30">        Objects.requireNonNull(charge, &quot;charge&quot;);</span>
+<span class="fc" id="L31">        Map&lt;String, Long&gt; stages = new LinkedHashMap&lt;&gt;(ledger.stages());</span>
+<span class="fc" id="L32">        charge.stages().forEach((stage, units) -&gt;</span>
+<span class="fc" id="L33">            stages.merge(stage, units, Math::addExact));</span>
+<span class="fc" id="L34">        PolynomialWorkLedger proposed = new PolynomialWorkLedger(stages);</span>
+<span class="fc" id="L35">        var projected = PolynomialTheoryUtilityCanonicalWorkProjection.measure(</span>
+<span class="fc" id="L36">            PolynomialTheoryUtilityCanonicalWorkProjection.partition(primitiveWork, proposed));</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        if (projected.primitiveWork() &gt; input.admittedPrimitiveWork()</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">                || projected.mechanicalWork() &gt; input.totalMechanicalWork()</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">                || projected.factorizationWork() &gt; input.factorizationWork()) {</span>
+<span class="fc" id="L40">            throw new LimitReached();</span>
+        }
+<span class="fc" id="L42">        ledger = proposed;</span>
+<span class="fc" id="L43">        work = projected;</span>
+<span class="fc" id="L44">    }</span>
+
+    public synchronized void consumePrimitive(long units) {
+<span class="fc" id="L47">        requireOwner();</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (units &lt; 0) throw new IllegalArgumentException(&quot;negative primitive work&quot;);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (units &gt; input.admittedPrimitiveWork() - primitiveWork) {</span>
+<span class="fc" id="L50">            throw new LimitReached();</span>
+        }
+<span class="fc" id="L52">        primitiveWork += units;</span>
+<span class="fc" id="L53">        consume(PolynomialWorkLedger.empty());</span>
+<span class="fc" id="L54">    }</span>
+
+    @Override
+    public synchronized long remainingOpaqueWorkUnits() {
+<span class="fc" id="L58">        requireOwner();</span>
+<span class="fc" id="L59">        return Math.min(input.totalMechanicalWork() - work.mechanicalWork(),</span>
+<span class="fc" id="L60">            input.factorizationWork() - work.factorizationWork());</span>
+    }
+
+    @Override
+    public PolynomialWorkLedger opaqueInvocationOverhead() {
+<span class="fc" id="L65">        return new PolynomialWorkLedger(Map.of(&quot;factorization.request-dispatch&quot;, 1L,</span>
+<span class="fc" id="L66">            &quot;study.evidence.factorization-attempt-records&quot;, 1L));</span>
+    }
+
+    public synchronized long remainingPrimitiveWork() {
+<span class="fc" id="L70">        return input.admittedPrimitiveWork() - primitiveWork;</span>
+    }
+
+    private void requireOwner() {
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (Thread.currentThread() != owner) {</span>
+<span class="nc" id="L75">            throw new IllegalStateException(&quot;a polynomial study row cannot share concurrent work authority&quot;);</span>
+        }
+<span class="fc" id="L77">    }</span>
+
+    public synchronized PolynomialWorkLedger ledger() {
+<span class="fc" id="L80">        return ledger;</span>
+    }
+
+    public synchronized PolynomialTheoryUtilityWorkBreakdown work() {
+<span class="fc" id="L84">        return work;</span>
+    }
+
+    public synchronized PolynomialTheoryUtilityCanonicalWorkProjection.Projection
+            projection() {
+<span class="fc" id="L89">        return PolynomialTheoryUtilityCanonicalWorkProjection.project(input,</span>
+<span class="fc" id="L90">            PolynomialTheoryUtilityCanonicalWorkProjection.partition(</span>
+                primitiveWork, ledger));
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

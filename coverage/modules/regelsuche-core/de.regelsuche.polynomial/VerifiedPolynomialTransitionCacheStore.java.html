@@ -526,25 +526,26 @@ public final class VerifiedPolynomialTransitionCacheStore {
             }
 <span class="nc" id="L527">        }</span>
 
-        private static VerifiedTransition from(
+        /** Observation of the existing issuer-owned primitive expansion. */
+        public static VerifiedTransition from(
             ExactFactorizationTransformationPipeline.Result result
         ) {
-<span class="nc bnc" id="L532" title="All 2 branches missed.">            if (!result.transformed()) {</span>
-<span class="nc" id="L533">                throw new IllegalArgumentException(</span>
+<span class="nc bnc" id="L533" title="All 2 branches missed.">            if (!result.transformed()) {</span>
+<span class="nc" id="L534">                throw new IllegalArgumentException(</span>
                     &quot;only transformed verifier-authorized results may be cached&quot;);
             }
-<span class="nc" id="L536">            ExactParsedTerm reparsed = result.reparsed().orElseThrow();</span>
-<span class="nc" id="L537">            String sourceExpression = result.occurrence().sourceText();</span>
-<span class="nc" id="L538">            String transformedExpression = result.transformedExpression()</span>
-<span class="nc" id="L539">                .orElseThrow();</span>
-<span class="nc" id="L540">            String sourceEvidenceHash = result.occurrence()</span>
-<span class="nc" id="L541">                .sourceEvidenceHash();</span>
-<span class="nc" id="L542">            String factorizationCertificateHash = result.factorization()</span>
-<span class="nc" id="L543">                .certificateHash();</span>
-<span class="nc" id="L544">            String candidateCertificateHash = result</span>
-<span class="nc" id="L545">                .candidateCertificateHash();</span>
-<span class="nc" id="L546">            String authorityCertificateHash = result.certificateHash();</span>
-<span class="nc" id="L547">            List&lt;PrimitiveStep&gt; expansion = List.of(</span>
+<span class="nc" id="L537">            ExactParsedTerm reparsed = result.reparsed().orElseThrow();</span>
+<span class="nc" id="L538">            String sourceExpression = result.occurrence().sourceText();</span>
+<span class="nc" id="L539">            String transformedExpression = result.transformedExpression()</span>
+<span class="nc" id="L540">                .orElseThrow();</span>
+<span class="nc" id="L541">            String sourceEvidenceHash = result.occurrence()</span>
+<span class="nc" id="L542">                .sourceEvidenceHash();</span>
+<span class="nc" id="L543">            String factorizationCertificateHash = result.factorization()</span>
+<span class="nc" id="L544">                .certificateHash();</span>
+<span class="nc" id="L545">            String candidateCertificateHash = result</span>
+<span class="nc" id="L546">                .candidateCertificateHash();</span>
+<span class="nc" id="L547">            String authorityCertificateHash = result.certificateHash();</span>
+<span class="nc" id="L548">            List&lt;PrimitiveStep&gt; expansion = List.of(</span>
                 new PrimitiveStep(
                     &quot;EXACT_SOURCE_EVIDENCE&quot;,
                     sourceEvidenceHash),
@@ -556,28 +557,28 @@ public final class VerifiedPolynomialTransitionCacheStore {
                     candidateCertificateHash),
                 new PrimitiveStep(
                     &quot;EXACT_FACTOR_RENDERING&quot;,
-<span class="nc" id="L559">                    result.rendering().orElseThrow().certificateHash()),</span>
+<span class="nc" id="L560">                    result.rendering().orElseThrow().certificateHash()),</span>
                 new PrimitiveStep(
                     &quot;EXACT_REPARSE&quot;,
-<span class="nc" id="L562">                    exactReparseEvidenceHash(reparsed)),</span>
+<span class="nc" id="L563">                    exactReparseEvidenceHash(reparsed)),</span>
                 new PrimitiveStep(
                     &quot;EXACT_POLYNOMIAL_RECONSTRUCTION&quot;,
-<span class="nc" id="L565">                    result.reconstruction().orElseThrow()</span>
-<span class="nc" id="L566">                        .certificateHash()),</span>
+<span class="nc" id="L566">                    result.reconstruction().orElseThrow()</span>
+<span class="nc" id="L567">                        .certificateHash()),</span>
                 new PrimitiveStep(
                     &quot;VERIFIER_BOUND_TRANSFORMATION&quot;,
                     authorityCertificateHash));
-<span class="nc" id="L570">            String id = transitionId(</span>
+<span class="nc" id="L571">            String id = transitionId(</span>
                 sourceExpression,
                 transformedExpression,
                 sourceEvidenceHash,
                 factorizationCertificateHash,
                 candidateCertificateHash,
                 authorityCertificateHash,
-<span class="nc" id="L577">                result.kind(),</span>
+<span class="nc" id="L578">                result.kind(),</span>
                 expansion,
-<span class="nc" id="L579">                result.totalWork());</span>
-<span class="nc" id="L580">            return new VerifiedTransition(</span>
+<span class="nc" id="L580">                result.totalWork());</span>
+<span class="nc" id="L581">            return new VerifiedTransition(</span>
                 id,
                 sourceExpression,
                 transformedExpression,
@@ -585,25 +586,25 @@ public final class VerifiedPolynomialTransitionCacheStore {
                 factorizationCertificateHash,
                 candidateCertificateHash,
                 authorityCertificateHash,
-<span class="nc" id="L588">                result.kind(),</span>
+<span class="nc" id="L589">                result.kind(),</span>
                 expansion,
-<span class="nc" id="L590">                result.totalWork());</span>
+<span class="nc" id="L591">                result.totalWork());</span>
         }
 
         public String canonicalMaterial() {
-<span class="nc" id="L594">            return id;</span>
+<span class="nc" id="L595">            return id;</span>
         }
     }
 
     /** One ordered primitive evidence step retained for transparent replay. */
     public record PrimitiveStep(String stageId, String evidenceHash) {
-<span class="nc" id="L600">        public PrimitiveStep {</span>
-<span class="nc" id="L601">            stageId = requireIdentity(stageId, &quot;stageId&quot;);</span>
-<span class="nc" id="L602">            evidenceHash = requireHash(evidenceHash, &quot;evidenceHash&quot;);</span>
-<span class="nc" id="L603">        }</span>
+<span class="nc" id="L601">        public PrimitiveStep {</span>
+<span class="nc" id="L602">            stageId = requireIdentity(stageId, &quot;stageId&quot;);</span>
+<span class="nc" id="L603">            evidenceHash = requireHash(evidenceHash, &quot;evidenceHash&quot;);</span>
+<span class="nc" id="L604">        }</span>
 
         public String canonicalMaterial() {
-<span class="nc" id="L606">            return stageId + &quot;:&quot; + evidenceHash;</span>
+<span class="nc" id="L607">            return stageId + &quot;:&quot; + evidenceHash;</span>
         }
     }
 
@@ -624,28 +625,28 @@ public final class VerifiedPolynomialTransitionCacheStore {
             String cacheRevision,
             String sourceEvidenceHash,
             String sourceExpression
-<span class="nc" id="L627">        ) {</span>
-<span class="nc" id="L628">            this.cacheId = requireIdentity(cacheId, &quot;cacheId&quot;);</span>
-<span class="nc" id="L629">            this.cacheRevision = requireIdentity(</span>
+<span class="nc" id="L628">        ) {</span>
+<span class="nc" id="L629">            this.cacheId = requireIdentity(cacheId, &quot;cacheId&quot;);</span>
+<span class="nc" id="L630">            this.cacheRevision = requireIdentity(</span>
                 cacheRevision,
                 &quot;cacheRevision&quot;);
-<span class="nc" id="L632">            this.sourceEvidenceHash = requireHash(</span>
+<span class="nc" id="L633">            this.sourceEvidenceHash = requireHash(</span>
                 sourceEvidenceHash,
                 &quot;sourceEvidenceHash&quot;);
-<span class="nc" id="L635">            this.sourceExpression = requireSource(</span>
+<span class="nc" id="L636">            this.sourceExpression = requireSource(</span>
                 sourceExpression,
                 &quot;sourceExpression&quot;);
-<span class="nc" id="L638">            keyId = keyId(</span>
+<span class="nc" id="L639">            keyId = keyId(</span>
                 this.cacheId,
                 this.cacheRevision,
                 this.sourceEvidenceHash,
                 this.sourceExpression);
-<span class="nc" id="L643">            tupleHashCode = tupleHashCode(</span>
+<span class="nc" id="L644">            tupleHashCode = tupleHashCode(</span>
                 this.cacheId,
                 this.cacheRevision,
                 this.sourceEvidenceHash,
                 this.sourceExpression);
-<span class="nc" id="L648">        }</span>
+<span class="nc" id="L649">        }</span>
 
         private static String keyId(
             String cacheId,
@@ -653,13 +654,13 @@ public final class VerifiedPolynomialTransitionCacheStore {
             String sourceEvidenceHash,
             String sourceExpression
         ) {
-<span class="nc" id="L656">            EvidenceDigest digest = new EvidenceDigest();</span>
-<span class="nc" id="L657">            digest.append(SCHEMA + &quot;.lookup-key&quot;);</span>
-<span class="nc" id="L658">            digest.append(cacheId);</span>
-<span class="nc" id="L659">            digest.append(cacheRevision);</span>
-<span class="nc" id="L660">            digest.append(sourceEvidenceHash);</span>
-<span class="nc" id="L661">            digest.append(sourceExpression);</span>
-<span class="nc" id="L662">            return digest.finish();</span>
+<span class="nc" id="L657">            EvidenceDigest digest = new EvidenceDigest();</span>
+<span class="nc" id="L658">            digest.append(SCHEMA + &quot;.lookup-key&quot;);</span>
+<span class="nc" id="L659">            digest.append(cacheId);</span>
+<span class="nc" id="L660">            digest.append(cacheRevision);</span>
+<span class="nc" id="L661">            digest.append(sourceEvidenceHash);</span>
+<span class="nc" id="L662">            digest.append(sourceExpression);</span>
+<span class="nc" id="L663">            return digest.finish();</span>
         }
 
         private static int tupleHashCode(
@@ -668,54 +669,54 @@ public final class VerifiedPolynomialTransitionCacheStore {
             String sourceEvidenceHash,
             String sourceExpression
         ) {
-<span class="nc" id="L671">            int result = cacheId.hashCode();</span>
-<span class="nc" id="L672">            result = 31 * result + cacheRevision.hashCode();</span>
-<span class="nc" id="L673">            result = 31 * result + sourceEvidenceHash.hashCode();</span>
-<span class="nc" id="L674">            return 31 * result + sourceExpression.hashCode();</span>
+<span class="nc" id="L672">            int result = cacheId.hashCode();</span>
+<span class="nc" id="L673">            result = 31 * result + cacheRevision.hashCode();</span>
+<span class="nc" id="L674">            result = 31 * result + sourceEvidenceHash.hashCode();</span>
+<span class="nc" id="L675">            return 31 * result + sourceExpression.hashCode();</span>
         }
 
         public String cacheId() {
-<span class="nc" id="L678">            return cacheId;</span>
+<span class="nc" id="L679">            return cacheId;</span>
         }
 
         public String cacheRevision() {
-<span class="nc" id="L682">            return cacheRevision;</span>
+<span class="nc" id="L683">            return cacheRevision;</span>
         }
 
         public String sourceEvidenceHash() {
-<span class="nc" id="L686">            return sourceEvidenceHash;</span>
+<span class="nc" id="L687">            return sourceEvidenceHash;</span>
         }
 
         public String sourceExpression() {
-<span class="nc" id="L690">            return sourceExpression;</span>
+<span class="nc" id="L691">            return sourceExpression;</span>
         }
 
         public String keyId() {
-<span class="nc" id="L694">            return keyId;</span>
+<span class="nc" id="L695">            return keyId;</span>
         }
 
         public String canonicalMaterial() {
-<span class="nc" id="L698">            return keyId;</span>
+<span class="nc" id="L699">            return keyId;</span>
         }
 
         @Override
         public boolean equals(Object other) {
-<span class="nc" id="L703">            return this == other</span>
-<span class="nc bnc" id="L704" title="All 4 branches missed.">                || other instanceof LookupRequest request</span>
-<span class="nc bnc" id="L705" title="All 2 branches missed.">                    &amp;&amp; cacheId.equals(request.cacheId)</span>
-<span class="nc bnc" id="L706" title="All 2 branches missed.">                    &amp;&amp; cacheRevision.equals(request.cacheRevision)</span>
-<span class="nc bnc" id="L707" title="All 2 branches missed.">                    &amp;&amp; sourceEvidenceHash.equals(request.sourceEvidenceHash)</span>
-<span class="nc bnc" id="L708" title="All 2 branches missed.">                    &amp;&amp; sourceExpression.equals(request.sourceExpression);</span>
+<span class="nc" id="L704">            return this == other</span>
+<span class="nc bnc" id="L705" title="All 4 branches missed.">                || other instanceof LookupRequest request</span>
+<span class="nc bnc" id="L706" title="All 2 branches missed.">                    &amp;&amp; cacheId.equals(request.cacheId)</span>
+<span class="nc bnc" id="L707" title="All 2 branches missed.">                    &amp;&amp; cacheRevision.equals(request.cacheRevision)</span>
+<span class="nc bnc" id="L708" title="All 2 branches missed.">                    &amp;&amp; sourceEvidenceHash.equals(request.sourceEvidenceHash)</span>
+<span class="nc bnc" id="L709" title="All 2 branches missed.">                    &amp;&amp; sourceExpression.equals(request.sourceExpression);</span>
         }
 
         @Override
         public int hashCode() {
-<span class="nc" id="L713">            return tupleHashCode;</span>
+<span class="nc" id="L714">            return tupleHashCode;</span>
         }
 
         @Override
         public String toString() {
-<span class="nc" id="L718">            return &quot;LookupRequest[cacheId=&quot; + cacheId</span>
+<span class="nc" id="L719">            return &quot;LookupRequest[cacheId=&quot; + cacheId</span>
                 + &quot;, cacheRevision=&quot; + cacheRevision
                 + &quot;, sourceEvidenceHash=&quot; + sourceEvidenceHash
                 + &quot;, keyId=&quot; + keyId + &quot;]&quot;;
@@ -728,49 +729,49 @@ public final class VerifiedPolynomialTransitionCacheStore {
         List&lt;String&gt; sourceProvenance,
         List&lt;String&gt; assumptions
     ) {
-<span class="nc" id="L731">        public Observation {</span>
-<span class="nc" id="L732">            observationId = requireIdentity(</span>
+<span class="nc" id="L732">        public Observation {</span>
+<span class="nc" id="L733">            observationId = requireIdentity(</span>
                 observationId,
                 &quot;observationId&quot;);
-<span class="nc" id="L735">            sourceProvenance = requireTextList(</span>
+<span class="nc" id="L736">            sourceProvenance = requireTextList(</span>
                 sourceProvenance,
                 &quot;sourceProvenance&quot;,
                 false);
-<span class="nc" id="L739">            assumptions = requireTextList(</span>
+<span class="nc" id="L740">            assumptions = requireTextList(</span>
                 assumptions,
                 &quot;assumptions&quot;,
                 true);
-<span class="nc" id="L743">        }</span>
+<span class="nc" id="L744">        }</span>
 
         public String canonicalMaterial() {
-<span class="nc" id="L746">            EvidenceDigest digest = new EvidenceDigest();</span>
-<span class="nc" id="L747">            digest.append(SCHEMA + &quot;.observation&quot;);</span>
-<span class="nc" id="L748">            digest.append(observationId);</span>
-<span class="nc" id="L749">            digest.append(Integer.toString(sourceProvenance.size()));</span>
-<span class="nc" id="L750">            sourceProvenance.forEach(digest::append);</span>
-<span class="nc" id="L751">            digest.append(Integer.toString(assumptions.size()));</span>
-<span class="nc" id="L752">            assumptions.forEach(digest::append);</span>
-<span class="nc" id="L753">            return digest.finish();</span>
+<span class="nc" id="L747">            EvidenceDigest digest = new EvidenceDigest();</span>
+<span class="nc" id="L748">            digest.append(SCHEMA + &quot;.observation&quot;);</span>
+<span class="nc" id="L749">            digest.append(observationId);</span>
+<span class="nc" id="L750">            digest.append(Integer.toString(sourceProvenance.size()));</span>
+<span class="nc" id="L751">            sourceProvenance.forEach(digest::append);</span>
+<span class="nc" id="L752">            digest.append(Integer.toString(assumptions.size()));</span>
+<span class="nc" id="L753">            assumptions.forEach(digest::append);</span>
+<span class="nc" id="L754">            return digest.finish();</span>
         }
     }
 
     /** Content-addressed observation lineage retained only inside the store. */
     private record Lineage(String id, Observation observation) {
-<span class="nc" id="L759">        private Lineage {</span>
-<span class="nc" id="L760">            id = requireHash(id, &quot;lineage id&quot;);</span>
-<span class="nc" id="L761">            observation = Objects.requireNonNull(</span>
+<span class="nc" id="L760">        private Lineage {</span>
+<span class="nc" id="L761">            id = requireHash(id, &quot;lineage id&quot;);</span>
+<span class="nc" id="L762">            observation = Objects.requireNonNull(</span>
                 observation,
                 &quot;observation&quot;);
-<span class="nc" id="L764">        }</span>
+<span class="nc" id="L765">        }</span>
 
         private static Lineage create(
             VerifiedTransition transition,
             Observation observation
         ) {
-<span class="nc" id="L770">            Objects.requireNonNull(transition, &quot;transition&quot;);</span>
-<span class="nc" id="L771">            Objects.requireNonNull(observation, &quot;observation&quot;);</span>
-<span class="nc" id="L772">            return new Lineage(</span>
-<span class="nc" id="L773">                lineageId(transition, observation),</span>
+<span class="nc" id="L771">            Objects.requireNonNull(transition, &quot;transition&quot;);</span>
+<span class="nc" id="L772">            Objects.requireNonNull(observation, &quot;observation&quot;);</span>
+<span class="nc" id="L773">            return new Lineage(</span>
+<span class="nc" id="L774">                lineageId(transition, observation),</span>
                 observation);
         }
     }
@@ -785,46 +786,46 @@ public final class VerifiedPolynomialTransitionCacheStore {
         List&lt;Lineage&gt; lineages,
         String purpose
     ) {
-<span class="nc" id="L788">        private Entry {</span>
-<span class="nc" id="L789">            id = requireHash(id, &quot;entry id&quot;);</span>
-<span class="nc bnc" id="L790" title="All 2 branches missed.">            if (retentionGeneration &lt; 1) {</span>
-<span class="nc" id="L791">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L789">        private Entry {</span>
+<span class="nc" id="L790">            id = requireHash(id, &quot;entry id&quot;);</span>
+<span class="nc bnc" id="L791" title="All 2 branches missed.">            if (retentionGeneration &lt; 1) {</span>
+<span class="nc" id="L792">                throw new IllegalArgumentException(</span>
                     &quot;retention generation must be positive&quot;);
             }
-<span class="nc" id="L794">            request = Objects.requireNonNull(request, &quot;request&quot;);</span>
-<span class="nc" id="L795">            transition = Objects.requireNonNull(</span>
+<span class="nc" id="L795">            request = Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="nc" id="L796">            transition = Objects.requireNonNull(</span>
                 transition,
                 &quot;transition&quot;);
-<span class="nc" id="L798">            Objects.requireNonNull(authorization, &quot;authorization&quot;);</span>
-<span class="nc bnc" id="L799" title="All 2 branches missed.">            if (!authorization.transformed()</span>
-<span class="nc bnc" id="L800" title="All 2 branches missed.">                    || !authorization.certificateHash().equals(transition.authorityCertificateHash())) {</span>
-<span class="nc" id="L801">                throw new IllegalArgumentException(&quot;cache authorization differs from its primitive transformation&quot;);</span>
+<span class="nc" id="L799">            Objects.requireNonNull(authorization, &quot;authorization&quot;);</span>
+<span class="nc bnc" id="L800" title="All 2 branches missed.">            if (!authorization.transformed()</span>
+<span class="nc bnc" id="L801" title="All 2 branches missed.">                    || !authorization.certificateHash().equals(transition.authorityCertificateHash())) {</span>
+<span class="nc" id="L802">                throw new IllegalArgumentException(&quot;cache authorization differs from its primitive transformation&quot;);</span>
             }
-<span class="nc" id="L803">            lineages = List.copyOf(</span>
-<span class="nc" id="L804">                Objects.requireNonNull(lineages, &quot;lineages&quot;));</span>
-<span class="nc bnc" id="L805" title="All 2 branches missed.">            if (lineages.isEmpty()</span>
-<span class="nc bnc" id="L806" title="All 2 branches missed.">                    || lineages.size() &gt; MAX_LINEAGES_PER_ENTRY</span>
-<span class="nc bnc" id="L807" title="All 2 branches missed.">                    || !PURPOSE.equals(purpose)</span>
-<span class="nc bnc" id="L808" title="All 2 branches missed.">                    || !request.sourceEvidenceHash().equals(</span>
-<span class="nc" id="L809">                        transition.sourceEvidenceHash())</span>
-<span class="nc bnc" id="L810" title="All 2 branches missed.">                    || !request.sourceExpression().equals(</span>
-<span class="nc" id="L811">                        transition.sourceExpression())</span>
-<span class="nc bnc" id="L812" title="All 2 branches missed.">                    || !id.equals(entryId(request, transition))) {</span>
-<span class="nc" id="L813">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L804">            lineages = List.copyOf(</span>
+<span class="nc" id="L805">                Objects.requireNonNull(lineages, &quot;lineages&quot;));</span>
+<span class="nc bnc" id="L806" title="All 2 branches missed.">            if (lineages.isEmpty()</span>
+<span class="nc bnc" id="L807" title="All 2 branches missed.">                    || lineages.size() &gt; MAX_LINEAGES_PER_ENTRY</span>
+<span class="nc bnc" id="L808" title="All 2 branches missed.">                    || !PURPOSE.equals(purpose)</span>
+<span class="nc bnc" id="L809" title="All 2 branches missed.">                    || !request.sourceEvidenceHash().equals(</span>
+<span class="nc" id="L810">                        transition.sourceEvidenceHash())</span>
+<span class="nc bnc" id="L811" title="All 2 branches missed.">                    || !request.sourceExpression().equals(</span>
+<span class="nc" id="L812">                        transition.sourceExpression())</span>
+<span class="nc bnc" id="L813" title="All 2 branches missed.">                    || !id.equals(entryId(request, transition))) {</span>
+<span class="nc" id="L814">                throw new IllegalArgumentException(</span>
                     &quot;verified transition cache entry is invalid&quot;);
             }
-<span class="nc" id="L816">            Set&lt;String&gt; lineageIds = new HashSet&lt;&gt;();</span>
-<span class="nc bnc" id="L817" title="All 2 branches missed.">            for (Lineage lineage : lineages) {</span>
-<span class="nc" id="L818">                Objects.requireNonNull(lineage, &quot;lineage&quot;);</span>
-<span class="nc bnc" id="L819" title="All 2 branches missed.">                if (!lineage.id().equals(lineageId(</span>
+<span class="nc" id="L817">            Set&lt;String&gt; lineageIds = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L818" title="All 2 branches missed.">            for (Lineage lineage : lineages) {</span>
+<span class="nc" id="L819">                Objects.requireNonNull(lineage, &quot;lineage&quot;);</span>
+<span class="nc bnc" id="L820" title="All 2 branches missed.">                if (!lineage.id().equals(lineageId(</span>
                         transition,
-<span class="nc" id="L821">                        lineage.observation()))</span>
-<span class="nc bnc" id="L822" title="All 2 branches missed.">                        || !lineageIds.add(lineage.id())) {</span>
-<span class="nc" id="L823">                    throw new IllegalArgumentException(</span>
+<span class="nc" id="L822">                        lineage.observation()))</span>
+<span class="nc bnc" id="L823" title="All 2 branches missed.">                        || !lineageIds.add(lineage.id())) {</span>
+<span class="nc" id="L824">                    throw new IllegalArgumentException(</span>
                         &quot;verified transition lineage is invalid&quot;);
                 }
-<span class="nc" id="L826">            }</span>
-<span class="nc" id="L827">        }</span>
+<span class="nc" id="L827">            }</span>
+<span class="nc" id="L828">        }</span>
 
         private static Entry create(
             LookupRequest request,
@@ -833,26 +834,26 @@ public final class VerifiedPolynomialTransitionCacheStore {
             Lineage lineage,
             long retentionGeneration
         ) {
-<span class="nc" id="L836">            return new Entry(</span>
-<span class="nc" id="L837">                entryId(request, transition),</span>
+<span class="nc" id="L837">            return new Entry(</span>
+<span class="nc" id="L838">                entryId(request, transition),</span>
                 retentionGeneration,
                 request,
                 transition,
                 authorization,
-<span class="nc" id="L842">                List.of(lineage),</span>
+<span class="nc" id="L843">                List.of(lineage),</span>
                 PURPOSE);
         }
 
         private boolean containsLineage(String lineageId) {
-<span class="nc" id="L847">            return lineages.stream().anyMatch(existing -&gt;</span>
-<span class="nc" id="L848">                existing.id().equals(lineageId));</span>
+<span class="nc" id="L848">            return lineages.stream().anyMatch(existing -&gt;</span>
+<span class="nc" id="L849">                existing.id().equals(lineageId));</span>
         }
 
         private Entry withLineage(Lineage lineage) {
-<span class="nc" id="L852">            Objects.requireNonNull(lineage, &quot;lineage&quot;);</span>
-<span class="nc" id="L853">            List&lt;Lineage&gt; updated = new ArrayList&lt;&gt;(lineages);</span>
-<span class="nc" id="L854">            updated.add(lineage);</span>
-<span class="nc" id="L855">            return new Entry(</span>
+<span class="nc" id="L853">            Objects.requireNonNull(lineage, &quot;lineage&quot;);</span>
+<span class="nc" id="L854">            List&lt;Lineage&gt; updated = new ArrayList&lt;&gt;(lineages);</span>
+<span class="nc" id="L855">            updated.add(lineage);</span>
+<span class="nc" id="L856">            return new Entry(</span>
                 id,
                 retentionGeneration,
                 request,
@@ -863,7 +864,7 @@ public final class VerifiedPolynomialTransitionCacheStore {
         }
 
         private String replayBindingId() {
-<span class="nc" id="L866">            return VerifiedPolynomialTransitionCacheStore.replayBindingId(</span>
+<span class="nc" id="L867">            return VerifiedPolynomialTransitionCacheStore.replayBindingId(</span>
                 id,
                 retentionGeneration);
         }
@@ -876,49 +877,49 @@ public final class VerifiedPolynomialTransitionCacheStore {
         long retentionGeneration,
         String replayBindingId
     ) {
-<span class="nc" id="L879">        public Eviction {</span>
-<span class="nc" id="L880">            entryId = requireHash(entryId, &quot;eviction entryId&quot;);</span>
-<span class="nc" id="L881">            lookupKeyId = requireHash(lookupKeyId, &quot;eviction lookupKeyId&quot;);</span>
-<span class="nc bnc" id="L882" title="All 2 branches missed.">            if (retentionGeneration &lt; 1) {</span>
-<span class="nc" id="L883">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L880">        public Eviction {</span>
+<span class="nc" id="L881">            entryId = requireHash(entryId, &quot;eviction entryId&quot;);</span>
+<span class="nc" id="L882">            lookupKeyId = requireHash(lookupKeyId, &quot;eviction lookupKeyId&quot;);</span>
+<span class="nc bnc" id="L883" title="All 2 branches missed.">            if (retentionGeneration &lt; 1) {</span>
+<span class="nc" id="L884">                throw new IllegalArgumentException(</span>
                     &quot;eviction retentionGeneration must be positive&quot;);
             }
-<span class="nc" id="L886">            replayBindingId = requireHash(</span>
+<span class="nc" id="L887">            replayBindingId = requireHash(</span>
                 replayBindingId,
                 &quot;eviction replayBindingId&quot;);
-<span class="nc bnc" id="L889" title="All 2 branches missed.">            if (!replayBindingId.equals(</span>
-<span class="nc" id="L890">                    VerifiedPolynomialTransitionCacheStore.replayBindingId(</span>
+<span class="nc bnc" id="L890" title="All 2 branches missed.">            if (!replayBindingId.equals(</span>
+<span class="nc" id="L891">                    VerifiedPolynomialTransitionCacheStore.replayBindingId(</span>
                         entryId,
                         retentionGeneration))) {
-<span class="nc" id="L893">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L894">                throw new IllegalArgumentException(</span>
                     &quot;eviction replay binding does not match its entry lifetime&quot;);
             }
-<span class="nc" id="L896">        }</span>
+<span class="nc" id="L897">        }</span>
 
         private static Eviction from(Entry entry) {
-<span class="nc" id="L899">            Objects.requireNonNull(entry, &quot;entry&quot;);</span>
-<span class="nc" id="L900">            return new Eviction(</span>
-<span class="nc" id="L901">                entry.id(),</span>
-<span class="nc" id="L902">                entry.request().keyId(),</span>
-<span class="nc" id="L903">                entry.retentionGeneration(),</span>
-<span class="nc" id="L904">                entry.replayBindingId());</span>
+<span class="nc" id="L900">            Objects.requireNonNull(entry, &quot;entry&quot;);</span>
+<span class="nc" id="L901">            return new Eviction(</span>
+<span class="nc" id="L902">                entry.id(),</span>
+<span class="nc" id="L903">                entry.request().keyId(),</span>
+<span class="nc" id="L904">                entry.retentionGeneration(),</span>
+<span class="nc" id="L905">                entry.replayBindingId());</span>
         }
 
         private String canonicalMaterial() {
-<span class="nc" id="L908">            return resultCertificate(</span>
+<span class="nc" id="L909">            return resultCertificate(</span>
                 SCHEMA + &quot;.eviction&quot;,
                 entryId,
                 lookupKeyId,
-<span class="nc" id="L912">                Long.toString(retentionGeneration),</span>
+<span class="nc" id="L913">                Long.toString(retentionGeneration),</span>
                 replayBindingId);
         }
     }
 
-<span class="nc" id="L917">    public enum RetentionStatus {</span>
-<span class="nc" id="L918">        INSERTED,</span>
-<span class="nc" id="L919">        LINEAGE_ADDED,</span>
-<span class="nc" id="L920">        UNCHANGED,</span>
-<span class="nc" id="L921">        LINEAGE_LIMIT_REACHED</span>
+<span class="nc" id="L918">    public enum RetentionStatus {</span>
+<span class="nc" id="L919">        INSERTED,</span>
+<span class="nc" id="L920">        LINEAGE_ADDED,</span>
+<span class="nc" id="L921">        UNCHANGED,</span>
+<span class="nc" id="L922">        LINEAGE_LIMIT_REACHED</span>
     }
 
     /** Issuer-owned retention evidence; retained entries remain private. */
@@ -943,46 +944,46 @@ public final class VerifiedPolynomialTransitionCacheStore {
             int lineageCount,
             Optional&lt;Eviction&gt; eviction,
             String certificateHash
-<span class="nc" id="L946">        ) {</span>
-<span class="nc" id="L947">            this.status = Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="nc" id="L948">            this.lookupRequest = Objects.requireNonNull(</span>
+<span class="nc" id="L947">        ) {</span>
+<span class="nc" id="L948">            this.status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="nc" id="L949">            this.lookupRequest = Objects.requireNonNull(</span>
                 lookupRequest,
                 &quot;lookupRequest&quot;);
-<span class="nc" id="L951">            this.entryId = requireHash(entryId, &quot;retention entryId&quot;);</span>
-<span class="nc" id="L952">            this.transitionId = requireHash(</span>
+<span class="nc" id="L952">            this.entryId = requireHash(entryId, &quot;retention entryId&quot;);</span>
+<span class="nc" id="L953">            this.transitionId = requireHash(</span>
                 transitionId,
                 &quot;retention transitionId&quot;);
-<span class="nc bnc" id="L955" title="All 2 branches missed.">            if (retentionGeneration &lt; 1) {</span>
-<span class="nc" id="L956">                throw new IllegalArgumentException(</span>
+<span class="nc bnc" id="L956" title="All 2 branches missed.">            if (retentionGeneration &lt; 1) {</span>
+<span class="nc" id="L957">                throw new IllegalArgumentException(</span>
                     &quot;retention generation must be positive&quot;);
             }
-<span class="nc" id="L959">            this.retentionGeneration = retentionGeneration;</span>
-<span class="nc" id="L960">            this.replayBindingId = requireHash(</span>
+<span class="nc" id="L960">            this.retentionGeneration = retentionGeneration;</span>
+<span class="nc" id="L961">            this.replayBindingId = requireHash(</span>
                 replayBindingId,
                 &quot;retention replayBindingId&quot;);
-<span class="nc bnc" id="L963" title="All 2 branches missed.">            if (!replayBindingId.equals(</span>
-<span class="nc" id="L964">                    VerifiedPolynomialTransitionCacheStore.replayBindingId(</span>
+<span class="nc bnc" id="L964" title="All 2 branches missed.">            if (!replayBindingId.equals(</span>
+<span class="nc" id="L965">                    VerifiedPolynomialTransitionCacheStore.replayBindingId(</span>
                         entryId,
                         retentionGeneration))) {
-<span class="nc" id="L967">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L968">                throw new IllegalArgumentException(</span>
                     &quot;retention replay binding does not match its entry lifetime&quot;);
             }
-<span class="nc bnc" id="L970" title="All 4 branches missed.">            if (lineageCount &lt; 1</span>
+<span class="nc bnc" id="L971" title="All 4 branches missed.">            if (lineageCount &lt; 1</span>
                     || lineageCount &gt; MAX_LINEAGES_PER_ENTRY) {
-<span class="nc" id="L972">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L973">                throw new IllegalArgumentException(</span>
                     &quot;retention lineageCount is invalid&quot;);
             }
-<span class="nc" id="L975">            this.lineageCount = lineageCount;</span>
-<span class="nc" id="L976">            this.eviction = Objects.requireNonNull(eviction, &quot;eviction&quot;);</span>
-<span class="nc bnc" id="L977" title="All 2 branches missed.">            if (status != RetentionStatus.INSERTED</span>
-<span class="nc bnc" id="L978" title="All 2 branches missed.">                    &amp;&amp; eviction.isPresent()) {</span>
-<span class="nc" id="L979">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L976">            this.lineageCount = lineageCount;</span>
+<span class="nc" id="L977">            this.eviction = Objects.requireNonNull(eviction, &quot;eviction&quot;);</span>
+<span class="nc bnc" id="L978" title="All 2 branches missed.">            if (status != RetentionStatus.INSERTED</span>
+<span class="nc bnc" id="L979" title="All 2 branches missed.">                    &amp;&amp; eviction.isPresent()) {</span>
+<span class="nc" id="L980">                throw new IllegalArgumentException(</span>
                     &quot;only insertion may evict a cache entry&quot;);
             }
-<span class="nc" id="L982">            this.certificateHash = requireHash(</span>
+<span class="nc" id="L983">            this.certificateHash = requireHash(</span>
                 certificateHash,
                 &quot;retention certificateHash&quot;);
-<span class="nc" id="L985">            String expected = certificate(</span>
+<span class="nc" id="L986">            String expected = certificate(</span>
                 status,
                 lookupRequest,
                 entryId,
@@ -991,36 +992,36 @@ public final class VerifiedPolynomialTransitionCacheStore {
                 replayBindingId,
                 lineageCount,
                 eviction);
-<span class="nc bnc" id="L994" title="All 2 branches missed.">            if (!expected.equals(certificateHash)) {</span>
-<span class="nc" id="L995">                throw new IllegalArgumentException(</span>
+<span class="nc bnc" id="L995" title="All 2 branches missed.">            if (!expected.equals(certificateHash)) {</span>
+<span class="nc" id="L996">                throw new IllegalArgumentException(</span>
                     &quot;retention certificate does not match its evidence&quot;);
             }
-<span class="nc" id="L998">        }</span>
+<span class="nc" id="L999">        }</span>
 
         private static RetentionResult create(
             RetentionStatus status,
             Entry entry,
             Optional&lt;Eviction&gt; eviction
         ) {
-<span class="nc" id="L1005">            Objects.requireNonNull(entry, &quot;entry&quot;);</span>
-<span class="nc" id="L1006">            Objects.requireNonNull(eviction, &quot;eviction&quot;);</span>
-<span class="nc" id="L1007">            return new RetentionResult(</span>
+<span class="nc" id="L1006">            Objects.requireNonNull(entry, &quot;entry&quot;);</span>
+<span class="nc" id="L1007">            Objects.requireNonNull(eviction, &quot;eviction&quot;);</span>
+<span class="nc" id="L1008">            return new RetentionResult(</span>
                 status,
-<span class="nc" id="L1009">                entry.request(),</span>
-<span class="nc" id="L1010">                entry.id(),</span>
-<span class="nc" id="L1011">                entry.transition().id(),</span>
-<span class="nc" id="L1012">                entry.retentionGeneration(),</span>
-<span class="nc" id="L1013">                entry.replayBindingId(),</span>
-<span class="nc" id="L1014">                entry.lineages().size(),</span>
+<span class="nc" id="L1010">                entry.request(),</span>
+<span class="nc" id="L1011">                entry.id(),</span>
+<span class="nc" id="L1012">                entry.transition().id(),</span>
+<span class="nc" id="L1013">                entry.retentionGeneration(),</span>
+<span class="nc" id="L1014">                entry.replayBindingId(),</span>
+<span class="nc" id="L1015">                entry.lineages().size(),</span>
                 eviction,
-<span class="nc" id="L1016">                certificate(</span>
+<span class="nc" id="L1017">                certificate(</span>
                     status,
-<span class="nc" id="L1018">                    entry.request(),</span>
-<span class="nc" id="L1019">                    entry.id(),</span>
-<span class="nc" id="L1020">                    entry.transition().id(),</span>
-<span class="nc" id="L1021">                    entry.retentionGeneration(),</span>
-<span class="nc" id="L1022">                    entry.replayBindingId(),</span>
-<span class="nc" id="L1023">                    entry.lineages().size(),</span>
+<span class="nc" id="L1019">                    entry.request(),</span>
+<span class="nc" id="L1020">                    entry.id(),</span>
+<span class="nc" id="L1021">                    entry.transition().id(),</span>
+<span class="nc" id="L1022">                    entry.retentionGeneration(),</span>
+<span class="nc" id="L1023">                    entry.replayBindingId(),</span>
+<span class="nc" id="L1024">                    entry.lineages().size(),</span>
                     eviction));
         }
 
@@ -1034,57 +1035,57 @@ public final class VerifiedPolynomialTransitionCacheStore {
             int lineageCount,
             Optional&lt;Eviction&gt; eviction
         ) {
-<span class="nc" id="L1037">            return resultCertificate(</span>
+<span class="nc" id="L1038">            return resultCertificate(</span>
                 SCHEMA + &quot;.retention-result&quot;,
-<span class="nc" id="L1039">                status.name(),</span>
-<span class="nc" id="L1040">                lookupRequest.keyId(),</span>
+<span class="nc" id="L1040">                status.name(),</span>
+<span class="nc" id="L1041">                lookupRequest.keyId(),</span>
                 entryId,
                 transitionId,
-<span class="nc" id="L1043">                Long.toString(retentionGeneration),</span>
+<span class="nc" id="L1044">                Long.toString(retentionGeneration),</span>
                 replayBindingId,
-<span class="nc" id="L1045">                Integer.toString(lineageCount),</span>
-<span class="nc" id="L1046">                eviction.map(Eviction::canonicalMaterial).orElse(&quot;&quot;));</span>
+<span class="nc" id="L1046">                Integer.toString(lineageCount),</span>
+<span class="nc" id="L1047">                eviction.map(Eviction::canonicalMaterial).orElse(&quot;&quot;));</span>
         }
 
         public RetentionStatus status() {
-<span class="nc" id="L1050">            return status;</span>
+<span class="nc" id="L1051">            return status;</span>
         }
 
         public LookupRequest lookupRequest() {
-<span class="nc" id="L1054">            return lookupRequest;</span>
+<span class="nc" id="L1055">            return lookupRequest;</span>
         }
 
         public String entryId() {
-<span class="nc" id="L1058">            return entryId;</span>
+<span class="nc" id="L1059">            return entryId;</span>
         }
 
         public String transitionId() {
-<span class="nc" id="L1062">            return transitionId;</span>
+<span class="nc" id="L1063">            return transitionId;</span>
         }
 
         public long retentionGeneration() {
-<span class="nc" id="L1066">            return retentionGeneration;</span>
+<span class="nc" id="L1067">            return retentionGeneration;</span>
         }
 
         public String replayBindingId() {
-<span class="nc" id="L1070">            return replayBindingId;</span>
+<span class="nc" id="L1071">            return replayBindingId;</span>
         }
 
         public int lineageCount() {
-<span class="nc" id="L1074">            return lineageCount;</span>
+<span class="nc" id="L1075">            return lineageCount;</span>
         }
 
         public Optional&lt;Eviction&gt; eviction() {
-<span class="nc" id="L1078">            return eviction;</span>
+<span class="nc" id="L1079">            return eviction;</span>
         }
 
         public String certificateHash() {
-<span class="nc" id="L1082">            return certificateHash;</span>
+<span class="nc" id="L1083">            return certificateHash;</span>
         }
 
         @Override
         public String toString() {
-<span class="nc" id="L1087">            return &quot;RetentionResult[status=&quot; + status</span>
+<span class="nc" id="L1088">            return &quot;RetentionResult[status=&quot; + status</span>
                 + &quot;, entryId=&quot; + entryId
                 + &quot;, retentionGeneration=&quot; + retentionGeneration
                 + &quot;, lineageCount=&quot; + lineageCount
@@ -1092,9 +1093,9 @@ public final class VerifiedPolynomialTransitionCacheStore {
         }
     }
 
-<span class="nc" id="L1095">    public enum LookupStatus {</span>
-<span class="nc" id="L1096">        HIT,</span>
-<span class="nc" id="L1097">        MISS</span>
+<span class="nc" id="L1096">    public enum LookupStatus {</span>
+<span class="nc" id="L1097">        HIT,</span>
+<span class="nc" id="L1098">        MISS</span>
     }
 
     /** Issuer-owned exact lookup evidence; retained entries remain private. */
@@ -1113,35 +1114,35 @@ public final class VerifiedPolynomialTransitionCacheStore {
             PolynomialWorkLedger lookupWork,
             String certificateHash,
             Object issuerAuthority
-<span class="nc" id="L1116">        ) {</span>
-<span class="nc" id="L1117">            this.status = Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="nc" id="L1118">            this.request = Objects.requireNonNull(request, &quot;request&quot;);</span>
-<span class="nc" id="L1119">            this.retainedEntry = Objects.requireNonNull(</span>
+<span class="nc" id="L1117">        ) {</span>
+<span class="nc" id="L1118">            this.status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="nc" id="L1119">            this.request = Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="nc" id="L1120">            this.retainedEntry = Objects.requireNonNull(</span>
                 retainedEntry,
                 &quot;retainedEntry&quot;);
-<span class="nc" id="L1122">            this.lookupWork = Objects.requireNonNull(</span>
+<span class="nc" id="L1123">            this.lookupWork = Objects.requireNonNull(</span>
                 lookupWork,
                 &quot;lookupWork&quot;);
-<span class="nc" id="L1125">            this.certificateHash = requireHash(</span>
+<span class="nc" id="L1126">            this.certificateHash = requireHash(</span>
                 certificateHash,
                 &quot;lookup certificateHash&quot;);
-<span class="nc" id="L1128">            this.issuerAuthority = Objects.requireNonNull(</span>
+<span class="nc" id="L1129">            this.issuerAuthority = Objects.requireNonNull(</span>
                 issuerAuthority,
                 &quot;issuerAuthority&quot;);
-<span class="nc bnc" id="L1131" title="All 4 branches missed.">            if ((status == LookupStatus.HIT) != retainedEntry.isPresent()) {</span>
-<span class="nc" id="L1132">                throw new IllegalArgumentException(</span>
+<span class="nc bnc" id="L1132" title="All 4 branches missed.">            if ((status == LookupStatus.HIT) != retainedEntry.isPresent()) {</span>
+<span class="nc" id="L1133">                throw new IllegalArgumentException(</span>
                     &quot;lookup status and retained entry disagree&quot;);
             }
-<span class="nc" id="L1135">            String expected = certificate(</span>
+<span class="nc" id="L1136">            String expected = certificate(</span>
                 status,
                 request,
                 retainedEntry,
                 lookupWork);
-<span class="nc bnc" id="L1140" title="All 2 branches missed.">            if (!expected.equals(certificateHash)) {</span>
-<span class="nc" id="L1141">                throw new IllegalArgumentException(</span>
+<span class="nc bnc" id="L1141" title="All 2 branches missed.">            if (!expected.equals(certificateHash)) {</span>
+<span class="nc" id="L1142">                throw new IllegalArgumentException(</span>
                     &quot;lookup certificate does not match its evidence&quot;);
             }
-<span class="nc" id="L1144">        }</span>
+<span class="nc" id="L1145">        }</span>
 
         private static LookupResult hit(
             LookupRequest request,
@@ -1149,10 +1150,10 @@ public final class VerifiedPolynomialTransitionCacheStore {
             PolynomialWorkLedger work,
             Object issuerAuthority
         ) {
-<span class="nc" id="L1152">            return create(</span>
+<span class="nc" id="L1153">            return create(</span>
                 LookupStatus.HIT,
                 request,
-<span class="nc" id="L1155">                Optional.of(entry),</span>
+<span class="nc" id="L1156">                Optional.of(entry),</span>
                 work,
                 issuerAuthority);
         }
@@ -1162,10 +1163,10 @@ public final class VerifiedPolynomialTransitionCacheStore {
             PolynomialWorkLedger work,
             Object issuerAuthority
         ) {
-<span class="nc" id="L1165">            return create(</span>
+<span class="nc" id="L1166">            return create(</span>
                 LookupStatus.MISS,
                 request,
-<span class="nc" id="L1168">                Optional.empty(),</span>
+<span class="nc" id="L1169">                Optional.empty(),</span>
                 work,
                 issuerAuthority);
         }
@@ -1177,12 +1178,12 @@ public final class VerifiedPolynomialTransitionCacheStore {
             PolynomialWorkLedger work,
             Object issuerAuthority
         ) {
-<span class="nc" id="L1180">            return new LookupResult(</span>
+<span class="nc" id="L1181">            return new LookupResult(</span>
                 status,
                 request,
                 retainedEntry,
                 work,
-<span class="nc" id="L1185">                certificate(status, request, retainedEntry, work),</span>
+<span class="nc" id="L1186">                certificate(status, request, retainedEntry, work),</span>
                 issuerAuthority);
         }
 
@@ -1192,57 +1193,57 @@ public final class VerifiedPolynomialTransitionCacheStore {
             Optional&lt;Entry&gt; retainedEntry,
             PolynomialWorkLedger work
         ) {
-<span class="nc" id="L1195">            return resultCertificate(</span>
+<span class="nc" id="L1196">            return resultCertificate(</span>
                 SCHEMA + &quot;.lookup-result&quot;,
-<span class="nc" id="L1197">                status.name(),</span>
-<span class="nc" id="L1198">                request.keyId(),</span>
-<span class="nc" id="L1199">                retainedEntry.map(Entry::replayBindingId).orElse(&quot;&quot;),</span>
-<span class="nc" id="L1200">                work.canonicalMaterial());</span>
+<span class="nc" id="L1198">                status.name(),</span>
+<span class="nc" id="L1199">                request.keyId(),</span>
+<span class="nc" id="L1200">                retainedEntry.map(Entry::replayBindingId).orElse(&quot;&quot;),</span>
+<span class="nc" id="L1201">                work.canonicalMaterial());</span>
         }
 
         private boolean issuedBy(Object authority) {
-<span class="nc bnc" id="L1204" title="All 2 branches missed.">            return issuerAuthority == authority;</span>
+<span class="nc bnc" id="L1205" title="All 2 branches missed.">            return issuerAuthority == authority;</span>
         }
 
         private Entry retainedEntry() {
-<span class="nc" id="L1208">            return retainedEntry.orElseThrow(() -&gt;</span>
-<span class="nc" id="L1209">                new IllegalStateException(</span>
+<span class="nc" id="L1209">            return retainedEntry.orElseThrow(() -&gt;</span>
+<span class="nc" id="L1210">                new IllegalStateException(</span>
                     &quot;lookup miss has no retained entry&quot;));
         }
 
         public LookupStatus status() {
-<span class="nc" id="L1214">            return status;</span>
+<span class="nc" id="L1215">            return status;</span>
         }
 
         public LookupRequest request() {
-<span class="nc" id="L1218">            return request;</span>
+<span class="nc" id="L1219">            return request;</span>
         }
 
         public PolynomialWorkLedger lookupWork() {
-<span class="nc" id="L1222">            return lookupWork;</span>
+<span class="nc" id="L1223">            return lookupWork;</span>
         }
 
         public String certificateHash() {
-<span class="nc" id="L1226">            return certificateHash;</span>
+<span class="nc" id="L1227">            return certificateHash;</span>
         }
 
         public boolean hit() {
-<span class="nc bnc" id="L1230" title="All 2 branches missed.">            return status == LookupStatus.HIT;</span>
+<span class="nc bnc" id="L1231" title="All 2 branches missed.">            return status == LookupStatus.HIT;</span>
         }
 
         @Override
         public String toString() {
-<span class="nc" id="L1235">            return &quot;LookupResult[status=&quot; + status</span>
-<span class="nc" id="L1236">                + &quot;, request=&quot; + request.keyId()</span>
+<span class="nc" id="L1236">            return &quot;LookupResult[status=&quot; + status</span>
+<span class="nc" id="L1237">                + &quot;, request=&quot; + request.keyId()</span>
                 + &quot;, certificateHash=&quot; + certificateHash + &quot;]&quot;;
         }
     }
 
-<span class="nc" id="L1241">    public enum ReplayStatus {</span>
-<span class="nc" id="L1242">        REPLAYED,</span>
-<span class="nc" id="L1243">        LOOKUP_MISS,</span>
-<span class="nc" id="L1244">        STALE_LOOKUP,</span>
-<span class="nc" id="L1245">        FOREIGN_LOOKUP</span>
+<span class="nc" id="L1242">    public enum ReplayStatus {</span>
+<span class="nc" id="L1243">        REPLAYED,</span>
+<span class="nc" id="L1244">        LOOKUP_MISS,</span>
+<span class="nc" id="L1245">        STALE_LOOKUP,</span>
+<span class="nc" id="L1246">        FOREIGN_LOOKUP</span>
     }
 
     /** Issuer-owned replay evidence; only successful replay releases a transition. */
@@ -1261,53 +1262,53 @@ public final class VerifiedPolynomialTransitionCacheStore {
             PolynomialWorkLedger replayWork,
             PolynomialWorkLedger actualExecutionWork,
             String certificateHash
-<span class="nc" id="L1264">        ) {</span>
-<span class="nc" id="L1265">            this.status = Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="nc" id="L1266">            this.lookup = Objects.requireNonNull(lookup, &quot;lookup&quot;);</span>
-<span class="nc" id="L1267">            this.releasedEntry = Objects.requireNonNull(</span>
+<span class="nc" id="L1265">        ) {</span>
+<span class="nc" id="L1266">            this.status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="nc" id="L1267">            this.lookup = Objects.requireNonNull(lookup, &quot;lookup&quot;);</span>
+<span class="nc" id="L1268">            this.releasedEntry = Objects.requireNonNull(</span>
                 releasedEntry,
                 &quot;releasedEntry&quot;);
-<span class="nc" id="L1270">            this.replayWork = Objects.requireNonNull(</span>
+<span class="nc" id="L1271">            this.replayWork = Objects.requireNonNull(</span>
                 replayWork,
                 &quot;replayWork&quot;);
-<span class="nc" id="L1273">            this.actualExecutionWork = Objects.requireNonNull(</span>
+<span class="nc" id="L1274">            this.actualExecutionWork = Objects.requireNonNull(</span>
                 actualExecutionWork,
                 &quot;actualExecutionWork&quot;);
-<span class="nc" id="L1276">            this.certificateHash = requireHash(</span>
+<span class="nc" id="L1277">            this.certificateHash = requireHash(</span>
                 certificateHash,
                 &quot;replay certificateHash&quot;);
-<span class="nc bnc" id="L1279" title="All 2 branches missed.">            if ((status == ReplayStatus.REPLAYED)</span>
-<span class="nc bnc" id="L1280" title="All 2 branches missed.">                    != releasedEntry.isPresent()) {</span>
-<span class="nc" id="L1281">                throw new IllegalArgumentException(</span>
+<span class="nc bnc" id="L1280" title="All 2 branches missed.">            if ((status == ReplayStatus.REPLAYED)</span>
+<span class="nc bnc" id="L1281" title="All 2 branches missed.">                    != releasedEntry.isPresent()) {</span>
+<span class="nc" id="L1282">                throw new IllegalArgumentException(</span>
                     &quot;replay status and released entry disagree&quot;);
             }
-<span class="nc" id="L1284">            PolynomialWorkLedger expectedWork = merge(</span>
-<span class="nc" id="L1285">                lookup.lookupWork(),</span>
+<span class="nc" id="L1285">            PolynomialWorkLedger expectedWork = merge(</span>
+<span class="nc" id="L1286">                lookup.lookupWork(),</span>
                 replayWork);
-<span class="nc bnc" id="L1287" title="All 2 branches missed.">            if (!actualExecutionWork.equals(expectedWork)) {</span>
-<span class="nc" id="L1288">                throw new IllegalArgumentException(</span>
+<span class="nc bnc" id="L1288" title="All 2 branches missed.">            if (!actualExecutionWork.equals(expectedWork)) {</span>
+<span class="nc" id="L1289">                throw new IllegalArgumentException(</span>
                     &quot;actual replay work does not match lookup plus replay&quot;);
             }
-<span class="nc" id="L1291">            String expectedCertificate = certificate(</span>
+<span class="nc" id="L1292">            String expectedCertificate = certificate(</span>
                 status,
                 lookup,
                 releasedEntry,
                 actualExecutionWork);
-<span class="nc bnc" id="L1296" title="All 2 branches missed.">            if (!expectedCertificate.equals(certificateHash)) {</span>
-<span class="nc" id="L1297">                throw new IllegalArgumentException(</span>
+<span class="nc bnc" id="L1297" title="All 2 branches missed.">            if (!expectedCertificate.equals(certificateHash)) {</span>
+<span class="nc" id="L1298">                throw new IllegalArgumentException(</span>
                     &quot;replay certificate does not match its evidence&quot;);
             }
-<span class="nc" id="L1300">        }</span>
+<span class="nc" id="L1301">        }</span>
 
         private static ReplayResult replayed(
             LookupResult lookup,
             Entry entry,
             PolynomialWorkLedger replayWork
         ) {
-<span class="nc" id="L1307">            return create(</span>
+<span class="nc" id="L1308">            return create(</span>
                 ReplayStatus.REPLAYED,
                 lookup,
-<span class="nc" id="L1310">                Optional.of(entry),</span>
+<span class="nc" id="L1311">                Optional.of(entry),</span>
                 replayWork);
         }
 
@@ -1316,14 +1317,14 @@ public final class VerifiedPolynomialTransitionCacheStore {
             LookupResult lookup,
             PolynomialWorkLedger replayWork
         ) {
-<span class="nc bnc" id="L1319" title="All 2 branches missed.">            if (status == ReplayStatus.REPLAYED) {</span>
-<span class="nc" id="L1320">                throw new IllegalArgumentException(</span>
+<span class="nc bnc" id="L1320" title="All 2 branches missed.">            if (status == ReplayStatus.REPLAYED) {</span>
+<span class="nc" id="L1321">                throw new IllegalArgumentException(</span>
                     &quot;successful replay status cannot describe failure&quot;);
             }
-<span class="nc" id="L1323">            return create(</span>
+<span class="nc" id="L1324">            return create(</span>
                 status,
                 lookup,
-<span class="nc" id="L1326">                Optional.empty(),</span>
+<span class="nc" id="L1327">                Optional.empty(),</span>
                 replayWork);
         }
 
@@ -1333,16 +1334,16 @@ public final class VerifiedPolynomialTransitionCacheStore {
             Optional&lt;Entry&gt; releasedEntry,
             PolynomialWorkLedger replayWork
         ) {
-<span class="nc" id="L1336">            PolynomialWorkLedger actual = merge(</span>
-<span class="nc" id="L1337">                lookup.lookupWork(),</span>
+<span class="nc" id="L1337">            PolynomialWorkLedger actual = merge(</span>
+<span class="nc" id="L1338">                lookup.lookupWork(),</span>
                 replayWork);
-<span class="nc" id="L1339">            return new ReplayResult(</span>
+<span class="nc" id="L1340">            return new ReplayResult(</span>
                 status,
                 lookup,
                 releasedEntry,
                 replayWork,
                 actual,
-<span class="nc" id="L1345">                certificate(status, lookup, releasedEntry, actual));</span>
+<span class="nc" id="L1346">                certificate(status, lookup, releasedEntry, actual));</span>
         }
 
         private static String certificate(
@@ -1351,63 +1352,63 @@ public final class VerifiedPolynomialTransitionCacheStore {
             Optional&lt;Entry&gt; releasedEntry,
             PolynomialWorkLedger actual
         ) {
-<span class="nc" id="L1354">            return resultCertificate(</span>
+<span class="nc" id="L1355">            return resultCertificate(</span>
                 SCHEMA + &quot;.replay-result&quot;,
-<span class="nc" id="L1356">                status.name(),</span>
-<span class="nc" id="L1357">                lookup.certificateHash(),</span>
-<span class="nc" id="L1358">                releasedEntry.map(Entry::replayBindingId).orElse(&quot;&quot;),</span>
-<span class="nc" id="L1359">                releasedEntry.map(value -&gt;</span>
-<span class="nc" id="L1360">                    value.transition().id()).orElse(&quot;&quot;),</span>
-<span class="nc" id="L1361">                actual.canonicalMaterial());</span>
+<span class="nc" id="L1357">                status.name(),</span>
+<span class="nc" id="L1358">                lookup.certificateHash(),</span>
+<span class="nc" id="L1359">                releasedEntry.map(Entry::replayBindingId).orElse(&quot;&quot;),</span>
+<span class="nc" id="L1360">                releasedEntry.map(value -&gt;</span>
+<span class="nc" id="L1361">                    value.transition().id()).orElse(&quot;&quot;),</span>
+<span class="nc" id="L1362">                actual.canonicalMaterial());</span>
         }
 
         public ReplayStatus status() {
-<span class="nc" id="L1365">            return status;</span>
+<span class="nc" id="L1366">            return status;</span>
         }
 
         public LookupResult lookup() {
-<span class="nc" id="L1369">            return lookup;</span>
+<span class="nc" id="L1370">            return lookup;</span>
         }
 
         public PolynomialWorkLedger replayWork() {
-<span class="nc" id="L1373">            return replayWork;</span>
+<span class="nc" id="L1374">            return replayWork;</span>
         }
 
         public PolynomialWorkLedger actualExecutionWork() {
-<span class="nc" id="L1377">            return actualExecutionWork;</span>
+<span class="nc" id="L1378">            return actualExecutionWork;</span>
         }
 
         public String certificateHash() {
-<span class="nc" id="L1381">            return certificateHash;</span>
+<span class="nc" id="L1382">            return certificateHash;</span>
         }
 
         public boolean replayed() {
-<span class="nc bnc" id="L1385" title="All 2 branches missed.">            return status == ReplayStatus.REPLAYED;</span>
+<span class="nc bnc" id="L1386" title="All 2 branches missed.">            return status == ReplayStatus.REPLAYED;</span>
         }
 
         /** Original issuer-owned primitive; never reconstructed from cached strings. */
         public Optional&lt;ExactFactorizationTransformationPipeline.Result&gt; authorization() {
-<span class="nc" id="L1390">            return releasedEntry.map(Entry::authorization);</span>
+<span class="nc" id="L1391">            return releasedEntry.map(Entry::authorization);</span>
         }
 
         public Optional&lt;VerifiedTransition&gt; transition() {
-<span class="nc" id="L1394">            return releasedEntry.map(Entry::transition);</span>
+<span class="nc" id="L1395">            return releasedEntry.map(Entry::transition);</span>
         }
 
         public List&lt;PrimitiveStep&gt; primitiveExpansion() {
-<span class="nc" id="L1398">            return transition().map(VerifiedTransition::primitiveExpansion)</span>
-<span class="nc" id="L1399">                .orElse(List.of());</span>
+<span class="nc" id="L1399">            return transition().map(VerifiedTransition::primitiveExpansion)</span>
+<span class="nc" id="L1400">                .orElse(List.of());</span>
         }
 
         /** Original derivation work retained as provenance, not replay work. */
         public Optional&lt;PolynomialWorkLedger&gt; retainedDerivationWork() {
-<span class="nc" id="L1404">            return transition().map(VerifiedTransition::derivationWork);</span>
+<span class="nc" id="L1405">            return transition().map(VerifiedTransition::derivationWork);</span>
         }
 
         @Override
         public String toString() {
-<span class="nc" id="L1409">            return &quot;ReplayResult[status=&quot; + status</span>
-<span class="nc" id="L1410">                + &quot;, lookup=&quot; + lookup.certificateHash()</span>
+<span class="nc" id="L1410">            return &quot;ReplayResult[status=&quot; + status</span>
+<span class="nc" id="L1411">                + &quot;, lookup=&quot; + lookup.certificateHash()</span>
                 + &quot;, certificateHash=&quot; + certificateHash + &quot;]&quot;;
         }
     }
@@ -1421,45 +1422,45 @@ public final class VerifiedPolynomialTransitionCacheStore {
         long evictions,
         long replays
     ) {
-<span class="nc" id="L1424">        public Stats {</span>
-<span class="nc bnc" id="L1425" title="All 12 branches missed.">            if (retainedEntries &lt; 0</span>
+<span class="nc" id="L1425">        public Stats {</span>
+<span class="nc bnc" id="L1426" title="All 12 branches missed.">            if (retainedEntries &lt; 0</span>
                     || insertions &lt; 0
                     || hits &lt; 0
                     || misses &lt; 0
                     || evictions &lt; 0
                     || replays &lt; 0) {
-<span class="nc" id="L1431">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L1432">                throw new IllegalArgumentException(</span>
                     &quot;verified cache statistics are invalid&quot;);
             }
-<span class="nc" id="L1434">        }</span>
+<span class="nc" id="L1435">        }</span>
     }
 
     private static final class EvidenceDigest {
         private final MessageDigest digest;
 
-<span class="nc" id="L1440">        private EvidenceDigest() {</span>
+<span class="nc" id="L1441">        private EvidenceDigest() {</span>
             try {
-<span class="nc" id="L1442">                digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
-<span class="nc" id="L1443">            } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L1444">                throw new IllegalStateException(</span>
+<span class="nc" id="L1443">                digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="nc" id="L1444">            } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L1445">                throw new IllegalStateException(</span>
                     &quot;SHA-256 is unavailable&quot;,
                     exception);
-<span class="nc" id="L1447">            }</span>
-<span class="nc" id="L1448">        }</span>
+<span class="nc" id="L1448">            }</span>
+<span class="nc" id="L1449">        }</span>
 
         private void append(String value) {
-<span class="nc" id="L1451">            byte[] bytes = Objects.requireNonNull(value, &quot;value&quot;)</span>
-<span class="nc" id="L1452">                .getBytes(StandardCharsets.UTF_8);</span>
-<span class="nc" id="L1453">            byte[] length = Integer.toString(bytes.length)</span>
-<span class="nc" id="L1454">                .getBytes(StandardCharsets.US_ASCII);</span>
-<span class="nc" id="L1455">            digest.update(length);</span>
-<span class="nc" id="L1456">            digest.update((byte) ':');</span>
-<span class="nc" id="L1457">            digest.update(bytes);</span>
-<span class="nc" id="L1458">            digest.update((byte) '\n');</span>
-<span class="nc" id="L1459">        }</span>
+<span class="nc" id="L1452">            byte[] bytes = Objects.requireNonNull(value, &quot;value&quot;)</span>
+<span class="nc" id="L1453">                .getBytes(StandardCharsets.UTF_8);</span>
+<span class="nc" id="L1454">            byte[] length = Integer.toString(bytes.length)</span>
+<span class="nc" id="L1455">                .getBytes(StandardCharsets.US_ASCII);</span>
+<span class="nc" id="L1456">            digest.update(length);</span>
+<span class="nc" id="L1457">            digest.update((byte) ':');</span>
+<span class="nc" id="L1458">            digest.update(bytes);</span>
+<span class="nc" id="L1459">            digest.update((byte) '\n');</span>
+<span class="nc" id="L1460">        }</span>
 
         private String finish() {
-<span class="nc" id="L1462">            return &quot;sha256:&quot; + HexFormat.of().formatHex(digest.digest());</span>
+<span class="nc" id="L1463">            return &quot;sha256:&quot; + HexFormat.of().formatHex(digest.digest());</span>
         }
     }
 }

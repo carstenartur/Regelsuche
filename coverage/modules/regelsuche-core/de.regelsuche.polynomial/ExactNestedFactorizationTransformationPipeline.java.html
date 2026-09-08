@@ -50,16 +50,27 @@ public final class ExactNestedFactorizationTransformationPipeline {
     private final ExpressionParser parser;
     private final ExactParsedUnivariatePolynomialView reconstructionView;
     private final Policy policy;
+    private final PolynomialWorkAuthority authority;
 
     public ExactNestedFactorizationTransformationPipeline() {
-<span class="nc" id="L55">        this(</span>
+<span class="nc" id="L56">        this(</span>
             new ExactParsedSubtermProjector(),
             new ExactParsedUnivariatePolynomialView(),
             new ExactFactorizationExpressionRenderer(),
             new ExpressionParser(),
             new ExactParsedUnivariatePolynomialView(),
-<span class="nc" id="L61">            Policy.boundedDefaults());</span>
-<span class="nc" id="L62">    }</span>
+<span class="nc" id="L62">            Policy.boundedDefaults());</span>
+<span class="nc" id="L63">    }</span>
+
+    public ExactNestedFactorizationTransformationPipeline(PolynomialWorkAuthority authority) {
+<span class="nc" id="L66">        this(</span>
+<span class="nc" id="L67">            new ExactParsedSubtermProjector(ExactParsedSubtermProjector.Policy.boundedDefaults(), authority),</span>
+            new ExactParsedUnivariatePolynomialView(ExactParsedUnivariatePolynomialView.DEFAULT_BUDGET, authority),
+<span class="nc" id="L69">            new ExactFactorizationExpressionRenderer(ExactFactorizationExpressionRenderer.Policy.boundedDefaults(), authority),</span>
+            new ExpressionParser(),
+            new ExactParsedUnivariatePolynomialView(ExactParsedUnivariatePolynomialView.DEFAULT_BUDGET, authority),
+<span class="nc" id="L72">            Policy.boundedDefaults(), authority);</span>
+<span class="nc" id="L73">    }</span>
 
     public ExactNestedFactorizationTransformationPipeline(
         ExactParsedSubtermProjector projector,
@@ -68,29 +79,41 @@ public final class ExactNestedFactorizationTransformationPipeline {
         ExpressionParser parser,
         ExactParsedUnivariatePolynomialView reconstructionView,
         Policy policy
-<span class="nc" id="L71">    ) {</span>
-<span class="nc" id="L72">        this.projector = Objects.requireNonNull(projector, &quot;projector&quot;);</span>
-<span class="nc" id="L73">        this.extractionView = Objects.requireNonNull(</span>
+    ) {
+<span class="nc" id="L83">        this(projector, extractionView, renderer, parser, reconstructionView,</span>
+<span class="nc" id="L84">            policy, PolynomialWorkAuthority.unbounded());</span>
+<span class="nc" id="L85">    }</span>
+
+    private ExactNestedFactorizationTransformationPipeline(
+            ExactParsedSubtermProjector projector,
+            ExactParsedUnivariatePolynomialView extractionView,
+            ExactFactorizationExpressionRenderer renderer,
+            ExpressionParser parser,
+            ExactParsedUnivariatePolynomialView reconstructionView,
+<span class="nc" id="L93">            Policy policy, PolynomialWorkAuthority authority) {</span>
+<span class="nc" id="L94">        this.authority = Objects.requireNonNull(authority, &quot;authority&quot;);</span>
+<span class="nc" id="L95">        this.projector = Objects.requireNonNull(projector, &quot;projector&quot;);</span>
+<span class="nc" id="L96">        this.extractionView = Objects.requireNonNull(</span>
             extractionView,
             &quot;extractionView&quot;);
-<span class="nc" id="L76">        this.renderer = Objects.requireNonNull(renderer, &quot;renderer&quot;);</span>
-<span class="nc" id="L77">        this.parser = Objects.requireNonNull(parser, &quot;parser&quot;);</span>
-<span class="nc" id="L78">        this.reconstructionView = Objects.requireNonNull(</span>
+<span class="nc" id="L99">        this.renderer = Objects.requireNonNull(renderer, &quot;renderer&quot;);</span>
+<span class="nc" id="L100">        this.parser = Objects.requireNonNull(parser, &quot;parser&quot;);</span>
+<span class="nc" id="L101">        this.reconstructionView = Objects.requireNonNull(</span>
             reconstructionView,
             &quot;reconstructionView&quot;);
-<span class="nc" id="L81">        this.policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
-<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (policy.maxPathDepth() &gt; projector.policy().maxPathDepth()) {</span>
-<span class="nc" id="L83">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L104">        this.policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        if (policy.maxPathDepth() &gt; projector.policy().maxPathDepth()) {</span>
+<span class="nc" id="L106">            throw new IllegalArgumentException(</span>
                 &quot;nested path policy exceeds projector path authority&quot;);
         }
-<span class="nc" id="L86">    }</span>
+<span class="nc" id="L109">    }</span>
 
     public Policy policy() {
-<span class="nc" id="L89">        return policy;</span>
+<span class="nc" id="L112">        return policy;</span>
     }
 
     public ExactParsedSubtermProjector projector() {
-<span class="nc" id="L93">        return projector;</span>
+<span class="nc" id="L116">        return projector;</span>
     }
 
     /** Uses implicit selection only when the verifier issued one candidate. */
@@ -99,11 +122,11 @@ public final class ExactNestedFactorizationTransformationPipeline {
         TreePosition position,
         FactorizationEngine&lt;ExactRational&gt; engine
     ) {
-<span class="nc" id="L102">        return transformInternal(</span>
+<span class="nc" id="L125">        return transformInternal(</span>
             root,
             position,
             engine,
-<span class="nc" id="L106">            OptionalInt.empty());</span>
+<span class="nc" id="L129">            OptionalInt.empty());</span>
     }
 
     /** Uses one explicitly selected verifier candidate. */
@@ -113,15 +136,15 @@ public final class ExactNestedFactorizationTransformationPipeline {
         FactorizationEngine&lt;ExactRational&gt; engine,
         int candidateIndex
     ) {
-<span class="nc bnc" id="L116" title="All 2 branches missed.">        if (candidateIndex &lt; 0) {</span>
-<span class="nc" id="L117">            throw new IllegalArgumentException(</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (candidateIndex &lt; 0) {</span>
+<span class="nc" id="L140">            throw new IllegalArgumentException(</span>
                 &quot;candidate index must not be negative&quot;);
         }
-<span class="nc" id="L120">        return transformInternal(</span>
+<span class="nc" id="L143">        return transformInternal(</span>
             root,
             position,
             engine,
-<span class="nc" id="L124">            OptionalInt.of(candidateIndex));</span>
+<span class="nc" id="L147">            OptionalInt.of(candidateIndex));</span>
     }
 
     private Result transformInternal(
@@ -130,24 +153,24 @@ public final class ExactNestedFactorizationTransformationPipeline {
         FactorizationEngine&lt;ExactRational&gt; engine,
         OptionalInt candidateIndex
     ) {
-<span class="nc" id="L133">        requireAttemptInputs(root, position, engine);</span>
-<span class="nc" id="L134">        Outcome&lt;PreflightContext&gt; preflight = preflight(root, position);</span>
-<span class="nc bnc" id="L135" title="All 2 branches missed.">        if (preflight.failed()) {</span>
-<span class="nc" id="L136">            return preflight.failureOrThrow();</span>
+<span class="nc" id="L156">        requireAttemptInputs(root, position, engine);</span>
+<span class="nc" id="L157">        Outcome&lt;PreflightContext&gt; preflight = preflight(root, position);</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        if (preflight.failed()) {</span>
+<span class="nc" id="L159">            return preflight.failureOrThrow();</span>
         }
-<span class="nc" id="L138">        Outcome&lt;PreparedTransformation&gt; prepared = prepareTransformation(</span>
+<span class="nc" id="L161">        Outcome&lt;PreparedTransformation&gt; prepared = prepareTransformation(</span>
             root,
             position,
             engine,
             candidateIndex,
-<span class="nc" id="L143">            preflight.valueOrThrow());</span>
-<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (prepared.failed()) {</span>
-<span class="nc" id="L145">            return prepared.failureOrThrow();</span>
+<span class="nc" id="L166">            preflight.valueOrThrow());</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        if (prepared.failed()) {</span>
+<span class="nc" id="L168">            return prepared.failureOrThrow();</span>
         }
-<span class="nc" id="L147">        return applyPreparedTransformation(</span>
+<span class="nc" id="L170">        return applyPreparedTransformation(</span>
             root,
             position,
-<span class="nc" id="L150">            prepared.valueOrThrow());</span>
+<span class="nc" id="L173">            prepared.valueOrThrow());</span>
     }
 
     /**
@@ -161,57 +184,63 @@ public final class ExactNestedFactorizationTransformationPipeline {
         TreePosition position,
         ExactFactorizationTransformationPipeline.Result authorization
     ) {
-<span class="nc" id="L164">        Objects.requireNonNull(root, &quot;root&quot;);</span>
-<span class="nc" id="L165">        Objects.requireNonNull(position, &quot;position&quot;);</span>
-<span class="nc" id="L166">        Objects.requireNonNull(authorization, &quot;authorization&quot;);</span>
-<span class="nc bnc" id="L167" title="All 2 branches missed.">        if (!authorization.transformed()) {</span>
-<span class="nc" id="L168">            throw new IllegalArgumentException(&quot;only a changed verified transformation can be replayed&quot;);</span>
+<span class="nc" id="L187">        Objects.requireNonNull(root, &quot;root&quot;);</span>
+<span class="nc" id="L188">        Objects.requireNonNull(position, &quot;position&quot;);</span>
+<span class="nc" id="L189">        Objects.requireNonNull(authorization, &quot;authorization&quot;);</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">        if (!authorization.transformed()) {</span>
+<span class="nc" id="L191">            throw new IllegalArgumentException(&quot;only a changed verified transformation can be replayed&quot;);</span>
         }
-<span class="nc" id="L170">        Outcome&lt;PreflightContext&gt; preflight = preflight(root, position, false);</span>
-<span class="nc bnc" id="L171" title="All 2 branches missed.">        if (preflight.failed()) return preflight.failureOrThrow();</span>
-<span class="nc" id="L172">        PreflightContext checked = preflight.valueOrThrow();</span>
-<span class="nc" id="L173">        ExactParsedSubtermProjector.Result projection = projector.project(root, position.path(), position.text());</span>
-<span class="nc" id="L174">        PolynomialWorkLedger prior = merge(checked.priorWork(), new PolynomialWorkLedger(projection.work().stages()));</span>
-<span class="nc bnc" id="L175" title="All 2 branches missed.">        if (!projection.successful()) {</span>
-<span class="nc" id="L176">            return projectionFailure(mapProjectionStatus(projection.status()), projection.detailCode(), position, projection, prior);</span>
+<span class="nc" id="L193">        Outcome&lt;PreflightContext&gt; preflight = preflight(root, position, false);</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if (preflight.failed()) return preflight.failureOrThrow();</span>
+<span class="nc" id="L195">        PreflightContext checked = preflight.valueOrThrow();</span>
+<span class="nc" id="L196">        ExactParsedSubtermProjector.Result projection = projector.project(root, position.path(), position.text());</span>
+<span class="nc" id="L197">        PolynomialWorkLedger prior = merge(checked.priorWork(), new PolynomialWorkLedger(projection.work().stages()));</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">        if (!projection.successful()) {</span>
+<span class="nc" id="L199">            return projectionFailure(mapProjectionStatus(projection.status()), projection.detailCode(), position, projection, prior);</span>
         }
-<span class="nc" id="L178">        ExactParsedTerm projected = projection.projected().orElseThrow();</span>
-<span class="nc" id="L179">        var validation = ExactFactorizationTransformationPipeline.validateReplaySource(</span>
-<span class="nc" id="L180">            projected, authorization, remainingAfterReservation(prior, checked.replacementReserve()));</span>
-<span class="nc" id="L181">        PolynomialWorkLedger throughValidation = merge(prior, validation.work());</span>
-<span class="nc bnc" id="L182" title="All 2 branches missed.">        if (validation.status() != ExactFactorizationTransformationPipeline.Status.TRANSFORMED) {</span>
-<span class="nc" id="L183">            return projectionFailure(mapTransformationStatus(validation.status()), validation.detailCode(),</span>
+<span class="nc" id="L201">        ExactParsedTerm projected = projection.projected().orElseThrow();</span>
+<span class="nc" id="L202">        var validation = ExactFactorizationTransformationPipeline.validateReplaySource(</span>
+<span class="nc" id="L203">            projected, authorization, remainingAfterReservation(prior, checked.replacementReserve()), authority);</span>
+<span class="nc" id="L204">        PolynomialWorkLedger throughValidation = merge(prior, validation.work());</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        if (validation.status() != ExactFactorizationTransformationPipeline.Status.TRANSFORMED) {</span>
+<span class="nc" id="L206">            return projectionFailure(mapTransformationStatus(validation.status()), validation.detailCode(),</span>
                 position, projection, throughValidation);
         }
-<span class="nc" id="L186">        var retainedSource = authorization.factorization().request().orElseThrow().source();</span>
-<span class="nc" id="L187">        var policyWork = new PolynomialWorkLedger(Map.of(&quot;projection.replay-policy-term-visits&quot;,</span>
-<span class="nc" id="L188">            Math.addExact(3L, Math.multiplyExact(4L, retainedSource.termCount()))));</span>
-<span class="nc bnc" id="L189" title="All 2 branches missed.">        if (!policyWork.within(remainingAfterReservation(throughValidation, checked.replacementReserve()))) {</span>
-<span class="nc" id="L190">            return projectionFailure(Status.BUDGET_INCONCLUSIVE, &quot;REPLAY_POLICY_VALIDATION_AUTHORITY_INSUFFICIENT&quot;,</span>
+<span class="nc" id="L209">        var retainedSource = authorization.factorization().request().orElseThrow().source();</span>
+<span class="nc" id="L210">        var policyWork = new PolynomialWorkLedger(Map.of(&quot;projection.replay-policy-term-visits&quot;,</span>
+<span class="nc" id="L211">            Math.addExact(3L, Math.multiplyExact(4L, retainedSource.termCount()))));</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        if (!policyWork.within(remainingAfterReservation(throughValidation, checked.replacementReserve()))) {</span>
+<span class="nc" id="L213">            return projectionFailure(Status.BUDGET_INCONCLUSIVE, &quot;REPLAY_POLICY_VALIDATION_AUTHORITY_INSUFFICIENT&quot;,</span>
                 position, projection, throughValidation);
         }
-<span class="nc" id="L193">        throughValidation = merge(throughValidation, policyWork);</span>
-<span class="nc" id="L194">        String policyViolation = replayPolicyViolation(authorization, retainedSource);</span>
-<span class="nc bnc" id="L195" title="All 2 branches missed.">        if (policyViolation != null) {</span>
-<span class="nc" id="L196">            return projectionFailure(Status.BUDGET_INCONCLUSIVE, policyViolation,</span>
+        try {
+<span class="nc" id="L217">            authority.consume(policyWork);</span>
+<span class="nc" id="L218">        } catch (PolynomialWorkAuthority.LimitReached exception) {</span>
+<span class="nc" id="L219">            return projectionFailure(Status.BUDGET_INCONCLUSIVE, exception.getMessage(),</span>
+                position, projection, throughValidation);
+<span class="nc" id="L221">        }</span>
+<span class="nc" id="L222">        throughValidation = merge(throughValidation, policyWork);</span>
+<span class="nc" id="L223">        String policyViolation = replayPolicyViolation(authorization, retainedSource);</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        if (policyViolation != null) {</span>
+<span class="nc" id="L225">            return projectionFailure(Status.BUDGET_INCONCLUSIVE, policyViolation,</span>
                 position, projection, throughValidation);
         }
-<span class="nc" id="L199">        return applyPreparedTransformation(root, position, new PreparedTransformation(</span>
-<span class="nc" id="L200">            projection, projected, authorization.factorization(), authorization,</span>
-<span class="nc" id="L201">            throughValidation, checked.replacementReserve(), true));</span>
+<span class="nc" id="L228">        return applyPreparedTransformation(root, position, new PreparedTransformation(</span>
+<span class="nc" id="L229">            projection, projected, authorization.factorization(), authorization,</span>
+<span class="nc" id="L230">            throughValidation, checked.replacementReserve(), true));</span>
     }
 
     private String replayPolicyViolation(ExactFactorizationTransformationPipeline.Result authorization,
             SparsePolynomial&lt;ExactRational&gt; source) {
-<span class="nc bnc" id="L206" title="All 2 branches missed.">        if (policy.maxCandidates() == 0) return &quot;REPLAY_MAX_CANDIDATES_IS_ZERO&quot;;</span>
-<span class="nc" id="L207">        String structural = policy.structuralLimits().firstViolation(source).orElse(null);</span>
-<span class="nc bnc" id="L208" title="All 2 branches missed.">        if (structural != null) return &quot;REPLAY_&quot; + structural;</span>
-<span class="nc bnc" id="L209" title="All 2 branches missed.">        if (policy.evidenceRequirement() == FactorizationRequest.EvidenceRequirement.INDEPENDENT_COMPLETE</span>
-<span class="nc bnc" id="L210" title="All 2 branches missed.">                &amp;&amp; authorization.factorization().report().orElseThrow().claimStrength()</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        if (policy.maxCandidates() == 0) return &quot;REPLAY_MAX_CANDIDATES_IS_ZERO&quot;;</span>
+<span class="nc" id="L236">        String structural = policy.structuralLimits().firstViolation(source).orElse(null);</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">        if (structural != null) return &quot;REPLAY_&quot; + structural;</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        if (policy.evidenceRequirement() == FactorizationRequest.EvidenceRequirement.INDEPENDENT_COMPLETE</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">                &amp;&amp; authorization.factorization().report().orElseThrow().claimStrength()</span>
                     != FactorizationVerifier.ClaimStrength.INDEPENDENTLY_CERTIFIED_COMPLETE) {
-<span class="nc" id="L212">            return &quot;REPLAY_REQUIRES_INDEPENDENT_COMPLETE_EVIDENCE&quot;;</span>
+<span class="nc" id="L241">            return &quot;REPLAY_REQUIRES_INDEPENDENT_COMPLETE_EVIDENCE&quot;;</span>
         }
-<span class="nc" id="L214">        return null;</span>
+<span class="nc" id="L243">        return null;</span>
     }
 
     private static void requireAttemptInputs(
@@ -219,20 +248,20 @@ public final class ExactNestedFactorizationTransformationPipeline {
         TreePosition position,
         FactorizationEngine&lt;ExactRational&gt; engine
     ) {
-<span class="nc" id="L222">        Objects.requireNonNull(root, &quot;root&quot;);</span>
-<span class="nc" id="L223">        Objects.requireNonNull(position, &quot;position&quot;);</span>
-<span class="nc" id="L224">        Objects.requireNonNull(engine, &quot;engine&quot;);</span>
-<span class="nc bnc" id="L225" title="All 4 branches missed.">        if (position.text() == null || position.text().isBlank()) {</span>
-<span class="nc" id="L226">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L251">        Objects.requireNonNull(root, &quot;root&quot;);</span>
+<span class="nc" id="L252">        Objects.requireNonNull(position, &quot;position&quot;);</span>
+<span class="nc" id="L253">        Objects.requireNonNull(engine, &quot;engine&quot;);</span>
+<span class="nc bnc" id="L254" title="All 4 branches missed.">        if (position.text() == null || position.text().isBlank()) {</span>
+<span class="nc" id="L255">            throw new IllegalArgumentException(</span>
                 &quot;tree position text must not be blank&quot;);
         }
-<span class="nc" id="L229">    }</span>
+<span class="nc" id="L258">    }</span>
 
     private Outcome&lt;PreflightContext&gt; preflight(
         ExactParsedTerm root,
         TreePosition position
     ) {
-<span class="nc" id="L235">        return preflight(root, position, true);</span>
+<span class="nc" id="L264">        return preflight(root, position, true);</span>
     }
 
     private Outcome&lt;PreflightContext&gt; preflight(
@@ -240,74 +269,71 @@ public final class ExactNestedFactorizationTransformationPipeline {
         TreePosition position,
         boolean factorizationRequired
     ) {
-<span class="nc" id="L243">        Work work = new Work(policy.maxTotalWorkUnits());</span>
-<span class="nc bnc" id="L244" title="All 2 branches missed.">        if (position.path().size() &gt; policy.maxPathDepth()) {</span>
-<span class="nc" id="L245">            return Outcome.failure(failure(</span>
+<span class="nc" id="L272">        Work work = new Work(policy.maxTotalWorkUnits(), authority);</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">        if (position.path().size() &gt; policy.maxPathDepth()) {</span>
+<span class="nc" id="L274">            return Outcome.failure(failure(</span>
                 Status.BUDGET_INCONCLUSIVE,
                 &quot;MAX_NESTED_PATH_DEPTH_EXCEEDED&quot;,
                 position,
-<span class="nc" id="L249">                work.ledger()));</span>
+<span class="nc" id="L278">                work.ledger()));</span>
         }
         try {
-<span class="nc" id="L252">            TreePosition.SelectionResult selection = position.selectAt(</span>
-<span class="nc" id="L253">                root.expression());</span>
-<span class="nc" id="L254">            work.consume(</span>
-                &quot;nested.position-preflight-path-navigation&quot;,
-<span class="nc" id="L256">                position.path().size());</span>
-<span class="nc bnc" id="L257" title="All 5 branches missed.">            switch (selection.status()) {</span>
+<span class="nc" id="L281">            work.consume(&quot;nested.position-preflight-path-navigation&quot;, position.path().size());</span>
+<span class="nc" id="L282">            TreePosition.SelectionResult selection = position.selectAt(root.expression());</span>
+<span class="nc bnc" id="L283" title="All 5 branches missed.">            switch (selection.status()) {</span>
                 case SELECTED -&gt; {
                     // The shared TreePosition authority accepted this path.
-<span class="nc" id="L260">                }</span>
+<span class="nc" id="L286">                }</span>
                 case INVALID_PATH -&gt; {
-<span class="nc" id="L262">                    return Outcome.failure(failure(</span>
+<span class="nc" id="L288">                    return Outcome.failure(failure(</span>
                         Status.UNSUPPORTED,
                         &quot;INVALID_TREE_POSITION_PATH&quot;,
                         position,
-<span class="nc" id="L266">                        work.ledger()));</span>
+<span class="nc" id="L292">                        work.ledger()));</span>
                 }
                 case POSITION_NOT_PRESENT -&gt; {
-<span class="nc" id="L269">                    return Outcome.failure(failure(</span>
+<span class="nc" id="L295">                    return Outcome.failure(failure(</span>
                         Status.POSITION_NOT_PRESENT,
                         &quot;SELECTED_PATH_IS_NOT_PRESENT&quot;,
                         position,
-<span class="nc" id="L273">                        work.ledger()));</span>
+<span class="nc" id="L299">                        work.ledger()));</span>
                 }
-<span class="nc" id="L275">                case REPLACED -&gt; throw invariant(</span>
+<span class="nc" id="L301">                case REPLACED -&gt; throw invariant(</span>
                     &quot;TREE_POSITION_SELECTION_RETURNED_REPLACED_STATUS&quot;);
             }
-<span class="nc" id="L278">            countNodes(</span>
-<span class="nc" id="L279">                root.expression(),</span>
-<span class="nc" id="L280">                policy.maxRootNodes(),</span>
+<span class="nc" id="L304">            countNodes(</span>
+<span class="nc" id="L305">                root.expression(),</span>
+<span class="nc" id="L306">                policy.maxRootNodes(),</span>
                 work,
                 &quot;nested.root-preflight-node-visits&quot;);
-<span class="nc" id="L283">        } catch (WorkLimitReached | RepresentationLimitReached exception) {</span>
-<span class="nc" id="L284">            return Outcome.failure(failure(</span>
+<span class="nc" id="L309">        } catch (WorkLimitReached | RepresentationLimitReached | PolynomialWorkAuthority.LimitReached exception) {</span>
+<span class="nc" id="L310">            return Outcome.failure(failure(</span>
                 Status.BUDGET_INCONCLUSIVE,
-<span class="nc" id="L286">                exception.getMessage(),</span>
+<span class="nc" id="L312">                exception.getMessage(),</span>
                 position,
-<span class="nc" id="L288">                work.ledger()));</span>
-<span class="nc" id="L289">        } catch (StructuralInvariantFailure exception) {</span>
-<span class="nc" id="L290">            return Outcome.failure(failure(</span>
+<span class="nc" id="L314">                work.ledger()));</span>
+<span class="nc" id="L315">        } catch (StructuralInvariantFailure exception) {</span>
+<span class="nc" id="L316">            return Outcome.failure(failure(</span>
                 Status.TECHNICAL_FAILURE,
-<span class="nc" id="L292">                exception.getMessage(),</span>
+<span class="nc" id="L318">                exception.getMessage(),</span>
                 position,
-<span class="nc" id="L294">                work.ledger()));</span>
-<span class="nc" id="L295">        }</span>
+<span class="nc" id="L320">                work.ledger()));</span>
+<span class="nc" id="L321">        }</span>
 
-<span class="nc" id="L297">        PolynomialWorkLedger priorWork = work.ledger();</span>
-<span class="nc" id="L298">        long replacementReserve = replacementReplayWorkCeiling();</span>
-<span class="nc bnc" id="L299" title="All 2 branches missed.">        long extractionCeiling = factorizationRequired ? extractionWorkCeiling() : 0L;</span>
-<span class="nc bnc" id="L300" title="All 2 branches missed.">        if (!canReserveBeforeProjection(</span>
+<span class="nc" id="L323">        PolynomialWorkLedger priorWork = work.ledger();</span>
+<span class="nc" id="L324">        long replacementReserve = replacementReplayWorkCeiling();</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">        long extractionCeiling = factorizationRequired ? extractionWorkCeiling() : 0L;</span>
+<span class="nc bnc" id="L326" title="All 2 branches missed.">        if (!canReserveBeforeProjection(</span>
                 priorWork,
                 replacementReserve,
                 extractionCeiling)) {
-<span class="nc" id="L304">            return Outcome.failure(failure(</span>
+<span class="nc" id="L330">            return Outcome.failure(failure(</span>
                 Status.BUDGET_INCONCLUSIVE,
                 &quot;INSUFFICIENT_AUTHORITY_FOR_PROJECTION_AND_REPLAY&quot;,
                 position,
                 priorWork));
         }
-<span class="nc" id="L310">        return Outcome.success(new PreflightContext(</span>
+<span class="nc" id="L336">        return Outcome.success(new PreflightContext(</span>
             priorWork,
             replacementReserve,
             extractionCeiling));
@@ -320,27 +346,27 @@ public final class ExactNestedFactorizationTransformationPipeline {
         OptionalInt candidateIndex,
         PreflightContext preflight
     ) {
-<span class="nc" id="L323">        ExactParsedSubtermProjector.Result projection = projector.project(</span>
+<span class="nc" id="L349">        ExactParsedSubtermProjector.Result projection = projector.project(</span>
             root,
-<span class="nc" id="L325">            position.path(),</span>
-<span class="nc" id="L326">            position.text());</span>
-<span class="nc" id="L327">        PolynomialWorkLedger priorWork = merge(</span>
-<span class="nc" id="L328">            preflight.priorWork(),</span>
-<span class="nc" id="L329">            new PolynomialWorkLedger(projection.work().stages()));</span>
-<span class="nc bnc" id="L330" title="All 2 branches missed.">        if (!projection.successful()) {</span>
-<span class="nc" id="L331">            return Outcome.failure(projectionFailure(</span>
-<span class="nc" id="L332">                mapProjectionStatus(projection.status()),</span>
-<span class="nc" id="L333">                projection.detailCode(),</span>
+<span class="nc" id="L351">            position.path(),</span>
+<span class="nc" id="L352">            position.text());</span>
+<span class="nc" id="L353">        PolynomialWorkLedger priorWork = merge(</span>
+<span class="nc" id="L354">            preflight.priorWork(),</span>
+<span class="nc" id="L355">            new PolynomialWorkLedger(projection.work().stages()));</span>
+<span class="nc bnc" id="L356" title="All 2 branches missed.">        if (!projection.successful()) {</span>
+<span class="nc" id="L357">            return Outcome.failure(projectionFailure(</span>
+<span class="nc" id="L358">                mapProjectionStatus(projection.status()),</span>
+<span class="nc" id="L359">                projection.detailCode(),</span>
                 position,
                 projection,
                 priorWork));
         }
 
-<span class="nc" id="L339">        long factorizationAuthority = remainingAfterReservation(</span>
+<span class="nc" id="L365">        long factorizationAuthority = remainingAfterReservation(</span>
             priorWork,
-<span class="nc" id="L341">            preflight.replacementReserve());</span>
-<span class="nc bnc" id="L342" title="All 2 branches missed.">        if (factorizationAuthority &lt; preflight.extractionCeiling()) {</span>
-<span class="nc" id="L343">            return Outcome.failure(projectionFailure(</span>
+<span class="nc" id="L367">            preflight.replacementReserve());</span>
+<span class="nc bnc" id="L368" title="All 2 branches missed.">        if (factorizationAuthority &lt; preflight.extractionCeiling()) {</span>
+<span class="nc" id="L369">            return Outcome.failure(projectionFailure(</span>
                 Status.BUDGET_INCONCLUSIVE,
                 &quot;INSUFFICIENT_REMAINING_FACTORIZATION_AUTHORITY&quot;,
                 position,
@@ -348,21 +374,21 @@ public final class ExactNestedFactorizationTransformationPipeline {
                 priorWork));
         }
 
-<span class="nc" id="L351">        ExactParsedTerm projected = projection.projected().orElseThrow();</span>
-<span class="nc" id="L352">        ExactParsedFactorizationPipeline.Result factorization =</span>
+<span class="nc" id="L377">        ExactParsedTerm projected = projection.projected().orElseThrow();</span>
+<span class="nc" id="L378">        ExactParsedFactorizationPipeline.Result factorization =</span>
             new ExactParsedFactorizationPipeline(
                 extractionView,
-<span class="nc" id="L355">                factorizationPolicy(factorizationAuthority))</span>
-<span class="nc" id="L356">                .factor(projected, engine);</span>
-<span class="nc" id="L357">        ExactFactorizationTransformationPipeline.Result transformation =</span>
-<span class="nc" id="L358">            transformProjected(projected, factorization, candidateIndex);</span>
-<span class="nc" id="L359">        PolynomialWorkLedger throughTransformation = merge(</span>
+<span class="nc" id="L381">                factorizationPolicy(factorizationAuthority), authority)</span>
+<span class="nc" id="L382">                .factor(projected, engine);</span>
+<span class="nc" id="L383">        ExactFactorizationTransformationPipeline.Result transformation =</span>
+<span class="nc" id="L384">            transformProjected(projected, factorization, candidateIndex);</span>
+<span class="nc" id="L385">        PolynomialWorkLedger throughTransformation = merge(</span>
             priorWork,
-<span class="nc" id="L361">            transformation.totalWork());</span>
-<span class="nc bnc" id="L362" title="All 2 branches missed.">        if (!transformation.transformed()) {</span>
-<span class="nc" id="L363">            return Outcome.failure(transformationFailure(</span>
-<span class="nc" id="L364">                mapTransformationStatus(transformation.status()),</span>
-<span class="nc" id="L365">                transformation.detailCode(),</span>
+<span class="nc" id="L387">            transformation.totalWork());</span>
+<span class="nc bnc" id="L388" title="All 2 branches missed.">        if (!transformation.transformed()) {</span>
+<span class="nc" id="L389">            return Outcome.failure(transformationFailure(</span>
+<span class="nc" id="L390">                mapTransformationStatus(transformation.status()),</span>
+<span class="nc" id="L391">                transformation.detailCode(),</span>
                 position,
                 projection,
                 factorization,
@@ -370,13 +396,13 @@ public final class ExactNestedFactorizationTransformationPipeline {
                 throughTransformation));
         }
 
-<span class="nc" id="L373">        return Outcome.success(new PreparedTransformation(</span>
+<span class="nc" id="L399">        return Outcome.success(new PreparedTransformation(</span>
             projection,
             projected,
             factorization,
             transformation,
             throughTransformation,
-<span class="nc" id="L379">            preflight.replacementReserve(),</span>
+<span class="nc" id="L405">            preflight.replacementReserve(),</span>
             false));
     }
 
@@ -386,18 +412,18 @@ public final class ExactNestedFactorizationTransformationPipeline {
                 ExactParsedFactorizationPipeline.Result factorization,
                 OptionalInt candidateIndex
             ) {
-<span class="nc" id="L389">        ExactFactorizationTransformationPipeline transformationPipeline =</span>
+<span class="nc" id="L415">        ExactFactorizationTransformationPipeline transformationPipeline =</span>
             new ExactFactorizationTransformationPipeline(
                 renderer,
                 parser,
-                reconstructionView);
-<span class="nc bnc" id="L394" title="All 2 branches missed.">        if (candidateIndex.isPresent()) {</span>
-<span class="nc" id="L395">            return transformationPipeline.transformRoot(</span>
+                reconstructionView, authority);
+<span class="nc bnc" id="L420" title="All 2 branches missed.">        if (candidateIndex.isPresent()) {</span>
+<span class="nc" id="L421">            return transformationPipeline.transformRoot(</span>
                 projected,
                 factorization,
-<span class="nc" id="L398">                candidateIndex.getAsInt());</span>
+<span class="nc" id="L424">                candidateIndex.getAsInt());</span>
         }
-<span class="nc" id="L400">        return transformationPipeline.transformRoot(projected, factorization);</span>
+<span class="nc" id="L426">        return transformationPipeline.transformRoot(projected, factorization);</span>
     }
 
     private Result applyPreparedTransformation(
@@ -405,58 +431,58 @@ public final class ExactNestedFactorizationTransformationPipeline {
         TreePosition position,
         PreparedTransformation prepared
     ) {
-<span class="nc" id="L408">        Work work = new Work(prepared.replacementReserve());</span>
+<span class="nc" id="L434">        Work work = new Work(prepared.replacementReserve(), authority);</span>
         try {
-<span class="nc" id="L410">            Expr selected = selectAuthorizedOccurrence(</span>
+<span class="nc" id="L436">            Expr selected = selectAuthorizedOccurrence(</span>
                 root,
                 position,
                 prepared,
                 work);
-<span class="nc" id="L415">            AppliedReplacement applied = applyAuthorizedReplacement(</span>
+<span class="nc" id="L441">            AppliedReplacement applied = applyAuthorizedReplacement(</span>
                 root,
                 position,
                 prepared,
                 selected,
                 work);
-<span class="nc" id="L421">            String rewrittenHash = verifyReplacementReplay(</span>
+<span class="nc" id="L447">            String rewrittenHash = verifyReplacementReplay(</span>
                 root,
                 position,
                 applied,
                 work);
-<span class="nc" id="L426">            PolynomialWorkLedger totalWork = merge(</span>
-<span class="nc" id="L427">                prepared.throughTransformation(),</span>
-<span class="nc" id="L428">                work.ledger());</span>
-<span class="nc bnc" id="L429" title="All 2 branches missed.">            if (!totalWork.within(policy.maxTotalWorkUnits())) {</span>
-<span class="nc" id="L430">                throw invariant(</span>
+<span class="nc" id="L452">            PolynomialWorkLedger totalWork = merge(</span>
+<span class="nc" id="L453">                prepared.throughTransformation(),</span>
+<span class="nc" id="L454">                work.ledger());</span>
+<span class="nc bnc" id="L455" title="All 2 branches missed.">            if (!totalWork.within(policy.maxTotalWorkUnits())) {</span>
+<span class="nc" id="L456">                throw invariant(</span>
                     &quot;NESTED_PIPELINE_EXCEEDED_TOTAL_WORK_AUTHORITY&quot;);
             }
-<span class="nc" id="L433">            return success(</span>
+<span class="nc" id="L459">            return success(</span>
                 position,
-<span class="nc" id="L435">                prepared.projection(),</span>
-<span class="nc" id="L436">                prepared.factorization(),</span>
-<span class="nc" id="L437">                prepared.transformation(),</span>
-<span class="nc" id="L438">                applied.rewrittenRoot(),</span>
+<span class="nc" id="L461">                prepared.projection(),</span>
+<span class="nc" id="L462">                prepared.factorization(),</span>
+<span class="nc" id="L463">                prepared.transformation(),</span>
+<span class="nc" id="L464">                applied.rewrittenRoot(),</span>
                 rewrittenHash,
                 totalWork,
-<span class="nc" id="L441">                prepared.replay());</span>
-<span class="nc" id="L442">        } catch (ApplicationFailure exception) {</span>
-<span class="nc" id="L443">            return preparedFailure(</span>
-<span class="nc" id="L444">                exception.status(),</span>
-<span class="nc" id="L445">                exception.getMessage(),</span>
+<span class="nc" id="L467">                prepared.replay());</span>
+<span class="nc" id="L468">        } catch (ApplicationFailure exception) {</span>
+<span class="nc" id="L469">            return preparedFailure(</span>
+<span class="nc" id="L470">                exception.status(),</span>
+<span class="nc" id="L471">                exception.getMessage(),</span>
                 position,
                 prepared,
                 work);
-<span class="nc" id="L449">        } catch (WorkLimitReached | RepresentationLimitReached exception) {</span>
-<span class="nc" id="L450">            return preparedFailure(</span>
+<span class="nc" id="L475">        } catch (WorkLimitReached | RepresentationLimitReached | PolynomialWorkAuthority.LimitReached exception) {</span>
+<span class="nc" id="L476">            return preparedFailure(</span>
                 Status.BUDGET_INCONCLUSIVE,
-<span class="nc" id="L452">                exception.getMessage(),</span>
+<span class="nc" id="L478">                exception.getMessage(),</span>
                 position,
                 prepared,
                 work);
-<span class="nc" id="L456">        } catch (StructuralInvariantFailure exception) {</span>
-<span class="nc" id="L457">            return preparedFailure(</span>
+<span class="nc" id="L482">        } catch (StructuralInvariantFailure exception) {</span>
+<span class="nc" id="L483">            return preparedFailure(</span>
                 Status.TECHNICAL_FAILURE,
-<span class="nc" id="L459">                exception.getMessage(),</span>
+<span class="nc" id="L485">                exception.getMessage(),</span>
                 position,
                 prepared,
                 work);
@@ -469,37 +495,32 @@ public final class ExactNestedFactorizationTransformationPipeline {
         PreparedTransformation prepared,
         Work work
     ) {
-<span class="nc" id="L472">        Expr selected = position.subtreeAt(root.expression()).orElse(null);</span>
-<span class="nc" id="L473">        work.consume(</span>
-            &quot;nested.application-path-navigation&quot;,
-<span class="nc" id="L475">            position.path().size());</span>
-<span class="nc bnc" id="L476" title="All 2 branches missed.">        if (selected == null) {</span>
-<span class="nc" id="L477">            throw applicationFailure(</span>
+<span class="nc" id="L498">        work.consume(&quot;nested.application-path-navigation&quot;, position.path().size());</span>
+<span class="nc" id="L499">        Expr selected = position.subtreeAt(root.expression()).orElse(null);</span>
+<span class="nc bnc" id="L500" title="All 2 branches missed.">        if (selected == null) {</span>
+<span class="nc" id="L501">            throw applicationFailure(</span>
                 Status.POSITION_NOT_PRESENT,
                 &quot;SELECTED_PATH_DISAPPEARED_BEFORE_APPLICATION&quot;);
         }
-<span class="nc bnc" id="L481" title="All 2 branches missed.">        if (selected != prepared.projected().expression()) {</span>
-<span class="nc" id="L482">            throw applicationFailure(</span>
+<span class="nc bnc" id="L505" title="All 2 branches missed.">        if (selected != prepared.projected().expression()) {</span>
+<span class="nc" id="L506">            throw applicationFailure(</span>
                 Status.POSITION_STALE,
                 &quot;SELECTED_OCCURRENCE_IDENTITY_CHANGED_BEFORE_APPLICATION&quot;);
         }
 
-<span class="nc" id="L487">        work.consume(</span>
+<span class="nc" id="L511">        work.consume(</span>
             &quot;nested.application-staleness-format-node-visits&quot;,
-<span class="nc" id="L489">            prepared.projection().work().units(</span>
+<span class="nc" id="L513">            prepared.projection().work().units(</span>
                 &quot;projection.subtree-node-visits&quot;));
-<span class="nc" id="L491">        String applicationText = ExpressionFormatter.format(selected);</span>
-<span class="nc" id="L492">        work.consume(</span>
-            &quot;nested.application-staleness-text-code-units&quot;,
-<span class="nc" id="L494">            Math.addExact(</span>
-<span class="nc" id="L495">                (long) position.text().length(),</span>
-<span class="nc" id="L496">                applicationText.length()));</span>
-<span class="nc bnc" id="L497" title="All 2 branches missed.">        if (!position.text().equals(applicationText)) {</span>
-<span class="nc" id="L498">            throw applicationFailure(</span>
+<span class="nc" id="L515">        work.consume(&quot;nested.application-staleness-text-code-units&quot;, position.text().length());</span>
+<span class="nc" id="L516">        String applicationText = ExpressionFormatter.formatMeasured(selected,</span>
+<span class="nc" id="L517">            units -&gt; work.consume(&quot;nested.application-staleness-text-code-units&quot;, units));</span>
+<span class="nc bnc" id="L518" title="All 2 branches missed.">        if (!position.text().equals(applicationText)) {</span>
+<span class="nc" id="L519">            throw applicationFailure(</span>
                 Status.POSITION_STALE,
                 &quot;SELECTED_POSITION_TEXT_CHANGED_BEFORE_APPLICATION&quot;);
         }
-<span class="nc" id="L502">        return selected;</span>
+<span class="nc" id="L523">        return selected;</span>
     }
 
     private AppliedReplacement applyAuthorizedReplacement(
@@ -509,48 +530,43 @@ public final class ExactNestedFactorizationTransformationPipeline {
         Expr selected,
         Work work
     ) {
-<span class="nc" id="L512">        Expr replacement = prepared.transformation().reparsed()</span>
-<span class="nc" id="L513">            .orElseThrow().expression();</span>
-<span class="nc" id="L514">        countNodes(</span>
+<span class="nc" id="L533">        Expr replacement = prepared.transformation().reparsed()</span>
+<span class="nc" id="L534">            .orElseThrow().expression();</span>
+<span class="nc" id="L535">        countNodes(</span>
             replacement,
-<span class="nc" id="L516">            policy.maxReplacementNodes(),</span>
+<span class="nc" id="L537">            policy.maxReplacementNodes(),</span>
             work,
             &quot;nested.replacement-node-visits&quot;);
-<span class="nc" id="L519">        TreePosition.ReplacementResult applied = position.replaceAt(</span>
-<span class="nc" id="L520">            root.expression(),</span>
-            replacement);
-<span class="nc" id="L522">        work.consume(</span>
-            &quot;nested.replacement-path-navigation&quot;,
-<span class="nc" id="L524">            position.path().size());</span>
-<span class="nc" id="L525">        work.consume(</span>
-            &quot;nested.replacement-ancestor-copies&quot;,
-<span class="nc" id="L527">            applied.copiedAncestors());</span>
-<span class="nc bnc" id="L528" title="All 2 branches missed.">        if (!applied.success()</span>
-<span class="nc bnc" id="L529" title="All 2 branches missed.">                || applied.selectedSubtree().orElseThrow() != selected) {</span>
-<span class="nc" id="L530">            throw invariant(</span>
+<span class="nc" id="L540">        work.consumeTogether(new PolynomialWorkLedger(Map.of(</span>
+<span class="nc" id="L541">            &quot;nested.replacement-path-navigation&quot;, (long) position.path().size(),</span>
+<span class="nc" id="L542">            &quot;nested.replacement-ancestor-copies&quot;, (long) position.path().size())));</span>
+<span class="nc" id="L543">        TreePosition.ReplacementResult applied = position.replaceAt(root.expression(), replacement);</span>
+<span class="nc bnc" id="L544" title="All 2 branches missed.">        if (applied.copiedAncestors() != position.path().size()) {</span>
+<span class="nc" id="L545">            throw invariant(&quot;STRUCTURAL_REPLACEMENT_COPY_COUNT_CHANGED&quot;);</span>
+        }
+<span class="nc bnc" id="L547" title="All 2 branches missed.">        if (!applied.success()</span>
+<span class="nc bnc" id="L548" title="All 2 branches missed.">                || applied.selectedSubtree().orElseThrow() != selected) {</span>
+<span class="nc" id="L549">            throw invariant(</span>
                 &quot;STRUCTURAL_REPLACEMENT_DID_NOT_TARGET_AUTHORIZED_OCCURRENCE&quot;);
         }
 
-<span class="nc" id="L534">        Expr rewrittenRoot = applied.rewrittenRoot().orElseThrow();</span>
-<span class="nc bnc" id="L535" title="All 2 branches missed.">        if (!surroundingReferencesPreserved(</span>
-<span class="nc" id="L536">                root.expression(),</span>
+<span class="nc" id="L553">        Expr rewrittenRoot = applied.rewrittenRoot().orElseThrow();</span>
+<span class="nc bnc" id="L554" title="All 2 branches missed.">        if (!surroundingReferencesPreserved(</span>
+<span class="nc" id="L555">                root.expression(),</span>
                 rewrittenRoot,
-<span class="nc" id="L538">                position.path(),</span>
+<span class="nc" id="L557">                position.path(),</span>
                 replacement,
                 work)) {
-<span class="nc" id="L541">            throw invariant(</span>
+<span class="nc" id="L560">            throw invariant(</span>
                 &quot;STRUCTURAL_REPLACEMENT_CHANGED_UNAUTHORIZED_SURROUNDING_AST&quot;);
         }
-<span class="nc" id="L544">        Expr replayedOccurrence = position.subtreeAt(</span>
-<span class="nc" id="L545">            rewrittenRoot).orElse(null);</span>
-<span class="nc" id="L546">        work.consume(</span>
-            &quot;nested.rewritten-path-replay&quot;,
-<span class="nc" id="L548">            position.path().size());</span>
-<span class="nc bnc" id="L549" title="All 2 branches missed.">        if (replayedOccurrence != replacement) {</span>
-<span class="nc" id="L550">            throw invariant(</span>
+<span class="nc" id="L563">        work.consume(&quot;nested.rewritten-path-replay&quot;, position.path().size());</span>
+<span class="nc" id="L564">        Expr replayedOccurrence = position.subtreeAt(rewrittenRoot).orElse(null);</span>
+<span class="nc bnc" id="L565" title="All 2 branches missed.">        if (replayedOccurrence != replacement) {</span>
+<span class="nc" id="L566">            throw invariant(</span>
                 &quot;REWRITTEN_PATH_DOES_NOT_RESOLVE_TO_REPLACEMENT&quot;);
         }
-<span class="nc" id="L553">        return new AppliedReplacement(replacement, rewrittenRoot);</span>
+<span class="nc" id="L569">        return new AppliedReplacement(replacement, rewrittenRoot);</span>
     }
 
     private String verifyReplacementReplay(
@@ -559,37 +575,35 @@ public final class ExactNestedFactorizationTransformationPipeline {
         AppliedReplacement applied,
         Work work
     ) {
-<span class="nc" id="L562">        TreePosition.ReplacementResult replay = position.replaceAt(</span>
-<span class="nc" id="L563">            root.expression(),</span>
-<span class="nc" id="L564">            applied.replacement());</span>
-<span class="nc" id="L565">        work.consume(</span>
-            &quot;nested.replacement-replay-path-navigation&quot;,
-<span class="nc" id="L567">            position.path().size());</span>
-<span class="nc" id="L568">        work.consume(</span>
-            &quot;nested.replacement-replay-ancestor-copies&quot;,
-<span class="nc" id="L570">            replay.copiedAncestors());</span>
-<span class="nc bnc" id="L571" title="All 2 branches missed.">        if (!replay.success()) {</span>
-<span class="nc" id="L572">            throw invariant(&quot;STRUCTURAL_REPLACEMENT_IS_NOT_REPLAYABLE&quot;);</span>
+<span class="nc" id="L578">        work.consumeTogether(new PolynomialWorkLedger(Map.of(</span>
+<span class="nc" id="L579">            &quot;nested.replacement-replay-path-navigation&quot;, (long) position.path().size(),</span>
+<span class="nc" id="L580">            &quot;nested.replacement-replay-ancestor-copies&quot;, (long) position.path().size())));</span>
+<span class="nc" id="L581">        TreePosition.ReplacementResult replay = position.replaceAt(root.expression(), applied.replacement());</span>
+<span class="nc bnc" id="L582" title="All 2 branches missed.">        if (replay.copiedAncestors() != position.path().size()) {</span>
+<span class="nc" id="L583">            throw invariant(&quot;STRUCTURAL_REPLAY_COPY_COUNT_CHANGED&quot;);</span>
+        }
+<span class="nc bnc" id="L585" title="All 2 branches missed.">        if (!replay.success()) {</span>
+<span class="nc" id="L586">            throw invariant(&quot;STRUCTURAL_REPLACEMENT_IS_NOT_REPLAYABLE&quot;);</span>
         }
 
-<span class="nc" id="L575">        int rewrittenNodeLimit = Math.addExact(</span>
-<span class="nc" id="L576">            policy.maxRootNodes(),</span>
-<span class="nc" id="L577">            policy.maxReplacementNodes());</span>
-<span class="nc" id="L578">        String rewrittenHash = structuralHash(</span>
-<span class="nc" id="L579">            applied.rewrittenRoot(),</span>
+<span class="nc" id="L589">        int rewrittenNodeLimit = Math.addExact(</span>
+<span class="nc" id="L590">            policy.maxRootNodes(),</span>
+<span class="nc" id="L591">            policy.maxReplacementNodes());</span>
+<span class="nc" id="L592">        String rewrittenHash = structuralHash(</span>
+<span class="nc" id="L593">            applied.rewrittenRoot(),</span>
             rewrittenNodeLimit,
             work,
             &quot;nested.rewritten-structural-hash&quot;);
-<span class="nc" id="L583">        String replayHash = structuralHash(</span>
-<span class="nc" id="L584">            replay.rewrittenRoot().orElseThrow(),</span>
+<span class="nc" id="L597">        String replayHash = structuralHash(</span>
+<span class="nc" id="L598">            replay.rewrittenRoot().orElseThrow(),</span>
             rewrittenNodeLimit,
             work,
             &quot;nested.replay-structural-hash&quot;);
-<span class="nc bnc" id="L588" title="All 2 branches missed.">        if (!rewrittenHash.equals(replayHash)) {</span>
-<span class="nc" id="L589">            throw invariant(</span>
+<span class="nc bnc" id="L602" title="All 2 branches missed.">        if (!rewrittenHash.equals(replayHash)) {</span>
+<span class="nc" id="L603">            throw invariant(</span>
                 &quot;STRUCTURAL_REPLACEMENT_REPLAY_HASH_MISMATCH&quot;);
         }
-<span class="nc" id="L592">        return rewrittenHash;</span>
+<span class="nc" id="L606">        return rewrittenHash;</span>
     }
 
     private Result emptyFailure(
@@ -597,11 +611,11 @@ public final class ExactNestedFactorizationTransformationPipeline {
         String detailCode,
         TreePosition position
     ) {
-<span class="nc" id="L600">        return failure(</span>
+<span class="nc" id="L614">        return failure(</span>
             status,
             detailCode,
             position,
-<span class="nc" id="L604">            PolynomialWorkLedger.empty());</span>
+<span class="nc" id="L618">            PolynomialWorkLedger.empty());</span>
     }
 
     private Result failure(
@@ -610,15 +624,15 @@ public final class ExactNestedFactorizationTransformationPipeline {
         TreePosition position,
         PolynomialWorkLedger totalWork
     ) {
-<span class="nc" id="L613">        return failure(</span>
+<span class="nc" id="L627">        return failure(</span>
             status,
             detailCode,
             position,
-<span class="nc" id="L617">            Optional.empty(),</span>
-<span class="nc" id="L618">            Optional.empty(),</span>
-<span class="nc" id="L619">            Optional.empty(),</span>
-<span class="nc" id="L620">            Optional.empty(),</span>
-<span class="nc" id="L621">            Optional.empty(),</span>
+<span class="nc" id="L631">            Optional.empty(),</span>
+<span class="nc" id="L632">            Optional.empty(),</span>
+<span class="nc" id="L633">            Optional.empty(),</span>
+<span class="nc" id="L634">            Optional.empty(),</span>
+<span class="nc" id="L635">            Optional.empty(),</span>
             totalWork);
     }
 
@@ -629,15 +643,15 @@ public final class ExactNestedFactorizationTransformationPipeline {
         ExactParsedSubtermProjector.Result projection,
         PolynomialWorkLedger totalWork
     ) {
-<span class="nc" id="L632">        return failure(</span>
+<span class="nc" id="L646">        return failure(</span>
             status,
             detailCode,
             position,
-<span class="nc" id="L636">            Optional.of(projection),</span>
-<span class="nc" id="L637">            Optional.empty(),</span>
-<span class="nc" id="L638">            Optional.empty(),</span>
-<span class="nc" id="L639">            Optional.empty(),</span>
-<span class="nc" id="L640">            Optional.empty(),</span>
+<span class="nc" id="L650">            Optional.of(projection),</span>
+<span class="nc" id="L651">            Optional.empty(),</span>
+<span class="nc" id="L652">            Optional.empty(),</span>
+<span class="nc" id="L653">            Optional.empty(),</span>
+<span class="nc" id="L654">            Optional.empty(),</span>
             totalWork);
     }
 
@@ -650,15 +664,15 @@ public final class ExactNestedFactorizationTransformationPipeline {
         ExactFactorizationTransformationPipeline.Result transformation,
         PolynomialWorkLedger totalWork
     ) {
-<span class="nc" id="L653">        return failure(</span>
+<span class="nc" id="L667">        return failure(</span>
             status,
             detailCode,
             position,
-<span class="nc" id="L657">            Optional.of(projection),</span>
-<span class="nc" id="L658">            Optional.of(factorization),</span>
-<span class="nc" id="L659">            Optional.of(transformation),</span>
-<span class="nc" id="L660">            Optional.empty(),</span>
-<span class="nc" id="L661">            Optional.empty(),</span>
+<span class="nc" id="L671">            Optional.of(projection),</span>
+<span class="nc" id="L672">            Optional.of(factorization),</span>
+<span class="nc" id="L673">            Optional.of(transformation),</span>
+<span class="nc" id="L674">            Optional.empty(),</span>
+<span class="nc" id="L675">            Optional.empty(),</span>
             totalWork);
     }
 
@@ -669,14 +683,14 @@ public final class ExactNestedFactorizationTransformationPipeline {
         PreparedTransformation prepared,
         Work work
     ) {
-<span class="nc" id="L672">        return transformationFailure(</span>
+<span class="nc" id="L686">        return transformationFailure(</span>
             status,
             detailCode,
             position,
-<span class="nc" id="L676">            prepared.projection(),</span>
-<span class="nc" id="L677">            prepared.factorization(),</span>
-<span class="nc" id="L678">            prepared.transformation(),</span>
-<span class="nc" id="L679">            merge(prepared.throughTransformation(), work.ledger()));</span>
+<span class="nc" id="L690">            prepared.projection(),</span>
+<span class="nc" id="L691">            prepared.factorization(),</span>
+<span class="nc" id="L692">            prepared.transformation(),</span>
+<span class="nc" id="L693">            merge(prepared.throughTransformation(), work.ledger()));</span>
     }
 
     private boolean canReserveBeforeProjection(
@@ -685,15 +699,15 @@ public final class ExactNestedFactorizationTransformationPipeline {
         long extractionCeiling
     ) {
         try {
-<span class="nc" id="L688">            long required = priorWork.totalWorkUnits();</span>
-<span class="nc" id="L689">            required = Math.addExact(</span>
+<span class="nc" id="L702">            long required = priorWork.totalWorkUnits();</span>
+<span class="nc" id="L703">            required = Math.addExact(</span>
                 required,
-<span class="nc" id="L691">                projector.policy().maxWorkUnits());</span>
-<span class="nc" id="L692">            required = Math.addExact(required, replacementReserve);</span>
-<span class="nc" id="L693">            required = Math.addExact(required, extractionCeiling);</span>
-<span class="nc bnc" id="L694" title="All 2 branches missed.">            return required &lt;= policy.maxTotalWorkUnits();</span>
-<span class="nc" id="L695">        } catch (ArithmeticException exception) {</span>
-<span class="nc" id="L696">            return false;</span>
+<span class="nc" id="L705">                projector.policy().maxWorkUnits());</span>
+<span class="nc" id="L706">            required = Math.addExact(required, replacementReserve);</span>
+<span class="nc" id="L707">            required = Math.addExact(required, extractionCeiling);</span>
+<span class="nc bnc" id="L708" title="All 2 branches missed.">            return required &lt;= policy.maxTotalWorkUnits();</span>
+<span class="nc" id="L709">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L710">            return false;</span>
         }
     }
 
@@ -701,56 +715,56 @@ public final class ExactNestedFactorizationTransformationPipeline {
         PolynomialWorkLedger priorWork,
         long replacementReserve
     ) {
-<span class="nc" id="L704">        long consumedAndReserved = Math.addExact(</span>
-<span class="nc" id="L705">            priorWork.totalWorkUnits(),</span>
+<span class="nc" id="L718">        long consumedAndReserved = Math.addExact(</span>
+<span class="nc" id="L719">            priorWork.totalWorkUnits(),</span>
             replacementReserve);
-<span class="nc" id="L707">        return policy.maxTotalWorkUnits() - consumedAndReserved;</span>
+<span class="nc" id="L721">        return policy.maxTotalWorkUnits() - consumedAndReserved;</span>
     }
 
     private long extractionWorkCeiling() {
-<span class="nc" id="L711">        return Math.addExact(</span>
-<span class="nc" id="L712">            (long) extractionView.budget().maxVisitedNodes(),</span>
-<span class="nc" id="L713">            extractionView.budget().maxArithmeticOperations());</span>
+<span class="nc" id="L725">        return Math.addExact(</span>
+<span class="nc" id="L726">            (long) extractionView.budget().maxVisitedNodes(),</span>
+<span class="nc" id="L727">            extractionView.budget().maxArithmeticOperations());</span>
     }
 
     private long replacementReplayWorkCeiling() {
         try {
-<span class="nc" id="L718">            long result = projector.policy().maxSubtreeNodes();</span>
-<span class="nc" id="L719">            result = Math.addExact(</span>
+<span class="nc" id="L732">            long result = projector.policy().maxSubtreeNodes();</span>
+<span class="nc" id="L733">            result = Math.addExact(</span>
                 result,
-<span class="nc" id="L721">                Math.multiplyExact(</span>
+<span class="nc" id="L735">                Math.multiplyExact(</span>
                     2L,
-<span class="nc" id="L723">                    projector.policy().maxFormattedCodeUnits()));</span>
-<span class="nc" id="L724">            result = Math.addExact(</span>
+<span class="nc" id="L737">                    projector.policy().maxFormattedCodeUnits()));</span>
+<span class="nc" id="L738">            result = Math.addExact(</span>
                 result,
-<span class="nc" id="L726">                Math.multiplyExact(8L, policy.maxPathDepth()));</span>
-<span class="nc" id="L727">            result = Math.addExact(</span>
+<span class="nc" id="L740">                Math.multiplyExact(8L, policy.maxPathDepth()));</span>
+<span class="nc" id="L741">            result = Math.addExact(</span>
                 result,
-<span class="nc" id="L729">                Math.multiplyExact(2L, policy.maxRootNodes()));</span>
-<span class="nc" id="L730">            result = Math.addExact(</span>
+<span class="nc" id="L743">                Math.multiplyExact(2L, policy.maxRootNodes()));</span>
+<span class="nc" id="L744">            result = Math.addExact(</span>
                 result,
-<span class="nc" id="L732">                Math.multiplyExact(3L, policy.maxReplacementNodes()));</span>
-<span class="nc" id="L733">            long hashNodes = Math.addExact(</span>
-<span class="nc" id="L734">                (long) policy.maxRootNodes(),</span>
-<span class="nc" id="L735">                policy.maxReplacementNodes());</span>
-<span class="nc" id="L736">            long structuralPayloadBytesPerHash = Math.addExact(</span>
-<span class="nc" id="L737">                Math.multiplyExact(</span>
+<span class="nc" id="L746">                Math.multiplyExact(3L, policy.maxReplacementNodes()));</span>
+<span class="nc" id="L747">            long hashNodes = Math.addExact(</span>
+<span class="nc" id="L748">                (long) policy.maxRootNodes(),</span>
+<span class="nc" id="L749">                policy.maxReplacementNodes());</span>
+<span class="nc" id="L750">            long structuralPayloadBytesPerHash = Math.addExact(</span>
+<span class="nc" id="L751">                Math.multiplyExact(</span>
                     4L,
-<span class="nc" id="L739">                    Math.addExact(</span>
-<span class="nc" id="L740">                        (long) projector.policy().maxRootSourceCodeUnits(),</span>
-<span class="nc" id="L741">                        renderer.policy().maxOutputCodeUnits())),</span>
-<span class="nc" id="L742">                Math.multiplyExact(64L, hashNodes));</span>
-<span class="nc" id="L743">            result = Math.addExact(</span>
+<span class="nc" id="L753">                    Math.addExact(</span>
+<span class="nc" id="L754">                        (long) projector.policy().maxRootSourceCodeUnits(),</span>
+<span class="nc" id="L755">                        renderer.policy().maxOutputCodeUnits())),</span>
+<span class="nc" id="L756">                Math.multiplyExact(64L, hashNodes));</span>
+<span class="nc" id="L757">            result = Math.addExact(</span>
                 result,
-<span class="nc" id="L745">                Math.multiplyExact(2L, structuralPayloadBytesPerHash));</span>
-<span class="nc" id="L746">            result = Math.addExact(</span>
+<span class="nc" id="L759">                Math.multiplyExact(2L, structuralPayloadBytesPerHash));</span>
+<span class="nc" id="L760">            result = Math.addExact(</span>
                 result,
-<span class="nc" id="L748">                Math.multiplyExact(</span>
-<span class="nc" id="L749">                    Math.multiplyExact(2L, STRUCTURAL_HASH_UNITS_PER_NODE),</span>
+<span class="nc" id="L762">                Math.multiplyExact(</span>
+<span class="nc" id="L763">                    Math.multiplyExact(2L, STRUCTURAL_HASH_UNITS_PER_NODE),</span>
                     hashNodes));
-<span class="nc" id="L751">            return result;</span>
-<span class="nc" id="L752">        } catch (ArithmeticException exception) {</span>
-<span class="nc" id="L753">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L765">            return result;</span>
+<span class="nc" id="L766">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L767">            throw new IllegalArgumentException(</span>
                 &quot;nested replacement reserve exceeds long range&quot;,
                 exception);
         }
@@ -759,11 +773,11 @@ public final class ExactNestedFactorizationTransformationPipeline {
     private ExactParsedFactorizationPipeline.Policy factorizationPolicy(
         long authority
     ) {
-<span class="nc" id="L762">        return new ExactParsedFactorizationPipeline.Policy(</span>
-<span class="nc" id="L763">            policy.structuralLimits(),</span>
-<span class="nc" id="L764">            policy.maxCandidates(),</span>
+<span class="nc" id="L776">        return new ExactParsedFactorizationPipeline.Policy(</span>
+<span class="nc" id="L777">            policy.structuralLimits(),</span>
+<span class="nc" id="L778">            policy.maxCandidates(),</span>
             authority,
-<span class="nc" id="L766">            policy.evidenceRequirement());</span>
+<span class="nc" id="L780">            policy.evidenceRequirement());</span>
     }
 
     private static boolean surroundingReferencesPreserved(
@@ -773,19 +787,19 @@ public final class ExactNestedFactorizationTransformationPipeline {
         Expr replacement,
         Work work
     ) {
-<span class="nc" id="L776">        ReferencePair current = new ReferencePair(original, rewritten);</span>
-<span class="nc bnc" id="L777" title="All 2 branches missed.">        for (int selectedIndex : path) {</span>
-<span class="nc" id="L778">            work.consume(&quot;nested.unchanged-ancestor-checks&quot;, 1);</span>
-<span class="nc" id="L779">            Optional&lt;ReferencePair&gt; next = preservedReferenceStep(</span>
+<span class="nc" id="L790">        ReferencePair current = new ReferencePair(original, rewritten);</span>
+<span class="nc bnc" id="L791" title="All 2 branches missed.">        for (int selectedIndex : path) {</span>
+<span class="nc" id="L792">            work.consume(&quot;nested.unchanged-ancestor-checks&quot;, 1);</span>
+<span class="nc" id="L793">            Optional&lt;ReferencePair&gt; next = preservedReferenceStep(</span>
                 current,
                 selectedIndex,
                 work);
-<span class="nc bnc" id="L783" title="All 2 branches missed.">            if (next.isEmpty()) {</span>
-<span class="nc" id="L784">                return false;</span>
+<span class="nc bnc" id="L797" title="All 2 branches missed.">            if (next.isEmpty()) {</span>
+<span class="nc" id="L798">                return false;</span>
             }
-<span class="nc" id="L786">            current = next.orElseThrow();</span>
-<span class="nc" id="L787">        }</span>
-<span class="nc bnc" id="L788" title="All 2 branches missed.">        return current.after() == replacement;</span>
+<span class="nc" id="L800">            current = next.orElseThrow();</span>
+<span class="nc" id="L801">        }</span>
+<span class="nc bnc" id="L802" title="All 2 branches missed.">        return current.after() == replacement;</span>
     }
 
     private static Optional&lt;ReferencePair&gt; preservedReferenceStep(
@@ -793,23 +807,23 @@ public final class ExactNestedFactorizationTransformationPipeline {
         int selectedIndex,
         Work work
     ) {
-<span class="nc bnc" id="L796" title="All 2 branches missed.">        if (current.before() instanceof BinaryExpr originalBinary</span>
-<span class="nc bnc" id="L797" title="All 2 branches missed.">                &amp;&amp; current.after() instanceof BinaryExpr rewrittenBinary) {</span>
-<span class="nc" id="L798">            return preservedBinaryStep(</span>
+<span class="nc bnc" id="L810" title="All 2 branches missed.">        if (current.before() instanceof BinaryExpr originalBinary</span>
+<span class="nc bnc" id="L811" title="All 2 branches missed.">                &amp;&amp; current.after() instanceof BinaryExpr rewrittenBinary) {</span>
+<span class="nc" id="L812">            return preservedBinaryStep(</span>
                 originalBinary,
                 rewrittenBinary,
                 selectedIndex,
                 work);
         }
-<span class="nc bnc" id="L804" title="All 2 branches missed.">        if (current.before() instanceof FunctionExpr originalFunction</span>
-<span class="nc bnc" id="L805" title="All 2 branches missed.">                &amp;&amp; current.after() instanceof FunctionExpr rewrittenFunction) {</span>
-<span class="nc" id="L806">            return preservedFunctionStep(</span>
+<span class="nc bnc" id="L818" title="All 2 branches missed.">        if (current.before() instanceof FunctionExpr originalFunction</span>
+<span class="nc bnc" id="L819" title="All 2 branches missed.">                &amp;&amp; current.after() instanceof FunctionExpr rewrittenFunction) {</span>
+<span class="nc" id="L820">            return preservedFunctionStep(</span>
                 originalFunction,
                 rewrittenFunction,
                 selectedIndex,
                 work);
         }
-<span class="nc" id="L812">        return Optional.empty();</span>
+<span class="nc" id="L826">        return Optional.empty();</span>
     }
 
     private static Optional&lt;ReferencePair&gt; preservedBinaryStep(
@@ -818,21 +832,21 @@ public final class ExactNestedFactorizationTransformationPipeline {
         int selectedIndex,
         Work work
     ) {
-<span class="nc bnc" id="L821" title="All 2 branches missed.">        if (original.operator() != rewritten.operator()) {</span>
-<span class="nc" id="L822">            return Optional.empty();</span>
+<span class="nc bnc" id="L835" title="All 2 branches missed.">        if (original.operator() != rewritten.operator()) {</span>
+<span class="nc" id="L836">            return Optional.empty();</span>
         }
-<span class="nc bnc" id="L824" title="All 3 branches missed.">        return switch (selectedIndex) {</span>
-<span class="nc bnc" id="L825" title="All 2 branches missed.">            case 0 -&gt; preservedSibling(original.right(), rewritten.right(), work)</span>
-<span class="nc" id="L826">                ? Optional.of(new ReferencePair(</span>
-<span class="nc" id="L827">                    original.left(),</span>
-<span class="nc" id="L828">                    rewritten.left()))</span>
-<span class="nc" id="L829">                : Optional.empty();</span>
-<span class="nc bnc" id="L830" title="All 2 branches missed.">            case 1 -&gt; preservedSibling(original.left(), rewritten.left(), work)</span>
-<span class="nc" id="L831">                ? Optional.of(new ReferencePair(</span>
-<span class="nc" id="L832">                    original.right(),</span>
-<span class="nc" id="L833">                    rewritten.right()))</span>
-<span class="nc" id="L834">                : Optional.empty();</span>
-<span class="nc" id="L835">            default -&gt; Optional.empty();</span>
+<span class="nc bnc" id="L838" title="All 3 branches missed.">        return switch (selectedIndex) {</span>
+<span class="nc bnc" id="L839" title="All 2 branches missed.">            case 0 -&gt; preservedSibling(original.right(), rewritten.right(), work)</span>
+<span class="nc" id="L840">                ? Optional.of(new ReferencePair(</span>
+<span class="nc" id="L841">                    original.left(),</span>
+<span class="nc" id="L842">                    rewritten.left()))</span>
+<span class="nc" id="L843">                : Optional.empty();</span>
+<span class="nc bnc" id="L844" title="All 2 branches missed.">            case 1 -&gt; preservedSibling(original.left(), rewritten.left(), work)</span>
+<span class="nc" id="L845">                ? Optional.of(new ReferencePair(</span>
+<span class="nc" id="L846">                    original.right(),</span>
+<span class="nc" id="L847">                    rewritten.right()))</span>
+<span class="nc" id="L848">                : Optional.empty();</span>
+<span class="nc" id="L849">            default -&gt; Optional.empty();</span>
         };
     }
 
@@ -842,19 +856,19 @@ public final class ExactNestedFactorizationTransformationPipeline {
         int selectedIndex,
         Work work
     ) {
-<span class="nc bnc" id="L845" title="All 2 branches missed.">        if (!sameFunctionShape(original, rewritten, selectedIndex)) {</span>
-<span class="nc" id="L846">            return Optional.empty();</span>
+<span class="nc bnc" id="L859" title="All 2 branches missed.">        if (!sameFunctionShape(original, rewritten, selectedIndex)) {</span>
+<span class="nc" id="L860">            return Optional.empty();</span>
         }
-<span class="nc bnc" id="L848" title="All 2 branches missed.">        if (!functionSiblingsPreserved(</span>
+<span class="nc bnc" id="L862" title="All 2 branches missed.">        if (!functionSiblingsPreserved(</span>
                 original,
                 rewritten,
                 selectedIndex,
                 work)) {
-<span class="nc" id="L853">            return Optional.empty();</span>
+<span class="nc" id="L867">            return Optional.empty();</span>
         }
-<span class="nc" id="L855">        return Optional.of(new ReferencePair(</span>
-<span class="nc" id="L856">            original.arguments().get(selectedIndex),</span>
-<span class="nc" id="L857">            rewritten.arguments().get(selectedIndex)));</span>
+<span class="nc" id="L869">        return Optional.of(new ReferencePair(</span>
+<span class="nc" id="L870">            original.arguments().get(selectedIndex),</span>
+<span class="nc" id="L871">            rewritten.arguments().get(selectedIndex)));</span>
     }
 
     private static boolean sameFunctionShape(
@@ -862,10 +876,10 @@ public final class ExactNestedFactorizationTransformationPipeline {
         FunctionExpr rewritten,
         int selectedIndex
     ) {
-<span class="nc bnc" id="L865" title="All 2 branches missed.">        return original.name().equals(rewritten.name())</span>
-<span class="nc bnc" id="L866" title="All 4 branches missed.">            &amp;&amp; original.arguments().size() == rewritten.arguments().size()</span>
+<span class="nc bnc" id="L879" title="All 2 branches missed.">        return original.name().equals(rewritten.name())</span>
+<span class="nc bnc" id="L880" title="All 4 branches missed.">            &amp;&amp; original.arguments().size() == rewritten.arguments().size()</span>
             &amp;&amp; selectedIndex &gt;= 0
-<span class="nc bnc" id="L868" title="All 2 branches missed.">            &amp;&amp; selectedIndex &lt; original.arguments().size();</span>
+<span class="nc bnc" id="L882" title="All 2 branches missed.">            &amp;&amp; selectedIndex &lt; original.arguments().size();</span>
     }
 
     private static boolean functionSiblingsPreserved(
@@ -874,18 +888,18 @@ public final class ExactNestedFactorizationTransformationPipeline {
         int selectedIndex,
         Work work
     ) {
-<span class="nc bnc" id="L877" title="All 2 branches missed.">        for (int index = 0; index &lt; original.arguments().size(); index++) {</span>
-<span class="nc bnc" id="L878" title="All 2 branches missed.">            if (index == selectedIndex) {</span>
-<span class="nc" id="L879">                continue;</span>
+<span class="nc bnc" id="L891" title="All 2 branches missed.">        for (int index = 0; index &lt; original.arguments().size(); index++) {</span>
+<span class="nc bnc" id="L892" title="All 2 branches missed.">            if (index == selectedIndex) {</span>
+<span class="nc" id="L893">                continue;</span>
             }
-<span class="nc bnc" id="L881" title="All 2 branches missed.">            if (!preservedSibling(</span>
-<span class="nc" id="L882">                    original.arguments().get(index),</span>
-<span class="nc" id="L883">                    rewritten.arguments().get(index),</span>
+<span class="nc bnc" id="L895" title="All 2 branches missed.">            if (!preservedSibling(</span>
+<span class="nc" id="L896">                    original.arguments().get(index),</span>
+<span class="nc" id="L897">                    rewritten.arguments().get(index),</span>
                     work)) {
-<span class="nc" id="L885">                return false;</span>
+<span class="nc" id="L899">                return false;</span>
             }
         }
-<span class="nc" id="L888">        return true;</span>
+<span class="nc" id="L902">        return true;</span>
     }
 
     private static boolean preservedSibling(
@@ -893,8 +907,8 @@ public final class ExactNestedFactorizationTransformationPipeline {
         Expr rewritten,
         Work work
     ) {
-<span class="nc" id="L896">        work.consume(&quot;nested.unchanged-sibling-checks&quot;, 1);</span>
-<span class="nc bnc" id="L897" title="All 2 branches missed.">        return original == rewritten;</span>
+<span class="nc" id="L910">        work.consume(&quot;nested.unchanged-sibling-checks&quot;, 1);</span>
+<span class="nc bnc" id="L911" title="All 2 branches missed.">        return original == rewritten;</span>
     }
 
     private static int countNodes(
@@ -903,23 +917,23 @@ public final class ExactNestedFactorizationTransformationPipeline {
         Work work,
         String stage
     ) {
-<span class="nc" id="L906">        Deque&lt;Expr&gt; pending = new ArrayDeque&lt;&gt;();</span>
-<span class="nc" id="L907">        IdentityHashMap&lt;Expr, Boolean&gt; visited = new IdentityHashMap&lt;&gt;();</span>
-<span class="nc" id="L908">        pending.push(Objects.requireNonNull(root, &quot;root&quot;));</span>
-<span class="nc" id="L909">        int count = 0;</span>
-<span class="nc bnc" id="L910" title="All 2 branches missed.">        while (!pending.isEmpty()) {</span>
-<span class="nc" id="L911">            Expr node = pending.pop();</span>
-<span class="nc bnc" id="L912" title="All 2 branches missed.">            if (visited.put(node, Boolean.TRUE) != null) {</span>
-<span class="nc" id="L913">                throw invariant(&quot;AST_REUSES_NODE_IDENTITY&quot;);</span>
+<span class="nc" id="L920">        Deque&lt;Expr&gt; pending = new ArrayDeque&lt;&gt;();</span>
+<span class="nc" id="L921">        IdentityHashMap&lt;Expr, Boolean&gt; visited = new IdentityHashMap&lt;&gt;();</span>
+<span class="nc" id="L922">        pending.push(Objects.requireNonNull(root, &quot;root&quot;));</span>
+<span class="nc" id="L923">        int count = 0;</span>
+<span class="nc bnc" id="L924" title="All 2 branches missed.">        while (!pending.isEmpty()) {</span>
+<span class="nc" id="L925">            Expr node = pending.pop();</span>
+<span class="nc bnc" id="L926" title="All 2 branches missed.">            if (visited.put(node, Boolean.TRUE) != null) {</span>
+<span class="nc" id="L927">                throw invariant(&quot;AST_REUSES_NODE_IDENTITY&quot;);</span>
             }
-<span class="nc" id="L915">            count++;</span>
-<span class="nc bnc" id="L916" title="All 2 branches missed.">            if (count &gt; limit) {</span>
-<span class="nc" id="L917">                throw representationLimit(stage + &quot;_LIMIT_EXCEEDED&quot;);</span>
+<span class="nc" id="L929">            count++;</span>
+<span class="nc bnc" id="L930" title="All 2 branches missed.">            if (count &gt; limit) {</span>
+<span class="nc" id="L931">                throw representationLimit(stage + &quot;_LIMIT_EXCEEDED&quot;);</span>
             }
-<span class="nc" id="L919">            work.consume(stage, 1);</span>
-<span class="nc" id="L920">            pushChildren(node, pending);</span>
-<span class="nc" id="L921">        }</span>
-<span class="nc" id="L922">        return count;</span>
+<span class="nc" id="L933">            work.consume(stage, 1);</span>
+<span class="nc" id="L934">            pushChildren(node, pending);</span>
+<span class="nc" id="L935">        }</span>
+<span class="nc" id="L936">        return count;</span>
     }
 
     private static String structuralHash(
@@ -928,68 +942,68 @@ public final class ExactNestedFactorizationTransformationPipeline {
         Work work,
         String stage
     ) {
-<span class="nc" id="L931">        Deque&lt;Expr&gt; pending = new ArrayDeque&lt;&gt;();</span>
-<span class="nc" id="L932">        IdentityHashMap&lt;Expr, Boolean&gt; visited = new IdentityHashMap&lt;&gt;();</span>
-<span class="nc" id="L933">        EvidenceDigest digest = new EvidenceDigest();</span>
-<span class="nc" id="L934">        pending.push(Objects.requireNonNull(root, &quot;root&quot;));</span>
-<span class="nc" id="L935">        int count = 0;</span>
-<span class="nc bnc" id="L936" title="All 2 branches missed.">        while (!pending.isEmpty()) {</span>
-<span class="nc" id="L937">            Expr node = pending.pop();</span>
-<span class="nc bnc" id="L938" title="All 2 branches missed.">            if (visited.put(node, Boolean.TRUE) != null) {</span>
-<span class="nc" id="L939">                throw invariant(&quot;REWRITTEN_AST_REUSES_NODE_IDENTITY&quot;);</span>
+<span class="nc" id="L945">        Deque&lt;Expr&gt; pending = new ArrayDeque&lt;&gt;();</span>
+<span class="nc" id="L946">        IdentityHashMap&lt;Expr, Boolean&gt; visited = new IdentityHashMap&lt;&gt;();</span>
+<span class="nc" id="L947">        EvidenceDigest digest = new EvidenceDigest();</span>
+<span class="nc" id="L948">        pending.push(Objects.requireNonNull(root, &quot;root&quot;));</span>
+<span class="nc" id="L949">        int count = 0;</span>
+<span class="nc bnc" id="L950" title="All 2 branches missed.">        while (!pending.isEmpty()) {</span>
+<span class="nc" id="L951">            Expr node = pending.pop();</span>
+<span class="nc bnc" id="L952" title="All 2 branches missed.">            if (visited.put(node, Boolean.TRUE) != null) {</span>
+<span class="nc" id="L953">                throw invariant(&quot;REWRITTEN_AST_REUSES_NODE_IDENTITY&quot;);</span>
             }
-<span class="nc" id="L941">            count++;</span>
-<span class="nc bnc" id="L942" title="All 2 branches missed.">            if (count &gt; nodeLimit) {</span>
-<span class="nc" id="L943">                throw representationLimit(</span>
+<span class="nc" id="L955">            count++;</span>
+<span class="nc bnc" id="L956" title="All 2 branches missed.">            if (count &gt; nodeLimit) {</span>
+<span class="nc" id="L957">                throw representationLimit(</span>
                     &quot;REWRITTEN_AST_NODE_LIMIT_EXCEEDED&quot;);
             }
-<span class="nc" id="L946">            work.consume(stage, STRUCTURAL_HASH_UNITS_PER_NODE);</span>
-<span class="nc bnc" id="L947" title="All 2 branches missed.">            if (node instanceof BinaryExpr binary) {</span>
-<span class="nc" id="L948">                appendStructuralMaterial(</span>
-                    digest, work, stage, &quot;BINARY&quot;);
-<span class="nc" id="L950">                appendStructuralMaterial(</span>
-                    digest,
-                    work,
-                    stage,
-<span class="nc" id="L954">                    binary.operator().name());</span>
-<span class="nc" id="L955">                pending.push(binary.right());</span>
-<span class="nc" id="L956">                pending.push(binary.left());</span>
-<span class="nc bnc" id="L957" title="All 2 branches missed.">            } else if (node instanceof FunctionExpr function) {</span>
-<span class="nc" id="L958">                appendStructuralMaterial(</span>
-                    digest, work, stage, &quot;FUNCTION&quot;);
-<span class="nc" id="L960">                appendStructuralMaterial(</span>
-<span class="nc" id="L961">                    digest, work, stage, function.name());</span>
+<span class="nc" id="L960">            work.consume(stage, STRUCTURAL_HASH_UNITS_PER_NODE);</span>
+<span class="nc bnc" id="L961" title="All 2 branches missed.">            if (node instanceof BinaryExpr binary) {</span>
 <span class="nc" id="L962">                appendStructuralMaterial(</span>
+                    digest, work, stage, &quot;BINARY&quot;);
+<span class="nc" id="L964">                appendStructuralMaterial(</span>
                     digest,
                     work,
                     stage,
-<span class="nc" id="L966">                    Integer.toString(function.arguments().size()));</span>
-<span class="nc" id="L967">                List&lt;Expr&gt; arguments = function.arguments();</span>
-<span class="nc" id="L968">                for (int index = arguments.size() - 1;</span>
-<span class="nc bnc" id="L969" title="All 2 branches missed.">                        index &gt;= 0;</span>
-<span class="nc" id="L970">                        index--) {</span>
-<span class="nc" id="L971">                    pending.push(arguments.get(index));</span>
-                }
-<span class="nc bnc" id="L973" title="All 2 branches missed.">            } else if (node instanceof VariableExpr variable) {</span>
+<span class="nc" id="L968">                    binary.operator().name());</span>
+<span class="nc" id="L969">                pending.push(binary.right());</span>
+<span class="nc" id="L970">                pending.push(binary.left());</span>
+<span class="nc bnc" id="L971" title="All 2 branches missed.">            } else if (node instanceof FunctionExpr function) {</span>
+<span class="nc" id="L972">                appendStructuralMaterial(</span>
+                    digest, work, stage, &quot;FUNCTION&quot;);
 <span class="nc" id="L974">                appendStructuralMaterial(</span>
-                    digest, work, stage, &quot;VARIABLE&quot;);
+<span class="nc" id="L975">                    digest, work, stage, function.name());</span>
 <span class="nc" id="L976">                appendStructuralMaterial(</span>
-<span class="nc" id="L977">                    digest, work, stage, variable.name());</span>
-<span class="nc bnc" id="L978" title="All 2 branches missed.">            } else if (node instanceof NumberExpr number) {</span>
-<span class="nc" id="L979">                appendStructuralMaterial(</span>
-                    digest, work, stage, &quot;NUMBER&quot;);
-<span class="nc" id="L981">                appendStructuralMaterial(</span>
                     digest,
                     work,
                     stage,
-<span class="nc" id="L985">                    number.value().canonicalText());</span>
+<span class="nc" id="L980">                    Integer.toString(function.arguments().size()));</span>
+<span class="nc" id="L981">                List&lt;Expr&gt; arguments = function.arguments();</span>
+<span class="nc" id="L982">                for (int index = arguments.size() - 1;</span>
+<span class="nc bnc" id="L983" title="All 2 branches missed.">                        index &gt;= 0;</span>
+<span class="nc" id="L984">                        index--) {</span>
+<span class="nc" id="L985">                    pending.push(arguments.get(index));</span>
+                }
+<span class="nc bnc" id="L987" title="All 2 branches missed.">            } else if (node instanceof VariableExpr variable) {</span>
+<span class="nc" id="L988">                appendStructuralMaterial(</span>
+                    digest, work, stage, &quot;VARIABLE&quot;);
+<span class="nc" id="L990">                appendStructuralMaterial(</span>
+<span class="nc" id="L991">                    digest, work, stage, variable.name());</span>
+<span class="nc bnc" id="L992" title="All 2 branches missed.">            } else if (node instanceof NumberExpr number) {</span>
+<span class="nc" id="L993">                appendStructuralMaterial(</span>
+                    digest, work, stage, &quot;NUMBER&quot;);
+<span class="nc" id="L995">                appendStructuralMaterial(</span>
+                    digest,
+                    work,
+                    stage,
+<span class="nc" id="L999">                    number.value().canonicalText());</span>
             } else {
-<span class="nc" id="L987">                throw invariant(&quot;UNSUPPORTED_AST_NODE_IN_STRUCTURAL_HASH&quot;);</span>
+<span class="nc" id="L1001">                throw invariant(&quot;UNSUPPORTED_AST_NODE_IN_STRUCTURAL_HASH&quot;);</span>
             }
-<span class="nc" id="L989">        }</span>
-<span class="nc" id="L990">        appendStructuralMaterial(</span>
-<span class="nc" id="L991">            digest, work, stage, Integer.toString(count));</span>
-<span class="nc" id="L992">        return digest.finish();</span>
+<span class="nc" id="L1003">        }</span>
+<span class="nc" id="L1004">        appendStructuralMaterial(</span>
+<span class="nc" id="L1005">            digest, work, stage, Integer.toString(count));</span>
+<span class="nc" id="L1006">        return digest.finish();</span>
     }
 
     private static void appendStructuralMaterial(
@@ -998,27 +1012,27 @@ public final class ExactNestedFactorizationTransformationPipeline {
         String stage,
         String value
     ) {
-<span class="nc" id="L1001">        byte[] bytes = Objects.requireNonNull(value, &quot;value&quot;)</span>
-<span class="nc" id="L1002">            .getBytes(StandardCharsets.UTF_8);</span>
-<span class="nc" id="L1003">        work.consume(</span>
+<span class="nc" id="L1015">        byte[] bytes = Objects.requireNonNull(value, &quot;value&quot;)</span>
+<span class="nc" id="L1016">            .getBytes(StandardCharsets.UTF_8);</span>
+<span class="nc" id="L1017">        work.consume(</span>
             stage + &quot;-payload-utf8-bytes&quot;,
             bytes.length);
-<span class="nc" id="L1006">        digest.append(value);</span>
-<span class="nc" id="L1007">    }</span>
+<span class="nc" id="L1020">        digest.append(value);</span>
+<span class="nc" id="L1021">    }</span>
 
     private static void pushChildren(Expr node, Deque&lt;Expr&gt; pending) {
-<span class="nc bnc" id="L1010" title="All 2 branches missed.">        if (node instanceof BinaryExpr binary) {</span>
-<span class="nc" id="L1011">            pending.push(binary.right());</span>
-<span class="nc" id="L1012">            pending.push(binary.left());</span>
-<span class="nc bnc" id="L1013" title="All 2 branches missed.">        } else if (node instanceof FunctionExpr function) {</span>
-<span class="nc" id="L1014">            List&lt;Expr&gt; arguments = function.arguments();</span>
-<span class="nc" id="L1015">            for (int index = arguments.size() - 1;</span>
-<span class="nc bnc" id="L1016" title="All 2 branches missed.">                    index &gt;= 0;</span>
-<span class="nc" id="L1017">                    index--) {</span>
-<span class="nc" id="L1018">                pending.push(arguments.get(index));</span>
+<span class="nc bnc" id="L1024" title="All 2 branches missed.">        if (node instanceof BinaryExpr binary) {</span>
+<span class="nc" id="L1025">            pending.push(binary.right());</span>
+<span class="nc" id="L1026">            pending.push(binary.left());</span>
+<span class="nc bnc" id="L1027" title="All 2 branches missed.">        } else if (node instanceof FunctionExpr function) {</span>
+<span class="nc" id="L1028">            List&lt;Expr&gt; arguments = function.arguments();</span>
+<span class="nc" id="L1029">            for (int index = arguments.size() - 1;</span>
+<span class="nc bnc" id="L1030" title="All 2 branches missed.">                    index &gt;= 0;</span>
+<span class="nc" id="L1031">                    index--) {</span>
+<span class="nc" id="L1032">                pending.push(arguments.get(index));</span>
             }
         }
-<span class="nc" id="L1021">    }</span>
+<span class="nc" id="L1035">    }</span>
 
     private Result success(
         TreePosition position,
@@ -1030,17 +1044,17 @@ public final class ExactNestedFactorizationTransformationPipeline {
         PolynomialWorkLedger totalWork,
         boolean replay
     ) {
-<span class="nc" id="L1033">        return new Result(</span>
+<span class="nc" id="L1047">        return new Result(</span>
             Status.TRANSFORMED,
-<span class="nc bnc" id="L1035" title="All 2 branches missed.">            replay ? &quot;VERIFIED_PRIMITIVE_REBOUND_AND_REPLAYED&quot;</span>
-<span class="nc" id="L1036">                : &quot;EXACT_NESTED_FACTORIZATION_REPLACED_AND_REPLAYED&quot;,</span>
+<span class="nc bnc" id="L1049" title="All 2 branches missed.">            replay ? &quot;VERIFIED_PRIMITIVE_REBOUND_AND_REPLAYED&quot;</span>
+<span class="nc" id="L1050">                : &quot;EXACT_NESTED_FACTORIZATION_REPLACED_AND_REPLAYED&quot;,</span>
             policy,
             position,
-<span class="nc" id="L1039">            Optional.of(projection),</span>
-<span class="nc" id="L1040">            Optional.of(factorization),</span>
-<span class="nc" id="L1041">            Optional.of(transformation),</span>
-<span class="nc" id="L1042">            Optional.of(rewrittenRoot),</span>
-<span class="nc" id="L1043">            Optional.of(rewrittenStructuralHash),</span>
+<span class="nc" id="L1053">            Optional.of(projection),</span>
+<span class="nc" id="L1054">            Optional.of(factorization),</span>
+<span class="nc" id="L1055">            Optional.of(transformation),</span>
+<span class="nc" id="L1056">            Optional.of(rewrittenRoot),</span>
+<span class="nc" id="L1057">            Optional.of(rewrittenStructuralHash),</span>
             totalWork);
     }
 
@@ -1056,7 +1070,7 @@ public final class ExactNestedFactorizationTransformationPipeline {
         Optional&lt;String&gt; rewrittenStructuralHash,
         PolynomialWorkLedger totalWork
     ) {
-<span class="nc" id="L1059">        return new Result(</span>
+<span class="nc" id="L1073">        return new Result(</span>
             status,
             detailCode,
             policy,
@@ -1072,33 +1086,33 @@ public final class ExactNestedFactorizationTransformationPipeline {
     private static Status mapProjectionStatus(
         ExactParsedSubtermProjector.Status status
     ) {
-<span class="nc bnc" id="L1075" title="All 6 branches missed.">        return switch (status) {</span>
-<span class="nc" id="L1076">            case PROJECTED -&gt; throw new IllegalStateException(</span>
+<span class="nc bnc" id="L1089" title="All 6 branches missed.">        return switch (status) {</span>
+<span class="nc" id="L1090">            case PROJECTED -&gt; throw new IllegalStateException(</span>
                 &quot;successful projection must continue&quot;);
-<span class="nc" id="L1078">            case POSITION_NOT_PRESENT -&gt; Status.POSITION_NOT_PRESENT;</span>
-<span class="nc" id="L1079">            case POSITION_STALE -&gt; Status.POSITION_STALE;</span>
-<span class="nc" id="L1080">            case UNSUPPORTED -&gt; Status.UNSUPPORTED;</span>
-<span class="nc" id="L1081">            case BUDGET_INCONCLUSIVE -&gt; Status.BUDGET_INCONCLUSIVE;</span>
-<span class="nc" id="L1082">            case TECHNICAL_FAILURE -&gt; Status.TECHNICAL_FAILURE;</span>
+<span class="nc" id="L1092">            case POSITION_NOT_PRESENT -&gt; Status.POSITION_NOT_PRESENT;</span>
+<span class="nc" id="L1093">            case POSITION_STALE -&gt; Status.POSITION_STALE;</span>
+<span class="nc" id="L1094">            case UNSUPPORTED -&gt; Status.UNSUPPORTED;</span>
+<span class="nc" id="L1095">            case BUDGET_INCONCLUSIVE -&gt; Status.BUDGET_INCONCLUSIVE;</span>
+<span class="nc" id="L1096">            case TECHNICAL_FAILURE -&gt; Status.TECHNICAL_FAILURE;</span>
         };
     }
 
     private static Status mapTransformationStatus(
         ExactFactorizationTransformationPipeline.Status status
     ) {
-<span class="nc bnc" id="L1089" title="All 9 branches missed.">        return switch (status) {</span>
-<span class="nc" id="L1090">            case TRANSFORMED -&gt; throw new IllegalStateException(</span>
+<span class="nc bnc" id="L1103" title="All 9 branches missed.">        return switch (status) {</span>
+<span class="nc" id="L1104">            case TRANSFORMED -&gt; throw new IllegalStateException(</span>
                 &quot;successful transformation must continue&quot;);
-<span class="nc" id="L1092">            case NO_CHANGE -&gt; Status.NO_CHANGE;</span>
-<span class="nc" id="L1093">            case NO_CANDIDATE -&gt; Status.NO_CANDIDATE;</span>
+<span class="nc" id="L1106">            case NO_CHANGE -&gt; Status.NO_CHANGE;</span>
+<span class="nc" id="L1107">            case NO_CANDIDATE -&gt; Status.NO_CANDIDATE;</span>
             case BACKEND_CLAIMED_IRREDUCIBLE -&gt;
-<span class="nc" id="L1095">                Status.BACKEND_CLAIMED_IRREDUCIBLE;</span>
-<span class="nc" id="L1096">            case IRREDUCIBLE -&gt; Status.IRREDUCIBLE;</span>
-<span class="nc" id="L1097">            case UNSUPPORTED -&gt; Status.UNSUPPORTED;</span>
-<span class="nc" id="L1098">            case BUDGET_INCONCLUSIVE -&gt; Status.BUDGET_INCONCLUSIVE;</span>
-<span class="nc" id="L1099">            case TECHNICAL_FAILURE -&gt; Status.TECHNICAL_FAILURE;</span>
+<span class="nc" id="L1109">                Status.BACKEND_CLAIMED_IRREDUCIBLE;</span>
+<span class="nc" id="L1110">            case IRREDUCIBLE -&gt; Status.IRREDUCIBLE;</span>
+<span class="nc" id="L1111">            case UNSUPPORTED -&gt; Status.UNSUPPORTED;</span>
+<span class="nc" id="L1112">            case BUDGET_INCONCLUSIVE -&gt; Status.BUDGET_INCONCLUSIVE;</span>
+<span class="nc" id="L1113">            case TECHNICAL_FAILURE -&gt; Status.TECHNICAL_FAILURE;</span>
             case SOURCE_EVIDENCE_MISMATCH -&gt;
-<span class="nc" id="L1101">                Status.SOURCE_EVIDENCE_MISMATCH;</span>
+<span class="nc" id="L1115">                Status.SOURCE_EVIDENCE_MISMATCH;</span>
         };
     }
 
@@ -1106,45 +1120,45 @@ public final class ExactNestedFactorizationTransformationPipeline {
         PolynomialWorkLedger first,
         PolynomialWorkLedger second
     ) {
-<span class="nc" id="L1109">        Map&lt;String, Long&gt; stages = new LinkedHashMap&lt;&gt;(first.stages());</span>
-<span class="nc" id="L1110">        second.stages().forEach((stage, units) -&gt; stages.merge(</span>
+<span class="nc" id="L1123">        Map&lt;String, Long&gt; stages = new LinkedHashMap&lt;&gt;(first.stages());</span>
+<span class="nc" id="L1124">        second.stages().forEach((stage, units) -&gt; stages.merge(</span>
             stage,
             units,
             Math::addExact));
-<span class="nc" id="L1114">        return new PolynomialWorkLedger(stages);</span>
+<span class="nc" id="L1128">        return new PolynomialWorkLedger(stages);</span>
     }
 
     private static RepresentationLimitReached representationLimit(
         String detailCode
     ) {
-<span class="nc" id="L1120">        return new RepresentationLimitReached(detailCode);</span>
+<span class="nc" id="L1134">        return new RepresentationLimitReached(detailCode);</span>
     }
 
     private static StructuralInvariantFailure invariant(
         String detailCode
     ) {
-<span class="nc" id="L1126">        return new StructuralInvariantFailure(detailCode);</span>
+<span class="nc" id="L1140">        return new StructuralInvariantFailure(detailCode);</span>
     }
 
     private static ApplicationFailure applicationFailure(
         Status status,
         String detailCode
     ) {
-<span class="nc" id="L1133">        return new ApplicationFailure(status, detailCode);</span>
+<span class="nc" id="L1147">        return new ApplicationFailure(status, detailCode);</span>
     }
 
-<span class="nc" id="L1136">    public enum Status {</span>
-<span class="nc" id="L1137">        TRANSFORMED,</span>
-<span class="nc" id="L1138">        POSITION_NOT_PRESENT,</span>
-<span class="nc" id="L1139">        POSITION_STALE,</span>
-<span class="nc" id="L1140">        NO_CHANGE,</span>
-<span class="nc" id="L1141">        NO_CANDIDATE,</span>
-<span class="nc" id="L1142">        BACKEND_CLAIMED_IRREDUCIBLE,</span>
-<span class="nc" id="L1143">        IRREDUCIBLE,</span>
-<span class="nc" id="L1144">        UNSUPPORTED,</span>
-<span class="nc" id="L1145">        BUDGET_INCONCLUSIVE,</span>
-<span class="nc" id="L1146">        TECHNICAL_FAILURE,</span>
-<span class="nc" id="L1147">        SOURCE_EVIDENCE_MISMATCH</span>
+<span class="nc" id="L1150">    public enum Status {</span>
+<span class="nc" id="L1151">        TRANSFORMED,</span>
+<span class="nc" id="L1152">        POSITION_NOT_PRESENT,</span>
+<span class="nc" id="L1153">        POSITION_STALE,</span>
+<span class="nc" id="L1154">        NO_CHANGE,</span>
+<span class="nc" id="L1155">        NO_CANDIDATE,</span>
+<span class="nc" id="L1156">        BACKEND_CLAIMED_IRREDUCIBLE,</span>
+<span class="nc" id="L1157">        IRREDUCIBLE,</span>
+<span class="nc" id="L1158">        UNSUPPORTED,</span>
+<span class="nc" id="L1159">        BUDGET_INCONCLUSIVE,</span>
+<span class="nc" id="L1160">        TECHNICAL_FAILURE,</span>
+<span class="nc" id="L1161">        SOURCE_EVIDENCE_MISMATCH</span>
     }
 
     /** Global bounds and factorization request policy for one nested attempt. */
@@ -1157,12 +1171,12 @@ public final class ExactNestedFactorizationTransformationPipeline {
         int maxCandidates,
         FactorizationRequest.EvidenceRequirement evidenceRequirement
     ) {
-<span class="nc" id="L1160">        public Policy {</span>
-<span class="nc" id="L1161">            Objects.requireNonNull(structuralLimits, &quot;structuralLimits&quot;);</span>
-<span class="nc" id="L1162">            Objects.requireNonNull(</span>
+<span class="nc" id="L1174">        public Policy {</span>
+<span class="nc" id="L1175">            Objects.requireNonNull(structuralLimits, &quot;structuralLimits&quot;);</span>
+<span class="nc" id="L1176">            Objects.requireNonNull(</span>
                 evidenceRequirement,
                 &quot;evidenceRequirement&quot;);
-<span class="nc bnc" id="L1165" title="All 18 branches missed.">            if (maxPathDepth &lt; 0</span>
+<span class="nc bnc" id="L1179" title="All 18 branches missed.">            if (maxPathDepth &lt; 0</span>
                     || maxPathDepth &gt; MAX_PATH_DEPTH
                     || maxRootNodes &lt; 1
                     || maxRootNodes &gt; MAX_ROOT_NODES
@@ -1171,13 +1185,13 @@ public final class ExactNestedFactorizationTransformationPipeline {
                     || maxTotalWorkUnits &lt; 1
                     || maxTotalWorkUnits &gt; MAX_TOTAL_WORK_UNITS
                     || maxCandidates &lt; 0) {
-<span class="nc" id="L1174">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L1188">                throw new IllegalArgumentException(</span>
                     &quot;nested factorization policy is invalid&quot;);
             }
-<span class="nc" id="L1177">        }</span>
+<span class="nc" id="L1191">        }</span>
 
         public static Policy boundedDefaults() {
-<span class="nc" id="L1180">            return new Policy(</span>
+<span class="nc" id="L1194">            return new Policy(</span>
                 256,
                 4_096,
                 4_096,
@@ -1194,13 +1208,13 @@ public final class ExactNestedFactorizationTransformationPipeline {
         }
 
         public String canonicalMaterial() {
-<span class="nc" id="L1197">            return maxPathDepth + &quot;:&quot;</span>
+<span class="nc" id="L1211">            return maxPathDepth + &quot;:&quot;</span>
                 + maxRootNodes + &quot;:&quot;
                 + maxReplacementNodes + &quot;:&quot;
                 + maxTotalWorkUnits + &quot;:&quot;
-<span class="nc" id="L1201">                + structuralLimits.canonicalMaterial() + &quot;:&quot;</span>
+<span class="nc" id="L1215">                + structuralLimits.canonicalMaterial() + &quot;:&quot;</span>
                 + maxCandidates + &quot;:&quot;
-<span class="nc" id="L1203">                + evidenceRequirement.name();</span>
+<span class="nc" id="L1217">                + evidenceRequirement.name();</span>
         }
     }
 
@@ -1232,173 +1246,173 @@ public final class ExactNestedFactorizationTransformationPipeline {
             Optional&lt;Expr&gt; rewrittenRoot,
             Optional&lt;String&gt; rewrittenStructuralHash,
             PolynomialWorkLedger totalWork
-<span class="nc" id="L1235">        ) {</span>
-<span class="nc" id="L1236">            this.status = Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="nc bnc" id="L1237" title="All 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
-<span class="nc" id="L1238">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L1249">        ) {</span>
+<span class="nc" id="L1250">            this.status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="nc bnc" id="L1251" title="All 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L1252">                throw new IllegalArgumentException(</span>
                     &quot;nested transformation detail code must not be blank&quot;);
             }
-<span class="nc" id="L1241">            this.detailCode = detailCode;</span>
-<span class="nc" id="L1242">            this.policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
-<span class="nc" id="L1243">            this.position = Objects.requireNonNull(position, &quot;position&quot;);</span>
-<span class="nc" id="L1244">            this.projection = Objects.requireNonNull(</span>
+<span class="nc" id="L1255">            this.detailCode = detailCode;</span>
+<span class="nc" id="L1256">            this.policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="nc" id="L1257">            this.position = Objects.requireNonNull(position, &quot;position&quot;);</span>
+<span class="nc" id="L1258">            this.projection = Objects.requireNonNull(</span>
                 projection,
                 &quot;projection&quot;);
-<span class="nc" id="L1247">            this.factorization = Objects.requireNonNull(</span>
+<span class="nc" id="L1261">            this.factorization = Objects.requireNonNull(</span>
                 factorization,
                 &quot;factorization&quot;);
-<span class="nc" id="L1250">            this.transformation = Objects.requireNonNull(</span>
+<span class="nc" id="L1264">            this.transformation = Objects.requireNonNull(</span>
                 transformation,
                 &quot;transformation&quot;);
-<span class="nc" id="L1253">            this.rewrittenRoot = Objects.requireNonNull(</span>
+<span class="nc" id="L1267">            this.rewrittenRoot = Objects.requireNonNull(</span>
                 rewrittenRoot,
                 &quot;rewrittenRoot&quot;);
-<span class="nc" id="L1256">            this.rewrittenStructuralHash = validateHash(</span>
-<span class="nc" id="L1257">                Objects.requireNonNull(</span>
+<span class="nc" id="L1270">            this.rewrittenStructuralHash = validateHash(</span>
+<span class="nc" id="L1271">                Objects.requireNonNull(</span>
                     rewrittenStructuralHash,
                     &quot;rewrittenStructuralHash&quot;));
-<span class="nc" id="L1260">            this.totalWork = Objects.requireNonNull(totalWork, &quot;totalWork&quot;);</span>
-<span class="nc bnc" id="L1261" title="All 2 branches missed.">            boolean transformed = status == Status.TRANSFORMED;</span>
-<span class="nc bnc" id="L1262" title="All 2 branches missed.">            if (transformed) {</span>
-<span class="nc bnc" id="L1263" title="All 2 branches missed.">                if (rewrittenRoot.isEmpty()</span>
-<span class="nc bnc" id="L1264" title="All 2 branches missed.">                        || rewrittenStructuralHash.isEmpty()</span>
-<span class="nc bnc" id="L1265" title="All 2 branches missed.">                        || projection.isEmpty()</span>
-<span class="nc bnc" id="L1266" title="All 2 branches missed.">                        || factorization.isEmpty()</span>
-<span class="nc bnc" id="L1267" title="All 2 branches missed.">                        || transformation.isEmpty()) {</span>
-<span class="nc" id="L1268">                    throw new IllegalArgumentException(</span>
+<span class="nc" id="L1274">            this.totalWork = Objects.requireNonNull(totalWork, &quot;totalWork&quot;);</span>
+<span class="nc bnc" id="L1275" title="All 2 branches missed.">            boolean transformed = status == Status.TRANSFORMED;</span>
+<span class="nc bnc" id="L1276" title="All 2 branches missed.">            if (transformed) {</span>
+<span class="nc bnc" id="L1277" title="All 2 branches missed.">                if (rewrittenRoot.isEmpty()</span>
+<span class="nc bnc" id="L1278" title="All 2 branches missed.">                        || rewrittenStructuralHash.isEmpty()</span>
+<span class="nc bnc" id="L1279" title="All 2 branches missed.">                        || projection.isEmpty()</span>
+<span class="nc bnc" id="L1280" title="All 2 branches missed.">                        || factorization.isEmpty()</span>
+<span class="nc bnc" id="L1281" title="All 2 branches missed.">                        || transformation.isEmpty()) {</span>
+<span class="nc" id="L1282">                    throw new IllegalArgumentException(</span>
                         &quot;successful nested transformation lacks evidence&quot;);
                 }
-<span class="nc bnc" id="L1271" title="All 2 branches missed.">            } else if (rewrittenRoot.isPresent()</span>
-<span class="nc bnc" id="L1272" title="All 2 branches missed.">                    || rewrittenStructuralHash.isPresent()) {</span>
-<span class="nc" id="L1273">                throw new IllegalArgumentException(</span>
+<span class="nc bnc" id="L1285" title="All 2 branches missed.">            } else if (rewrittenRoot.isPresent()</span>
+<span class="nc bnc" id="L1286" title="All 2 branches missed.">                    || rewrittenStructuralHash.isPresent()) {</span>
+<span class="nc" id="L1287">                throw new IllegalArgumentException(</span>
                     &quot;failed nested transformation retained rewritten output&quot;);
             }
-<span class="nc bnc" id="L1276" title="All 4 branches missed.">            if (factorization.isPresent() &amp;&amp; projection.isEmpty()</span>
-<span class="nc bnc" id="L1277" title="All 2 branches missed.">                    || transformation.isPresent()</span>
-<span class="nc bnc" id="L1278" title="All 2 branches missed.">                        &amp;&amp; factorization.isEmpty()) {</span>
-<span class="nc" id="L1279">                throw new IllegalArgumentException(</span>
+<span class="nc bnc" id="L1290" title="All 4 branches missed.">            if (factorization.isPresent() &amp;&amp; projection.isEmpty()</span>
+<span class="nc bnc" id="L1291" title="All 2 branches missed.">                    || transformation.isPresent()</span>
+<span class="nc bnc" id="L1292" title="All 2 branches missed.">                        &amp;&amp; factorization.isEmpty()) {</span>
+<span class="nc" id="L1293">                throw new IllegalArgumentException(</span>
                     &quot;nested upstream evidence ordering is invalid&quot;);
             }
-<span class="nc bnc" id="L1282" title="All 2 branches missed.">            if (!totalWork.within(policy.maxTotalWorkUnits())) {</span>
-<span class="nc" id="L1283">                throw new IllegalArgumentException(</span>
+<span class="nc bnc" id="L1296" title="All 2 branches missed.">            if (!totalWork.within(policy.maxTotalWorkUnits())) {</span>
+<span class="nc" id="L1297">                throw new IllegalArgumentException(</span>
                     &quot;nested transformation work exceeds policy&quot;);
             }
-<span class="nc" id="L1286">            this.certificateHash = certificate();</span>
-<span class="nc" id="L1287">        }</span>
+<span class="nc" id="L1300">            this.certificateHash = certificate();</span>
+<span class="nc" id="L1301">        }</span>
 
         private static Optional&lt;String&gt; validateHash(
             Optional&lt;String&gt; hash
         ) {
-<span class="nc" id="L1292">            hash.ifPresent(value -&gt; {</span>
-<span class="nc bnc" id="L1293" title="All 2 branches missed.">                if (!value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
-<span class="nc" id="L1294">                    throw new IllegalArgumentException(</span>
+<span class="nc" id="L1306">            hash.ifPresent(value -&gt; {</span>
+<span class="nc bnc" id="L1307" title="All 2 branches missed.">                if (!value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L1308">                    throw new IllegalArgumentException(</span>
                         &quot;nested structural hash is invalid&quot;);
                 }
-<span class="nc" id="L1297">            });</span>
-<span class="nc" id="L1298">            return hash;</span>
+<span class="nc" id="L1311">            });</span>
+<span class="nc" id="L1312">            return hash;</span>
         }
 
         public Status status() {
-<span class="nc" id="L1302">            return status;</span>
+<span class="nc" id="L1316">            return status;</span>
         }
 
         public String detailCode() {
-<span class="nc" id="L1306">            return detailCode;</span>
+<span class="nc" id="L1320">            return detailCode;</span>
         }
 
         public Policy policy() {
-<span class="nc" id="L1310">            return policy;</span>
+<span class="nc" id="L1324">            return policy;</span>
         }
 
         public TreePosition position() {
-<span class="nc" id="L1314">            return position;</span>
+<span class="nc" id="L1328">            return position;</span>
         }
 
         public Optional&lt;ExactParsedSubtermProjector.Result&gt; projection() {
-<span class="nc" id="L1318">            return projection;</span>
+<span class="nc" id="L1332">            return projection;</span>
         }
 
         public Optional&lt;ExactParsedFactorizationPipeline.Result&gt;
                 factorization() {
-<span class="nc" id="L1323">            return factorization;</span>
+<span class="nc" id="L1337">            return factorization;</span>
         }
 
         public Optional&lt;ExactFactorizationTransformationPipeline.Result&gt;
                 transformation() {
-<span class="nc" id="L1328">            return transformation;</span>
+<span class="nc" id="L1342">            return transformation;</span>
         }
 
         /** Shared identity of the primitive; occurrence/application certificates remain distinct. */
         public Optional&lt;String&gt; primitiveTransformationId() {
-<span class="nc" id="L1333">            return transformation.map(ExactFactorizationTransformationPipeline.Result::certificateHash);</span>
+<span class="nc" id="L1347">            return transformation.map(ExactFactorizationTransformationPipeline.Result::certificateHash);</span>
         }
 
         public Optional&lt;Expr&gt; rewrittenRoot() {
-<span class="nc" id="L1337">            return rewrittenRoot;</span>
+<span class="nc" id="L1351">            return rewrittenRoot;</span>
         }
 
         public Optional&lt;String&gt; rewrittenStructuralHash() {
-<span class="nc" id="L1341">            return rewrittenStructuralHash;</span>
+<span class="nc" id="L1355">            return rewrittenStructuralHash;</span>
         }
 
         public PolynomialWorkLedger totalWork() {
-<span class="nc" id="L1345">            return totalWork;</span>
+<span class="nc" id="L1359">            return totalWork;</span>
         }
 
         public String certificateHash() {
-<span class="nc" id="L1349">            return certificateHash;</span>
+<span class="nc" id="L1363">            return certificateHash;</span>
         }
 
         public boolean transformed() {
-<span class="nc bnc" id="L1353" title="All 2 branches missed.">            return status == Status.TRANSFORMED;</span>
+<span class="nc bnc" id="L1367" title="All 2 branches missed.">            return status == Status.TRANSFORMED;</span>
         }
 
         public String canonicalMaterial() {
-<span class="nc" id="L1357">            EvidenceDigest digest = new EvidenceDigest();</span>
-<span class="nc" id="L1358">            digest.append(certificateMaterial());</span>
-<span class="nc" id="L1359">            digest.append(certificateHash);</span>
-<span class="nc" id="L1360">            return digest.finish();</span>
+<span class="nc" id="L1371">            EvidenceDigest digest = new EvidenceDigest();</span>
+<span class="nc" id="L1372">            digest.append(certificateMaterial());</span>
+<span class="nc" id="L1373">            digest.append(certificateHash);</span>
+<span class="nc" id="L1374">            return digest.finish();</span>
         }
 
         private String certificate() {
-<span class="nc" id="L1364">            EvidenceDigest digest = new EvidenceDigest();</span>
-<span class="nc" id="L1365">            digest.append(certificateMaterial());</span>
-<span class="nc" id="L1366">            return digest.finish();</span>
+<span class="nc" id="L1378">            EvidenceDigest digest = new EvidenceDigest();</span>
+<span class="nc" id="L1379">            digest.append(certificateMaterial());</span>
+<span class="nc" id="L1380">            return digest.finish();</span>
         }
 
         private String certificateMaterial() {
-<span class="nc" id="L1370">            EvidenceDigest digest = new EvidenceDigest();</span>
-<span class="nc" id="L1371">            digest.append(PIPELINE_ID);</span>
-<span class="nc" id="L1372">            digest.append(status.name());</span>
-<span class="nc" id="L1373">            digest.append(detailCode);</span>
-<span class="nc" id="L1374">            digest.append(policy.canonicalMaterial());</span>
-<span class="nc" id="L1375">            digest.append(position.path().stream()</span>
-<span class="nc" id="L1376">                .map(String::valueOf)</span>
-<span class="nc" id="L1377">                .collect(java.util.stream.Collectors.joining(&quot;.&quot;)));</span>
-<span class="nc" id="L1378">            digest.append(position.text());</span>
-<span class="nc" id="L1379">            digest.append(projection.map(</span>
+<span class="nc" id="L1384">            EvidenceDigest digest = new EvidenceDigest();</span>
+<span class="nc" id="L1385">            digest.append(PIPELINE_ID);</span>
+<span class="nc" id="L1386">            digest.append(status.name());</span>
+<span class="nc" id="L1387">            digest.append(detailCode);</span>
+<span class="nc" id="L1388">            digest.append(policy.canonicalMaterial());</span>
+<span class="nc" id="L1389">            digest.append(position.path().stream()</span>
+<span class="nc" id="L1390">                .map(String::valueOf)</span>
+<span class="nc" id="L1391">                .collect(java.util.stream.Collectors.joining(&quot;.&quot;)));</span>
+<span class="nc" id="L1392">            digest.append(position.text());</span>
+<span class="nc" id="L1393">            digest.append(projection.map(</span>
                 ExactParsedSubtermProjector.Result::certificateHash)
-<span class="nc" id="L1381">                .orElse(&quot;&quot;));</span>
-<span class="nc" id="L1382">            digest.append(factorization.map(</span>
+<span class="nc" id="L1395">                .orElse(&quot;&quot;));</span>
+<span class="nc" id="L1396">            digest.append(factorization.map(</span>
                 ExactParsedFactorizationPipeline.Result::certificateHash)
-<span class="nc" id="L1384">                .orElse(&quot;&quot;));</span>
-<span class="nc" id="L1385">            digest.append(transformation.map(</span>
+<span class="nc" id="L1398">                .orElse(&quot;&quot;));</span>
+<span class="nc" id="L1399">            digest.append(transformation.map(</span>
                 ExactFactorizationTransformationPipeline.Result
-<span class="nc" id="L1387">                    ::certificateHash).orElse(&quot;&quot;));</span>
-<span class="nc" id="L1388">            digest.append(rewrittenStructuralHash.orElse(&quot;&quot;));</span>
-<span class="nc" id="L1389">            digest.append(totalWork.canonicalMaterial());</span>
-<span class="nc" id="L1390">            return digest.finish();</span>
+<span class="nc" id="L1401">                    ::certificateHash).orElse(&quot;&quot;));</span>
+<span class="nc" id="L1402">            digest.append(rewrittenStructuralHash.orElse(&quot;&quot;));</span>
+<span class="nc" id="L1403">            digest.append(totalWork.canonicalMaterial());</span>
+<span class="nc" id="L1404">            return digest.finish();</span>
         }
     }
 
-<span class="nc" id="L1394">    private record PreflightContext(</span>
+<span class="nc" id="L1408">    private record PreflightContext(</span>
         PolynomialWorkLedger priorWork,
         long replacementReserve,
         long extractionCeiling
     ) {
     }
 
-<span class="nc" id="L1401">    private record PreparedTransformation(</span>
+<span class="nc" id="L1415">    private record PreparedTransformation(</span>
         ExactParsedSubtermProjector.Result projection,
         ExactParsedTerm projected,
         ExactParsedFactorizationPipeline.Result factorization,
@@ -1409,109 +1423,123 @@ public final class ExactNestedFactorizationTransformationPipeline {
     ) {
     }
 
-<span class="nc" id="L1412">    private record AppliedReplacement(</span>
+<span class="nc" id="L1426">    private record AppliedReplacement(</span>
         Expr replacement,
         Expr rewrittenRoot
     ) {
     }
 
-<span class="nc" id="L1418">    private record ReferencePair(Expr before, Expr after) {</span>
+<span class="nc" id="L1432">    private record ReferencePair(Expr before, Expr after) {</span>
     }
 
     private record Outcome&lt;T&gt;(
         Optional&lt;T&gt; value,
         Optional&lt;Result&gt; failure
     ) {
-<span class="nc" id="L1425">        private Outcome {</span>
-<span class="nc" id="L1426">            value = Objects.requireNonNull(value, &quot;value&quot;);</span>
-<span class="nc" id="L1427">            failure = Objects.requireNonNull(failure, &quot;failure&quot;);</span>
-<span class="nc bnc" id="L1428" title="All 2 branches missed.">            if (value.isPresent() == failure.isPresent()) {</span>
-<span class="nc" id="L1429">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L1439">        private Outcome {</span>
+<span class="nc" id="L1440">            value = Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="nc" id="L1441">            failure = Objects.requireNonNull(failure, &quot;failure&quot;);</span>
+<span class="nc bnc" id="L1442" title="All 2 branches missed.">            if (value.isPresent() == failure.isPresent()) {</span>
+<span class="nc" id="L1443">                throw new IllegalArgumentException(</span>
                     &quot;pipeline outcome must contain value xor failure&quot;);
             }
-<span class="nc" id="L1432">        }</span>
+<span class="nc" id="L1446">        }</span>
 
         private static &lt;T&gt; Outcome&lt;T&gt; success(T value) {
-<span class="nc" id="L1435">            return new Outcome&lt;&gt;(</span>
-<span class="nc" id="L1436">                Optional.of(Objects.requireNonNull(value, &quot;value&quot;)),</span>
-<span class="nc" id="L1437">                Optional.empty());</span>
+<span class="nc" id="L1449">            return new Outcome&lt;&gt;(</span>
+<span class="nc" id="L1450">                Optional.of(Objects.requireNonNull(value, &quot;value&quot;)),</span>
+<span class="nc" id="L1451">                Optional.empty());</span>
         }
 
         private static &lt;T&gt; Outcome&lt;T&gt; failure(Result failure) {
-<span class="nc" id="L1441">            return new Outcome&lt;&gt;(</span>
-<span class="nc" id="L1442">                Optional.empty(),</span>
-<span class="nc" id="L1443">                Optional.of(Objects.requireNonNull(failure, &quot;failure&quot;)));</span>
+<span class="nc" id="L1455">            return new Outcome&lt;&gt;(</span>
+<span class="nc" id="L1456">                Optional.empty(),</span>
+<span class="nc" id="L1457">                Optional.of(Objects.requireNonNull(failure, &quot;failure&quot;)));</span>
         }
 
         private boolean failed() {
-<span class="nc" id="L1447">            return failure.isPresent();</span>
+<span class="nc" id="L1461">            return failure.isPresent();</span>
         }
 
         private T valueOrThrow() {
-<span class="nc" id="L1451">            return value.orElseThrow();</span>
+<span class="nc" id="L1465">            return value.orElseThrow();</span>
         }
 
         private Result failureOrThrow() {
-<span class="nc" id="L1455">            return failure.orElseThrow();</span>
+<span class="nc" id="L1469">            return failure.orElseThrow();</span>
         }
     }
 
     private static final class Work {
         private final long limit;
-<span class="nc" id="L1461">        private final Map&lt;String, Long&gt; stages = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc" id="L1475">        private final Map&lt;String, Long&gt; stages = new LinkedHashMap&lt;&gt;();</span>
         private long total;
 
-<span class="nc" id="L1464">        private Work(long limit) {</span>
-<span class="nc" id="L1465">            this.limit = limit;</span>
-<span class="nc" id="L1466">        }</span>
+        private final PolynomialWorkAuthority authority;
+
+<span class="nc" id="L1480">        private Work(long limit, PolynomialWorkAuthority authority) {</span>
+<span class="nc" id="L1481">            this.limit = limit;</span>
+<span class="nc" id="L1482">            this.authority = authority;</span>
+<span class="nc" id="L1483">        }</span>
 
         private void consume(String stage, long units) {
-<span class="nc bnc" id="L1469" title="All 6 branches missed.">            if (stage == null || stage.isBlank() || units &lt; 0) {</span>
-<span class="nc" id="L1470">                throw new IllegalArgumentException(</span>
+<span class="nc bnc" id="L1486" title="All 6 branches missed.">            if (stage == null || stage.isBlank() || units &lt; 0) {</span>
+<span class="nc" id="L1487">                throw new IllegalArgumentException(</span>
                     &quot;nested work entry is invalid&quot;);
             }
-<span class="nc bnc" id="L1473" title="All 2 branches missed.">            if (units &gt; limit - total) {</span>
-<span class="nc" id="L1474">                throw new WorkLimitReached(</span>
+<span class="nc bnc" id="L1490" title="All 2 branches missed.">            if (units &gt; limit - total) {</span>
+<span class="nc" id="L1491">                throw new WorkLimitReached(</span>
                     &quot;NESTED_REPLACEMENT_REPLAY_WORK_BUDGET_EXCEEDED&quot;);
             }
-<span class="nc bnc" id="L1477" title="All 2 branches missed.">            if (units == 0) {</span>
-<span class="nc" id="L1478">                return;</span>
+<span class="nc bnc" id="L1494" title="All 2 branches missed.">            if (units == 0) {</span>
+<span class="nc" id="L1495">                return;</span>
             }
-<span class="nc" id="L1480">            total += units;</span>
-<span class="nc" id="L1481">            stages.merge(stage, units, Math::addExact);</span>
-<span class="nc" id="L1482">        }</span>
+<span class="nc" id="L1497">            authority.consume(stage, units);</span>
+<span class="nc" id="L1498">            total += units;</span>
+<span class="nc" id="L1499">            stages.merge(stage, units, Math::addExact);</span>
+<span class="nc" id="L1500">        }</span>
+
+        private void consumeTogether(PolynomialWorkLedger charge) {
+<span class="nc bnc" id="L1503" title="All 2 branches missed.">            if (charge.totalWorkUnits() == 0) return;</span>
+<span class="nc bnc" id="L1504" title="All 2 branches missed.">            if (charge.totalWorkUnits() &gt; limit - total) {</span>
+<span class="nc" id="L1505">                throw new WorkLimitReached(&quot;NESTED_REPLACEMENT_REPLAY_WORK_BUDGET_EXCEEDED&quot;);</span>
+            }
+<span class="nc" id="L1507">            authority.consume(charge);</span>
+<span class="nc" id="L1508">            total += charge.totalWorkUnits();</span>
+<span class="nc" id="L1509">            charge.stages().forEach((stage, units) -&gt; stages.merge(stage, units, Math::addExact));</span>
+<span class="nc" id="L1510">        }</span>
 
         private PolynomialWorkLedger ledger() {
-<span class="nc" id="L1485">            return new PolynomialWorkLedger(stages);</span>
+<span class="nc" id="L1513">            return new PolynomialWorkLedger(stages);</span>
         }
     }
 
     private static final class EvidenceDigest {
         private final MessageDigest digest;
 
-<span class="nc" id="L1492">        private EvidenceDigest() {</span>
+<span class="nc" id="L1520">        private EvidenceDigest() {</span>
             try {
-<span class="nc" id="L1494">                digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
-<span class="nc" id="L1495">            } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L1496">                throw new IllegalStateException(</span>
+<span class="nc" id="L1522">                digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="nc" id="L1523">            } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L1524">                throw new IllegalStateException(</span>
                     &quot;SHA-256 is unavailable&quot;,
                     exception);
-<span class="nc" id="L1499">            }</span>
-<span class="nc" id="L1500">        }</span>
+<span class="nc" id="L1527">            }</span>
+<span class="nc" id="L1528">        }</span>
 
         private void append(String value) {
-<span class="nc" id="L1503">            byte[] bytes = Objects.requireNonNull(value, &quot;value&quot;)</span>
-<span class="nc" id="L1504">                .getBytes(StandardCharsets.UTF_8);</span>
-<span class="nc" id="L1505">            byte[] length = Integer.toString(bytes.length)</span>
-<span class="nc" id="L1506">                .getBytes(StandardCharsets.US_ASCII);</span>
-<span class="nc" id="L1507">            digest.update(length);</span>
-<span class="nc" id="L1508">            digest.update((byte) ':');</span>
-<span class="nc" id="L1509">            digest.update(bytes);</span>
-<span class="nc" id="L1510">            digest.update((byte) '\n');</span>
-<span class="nc" id="L1511">        }</span>
+<span class="nc" id="L1531">            byte[] bytes = Objects.requireNonNull(value, &quot;value&quot;)</span>
+<span class="nc" id="L1532">                .getBytes(StandardCharsets.UTF_8);</span>
+<span class="nc" id="L1533">            byte[] length = Integer.toString(bytes.length)</span>
+<span class="nc" id="L1534">                .getBytes(StandardCharsets.US_ASCII);</span>
+<span class="nc" id="L1535">            digest.update(length);</span>
+<span class="nc" id="L1536">            digest.update((byte) ':');</span>
+<span class="nc" id="L1537">            digest.update(bytes);</span>
+<span class="nc" id="L1538">            digest.update((byte) '\n');</span>
+<span class="nc" id="L1539">        }</span>
 
         private String finish() {
-<span class="nc" id="L1514">            return &quot;sha256:&quot; + HexFormat.of().formatHex(digest.digest());</span>
+<span class="nc" id="L1542">            return &quot;sha256:&quot; + HexFormat.of().formatHex(digest.digest());</span>
         }
     }
 
@@ -1519,33 +1547,33 @@ public final class ExactNestedFactorizationTransformationPipeline {
         private final Status status;
 
         private ApplicationFailure(Status status, String detailCode) {
-<span class="nc" id="L1522">            super(detailCode);</span>
-<span class="nc" id="L1523">            this.status = Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="nc" id="L1524">        }</span>
+<span class="nc" id="L1550">            super(detailCode);</span>
+<span class="nc" id="L1551">            this.status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="nc" id="L1552">        }</span>
 
         private Status status() {
-<span class="nc" id="L1527">            return status;</span>
+<span class="nc" id="L1555">            return status;</span>
         }
     }
 
     private static final class WorkLimitReached extends RuntimeException {
         private WorkLimitReached(String detailCode) {
-<span class="nc" id="L1533">            super(detailCode);</span>
-<span class="nc" id="L1534">        }</span>
+<span class="nc" id="L1561">            super(detailCode);</span>
+<span class="nc" id="L1562">        }</span>
     }
 
     private static final class RepresentationLimitReached
             extends RuntimeException {
         private RepresentationLimitReached(String detailCode) {
-<span class="nc" id="L1540">            super(detailCode);</span>
-<span class="nc" id="L1541">        }</span>
+<span class="nc" id="L1568">            super(detailCode);</span>
+<span class="nc" id="L1569">        }</span>
     }
 
     private static final class StructuralInvariantFailure
             extends RuntimeException {
         private StructuralInvariantFailure(String detailCode) {
-<span class="nc" id="L1547">            super(detailCode);</span>
-<span class="nc" id="L1548">        }</span>
+<span class="nc" id="L1575">            super(detailCode);</span>
+<span class="nc" id="L1576">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
