@@ -141,14 +141,18 @@ public final class WorkSearchReplay {
 <span class="nc" id="L141">    }</span>
 
     private static void writeTransformationWork(JsonWriter json, TransformationWorkMetrics work) {
-<span class="nc" id="L144">        json.property(&quot;engineInvocations&quot;, work.engineInvocations()).property(&quot;programNodeVisits&quot;, work.programNodeVisits())</span>
-<span class="nc" id="L145">            .property(&quot;sourceInvocations&quot;, work.sourceInvocations()).property(&quot;sourceCandidates&quot;, work.sourceCandidates())</span>
-<span class="nc" id="L146">            .property(&quot;composedCandidates&quot;, work.composedCandidates()).property(&quot;requirementEvaluations&quot;, work.requirementEvaluations())</span>
-<span class="nc" id="L147">            .property(&quot;requirementRejections&quot;, work.requirementRejections()).property(&quot;priorityCandidatesOrdered&quot;, work.priorityCandidatesOrdered())</span>
-<span class="nc" id="L148">            .property(&quot;prunedCandidates&quot;, work.prunedCandidates()).property(&quot;repeatIterations&quot;, work.repeatIterations())</span>
-<span class="nc" id="L149">            .property(&quot;repeatEndpoints&quot;, work.repeatEndpoints()).property(&quot;alternativeSelections&quot;, work.alternativeSelections())</span>
-<span class="nc" id="L150">            .property(&quot;alternativesSkipped&quot;, work.alternativesSkipped()).property(&quot;duplicateCandidatesDropped&quot;, work.duplicateCandidatesDropped())</span>
-<span class="nc" id="L151">            .object(&quot;candidateWork&quot;, item -&gt; writeWork(item, work.candidateWork()));</span>
-<span class="nc" id="L152">    }</span>
+        // Preserve frozen historical bytes when no delegated source ran.
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        if (work.delegatedMechanicalWorkUnits() != 0) {</span>
+<span class="nc" id="L146">            json.property(&quot;delegatedMechanicalWorkUnits&quot;, work.delegatedMechanicalWorkUnits());</span>
+        }
+<span class="nc" id="L148">        json.property(&quot;engineInvocations&quot;, work.engineInvocations()).property(&quot;programNodeVisits&quot;, work.programNodeVisits())</span>
+<span class="nc" id="L149">            .property(&quot;sourceInvocations&quot;, work.sourceInvocations()).property(&quot;sourceCandidates&quot;, work.sourceCandidates())</span>
+<span class="nc" id="L150">            .property(&quot;composedCandidates&quot;, work.composedCandidates()).property(&quot;requirementEvaluations&quot;, work.requirementEvaluations())</span>
+<span class="nc" id="L151">            .property(&quot;requirementRejections&quot;, work.requirementRejections()).property(&quot;priorityCandidatesOrdered&quot;, work.priorityCandidatesOrdered())</span>
+<span class="nc" id="L152">            .property(&quot;prunedCandidates&quot;, work.prunedCandidates()).property(&quot;repeatIterations&quot;, work.repeatIterations())</span>
+<span class="nc" id="L153">            .property(&quot;repeatEndpoints&quot;, work.repeatEndpoints()).property(&quot;alternativeSelections&quot;, work.alternativeSelections())</span>
+<span class="nc" id="L154">            .property(&quot;alternativesSkipped&quot;, work.alternativesSkipped()).property(&quot;duplicateCandidatesDropped&quot;, work.duplicateCandidatesDropped())</span>
+<span class="nc" id="L155">            .object(&quot;candidateWork&quot;, item -&gt; writeWork(item, work.candidateWork()));</span>
+<span class="nc" id="L156">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

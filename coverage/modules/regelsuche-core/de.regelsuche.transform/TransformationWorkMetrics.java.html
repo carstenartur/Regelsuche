@@ -22,36 +22,50 @@ public record TransformationWorkMetrics(
     long alternativeSelections,
     long alternativesSkipped,
     long duplicateCandidatesDropped,
-    ExecutionWork candidateWork
+    ExecutionWork candidateWork,
+    long delegatedMechanicalWorkUnits
 ) {
-<span class="fc" id="L27">    public static final TransformationWorkMetrics ZERO =</span>
+<span class="fc" id="L28">    public static final TransformationWorkMetrics ZERO =</span>
         new TransformationWorkMetrics(
             0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0);
 
-<span class="fc" id="L32">    public TransformationWorkMetrics {</span>
-<span class="fc" id="L33">        candidateWork = java.util.Objects.requireNonNull(candidateWork, &quot;candidateWork&quot;);</span>
-<span class="fc" id="L34">        requireNonNegative(engineInvocations, &quot;engineInvocations&quot;);</span>
-<span class="fc" id="L35">        requireNonNegative(programNodeVisits, &quot;programNodeVisits&quot;);</span>
-<span class="fc" id="L36">        requireNonNegative(sourceInvocations, &quot;sourceInvocations&quot;);</span>
-<span class="fc" id="L37">        requireNonNegative(sourceCandidates, &quot;sourceCandidates&quot;);</span>
-<span class="fc" id="L38">        requireNonNegative(composedCandidates, &quot;composedCandidates&quot;);</span>
-<span class="fc" id="L39">        requireNonNegative(requirementEvaluations, &quot;requirementEvaluations&quot;);</span>
-<span class="fc" id="L40">        requireNonNegative(requirementRejections, &quot;requirementRejections&quot;);</span>
-<span class="fc" id="L41">        requireNonNegative(</span>
+<span class="fc" id="L33">    public TransformationWorkMetrics {</span>
+<span class="fc" id="L34">        candidateWork = java.util.Objects.requireNonNull(candidateWork, &quot;candidateWork&quot;);</span>
+<span class="fc" id="L35">        requireNonNegative(delegatedMechanicalWorkUnits, &quot;delegatedMechanicalWorkUnits&quot;);</span>
+<span class="fc" id="L36">        requireNonNegative(engineInvocations, &quot;engineInvocations&quot;);</span>
+<span class="fc" id="L37">        requireNonNegative(programNodeVisits, &quot;programNodeVisits&quot;);</span>
+<span class="fc" id="L38">        requireNonNegative(sourceInvocations, &quot;sourceInvocations&quot;);</span>
+<span class="fc" id="L39">        requireNonNegative(sourceCandidates, &quot;sourceCandidates&quot;);</span>
+<span class="fc" id="L40">        requireNonNegative(composedCandidates, &quot;composedCandidates&quot;);</span>
+<span class="fc" id="L41">        requireNonNegative(requirementEvaluations, &quot;requirementEvaluations&quot;);</span>
+<span class="fc" id="L42">        requireNonNegative(requirementRejections, &quot;requirementRejections&quot;);</span>
+<span class="fc" id="L43">        requireNonNegative(</span>
             priorityCandidatesOrdered, &quot;priorityCandidatesOrdered&quot;);
-<span class="fc" id="L43">        requireNonNegative(prunedCandidates, &quot;prunedCandidates&quot;);</span>
-<span class="fc" id="L44">        requireNonNegative(repeatIterations, &quot;repeatIterations&quot;);</span>
-<span class="fc" id="L45">        requireNonNegative(repeatEndpoints, &quot;repeatEndpoints&quot;);</span>
-<span class="fc" id="L46">        requireNonNegative(alternativeSelections, &quot;alternativeSelections&quot;);</span>
-<span class="fc" id="L47">        requireNonNegative(alternativesSkipped, &quot;alternativesSkipped&quot;);</span>
-<span class="fc" id="L48">        requireNonNegative(</span>
+<span class="fc" id="L45">        requireNonNegative(prunedCandidates, &quot;prunedCandidates&quot;);</span>
+<span class="fc" id="L46">        requireNonNegative(repeatIterations, &quot;repeatIterations&quot;);</span>
+<span class="fc" id="L47">        requireNonNegative(repeatEndpoints, &quot;repeatEndpoints&quot;);</span>
+<span class="fc" id="L48">        requireNonNegative(alternativeSelections, &quot;alternativeSelections&quot;);</span>
+<span class="fc" id="L49">        requireNonNegative(alternativesSkipped, &quot;alternativesSkipped&quot;);</span>
+<span class="fc" id="L50">        requireNonNegative(</span>
             duplicateCandidatesDropped, &quot;duplicateCandidatesDropped&quot;);
-<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (requirementRejections &gt; requirementEvaluations) {</span>
-<span class="nc" id="L51">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (requirementRejections &gt; requirementEvaluations) {</span>
+<span class="nc" id="L53">            throw new IllegalArgumentException(</span>
                 &quot;requirementRejections must not exceed requirementEvaluations&quot;);
         }
-<span class="fc" id="L54">    }</span>
+<span class="fc" id="L56">    }</span>
+
+    /** Existing event-only observations retain their exact zero-delegation formula. */
+    public TransformationWorkMetrics(long engineInvocations, long programNodeVisits, long sourceInvocations,
+            long sourceCandidates, long composedCandidates, long requirementEvaluations,
+            long requirementRejections, long priorityCandidatesOrdered, long prunedCandidates,
+            long repeatIterations, long repeatEndpoints, long alternativeSelections,
+            long alternativesSkipped, long duplicateCandidatesDropped, ExecutionWork candidateWork) {
+<span class="fc" id="L64">        this(engineInvocations, programNodeVisits, sourceInvocations, sourceCandidates, composedCandidates,</span>
+            requirementEvaluations, requirementRejections, priorityCandidatesOrdered, prunedCandidates,
+            repeatIterations, repeatEndpoints, alternativeSelections, alternativesSkipped,
+            duplicateCandidatesDropped, candidateWork, 0);
+<span class="fc" id="L68">    }</span>
 
     /** Frozen v1 constructor: historical mechanical reports retain their scalar formula. */
     public TransformationWorkMetrics(long engineInvocations, long programNodeVisits, long sourceInvocations,
@@ -59,18 +73,18 @@ public record TransformationWorkMetrics(
             long requirementRejections, long priorityCandidatesOrdered, long prunedCandidates,
             long repeatIterations, long repeatEndpoints, long alternativeSelections,
             long alternativesSkipped, long duplicateCandidatesDropped) {
-<span class="fc" id="L62">        this(engineInvocations, programNodeVisits, sourceInvocations, sourceCandidates, composedCandidates,</span>
+<span class="fc" id="L76">        this(engineInvocations, programNodeVisits, sourceInvocations, sourceCandidates, composedCandidates,</span>
             requirementEvaluations, requirementRejections, priorityCandidatesOrdered, prunedCandidates,
             repeatIterations, repeatEndpoints, alternativeSelections, alternativesSkipped,
             duplicateCandidatesDropped, ExecutionWork.ZERO);
-<span class="fc" id="L66">    }</span>
+<span class="fc" id="L80">    }</span>
 
     /** Work accounting for one ordinary, non-program engine invocation. */
     public static TransformationWorkMetrics flatEngine(int candidates) {
-<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if (candidates &lt; 0) {</span>
-<span class="nc" id="L71">            throw new IllegalArgumentException(&quot;candidates must not be negative&quot;);</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (candidates &lt; 0) {</span>
+<span class="nc" id="L85">            throw new IllegalArgumentException(&quot;candidates must not be negative&quot;);</span>
         }
-<span class="fc" id="L73">        return new TransformationWorkMetrics(</span>
+<span class="fc" id="L87">        return new TransformationWorkMetrics(</span>
             1,
             0,
             1,
@@ -88,31 +102,32 @@ public record TransformationWorkMetrics(
     }
 
     public TransformationWorkMetrics plus(TransformationWorkMetrics other) {
-<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (other == null) {</span>
-<span class="nc" id="L92">            return this;</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (other == null) {</span>
+<span class="nc" id="L106">            return this;</span>
         }
-<span class="fc" id="L94">        return new TransformationWorkMetrics(</span>
-<span class="fc" id="L95">            add(engineInvocations, other.engineInvocations),</span>
-<span class="fc" id="L96">            add(programNodeVisits, other.programNodeVisits),</span>
-<span class="fc" id="L97">            add(sourceInvocations, other.sourceInvocations),</span>
-<span class="fc" id="L98">            add(sourceCandidates, other.sourceCandidates),</span>
-<span class="fc" id="L99">            add(composedCandidates, other.composedCandidates),</span>
-<span class="fc" id="L100">            add(requirementEvaluations, other.requirementEvaluations),</span>
-<span class="fc" id="L101">            add(requirementRejections, other.requirementRejections),</span>
-<span class="fc" id="L102">            add(priorityCandidatesOrdered, other.priorityCandidatesOrdered),</span>
-<span class="fc" id="L103">            add(prunedCandidates, other.prunedCandidates),</span>
-<span class="fc" id="L104">            add(repeatIterations, other.repeatIterations),</span>
-<span class="fc" id="L105">            add(repeatEndpoints, other.repeatEndpoints),</span>
-<span class="fc" id="L106">            add(alternativeSelections, other.alternativeSelections),</span>
-<span class="fc" id="L107">            add(alternativesSkipped, other.alternativesSkipped),</span>
-<span class="fc" id="L108">            add(duplicateCandidatesDropped, other.duplicateCandidatesDropped), candidateWork.plus(other.candidateWork));</span>
+<span class="fc" id="L108">        return new TransformationWorkMetrics(</span>
+<span class="fc" id="L109">            add(engineInvocations, other.engineInvocations),</span>
+<span class="fc" id="L110">            add(programNodeVisits, other.programNodeVisits),</span>
+<span class="fc" id="L111">            add(sourceInvocations, other.sourceInvocations),</span>
+<span class="fc" id="L112">            add(sourceCandidates, other.sourceCandidates),</span>
+<span class="fc" id="L113">            add(composedCandidates, other.composedCandidates),</span>
+<span class="fc" id="L114">            add(requirementEvaluations, other.requirementEvaluations),</span>
+<span class="fc" id="L115">            add(requirementRejections, other.requirementRejections),</span>
+<span class="fc" id="L116">            add(priorityCandidatesOrdered, other.priorityCandidatesOrdered),</span>
+<span class="fc" id="L117">            add(prunedCandidates, other.prunedCandidates),</span>
+<span class="fc" id="L118">            add(repeatIterations, other.repeatIterations),</span>
+<span class="fc" id="L119">            add(repeatEndpoints, other.repeatEndpoints),</span>
+<span class="fc" id="L120">            add(alternativeSelections, other.alternativeSelections),</span>
+<span class="fc" id="L121">            add(alternativesSkipped, other.alternativesSkipped),</span>
+<span class="fc" id="L122">            add(duplicateCandidatesDropped, other.duplicateCandidatesDropped), candidateWork.plus(other.candidateWork),</span>
+<span class="fc" id="L123">            add(delegatedMechanicalWorkUnits, other.delegatedMechanicalWorkUnits));</span>
     }
 
     public TransformationWorkMetrics withDuplicateCandidatesDropped(
         long additional
     ) {
-<span class="fc" id="L114">        requireNonNegative(additional, &quot;additional&quot;);</span>
-<span class="fc" id="L115">        return new TransformationWorkMetrics(</span>
+<span class="fc" id="L129">        requireNonNegative(additional, &quot;additional&quot;);</span>
+<span class="fc" id="L130">        return new TransformationWorkMetrics(</span>
             engineInvocations,
             programNodeVisits,
             sourceInvocations,
@@ -126,55 +141,63 @@ public record TransformationWorkMetrics(
             repeatEndpoints,
             alternativeSelections,
             alternativesSkipped,
-<span class="fc" id="L129">            add(duplicateCandidatesDropped, additional), candidateWork);</span>
+<span class="fc" id="L144">            add(duplicateCandidatesDropped, additional), candidateWork, delegatedMechanicalWorkUnits);</span>
     }
 
     public TransformationWorkMetrics withCandidateWork(ExecutionWork work) {
-<span class="fc" id="L133">        return new TransformationWorkMetrics(engineInvocations, programNodeVisits, sourceInvocations,</span>
+<span class="fc" id="L148">        return new TransformationWorkMetrics(engineInvocations, programNodeVisits, sourceInvocations,</span>
             sourceCandidates, composedCandidates, requirementEvaluations, requirementRejections,
             priorityCandidatesOrdered, prunedCandidates, repeatIterations, repeatEndpoints,
-            alternativeSelections, alternativesSkipped, duplicateCandidatesDropped, work);
+            alternativeSelections, alternativesSkipped, duplicateCandidatesDropped, work, delegatedMechanicalWorkUnits);
+    }
+
+    public TransformationWorkMetrics withDelegatedMechanicalWork(long units) {
+<span class="fc" id="L155">        return new TransformationWorkMetrics(engineInvocations, programNodeVisits, sourceInvocations,</span>
+            sourceCandidates, composedCandidates, requirementEvaluations, requirementRejections,
+            priorityCandidatesOrdered, prunedCandidates, repeatIterations, repeatEndpoints,
+            alternativeSelections, alternativesSkipped, duplicateCandidatesDropped, candidateWork, units);
     }
 
     /** v2 includes all observed mathematical candidate work, even if later discarded. */
     public long totalWorkUnitsV2() {
-<span class="fc" id="L141">        return Math.addExact(totalWorkUnits(), candidateWork.canonicalWorkUnits());</span>
+<span class="fc" id="L163">        return Math.addExact(totalWorkUnits(), candidateWork.canonicalWorkUnits());</span>
     }
 
     /**
-     * Frozen v1 scalar work formula. Every retained mechanical event contributes
-     * one unit. Individual fields remain authoritative for later analysis.
+     * Each retained event contributes one unit; separately measured delegated
+     * mechanics are added without relabeling them as fictitious invocations.
+     * Event-only historical observations retain exactly their frozen v1 total.
      */
     public long totalWorkUnits() {
-<span class="fc" id="L149">        long total = 0;</span>
-<span class="fc" id="L150">        total = add(total, engineInvocations);</span>
-<span class="fc" id="L151">        total = add(total, programNodeVisits);</span>
-<span class="fc" id="L152">        total = add(total, sourceInvocations);</span>
-<span class="fc" id="L153">        total = add(total, sourceCandidates);</span>
-<span class="fc" id="L154">        total = add(total, composedCandidates);</span>
-<span class="fc" id="L155">        total = add(total, requirementEvaluations);</span>
-<span class="fc" id="L156">        total = add(total, requirementRejections);</span>
-<span class="fc" id="L157">        total = add(total, priorityCandidatesOrdered);</span>
-<span class="fc" id="L158">        total = add(total, prunedCandidates);</span>
-<span class="fc" id="L159">        total = add(total, repeatIterations);</span>
-<span class="fc" id="L160">        total = add(total, repeatEndpoints);</span>
-<span class="fc" id="L161">        total = add(total, alternativeSelections);</span>
-<span class="fc" id="L162">        total = add(total, alternativesSkipped);</span>
-<span class="fc" id="L163">        return add(total, duplicateCandidatesDropped);</span>
+<span class="fc" id="L172">        long total = 0;</span>
+<span class="fc" id="L173">        total = add(total, engineInvocations);</span>
+<span class="fc" id="L174">        total = add(total, programNodeVisits);</span>
+<span class="fc" id="L175">        total = add(total, sourceInvocations);</span>
+<span class="fc" id="L176">        total = add(total, sourceCandidates);</span>
+<span class="fc" id="L177">        total = add(total, composedCandidates);</span>
+<span class="fc" id="L178">        total = add(total, requirementEvaluations);</span>
+<span class="fc" id="L179">        total = add(total, requirementRejections);</span>
+<span class="fc" id="L180">        total = add(total, priorityCandidatesOrdered);</span>
+<span class="fc" id="L181">        total = add(total, prunedCandidates);</span>
+<span class="fc" id="L182">        total = add(total, repeatIterations);</span>
+<span class="fc" id="L183">        total = add(total, repeatEndpoints);</span>
+<span class="fc" id="L184">        total = add(total, alternativeSelections);</span>
+<span class="fc" id="L185">        total = add(total, alternativesSkipped);</span>
+<span class="fc" id="L186">        return add(add(total, duplicateCandidatesDropped), delegatedMechanicalWorkUnits);</span>
     }
 
     private static long add(long left, long right) {
         try {
-<span class="fc" id="L168">            return Math.addExact(left, right);</span>
-<span class="nc" id="L169">        } catch (ArithmeticException exception) {</span>
-<span class="nc" id="L170">            return Long.MAX_VALUE;</span>
+<span class="fc" id="L191">            return Math.addExact(left, right);</span>
+<span class="nc" id="L192">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L193">            return Long.MAX_VALUE;</span>
         }
     }
 
     private static void requireNonNegative(long value, String name) {
-<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        if (value &lt; 0) {</span>
-<span class="nc" id="L176">            throw new IllegalArgumentException(name + &quot; must not be negative&quot;);</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        if (value &lt; 0) {</span>
+<span class="fc" id="L199">            throw new IllegalArgumentException(name + &quot; must not be negative&quot;);</span>
         }
-<span class="fc" id="L178">    }</span>
+<span class="fc" id="L201">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

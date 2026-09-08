@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialSearchIntegration.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.polynomial</a> &gt; <span class="el_source">PolynomialSearchIntegration.java</span></div><h1>PolynomialSearchIntegration.java</h1><pre class="source lang-java linenums">package de.regelsuche.polynomial;
+
+import de.regelsuche.math.algorithms.polynomial.NativeUnivariateFactorizationEngine;
+import de.regelsuche.mining.PolynomialTheoryCandidateObserver;
+import de.regelsuche.mining.PolynomialTheoryFormationOutcomeLedger;
+import de.regelsuche.mining.RuleCandidateFormationObserver;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.search.program.ExactPolynomialTransformationSource;
+import de.regelsuche.search.strategy.SearchExpansionSource;
+import de.regelsuche.transform.HypothesisOperator;
+import de.regelsuche.transform.PolynomialDecompositionSynthesisOperator;
+import de.regelsuche.transform.PolynomialDerivedMacroCache;
+import de.regelsuche.transform.PolynomialTheorySubsumptionClassifier;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+/** Explicit application composition; no profile changes the default rule inventory. */
+public final class PolynomialSearchIntegration {
+    public static final String EXTERNAL_ENGINE_ID =
+        &quot;regelsuche.factorization.sympy-graalpy.rational/v1&quot;;
+
+<span class="fc" id="L23">    public enum Profile {</span>
+<span class="fc" id="L24">        NO_FACTORIZATION,</span>
+<span class="fc" id="L25">        ON_DEMAND_VERIFIED_FACTORIZATION,</span>
+<span class="fc" id="L26">        VERIFIED_DERIVED_MACRO_CACHE,</span>
+<span class="fc" id="L27">        SPECIALIZED_BINARY_QUARTIC_CONTROL,</span>
+<span class="fc" id="L28">        OPTIONAL_EXTERNAL_VERIFIED_FACTORIZATION</span>
+    }
+
+    private PolynomialSearchIntegration() { }
+
+    /**
+     * Opens one isolated cache lifetime. The optional backend is supplied and
+     * closed by the caller; a missing or different backend is never substituted.
+     */
+    public static Session open(Profile profile,
+            Optional&lt;FactorizationEngine&lt;ExactRational&gt;&gt; external, int cacheCapacity) {
+<span class="fc" id="L39">        Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="fc" id="L40">        Objects.requireNonNull(external, &quot;external&quot;);</span>
+<span class="fc bfc" id="L41" title="All 4 branches covered.">        if (profile != Profile.OPTIONAL_EXTERNAL_VERIFIED_FACTORIZATION &amp;&amp; external.isPresent()) {</span>
+<span class="fc" id="L42">            throw new IllegalArgumentException(&quot;external engine supplied to another profile&quot;);</span>
+        }
+<span class="fc bfc" id="L44" title="All 4 branches covered.">        return switch (profile) {</span>
+<span class="fc" id="L45">            case NO_FACTORIZATION -&gt; new Session(profile, null, null, List.of());</span>
+<span class="fc" id="L46">            case SPECIALIZED_BINARY_QUARTIC_CONTROL -&gt; new Session(profile, null, null,</span>
+<span class="fc" id="L47">                List.of(new PolynomialDecompositionSynthesisOperator()));</span>
+            case ON_DEMAND_VERIFIED_FACTORIZATION, VERIFIED_DERIVED_MACRO_CACHE -&gt;
+<span class="fc" id="L49">                exact(profile, NativeUnivariateFactorizationEngine.boundedRationals(), cacheCapacity);</span>
+            case OPTIONAL_EXTERNAL_VERIFIED_FACTORIZATION -&gt; {
+<span class="fc" id="L51">                var engine = external.orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                    &quot;optional pinned GraalPy/SymPy engine is not configured&quot;));
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">                if (!EXTERNAL_ENGINE_ID.equals(engine.engineId())</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">                        || !ExactRationalField.DOMAIN_ID.equals(engine.coefficientDomainId())) {</span>
+<span class="nc" id="L55">                    throw new IllegalArgumentException(&quot;external backend differs from the selected profile&quot;);</span>
+                }
+<span class="fc" id="L57">                yield exact(profile, engine, cacheCapacity);</span>
+            }
+        };
+    }
+
+    private static Session exact(Profile profile, FactorizationEngine&lt;ExactRational&gt; engine, int capacity) {
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        var mode = profile == Profile.VERIFIED_DERIVED_MACRO_CACHE</span>
+<span class="fc" id="L64">            ? ExactPolynomialTransformationSource.Mode.VERIFIED_CACHE</span>
+<span class="fc" id="L65">            : ExactPolynomialTransformationSource.Mode.ON_DEMAND;</span>
+<span class="fc" id="L66">        var source = new ExactPolynomialTransformationSource(engine, mode, List.of(), capacity);</span>
+<span class="fc" id="L67">        return new Session(profile, engine, source, List.of());</span>
+    }
+
+    /** The historical control deliberately remains separate from exact-theory search sources. */
+    public static final class Session {
+        private final Profile profile;
+        private final FactorizationEngine&lt;ExactRational&gt; engine;
+        private final ExactPolynomialTransformationSource source;
+        private final List&lt;HypothesisOperator&gt; specializedControls;
+
+        private Session(Profile profile, FactorizationEngine&lt;ExactRational&gt; engine,
+<span class="fc" id="L78">                ExactPolynomialTransformationSource source, List&lt;HypothesisOperator&gt; controls) {</span>
+<span class="fc" id="L79">            this.profile = profile;</span>
+<span class="fc" id="L80">            this.engine = engine;</span>
+<span class="fc" id="L81">            this.source = source;</span>
+<span class="fc" id="L82">            specializedControls = List.copyOf(controls);</span>
+<span class="fc" id="L83">        }</span>
+
+<span class="nc" id="L85">        public Profile profile() { return profile; }</span>
+<span class="fc" id="L86">        public List&lt;HypothesisOperator&gt; specializedControls() { return specializedControls; }</span>
+        public Optional&lt;ExactPolynomialTransformationSource&gt; sourceAt(List&lt;Integer&gt; path) {
+<span class="fc" id="L88">            Objects.requireNonNull(path, &quot;path&quot;);</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">            return source == null ? Optional.empty() : Optional.of(source.atPath(path));</span>
+        }
+
+        public Optional&lt;SearchExpansionSource&gt; frontierAt(List&lt;Integer&gt; path) {
+<span class="fc" id="L93">            return sourceAt(path).map(SearchExpansionSource.ExactPolynomial::new);</span>
+        }
+
+        /**
+         * Composes the post-formation classifier with this session's executable
+         * cache. Learning work is admitted separately, never borrowed from the
+         * subsequent search invocation or made into a standard/kernel rule.
+         */
+        public RuleCandidateFormationObserver learningObserver(PolynomialDerivedMacroCache macros,
+                PolynomialTheoryFormationOutcomeLedger outcomes, long retentionWorkLimit) {
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if (profile != Profile.VERIFIED_DERIVED_MACRO_CACHE) {</span>
+<span class="fc" id="L104">                throw new IllegalStateException(&quot;learning handoff requires the explicit cache profile&quot;);</span>
+            }
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">            if (retentionWorkLimit &lt; 0) throw new IllegalArgumentException(&quot;negative retention authority&quot;);</span>
+<span class="fc" id="L107">            var classifier = new PolynomialTheorySubsumptionClassifier(engine);</span>
+<span class="fc" id="L108">            return new PolynomialTheoryCandidateObserver(classifier, macros, outcomes,</span>
+<span class="fc" id="L109">                (classification, evidence) -&gt; source.retainLearned(</span>
+<span class="fc" id="L110">                    classification, evidence.sourceProvenance(), retentionWorkLimit));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

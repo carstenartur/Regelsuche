@@ -739,19 +739,24 @@ Systeme.
 
 ## Nächste Ausbaustufen
 
-Issue #763 verfolgt nach dem exakten Wurzel-Transformationspfad insbesondere:
+Die verschachtelte occurrence-preserving Faktorisierung und die explizite
+[gemeinsame Such-, Replay- und Lernintegration](exact-polynomial-search-integration.md)
+sind implementiert. Sie verwenden dieselbe verifier-autorisierte primitive
+Transformation und getrennte Zertifikate für konkrete Auftreten. Die
+Faktorisierung ist dadurch nicht automatisch ein neuer Suchstandard.
 
-1. verschachtelte occurrence-preserving Faktorisierung über die vorhandene
-   Pfad- und Stalenessschutz-Infrastruktur;
-2. dieselbe verifier-autorisierte Transformationsidentität für On-Demand-Suche,
-   Replay und abgeleitete Cache-Makros;
-3. den eingefrorenen Vergleich von keiner Faktorisierung, On-Demand-Ausführung
+Issue #763 verfolgt weiterhin:
+
+1. den eingefrorenen Vergleich von keiner Faktorisierung, On-Demand-Ausführung
    und verifier-gebundenem Cache unter gleicher sichtbarer Information und
    kanonischer Arbeit;
-4. stärkere Rekombination, zunächst LLL-/van-Hoeij-artig, für Fälle mit vielen
-   modularen Faktoren;
-5. breitere gehaltene und adversarielle Korpora mit abgestuften Budgets;
-6. spätere multivariate und algebraische Koeffizientendomänen hinter
+2. eine nachweislich budgettreue kanonische Laufzeitautorität für die noch
+   offene Nutzenqualifikation; die dokumentierte konservative Roharbeitsgrenze
+   reicht für die eingefrorenen Studienbudgets nicht aus;
+3. spätere stärkere Rekombination, etwa LLL-/van-Hoeij-artig, sofern die
+   qualifizierten Messungen sie rechtfertigen;
+4. breitere gehaltene und adversarielle Korpora mit abgestuften Budgets;
+5. spätere multivariate und algebraische Koeffizientendomänen hinter
    demselben Domain-, Ring-, Engine- und Verifiervertrag.
 
 ## Prüfung aus dem Checkout

@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExactPolynomialTransformationSource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.program</a> &gt; <span class="el_source">ExactPolynomialTransformationSource.java</span></div><h1>ExactPolynomialTransformationSource.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.program;
+
+import de.regelsuche.moves.enumerate.TreePosition;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.parse.ExactParsedSubtermProjector;
+import de.regelsuche.parse.ExactParsedTerm;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.polynomial.ExactFactorizationExpressionRenderer;
+import de.regelsuche.polynomial.ExactFactorizationTransformationPipeline;
+import de.regelsuche.polynomial.ExactNestedFactorizationTransformationPipeline;
+import de.regelsuche.polynomial.ExactParsedUnivariatePolynomialView;
+import de.regelsuche.polynomial.ExactRationalField;
+import de.regelsuche.polynomial.FactorizationEngine;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.polynomial.VerifiedPolynomialTransitionCacheStore;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.transform.PolynomialTheorySubsumptionClassifier;
+import de.regelsuche.transform.ExactTheoryEvidence;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Explicit on-demand exact source for the budgeted search/program frontier.
+ * The engine is injected; cache misses use that same engine, never a hidden
+ * alternative. The cache index is merely an exact source lookup: only the
+ * store's live replay and the shared occurrence verifier can release an edge.
+ */
+public final class ExactPolynomialTransformationSource implements BudgetedTransformationSource {
+    public static final String SOURCE_ID = &quot;regelsuche.exact-polynomial-transformation-source/v1&quot;;
+<span class="nc" id="L38">    public enum Mode { ON_DEMAND, VERIFIED_CACHE }</span>
+
+    private final FactorizationEngine&lt;ExactRational&gt; engine;
+    private final Mode mode;
+    private final List&lt;Integer&gt; path;
+    private final CacheState cacheState;
+    private final VerifiedPolynomialTransitionCacheStore cache;
+    private final Map&lt;String, IndexedEntry&gt; index;
+    private final SourceIdentity identity;
+<span class="nc" id="L47">    private Optional&lt;Observation&gt; lastObservation = Optional.empty();</span>
+<span class="nc" id="L48">    private PolynomialWorkLedger lastWork = PolynomialWorkLedger.empty();</span>
+<span class="nc" id="L49">    private Optional&lt;VerifiedExecution&gt; lastVerifiedExecution = Optional.empty();</span>
+
+    public ExactPolynomialTransformationSource(FactorizationEngine&lt;ExactRational&gt; engine,
+            Mode mode, List&lt;Integer&gt; path, int cacheCapacity) {
+<span class="nc" id="L53">        this(engine, mode, path, new CacheState(cacheCapacity));</span>
+<span class="nc" id="L54">    }</span>
+
+    private ExactPolynomialTransformationSource(FactorizationEngine&lt;ExactRational&gt; engine,
+<span class="nc" id="L57">            Mode mode, List&lt;Integer&gt; path, CacheState cacheState) {</span>
+<span class="nc" id="L58">        this.engine = Objects.requireNonNull(engine, &quot;engine&quot;);</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        if (!ExactRationalField.DOMAIN_ID.equals(engine.coefficientDomainId())) {</span>
+<span class="nc" id="L60">            throw new IllegalArgumentException(&quot;exact search requires a rational polynomial engine&quot;);</span>
+        }
+<span class="nc" id="L62">        this.mode = Objects.requireNonNull(mode, &quot;mode&quot;);</span>
+<span class="nc" id="L63">        this.path = List.copyOf(path);</span>
+<span class="nc bnc" id="L64" title="All 6 branches missed.">        if (this.path.size() &gt; 256 || this.path.stream().anyMatch(i -&gt; i &lt; 0)) {</span>
+<span class="nc" id="L65">            throw new IllegalArgumentException(&quot;invalid polynomial occurrence path&quot;);</span>
+        }
+<span class="nc" id="L67">        this.cacheState = cacheState;</span>
+<span class="nc" id="L68">        cache = cacheState.store;</span>
+<span class="nc" id="L69">        index = cacheState.index;</span>
+<span class="nc" id="L70">        String revision = hash(SOURCE_ID, ExactNestedFactorizationTransformationPipeline.PIPELINE_ID,</span>
+<span class="nc" id="L71">            engine.engineId(), engine.coefficientDomainId(), mode.name(), this.path.toString(),</span>
+<span class="nc" id="L72">            Integer.toString(cache.capacity()), &quot;exact-source-fifo:no-backend-fallback:raw-work-ceiling&quot;);</span>
+<span class="nc" id="L73">        identity = new SourceIdentity(SOURCE_ID, revision, revision);</span>
+<span class="nc" id="L74">    }</span>
+
+<span class="nc" id="L76">    @Override public SourceIdentity identity() { return identity; }</span>
+<span class="nc" id="L77">    public synchronized Optional&lt;Observation&gt; lastObservation() { return lastObservation; }</span>
+<span class="nc" id="L78">    public synchronized PolynomialWorkLedger lastWork() { return lastWork; }</span>
+<span class="nc" id="L79">    public synchronized Optional&lt;VerifiedExecution&gt; lastVerifiedExecution() { return lastVerifiedExecution; }</span>
+    public synchronized VerifiedPolynomialTransitionCacheStore.Stats cacheStats() {
+<span class="nc" id="L81">        synchronized (cacheState) {</span>
+<span class="nc" id="L82">            var stats = cache.stats();</span>
+<span class="nc" id="L83">            return new VerifiedPolynomialTransitionCacheStore.Stats(stats.retainedEntries(),</span>
+<span class="nc" id="L84">                stats.insertions(), stats.hits(), cacheState.indexMisses,</span>
+<span class="nc" id="L85">                stats.evictions(), stats.replays());</span>
+        }
+    }
+
+    /** Another occurrence in the same explicitly owned run/cache lifetime. */
+    public ExactPolynomialTransformationSource atPath(List&lt;Integer&gt; selectedPath) {
+<span class="nc" id="L91">        return new ExactPolynomialTransformationSource(engine, mode, selectedPath, cacheState);</span>
+    }
+
+    /** Explicit learning handoff, admitted separately and never added to the rule inventory. */
+    public synchronized PolynomialWorkLedger retainLearned(
+            PolynomialTheorySubsumptionClassifier.Classification classification,
+            List&lt;String&gt; provenance, long availableMechanicalWork) {
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (mode != Mode.VERIFIED_CACHE) throw new IllegalStateException(&quot;cache is disabled&quot;);</span>
+<span class="nc" id="L99">        var authorization = Objects.requireNonNull(classification, &quot;classification&quot;).transformation().orElseThrow(</span>
+<span class="nc" id="L100">            () -&gt; new IllegalArgumentException(&quot;learning handoff lacks verifier authorization&quot;));</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        if (!engine.engineId().equals(authorization.factorization().engineId())) {</span>
+<span class="nc" id="L102">            throw new IllegalArgumentException(&quot;learned transformation uses another engine&quot;);</span>
+        }
+<span class="nc" id="L104">        synchronized (cacheState) {</span>
+<span class="nc" id="L105">            Work work = new Work(availableMechanicalWork);</span>
+<span class="nc" id="L106">            try { retain(authorization, provenance, work); }</span>
+<span class="nc" id="L107">            catch (Exhausted exhausted) {</span>
+<span class="nc" id="L108">                throw new IllegalArgumentException(&quot;insufficient work to retain learned polynomial evidence&quot;);</span>
+<span class="nc" id="L109">            }</span>
+<span class="nc" id="L110">            return work.ledger();</span>
+        }
+    }
+
+    @Override public synchronized Result transform(String expression, long availableMathematicalWorkUnits) {
+<span class="nc" id="L115">        synchronized (cacheState) {</span>
+<span class="nc" id="L116">            return executeSource(expression, availableMathematicalWorkUnits);</span>
+        }
+    }
+
+    private Result executeSource(String expression, long availableMathematicalWorkUnits) {
+<span class="nc bnc" id="L121" title="All 8 branches missed.">        if (expression == null || expression.isBlank() || availableMathematicalWorkUnits &lt; 0</span>
+                || availableMathematicalWorkUnits == Long.MAX_VALUE) {
+<span class="nc" id="L123">            throw new IllegalArgumentException(&quot;exact source and nonnegative work authority are required&quot;);</span>
+        }
+<span class="nc" id="L125">        lastObservation = Optional.empty();</span>
+<span class="nc" id="L126">        lastWork = PolynomialWorkLedger.empty();</span>
+<span class="nc" id="L127">        lastVerifiedExecution = Optional.empty();</span>
+<span class="nc" id="L128">        long ceiling = Math.min(availableMathematicalWorkUnits,</span>
+<span class="nc" id="L129">            ExactNestedFactorizationTransformationPipeline.Policy.boundedDefaults().maxTotalWorkUnits());</span>
+<span class="nc" id="L130">        Work work = new Work(ceiling);</span>
+        try {
+<span class="nc bnc" id="L132" title="All 2 branches missed.">            if (expression.length() &gt; ExactParsedSubtermProjector.MAX_ROOT_SOURCE_CODE_UNITS) throw new Exhausted();</span>
+<span class="nc" id="L133">            work.add(&quot;projection.search-source-parse-code-units&quot;, expression.length());</span>
+            ExactParsedTerm root;
+<span class="nc" id="L135">            try { root = new ExpressionParser().parseExactTerm(expression); }</span>
+<span class="nc" id="L136">            catch (IllegalArgumentException invalid) {</span>
+<span class="nc" id="L137">                return noMatch(expression, availableMathematicalWorkUnits, work, &quot;UNSUPPORTED_EXACT_SOURCE&quot;);</span>
+<span class="nc" id="L138">            }</span>
+<span class="nc" id="L139">            TreePosition selector = new TreePosition(path, &quot;pending&quot;);</span>
+<span class="nc" id="L140">            work.add(&quot;projection.search-path-navigation&quot;, path.size() + 1L);</span>
+<span class="nc" id="L141">            var selected = selector.subtreeAt(root.expression());</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">            if (selected.isEmpty()) return noMatch(expression, availableMathematicalWorkUnits, work, &quot;POSITION_NOT_PRESENT&quot;);</span>
+<span class="nc" id="L143">            var range = root.sourceRangeFor(selected.orElseThrow()).orElseThrow();</span>
+<span class="nc" id="L144">            work.add(&quot;projection.search-source-snapshot-code-units&quot;, range.endExclusive() - range.startInclusive());</span>
+<span class="nc" id="L145">            String source = expression.substring(range.startInclusive(), range.endExclusive());</span>
+<span class="nc" id="L146">            work.add(&quot;projection.search-staleness-format-reserve&quot;, Math.multiplyExact(4L, source.length()));</span>
+<span class="nc" id="L147">            TreePosition position = new TreePosition(path, ExpressionFormatter.format(selected.orElseThrow()));</span>
+<span class="nc" id="L148">            return execute(expression, root, position, source, range, availableMathematicalWorkUnits, work);</span>
+<span class="nc" id="L149">        } catch (Exhausted exhausted) {</span>
+<span class="nc" id="L150">            return inconclusive(expression, availableMathematicalWorkUnits, work, &quot;POLYNOMIAL_SOURCE_WORK_EXHAUSTED&quot;);</span>
+        } finally {
+            // Technical failures propagate, but never erase the consumed prefix.
+<span class="nc" id="L153">            lastWork = work.ledger();</span>
+        }
+    }
+
+    private Result execute(String expression, ExactParsedTerm root, TreePosition position,
+            String source, ExactParsedTerm.SourceRange range, long available, Work work) {
+<span class="nc" id="L159">        VerifiedPolynomialTransitionCacheStore.ReplayResult released = null;</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        if (mode == Mode.VERIFIED_CACHE) {</span>
+<span class="nc" id="L161">            work.add(&quot;cache.lookup.exact-source-index-code-units&quot;, source.length() + 1L);</span>
+<span class="nc" id="L162">            var indexed = index.get(source);</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">            if (indexed == null) {</span>
+<span class="nc" id="L164">                cacheState.indexMisses = Math.incrementExact(cacheState.indexMisses);</span>
+            } else {
+<span class="nc" id="L166">                var request = indexed.request();</span>
+                // Reserve all bounded key comparison and release work before either operation.
+<span class="nc" id="L168">                long lookupCeiling = request.cacheId().length() + request.cacheRevision().length()</span>
+<span class="nc" id="L169">                    + request.sourceEvidenceHash().length() + request.sourceExpression().length() + 2L;</span>
+<span class="nc" id="L170">                work.require(lookupCeiling);</span>
+<span class="nc" id="L171">                var lookup = cache.lookup(request);</span>
+<span class="nc" id="L172">                work.merge(&quot;cache.lookup.&quot;, lookup.lookupWork());</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">                if (indexed.mathematicalWork() &gt; available) {</span>
+<span class="nc" id="L174">                    return inconclusive(expression, available, work, &quot;PRIMITIVE_MATHEMATICAL_AUTHORITY_INSUFFICIENT&quot;);</span>
+                }
+<span class="nc" id="L176">                long releaseCeiling = cache.replayWorkCeiling(lookup);</span>
+<span class="nc" id="L177">                work.require(releaseCeiling);</span>
+<span class="nc" id="L178">                released = cache.replay(lookup);</span>
+<span class="nc" id="L179">                work.merge(&quot;cache.replay.&quot;, released.replayWork());</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">                if (!released.replayed()) throw new IllegalStateException(&quot;owned cache index lost its retention binding&quot;);</span>
+            }
+        }
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        if (work.remaining() &lt; 1) throw new Exhausted();</span>
+<span class="nc" id="L184">        var pipeline = pipeline(work.remaining());</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        var nested = released == null ? pipeline.transform(root, position, engine, 0)</span>
+<span class="nc" id="L186">            : pipeline.replay(root, position, released.authorization().orElseThrow());</span>
+<span class="nc" id="L187">        work.merge(&quot;&quot;, nested.totalWork());</span>
+<span class="nc" id="L188">        lastObservation = Optional.of(new Observation(nested, Optional.ofNullable(released), work.ledger()));</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">        if (!nested.transformed()) {</span>
+<span class="nc bnc" id="L190" title="All 3 branches missed.">            return switch (nested.status()) {</span>
+<span class="nc" id="L191">                case BUDGET_INCONCLUSIVE -&gt; inconclusive(expression, available, work, nested.detailCode());</span>
+<span class="nc" id="L192">                case TECHNICAL_FAILURE, SOURCE_EVIDENCE_MISMATCH -&gt; throw new IllegalStateException(nested.detailCode());</span>
+<span class="nc" id="L193">                default -&gt; noMatch(expression, available, work, nested.detailCode());</span>
+            };
+        }
+<span class="nc" id="L196">        var primitive = nested.transformation().orElseThrow();</span>
+<span class="nc" id="L197">        String replacement = primitive.transformedExpression().orElseThrow();</span>
+<span class="nc" id="L198">        long outputLength = (long) expression.length() - (range.endExclusive() - range.startInclusive()) + replacement.length() + 2;</span>
+<span class="nc" id="L199">        work.add(&quot;nested.rewritten-exact-source-code-units&quot;, outputLength);</span>
+<span class="nc" id="L200">        String rewritten = expression.substring(0, range.startInclusive()) + &quot;(&quot; + replacement + &quot;)&quot;</span>
+<span class="nc" id="L201">            + expression.substring(range.endExclusive());</span>
+        // The surrounding source is sliced, never rendered through NumberExpr/double.
+<span class="nc" id="L203">        new ExpressionParser().parseExactTerm(rewritten);</span>
+<span class="nc" id="L204">        long mathematical = Math.max(1L, primitive.factorization().totalWork().totalWorkUnits());</span>
+<span class="nc" id="L205">        long evidenceCeiling = Math.addExact(4096L, Math.multiplyExact(8L,</span>
+<span class="nc" id="L206">            Math.addExact((long) expression.length(), rewritten.length())));</span>
+<span class="nc" id="L207">        work.require(evidenceCeiling);</span>
+<span class="nc" id="L208">        String evidenceJson = new JsonWriter().beginObject()</span>
+<span class="nc" id="L209">            .property(&quot;schema&quot;, &quot;regelsuche.verified-polynomial-search-execution/v1&quot;)</span>
+<span class="nc" id="L210">            .property(&quot;source&quot;, expression).property(&quot;transformed&quot;, rewritten)</span>
+<span class="nc" id="L211">            .property(&quot;primitiveEvidenceHash&quot;, primitive.certificateHash())</span>
+<span class="nc" id="L212">            .property(&quot;occurrenceEvidenceHash&quot;, nested.certificateHash())</span>
+<span class="nc" id="L213">            .property(&quot;theoryStepId&quot;, ExactFactorizationTransformationPipeline.TRANSFORMATION_ID)</span>
+<span class="nc" id="L214">            .property(&quot;mathematicalWorkUnits&quot;, mathematical).endObject().toString();</span>
+<span class="nc" id="L215">        long evidenceUnits = evidenceJson.getBytes(StandardCharsets.UTF_8).length;</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        if (evidenceUnits &gt; evidenceCeiling) throw new IllegalStateException(&quot;execution evidence exceeded its admitted ceiling&quot;);</span>
+<span class="nc" id="L217">        work.add(&quot;nested.rewritten-execution-evidence-utf8-bytes&quot;, evidenceUnits);</span>
+<span class="nc bnc" id="L218" title="All 4 branches missed.">        if (mode == Mode.VERIFIED_CACHE &amp;&amp; released == null) retain(primitive, List.of(position.pathKey()), work);</span>
+<span class="nc" id="L219">        lastObservation = Optional.of(new Observation(nested, Optional.ofNullable(released), work.ledger()));</span>
+<span class="nc" id="L220">        var transition = ExactTheoryTransition.create(expression, rewritten,</span>
+<span class="nc" id="L221">            ExactFactorizationTransformationPipeline.TRANSFORMATION_ID, primitive.certificateHash(), List.of(),</span>
+<span class="nc" id="L222">            mathematical, nested.certificateHash());</span>
+<span class="nc" id="L223">        lastWork = work.ledger();</span>
+<span class="nc" id="L224">        var result = Result.candidates(identity, expression, available, List.of(transition), work.total,</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">            released == null ? &quot;ON_DEMAND_VERIFIED_POLYNOMIAL&quot; : &quot;VERIFIED_POLYNOMIAL_CACHE_REPLAY&quot;);</span>
+<span class="nc" id="L226">        lastVerifiedExecution = Optional.of(new VerifiedExecution(result, evidenceJson));</span>
+<span class="nc" id="L227">        return result;</span>
+    }
+
+    private void retain(ExactFactorizationTransformationPipeline.Result primitive, List&lt;String&gt; provenance, Work work) {
+<span class="nc" id="L231">        String source = primitive.occurrence().sourceText();</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">        if (index.containsKey(source)) return;</span>
+<span class="nc" id="L233">        long material = source.length() + primitive.transformedExpression().orElseThrow().length()</span>
+<span class="nc" id="L234">            + provenance.stream().mapToLong(String::length).sum() + 1024L;</span>
+<span class="nc" id="L235">        work.add(&quot;cache.insertion.verifier-evidence-code-units&quot;, material);</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">        if (cache.size() == cache.capacity()) work.add(&quot;cache.eviction.fifo-entry&quot;, 1);</span>
+<span class="nc" id="L237">        var retained = cache.retain(primitive, SOURCE_ID, engine.engineId(),</span>
+<span class="nc" id="L238">            new VerifiedPolynomialTransitionCacheStore.Observation(primitive.certificateHash(), provenance, List.of()));</span>
+<span class="nc" id="L239">        retained.eviction().ifPresent(eviction -&gt; index.values().removeIf(entry -&gt;</span>
+<span class="nc" id="L240">            entry.request().keyId().equals(eviction.lookupKeyId())));</span>
+<span class="nc" id="L241">        index.put(source, new IndexedEntry(retained.lookupRequest(),</span>
+<span class="nc" id="L242">            primitive.factorization().totalWork().totalWorkUnits()));</span>
+<span class="nc" id="L243">    }</span>
+
+    private static ExactNestedFactorizationTransformationPipeline pipeline(long work) {
+<span class="nc" id="L246">        var defaults = ExactNestedFactorizationTransformationPipeline.Policy.boundedDefaults();</span>
+<span class="nc" id="L247">        return new ExactNestedFactorizationTransformationPipeline(new ExactParsedSubtermProjector(),</span>
+            new ExactParsedUnivariatePolynomialView(), new ExactFactorizationExpressionRenderer(), new ExpressionParser(),
+            new ExactParsedUnivariatePolynomialView(), new ExactNestedFactorizationTransformationPipeline.Policy(
+<span class="nc" id="L250">                defaults.maxPathDepth(), defaults.maxRootNodes(), defaults.maxReplacementNodes(), work,</span>
+<span class="nc" id="L251">                defaults.structuralLimits(), defaults.maxCandidates(), defaults.evidenceRequirement()));</span>
+    }
+
+    private Result inconclusive(String expression, long available, Work work, String detail) {
+<span class="nc" id="L255">        lastWork = work.ledger();</span>
+<span class="nc" id="L256">        return Result.budgetInconclusive(identity, expression, available, Math.addExact(available, 1L), work.total, detail);</span>
+    }
+    private Result noMatch(String expression, long available, Work work, String detail) {
+<span class="nc" id="L259">        lastWork = work.ledger();</span>
+<span class="nc" id="L260">        return Result.noMatch(identity, expression, available, work.total, detail);</span>
+    }
+
+    public record Observation(ExactNestedFactorizationTransformationPipeline.Result occurrence,
+            Optional&lt;VerifiedPolynomialTransitionCacheStore.ReplayResult&gt; cacheReplay, PolynomialWorkLedger executionWork) {
+<span class="nc" id="L265">        public Observation { Objects.requireNonNull(occurrence); Objects.requireNonNull(cacheReplay); Objects.requireNonNull(executionWork); }</span>
+    }
+
+    /** Private-constructor capability, issued only after the actual occurrence rewrite succeeds. */
+    public static final class VerifiedExecution {
+        private final Result result;
+        private final String evidenceJson;
+<span class="nc" id="L272">        private VerifiedExecution(Result result, String evidenceJson) {</span>
+<span class="nc" id="L273">            this.result = result;</span>
+<span class="nc" id="L274">            this.evidenceJson = evidenceJson;</span>
+<span class="nc" id="L275">        }</span>
+<span class="nc" id="L276">        public Result result() { return result; }</span>
+        ExactTheoryEvidence.Binding binding() {
+<span class="nc" id="L278">            var transition = result.candidates().getFirst();</span>
+<span class="nc" id="L279">            return new ExactTheoryEvidence.Binding(transition.sourceExpression(), transition.transformedExpression(),</span>
+<span class="nc" id="L280">                transition.theoryStepId(), transition.evidenceHash(), hash(evidenceJson), result.contentHash(),</span>
+<span class="nc" id="L281">                transition.mathematicalWorkUnits(), evidenceJson);</span>
+        }
+    }
+
+    private static final class Work {
+        private final long limit;
+        private long total;
+<span class="nc" id="L288">        private final Map&lt;String, Long&gt; stages = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">        Work(long limit) { if (limit &lt; 0) throw new IllegalArgumentException(&quot;negative work&quot;); this.limit = limit; }</span>
+<span class="nc" id="L290">        long remaining() { return limit - total; }</span>
+<span class="nc bnc" id="L291" title="All 4 branches missed.">        void require(long units) { if (units &lt; 0 || units &gt; remaining()) throw new Exhausted(); }</span>
+<span class="nc" id="L292">        void add(String stage, long units) { require(units); total += units; stages.merge(stage, units, Math::addExact); }</span>
+<span class="nc" id="L293">        void merge(String prefix, PolynomialWorkLedger ledger) { require(ledger.totalWorkUnits()); ledger.stages().forEach((s,n) -&gt; add(prefix+s,n)); }</span>
+<span class="nc" id="L294">        PolynomialWorkLedger ledger() { return new PolynomialWorkLedger(stages); }</span>
+    }
+    private static final class CacheState {
+        final VerifiedPolynomialTransitionCacheStore store;
+<span class="nc" id="L298">        final Map&lt;String, IndexedEntry&gt; index = new LinkedHashMap&lt;&gt;();</span>
+        long indexMisses;
+<span class="nc" id="L300">        CacheState(int capacity) { store = new VerifiedPolynomialTransitionCacheStore(capacity); }</span>
+    }
+<span class="nc" id="L302">    private record IndexedEntry(VerifiedPolynomialTransitionCacheStore.LookupRequest request, long mathematicalWork) { }</span>
+    private static final class Exhausted extends RuntimeException { private static final long serialVersionUID = 1L; }
+    private static String hash(String... values) {
+        try {
+<span class="nc" id="L306">            MessageDigest digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="nc bnc" id="L307" title="All 2 branches missed.">            for (String value : values) {</span>
+<span class="nc" id="L308">                byte[] bytes = value.getBytes(StandardCharsets.UTF_8);</span>
+<span class="nc" id="L309">                digest.update((bytes.length + &quot;:&quot;).getBytes(StandardCharsets.UTF_8));</span>
+<span class="nc" id="L310">                digest.update(bytes);</span>
+            }
+<span class="nc" id="L312">            return &quot;sha256:&quot;+HexFormat.of().formatHex(digest.digest());</span>
+<span class="nc" id="L313">        } catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

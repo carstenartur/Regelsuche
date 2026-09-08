@@ -13,7 +13,7 @@ import java.util.function.BiFunction;
 
 public class RuleCandidateMiner {
 <span class="fc" id="L15">    private static final RuleCandidateFormationObserver NO_FORMATION_OBSERVER =</span>
-<span class="nc" id="L16">        (candidate, evidence) -&gt; { };</span>
+<span class="nc" id="L16">        (candidate, evidence) -&gt; RuleCandidateFormationObserver.Disposition.RETAIN_FOR_REVIEW;</span>
 
     private final KnownRuleRepository knownRules;
     private final PatternGeneralizer patternGeneralizer;
@@ -145,112 +145,110 @@ public class RuleCandidateMiner {
 <span class="nc" id="L145">                continue;</span>
             }
 <span class="fc" id="L147">            RuleCandidate candidate = bucket.toCandidate(knownRules);</span>
-<span class="fc" id="L148">            observe(candidate, bucket.paths);</span>
-<span class="fc" id="L149">            result.add(candidate);</span>
-<span class="fc" id="L150">        }</span>
-<span class="fc" id="L151">        return List.copyOf(result);</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            if (retainForReview(candidate, bucket.paths)) result.add(candidate);</span>
+<span class="fc" id="L149">        }</span>
+<span class="fc" id="L150">        return List.copyOf(result);</span>
     }
 
     public Optional&lt;RuleCandidate&gt; mineFromSinglePathForValidatedSchema(
         SuccessfulTransformationPath path
     ) {
-<span class="fc" id="L157">        return formFromSinglePath(path).map(formed -&gt; {</span>
-<span class="fc" id="L158">            observe(formed.candidate(), formed.sourcePaths());</span>
-<span class="fc" id="L159">            return formed.candidate();</span>
-        });
+<span class="fc" id="L156">        return formFromSinglePath(path)</span>
+<span class="fc" id="L157">            .filter(formed -&gt; retainForReview(formed.candidate(), formed.sourcePaths()))</span>
+<span class="fc" id="L158">            .map(FormedCandidate::candidate);</span>
     }
 
     public List&lt;RuleCandidate&gt; mineFromSinglePathForValidatedSchema(
         List&lt;SuccessfulTransformationPath&gt; paths
     ) {
-<span class="pc bpc" id="L166" title="2 of 4 branches missed.">        if (paths == null || paths.isEmpty()) {</span>
-<span class="nc" id="L167">            return List.of();</span>
+<span class="pc bpc" id="L164" title="2 of 4 branches missed.">        if (paths == null || paths.isEmpty()) {</span>
+<span class="nc" id="L165">            return List.of();</span>
         }
-<span class="fc" id="L169">        Map&lt;String, FormedCandidate&gt; deduplicated = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L170" title="All 2 branches covered.">        for (SuccessfulTransformationPath path : paths) {</span>
-<span class="fc" id="L171">            formFromSinglePath(path).ifPresent(formed -&gt;</span>
-<span class="fc" id="L172">                deduplicated.merge(</span>
-<span class="fc" id="L173">                    formed.candidate().canonicalHash(),</span>
+<span class="fc" id="L167">        Map&lt;String, FormedCandidate&gt; deduplicated = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        for (SuccessfulTransformationPath path : paths) {</span>
+<span class="fc" id="L169">            formFromSinglePath(path).ifPresent(formed -&gt;</span>
+<span class="fc" id="L170">                deduplicated.merge(</span>
+<span class="fc" id="L171">                    formed.candidate().canonicalHash(),</span>
                     formed,
                     FormedCandidate::merge));
-<span class="fc" id="L176">        }</span>
-<span class="fc" id="L177">        List&lt;RuleCandidate&gt; result = new ArrayList&lt;&gt;(</span>
-<span class="fc" id="L178">            deduplicated.size());</span>
-<span class="fc bfc" id="L179" title="All 2 branches covered.">        for (FormedCandidate formed : deduplicated.values()) {</span>
-<span class="fc" id="L180">            observe(formed.candidate(), formed.sourcePaths());</span>
-<span class="fc" id="L181">            result.add(formed.candidate());</span>
-<span class="fc" id="L182">        }</span>
-<span class="fc" id="L183">        return List.copyOf(result);</span>
+<span class="fc" id="L174">        }</span>
+<span class="fc" id="L175">        List&lt;RuleCandidate&gt; result = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L176">            deduplicated.size());</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        for (FormedCandidate formed : deduplicated.values()) {</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">            if (retainForReview(formed.candidate(), formed.sourcePaths())) result.add(formed.candidate());</span>
+<span class="fc" id="L179">        }</span>
+<span class="fc" id="L180">        return List.copyOf(result);</span>
     }
 
-    private void observe(
+    private boolean retainForReview(
         RuleCandidate candidate,
         List&lt;SuccessfulTransformationPath&gt; sourcePaths
     ) {
-<span class="fc bfc" id="L190" title="All 2 branches covered.">        if (formationObserver == NO_FORMATION_OBSERVER) {</span>
-<span class="fc" id="L191">            return;</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        if (formationObserver == NO_FORMATION_OBSERVER) {</span>
+<span class="fc" id="L188">            return true;</span>
         }
-<span class="fc" id="L193">        formationObserver.onCandidateFormed(</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        return Objects.requireNonNull(formationObserver.onCandidateFormed(</span>
             candidate,
-<span class="fc" id="L195">            RuleCandidateFormationObserver.Evidence.fromPaths(sourcePaths));</span>
-<span class="fc" id="L196">    }</span>
+<span class="fc" id="L192">            RuleCandidateFormationObserver.Evidence.fromPaths(sourcePaths)), &quot;formation disposition&quot;)</span>
+                == RuleCandidateFormationObserver.Disposition.RETAIN_FOR_REVIEW;
+    }
 
     private Optional&lt;FormedCandidate&gt; formFromSinglePath(
         SuccessfulTransformationPath path
     ) {
-<span class="pc bpc" id="L201" title="1 of 4 branches missed.">        if (path == null || !path.equivalenceVerified()) {</span>
-<span class="fc" id="L202">            return Optional.empty();</span>
+<span class="pc bpc" id="L199" title="1 of 4 branches missed.">        if (path == null || !path.equivalenceVerified()) {</span>
+<span class="fc" id="L200">            return Optional.empty();</span>
         }
-<span class="fc" id="L204">        return patternGeneralizer.generalizeSingleExampleSchema(path)</span>
-<span class="fc" id="L205">            .filter(pattern -&gt;</span>
-<span class="pc bpc" id="L206" title="1 of 2 branches missed.">                !pattern.expressionPlaceholderValues().isEmpty())</span>
-<span class="fc" id="L207">            .filter(validator::validateGeneratedExpressionInstantiations)</span>
-<span class="fc" id="L208">            .filter(validator::validate)</span>
-<span class="fc" id="L209">            .map(pattern -&gt; new FormedCandidate(</span>
-<span class="fc" id="L210">                toSinglePathCandidate(path, pattern),</span>
-<span class="fc" id="L211">                List.of(path)))</span>
-<span class="fc" id="L212">            .filter(formed -&gt;</span>
-<span class="pc bpc" id="L213" title="1 of 2 branches missed.">                formed.candidate().status() == RuleStatus.NEW);</span>
+<span class="fc" id="L202">        return patternGeneralizer.generalizeSingleExampleSchema(path)</span>
+<span class="fc" id="L203">            .filter(pattern -&gt;</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">                !pattern.expressionPlaceholderValues().isEmpty())</span>
+<span class="fc" id="L205">            .filter(validator::validateGeneratedExpressionInstantiations)</span>
+<span class="fc" id="L206">            .filter(validator::validate)</span>
+<span class="fc" id="L207">            .map(pattern -&gt; new FormedCandidate(</span>
+<span class="fc" id="L208">                toSinglePathCandidate(path, pattern),</span>
+<span class="fc" id="L209">                List.of(path)))</span>
+<span class="fc" id="L210">            .filter(formed -&gt;</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">                formed.candidate().status() == RuleStatus.NEW);</span>
     }
 
     private RuleCandidate toSinglePathCandidate(
         SuccessfulTransformationPath path,
         GeneralizedPattern pattern
     ) {
-<span class="fc" id="L220">        CandidateProofStatus proofStatus = validator.proofStatus(pattern);</span>
-<span class="fc" id="L221">        CanonicalPatternIdentity identity = canonicalIdentity(</span>
-<span class="fc" id="L222">            pattern.leftPattern(),</span>
-<span class="fc" id="L223">            pattern.rightPattern());</span>
-<span class="fc" id="L224">        return new RuleCandidate(</span>
-<span class="fc" id="L225">            pattern.leftPattern(),</span>
-<span class="fc" id="L226">            pattern.rightPattern(),</span>
+<span class="fc" id="L218">        CandidateProofStatus proofStatus = validator.proofStatus(pattern);</span>
+<span class="fc" id="L219">        CanonicalPatternIdentity identity = canonicalIdentity(</span>
+<span class="fc" id="L220">            pattern.leftPattern(),</span>
+<span class="fc" id="L221">            pattern.rightPattern());</span>
+<span class="fc" id="L222">        return new RuleCandidate(</span>
+<span class="fc" id="L223">            pattern.leftPattern(),</span>
+<span class="fc" id="L224">            pattern.rightPattern(),</span>
             1,
-<span class="fc" id="L228">            path.scoreImprovement(),</span>
-<span class="fc" id="L229">            path.scoreImprovement(),</span>
-<span class="fc" id="L230">            path.equivalenceVerified(),</span>
+<span class="fc" id="L226">            path.scoreImprovement(),</span>
+<span class="fc" id="L227">            path.scoreImprovement(),</span>
+<span class="fc" id="L228">            path.equivalenceVerified(),</span>
             true,
-<span class="pc bpc" id="L232" title="1 of 2 branches missed.">            !pattern.expressionPlaceholderValues().isEmpty(),</span>
-<span class="fc" id="L233">            pattern.parameterRelations(),</span>
-<span class="fc" id="L234">            knownRules.statusFor(</span>
-<span class="fc" id="L235">                pattern.leftPattern(),</span>
-<span class="fc" id="L236">                pattern.rightPattern()),</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">            !pattern.expressionPlaceholderValues().isEmpty(),</span>
+<span class="fc" id="L231">            pattern.parameterRelations(),</span>
+<span class="fc" id="L232">            knownRules.statusFor(</span>
+<span class="fc" id="L233">                pattern.leftPattern(),</span>
+<span class="fc" id="L234">                pattern.rightPattern()),</span>
             proofStatus,
-<span class="fc" id="L238">            identity.hash(),</span>
-<span class="fc" id="L239">            List.of(path.id()));</span>
+<span class="fc" id="L236">            identity.hash(),</span>
+<span class="fc" id="L237">            List.of(path.id()));</span>
     }
 
     private CanonicalPatternIdentity canonicalIdentity(
         String leftPattern,
         String rightPattern
     ) {
-<span class="fc" id="L246">        String hash = canonicalHashFunction.apply(</span>
+<span class="fc" id="L244">        String hash = canonicalHashFunction.apply(</span>
             leftPattern,
             rightPattern);
-<span class="pc bpc" id="L249" title="2 of 4 branches missed.">        if (hash == null || hash.isBlank()) {</span>
-<span class="nc" id="L250">            throw new IllegalStateException(</span>
+<span class="pc bpc" id="L247" title="2 of 4 branches missed.">        if (hash == null || hash.isBlank()) {</span>
+<span class="nc" id="L248">            throw new IllegalStateException(</span>
                 &quot;canonical candidate hash must not be blank&quot;);
         }
-<span class="fc" id="L253">        return CanonicalPatternIdentity.from(</span>
+<span class="fc" id="L251">        return CanonicalPatternIdentity.from(</span>
             leftPattern,
             rightPattern,
             hash);
@@ -260,22 +258,22 @@ public class RuleCandidateMiner {
         RuleCandidate candidate,
         List&lt;SuccessfulTransformationPath&gt; sourcePaths
     ) {
-<span class="fc" id="L263">        private FormedCandidate {</span>
-<span class="fc" id="L264">            candidate = Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
-<span class="fc" id="L265">            sourcePaths = List.copyOf(</span>
-<span class="fc" id="L266">                Objects.requireNonNull(sourcePaths, &quot;sourcePaths&quot;));</span>
-<span class="fc" id="L267">        }</span>
+<span class="fc" id="L261">        private FormedCandidate {</span>
+<span class="fc" id="L262">            candidate = Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc" id="L263">            sourcePaths = List.copyOf(</span>
+<span class="fc" id="L264">                Objects.requireNonNull(sourcePaths, &quot;sourcePaths&quot;));</span>
+<span class="fc" id="L265">        }</span>
 
         private FormedCandidate merge(FormedCandidate other) {
-<span class="fc" id="L270">            Objects.requireNonNull(other, &quot;other&quot;);</span>
-<span class="fc" id="L271">            CanonicalPatternIdentity.from(candidate)</span>
-<span class="fc" id="L272">                .requireSameHashContent(</span>
-<span class="fc" id="L273">                    CanonicalPatternIdentity.from(other.candidate));</span>
-<span class="fc" id="L274">            List&lt;SuccessfulTransformationPath&gt; merged = new ArrayList&lt;&gt;(</span>
-<span class="fc" id="L275">                sourcePaths.size() + other.sourcePaths.size());</span>
-<span class="fc" id="L276">            merged.addAll(sourcePaths);</span>
-<span class="fc" id="L277">            merged.addAll(other.sourcePaths);</span>
-<span class="fc" id="L278">            return new FormedCandidate(candidate, merged);</span>
+<span class="fc" id="L268">            Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc" id="L269">            CanonicalPatternIdentity.from(candidate)</span>
+<span class="fc" id="L270">                .requireSameHashContent(</span>
+<span class="fc" id="L271">                    CanonicalPatternIdentity.from(other.candidate));</span>
+<span class="fc" id="L272">            List&lt;SuccessfulTransformationPath&gt; merged = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L273">                sourcePaths.size() + other.sourcePaths.size());</span>
+<span class="fc" id="L274">            merged.addAll(sourcePaths);</span>
+<span class="fc" id="L275">            merged.addAll(other.sourcePaths);</span>
+<span class="fc" id="L276">            return new FormedCandidate(candidate, merged);</span>
         }
     }
 
@@ -284,50 +282,50 @@ public class RuleCandidateMiner {
         String canonicalRightPattern,
         String hash
     ) {
-<span class="fc" id="L287">        private CanonicalPatternIdentity {</span>
-<span class="fc" id="L288">            canonicalLeftPattern = Objects.requireNonNull(</span>
+<span class="fc" id="L285">        private CanonicalPatternIdentity {</span>
+<span class="fc" id="L286">            canonicalLeftPattern = Objects.requireNonNull(</span>
                 canonicalLeftPattern,
                 &quot;canonicalLeftPattern&quot;);
-<span class="fc" id="L291">            canonicalRightPattern = Objects.requireNonNull(</span>
+<span class="fc" id="L289">            canonicalRightPattern = Objects.requireNonNull(</span>
                 canonicalRightPattern,
                 &quot;canonicalRightPattern&quot;);
-<span class="fc" id="L294">            hash = Objects.requireNonNull(hash, &quot;hash&quot;);</span>
-<span class="fc" id="L295">        }</span>
+<span class="fc" id="L292">            hash = Objects.requireNonNull(hash, &quot;hash&quot;);</span>
+<span class="fc" id="L293">        }</span>
 
         private static CanonicalPatternIdentity from(
             String leftPattern,
             String rightPattern,
             String hash
         ) {
-<span class="fc" id="L302">            return new CanonicalPatternIdentity(</span>
-<span class="fc" id="L303">                RulePatternCanonicalizer.canonicalize(leftPattern),</span>
-<span class="fc" id="L304">                RulePatternCanonicalizer.canonicalize(rightPattern),</span>
+<span class="fc" id="L300">            return new CanonicalPatternIdentity(</span>
+<span class="fc" id="L301">                RulePatternCanonicalizer.canonicalize(leftPattern),</span>
+<span class="fc" id="L302">                RulePatternCanonicalizer.canonicalize(rightPattern),</span>
                 hash);
         }
 
         private static CanonicalPatternIdentity from(
             RuleCandidate candidate
         ) {
-<span class="fc" id="L311">            Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
-<span class="fc" id="L312">            return from(</span>
-<span class="fc" id="L313">                candidate.leftPattern(),</span>
-<span class="fc" id="L314">                candidate.rightPattern(),</span>
-<span class="fc" id="L315">                candidate.canonicalHash());</span>
+<span class="fc" id="L309">            Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc" id="L310">            return from(</span>
+<span class="fc" id="L311">                candidate.leftPattern(),</span>
+<span class="fc" id="L312">                candidate.rightPattern(),</span>
+<span class="fc" id="L313">                candidate.canonicalHash());</span>
         }
 
         private void requireSameHashContent(
             CanonicalPatternIdentity other
         ) {
-<span class="fc" id="L321">            Objects.requireNonNull(other, &quot;other&quot;);</span>
-<span class="pc bpc" id="L322" title="1 of 2 branches missed.">            if (!hash.equals(other.hash)</span>
-<span class="fc bfc" id="L323" title="All 2 branches covered.">                    || !canonicalLeftPattern.equals(</span>
+<span class="fc" id="L319">            Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">            if (!hash.equals(other.hash)</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">                    || !canonicalLeftPattern.equals(</span>
                         other.canonicalLeftPattern)
-<span class="pc bpc" id="L325" title="1 of 2 branches missed.">                    || !canonicalRightPattern.equals(</span>
+<span class="pc bpc" id="L323" title="1 of 2 branches missed.">                    || !canonicalRightPattern.equals(</span>
                         other.canonicalRightPattern)) {
-<span class="fc" id="L327">                throw new IllegalStateException(</span>
+<span class="fc" id="L325">                throw new IllegalStateException(</span>
                     &quot;canonical candidate hash collision for key &quot; + hash);
             }
-<span class="fc" id="L330">        }</span>
+<span class="fc" id="L328">        }</span>
     }
 
     private static final class CandidateBucket {
@@ -336,7 +334,7 @@ public class RuleCandidateMiner {
         private final List&lt;String&gt; parameterRelations;
         private final CandidateProofStatus proofStatus;
         private final CanonicalPatternIdentity identity;
-<span class="fc" id="L339">        private final List&lt;SuccessfulTransformationPath&gt; paths =</span>
+<span class="fc" id="L337">        private final List&lt;SuccessfulTransformationPath&gt; paths =</span>
             new ArrayList&lt;&gt;();
 
         private CandidateBucket(
@@ -345,65 +343,65 @@ public class RuleCandidateMiner {
             List&lt;String&gt; parameterRelations,
             CandidateProofStatus proofStatus,
             CanonicalPatternIdentity identity
-<span class="fc" id="L348">        ) {</span>
-<span class="fc" id="L349">            this.leftPattern = leftPattern;</span>
-<span class="fc" id="L350">            this.rightPattern = rightPattern;</span>
-<span class="fc" id="L351">            this.parameterRelations = List.copyOf(parameterRelations);</span>
-<span class="fc" id="L352">            this.proofStatus = proofStatus;</span>
-<span class="fc" id="L353">            this.identity = identity;</span>
-<span class="fc" id="L354">        }</span>
+<span class="fc" id="L346">        ) {</span>
+<span class="fc" id="L347">            this.leftPattern = leftPattern;</span>
+<span class="fc" id="L348">            this.rightPattern = rightPattern;</span>
+<span class="fc" id="L349">            this.parameterRelations = List.copyOf(parameterRelations);</span>
+<span class="fc" id="L350">            this.proofStatus = proofStatus;</span>
+<span class="fc" id="L351">            this.identity = identity;</span>
+<span class="fc" id="L352">        }</span>
 
         private void requireSameCanonicalContent(
             CanonicalPatternIdentity candidateIdentity
         ) {
-<span class="nc" id="L359">            identity.requireSameHashContent(candidateIdentity);</span>
-<span class="nc" id="L360">        }</span>
+<span class="nc" id="L357">            identity.requireSameHashContent(candidateIdentity);</span>
+<span class="nc" id="L358">        }</span>
 
         private void addAll(List&lt;SuccessfulTransformationPath&gt; paths) {
-<span class="fc bfc" id="L363" title="All 2 branches covered.">            for (SuccessfulTransformationPath path : paths) {</span>
-<span class="fc" id="L364">                boolean alreadyPresent = this.paths.stream()</span>
-<span class="fc" id="L365">                    .anyMatch(existing -&gt;</span>
-<span class="pc bpc" id="L366" title="1 of 2 branches missed.">                        existing.id() != null</span>
-<span class="pc bpc" id="L367" title="1 of 2 branches missed.">                            &amp;&amp; existing.id().equals(path.id()));</span>
-<span class="pc bpc" id="L368" title="1 of 2 branches missed.">                if (!alreadyPresent) {</span>
-<span class="fc" id="L369">                    this.paths.add(path);</span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">            for (SuccessfulTransformationPath path : paths) {</span>
+<span class="fc" id="L362">                boolean alreadyPresent = this.paths.stream()</span>
+<span class="fc" id="L363">                    .anyMatch(existing -&gt;</span>
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">                        existing.id() != null</span>
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">                            &amp;&amp; existing.id().equals(path.id()));</span>
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">                if (!alreadyPresent) {</span>
+<span class="fc" id="L367">                    this.paths.add(path);</span>
                 }
-<span class="fc" id="L371">            }</span>
-<span class="fc" id="L372">        }</span>
+<span class="fc" id="L369">            }</span>
+<span class="fc" id="L370">        }</span>
 
         private RuleCandidate toCandidate(
             KnownRuleRepository knownRules
         ) {
-<span class="fc" id="L377">            double average = paths.stream()</span>
-<span class="fc" id="L378">                .mapToInt(SuccessfulTransformationPath::scoreImprovement)</span>
-<span class="fc" id="L379">                .average()</span>
-<span class="fc" id="L380">                .orElse(0);</span>
-<span class="fc" id="L381">            int maximum = paths.stream()</span>
-<span class="fc" id="L382">                .mapToInt(SuccessfulTransformationPath::scoreImprovement)</span>
-<span class="fc" id="L383">                .max()</span>
-<span class="fc" id="L384">                .orElse(0);</span>
-<span class="fc" id="L385">            boolean equivalenceVerified = paths.stream()</span>
-<span class="fc" id="L386">                .allMatch(</span>
+<span class="fc" id="L375">            double average = paths.stream()</span>
+<span class="fc" id="L376">                .mapToInt(SuccessfulTransformationPath::scoreImprovement)</span>
+<span class="fc" id="L377">                .average()</span>
+<span class="fc" id="L378">                .orElse(0);</span>
+<span class="fc" id="L379">            int maximum = paths.stream()</span>
+<span class="fc" id="L380">                .mapToInt(SuccessfulTransformationPath::scoreImprovement)</span>
+<span class="fc" id="L381">                .max()</span>
+<span class="fc" id="L382">                .orElse(0);</span>
+<span class="fc" id="L383">            boolean equivalenceVerified = paths.stream()</span>
+<span class="fc" id="L384">                .allMatch(</span>
                     SuccessfulTransformationPath::equivalenceVerified);
-<span class="fc" id="L388">            List&lt;String&gt; supportingIds = paths.stream()</span>
-<span class="fc" id="L389">                .map(SuccessfulTransformationPath::id)</span>
-<span class="pc bpc" id="L390" title="2 of 4 branches missed.">                .filter(id -&gt; id != null &amp;&amp; !id.isBlank())</span>
-<span class="fc" id="L391">                .distinct()</span>
-<span class="fc" id="L392">                .toList();</span>
-<span class="fc" id="L393">            return new RuleCandidate(</span>
+<span class="fc" id="L386">            List&lt;String&gt; supportingIds = paths.stream()</span>
+<span class="fc" id="L387">                .map(SuccessfulTransformationPath::id)</span>
+<span class="pc bpc" id="L388" title="2 of 4 branches missed.">                .filter(id -&gt; id != null &amp;&amp; !id.isBlank())</span>
+<span class="fc" id="L389">                .distinct()</span>
+<span class="fc" id="L390">                .toList();</span>
+<span class="fc" id="L391">            return new RuleCandidate(</span>
                 leftPattern,
                 rightPattern,
-<span class="fc" id="L396">                paths.size(),</span>
+<span class="fc" id="L394">                paths.size(),</span>
                 average,
                 maximum,
                 equivalenceVerified,
                 true,
-<span class="pc bpc" id="L401" title="1 of 2 branches missed.">                leftPattern.contains(&quot;A&quot;)</span>
-<span class="pc bnc" id="L402" title="All 2 branches missed.">                    || rightPattern.contains(&quot;A&quot;),</span>
+<span class="pc bpc" id="L399" title="1 of 2 branches missed.">                leftPattern.contains(&quot;A&quot;)</span>
+<span class="pc bnc" id="L400" title="All 2 branches missed.">                    || rightPattern.contains(&quot;A&quot;),</span>
                 parameterRelations,
-<span class="fc" id="L404">                knownRules.statusFor(leftPattern, rightPattern),</span>
+<span class="fc" id="L402">                knownRules.statusFor(leftPattern, rightPattern),</span>
                 proofStatus,
-<span class="fc" id="L406">                identity.hash(),</span>
+<span class="fc" id="L404">                identity.hash(),</span>
                 supportingIds);
         }
     }

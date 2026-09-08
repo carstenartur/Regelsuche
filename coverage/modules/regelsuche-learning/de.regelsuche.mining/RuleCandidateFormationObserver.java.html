@@ -10,13 +10,20 @@ import java.util.Objects;
  * evidence that led to that formation.
  *
  * &lt;p&gt;The callback is deliberately positioned after candidate formation. It
- * must not mutate, promote or replace the candidate. A configured observer is
+ * must not mutate, promote or replace the candidate. It explicitly routes the
+ * unchanged candidate to ordinary review or exclusively to a derived cache.
+ * A configured observer is
  * part of the fail-closed formation lifecycle: if it rejects the evidence, the
  * mining call does not pretend that post-formation processing succeeded.&lt;/p&gt;
  */
 @FunctionalInterface
 public interface RuleCandidateFormationObserver {
-    void onCandidateFormed(RuleCandidate candidate, Evidence evidence);
+    Disposition onCandidateFormed(RuleCandidate candidate, Evidence evidence);
+
+<span class="fc" id="L23">    enum Disposition {</span>
+<span class="fc" id="L24">        RETAIN_FOR_REVIEW,</span>
+<span class="fc" id="L25">        DERIVED_CACHE_ONLY</span>
+    }
 
     /**
      * Formation evidence retained independently from any later theory
@@ -28,40 +35,40 @@ public interface RuleCandidateFormationObserver {
         List&lt;String&gt; assumptions,
         List&lt;String&gt; validationEvidence
     ) {
-<span class="fc" id="L31">        public Evidence {</span>
-<span class="fc" id="L32">            appliedRuleIds = normalized(</span>
+<span class="fc" id="L38">        public Evidence {</span>
+<span class="fc" id="L39">            appliedRuleIds = normalized(</span>
                 appliedRuleIds,
                 &quot;appliedRuleIds&quot;);
-<span class="fc" id="L35">            sourceProvenance = normalized(</span>
+<span class="fc" id="L42">            sourceProvenance = normalized(</span>
                 sourceProvenance,
                 &quot;sourceProvenance&quot;);
-<span class="fc" id="L38">            assumptions = normalized(assumptions, &quot;assumptions&quot;);</span>
-<span class="fc" id="L39">            validationEvidence = normalized(</span>
+<span class="fc" id="L45">            assumptions = normalized(assumptions, &quot;assumptions&quot;);</span>
+<span class="fc" id="L46">            validationEvidence = normalized(</span>
                 validationEvidence,
                 &quot;validationEvidence&quot;);
-<span class="fc" id="L42">        }</span>
+<span class="fc" id="L49">        }</span>
 
         public static Evidence fromPaths(
             List&lt;SuccessfulTransformationPath&gt; paths
         ) {
-<span class="fc" id="L47">            Objects.requireNonNull(paths, &quot;paths&quot;);</span>
-<span class="fc" id="L48">            List&lt;String&gt; appliedRuleIds = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L49">            List&lt;String&gt; sourceProvenance = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L50">            List&lt;String&gt; assumptions = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L51">            List&lt;String&gt; validationEvidence = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L52" title="All 2 branches covered.">            for (SuccessfulTransformationPath path : paths) {</span>
-<span class="fc" id="L53">                SuccessfulTransformationPath checked =</span>
-<span class="fc" id="L54">                    Objects.requireNonNull(path, &quot;path&quot;);</span>
-<span class="fc" id="L55">                appliedRuleIds.addAll(checked.rules());</span>
-<span class="fc" id="L56">                sourceProvenance.add(checked.id());</span>
-<span class="fc" id="L57">                assumptions.addAll(checked.assumptions());</span>
-<span class="pc bpc" id="L58" title="1 of 2 branches missed.">                if (checked.equivalenceEvidence() != null</span>
-<span class="pc bpc" id="L59" title="1 of 2 branches missed.">                        &amp;&amp; !checked.equivalenceEvidence().isBlank()) {</span>
-<span class="fc" id="L60">                    validationEvidence.add(</span>
-<span class="fc" id="L61">                        checked.equivalenceEvidence());</span>
+<span class="fc" id="L54">            Objects.requireNonNull(paths, &quot;paths&quot;);</span>
+<span class="fc" id="L55">            List&lt;String&gt; appliedRuleIds = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L56">            List&lt;String&gt; sourceProvenance = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L57">            List&lt;String&gt; assumptions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L58">            List&lt;String&gt; validationEvidence = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            for (SuccessfulTransformationPath path : paths) {</span>
+<span class="fc" id="L60">                SuccessfulTransformationPath checked =</span>
+<span class="fc" id="L61">                    Objects.requireNonNull(path, &quot;path&quot;);</span>
+<span class="fc" id="L62">                appliedRuleIds.addAll(checked.rules());</span>
+<span class="fc" id="L63">                sourceProvenance.add(checked.id());</span>
+<span class="fc" id="L64">                assumptions.addAll(checked.assumptions());</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                if (checked.equivalenceEvidence() != null</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">                        &amp;&amp; !checked.equivalenceEvidence().isBlank()) {</span>
+<span class="fc" id="L67">                    validationEvidence.add(</span>
+<span class="fc" id="L68">                        checked.equivalenceEvidence());</span>
                 }
-<span class="fc" id="L63">            }</span>
-<span class="fc" id="L64">            return new Evidence(</span>
+<span class="fc" id="L70">            }</span>
+<span class="fc" id="L71">            return new Evidence(</span>
                 appliedRuleIds,
                 sourceProvenance,
                 assumptions,
@@ -72,16 +79,16 @@ public interface RuleCandidateFormationObserver {
             List&lt;String&gt; values,
             String name
         ) {
-<span class="fc" id="L75">            Objects.requireNonNull(values, name);</span>
-<span class="fc" id="L76">            LinkedHashSet&lt;String&gt; normalized = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L77" title="All 2 branches covered.">            for (String value : values) {</span>
-<span class="pc bpc" id="L78" title="1 of 4 branches missed.">                if (value == null || value.isBlank()) {</span>
-<span class="fc" id="L79">                    throw new IllegalArgumentException(</span>
+<span class="fc" id="L82">            Objects.requireNonNull(values, name);</span>
+<span class="fc" id="L83">            LinkedHashSet&lt;String&gt; normalized = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            for (String value : values) {</span>
+<span class="pc bpc" id="L85" title="1 of 4 branches missed.">                if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L86">                    throw new IllegalArgumentException(</span>
                         name + &quot; must not contain blank entries&quot;);
                 }
-<span class="fc" id="L82">                normalized.add(value);</span>
-<span class="fc" id="L83">            }</span>
-<span class="fc" id="L84">            return List.copyOf(normalized);</span>
+<span class="fc" id="L89">                normalized.add(value);</span>
+<span class="fc" id="L90">            }</span>
+<span class="fc" id="L91">            return List.copyOf(normalized);</span>
         }
     }
 }

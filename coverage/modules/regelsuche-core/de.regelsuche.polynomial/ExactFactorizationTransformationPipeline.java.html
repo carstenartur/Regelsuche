@@ -403,60 +403,83 @@ public final class ExactFactorizationTransformationPipeline {
             afterComparison);
     }
 
+    /** Rebinds retained issuer-owned evidence without rerunning its engine. */
+    static ReplaySourceValidation validateReplaySource(
+        ExactParsedTerm source,
+        Result retained,
+        long availableWork
+    ) {
+<span class="nc" id="L412">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="nc" id="L413">        Objects.requireNonNull(retained, &quot;retained&quot;);</span>
+<span class="nc bnc" id="L414" title="All 4 branches missed.">        if (!retained.transformed() || availableWork &lt; 0) {</span>
+<span class="nc" id="L415">            throw new IllegalArgumentException(&quot;replay requires a verified changed transformation and work authority&quot;);</span>
+        }
+<span class="nc" id="L417">        PolynomialWorkLedger work = sourceValidationWork(source, retained.factorization().extraction());</span>
+<span class="nc bnc" id="L418" title="All 2 branches missed.">        if (!work.within(availableWork)) {</span>
+<span class="nc" id="L419">            return new ReplaySourceValidation(Status.BUDGET_INCONCLUSIVE,</span>
+<span class="nc" id="L420">                &quot;REPLAY_SOURCE_VALIDATION_AUTHORITY_INSUFFICIENT&quot;, PolynomialWorkLedger.empty());</span>
+        }
+<span class="nc" id="L422">        String violation = sourceContinuityViolation(source, retained.factorization());</span>
+<span class="nc bnc" id="L423" title="All 2 branches missed.">        return new ReplaySourceValidation(violation == null ? Status.TRANSFORMED : Status.SOURCE_EVIDENCE_MISMATCH,</span>
+<span class="nc bnc" id="L424" title="All 2 branches missed.">            violation == null ? &quot;REPLAY_SOURCE_EVIDENCE_VALIDATED&quot; : violation, work);</span>
+    }
+
+<span class="nc" id="L427">    record ReplaySourceValidation(Status status, String detailCode, PolynomialWorkLedger work) { }</span>
+
     private static SourceAuthorization authorizeSource(
         ExactParsedTerm source,
         ExactParsedFactorizationPipeline.Result factorization
     ) {
-<span class="fc" id="L410">        OccurrenceEvidence occurrence = OccurrenceEvidence.root(</span>
+<span class="fc" id="L433">        OccurrenceEvidence occurrence = OccurrenceEvidence.root(</span>
             factorization);
-<span class="fc" id="L412">        PolynomialWorkLedger validationWork = sourceValidationWork(</span>
+<span class="fc" id="L435">        PolynomialWorkLedger validationWork = sourceValidationWork(</span>
             source,
-<span class="fc" id="L414">            factorization.extraction());</span>
-<span class="fc" id="L415">        long remaining = factorization.policy().maxTotalWorkUnits()</span>
-<span class="fc" id="L416">            - factorization.totalWork().totalWorkUnits();</span>
-<span class="fc bfc" id="L417" title="All 2 branches covered.">        if (!validationWork.within(remaining)) {</span>
-<span class="fc" id="L418">            return new SourceAuthorization(</span>
+<span class="fc" id="L437">            factorization.extraction());</span>
+<span class="fc" id="L438">        long remaining = factorization.policy().maxTotalWorkUnits()</span>
+<span class="fc" id="L439">            - factorization.totalWork().totalWorkUnits();</span>
+<span class="fc bfc" id="L440" title="All 2 branches covered.">        if (!validationWork.within(remaining)) {</span>
+<span class="fc" id="L441">            return new SourceAuthorization(</span>
                 occurrence,
-<span class="fc" id="L420">                factorization.totalWork(),</span>
+<span class="fc" id="L443">                factorization.totalWork(),</span>
                 AuthorizationStatus.INSUFFICIENT_AUTHORITY,
                 &quot;SOURCE_EVIDENCE_VALIDATION_AUTHORITY_INSUFFICIENT&quot;);
         }
-<span class="fc" id="L424">        PolynomialWorkLedger totalWork = merge(</span>
-<span class="fc" id="L425">            factorization.totalWork(),</span>
+<span class="fc" id="L447">        PolynomialWorkLedger totalWork = merge(</span>
+<span class="fc" id="L448">            factorization.totalWork(),</span>
             validationWork);
-<span class="fc" id="L427">        String violation = sourceContinuityViolation(</span>
+<span class="fc" id="L450">        String violation = sourceContinuityViolation(</span>
             source,
             factorization);
-<span class="fc" id="L430">        return new SourceAuthorization(</span>
+<span class="fc" id="L453">        return new SourceAuthorization(</span>
             occurrence,
             totalWork,
-<span class="fc bfc" id="L433" title="All 2 branches covered.">            violation == null</span>
-<span class="fc" id="L434">                ? AuthorizationStatus.AUTHORIZED</span>
-<span class="fc" id="L435">                : AuthorizationStatus.MISMATCH,</span>
-<span class="fc bfc" id="L436" title="All 2 branches covered.">            violation == null ? &quot;SOURCE_EVIDENCE_VALIDATED&quot; : violation);</span>
+<span class="fc bfc" id="L456" title="All 2 branches covered.">            violation == null</span>
+<span class="fc" id="L457">                ? AuthorizationStatus.AUTHORIZED</span>
+<span class="fc" id="L458">                : AuthorizationStatus.MISMATCH,</span>
+<span class="fc bfc" id="L459" title="All 2 branches covered.">            violation == null ? &quot;SOURCE_EVIDENCE_VALIDATED&quot; : violation);</span>
     }
 
     private static PolynomialWorkLedger sourceValidationWork(
         ExactParsedTerm source,
         ExactParsedUnivariatePolynomialView.Analysis extraction
     ) {
-<span class="fc" id="L443">        long sourceCodeUnits = Math.addExact(</span>
-<span class="fc" id="L444">            (long) source.source().length(),</span>
-<span class="fc" id="L445">            extraction.source().length());</span>
-<span class="fc" id="L446">        long textWork = Math.multiplyExact(</span>
+<span class="fc" id="L466">        long sourceCodeUnits = Math.addExact(</span>
+<span class="fc" id="L467">            (long) source.source().length(),</span>
+<span class="fc" id="L468">            extraction.source().length());</span>
+<span class="fc" id="L469">        long textWork = Math.multiplyExact(</span>
             SOURCE_TEXT_VALIDATION_MULTIPLIER,
             sourceCodeUnits);
-<span class="fc" id="L449">        long comparedLiterals = Math.max(</span>
-<span class="fc" id="L450">            source.literals().size(),</span>
-<span class="fc" id="L451">            extraction.literals().size());</span>
-<span class="fc" id="L452">        long literalWork = Math.multiplyExact(</span>
+<span class="fc" id="L472">        long comparedLiterals = Math.max(</span>
+<span class="fc" id="L473">            source.literals().size(),</span>
+<span class="fc" id="L474">            extraction.literals().size());</span>
+<span class="fc" id="L475">        long literalWork = Math.multiplyExact(</span>
             SOURCE_LITERAL_VALIDATION_UNITS,
             comparedLiterals);
-<span class="fc" id="L455">        return new PolynomialWorkLedger(Map.of(</span>
+<span class="fc" id="L478">        return new PolynomialWorkLedger(Map.of(</span>
             &quot;transform.source-evidence-literal-validation&quot;,
-<span class="fc" id="L457">            literalWork,</span>
+<span class="fc" id="L480">            literalWork,</span>
             &quot;transform.source-evidence-text-validation&quot;,
-<span class="fc" id="L459">            textWork));</span>
+<span class="fc" id="L482">            textWork));</span>
     }
 
     private static Result authorizationFailure(
@@ -464,60 +487,60 @@ public final class ExactFactorizationTransformationPipeline {
         ExactParsedFactorizationPipeline.Result factorization,
         int candidateIndex
     ) {
-<span class="fc bfc" id="L467" title="All 3 branches covered.">        return switch (authorization.status()) {</span>
-<span class="fc" id="L468">            case AUTHORIZED -&gt; null;</span>
-<span class="fc" id="L469">            case INSUFFICIENT_AUTHORITY -&gt; Result.failure(</span>
+<span class="fc bfc" id="L490" title="All 3 branches covered.">        return switch (authorization.status()) {</span>
+<span class="fc" id="L491">            case AUTHORIZED -&gt; null;</span>
+<span class="fc" id="L492">            case INSUFFICIENT_AUTHORITY -&gt; Result.failure(</span>
                 Status.BUDGET_INCONCLUSIVE,
-<span class="fc" id="L471">                authorization.detailCode(),</span>
-<span class="fc" id="L472">                authorization.occurrence(),</span>
+<span class="fc" id="L494">                authorization.detailCode(),</span>
+<span class="fc" id="L495">                authorization.occurrence(),</span>
                 factorization,
                 candidateIndex,
                 &quot;&quot;,
-<span class="fc" id="L476">                Optional.empty(),</span>
-<span class="fc" id="L477">                Optional.empty(),</span>
-<span class="fc" id="L478">                Optional.empty(),</span>
-<span class="fc" id="L479">                authorization.totalWork());</span>
-<span class="fc" id="L480">            case MISMATCH -&gt; Result.failure(</span>
+<span class="fc" id="L499">                Optional.empty(),</span>
+<span class="fc" id="L500">                Optional.empty(),</span>
+<span class="fc" id="L501">                Optional.empty(),</span>
+<span class="fc" id="L502">                authorization.totalWork());</span>
+<span class="fc" id="L503">            case MISMATCH -&gt; Result.failure(</span>
                 Status.SOURCE_EVIDENCE_MISMATCH,
-<span class="fc" id="L482">                authorization.detailCode(),</span>
-<span class="fc" id="L483">                authorization.occurrence(),</span>
+<span class="fc" id="L505">                authorization.detailCode(),</span>
+<span class="fc" id="L506">                authorization.occurrence(),</span>
                 factorization,
                 candidateIndex,
                 &quot;&quot;,
-<span class="fc" id="L487">                Optional.empty(),</span>
-<span class="fc" id="L488">                Optional.empty(),</span>
-<span class="fc" id="L489">                Optional.empty(),</span>
-<span class="fc" id="L490">                authorization.totalWork());</span>
+<span class="fc" id="L510">                Optional.empty(),</span>
+<span class="fc" id="L511">                Optional.empty(),</span>
+<span class="fc" id="L512">                Optional.empty(),</span>
+<span class="fc" id="L513">                authorization.totalWork());</span>
         };
     }
 
     private long continuationCeiling(
         ExactParsedFactorizationPipeline.Result factorization
     ) {
-<span class="fc" id="L497">        long result = renderer.policy().maxWorkUnits();</span>
-<span class="fc" id="L498">        result = Math.addExact(</span>
+<span class="fc" id="L520">        long result = renderer.policy().maxWorkUnits();</span>
+<span class="fc" id="L521">        result = Math.addExact(</span>
             result,
-<span class="fc" id="L500">            renderer.policy().maxOutputCodeUnits());</span>
-<span class="fc" id="L501">        result = Math.addExact(</span>
+<span class="fc" id="L523">            renderer.policy().maxOutputCodeUnits());</span>
+<span class="fc" id="L524">        result = Math.addExact(</span>
             result,
-<span class="fc" id="L503">            reparseView.budget().maxVisitedNodes());</span>
-<span class="fc" id="L504">        result = Math.addExact(</span>
+<span class="fc" id="L526">            reparseView.budget().maxVisitedNodes());</span>
+<span class="fc" id="L527">        result = Math.addExact(</span>
             result,
-<span class="fc" id="L506">            reparseView.budget().maxArithmeticOperations());</span>
-<span class="fc" id="L507">        result = Math.addExact(</span>
+<span class="fc" id="L529">            reparseView.budget().maxArithmeticOperations());</span>
+<span class="fc" id="L530">        result = Math.addExact(</span>
             result,
-<span class="fc" id="L509">            factorization.extraction().budget().maxVisitedNodes());</span>
-<span class="fc" id="L510">        return Math.addExact(</span>
+<span class="fc" id="L532">            factorization.extraction().budget().maxVisitedNodes());</span>
+<span class="fc" id="L533">        return Math.addExact(</span>
             result,
-<span class="fc" id="L512">            reparseView.budget().maxVisitedNodes());</span>
+<span class="fc" id="L535">            reparseView.budget().maxVisitedNodes());</span>
     }
 
     private static boolean withinOriginalAuthority(
         ExactParsedFactorizationPipeline.Result factorization,
         PolynomialWorkLedger work
     ) {
-<span class="fc" id="L519">        return work.within(</span>
-<span class="fc" id="L520">            factorization.policy().maxTotalWorkUnits());</span>
+<span class="fc" id="L542">        return work.within(</span>
+<span class="fc" id="L543">            factorization.policy().maxTotalWorkUnits());</span>
     }
 
     private static Result unavailableFactorization(
@@ -525,23 +548,23 @@ public final class ExactFactorizationTransformationPipeline {
         ExactParsedFactorizationPipeline.Result factorization,
         PolynomialWorkLedger totalWork
     ) {
-<span class="nc bnc" id="L528" title="All 3 branches missed.">        Status status = switch (factorization.status()) {</span>
-<span class="nc" id="L529">            case BUDGET_INCONCLUSIVE -&gt; Status.BUDGET_INCONCLUSIVE;</span>
+<span class="nc bnc" id="L551" title="All 3 branches missed.">        Status status = switch (factorization.status()) {</span>
+<span class="nc" id="L552">            case BUDGET_INCONCLUSIVE -&gt; Status.BUDGET_INCONCLUSIVE;</span>
             case UNSUPPORTED_EXPRESSION, UNSUPPORTED_REQUEST -&gt;
-<span class="nc" id="L531">                Status.UNSUPPORTED;</span>
-<span class="nc" id="L532">            case EXECUTED -&gt; throw new IllegalStateException(</span>
+<span class="nc" id="L554">                Status.UNSUPPORTED;</span>
+<span class="nc" id="L555">            case EXECUTED -&gt; throw new IllegalStateException(</span>
                 &quot;executed factorization must have a verifier report&quot;);
         };
-<span class="nc" id="L535">        return Result.failure(</span>
+<span class="nc" id="L558">        return Result.failure(</span>
             status,
-<span class="nc" id="L537">            factorization.detailCode(),</span>
+<span class="nc" id="L560">            factorization.detailCode(),</span>
             occurrence,
             factorization,
             -1,
             &quot;&quot;,
-<span class="nc" id="L542">            Optional.empty(),</span>
-<span class="nc" id="L543">            Optional.empty(),</span>
-<span class="nc" id="L544">            Optional.empty(),</span>
+<span class="nc" id="L565">            Optional.empty(),</span>
+<span class="nc" id="L566">            Optional.empty(),</span>
+<span class="nc" id="L567">            Optional.empty(),</span>
             totalWork);
     }
 
@@ -551,32 +574,32 @@ public final class ExactFactorizationTransformationPipeline {
         FactorizationVerifier.Report&lt;ExactRational&gt; report,
         PolynomialWorkLedger totalWork
     ) {
-<span class="pc bpc" id="L554" title="5 of 6 branches missed.">        Status status = switch (report.status()) {</span>
-<span class="nc" id="L555">            case IRREDUCIBLE -&gt; Status.IRREDUCIBLE;</span>
+<span class="pc bpc" id="L577" title="5 of 6 branches missed.">        Status status = switch (report.status()) {</span>
+<span class="nc" id="L578">            case IRREDUCIBLE -&gt; Status.IRREDUCIBLE;</span>
             case NO_FACTORIZATION_FOUND -&gt;
-<span class="fc bfc" id="L557" title="All 2 branches covered.">                report.claimStrength()</span>
-<span class="fc" id="L558">                    == FactorizationVerifier.ClaimStrength</span>
+<span class="fc bfc" id="L580" title="All 2 branches covered.">                report.claimStrength()</span>
+<span class="fc" id="L581">                    == FactorizationVerifier.ClaimStrength</span>
                         .BACKEND_CLAIMED_IRREDUCIBLE
-<span class="fc" id="L560">                    ? Status.BACKEND_CLAIMED_IRREDUCIBLE</span>
-<span class="fc" id="L561">                    : Status.NO_CANDIDATE;</span>
-<span class="nc" id="L562">            case BUDGET_INCONCLUSIVE -&gt; Status.BUDGET_INCONCLUSIVE;</span>
+<span class="fc" id="L583">                    ? Status.BACKEND_CLAIMED_IRREDUCIBLE</span>
+<span class="fc" id="L584">                    : Status.NO_CANDIDATE;</span>
+<span class="nc" id="L585">            case BUDGET_INCONCLUSIVE -&gt; Status.BUDGET_INCONCLUSIVE;</span>
             case UNSUPPORTED_DOMAIN, UNSUPPORTED_REQUEST -&gt;
-<span class="nc" id="L564">                Status.UNSUPPORTED;</span>
-<span class="nc" id="L565">            case TECHNICAL_FAILURE -&gt; Status.TECHNICAL_FAILURE;</span>
+<span class="nc" id="L587">                Status.UNSUPPORTED;</span>
+<span class="nc" id="L588">            case TECHNICAL_FAILURE -&gt; Status.TECHNICAL_FAILURE;</span>
             case COMPLETE_FACTORIZATION, PARTIAL_FACTORIZATION -&gt;
-<span class="nc" id="L567">                throw new IllegalStateException(</span>
+<span class="nc" id="L590">                throw new IllegalStateException(</span>
                     &quot;successful factorization report requires candidates&quot;);
         };
-<span class="fc" id="L570">        return Result.failure(</span>
+<span class="fc" id="L593">        return Result.failure(</span>
             status,
-<span class="fc" id="L572">            report.detailCode(),</span>
+<span class="fc" id="L595">            report.detailCode(),</span>
             occurrence,
             factorization,
             -1,
             &quot;&quot;,
-<span class="fc" id="L577">            Optional.empty(),</span>
-<span class="fc" id="L578">            Optional.empty(),</span>
-<span class="fc" id="L579">            Optional.empty(),</span>
+<span class="fc" id="L600">            Optional.empty(),</span>
+<span class="fc" id="L601">            Optional.empty(),</span>
+<span class="fc" id="L602">            Optional.empty(),</span>
             totalWork);
     }
 
@@ -584,89 +607,89 @@ public final class ExactFactorizationTransformationPipeline {
         ExactParsedTerm source,
         ExactParsedFactorizationPipeline.Result factorization
     ) {
-<span class="fc" id="L587">        ExactParsedUnivariatePolynomialView.Analysis extraction =</span>
-<span class="fc" id="L588">            factorization.extraction();</span>
-<span class="fc bfc" id="L589" title="All 2 branches covered.">        if (!source.source().equals(extraction.source())) {</span>
-<span class="fc" id="L590">            return &quot;SOURCE_TEXT_DOES_NOT_MATCH_FACTORIZATION_EVIDENCE&quot;;</span>
+<span class="fc" id="L610">        ExactParsedUnivariatePolynomialView.Analysis extraction =</span>
+<span class="fc" id="L611">            factorization.extraction();</span>
+<span class="fc bfc" id="L612" title="All 2 branches covered.">        if (!source.source().equals(extraction.source())) {</span>
+<span class="fc" id="L613">            return &quot;SOURCE_TEXT_DOES_NOT_MATCH_FACTORIZATION_EVIDENCE&quot;;</span>
         }
-<span class="fc" id="L592">        List&lt;ExactParsedTerm.LiteralOccurrence&gt; actual =</span>
-<span class="fc" id="L593">            source.literals();</span>
-<span class="fc" id="L594">        List&lt;ExactParsedUnivariatePolynomialView.LiteralBinding&gt; expected =</span>
-<span class="fc" id="L595">            extraction.literals();</span>
-<span class="pc bpc" id="L596" title="1 of 2 branches missed.">        if (actual.size() != expected.size()) {</span>
-<span class="nc" id="L597">            return &quot;SOURCE_LITERAL_COUNT_DOES_NOT_MATCH_FACTORIZATION_EVIDENCE&quot;;</span>
+<span class="fc" id="L615">        List&lt;ExactParsedTerm.LiteralOccurrence&gt; actual =</span>
+<span class="fc" id="L616">            source.literals();</span>
+<span class="fc" id="L617">        List&lt;ExactParsedUnivariatePolynomialView.LiteralBinding&gt; expected =</span>
+<span class="fc" id="L618">            extraction.literals();</span>
+<span class="pc bpc" id="L619" title="1 of 2 branches missed.">        if (actual.size() != expected.size()) {</span>
+<span class="nc" id="L620">            return &quot;SOURCE_LITERAL_COUNT_DOES_NOT_MATCH_FACTORIZATION_EVIDENCE&quot;;</span>
         }
-<span class="fc bfc" id="L599" title="All 2 branches covered.">        for (int index = 0; index &lt; actual.size(); index++) {</span>
-<span class="fc" id="L600">            ExactParsedTerm.LiteralOccurrence literal = actual.get(index);</span>
-<span class="fc" id="L601">            ExactParsedUnivariatePolynomialView.LiteralBinding binding =</span>
-<span class="fc" id="L602">                expected.get(index);</span>
-<span class="pc bpc" id="L603" title="1 of 2 branches missed.">            if (literal.startInclusive() != binding.startInclusive()</span>
-<span class="pc bpc" id="L604" title="1 of 2 branches missed.">                    || literal.endExclusive() != binding.endExclusive()</span>
-<span class="pc bpc" id="L605" title="1 of 2 branches missed.">                    || !literal.sourceLexeme().equals(binding.sourceLexeme())</span>
-<span class="pc bpc" id="L606" title="1 of 2 branches missed.">                    || !literal.evidence().canonicalValue().equals(</span>
-<span class="fc" id="L607">                        binding.canonicalValue())</span>
-<span class="pc bpc" id="L608" title="1 of 2 branches missed.">                    || !literal.evidence().valueId().equals(</span>
-<span class="fc" id="L609">                        binding.valueId())</span>
-<span class="pc bpc" id="L610" title="1 of 2 branches missed.">                    || !literal.evidence().certificateHash().equals(</span>
-<span class="fc" id="L611">                        binding.certificateHash())) {</span>
-<span class="nc" id="L612">                return &quot;SOURCE_LITERAL_EVIDENCE_DOES_NOT_MATCH_FACTORIZATION&quot;;</span>
+<span class="fc bfc" id="L622" title="All 2 branches covered.">        for (int index = 0; index &lt; actual.size(); index++) {</span>
+<span class="fc" id="L623">            ExactParsedTerm.LiteralOccurrence literal = actual.get(index);</span>
+<span class="fc" id="L624">            ExactParsedUnivariatePolynomialView.LiteralBinding binding =</span>
+<span class="fc" id="L625">                expected.get(index);</span>
+<span class="pc bpc" id="L626" title="1 of 2 branches missed.">            if (literal.startInclusive() != binding.startInclusive()</span>
+<span class="pc bpc" id="L627" title="1 of 2 branches missed.">                    || literal.endExclusive() != binding.endExclusive()</span>
+<span class="pc bpc" id="L628" title="1 of 2 branches missed.">                    || !literal.sourceLexeme().equals(binding.sourceLexeme())</span>
+<span class="pc bpc" id="L629" title="1 of 2 branches missed.">                    || !literal.evidence().canonicalValue().equals(</span>
+<span class="fc" id="L630">                        binding.canonicalValue())</span>
+<span class="pc bpc" id="L631" title="1 of 2 branches missed.">                    || !literal.evidence().valueId().equals(</span>
+<span class="fc" id="L632">                        binding.valueId())</span>
+<span class="pc bpc" id="L633" title="1 of 2 branches missed.">                    || !literal.evidence().certificateHash().equals(</span>
+<span class="fc" id="L634">                        binding.certificateHash())) {</span>
+<span class="nc" id="L635">                return &quot;SOURCE_LITERAL_EVIDENCE_DOES_NOT_MATCH_FACTORIZATION&quot;;</span>
             }
         }
-<span class="pc bpc" id="L615" title="1 of 2 branches missed.">        if (factorization.executed()) {</span>
-<span class="fc" id="L616">            SparsePolynomial&lt;ExactRational&gt; extracted =</span>
-<span class="fc" id="L617">                extraction.polynomial().orElseThrow();</span>
-<span class="pc bpc" id="L618" title="1 of 2 branches missed.">            if (!extracted.equals(</span>
-<span class="fc" id="L619">                    factorization.request().orElseThrow().source())) {</span>
-<span class="nc" id="L620">                return &quot;EXTRACTION_DOES_NOT_MATCH_FACTORIZATION_REQUEST&quot;;</span>
+<span class="pc bpc" id="L638" title="1 of 2 branches missed.">        if (factorization.executed()) {</span>
+<span class="fc" id="L639">            SparsePolynomial&lt;ExactRational&gt; extracted =</span>
+<span class="fc" id="L640">                extraction.polynomial().orElseThrow();</span>
+<span class="pc bpc" id="L641" title="1 of 2 branches missed.">            if (!extracted.equals(</span>
+<span class="fc" id="L642">                    factorization.request().orElseThrow().source())) {</span>
+<span class="nc" id="L643">                return &quot;EXTRACTION_DOES_NOT_MATCH_FACTORIZATION_REQUEST&quot;;</span>
             }
         }
-<span class="fc" id="L623">        return null;</span>
+<span class="fc" id="L646">        return null;</span>
     }
 
     private static String technicalDetail(
         String prefix,
         RuntimeException exception
     ) {
-<span class="nc" id="L630">        String simple = exception.getClass().getSimpleName();</span>
-<span class="nc bnc" id="L631" title="All 2 branches missed.">        return prefix + &quot;_&quot; + (simple.isBlank()</span>
-<span class="nc" id="L632">            ? &quot;RUNTIME&quot;</span>
-<span class="nc" id="L633">            : simple.toUpperCase(java.util.Locale.ROOT));</span>
+<span class="nc" id="L653">        String simple = exception.getClass().getSimpleName();</span>
+<span class="nc bnc" id="L654" title="All 2 branches missed.">        return prefix + &quot;_&quot; + (simple.isBlank()</span>
+<span class="nc" id="L655">            ? &quot;RUNTIME&quot;</span>
+<span class="nc" id="L656">            : simple.toUpperCase(java.util.Locale.ROOT));</span>
     }
 
     private static PolynomialWorkLedger merge(
         PolynomialWorkLedger first,
         PolynomialWorkLedger second
     ) {
-<span class="fc" id="L640">        Map&lt;String, Long&gt; stages = new LinkedHashMap&lt;&gt;(first.stages());</span>
-<span class="fc" id="L641">        second.stages().forEach((stage, units) -&gt; stages.merge(</span>
+<span class="fc" id="L663">        Map&lt;String, Long&gt; stages = new LinkedHashMap&lt;&gt;(first.stages());</span>
+<span class="fc" id="L664">        second.stages().forEach((stage, units) -&gt; stages.merge(</span>
             stage,
             units,
             Math::addExact));
-<span class="fc" id="L645">        return new PolynomialWorkLedger(stages);</span>
+<span class="fc" id="L668">        return new PolynomialWorkLedger(stages);</span>
     }
 
-<span class="fc" id="L648">    public enum Status {</span>
-<span class="fc" id="L649">        TRANSFORMED,</span>
-<span class="fc" id="L650">        NO_CHANGE,</span>
-<span class="fc" id="L651">        NO_CANDIDATE,</span>
-<span class="fc" id="L652">        BACKEND_CLAIMED_IRREDUCIBLE,</span>
-<span class="fc" id="L653">        IRREDUCIBLE,</span>
-<span class="fc" id="L654">        UNSUPPORTED,</span>
-<span class="fc" id="L655">        BUDGET_INCONCLUSIVE,</span>
-<span class="fc" id="L656">        TECHNICAL_FAILURE,</span>
-<span class="fc" id="L657">        SOURCE_EVIDENCE_MISMATCH</span>
+<span class="fc" id="L671">    public enum Status {</span>
+<span class="fc" id="L672">        TRANSFORMED,</span>
+<span class="fc" id="L673">        NO_CHANGE,</span>
+<span class="fc" id="L674">        NO_CANDIDATE,</span>
+<span class="fc" id="L675">        BACKEND_CLAIMED_IRREDUCIBLE,</span>
+<span class="fc" id="L676">        IRREDUCIBLE,</span>
+<span class="fc" id="L677">        UNSUPPORTED,</span>
+<span class="fc" id="L678">        BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L679">        TECHNICAL_FAILURE,</span>
+<span class="fc" id="L680">        SOURCE_EVIDENCE_MISMATCH</span>
     }
 
-<span class="fc" id="L660">    public enum Kind {</span>
-<span class="fc" id="L661">        NONE,</span>
-<span class="fc" id="L662">        VERIFIED_DECOMPOSITION,</span>
-<span class="fc" id="L663">        VERIFIED_DECOMPOSITION_WITH_COMPLETE_BACKEND_CLAIM</span>
+<span class="fc" id="L683">    public enum Kind {</span>
+<span class="fc" id="L684">        NONE,</span>
+<span class="fc" id="L685">        VERIFIED_DECOMPOSITION,</span>
+<span class="fc" id="L686">        VERIFIED_DECOMPOSITION_WITH_COMPLETE_BACKEND_CLAIM</span>
     }
 
-<span class="fc" id="L666">    private enum AuthorizationStatus {</span>
-<span class="fc" id="L667">        AUTHORIZED,</span>
-<span class="fc" id="L668">        INSUFFICIENT_AUTHORITY,</span>
-<span class="fc" id="L669">        MISMATCH</span>
+<span class="fc" id="L689">    private enum AuthorizationStatus {</span>
+<span class="fc" id="L690">        AUTHORIZED,</span>
+<span class="fc" id="L691">        INSUFFICIENT_AUTHORITY,</span>
+<span class="fc" id="L692">        MISMATCH</span>
     }
 
     private record SourceAuthorization(
@@ -675,15 +698,15 @@ public final class ExactFactorizationTransformationPipeline {
         AuthorizationStatus status,
         String detailCode
     ) {
-<span class="fc" id="L678">        private SourceAuthorization {</span>
-<span class="fc" id="L679">            Objects.requireNonNull(occurrence, &quot;occurrence&quot;);</span>
-<span class="fc" id="L680">            Objects.requireNonNull(totalWork, &quot;totalWork&quot;);</span>
-<span class="fc" id="L681">            Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="pc bpc" id="L682" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
-<span class="nc" id="L683">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L701">        private SourceAuthorization {</span>
+<span class="fc" id="L702">            Objects.requireNonNull(occurrence, &quot;occurrence&quot;);</span>
+<span class="fc" id="L703">            Objects.requireNonNull(totalWork, &quot;totalWork&quot;);</span>
+<span class="fc" id="L704">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L705" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L706">                throw new IllegalArgumentException(</span>
                     &quot;source authorization detail must not be blank&quot;);
             }
-<span class="fc" id="L686">        }</span>
+<span class="fc" id="L709">        }</span>
     }
 
     /** Root occurrence identity plus source-bound exact extraction evidence. */
@@ -692,40 +715,40 @@ public final class ExactFactorizationTransformationPipeline {
         String sourceText,
         String sourceEvidenceHash
     ) {
-<span class="fc" id="L695">        public OccurrenceEvidence {</span>
-<span class="fc" id="L696">            path = List.copyOf(Objects.requireNonNull(path, &quot;path&quot;));</span>
-<span class="pc bpc" id="L697" title="7 of 10 branches missed.">            if (path.stream().anyMatch(index -&gt; index == null || index &lt; 0)</span>
+<span class="fc" id="L718">        public OccurrenceEvidence {</span>
+<span class="fc" id="L719">            path = List.copyOf(Objects.requireNonNull(path, &quot;path&quot;));</span>
+<span class="pc bpc" id="L720" title="7 of 10 branches missed.">            if (path.stream().anyMatch(index -&gt; index == null || index &lt; 0)</span>
                     || sourceText == null
                     || sourceEvidenceHash == null
-<span class="pc bpc" id="L700" title="1 of 2 branches missed.">                    || !sourceEvidenceHash.matches(</span>
+<span class="pc bpc" id="L723" title="1 of 2 branches missed.">                    || !sourceEvidenceHash.matches(</span>
                         &quot;sha256:[0-9a-f]{64}&quot;)) {
-<span class="nc" id="L702">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L725">                throw new IllegalArgumentException(</span>
                     &quot;factorization occurrence evidence is invalid&quot;);
             }
-<span class="fc" id="L705">        }</span>
+<span class="fc" id="L728">        }</span>
 
         private static OccurrenceEvidence root(
             ExactParsedFactorizationPipeline.Result factorization
         ) {
-<span class="fc" id="L710">            return new OccurrenceEvidence(</span>
-<span class="fc" id="L711">                List.of(),</span>
-<span class="fc" id="L712">                factorization.extraction().source(),</span>
-<span class="fc" id="L713">                factorization.extraction().certificateHash());</span>
+<span class="fc" id="L733">            return new OccurrenceEvidence(</span>
+<span class="fc" id="L734">                List.of(),</span>
+<span class="fc" id="L735">                factorization.extraction().source(),</span>
+<span class="fc" id="L736">                factorization.extraction().certificateHash());</span>
         }
 
         public boolean isRoot() {
-<span class="fc" id="L717">            return path.isEmpty();</span>
+<span class="fc" id="L740">            return path.isEmpty();</span>
         }
 
         public String canonicalMaterial() {
-<span class="fc" id="L721">            StringBuilder result = new StringBuilder();</span>
-<span class="fc" id="L722">            PolynomialEvidence.append(</span>
+<span class="fc" id="L744">            StringBuilder result = new StringBuilder();</span>
+<span class="fc" id="L745">            PolynomialEvidence.append(</span>
                 result,
-<span class="fc" id="L724">                path.stream().map(String::valueOf)</span>
-<span class="fc" id="L725">                    .collect(java.util.stream.Collectors.joining(&quot;.&quot;)));</span>
-<span class="fc" id="L726">            PolynomialEvidence.append(result, sourceText);</span>
-<span class="fc" id="L727">            PolynomialEvidence.append(result, sourceEvidenceHash);</span>
-<span class="fc" id="L728">            return result.toString();</span>
+<span class="fc" id="L747">                path.stream().map(String::valueOf)</span>
+<span class="fc" id="L748">                    .collect(java.util.stream.Collectors.joining(&quot;.&quot;)));</span>
+<span class="fc" id="L749">            PolynomialEvidence.append(result, sourceText);</span>
+<span class="fc" id="L750">            PolynomialEvidence.append(result, sourceEvidenceHash);</span>
+<span class="fc" id="L751">            return result.toString();</span>
         }
     }
 
@@ -759,64 +782,64 @@ public final class ExactFactorizationTransformationPipeline {
             Optional&lt;ExactParsedUnivariatePolynomialView.Analysis&gt;
                 reconstruction,
             PolynomialWorkLedger totalWork
-<span class="fc" id="L762">        ) {</span>
-<span class="fc" id="L763">            this.status = Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="fc" id="L764">            this.kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
-<span class="pc bpc" id="L765" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
-<span class="nc" id="L766">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L785">        ) {</span>
+<span class="fc" id="L786">            this.status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L787">            this.kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="pc bpc" id="L788" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L789">                throw new IllegalArgumentException(</span>
                     &quot;transformation detail code must not be blank&quot;);
             }
-<span class="fc" id="L769">            this.detailCode = detailCode;</span>
-<span class="fc" id="L770">            this.occurrence = Objects.requireNonNull(</span>
+<span class="fc" id="L792">            this.detailCode = detailCode;</span>
+<span class="fc" id="L793">            this.occurrence = Objects.requireNonNull(</span>
                 occurrence,
                 &quot;occurrence&quot;);
-<span class="fc" id="L773">            this.factorization = Objects.requireNonNull(</span>
+<span class="fc" id="L796">            this.factorization = Objects.requireNonNull(</span>
                 factorization,
                 &quot;factorization&quot;);
-<span class="fc" id="L776">            this.candidateIndex = candidateIndex;</span>
-<span class="pc bpc" id="L777" title="1 of 2 branches missed.">            if (candidateCertificateHash == null</span>
-<span class="fc bfc" id="L778" title="All 2 branches covered.">                    || !candidateCertificateHash.isEmpty()</span>
-<span class="pc bpc" id="L779" title="1 of 2 branches missed.">                    &amp;&amp; !candidateCertificateHash.matches(</span>
+<span class="fc" id="L799">            this.candidateIndex = candidateIndex;</span>
+<span class="pc bpc" id="L800" title="1 of 2 branches missed.">            if (candidateCertificateHash == null</span>
+<span class="fc bfc" id="L801" title="All 2 branches covered.">                    || !candidateCertificateHash.isEmpty()</span>
+<span class="pc bpc" id="L802" title="1 of 2 branches missed.">                    &amp;&amp; !candidateCertificateHash.matches(</span>
                         &quot;sha256:[0-9a-f]{64}&quot;)) {
-<span class="nc" id="L781">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L804">                throw new IllegalArgumentException(</span>
                     &quot;transformation candidate certificate is invalid&quot;);
             }
-<span class="fc" id="L784">            this.candidateCertificateHash = candidateCertificateHash;</span>
-<span class="fc" id="L785">            this.rendering = Objects.requireNonNull(</span>
+<span class="fc" id="L807">            this.candidateCertificateHash = candidateCertificateHash;</span>
+<span class="fc" id="L808">            this.rendering = Objects.requireNonNull(</span>
                 rendering,
                 &quot;rendering&quot;);
-<span class="fc" id="L788">            this.reparsed = Objects.requireNonNull(reparsed, &quot;reparsed&quot;);</span>
-<span class="fc" id="L789">            this.reconstruction = Objects.requireNonNull(</span>
+<span class="fc" id="L811">            this.reparsed = Objects.requireNonNull(reparsed, &quot;reparsed&quot;);</span>
+<span class="fc" id="L812">            this.reconstruction = Objects.requireNonNull(</span>
                 reconstruction,
                 &quot;reconstruction&quot;);
-<span class="fc" id="L792">            this.totalWork = Objects.requireNonNull(</span>
+<span class="fc" id="L815">            this.totalWork = Objects.requireNonNull(</span>
                 totalWork,
                 &quot;totalWork&quot;);
-<span class="fc bfc" id="L795" title="All 2 branches covered.">            boolean transformed = status == Status.TRANSFORMED;</span>
-<span class="fc bfc" id="L796" title="All 2 branches covered.">            if (transformed) {</span>
-<span class="pc bpc" id="L797" title="2 of 4 branches missed.">                if (kind == Kind.NONE</span>
+<span class="fc bfc" id="L818" title="All 2 branches covered.">            boolean transformed = status == Status.TRANSFORMED;</span>
+<span class="fc bfc" id="L819" title="All 2 branches covered.">            if (transformed) {</span>
+<span class="pc bpc" id="L820" title="2 of 4 branches missed.">                if (kind == Kind.NONE</span>
                         || candidateIndex &lt; 0
-<span class="pc bpc" id="L799" title="1 of 2 branches missed.">                        || candidateCertificateHash.isEmpty()</span>
-<span class="pc bpc" id="L800" title="1 of 2 branches missed.">                        || rendering.isEmpty()</span>
-<span class="pc bpc" id="L801" title="1 of 2 branches missed.">                        || !rendering.orElseThrow().rendered()</span>
-<span class="pc bpc" id="L802" title="1 of 2 branches missed.">                        || reparsed.isEmpty()</span>
-<span class="pc bpc" id="L803" title="1 of 2 branches missed.">                        || reconstruction.isEmpty()</span>
-<span class="pc bpc" id="L804" title="1 of 2 branches missed.">                        || !reconstruction.orElseThrow().supported()) {</span>
-<span class="nc" id="L805">                    throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L822" title="1 of 2 branches missed.">                        || candidateCertificateHash.isEmpty()</span>
+<span class="pc bpc" id="L823" title="1 of 2 branches missed.">                        || rendering.isEmpty()</span>
+<span class="pc bpc" id="L824" title="1 of 2 branches missed.">                        || !rendering.orElseThrow().rendered()</span>
+<span class="pc bpc" id="L825" title="1 of 2 branches missed.">                        || reparsed.isEmpty()</span>
+<span class="pc bpc" id="L826" title="1 of 2 branches missed.">                        || reconstruction.isEmpty()</span>
+<span class="pc bpc" id="L827" title="1 of 2 branches missed.">                        || !reconstruction.orElseThrow().supported()) {</span>
+<span class="nc" id="L828">                    throw new IllegalArgumentException(</span>
                         &quot;transformed result lacks exact evidence&quot;);
                 }
-<span class="pc bpc" id="L808" title="1 of 2 branches missed.">            } else if (kind != Kind.NONE) {</span>
-<span class="nc" id="L809">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L831" title="1 of 2 branches missed.">            } else if (kind != Kind.NONE) {</span>
+<span class="nc" id="L832">                throw new IllegalArgumentException(</span>
                     &quot;non-transformed result cannot retain a transformation kind&quot;);
             }
-<span class="pc bpc" id="L812" title="1 of 2 branches missed.">            if (!totalWork.within(</span>
-<span class="fc" id="L813">                    factorization.policy().maxTotalWorkUnits())) {</span>
-<span class="nc" id="L814">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L835" title="1 of 2 branches missed.">            if (!totalWork.within(</span>
+<span class="fc" id="L836">                    factorization.policy().maxTotalWorkUnits())) {</span>
+<span class="nc" id="L837">                throw new IllegalArgumentException(</span>
                     &quot;transformation work exceeds original authority&quot;);
             }
-<span class="fc" id="L817">            this.certificateHash = PolynomialEvidence.sha256(</span>
-<span class="fc" id="L818">                evidenceMaterial());</span>
-<span class="fc" id="L819">        }</span>
+<span class="fc" id="L840">            this.certificateHash = PolynomialEvidence.sha256(</span>
+<span class="fc" id="L841">                evidenceMaterial());</span>
+<span class="fc" id="L842">        }</span>
 
         private static Result transformed(
             Kind kind,
@@ -829,7 +852,7 @@ public final class ExactFactorizationTransformationPipeline {
             ExactParsedUnivariatePolynomialView.Analysis reconstruction,
             PolynomialWorkLedger totalWork
         ) {
-<span class="fc" id="L832">            return new Result(</span>
+<span class="fc" id="L855">            return new Result(</span>
                 Status.TRANSFORMED,
                 kind,
                 &quot;EXACT_FACTORIZATION_TRANSFORMATION_RECONSTRUCTED&quot;,
@@ -837,9 +860,9 @@ public final class ExactFactorizationTransformationPipeline {
                 factorization,
                 candidateIndex,
                 candidateCertificateHash,
-<span class="fc" id="L840">                Optional.of(rendering),</span>
-<span class="fc" id="L841">                Optional.of(reparsed),</span>
-<span class="fc" id="L842">                Optional.of(reconstruction),</span>
+<span class="fc" id="L863">                Optional.of(rendering),</span>
+<span class="fc" id="L864">                Optional.of(reparsed),</span>
+<span class="fc" id="L865">                Optional.of(reconstruction),</span>
                 totalWork);
         }
 
@@ -856,11 +879,11 @@ public final class ExactFactorizationTransformationPipeline {
                 reconstruction,
             PolynomialWorkLedger totalWork
         ) {
-<span class="pc bpc" id="L859" title="1 of 2 branches missed.">            if (status == Status.TRANSFORMED) {</span>
-<span class="nc" id="L860">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L882" title="1 of 2 branches missed.">            if (status == Status.TRANSFORMED) {</span>
+<span class="nc" id="L883">                throw new IllegalArgumentException(</span>
                     &quot;transformed status requires exact reconstruction&quot;);
             }
-<span class="fc" id="L863">            return new Result(</span>
+<span class="fc" id="L886">            return new Result(</span>
                 status,
                 Kind.NONE,
                 detailCode,
@@ -875,38 +898,38 @@ public final class ExactFactorizationTransformationPipeline {
         }
 
         public Status status() {
-<span class="fc" id="L878">            return status;</span>
+<span class="fc" id="L901">            return status;</span>
         }
 
         public Kind kind() {
-<span class="fc" id="L882">            return kind;</span>
+<span class="fc" id="L905">            return kind;</span>
         }
 
         public String detailCode() {
-<span class="fc" id="L886">            return detailCode;</span>
+<span class="fc" id="L909">            return detailCode;</span>
         }
 
         public OccurrenceEvidence occurrence() {
-<span class="fc" id="L890">            return occurrence;</span>
+<span class="fc" id="L913">            return occurrence;</span>
         }
 
         public ExactParsedFactorizationPipeline.Result factorization() {
-<span class="nc" id="L894">            return factorization;</span>
+<span class="nc" id="L917">            return factorization;</span>
         }
 
         public OptionalInt candidateIndex() {
-<span class="fc bfc" id="L898" title="All 2 branches covered.">            return candidateIndex &lt; 0</span>
-<span class="fc" id="L899">                ? OptionalInt.empty()</span>
-<span class="fc" id="L900">                : OptionalInt.of(candidateIndex);</span>
+<span class="fc bfc" id="L921" title="All 2 branches covered.">            return candidateIndex &lt; 0</span>
+<span class="fc" id="L922">                ? OptionalInt.empty()</span>
+<span class="fc" id="L923">                : OptionalInt.of(candidateIndex);</span>
         }
 
         public String candidateCertificateHash() {
-<span class="nc" id="L904">            return candidateCertificateHash;</span>
+<span class="nc" id="L927">            return candidateCertificateHash;</span>
         }
 
         public Optional&lt;ExactFactorizationExpressionRenderer.Result&gt;
                 rendering() {
-<span class="fc" id="L909">            return rendering;</span>
+<span class="fc" id="L932">            return rendering;</span>
         }
 
         /**
@@ -914,7 +937,7 @@ public final class ExactFactorizationTransformationPipeline {
          * the later reparse or reconstruction stage rejected it.
          */
         public Optional&lt;String&gt; renderedExpression() {
-<span class="fc" id="L917">            return rendering.flatMap(</span>
+<span class="fc" id="L940">            return rendering.flatMap(</span>
                 ExactFactorizationExpressionRenderer.Result::expression);
         }
 
@@ -923,72 +946,72 @@ public final class ExactFactorizationTransformationPipeline {
          * reparse and reconstruction boundary issued a transformation.
          */
         public Optional&lt;String&gt; transformedExpression() {
-<span class="fc bfc" id="L926" title="All 2 branches covered.">            return transformed()</span>
-<span class="fc" id="L927">                ? renderedExpression()</span>
-<span class="fc" id="L928">                : Optional.empty();</span>
+<span class="fc bfc" id="L949" title="All 2 branches covered.">            return transformed()</span>
+<span class="fc" id="L950">                ? renderedExpression()</span>
+<span class="fc" id="L951">                : Optional.empty();</span>
         }
 
         public Optional&lt;ExactParsedTerm&gt; reparsed() {
-<span class="fc" id="L932">            return reparsed;</span>
+<span class="fc" id="L955">            return reparsed;</span>
         }
 
         public Optional&lt;ExactParsedUnivariatePolynomialView.Analysis&gt;
                 reconstruction() {
-<span class="fc" id="L937">            return reconstruction;</span>
+<span class="fc" id="L960">            return reconstruction;</span>
         }
 
         public PolynomialWorkLedger totalWork() {
-<span class="fc" id="L941">            return totalWork;</span>
+<span class="fc" id="L964">            return totalWork;</span>
         }
 
         public String certificateHash() {
-<span class="fc" id="L945">            return certificateHash;</span>
+<span class="fc" id="L968">            return certificateHash;</span>
         }
 
         public boolean transformed() {
-<span class="fc bfc" id="L949" title="All 2 branches covered.">            return status == Status.TRANSFORMED;</span>
+<span class="fc bfc" id="L972" title="All 2 branches covered.">            return status == Status.TRANSFORMED;</span>
         }
 
         public String canonicalMaterial() {
-<span class="fc" id="L953">            StringBuilder result = new StringBuilder(evidenceMaterial());</span>
-<span class="fc" id="L954">            PolynomialEvidence.append(result, certificateHash);</span>
-<span class="fc" id="L955">            return result.toString();</span>
+<span class="fc" id="L976">            StringBuilder result = new StringBuilder(evidenceMaterial());</span>
+<span class="fc" id="L977">            PolynomialEvidence.append(result, certificateHash);</span>
+<span class="fc" id="L978">            return result.toString();</span>
         }
 
         private String evidenceMaterial() {
-<span class="fc" id="L959">            StringBuilder result = new StringBuilder(TRANSFORMATION_ID);</span>
-<span class="fc" id="L960">            PolynomialEvidence.append(result, status.name());</span>
-<span class="fc" id="L961">            PolynomialEvidence.append(result, kind.name());</span>
-<span class="fc" id="L962">            PolynomialEvidence.append(result, detailCode);</span>
-<span class="fc" id="L963">            PolynomialEvidence.append(</span>
+<span class="fc" id="L982">            StringBuilder result = new StringBuilder(TRANSFORMATION_ID);</span>
+<span class="fc" id="L983">            PolynomialEvidence.append(result, status.name());</span>
+<span class="fc" id="L984">            PolynomialEvidence.append(result, kind.name());</span>
+<span class="fc" id="L985">            PolynomialEvidence.append(result, detailCode);</span>
+<span class="fc" id="L986">            PolynomialEvidence.append(</span>
                 result,
-<span class="fc" id="L965">                occurrence.canonicalMaterial());</span>
-<span class="fc" id="L966">            PolynomialEvidence.append(</span>
+<span class="fc" id="L988">                occurrence.canonicalMaterial());</span>
+<span class="fc" id="L989">            PolynomialEvidence.append(</span>
                 result,
-<span class="fc" id="L968">                factorization.certificateHash());</span>
-<span class="fc" id="L969">            PolynomialEvidence.append(</span>
+<span class="fc" id="L991">                factorization.certificateHash());</span>
+<span class="fc" id="L992">            PolynomialEvidence.append(</span>
                 result,
-<span class="fc" id="L971">                Integer.toString(candidateIndex));</span>
-<span class="fc" id="L972">            PolynomialEvidence.append(</span>
+<span class="fc" id="L994">                Integer.toString(candidateIndex));</span>
+<span class="fc" id="L995">            PolynomialEvidence.append(</span>
                 result,
                 candidateCertificateHash);
-<span class="fc" id="L975">            PolynomialEvidence.append(</span>
+<span class="fc" id="L998">            PolynomialEvidence.append(</span>
                 result,
-<span class="fc" id="L977">                rendering.map(</span>
+<span class="fc" id="L1000">                rendering.map(</span>
                     ExactFactorizationExpressionRenderer.Result
-<span class="fc" id="L979">                        ::certificateHash).orElse(&quot;&quot;));</span>
-<span class="fc" id="L980">            PolynomialEvidence.append(</span>
+<span class="fc" id="L1002">                        ::certificateHash).orElse(&quot;&quot;));</span>
+<span class="fc" id="L1003">            PolynomialEvidence.append(</span>
                 result,
-<span class="fc" id="L982">                reparsed.map(ExactParsedTerm::source).orElse(&quot;&quot;));</span>
-<span class="fc" id="L983">            PolynomialEvidence.append(</span>
+<span class="fc" id="L1005">                reparsed.map(ExactParsedTerm::source).orElse(&quot;&quot;));</span>
+<span class="fc" id="L1006">            PolynomialEvidence.append(</span>
                 result,
-<span class="fc" id="L985">                reconstruction.map(</span>
+<span class="fc" id="L1008">                reconstruction.map(</span>
                     ExactParsedUnivariatePolynomialView.Analysis
-<span class="fc" id="L987">                        ::certificateHash).orElse(&quot;&quot;));</span>
-<span class="fc" id="L988">            PolynomialEvidence.append(</span>
+<span class="fc" id="L1010">                        ::certificateHash).orElse(&quot;&quot;));</span>
+<span class="fc" id="L1011">            PolynomialEvidence.append(</span>
                 result,
-<span class="fc" id="L990">                totalWork.canonicalMaterial());</span>
-<span class="fc" id="L991">            return result.toString();</span>
+<span class="fc" id="L1013">                totalWork.canonicalMaterial());</span>
+<span class="fc" id="L1014">            return result.toString();</span>
         }
     }
 }

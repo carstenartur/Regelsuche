@@ -91,6 +91,9 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 - [Generationenbasiertes Regelmining](generational-rule-mining.md) —
   generationsgetrennte Schatteninventare, exakte Kandidatenprüfung und
   kumulative Wiederverwendung gelernter Transformationen.
+- [Exakte Polynom-Suchintegration](exact-polynomial-search-integration.md) —
+  explizite Profile, gemeinsame Verifier-Autorität für Suche und Replay,
+  Miner-Übergabe und offene Grenze zur Nutzenqualifikation.
 - [Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md) —
   exakte Koeffizientendomänen, Polynomringe, kanonische Sparse-Polynome,
   untrusted Engine-Proposals und verifier-ausgestellte Evidence.
