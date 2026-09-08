@@ -33,11 +33,21 @@ public class Neo4jExpressionGraphStore implements ExpressionGraphStore {
 
     @Override
     public void saveEdge(GraphEdge edge) {
+        // Legacy observation-only relationships have neither property. Normalize only those
+        // before the identity-aware MERGE; matching on rule alone could erase a recorded execution.
+        String legacyObservation = edge.execution() == null
+            ? "WITH from, to "
+                + "OPTIONAL MATCH (from)-[legacy:TRANSFORMATION {rule: $rule}]->(to) "
+                + "WHERE legacy.executionIdentity IS NULL AND legacy.execution IS NULL "
+                + "SET legacy.executionIdentity = '' "
+                + "WITH DISTINCT from, to "
+            : "";
         try (Session session = driver.session()) {
             session.run(
                 "MERGE (from:Expression {value: $from}) "
-                     + "MERGE (to:Expression {value: $to}) "
-                     + "MERGE (from)-[r:TRANSFORMATION {rule: $rule, executionIdentity: $executionIdentity}]->(to) "
+                    + "MERGE (to:Expression {value: $to}) "
+                    + legacyObservation
+                    + "MERGE (from)-[r:TRANSFORMATION {rule: $rule, executionIdentity: $executionIdentity}]->(to) "
                     + "SET r.depth = $depth, r.improvement = $improvement, "
                     + "r.pathId = $pathId, r.canonicalHash = $canonicalHash, "
                     + "r.scoreBefore = $scoreBefore, r.scoreAfter = $scoreAfter, "
@@ -46,7 +56,7 @@ public class Neo4jExpressionGraphStore implements ExpressionGraphStore {
                     + "r.equivalencePreservingByConstruction = $equivalencePreservingByConstruction, "
                     + "r.validationStatus = $validationStatus, r.execution = $execution",
                 GraphEdgePersistence.properties(edge)
-            );
+            ).consume();
         }
     }
 

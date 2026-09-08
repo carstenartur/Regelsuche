@@ -52,6 +52,14 @@ not primitive work. The recorded `primitiveRewrites`, `exactTheorySteps` and
 observations are not necessarily one sequential execution and must not be charged
 as if they were a single path.
 
+When an observation-only edge is saved to a legacy Neo4j store, relationships
+with the same directed endpoints and rule and with neither an execution identity
+nor execution JSON are assigned the empty observation identity in the same query.
+The subsequent identity-aware merge reuses them. Existing recorded executions
+remain separate and unchanged; saving a recorded execution never promotes a
+legacy observation to that execution. This is a lazy compatibility migration,
+not deletion or consolidation of duplicates already present in a store.
+
 ## Loading and independently replaying artifacts
 
 ```java
@@ -93,6 +101,11 @@ cover mixed-state transfer, file restart, full export/session round trips,
 distinct evidence at identical expressions, native primitive macro lineage,
 assumptions, tampered work/evidence/byte references and missing lineage. A public
 hash recomputed over altered JSON still fails fresh verifier/search comparison.
+
+`Neo4jExpressionGraphStoreTest` runs against a pinned Neo4j 5.26 container in the
+Maven `full` integration-test profile (also available through Gradle
+`:app:dockerE2eTest`). It covers legacy and empty identities, repeated writes,
+parallel recorded executions, reconnecting and unrelated legacy relationships.
 
 This completes a storage and replay boundary, not a new proof engine. Display
 metadata and imported validation labels are not proof authority. It does not
