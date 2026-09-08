@@ -4,10 +4,12 @@ import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.scoring.ExpressionScorer;
-import de.regelsuche.transform.MeasuredTransformationEngine;
+import de.regelsuche.search.program.BudgetedRewriteProgramExecution.PathBudget;
+import de.regelsuche.search.program.RewriteExecution;
+import de.regelsuche.search.strategy.SearchExpansionSource.WorkRevision;
+import de.regelsuche.transform.ExecutionWork;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
-import de.regelsuche.transform.TransformationBatch;
 import de.regelsuche.transform.TransformationWorkMetrics;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -19,17 +21,19 @@ import java.util.PriorityQueue;
 import java.util.Set;
 
 /**
- * Deterministic syntax-targeted best-first search with explicit primitive-step
- * and total-work budgets.
+ * Deterministic syntax-targeted best-first search with explicit primitive,
+ * exact-theory and total-work budgets.
  *
  * <p>Ordinary search-edge depth remains visible, but it never substitutes for
  * primitive depth. A composed program edge containing three primitive rewrites
  * consumes three primitive steps before it can enter the frontier. The total
  * work budget reserves one unit per possible primitive path edge for later
  * exact auditing; the remainder bounds transformation formation and outer
- * search administration.</p>
+ * search administration. Mixed v2 execution additionally charges every observed
+ * source candidate's mathematical work before frontier admission. The v1
+ * mechanical formula remains available for frozen historical evaluations.</p>
  */
-public final class PrimitiveWorkBestFirstSearchStrategy {
+public final class WorkBudgetBestFirstSearchStrategy {
     public Result search(Problem problem) {
         Objects.requireNonNull(problem, "problem");
         State root = State.root(problem);
@@ -60,8 +64,8 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
         Problem problem,
         SearchContext context
     ) {
-        State current = context.poll();
-        if (!context.visit(current)) {
+        State current = context.poll(problem);
+        if (!context.visit(current, problem)) {
             return context.prune(problem, PruneKind.DUPLICATE);
         }
         if (context.exceedsWorkBudget(problem)) {
@@ -73,7 +77,7 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
             context.reached = current;
             return LoopAction.STOP;
         }
-        if (current.primitiveDepth()
+        if (!problem.mixedWork() && current.primitiveDepth()
                 >= problem.budget().maxPrimitiveSteps()) {
             return context.prune(problem, PruneKind.PRIMITIVE_BUDGET);
         }
@@ -85,15 +89,15 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
         SearchContext context,
         State current
     ) {
-        TransformationBatch batch = problem.engine()
-            .transformMeasured(current.expression());
-        context.account(batch);
+        RewriteExecution execution = problem.source().expand(current.expression(),
+            problem.budget().pathBudget().after(current.executionWork()));
+        context.account(current, execution);
         if (context.exceedsWorkBudget(problem)) {
             return LoopAction.STOP;
         }
 
         List<Transformation> transformations = new ArrayList<>(
-            batch.transformations());
+            execution.transformations());
         transformations.sort(transformationComparator(problem));
         return enqueueCandidates(problem, context, current, transformations);
     }
@@ -130,24 +134,28 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
         State current,
         Transformation transformation
     ) {
-        if (current.appliedRuleApplications().contains(
-                transformation.applicationKey())) {
-            return context.reject(problem, PruneKind.REPEATED_APPLICATION);
+        transformation.provenance().requireSource(current.expression());
+        if (alreadyApplied(problem, current, transformation)) {
+            return context.reject(problem, current, transformation, PruneKind.REPEATED_APPLICATION);
         }
 
         int nextExpandingSteps = nextExpandingSteps(current, transformation);
         if (nextExpandingSteps > problem.budget().maxExpandingSteps()) {
-            return context.reject(problem, PruneKind.EXPANSION_BUDGET);
+            return context.reject(problem, current, transformation, PruneKind.EXPANSION_BUDGET);
         }
 
         int nextPrimitiveDepth = nextPrimitiveDepth(current, transformation);
         if (nextPrimitiveDepth < 0
                 || nextPrimitiveDepth > problem.budget().maxPrimitiveSteps()) {
-            return context.reject(problem, PruneKind.PRIMITIVE_BUDGET);
+            return context.reject(problem, current, transformation, PruneKind.PRIMITIVE_BUDGET);
+        }
+        if (!problem.budget().pathBudget().after(current.executionWork())
+                .admits(transformation.executionWork())) {
+            return context.reject(problem, current, transformation, PruneKind.PATH_WORK_BUDGET);
         }
         if (transformation.transformedExpression().equals(
                 current.expression())) {
-            return context.reject(problem, PruneKind.SAME_EXPRESSION);
+            return context.reject(problem, current, transformation, PruneKind.SAME_EXPRESSION);
         }
 
         State next = current.next(
@@ -155,14 +163,26 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
             transformation,
             nextPrimitiveDepth,
             nextExpandingSteps);
-        if (!context.queue(next)) {
-            return context.reject(problem, PruneKind.DUPLICATE);
+        if (context.contains(next, problem)) {
+            return context.reject(problem, current, transformation, PruneKind.DUPLICATE);
         }
+        if (problem.mixedWork() && !context.reserveEnqueue(problem)) {
+            context.decisions.add(new CandidateDecision(current, transformation, Decision.WORK_BUDGET));
+            return CandidateAction.STOP;
+        }
+        context.queue(next, problem);
         context.metrics.enqueuedStates = add(
             context.metrics.enqueuedStates, 1);
+        context.decisions.add(new CandidateDecision(current, transformation, Decision.ENQUEUED));
         return context.exceedsWorkBudget(problem)
             ? CandidateAction.STOP
             : CandidateAction.ENQUEUED;
+    }
+
+    private static boolean alreadyApplied(Problem problem, State current, Transformation transformation) {
+        return problem.mixedWork()
+            ? current.transformations().stream().anyMatch(step -> step.provenance().equals(transformation.provenance()))
+            : current.appliedRuleApplications().contains(transformation.applicationKey());
     }
 
     private static int nextExpandingSteps(
@@ -191,13 +211,9 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
     }
 
     private static Result finish(Problem problem, SearchContext context) {
-        return result(
-            problem,
-            context.explored,
-            context.reached,
-            context.best,
-            status(problem, context),
-            context.metrics);
+        return new Result(context.explored, context.reached, context.best, status(problem, context),
+            context.metrics.snapshot(context.explored.size(), problem), context.expansions, context.decisions,
+            RunConfiguration.of(problem));
     }
 
     private static Status status(Problem problem, SearchContext context) {
@@ -217,6 +233,12 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
         }
         if (context.metrics.primitiveBudgetPrunes > 0) {
             return Status.PRIMITIVE_BUDGET;
+        }
+        if (context.metrics.pathWorkBudgetPrunes > 0) {
+            return Status.PATH_WORK_BUDGET;
+        }
+        if (context.expansions.stream().anyMatch(call -> !call.execution().complete())) {
+            return Status.INCOMPLETE_EXPANSION;
         }
         if (context.metrics.expandedStates > 0
                 && context.metrics.generatedTransformations == 0) {
@@ -238,22 +260,9 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
             reached,
             best,
             status,
-            new Metrics(
+            metrics.snapshot(
                 explored.size(),
-                metrics.expandedStates,
-                metrics.generatedTransformations,
-                metrics.enqueuedStates,
-                metrics.duplicatePrunes,
-                metrics.repeatedApplicationPrunes,
-                metrics.sameExpressionPrunes,
-                metrics.expansionBudgetPrunes,
-                metrics.primitiveBudgetPrunes,
-                metrics.candidateBudgetPrunes,
-                metrics.statesWithoutTransformations,
-                metrics.engineBatches,
-                metrics.work,
-                problem.budget().maxPrimitiveSteps(),
-                problem.budget().maxWorkUnits()));
+                problem), List.of(), List.of(), RunConfiguration.of(problem));
     }
 
     private static Comparator<State> comparator(Problem problem) {
@@ -335,11 +344,14 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
                 && candidate.expression().compareTo(current.expression()) < 0);
     }
 
-    private static String stateKey(State state) {
-        return state.expression() + "\u0000"
-            + state.primitiveDepth() + "\u0000"
-            + AssumptionSignature.ofExpressions(state.assumptions()).fingerprint();
+    private static StateKey stateKey(State state, Problem problem) {
+        return new StateKey(state.expression(), state.primitiveDepth(),
+            AssumptionSignature.ofExpressions(state.assumptions()).fingerprint(),
+            problem.mixedWork() ? state.transformations() : List.of());
     }
+
+    private record StateKey(String expression, int primitiveDepth, String assumptions,
+                            List<Transformation> transformations) {}
 
     private static String normalize(String expression, String name) {
         if (expression == null || expression.isBlank()) {
@@ -359,7 +371,7 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
     public record Problem(
         String inputExpression,
         String targetExpression,
-        MeasuredTransformationEngine engine,
+        SearchExpansionSource source,
         ExpressionScorer scorer,
         ExpressionCanonicalizer canonicalizer,
         Budget budget
@@ -367,23 +379,30 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
         public Problem {
             inputExpression = normalize(inputExpression, "inputExpression");
             targetExpression = normalize(targetExpression, "targetExpression");
-            Objects.requireNonNull(engine, "engine");
+            Objects.requireNonNull(source, "source");
             Objects.requireNonNull(scorer, "scorer");
             Objects.requireNonNull(canonicalizer, "canonicalizer");
             Objects.requireNonNull(budget, "budget");
+            if (source.workRevision() == WorkRevision.MECHANICAL_V1 && budget.maxExactTheoryWorkUnits() != 0) {
+                throw new IllegalArgumentException("v1 mechanical evaluation cannot grant theory authority");
+            }
         }
+
+        boolean mixedWork() { return source.workRevision() == WorkRevision.MIXED_V2; }
     }
 
     /** Total work budget including a worst-case exact path-audit reserve. */
     public record Budget(
         int maxPrimitiveSteps,
+        long maxExactTheoryWorkUnits,
         int maxExploredStates,
         int maxCandidatesPerState,
         int maxExpandingSteps,
         long maxWorkUnits
     ) {
         public Budget {
-            if (maxPrimitiveSteps < 1
+            if (maxPrimitiveSteps < 0
+                    || maxExactTheoryWorkUnits < 0
                     || maxExploredStates < 1
                     || maxCandidatesPerState < 1
                     || maxExpandingSteps < 0
@@ -392,6 +411,15 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
                     "primitive-work search budgets are invalid or leave no "
                         + "mechanical work after exact path-audit reservation");
             }
+        }
+
+        public static Budget primitive(int primitiveSteps, int states, int candidates, int expandingSteps, long work) {
+            if (primitiveSteps < 1) throw new IllegalArgumentException("v1 requires a positive primitive allowance");
+            return new Budget(primitiveSteps, 0, states, candidates, expandingSteps, work);
+        }
+
+        public PathBudget pathBudget() {
+            return new PathBudget(maxPrimitiveSteps, maxExactTheoryWorkUnits);
         }
 
         public long exactPathAuditReserve() {
@@ -414,7 +442,9 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
         Set<String> appliedRuleApplications,
         List<String> assumptions,
         int expandingSteps,
-        String canonicalHash
+        String canonicalHash,
+        List<Transformation> transformations,
+        ExecutionWork executionWork
     ) {
         public State {
             expression = normalize(expression, "expression");
@@ -430,6 +460,9 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
             assumptions = AssumptionSignature.ofExpressions(assumptions)
                 .normalizedAssumptions();
             canonicalHash = normalize(canonicalHash, "canonicalHash");
+            transformations = List.copyOf(transformations);
+            requirePath(expression, edgeDepth, path, appliedRuleIds, primitiveRuleIds,
+                appliedRuleApplications, assumptions, expandingSteps, transformations, executionWork);
             if (primitiveRuleIds.size() != primitiveDepth) {
                 throw new IllegalArgumentException(
                     "primitiveDepth must equal retained primitive lineage size");
@@ -449,7 +482,7 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
                 Set.of(),
                 List.of(),
                 0,
-                problem.canonicalizer().stableHash(input));
+                problem.canonicalizer().stableHash(input), List.of(), ExecutionWork.ZERO);
         }
 
         private State next(
@@ -481,12 +514,42 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
                 nextApplications,
                 nextAssumptions,
                 nextExpandingSteps,
-                problem.canonicalizer().stableHash(output));
+                problem.canonicalizer().stableHash(output), append(transformations, transformation),
+                executionWork.plus(transformation.executionWork()));
         }
 
         public boolean programUsed() {
             return appliedRuleIds.stream()
                 .anyMatch(rule -> rule.startsWith("program:"));
+        }
+
+        private static void requirePath(String expression, int depth, List<String> path,
+                List<String> rules, List<String> primitives, Set<String> applications, List<String> assumptions,
+                int expandingSteps, List<Transformation> steps, ExecutionWork work) {
+            if (steps.size() != depth || path.size() != depth + 1 || !path.getLast().equals(expression)) {
+                throw new IllegalArgumentException("state path length or endpoint differs from retained steps");
+            }
+            for (int i = 0; i < steps.size(); i++) {
+                steps.get(i).provenance().requireSource(path.get(i));
+                if (!steps.get(i).transformedExpression().equals(path.get(i + 1))) {
+                    throw new IllegalArgumentException("state path is discontinuous");
+                }
+            }
+            requireLineage(rules, primitives, applications, assumptions, expandingSteps, steps, work);
+        }
+
+        private static void requireLineage(List<String> rules, List<String> primitives, Set<String> applications,
+                List<String> assumptions, int expandingSteps, List<Transformation> steps, ExecutionWork work) {
+            if (!steps.stream().map(Transformation::rule).toList().equals(rules)
+                    || !steps.stream().flatMap(step -> step.primitiveRuleIds().stream()).toList().equals(primitives)
+                    || !Set.copyOf(steps.stream().map(Transformation::applicationKey).toList()).equals(applications)
+                    || !AssumptionSignature.ofExpressions(steps.stream()
+                        .flatMap(step -> step.assumptions().stream()).toList()).normalizedAssumptions().equals(assumptions)
+                    || steps.stream().filter(step -> step.kind() == RewriteKind.EXPAND).count() != expandingSteps
+                    || !steps.stream().map(Transformation::executionWork).reduce(ExecutionWork.ZERO, ExecutionWork::plus)
+                        .equals(work)) {
+                throw new IllegalArgumentException("state lineage or work differs from retained transformations");
+            }
         }
 
         private static <T> List<T> append(List<T> values, T value) {
@@ -502,6 +565,8 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
         WORK_BUDGET,
         OUTER_STATE_BUDGET,
         PRIMITIVE_BUDGET,
+        PATH_WORK_BUDGET,
+        INCOMPLETE_EXPANSION,
         CANDIDATE_BUDGET,
         NO_TRANSFORMATIONS,
         FRONTIER_EXHAUSTED
@@ -522,10 +587,15 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
         long engineBatches,
         TransformationWorkMetrics transformationWork,
         int primitiveStepBudget,
-        long workUnitBudget
+        long workUnitBudget,
+        long pathWorkBudgetPrunes,
+        long frontierAdmissionChecks,
+        long exactTheoryWorkBudget,
+        WorkRevision workRevision
     ) {
         public Metrics {
             Objects.requireNonNull(transformationWork, "transformationWork");
+            Objects.requireNonNull(workRevision, "workRevision");
         }
 
         public long exactPathAuditReserve() {
@@ -548,6 +618,8 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
             total = add(total, primitiveBudgetPrunes);
             total = add(total, candidateBudgetPrunes);
             total = add(total, statesWithoutTransformations);
+            total = add(total, pathWorkBudgetPrunes);
+            total = add(total, frontierAdmissionChecks);
             return add(total, engineBatches);
         }
 
@@ -556,6 +628,11 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
                 transformationWork.totalWorkUnits(),
                 outerSearchWorkUnits());
         }
+
+        public long chargedSearchWorkUnits() {
+            return workRevision == WorkRevision.MECHANICAL_V1 ? totalMechanicalWorkUnits()
+                : Math.addExact(totalMechanicalWorkUnits(), transformationWork.candidateWork().canonicalWorkUnits());
+        }
     }
 
     public record Result(
@@ -563,18 +640,64 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
         State reachedState,
         State bestState,
         Status status,
-        Metrics metrics
+        Metrics metrics,
+        List<ExpansionObservation> expansions,
+        List<CandidateDecision> candidateDecisions,
+        RunConfiguration configuration
     ) {
         public Result {
             exploredStates = List.copyOf(exploredStates);
             Objects.requireNonNull(bestState, "bestState");
             Objects.requireNonNull(status, "status");
             Objects.requireNonNull(metrics, "metrics");
+            expansions = List.copyOf(expansions);
+            candidateDecisions = List.copyOf(candidateDecisions);
+            Objects.requireNonNull(configuration, "configuration");
         }
 
         public boolean reached() {
             return status == Status.REACHED
                 || status == Status.ROOT_ALREADY_TARGET;
+        }
+
+        public boolean expansionsComplete() {
+            return expansions.stream().allMatch(call -> call.execution().complete());
+        }
+
+        public String toCanonicalJson() { return WorkSearchReplay.toCanonicalJson(this); }
+    }
+
+    public record ExpansionObservation(State source, RewriteExecution execution) {
+        public ExpansionObservation {
+            Objects.requireNonNull(source, "source");
+            Objects.requireNonNull(execution, "execution");
+        }
+    }
+
+    public enum Decision {
+        ENQUEUED, WORK_BUDGET, DUPLICATE, REPEATED_APPLICATION, SAME_EXPRESSION,
+        EXPANSION_BUDGET, PRIMITIVE_BUDGET, PATH_WORK_BUDGET, CANDIDATE_BUDGET
+    }
+
+    public record CandidateDecision(State source, Transformation transformation, Decision outcome) {
+        public CandidateDecision {
+            Objects.requireNonNull(source, "source");
+            Objects.requireNonNull(transformation, "transformation").provenance().requireSource(source.expression());
+            Objects.requireNonNull(outcome, "outcome");
+        }
+    }
+
+    public record RunConfiguration(String inputExpression, String targetExpression, Budget budget, WorkRevision workRevision) {
+        public RunConfiguration {
+            Objects.requireNonNull(inputExpression, "inputExpression");
+            Objects.requireNonNull(targetExpression, "targetExpression");
+            Objects.requireNonNull(budget, "budget");
+            Objects.requireNonNull(workRevision, "workRevision");
+        }
+
+        static RunConfiguration of(Problem problem) {
+            return new RunConfiguration(problem.inputExpression(), problem.targetExpression(), problem.budget(),
+                problem.source().workRevision());
         }
     }
 
@@ -595,14 +718,17 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
         SAME_EXPRESSION,
         EXPANSION_BUDGET,
         PRIMITIVE_BUDGET,
+        PATH_WORK_BUDGET,
         CANDIDATE_BUDGET
     }
 
     private static final class SearchContext {
         private final PriorityQueue<State> frontier;
-        private final Set<String> queued = new HashSet<>();
-        private final Set<String> visited = new HashSet<>();
+        private final Set<StateKey> queued = new HashSet<>();
+        private final Set<StateKey> visited = new HashSet<>();
         private final List<State> explored = new ArrayList<>();
+        private final List<ExpansionObservation> expansions = new ArrayList<>();
+        private final List<CandidateDecision> decisions = new ArrayList<>();
         private final MutableMetrics metrics = new MutableMetrics();
         private State best;
         private State reached;
@@ -610,7 +736,7 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
         private SearchContext(Problem problem, State root) {
             frontier = new PriorityQueue<>(comparator(problem));
             frontier.add(root);
-            queued.add(stateKey(root));
+            queued.add(stateKey(root, problem));
             best = root;
         }
 
@@ -624,14 +750,14 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
                 && !metrics.workBudgetExceeded;
         }
 
-        private State poll() {
+        private State poll(Problem problem) {
             State current = frontier.remove();
-            queued.remove(stateKey(current));
+            queued.remove(stateKey(current, problem));
             return current;
         }
 
-        private boolean visit(State current) {
-            if (!visited.add(stateKey(current))) {
+        private boolean visit(State current, Problem problem) {
+            if (!visited.add(stateKey(current, problem))) {
                 return false;
             }
             explored.add(current);
@@ -644,26 +770,39 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
             }
         }
 
-        private void account(TransformationBatch batch) {
+        private void account(State current, RewriteExecution batch) {
+            expansions.add(new ExpansionObservation(current, batch));
             metrics.engineBatches = add(metrics.engineBatches, 1);
             metrics.work = metrics.work.plus(batch.workMetrics());
             metrics.expandedStates = add(metrics.expandedStates, 1);
             metrics.generatedTransformations = add(
                 metrics.generatedTransformations,
                 batch.transformations().size());
+            metrics.pathWorkBudgetPrunes = add(metrics.pathWorkBudgetPrunes,
+                batch.sourceObservations().stream().filter(observation -> !observation.admitted()).count());
             if (batch.transformations().isEmpty()) {
                 metrics.statesWithoutTransformations = add(
                     metrics.statesWithoutTransformations, 1);
             }
         }
 
-        private boolean queue(State state) {
-            String key = stateKey(state);
-            if (visited.contains(key) || !queued.add(key)) {
-                return false;
-            }
+        private boolean contains(State state, Problem problem) {
+            StateKey key = stateKey(state, problem);
+            return visited.contains(key) || queued.contains(key);
+        }
+
+        private void queue(State state, Problem problem) {
+            queued.add(stateKey(state, problem));
             frontier.add(state);
-            return true;
+        }
+
+        private boolean reserveEnqueue(Problem problem) {
+            metrics.frontierAdmissionChecks = Math.addExact(metrics.frontierAdmissionChecks, 1);
+            long charged = metrics.snapshot(explored.size(), problem).chargedSearchWorkUnits();
+            if (charged >= problem.budget().mechanicalSearchWorkBudget()) {
+                metrics.workBudgetExceeded = true;
+            }
+            return !metrics.workBudgetExceeded;
         }
 
         private LoopAction prune(Problem problem, PruneKind kind) {
@@ -673,7 +812,8 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
                 : LoopAction.CONTINUE;
         }
 
-        private CandidateAction reject(Problem problem, PruneKind kind) {
+        private CandidateAction reject(Problem problem, State current, Transformation transformation, PruneKind kind) {
+            decisions.add(new CandidateDecision(current, transformation, Decision.valueOf(kind.name())));
             increment(kind);
             return exceedsWorkBudget(problem)
                 ? CandidateAction.STOP
@@ -693,13 +833,14 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
                     metrics.expansionBudgetPrunes, 1);
                 case PRIMITIVE_BUDGET -> metrics.primitiveBudgetPrunes = add(
                     metrics.primitiveBudgetPrunes, 1);
+                case PATH_WORK_BUDGET -> metrics.pathWorkBudgetPrunes = add(metrics.pathWorkBudgetPrunes, 1);
                 case CANDIDATE_BUDGET -> metrics.candidateBudgetPrunes = add(
                     metrics.candidateBudgetPrunes, 1);
             }
         }
 
         private boolean exceedsWorkBudget(Problem problem) {
-            if (metrics.totalMechanicalWorkUnits(explored.size())
+            if (metrics.snapshot(explored.size(), problem).chargedSearchWorkUnits()
                     > problem.budget().mechanicalSearchWorkBudget()) {
                 metrics.workBudgetExceeded = true;
             }
@@ -716,6 +857,8 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
         private long sameExpressionPrunes;
         private long expansionBudgetPrunes;
         private long primitiveBudgetPrunes;
+        private long pathWorkBudgetPrunes;
+        private long frontierAdmissionChecks;
         private long candidateBudgetPrunes;
         private long statesWithoutTransformations;
         private long engineBatches;
@@ -723,20 +866,13 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
             TransformationWorkMetrics.ZERO;
         private boolean workBudgetExceeded;
 
-        private long totalMechanicalWorkUnits(int exploredStates) {
-            long total = exploredStates;
-            total = add(total, expandedStates);
-            total = add(total, generatedTransformations);
-            total = add(total, enqueuedStates);
-            total = add(total, duplicatePrunes);
-            total = add(total, repeatedApplicationPrunes);
-            total = add(total, sameExpressionPrunes);
-            total = add(total, expansionBudgetPrunes);
-            total = add(total, primitiveBudgetPrunes);
-            total = add(total, candidateBudgetPrunes);
-            total = add(total, statesWithoutTransformations);
-            total = add(total, engineBatches);
-            return add(total, work.totalWorkUnits());
+        private Metrics snapshot(int exploredStates, Problem problem) {
+            return new Metrics(exploredStates, expandedStates, generatedTransformations, enqueuedStates,
+                duplicatePrunes, repeatedApplicationPrunes, sameExpressionPrunes, expansionBudgetPrunes,
+                primitiveBudgetPrunes, candidateBudgetPrunes, statesWithoutTransformations, engineBatches,
+                work, problem.budget().maxPrimitiveSteps(), problem.budget().maxWorkUnits(),
+                pathWorkBudgetPrunes, frontierAdmissionChecks, problem.budget().maxExactTheoryWorkUnits(),
+                problem.source().workRevision());
         }
     }
 }
