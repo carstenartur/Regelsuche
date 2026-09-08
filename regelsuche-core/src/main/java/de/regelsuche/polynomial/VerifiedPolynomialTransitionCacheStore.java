@@ -132,6 +132,7 @@ public final class VerifiedPolynomialTransitionCacheStore {
         Entry retained = Entry.create(
             request,
             transition,
+            transformation,
             lineage,
             retentionGeneration);
         Optional<Eviction> eviction = Optional.empty();
@@ -213,6 +214,12 @@ public final class VerifiedPolynomialTransitionCacheStore {
             Optional.of(current));
         replays = increment(replays, "replays");
         return ReplayResult.replayed(lookup, current, work);
+    }
+
+    /** Admission bound only; it releases neither a transition nor its authority. */
+    public long replayWorkCeiling(LookupResult lookup) {
+        Objects.requireNonNull(lookup, "lookup");
+        return replayWork(true, true, true, lookup.retainedEntry).totalWorkUnits();
     }
 
     public synchronized Stats stats() {
@@ -774,6 +781,7 @@ public final class VerifiedPolynomialTransitionCacheStore {
         long retentionGeneration,
         LookupRequest request,
         VerifiedTransition transition,
+        ExactFactorizationTransformationPipeline.Result authorization,
         List<Lineage> lineages,
         String purpose
     ) {
@@ -787,6 +795,11 @@ public final class VerifiedPolynomialTransitionCacheStore {
             transition = Objects.requireNonNull(
                 transition,
                 "transition");
+            Objects.requireNonNull(authorization, "authorization");
+            if (!authorization.transformed()
+                    || !authorization.certificateHash().equals(transition.authorityCertificateHash())) {
+                throw new IllegalArgumentException("cache authorization differs from its primitive transformation");
+            }
             lineages = List.copyOf(
                 Objects.requireNonNull(lineages, "lineages"));
             if (lineages.isEmpty()
@@ -816,6 +829,7 @@ public final class VerifiedPolynomialTransitionCacheStore {
         private static Entry create(
             LookupRequest request,
             VerifiedTransition transition,
+            ExactFactorizationTransformationPipeline.Result authorization,
             Lineage lineage,
             long retentionGeneration
         ) {
@@ -824,6 +838,7 @@ public final class VerifiedPolynomialTransitionCacheStore {
                 retentionGeneration,
                 request,
                 transition,
+                authorization,
                 List.of(lineage),
                 PURPOSE);
         }
@@ -842,6 +857,7 @@ public final class VerifiedPolynomialTransitionCacheStore {
                 retentionGeneration,
                 request,
                 transition,
+                authorization,
                 updated,
                 purpose);
         }
@@ -1367,6 +1383,11 @@ public final class VerifiedPolynomialTransitionCacheStore {
 
         public boolean replayed() {
             return status == ReplayStatus.REPLAYED;
+        }
+
+        /** Original issuer-owned primitive; never reconstructed from cached strings. */
+        public Optional<ExactFactorizationTransformationPipeline.Result> authorization() {
+            return releasedEntry.map(Entry::authorization);
         }
 
         public Optional<VerifiedTransition> transition() {

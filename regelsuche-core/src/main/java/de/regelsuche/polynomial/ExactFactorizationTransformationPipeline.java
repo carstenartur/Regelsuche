@@ -403,6 +403,29 @@ public final class ExactFactorizationTransformationPipeline {
             afterComparison);
     }
 
+    /** Rebinds retained issuer-owned evidence without rerunning its engine. */
+    static ReplaySourceValidation validateReplaySource(
+        ExactParsedTerm source,
+        Result retained,
+        long availableWork
+    ) {
+        Objects.requireNonNull(source, "source");
+        Objects.requireNonNull(retained, "retained");
+        if (!retained.transformed() || availableWork < 0) {
+            throw new IllegalArgumentException("replay requires a verified changed transformation and work authority");
+        }
+        PolynomialWorkLedger work = sourceValidationWork(source, retained.factorization().extraction());
+        if (!work.within(availableWork)) {
+            return new ReplaySourceValidation(Status.BUDGET_INCONCLUSIVE,
+                "REPLAY_SOURCE_VALIDATION_AUTHORITY_INSUFFICIENT", PolynomialWorkLedger.empty());
+        }
+        String violation = sourceContinuityViolation(source, retained.factorization());
+        return new ReplaySourceValidation(violation == null ? Status.TRANSFORMED : Status.SOURCE_EVIDENCE_MISMATCH,
+            violation == null ? "REPLAY_SOURCE_EVIDENCE_VALIDATED" : violation, work);
+    }
+
+    record ReplaySourceValidation(Status status, String detailCode, PolynomialWorkLedger work) { }
+
     private static SourceAuthorization authorizeSource(
         ExactParsedTerm source,
         ExactParsedFactorizationPipeline.Result factorization

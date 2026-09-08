@@ -6,6 +6,7 @@ import de.regelsuche.validation.CandidateProofStatus;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 
 /**
  * Explicit post-formation adapter for exact polynomial theory classification.
@@ -25,11 +26,22 @@ public final class PolynomialTheoryCandidateObserver
     private final PolynomialTheorySubsumptionClassifier classifier;
     private final PolynomialDerivedMacroCache macroCache;
     private final PolynomialTheoryFormationOutcomeLedger outcomeLedger;
+    private final BiConsumer<PolynomialTheorySubsumptionClassifier.Classification, Evidence> verifiedHandoff;
 
     public PolynomialTheoryCandidateObserver(
         PolynomialTheorySubsumptionClassifier classifier,
         PolynomialDerivedMacroCache macroCache,
         PolynomialTheoryFormationOutcomeLedger outcomeLedger
+    ) {
+        this(classifier, macroCache, outcomeLedger, (classification, evidence) -> { });
+    }
+
+    /** Optional executable handoff receives this exact classification, including duplicate observations. */
+    public PolynomialTheoryCandidateObserver(
+        PolynomialTheorySubsumptionClassifier classifier,
+        PolynomialDerivedMacroCache macroCache,
+        PolynomialTheoryFormationOutcomeLedger outcomeLedger,
+        BiConsumer<PolynomialTheorySubsumptionClassifier.Classification, Evidence> verifiedHandoff
     ) {
         this.classifier = Objects.requireNonNull(
             classifier,
@@ -40,10 +52,11 @@ public final class PolynomialTheoryCandidateObserver
         this.outcomeLedger = Objects.requireNonNull(
             outcomeLedger,
             "outcomeLedger");
+        this.verifiedHandoff = Objects.requireNonNull(verifiedHandoff, "verifiedHandoff");
     }
 
     @Override
-    public synchronized void onCandidateFormed(
+    public synchronized Disposition onCandidateFormed(
         RuleCandidate candidate,
         Evidence evidence
     ) {
@@ -81,5 +94,7 @@ public final class PolynomialTheoryCandidateObserver
             checkedEvidence,
             classification,
             macroEntryId);
+        if (classification.subsumed()) verifiedHandoff.accept(classification, checkedEvidence);
+        return classification.subsumed() ? Disposition.DERIVED_CACHE_ONLY : Disposition.RETAIN_FOR_REVIEW;
     }
 }

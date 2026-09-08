@@ -28,12 +28,13 @@ class PolynomialTheoryMiningIntegrationTest {
                 ledger);
         KnownRuleRepository knownRules = new KnownRuleRepository();
 
-        RuleCandidate first = miner(knownRules, observer)
+        assertTrue(miner(knownRules, observer)
             .mineFromSinglePathForValidatedSchema(path(
                 "generation:1:path:x",
                 "x",
                 "observed-factorization-generation-1"))
-            .orElseThrow();
+            .isEmpty(), "theory-derived identities must not reach ordinary promotion");
+        RuleCandidate first = ledger.entries().getFirst().candidate();
 
         assertTrue(first.equivalenceVerified());
         assertEquals(1, macroCache.size());
@@ -70,12 +71,13 @@ class PolynomialTheoryMiningIntegrationTest {
             "the cached macro expands through the verifier-authorized "
                 + "theory method, not the mining path's source rule label");
 
-        RuleCandidate second = miner(knownRules, observer)
+        assertTrue(miner(knownRules, observer)
             .mineFromSinglePathForValidatedSchema(path(
                 "generation:2:path:y",
                 "y",
                 "observed-factorization-generation-2"))
-            .orElseThrow();
+            .isEmpty());
+        RuleCandidate second = ledger.entries().getLast().candidate();
 
         assertEquals(first.canonicalHash(), second.canonicalHash());
         assertEquals(1, macroCache.size());

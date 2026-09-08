@@ -11,6 +11,31 @@ import org.junit.jupiter.api.Test;
 
 class PolynomialTheoryUtilityCanonicalWorkProjectionTest {
     @Test
+    void automaticPartitionPreservesEveryStageAndUsesFrozenOwnership() {
+        var total = ledger("projection.search-source-parse-code-units", 7L,
+            "exact-parsed-view.ast-visits", 3L, "unknown-new-engine-stage", 5L,
+            "verify.product-comparisons", 1L, "render.output-code-units", 4L,
+            "transform.exact-reparse-input-code-units", 4L,
+            "transform.structural-change-comparison", 1L,
+            "nested.rewritten-exact-source-code-units", 9L,
+            "cache.lookup.exact-source-index-code-units", 6L,
+            "cache.insertion.verifier-evidence-code-units", 11L,
+            "cache.eviction.fifo-entry", 1L, "cache.replay.release", 3L,
+            "study.evidence.payload-utf8-bytes", 64L);
+        var raw = PolynomialTheoryUtilityCanonicalWorkProjection.partition(1, total);
+        assertEquals(total, raw.totalMechanicalWork());
+        assertEquals(7, raw.matchingWork().totalWorkUnits());
+        assertEquals(3, raw.sourceValidationWork().totalWorkUnits());
+        assertEquals(Map.of("unknown-new-engine-stage", 5L), raw.factorizationWork().stages());
+        assertEquals(9, raw.occurrenceReplacementWork().totalWorkUnits());
+        assertEquals(6, raw.cacheLookupWork().totalWorkUnits());
+        assertEquals(11, raw.cacheInsertionWork().totalWorkUnits());
+        assertEquals(1, raw.cacheEvictionWork().totalWorkUnits());
+        assertEquals(3, raw.cacheReplayWork().totalWorkUnits());
+        assertEquals(64, raw.evidenceConstructionWork().totalWorkUnits());
+    }
+
+    @Test
     void projectsACompletePartitionWithFrozenQuanta() {
         PolynomialTheoryUtilityExecutionInput input = input(
             "z02-difference-of-squares"

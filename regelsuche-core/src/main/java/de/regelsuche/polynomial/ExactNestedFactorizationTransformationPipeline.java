@@ -26,7 +26,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
- * Applies one verifier-authorized exact factorization at a selected AST
+ * Shared core authority applying one verifier-authorized exact factorization at a selected AST
  * occurrence and replays the replacement through the shared tree editor.
  *
  * <p>Projection, factorization, rendering, exact reconstruction, structural
@@ -150,6 +150,44 @@ public final class ExactNestedFactorizationTransformationPipeline {
             prepared.valueOrThrow());
     }
 
+    /**
+     * Replays the original verified primitive at a freshly projected occurrence.
+     * Derivation evidence is retained, but only this invocation's validation and
+     * replacement work is consumed. No engine is called and no cached string pair
+     * can manufacture the required issuer-owned authorization.
+     */
+    public Result replay(
+        ExactParsedTerm root,
+        TreePosition position,
+        ExactFactorizationTransformationPipeline.Result authorization
+    ) {
+        Objects.requireNonNull(root, "root");
+        Objects.requireNonNull(position, "position");
+        Objects.requireNonNull(authorization, "authorization");
+        if (!authorization.transformed()) {
+            throw new IllegalArgumentException("only a changed verified transformation can be replayed");
+        }
+        Outcome<PreflightContext> preflight = preflight(root, position, false);
+        if (preflight.failed()) return preflight.failureOrThrow();
+        PreflightContext checked = preflight.valueOrThrow();
+        ExactParsedSubtermProjector.Result projection = projector.project(root, position.path(), position.text());
+        PolynomialWorkLedger prior = merge(checked.priorWork(), new PolynomialWorkLedger(projection.work().stages()));
+        if (!projection.successful()) {
+            return projectionFailure(mapProjectionStatus(projection.status()), projection.detailCode(), position, projection, prior);
+        }
+        ExactParsedTerm projected = projection.projected().orElseThrow();
+        var validation = ExactFactorizationTransformationPipeline.validateReplaySource(
+            projected, authorization, remainingAfterReservation(prior, checked.replacementReserve()));
+        PolynomialWorkLedger throughValidation = merge(prior, validation.work());
+        if (validation.status() != ExactFactorizationTransformationPipeline.Status.TRANSFORMED) {
+            return projectionFailure(mapTransformationStatus(validation.status()), validation.detailCode(),
+                position, projection, throughValidation);
+        }
+        return applyPreparedTransformation(root, position, new PreparedTransformation(
+            projection, projected, authorization.factorization(), authorization,
+            throughValidation, checked.replacementReserve(), true));
+    }
+
     private static void requireAttemptInputs(
         ExactParsedTerm root,
         TreePosition position,
@@ -167,6 +205,14 @@ public final class ExactNestedFactorizationTransformationPipeline {
     private Outcome<PreflightContext> preflight(
         ExactParsedTerm root,
         TreePosition position
+    ) {
+        return preflight(root, position, true);
+    }
+
+    private Outcome<PreflightContext> preflight(
+        ExactParsedTerm root,
+        TreePosition position,
+        boolean factorizationRequired
     ) {
         Work work = new Work(policy.maxTotalWorkUnits());
         if (position.path().size() > policy.maxPathDepth()) {
@@ -224,7 +270,7 @@ public final class ExactNestedFactorizationTransformationPipeline {
 
         PolynomialWorkLedger priorWork = work.ledger();
         long replacementReserve = replacementReplayWorkCeiling();
-        long extractionCeiling = extractionWorkCeiling();
+        long extractionCeiling = factorizationRequired ? extractionWorkCeiling() : 0L;
         if (!canReserveBeforeProjection(
                 priorWork,
                 replacementReserve,
@@ -304,7 +350,8 @@ public final class ExactNestedFactorizationTransformationPipeline {
             factorization,
             transformation,
             throughTransformation,
-            preflight.replacementReserve()));
+            preflight.replacementReserve(),
+            false));
     }
 
     private ExactFactorizationTransformationPipeline.Result
@@ -364,7 +411,8 @@ public final class ExactNestedFactorizationTransformationPipeline {
                 prepared.transformation(),
                 applied.rewrittenRoot(),
                 rewrittenHash,
-                totalWork);
+                totalWork,
+                prepared.replay());
         } catch (ApplicationFailure exception) {
             return preparedFailure(
                 exception.status(),
@@ -953,11 +1001,13 @@ public final class ExactNestedFactorizationTransformationPipeline {
         ExactFactorizationTransformationPipeline.Result transformation,
         Expr rewrittenRoot,
         String rewrittenStructuralHash,
-        PolynomialWorkLedger totalWork
+        PolynomialWorkLedger totalWork,
+        boolean replay
     ) {
         return new Result(
             Status.TRANSFORMED,
-            "EXACT_NESTED_FACTORIZATION_REPLACED_AND_REPLAYED",
+            replay ? "VERIFIED_PRIMITIVE_REBOUND_AND_REPLAYED"
+                : "EXACT_NESTED_FACTORIZATION_REPLACED_AND_REPLAYED",
             policy,
             position,
             Optional.of(projection),
@@ -1252,6 +1302,11 @@ public final class ExactNestedFactorizationTransformationPipeline {
             return transformation;
         }
 
+        /** Shared identity of the primitive; occurrence/application certificates remain distinct. */
+        public Optional<String> primitiveTransformationId() {
+            return transformation.map(ExactFactorizationTransformationPipeline.Result::certificateHash);
+        }
+
         public Optional<Expr> rewrittenRoot() {
             return rewrittenRoot;
         }
@@ -1323,7 +1378,8 @@ public final class ExactNestedFactorizationTransformationPipeline {
         ExactParsedFactorizationPipeline.Result factorization,
         ExactFactorizationTransformationPipeline.Result transformation,
         PolynomialWorkLedger throughTransformation,
-        long replacementReserve
+        long replacementReserve,
+        boolean replay
     ) {
     }
 

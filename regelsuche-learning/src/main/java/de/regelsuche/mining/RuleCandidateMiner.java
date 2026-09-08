@@ -13,7 +13,7 @@ import java.util.function.BiFunction;
 
 public class RuleCandidateMiner {
     private static final RuleCandidateFormationObserver NO_FORMATION_OBSERVER =
-        (candidate, evidence) -> { };
+        (candidate, evidence) -> RuleCandidateFormationObserver.Disposition.RETAIN_FOR_REVIEW;
 
     private final KnownRuleRepository knownRules;
     private final PatternGeneralizer patternGeneralizer;
@@ -145,8 +145,7 @@ public class RuleCandidateMiner {
                 continue;
             }
             RuleCandidate candidate = bucket.toCandidate(knownRules);
-            observe(candidate, bucket.paths);
-            result.add(candidate);
+            if (retainForReview(candidate, bucket.paths)) result.add(candidate);
         }
         return List.copyOf(result);
     }
@@ -154,10 +153,9 @@ public class RuleCandidateMiner {
     public Optional<RuleCandidate> mineFromSinglePathForValidatedSchema(
         SuccessfulTransformationPath path
     ) {
-        return formFromSinglePath(path).map(formed -> {
-            observe(formed.candidate(), formed.sourcePaths());
-            return formed.candidate();
-        });
+        return formFromSinglePath(path)
+            .filter(formed -> retainForReview(formed.candidate(), formed.sourcePaths()))
+            .map(FormedCandidate::candidate);
     }
 
     public List<RuleCandidate> mineFromSinglePathForValidatedSchema(
@@ -177,22 +175,22 @@ public class RuleCandidateMiner {
         List<RuleCandidate> result = new ArrayList<>(
             deduplicated.size());
         for (FormedCandidate formed : deduplicated.values()) {
-            observe(formed.candidate(), formed.sourcePaths());
-            result.add(formed.candidate());
+            if (retainForReview(formed.candidate(), formed.sourcePaths())) result.add(formed.candidate());
         }
         return List.copyOf(result);
     }
 
-    private void observe(
+    private boolean retainForReview(
         RuleCandidate candidate,
         List<SuccessfulTransformationPath> sourcePaths
     ) {
         if (formationObserver == NO_FORMATION_OBSERVER) {
-            return;
+            return true;
         }
-        formationObserver.onCandidateFormed(
+        return Objects.requireNonNull(formationObserver.onCandidateFormed(
             candidate,
-            RuleCandidateFormationObserver.Evidence.fromPaths(sourcePaths));
+            RuleCandidateFormationObserver.Evidence.fromPaths(sourcePaths)), "formation disposition")
+                == RuleCandidateFormationObserver.Disposition.RETAIN_FOR_REVIEW;
     }
 
     private Optional<FormedCandidate> formFromSinglePath(

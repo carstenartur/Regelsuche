@@ -40,6 +40,27 @@ public final class PolynomialTheoryUtilityCanonicalWorkProjection {
     private PolynomialTheoryUtilityCanonicalWorkProjection() {
     }
 
+    /** Exact stage ownership, using the existing frozen v2 rules without changing units. */
+    public static RawWork partition(long primitiveWork, PolynomialWorkLedger total) {
+        Objects.requireNonNull(total, "total");
+        Map<Dimension, Map<String, Long>> segments = new java.util.EnumMap<>(Dimension.class);
+        for (Dimension dimension : Dimension.values()) segments.put(dimension, new LinkedHashMap<>());
+        total.stages().forEach((stage, units) -> {
+            Dimension owner = java.util.Arrays.stream(Dimension.values())
+                .filter(dimension -> dimension.accepts(stage)).findFirst().orElseThrow();
+            segments.get(owner).put(stage, units);
+        });
+        java.util.function.Function<Dimension, PolynomialWorkLedger> ledger =
+            dimension -> new PolynomialWorkLedger(segments.get(dimension));
+        return new RawWork(primitiveWork, total, ledger.apply(Dimension.MATCHING),
+            ledger.apply(Dimension.SOURCE_VALIDATION), ledger.apply(Dimension.FACTORIZATION),
+            ledger.apply(Dimension.VERIFICATION), ledger.apply(Dimension.RENDERING),
+            ledger.apply(Dimension.REPARSE), ledger.apply(Dimension.RECONSTRUCTION),
+            ledger.apply(Dimension.OCCURRENCE_REPLACEMENT), ledger.apply(Dimension.CACHE_LOOKUP),
+            ledger.apply(Dimension.CACHE_INSERTION), ledger.apply(Dimension.CACHE_EVICTION),
+            ledger.apply(Dimension.CACHE_REPLAY), ledger.apply(Dimension.EVIDENCE_CONSTRUCTION));
+    }
+
     public static Projection project(
         PolynomialTheoryUtilityExecutionInput input,
         RawWork rawWork
