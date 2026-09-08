@@ -222,6 +222,23 @@ class MatrixPreparationTest {
         assertThrows(ExactMatrixAlgebra.Unsupported.class, () -> algebra.checked(new PolynomialMatrix(List.of(List.of(polynomial)))));
     }
 
+    @Test
+    void aZeroFactorCannotHideACoordinateUsedAsACatalogParameter() {
+        for (var profile : MatrixPreparation.Profile.values()) {
+            var request = new MatrixPreparation.Request("0*x=0", List.of("x"), profile,
+                MatrixPreparation.DEFAULT_WORK, List.of(named("A", "x"), named("Z", "0")),
+                List.of(), "", false, "", List.of());
+            var result = preparation.analyze(request);
+            assertEquals(RepresentationBridge.Status.DOMAIN_UNSUPPORTED, result.status());
+            assertEquals("CATALOG_COEFFICIENT_USES_VECTOR_COORDINATE", result.detailCode());
+            assertEquals(0, result.acceptedCount());
+        }
+        var independentParameter = new MatrixPreparation.Request("a*x=1", List.of("x"),
+            SAFE_PREPARED_REPRESENTATION_V1, MatrixPreparation.DEFAULT_WORK, List.of(named("A", "a")),
+            List.of(), "", false, "", List.of());
+        accepted(preparation.analyze(independentParameter), "VISIBLE_CATALOG_MATRIX");
+    }
+
     private MatrixPreparation.Request scalar(String source) {
         return MatrixPreparation.Request.scalar(source, List.of("x", "y"), SAFE_PREPARED_REPRESENTATION_V1, MatrixPreparation.DEFAULT_WORK);
     }

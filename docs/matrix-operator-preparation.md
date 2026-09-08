@@ -58,7 +58,9 @@ profile. Unproved or ill-dimensioned proposals cannot be accepted.
 Scalar entries use existing exact rational polynomials. Numeric literals,
 including finite decimals, remain exact. Coordinates are explicitly declared
 and ordered; other symbols are scalar parameters. The system must be affine in
-the coordinates. Functions, nonconstant denominators, undefined constant
+the coordinates. Catalog entries and inverse witnesses must be independent of
+those coordinates, even when a later factor would cancel that dependence.
+Functions, nonconstant denominators, undefined constant
 operations, and unguarded symbolic zeroth powers are outside the new profile.
 The current bounds are 16 rows/columns, eight catalog matrices, eight operator
 recipes, polynomial degree 32, 256 terms, 2048-bit rational coefficients, source

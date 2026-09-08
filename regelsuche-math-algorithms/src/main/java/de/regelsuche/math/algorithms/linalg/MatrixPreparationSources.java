@@ -73,8 +73,18 @@ final class MatrixPreparationSources {
     }
 
     private PolynomialMatrix parseMatrix(List<List<String>> entries) {
-        return algebra.matrix(entries.size(), entries.getFirst().size(),
+        PolynomialMatrix matrix = algebra.matrix(entries.size(), entries.getFirst().size(),
             (row, column) -> algebra.scalar(parser.parseTerm(entries.get(row).get(column))));
+        for (List<Polynomial> row : matrix.entries()) {
+            for (Polynomial entry : row) {
+                for (String parameter : entry.variables()) {
+                    work.consume(1);
+                    ExactMatrixAlgebra.require(!request.unknowns().contains(parameter),
+                        "CATALOG_COEFFICIENT_USES_VECTOR_COORDINATE");
+                }
+            }
+        }
+        return matrix;
     }
 
     private List<Equation> fromMatrix(PolynomialMatrix matrix, List<String> coordinates, List<String> rhs) {
