@@ -157,7 +157,7 @@ public final class EqualitySaturationStrategy implements SearchStrategy {
     /**
      * Per-node extraction cost: 1 per inner node (operator, function),
      * 0 per leaf (variable, number). This matches the historical
-     * {@link de.regelsuche.scoring.cost.OperatorCountCost} contract and
+     * {@link de.regelsuche.scoring.cost.StructuralCostModel#OPERATOR_COUNT} contract and
      * is the most defensible &quot;cheapest = smallest&quot; baseline.
      *
      * &lt;p&gt;Goal-specific cost models attached to the {@link SearchProblem}

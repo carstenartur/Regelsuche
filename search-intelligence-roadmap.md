@@ -55,15 +55,15 @@ Geliefert in `de.regelsuche.scoring.cost`:
   Convenience-`cost(expression, canonicalizer, score)`-Overload, die das
   Parsing kapselt.
 * Sechs Implementierungen:
-  * `OperatorCountCost` — historischer Default, zählt AST-Operatoren;
-  * `DepthCost` — bevorzugt flache Strukturen;
-  * `FactoredFormCost` — belohnt Multiplikationen nicht-trivialer
+  * `StructuralCostModel.OPERATOR_COUNT` — historischer Default, zählt AST-Operatoren;
+  * `StructuralCostModel.DEPTH` — bevorzugt flache Strukturen;
+  * `StructuralCostModel.FACTORED_FORM` — belohnt Multiplikationen nicht-trivialer
     Teilausdrücke und bestraft Top-Level-Summanden;
   * `NumericStabilityCost` — bestraft Subtraktion ähnlicher Operanden
     (Auslöschung), Division durch potenziell kleine Werte, hohe Potenzen;
   * `TeachingFriendlinessCost` — bevorzugt kleine Koeffizienten, geringe
     Tiefe, vermeidet Division und exotische Funktionen;
-  * `SymmetryCost` — Kommutativ-Bonus (gleich lange Operanden in
+  * `StructuralCostModel.SYMMETRY` — Kommutativ-Bonus (gleich lange Operanden in
     AC-Gruppen), Palindrom-Bonus (z. B. `a + b + a`).
 * Enum `TransformationGoal { SIMPLIFY, FACTORIZE, NUMERICALLY_STABLE,
   PROOF_FRIENDLY, TEACHING_FRIENDLY }` mit `defaultCostModel()`.
@@ -147,7 +147,7 @@ Geliefert in `de.regelsuche.egraph` und
 * `SearchProfile.EQUALITY_SATURATION` — neues Profil, eigenes
   Heuristik-Preset, baut die neue Strategie.
 * Extraktion nutzt einen Cost-Hook (Default: 1 pro Operator/Funktion,
-  0 pro Blatt — kompatibel zum historischen `OperatorCountCost`); die
+  0 pro Blatt — kompatibel zum historischen `StructuralCostModel.OPERATOR_COUNT`); die
   goal-spezifischen `CostModel`s aus PR 3 wirken weiterhin auf die
   pfadbasierten Strategien.
 * Tests: `equalitySaturationFindsBinomialExpansion`,

@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExpressionDefinedness.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.assumption</a> &gt; <span class="el_source">ExpressionDefinedness.java</span></div><h1>ExpressionDefinedness.java</h1><pre class="source lang-java linenums">package de.regelsuche.assumption;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.scalar.ExactRational;
+import java.util.ArrayList;
+import java.util.List;
+
+/** Shared conservative real-domain guard for removing an expression during simplification. */
+public final class ExpressionDefinedness {
+    private ExpressionDefinedness() {
+    }
+
+    /** True only when removing the expression needs no additional assumptions. */
+    public static boolean isTotal(Expr expression) {
+<span class="fc" id="L21">        return canElideWithoutDomainLoss(expression, null);</span>
+    }
+
+    /**
+     * Returns whether {@code expression} may disappear from the canonical AST
+     * without enlarging its documented real-domain semantics. Partial
+     * operators are inspected recursively. If all required guards are
+     * representable and an {@link AssumptionContext} is available, they are
+     * recorded before the elision is allowed.
+     */
+    public static boolean canElideWithoutDomainLoss(
+        Expr expression,
+        AssumptionContext context
+    ) {
+<span class="fc" id="L35">        List&lt;Assumption&gt; requirements = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (!collectElisionRequirements(expression, requirements)) {</span>
+<span class="fc" id="L37">            return false;</span>
+        }
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (requirements.isEmpty()) {</span>
+<span class="fc" id="L40">            return true;</span>
+        }
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (context == null) {</span>
+<span class="fc" id="L43">            return false;</span>
+        }
+<span class="nc" id="L45">        context.addAll(requirements);</span>
+<span class="nc" id="L46">        return true;</span>
+    }
+
+    private static boolean collectElisionRequirements(
+        Expr expression,
+        List&lt;Assumption&gt; requirements
+    ) {
+<span class="fc bfc" id="L53" title="All 4 branches covered.">        if (expression instanceof NumberExpr</span>
+                || expression instanceof VariableExpr) {
+<span class="fc" id="L55">            return true;</span>
+        }
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L58">            return collectFunctionElisionRequirements(</span>
+                function, requirements);
+        }
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (!(expression instanceof BinaryExpr binary)) {</span>
+<span class="nc" id="L62">            return false;</span>
+        }
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (!collectElisionRequirements(binary.left(), requirements)</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                || !collectElisionRequirements(binary.right(), requirements)) {</span>
+<span class="nc" id="L66">            return false;</span>
+        }
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (binary.operator() == BinaryOperator.DIV) {</span>
+<span class="fc" id="L69">            return requireNonZeroForElision(</span>
+<span class="fc" id="L70">                binary.right(), requirements);</span>
+        }
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (binary.operator() == BinaryOperator.POW) {</span>
+<span class="fc" id="L73">            return collectPowerElisionRequirements(</span>
+<span class="fc" id="L74">                binary.left(), binary.right(), requirements);</span>
+        }
+<span class="fc" id="L76">        return true;</span>
+    }
+
+    private static boolean collectFunctionElisionRequirements(
+        FunctionExpr function,
+        List&lt;Assumption&gt; requirements
+    ) {
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (Expr argument : function.arguments()) {</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            if (!collectElisionRequirements(argument, requirements)) {</span>
+<span class="nc" id="L85">                return false;</span>
+            }
+<span class="fc" id="L87">        }</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (function.arguments().size() != 1) {</span>
+<span class="nc" id="L89">            return false;</span>
+        }
+<span class="fc" id="L91">        Expr argument = function.argument();</span>
+<span class="fc" id="L92">        String argumentText = ExpressionFormatter.format(argument);</span>
+<span class="pc bpc" id="L93" title="2 of 5 branches missed.">        return switch (function.name()) {</span>
+<span class="fc" id="L94">            case &quot;sin&quot;, &quot;cos&quot;, &quot;exp&quot;, &quot;abs&quot; -&gt; true;</span>
+            case &quot;log&quot;, &quot;ln&quot; -&gt; {
+<span class="fc" id="L96">                requirements.add(Assumption.positive(argumentText));</span>
+<span class="fc" id="L97">                yield true;</span>
+            }
+            case &quot;sqrt&quot; -&gt; {
+<span class="nc" id="L100">                requirements.add(Assumption.nonNegative(argumentText));</span>
+<span class="nc" id="L101">                yield true;</span>
+            }
+            case &quot;tan&quot; -&gt; {
+<span class="nc" id="L104">                requirements.add(Assumption.nonZero(</span>
+                    &quot;cos(&quot; + argumentText + &quot;)&quot;));
+<span class="nc" id="L106">                yield true;</span>
+            }
+<span class="fc" id="L108">            default -&gt; false;</span>
+        };
+    }
+
+    private static boolean collectPowerElisionRequirements(
+        Expr base,
+        Expr exponent,
+        List&lt;Assumption&gt; requirements
+    ) {
+<span class="fc" id="L117">        ExactRational value = signedIntegerLiteralValue(exponent);</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L119">            return false;</span>
+        }
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        return value.signum() &gt; 0</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            || requireNonZeroForElision(base, requirements);</span>
+    }
+
+    /**
+     * Returns an integral numeric exponent represented by the AST.
+     * Negative literals are parsed as {@code 0 - n}, so recognize that exact
+     * parser shape without broadening this guard into a general evaluator.
+     */
+    private static ExactRational signedIntegerLiteralValue(Expr expression) {
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L132">            ExactRational value = number.value();</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            return value.isInteger()</span>
+<span class="fc" id="L134">                ? value</span>
+<span class="nc" id="L135">                : null;</span>
+        }
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if (expression instanceof BinaryExpr binary</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">                &amp;&amp; binary.operator() == BinaryOperator.SUB</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">                &amp;&amp; isNumber(binary.left(), 0)</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">                &amp;&amp; binary.right() instanceof NumberExpr number) {</span>
+<span class="nc" id="L141">            ExactRational magnitude = number.value();</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">            return magnitude.isInteger()</span>
+<span class="nc" id="L143">                ? magnitude.negate()</span>
+<span class="nc" id="L144">                : null;</span>
+        }
+<span class="nc" id="L146">        return null;</span>
+    }
+
+    private static boolean requireNonZeroForElision(
+        Expr expression,
+        List&lt;Assumption&gt; requirements
+    ) {
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            return !number.value().equalsInteger(0);</span>
+        }
+<span class="fc" id="L156">        requirements.add(Assumption.nonZero(</span>
+<span class="fc" id="L157">            ExpressionFormatter.format(expression)));</span>
+<span class="fc" id="L158">        return true;</span>
+    }
+
+    private static boolean isNumber(Expr expression, long value) {
+<span class="nc bnc" id="L162" title="All 4 branches missed.">        return expression instanceof NumberExpr number &amp;&amp; number.value().equalsInteger(value);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -3,25 +3,20 @@
 <span class="fc" id="L3">public class AStarSearchStrategy extends BestFirstSearchStrategy {</span>
     @Override
     protected int priority(SearchState state) {
-<span class="fc" id="L6">        int costSoFar = state.depth() * 3 + state.expandedStepCount() * 4;</span>
-<span class="fc" id="L7">        int estimatedRemainingCost = Math.max(0, state.score().weightedTotal() - state.score().recognizedPatternBonus());</span>
-<span class="fc" id="L8">        int diversityBonus = Math.min(6, state.appliedRuleIds().stream().distinct().toList().size());</span>
-<span class="fc" id="L9">        return costSoFar + estimatedRemainingCost - diversityBonus;</span>
+<span class="fc" id="L6">        return pathPriority(state, state.score().weightedTotal());</span>
     }
 
     @Override
     protected int priority(SearchState state, SearchProblem problem) {
-<span class="pc bpc" id="L14" title="1 of 2 branches missed.">        if (problem.costModel() == null) {</span>
-<span class="fc" id="L15">            return priority(state);</span>
-        }
-<span class="nc" id="L17">        int costSoFar = state.depth() * 3 + state.expandedStepCount() * 4;</span>
-<span class="nc" id="L18">        int modelCost = problem.costModel().cost(state.expression(), problem.canonicalizer(), state.score());</span>
-<span class="nc bnc" id="L19" title="All 2 branches missed.">        if (modelCost == Integer.MAX_VALUE) {</span>
-<span class="nc" id="L20">            return Integer.MAX_VALUE / 2;</span>
-        }
-<span class="nc" id="L22">        int estimatedRemainingCost = Math.max(0, modelCost - state.score().recognizedPatternBonus());</span>
-<span class="nc" id="L23">        int diversityBonus = Math.min(6, state.appliedRuleIds().stream().distinct().toList().size());</span>
-<span class="nc" id="L24">        return costSoFar + estimatedRemainingCost - diversityBonus;</span>
+<span class="fc bfc" id="L11" title="All 2 branches covered.">        return problem.costModel() == null ? priority(state) : pathPriority(state,</span>
+<span class="fc" id="L12">            problem.costModel().cost(state.expression(), problem.canonicalizer(), state.score()));</span>
+    }
+
+    private static int pathPriority(SearchState state, int modelCost) {
+<span class="fc" id="L16">        long costSoFar = state.depth() * 3L + state.expandedStepCount() * 4L;</span>
+<span class="fc" id="L17">        long estimatedRemainingCost = Math.max(0, (long) modelCost - state.score().recognizedPatternBonus());</span>
+<span class="fc" id="L18">        int diversityBonus = Math.min(6, state.appliedRuleIds().stream().distinct().toList().size());</span>
+<span class="fc" id="L19">        return SearchPriority.saturate(costSoFar + estimatedRemainingCost - diversityBonus);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

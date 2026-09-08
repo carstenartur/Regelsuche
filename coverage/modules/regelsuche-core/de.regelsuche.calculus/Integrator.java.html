@@ -19,7 +19,7 @@ import java.util.Optional;
  *   &lt;li&gt;constant: {@code ∫ c dx = c*x},&lt;/li&gt;
  *   &lt;li&gt;variable: {@code ∫ x dx = x^2 / 2},&lt;/li&gt;
  *   &lt;li&gt;power (constant exponent {@code n != -1}): {@code ∫ x^n dx = x^(n+1)/(n+1)},&lt;/li&gt;
- *   &lt;li&gt;{@code ∫ 1/x dx = ln(x)},&lt;/li&gt;
+ *   &lt;li&gt;{@code ∫ 1/x dx = ln(abs(x))} on intervals excluding zero,&lt;/li&gt;
  *   &lt;li&gt;{@code ∫ exp(x) dx = exp(x)}, {@code ∫ sin(x) dx = -cos(x)}, {@code ∫ cos(x) dx = sin(x)},&lt;/li&gt;
  *   &lt;li&gt;linearity: {@code ∫ (f + g) dx = ∫f + ∫g}, {@code ∫ c*f dx = c * ∫f}.&lt;/li&gt;
  * &lt;/ul&gt;
@@ -39,8 +39,8 @@ import java.util.Optional;
     }
 
     private Optional&lt;Expr&gt; integrateInternal(Expr expr, String variable) {
-<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (expr instanceof NumberExpr number) {</span>
-<span class="nc" id="L43">            return Optional.of(new BinaryExpr(new NumberExpr(number.value()), BinaryOperator.MUL, new VariableExpr(variable)));</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (expr instanceof NumberExpr number) {</span>
+<span class="fc" id="L43">            return Optional.of(new BinaryExpr(new NumberExpr(number.value()), BinaryOperator.MUL, new VariableExpr(variable)));</span>
         }
 <span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (expr instanceof VariableExpr varExpr) {</span>
 <span class="nc bnc" id="L46" title="All 2 branches missed.">            if (varExpr.name().equals(variable)) {</span>
@@ -53,12 +53,12 @@ import java.util.Optional;
 <span class="nc" id="L53">            return Optional.of(new BinaryExpr(varExpr, BinaryOperator.MUL, new VariableExpr(variable)));</span>
         }
 <span class="fc bfc" id="L55" title="All 2 branches covered.">        if (expr instanceof BinaryExpr binary) {</span>
-<span class="pc bpc" id="L56" title="4 of 5 branches missed.">            return switch (binary.operator()) {</span>
+<span class="pc bpc" id="L56" title="3 of 5 branches missed.">            return switch (binary.operator()) {</span>
 <span class="nc" id="L57">                case ADD -&gt; combine(binary.left(), binary.right(), variable, BinaryOperator.ADD);</span>
 <span class="nc" id="L58">                case SUB -&gt; combine(binary.left(), binary.right(), variable, BinaryOperator.SUB);</span>
 <span class="nc" id="L59">                case MUL -&gt; integrateProduct(binary.left(), binary.right(), variable);</span>
 <span class="fc" id="L60">                case POW -&gt; integratePower(binary.left(), binary.right(), variable);</span>
-<span class="nc" id="L61">                case DIV -&gt; integrateDivision(binary.left(), binary.right(), variable);</span>
+<span class="fc" id="L61">                case DIV -&gt; integrateDivision(binary.left(), binary.right(), variable);</span>
             };
         }
 <span class="pc bpc" id="L64" title="2 of 4 branches missed.">        if (expr instanceof FunctionExpr fn &amp;&amp; fn.arguments().size() == 1</span>
@@ -118,7 +118,7 @@ import java.util.Optional;
     }
 
     private Optional&lt;Expr&gt; integrateDivision(Expr left, Expr right, String variable) {
-<span class="nc bnc" id="L121" title="All 4 branches missed.">        if (left instanceof NumberExpr number</span>
+<span class="pc bpc" id="L121" title="2 of 4 branches missed.">        if (left instanceof NumberExpr number</span>
 <span class="nc" id="L122">            &amp;&amp; right instanceof VariableExpr varExpr</span>
 <span class="nc bnc" id="L123" title="All 2 branches missed.">            &amp;&amp; varExpr.name().equals(variable)) {</span>
 <span class="nc" id="L124">            return Optional.of(new BinaryExpr(</span>
@@ -127,16 +127,16 @@ import java.util.Optional;
                 new FunctionExpr(&quot;ln&quot;, new FunctionExpr(&quot;abs&quot;, varExpr))
             ));
         }
-<span class="nc bnc" id="L130" title="All 2 branches missed.">        if (isConstantWith(right, variable)) {</span>
-<span class="nc" id="L131">            return integrateInternal(left, variable).map(integrated -&gt;</span>
-<span class="nc" id="L132">                new BinaryExpr(integrated, BinaryOperator.DIV, right));</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (isConstantWith(right, variable)) {</span>
+<span class="fc" id="L131">            return integrateInternal(left, variable).map(integrated -&gt;</span>
+<span class="fc" id="L132">                new BinaryExpr(integrated, BinaryOperator.DIV, right));</span>
         }
 <span class="nc" id="L134">        return Optional.empty();</span>
     }
 
     private boolean isConstantWith(Expr expr, String variable) {
-<span class="nc bnc" id="L138" title="All 2 branches missed.">        if (expr instanceof NumberExpr) {</span>
-<span class="nc" id="L139">            return true;</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (expr instanceof NumberExpr) {</span>
+<span class="fc" id="L139">            return true;</span>
         }
 <span class="nc bnc" id="L141" title="All 2 branches missed.">        if (expr instanceof VariableExpr varExpr) {</span>
 <span class="nc bnc" id="L142" title="All 2 branches missed.">            return !varExpr.name().equals(variable);</span>

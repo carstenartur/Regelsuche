@@ -9,16 +9,16 @@
  */
 <span class="fc" id="L10">public enum TransformationGoal {</span>
     /** Minimise expression size — the historical default. */
-<span class="fc" id="L12">    SIMPLIFY(new OperatorCountCost()),</span>
+<span class="fc" id="L12">    SIMPLIFY(StructuralCostModel.OPERATOR_COUNT),</span>
 
     /** Prefer factored form over expanded polynomials. */
-<span class="fc" id="L15">    FACTORIZE(new FactoredFormCost()),</span>
+<span class="fc" id="L15">    FACTORIZE(StructuralCostModel.FACTORED_FORM),</span>
 
     /** Prefer numerically stable form (Horner over expanded, etc.). */
 <span class="fc" id="L18">    NUMERICALLY_STABLE(new NumericStabilityCost()),</span>
 
     /** Prefer shallow, symmetric forms that ease case analysis in a proof. */
-<span class="fc" id="L21">    PROOF_FRIENDLY(new SymmetryCost()),</span>
+<span class="fc" id="L21">    PROOF_FRIENDLY(StructuralCostModel.SYMMETRY),</span>
 
     /**
      * Prefer school-book-style notation: small coefficients, shallow
