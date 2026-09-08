@@ -27,6 +27,67 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(20)
 class VerifiedTheorySearchFrontierTest {
     @Test
+    void loadedArtifactsRequireFreshVerifiedSearchAndRetainCommonStateEvidence(
+            @org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+        var evidence = unitEvidence("artifact-search");
+        var result = search(mixedChoices(evidence), "x*x + 0", "x ^ 2", budget(2, work(evidence)));
+        var common = result.reachedState().toSearchState(new ExpressionScorer());
+        assertEquals(result.reachedState().transformations(), common.transformations());
+        assertEquals(result.reachedState().executionWork(), common.executionWork().orElseThrow());
+        var record = common.recordedExecution().orElseThrow();
+        var loaded = de.regelsuche.transform.RecordedExecution.fromCanonicalJson(record.toCanonicalJson());
+        assertEquals(record, loaded);
+        assertTrue(loaded.provenance().contains(evidence.evidenceHash()));
+        assertThrows(IllegalArgumentException.class, () -> de.regelsuche.transform.ExactTheoryEvidence.fromVerified(loaded));
+        var artifact = directory.resolve("search.json");
+        java.nio.file.Files.writeString(artifact, result.toCanonicalJson());
+        var reference = de.regelsuche.search.strategy.SearchReplayArtifact.describe(result.toCanonicalJson());
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.function.Supplier<Problem> fresh = () -> {
+            calls.incrementAndGet();
+            var rebuilt = unitEvidence("artifact-search");
+            return problem(mixedChoices(rebuilt), "x*x + 0", "x ^ 2", budget(2, work(rebuilt)));
+        };
+        assertEquals(result, WorkSearchReplay.verifyArtifact(artifact, reference, fresh));
+        assertEquals(1, calls.get());
+        var stateArtifact = directory.resolve("state.json");
+        String stateJson = de.regelsuche.search.strategy.SearchStateReplay.toCanonicalJson(common);
+        java.nio.file.Files.writeString(stateArtifact, stateJson);
+        var stateReference = de.regelsuche.search.strategy.SearchReplayArtifact.describe(stateJson);
+        var replayed = de.regelsuche.search.strategy.SearchStateReplay.verifyArtifact(stateArtifact, stateReference,
+            () -> new WorkBudgetBestFirstSearchStrategy().search(fresh.get()).reachedState().toSearchState(new ExpressionScorer()));
+        assertEquals(common, replayed);
+        loaded.requireReplay(common.path().getFirst(), replayed.transformations());
+
+        java.nio.file.Files.writeString(artifact, result.toCanonicalJson().replace(evidence.evidenceHash(), "sha256:" + "0".repeat(64)));
+        int before = calls.get();
+        assertThrows(IllegalArgumentException.class, () -> WorkSearchReplay.verifyArtifact(artifact, reference, fresh));
+        assertEquals(before, calls.get(), "changed artifact must not invoke the expensive verifier pipeline");
+        var changedReference = de.regelsuche.search.strategy.SearchReplayArtifact.describe(java.nio.file.Files.readString(artifact));
+        assertThrows(IllegalArgumentException.class, () -> WorkSearchReplay.verifyArtifact(artifact, changedReference, fresh));
+        assertEquals(before + 1, calls.get(), "a recomputed public hash cannot forge the fresh proof");
+    }
+
+    @Test
+    void commonStateRejectsErasedLineageAndDistinctEvidenceKeepsDistinctArchiveIdentity() {
+        var first = unitEvidence("state-evidence-a");
+        var second = unitEvidence("state-evidence-b");
+        var a = search(ordinaryTheory("theory", first), first.data().sourceExpression(), first.data().transformedExpression(),
+            budget(0, work(first))).reachedState().toSearchState(new ExpressionScorer());
+        var b = search(ordinaryTheory("theory", second), second.data().sourceExpression(), second.data().transformedExpression(),
+            budget(0, work(second))).reachedState().toSearchState(new ExpressionScorer());
+        assertNotEquals(a, b);
+        assertNotEquals(a.recordedExecution().orElseThrow().contentHash(), b.recordedExecution().orElseThrow().contentHash());
+        assertThrows(IllegalArgumentException.class, () -> a.recordedExecution().orElseThrow()
+            .requireReplay(a.path().getFirst(), List.of(new Transformation(first.data().theoryStepId(), first.data().transformedExpression()))));
+        assertThrows(IllegalArgumentException.class, () -> new de.regelsuche.search.strategy.SearchState(
+            a.expression(), a.depth(), a.score(), a.path(), a.appliedRuleIds(), a.appliedRuleApplications(),
+            a.expandedStepCount(), a.canonicalHash(), a.parentExpression(), a.appliedRuleId(), a.appliedRuleKind(),
+            a.mayIncreaseComplexity(), a.estimatedCostDelta(), a.equivalencePreservingByConstruction(), a.improvement(),
+            a.appliedRuleKinds(), a.equivalencePreservingFlags(), a.assumptions(), List.of()));
+    }
+
+    @Test
     void searchesAcrossPrimitiveTheoryAndPrimitiveEdgesAtExactPathAllowance() {
         var evidence = unitEvidence("frontier-mixed");
         var result = search(mixedChoices(evidence), "x*x + 0", "x ^ 2", budget(2, work(evidence)));

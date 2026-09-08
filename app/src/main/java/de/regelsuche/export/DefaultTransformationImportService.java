@@ -72,7 +72,9 @@ public class DefaultTransformationImportService implements TransformationImportS
             intValue(values.get("scoreBefore"), 0),
             intValue(values.get("scoreAfter"), 0),
             booleanValue(values.get("equivalencePreserving"), true),
-            stringValue(values.get("explanation"), "")
+            stringValue(values.get("explanation"), ""),
+            stringList(values.get("assumptions")),
+            de.regelsuche.transform.RecordedExecution.readOptional(values)
         );
     }
 

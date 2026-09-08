@@ -37,6 +37,7 @@ public final class SearchGraphJsonSerializer {
                 inner.property("from", edge.from());
                 inner.property("to", edge.to());
                 inner.property("ruleId", edge.ruleId());
+                de.regelsuche.transform.RecordedExecution.writeOptional(inner, edge.execution());
                 inner.property("ruleLatex", edge.ruleLatex());
                 MathLayoutJsonWriter.write(inner, "layout", edge.layout());
                 inner.property("ruleKind", edge.ruleKind().name());

@@ -352,7 +352,7 @@ public final class SearchSpaceSubgraphExtractor {
                 continue;
             }
             int generated = 0;
-            for (Transformation transformation : problem.engine().transform(current.expression())) {
+            for (Transformation transformation : problem.transformations(current.expression())) {
                 if (generated >= problem.heuristic().maxCandidatesPerState() || states.size() >= MAX_NODES) {
                     break;
                 }
@@ -392,7 +392,8 @@ public final class SearchSpaceSubgraphExtractor {
                     current.score().weightedTotal() - nextScore.weightedTotal(),
                     kinds,
                     flags,
-                    assumptions
+                    assumptions,
+                    SearchState.extendedPath(current, transformation)
                 ));
                 generated++;
             }

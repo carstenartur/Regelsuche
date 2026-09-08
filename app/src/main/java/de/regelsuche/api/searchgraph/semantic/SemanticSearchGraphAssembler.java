@@ -202,6 +202,14 @@ public final class SemanticSearchGraphAssembler {
             hiddenAlternativeCount
         );
 
+        Map<String, de.regelsuche.transform.RecordedExecution> executionObservations = new LinkedHashMap<>();
+        graph.edges().forEach(edge -> {
+            if (edge.execution() != null) executionObservations.put(edge.sourceEdgeId(), edge.execution());
+        });
+        pathList.forEach(path -> path.steps().forEach(step -> {
+            if (step.execution() != null) executionObservations.put(SearchGraphEdgeDto.sourceEdgeId(
+                step.beforeExpression(), step.afterExpression(), step.ruleId(), step.execution()), step.execution());
+        }));
         return new SemanticSearchGraphDto(
             visibleNodes,
             visibleEdges,
@@ -216,7 +224,8 @@ public final class SemanticSearchGraphAssembler {
                 maxAlternatives,
                 maxVariantsPerCluster,
                 layout
-            )
+            ),
+            executionObservations
         );
     }
 
@@ -349,7 +358,7 @@ public final class SemanticSearchGraphAssembler {
         for (SearchGraphEdgeDto edge : rawEdges) {
             String from = rawExpressionToClusterId.getOrDefault(edge.from(), edge.from());
             String to = rawExpressionToClusterId.getOrDefault(edge.to(), edge.to());
-            String rawId = edgeId(edge.from(), edge.to(), edge.ruleId());
+            String rawId = edge.sourceEdgeId();
             if (mainPathSourceEdgeIds.contains(rawId)) {
                 continue;
             }
@@ -412,7 +421,7 @@ public final class SemanticSearchGraphAssembler {
                 true,
                 false,
                 null,
-                collapsed.stream().map(e -> e.from() + "->" + e.to() + ":" + e.ruleId()).toList(),
+                collapsed.stream().map(SearchGraphEdgeDto::sourceEdgeId).toList(),
                 0.0
             ));
         }
@@ -457,7 +466,7 @@ public final class SemanticSearchGraphAssembler {
         Set<Integer> preservedLowSignalSteps = lowSignalStepsNeededForReadableProjection(mainPath, showLowSignal);
         for (int i = 0; i < mainPath.steps().size(); i++) {
             TransformationStep step = mainPath.steps().get(i);
-            String rawId = edgeId(step.beforeExpression(), step.afterExpression(), step.ruleId());
+            String rawId = SearchGraphEdgeDto.sourceEdgeId(step.beforeExpression(), step.afterExpression(), step.ruleId(), step.execution());
             sourceEdgeIds.add(rawId);
             boolean lowSignal = classifyStepSignal(step) == RewriteSignal.LOW_SIGNAL;
             if (!showLowSignal && lowSignal && !preservedLowSignalSteps.contains(i)) {
@@ -993,10 +1002,6 @@ public final class SemanticSearchGraphAssembler {
         return canonicalizer.stableHash(canonicalizer.canonicalize(expression));
     }
 
-    private static String edgeId(String from, String to, String ruleId) {
-        return from + "->" + to + ":" + ruleId;
-    }
-
     private record MainPathProjection(
         List<SemanticGraphEdgeDto> edges,
         Set<String> visibleNodeIds,
@@ -1028,7 +1033,8 @@ public final class SemanticSearchGraphAssembler {
     private static List<SemanticGraphEdgeDto> dedupeEdges(Collection<SemanticGraphEdgeDto> edges) {
         Map<String, SemanticGraphEdgeDto> byKey = new LinkedHashMap<>();
         for (SemanticGraphEdgeDto edge : edges) {
-            String key = edge.from() + "|" + edge.to() + "|" + edge.ruleId() + "|" + edge.kind();
+            String key = edge.from() + "|" + edge.to() + "|" + edge.ruleId() + "|" + edge.kind()
+                + "|" + edge.sourceEdgeIds();
             byKey.putIfAbsent(key, edge);
         }
         return new ArrayList<>(byKey.values());
@@ -1083,7 +1089,8 @@ public final class SemanticSearchGraphAssembler {
         for (TransformationStep step : mainPath.steps()) {
             if (step.beforeExpression().equals(edge.from())
                 && step.afterExpression().equals(edge.to())
-                && step.ruleId().equals(edge.ruleId())) {
+                && step.ruleId().equals(edge.ruleId())
+                && Objects.equals(step.execution(), edge.execution())) {
                 return true;
             }
         }

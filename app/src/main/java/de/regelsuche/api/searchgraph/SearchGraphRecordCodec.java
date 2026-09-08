@@ -68,6 +68,7 @@ public final class SearchGraphRecordCodec {
             inner.property("from", edge.from());
             inner.property("to", edge.to());
             inner.property("ruleId", edge.ruleId());
+            de.regelsuche.transform.RecordedExecution.writeOptional(inner, edge.execution());
             inner.property("ruleLatex", edge.ruleLatex());
             MathLayoutJsonWriter.write(inner, "layout", edge.layout());
             inner.property("ruleKind", edge.ruleKind().name());
@@ -128,6 +129,7 @@ public final class SearchGraphRecordCodec {
             inner.property("toExpression", step.toExpression());
             inner.property("toLatex", step.toLatex());
             inner.property("ruleId", step.ruleId());
+            de.regelsuche.transform.RecordedExecution.writeOptional(inner, step.execution());
             inner.property("ruleExplanation", step.ruleExplanation());
             inner.property("scoreDelta", step.scoreDelta());
             inner.property("equivalencePreserving", step.equivalencePreserving());
@@ -149,6 +151,7 @@ public final class SearchGraphRecordCodec {
             macro.property("fromExpression", expansion.fromExpression());
             macro.property("toExpression", expansion.toExpression());
             macro.stringArray("supportingPathIds", expansion.supportingPathIds());
+            if (!expansion.assumptions().isEmpty()) macro.stringArray("assumptions", expansion.assumptions());
             macro.property("compressionRatio", expansion.compressionRatio());
             macro.property("expanded", expansion.expanded());
             macro.object("stats", stats -> {
@@ -174,6 +177,8 @@ public final class SearchGraphRecordCodec {
         writer.property("scoreAfter", step.scoreAfter());
         writer.property("equivalencePreserving", step.equivalencePreserving());
         writer.property("explanation", step.explanation());
+        if (!step.assumptions().isEmpty()) writer.stringArray("assumptions", step.assumptions());
+        de.regelsuche.transform.RecordedExecution.writeOptional(writer, step.execution());
     }
 
     /**
@@ -292,7 +297,9 @@ public final class SearchGraphRecordCodec {
                     intValue(m.get("scoreDelta"), 0),
                     stringList(m.get("assumptions")),
                     stringList(m.get("pathIds")),
-                    booleanValue(m.get("equivalencePreserving"), true)
+                    booleanValue(m.get("equivalencePreserving"), true),
+                    readMacroExpansion(m.get("macroMoveExpansion")),
+                    de.regelsuche.transform.RecordedExecution.readOptional(m)
                 );
             })
             .toList();
@@ -353,6 +360,27 @@ public final class SearchGraphRecordCodec {
         return new SearchGraphDto(nodes, edges, clusters, statsDto);
     }
 
+    private static MacroMoveExpansion readMacroExpansion(Object raw) {
+        if (raw == null) return null;
+        var values = asMap(raw);
+        var stats = asMap(values.get("stats"));
+        List<TransformationStep> steps = readList(values.get("atomicSteps")).stream()
+            .map(SearchGraphRecordCodec::asMap).map(step -> new TransformationStep(
+                intValue(step.get("index"), 0), stringValue(step.get("beforeExpression"), ""),
+                stringValue(step.get("afterExpression"), ""), stringValue(step.get("ruleId"), ""),
+                RewriteKind.valueOf(stringValue(step.get("ruleKind"), RewriteKind.NORMALIZE.name())),
+                intValue(step.get("scoreBefore"), 0), intValue(step.get("scoreAfter"), 0),
+                booleanValue(step.get("equivalencePreserving"), true), stringValue(step.get("explanation"), ""),
+                stringList(step.get("assumptions")), de.regelsuche.transform.RecordedExecution.readOptional(step))).toList();
+        return new MacroMoveExpansion(stringValue(values.get("macroRuleId"), ""),
+            stringValue(values.get("fromExpression"), ""), stringValue(values.get("toExpression"), ""),
+            steps, stringList(values.get("supportingPathIds")), stringList(values.get("assumptions")),
+            doubleValue(values.get("compressionRatio"), 1), booleanValue(values.get("expanded"), false),
+            new de.regelsuche.mining.MacroMoveStatistics(intValue(stats.get("timesConsidered"), 0),
+                intValue(stats.get("timesApplied"), 0), intValue(stats.get("timesImprovedScore"), 0),
+                doubleValue(stats.get("averageCostReduction"), 0), stringList(stats.get("usefulForGoals"))));
+    }
+
     private static PathReplayDto readReplay(Map<String, Object> values) {
         List<PathReplayDto.ReplayStep> steps = readList(values.get("steps")).stream()
             .map(SearchGraphRecordCodec::asMap)
@@ -373,7 +401,9 @@ public final class SearchGraphRecordCodec {
                             stringValue(m.get("fromExpression"), ""),
                             stringValue(m.get("toExpression"), ""))),
                     readSpanList(m.get("changedFromSpans")),
-                    readSpanList(m.get("changedToSpans"))
+                    readSpanList(m.get("changedToSpans")),
+                    readMacroExpansion(m.get("macroMoveExpansion")),
+                    de.regelsuche.transform.RecordedExecution.readOptional(m)
                 );
             })
             .toList();

@@ -338,7 +338,8 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             equivalenceFlagsWith(
                 current.equivalencePreservingFlags(),
                 transformation.equivalencePreservingByConstruction()),
-            assumptionsWith(current.assumptions(), transformation.assumptions())
+            assumptionsWith(current.assumptions(), transformation.assumptions()),
+            SearchState.extendedPath(current, transformation)
         );
     }
 

@@ -37,30 +37,15 @@ public class Neo4jExpressionGraphStore implements ExpressionGraphStore {
             session.run(
                 "MERGE (from:Expression {value: $from}) "
                      + "MERGE (to:Expression {value: $to}) "
-                     + "MERGE (from)-[r:TRANSFORMATION {rule: $rule}]->(to) "
+                     + "MERGE (from)-[r:TRANSFORMATION {rule: $rule, executionIdentity: $executionIdentity}]->(to) "
                     + "SET r.depth = $depth, r.improvement = $improvement, "
                     + "r.pathId = $pathId, r.canonicalHash = $canonicalHash, "
                     + "r.scoreBefore = $scoreBefore, r.scoreAfter = $scoreAfter, "
                     + "r.rewriteKind = $rewriteKind, r.mayIncreaseComplexity = $mayIncreaseComplexity, "
                     + "r.estimatedCostDelta = $estimatedCostDelta, "
                     + "r.equivalencePreservingByConstruction = $equivalencePreservingByConstruction, "
-                    + "r.validationStatus = $validationStatus",
-                java.util.Map.ofEntries(
-                    java.util.Map.entry("from", edge.fromExpression()),
-                    java.util.Map.entry("to", edge.toExpression()),
-                    java.util.Map.entry("rule", edge.transformationRule()),
-                    java.util.Map.entry("depth", edge.depth()),
-                    java.util.Map.entry("improvement", edge.improvement()),
-                    java.util.Map.entry("pathId", edge.pathId()),
-                    java.util.Map.entry("canonicalHash", edge.canonicalHash()),
-                    java.util.Map.entry("scoreBefore", edge.scoreBefore()),
-                    java.util.Map.entry("scoreAfter", edge.scoreAfter()),
-                    java.util.Map.entry("rewriteKind", edge.rewriteKind().name()),
-                    java.util.Map.entry("mayIncreaseComplexity", edge.mayIncreaseComplexity()),
-                    java.util.Map.entry("estimatedCostDelta", edge.estimatedCostDelta()),
-                    java.util.Map.entry("equivalencePreservingByConstruction", edge.equivalencePreservingByConstruction()),
-                    java.util.Map.entry("validationStatus", edge.validationStatus().name())
-                )
+                    + "r.validationStatus = $validationStatus, r.execution = $execution",
+                GraphEdgePersistence.properties(edge)
             );
         }
     }
@@ -77,17 +62,15 @@ public class Neo4jExpressionGraphStore implements ExpressionGraphStore {
 
             Result edgeResult = session.run(
                 "MATCH (from:Expression)-[r:TRANSFORMATION]->(to:Expression) "
-                    + "RETURN from.value AS fromExpr, to.value AS toExpr, r.rule AS rule, r.depth AS depth, r.improvement AS improvement"
+                    + "RETURN from.value AS fromExpr, to.value AS toExpr, properties(r) AS properties"
             );
             List<GraphEdge> edges = new ArrayList<>();
             while (edgeResult.hasNext()) {
                 Record record = edgeResult.next();
-                edges.add(new GraphEdge(
+                edges.add(GraphEdgePersistence.read(
                     record.get("fromExpr").asString(),
                     record.get("toExpr").asString(),
-                    record.get("rule").asString(),
-                    record.get("depth").asInt(),
-                    record.get("improvement").asInt()
+                    record.get("properties").asMap()
                 ));
             }
             return new GraphSnapshot(nodes, edges);
@@ -127,25 +110,27 @@ public class Neo4jExpressionGraphStore implements ExpressionGraphStore {
                         + "MERGE (step:TransformationStep {pathId: $pathId, index: $index}) "
                         + "SET step.ruleId = $ruleId, step.ruleKind = $ruleKind, step.explanation = $explanation, "
                         + "step.scoreBefore = $scoreBefore, step.scoreAfter = $scoreAfter, "
-                        + "step.equivalencePreserving = $equivalencePreserving "
+                        + "step.equivalencePreserving = $equivalencePreserving, step.execution = $execution, "
+                        + "step.assumptions = $assumptions "
                         + "MERGE (path)-[:HAS_STEP]->(step) "
                         + "MERGE (step)-[:FROM]->(from) "
                         + "MERGE (step)-[:TO]->(to)",
-                    Map.of(
-                        "pathId", transformation.id(),
-                        "index", step.index(),
-                        "before", step.beforeExpression(),
-                        "after", step.afterExpression(),
-                        "ruleId", step.ruleId(),
-                        "ruleKind", step.ruleKind().name(),
-                        "explanation", step.explanation(),
-                        "scoreBefore", step.scoreBefore(),
-                        "scoreAfter", step.scoreAfter(),
-                        "equivalencePreserving", step.equivalencePreserving()
-                    )
+                    stepProperties(transformation.id(), step)
                 );
             }
         }
+    }
+
+    private static Map<String, Object> stepProperties(String pathId, TransformationStep step) {
+        Map<String, Object> values = new java.util.LinkedHashMap<>();
+        values.put("pathId", pathId); values.put("index", step.index());
+        values.put("before", step.beforeExpression()); values.put("after", step.afterExpression());
+        values.put("ruleId", step.ruleId()); values.put("ruleKind", step.ruleKind().name());
+        values.put("explanation", step.explanation()); values.put("scoreBefore", step.scoreBefore());
+        values.put("scoreAfter", step.scoreAfter()); values.put("equivalencePreserving", step.equivalencePreserving());
+        values.put("assumptions", step.assumptions());
+        values.put("execution", step.execution() == null ? null : step.execution().toCanonicalJson());
+        return values;
     }
 
     @Override

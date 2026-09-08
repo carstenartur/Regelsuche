@@ -117,7 +117,8 @@ public class RandomMonteCarloSearchStrategy implements SearchStrategy {
                     improvement,
                     appliedRuleKinds,
                     equivalenceFlags,
-                    assumptions
+                    assumptions,
+                    SearchState.extendedPath(current, transformation)
                 );
                 if (!visited.contains(stateKey(nextState))) {
                     frontier.add(nextState);

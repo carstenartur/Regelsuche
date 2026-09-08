@@ -153,7 +153,8 @@ public class TransformationSearchService {
                     state.estimatedCostDelta(),
                     state.equivalencePreservingByConstruction(),
                     CandidateProofStatus.OBSERVED,
-                    macroExpansion
+                    macroExpansion,
+                    state.incomingExecution().orElse(null)
                 ));
             }
             if (state.improvement() > 0) {

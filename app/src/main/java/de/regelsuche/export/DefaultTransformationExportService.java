@@ -133,6 +133,8 @@ public class DefaultTransformationExportService implements TransformationExportS
         writer.property("scoreAfter", step.scoreAfter());
         writer.property("equivalencePreserving", step.equivalencePreserving());
         writer.property("explanation", step.explanation());
+        if (!step.assumptions().isEmpty()) writer.stringArray("assumptions", step.assumptions());
+        de.regelsuche.transform.RecordedExecution.writeOptional(writer, step.execution());
     }
 
     private void writeScore(JsonWriter writer, ExpressionScore score) {

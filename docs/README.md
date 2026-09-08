@@ -78,6 +78,9 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 - [Search Intelligence](search-intelligence.md) — Suchprofile,
   Diversity-Kontrolle, begrenztes Reachability-Orakel und historischer
   Rediscovery-Atlas.
+- [Typisierte Suchausführung und Artefakt-Replay](recorded-search-execution.md) —
+  getrennte primitive und exakte Theorie-Arbeit, persistierte Provenienz und
+  erneute unabhängige Verifikation geladener Suchpfade.
 - [Sicherer Regelvorbereitungskoordinator](safe-rule-preparation-coordinator.md) —
   direkte Ausführung, native Exact-Registry, lokale Pattern-Bridges, Guards und
   Zertifikate.
