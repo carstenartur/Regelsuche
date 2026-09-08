@@ -63,6 +63,12 @@ store-issued replay releases it. Cached strings or publicly constructible
 evidence summaries cannot mint that authority. Eviction invalidates an old
 lookup even after reinsertion of the same content.
 
+Replay also validates the current structural and candidate limits. A profile
+requesting independent completeness rejects a retained product-only or
+backend-claimed certificate; it cannot upgrade that claim on a cache hit. An
+original independently certified complete result remains replayable under the
+same evidence requirement without invoking the engine again.
+
 `ExactNestedFactorizationTransformationPipeline.replay` projects and validates
 the new occurrence against the original exact source, then uses the same local
 replacement and surrounding-node/replay checks as direct execution. It does not

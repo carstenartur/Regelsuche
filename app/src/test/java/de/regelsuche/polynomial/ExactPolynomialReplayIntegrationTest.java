@@ -6,6 +6,7 @@ import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.math.algorithms.polynomial.NativeUnivariateFactorizationEngine;
 import de.regelsuche.moves.enumerate.TreePosition;
 import de.regelsuche.parse.ExactParsedTerm;
+import de.regelsuche.parse.ExactParsedSubtermProjector;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.PolynomialTheorySubsumptionClassifier;
@@ -73,6 +74,49 @@ class ExactPolynomialReplayIntegrationTest {
         var lookup = store.lookup(first.lookupRequest());
         store.retain(classification.classify("x^2-4", "(x-2)*(x+2)").transformation().orElseThrow(), "cache", "v1", observation);
         assertTrue(store.replay(lookup).authorization().isEmpty());
+    }
+
+    @Test
+    void replayCannotWidenCurrentStructuralCandidateOrEvidencePolicy() {
+        var root = parser.parseExactTerm("x^2-1");
+        var original = pipeline.transform(root, position(root),
+            NativeUnivariateFactorizationEngine.boundedRationals(), 0).transformation().orElseThrow();
+        for (var stricter : List.of(
+                restricted(1, 1, FactorizationRequest.EvidenceRequirement.VERIFIED_DECOMPOSITION),
+                restricted(64, 0, FactorizationRequest.EvidenceRequirement.VERIFIED_DECOMPOSITION),
+                restricted(64, 1, FactorizationRequest.EvidenceRequirement.INDEPENDENT_COMPLETE))) {
+            var result = stricter.replay(root, position(root), original);
+            assertEquals(ExactNestedFactorizationTransformationPipeline.Status.BUDGET_INCONCLUSIVE,
+                result.status(), result.detailCode());
+            assertTrue(result.rewrittenRoot().isEmpty());
+        }
+    }
+
+    @Test
+    void independentlyCompleteAuthorityCanReplayUnderTheSameEvidenceRequirement() {
+        var strict = restricted(64, 250_000, FactorizationRequest.EvidenceRequirement.INDEPENDENT_COMPLETE);
+        var root = parser.parseExactTerm("x^2-1");
+        var direct = strict.transform(root, position(root), NativeUnivariateFactorizationEngine.boundedRationals(), 0);
+        assertTrue(direct.transformed(), direct.detailCode());
+        var original = direct.transformation().orElseThrow();
+        assertEquals(FactorizationVerifier.ClaimStrength.INDEPENDENTLY_CERTIFIED_COMPLETE,
+            original.factorization().report().orElseThrow().claimStrength());
+        var replay = strict.replay(root, position(root), original);
+        assertTrue(replay.transformed(), replay.detailCode());
+        assertEquals(original.certificateHash(), replay.primitiveTransformationId().orElseThrow());
+    }
+
+    private ExactNestedFactorizationTransformationPipeline restricted(int degree, int candidates,
+            FactorizationRequest.EvidenceRequirement evidence) {
+        var defaults = ExactNestedFactorizationTransformationPipeline.Policy.boundedDefaults();
+        var limits = defaults.structuralLimits();
+        return new ExactNestedFactorizationTransformationPipeline(new ExactParsedSubtermProjector(),
+            new ExactParsedUnivariatePolynomialView(), new ExactFactorizationExpressionRenderer(),
+            new ExpressionParser(), new ExactParsedUnivariatePolynomialView(),
+            new ExactNestedFactorizationTransformationPipeline.Policy(defaults.maxPathDepth(),
+                defaults.maxRootNodes(), defaults.maxReplacementNodes(), defaults.maxTotalWorkUnits(),
+                new FactorizationRequest.StructuralLimits(limits.maxVariables(), degree,
+                    limits.maxTerms(), limits.maxCoefficientBitLength()), candidates, evidence));
     }
 
     private TreePosition position(ExactParsedTerm root, Integer... path) {

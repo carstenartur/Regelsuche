@@ -183,9 +183,35 @@ public final class ExactNestedFactorizationTransformationPipeline {
             return projectionFailure(mapTransformationStatus(validation.status()), validation.detailCode(),
                 position, projection, throughValidation);
         }
+        var retainedSource = authorization.factorization().request().orElseThrow().source();
+        var policyWork = new PolynomialWorkLedger(Map.of("projection.replay-policy-term-visits",
+            Math.addExact(3L, Math.multiplyExact(4L, retainedSource.termCount()))));
+        if (!policyWork.within(remainingAfterReservation(throughValidation, checked.replacementReserve()))) {
+            return projectionFailure(Status.BUDGET_INCONCLUSIVE, "REPLAY_POLICY_VALIDATION_AUTHORITY_INSUFFICIENT",
+                position, projection, throughValidation);
+        }
+        throughValidation = merge(throughValidation, policyWork);
+        String policyViolation = replayPolicyViolation(authorization, retainedSource);
+        if (policyViolation != null) {
+            return projectionFailure(Status.BUDGET_INCONCLUSIVE, policyViolation,
+                position, projection, throughValidation);
+        }
         return applyPreparedTransformation(root, position, new PreparedTransformation(
             projection, projected, authorization.factorization(), authorization,
             throughValidation, checked.replacementReserve(), true));
+    }
+
+    private String replayPolicyViolation(ExactFactorizationTransformationPipeline.Result authorization,
+            SparsePolynomial<ExactRational> source) {
+        if (policy.maxCandidates() == 0) return "REPLAY_MAX_CANDIDATES_IS_ZERO";
+        String structural = policy.structuralLimits().firstViolation(source).orElse(null);
+        if (structural != null) return "REPLAY_" + structural;
+        if (policy.evidenceRequirement() == FactorizationRequest.EvidenceRequirement.INDEPENDENT_COMPLETE
+                && authorization.factorization().report().orElseThrow().claimStrength()
+                    != FactorizationVerifier.ClaimStrength.INDEPENDENTLY_CERTIFIED_COMPLETE) {
+            return "REPLAY_REQUIRES_INDEPENDENT_COMPLETE_EVIDENCE";
+        }
+        return null;
     }
 
     private static void requireAttemptInputs(
