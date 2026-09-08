@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PrimitiveTraceMinimalityVerifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">PrimitiveTraceMinimalityVerifier.java</span></div><h1>PrimitiveTraceMinimalityVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.reachability.BoundedReachabilityOracle;
+import de.regelsuche.transform.MeasuredTransformationEngine;
+import de.regelsuche.transform.MeasuredTransformationEngines;
+import de.regelsuche.transform.PreparedAstRewriteTransformationEngine;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
+import de.regelsuche.transform.TransformationProvenance;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Certifies the shortest directed primitive connection for concrete endpoints
+ * in one frozen genome inventory. This is not a mathematical identity proof or
+ * a universal minimality claim for every substitution into a learned program.
+ */
+public final class PrimitiveTraceMinimalityVerifier {
+    public static final String REVISION = &quot;regelsuche.primitive-trace-minimality/v1&quot;;
+    public static final String SCOPE = &quot;CONCRETE_FORMATTED_ENDPOINTS;FROZEN_DIRECTED_GENES;ONE_AST_OCCURRENCE_PER_STEP;NO_GROWTH_FILTER&quot;;
+
+<span class="fc" id="L33">    public enum Status { SHORTEST_CONFIRMED, SHORTER_PATH_FOUND, INCONCLUSIVE, TECHNICAL_FAILURE }</span>
+
+    /** Every ceiling is an execution limit: none may silently narrow the claimed graph. */
+    public record Limits(int maximumStates, int maximumTransitions, int maximumCandidatesPerState,
+                         int maximumAstNodes, long maximumSourceWork) {
+<span class="fc" id="L38">        public Limits {</span>
+<span class="pc bpc" id="L39" title="10 of 20 branches missed.">            if (maximumStates &lt; 1 || maximumStates &gt; 100_000 || maximumTransitions &lt; 0 || maximumTransitions &gt; 1_000_000</span>
+                    || maximumCandidatesPerState &lt; 1 || maximumCandidatesPerState &gt; 4096
+                    || maximumAstNodes &lt; 1 || maximumAstNodes &gt; 4096 || maximumSourceWork &lt; 1 || maximumSourceWork &gt; 2_000_000) {
+<span class="nc" id="L42">                throw new IllegalArgumentException(&quot;invalid primitive minimality limits&quot;);</span>
+            }
+<span class="fc" id="L44">        }</span>
+<span class="fc" id="L45">        public static Limits defaults() { return new Limits(4096, 65_536, 512, 1024, 500_000); }</span>
+    }
+
+    /** Issued only by a replay and complete shortest-path check, never by parsing a claim. */
+    public static final class Assessment {
+        private final String inventoryHash;
+        private final String source;
+        private final List&lt;Transformation&gt; observedPath;
+        private final Limits limits;
+        private final Status status;
+        private final List&lt;Transformation&gt; shortestPath;
+        private final Optional&lt;BoundedReachabilityOracle.Result&gt; oracle;
+        private final long sourceWork;
+        private final String detail;
+
+        private Assessment(String inventoryHash, String source, List&lt;Transformation&gt; observedPath, Limits limits,
+                Status status, List&lt;Transformation&gt; shortestPath, BoundedReachabilityOracle.Result oracle,
+<span class="fc" id="L62">                long sourceWork, String detail) {</span>
+<span class="fc" id="L63">            this.inventoryHash = inventoryHash;</span>
+<span class="fc" id="L64">            this.source = source;</span>
+<span class="fc" id="L65">            this.observedPath = List.copyOf(observedPath);</span>
+<span class="fc" id="L66">            this.limits = limits;</span>
+<span class="fc" id="L67">            this.status = status;</span>
+<span class="fc" id="L68">            this.shortestPath = List.copyOf(shortestPath);</span>
+<span class="fc" id="L69">            this.oracle = Optional.ofNullable(oracle);</span>
+<span class="fc" id="L70">            this.sourceWork = sourceWork;</span>
+<span class="fc" id="L71">            this.detail = detail;</span>
+<span class="fc" id="L72">        }</span>
+<span class="fc" id="L73">        public String inventoryHash() { return inventoryHash; }</span>
+<span class="nc" id="L74">        public String source() { return source; }</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        public String target() { return observedPath.isEmpty() ? source : normalize(observedPath.getLast().transformedExpression()); }</span>
+<span class="fc" id="L76">        public int observedPrimitiveSteps() { return observedPath.size(); }</span>
+<span class="fc" id="L77">        public Limits limits() { return limits; }</span>
+<span class="fc" id="L78">        public Status status() { return status; }</span>
+<span class="fc bfc" id="L79" title="All 4 branches covered.">        public boolean minimumProved() { return status == Status.SHORTEST_CONFIRMED || status == Status.SHORTER_PATH_FOUND; }</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        public int minimumPrimitiveSteps() { return minimumProved() ? shortestPath.size() : -1; }</span>
+<span class="fc" id="L81">        public List&lt;Transformation&gt; shortestPath() { return shortestPath; }</span>
+<span class="fc" id="L82">        public Optional&lt;BoundedReachabilityOracle.Result&gt; oracle() { return oracle; }</span>
+<span class="fc bfc" id="L83" title="All 4 branches covered.">        public boolean reusableMultistepTrace() { return minimumProved() &amp;&amp; shortestPath.size() &gt;= 2; }</span>
+        public long measuredWork() {
+<span class="fc" id="L85">            return Math.addExact(sourceWork, oracle.map(value -&gt; (long) value.work().expandedStates()</span>
+<span class="fc" id="L86">                + value.work().generatedTransitions() + value.work().discoveredStates()).orElse(0L));</span>
+        }
+<span class="nc" id="L88">        public String contentHash() { return SchematicProofPlan.hash(toCanonicalJson()); }</span>
+        public String toCanonicalJson() {
+<span class="fc" id="L90">            return new JsonWriter().beginObject().property(&quot;schema&quot;, REVISION).property(&quot;scope&quot;, SCOPE)</span>
+<span class="fc" id="L91">                .property(&quot;inventoryHash&quot;, inventoryHash).property(&quot;source&quot;, source).property(&quot;target&quot;, target())</span>
+<span class="fc" id="L92">                .property(&quot;status&quot;, status.name()).property(&quot;detail&quot;, detail)</span>
+<span class="fc" id="L93">                .property(&quot;observedPrimitiveSteps&quot;, observedPrimitiveSteps()).property(&quot;minimumPrimitiveSteps&quot;, minimumPrimitiveSteps())</span>
+<span class="fc" id="L94">                .property(&quot;reusableMultistepTrace&quot;, reusableMultistepTrace()).property(&quot;sourceWork&quot;, sourceWork)</span>
+<span class="fc" id="L95">                .property(&quot;measuredWork&quot;, measuredWork())</span>
+<span class="fc" id="L96">                .property(&quot;workScope&quot;, &quot;SOURCE_EVENTS_PLUS_ORACLE_EXPANSIONS_TRANSITIONS_AND_RETAINED_STATES;NOT_CPU_TIME&quot;)</span>
+<span class="fc" id="L97">                .object(&quot;limits&quot;, value -&gt; writeLimits(value, limits))</span>
+<span class="fc" id="L98">                .array(&quot;observedPath&quot;, values -&gt; observedPath.forEach(step -&gt; values.objectValue(value -&gt; writeStep(value, step))))</span>
+<span class="fc" id="L99">                .array(&quot;shortestPath&quot;, values -&gt; shortestPath.forEach(step -&gt; values.objectValue(value -&gt; writeStep(value, step))))</span>
+<span class="fc" id="L100">                .object(&quot;oracle&quot;, value -&gt; oracle.ifPresent(result -&gt; writeOracle(value, result))).endObject().toString();</span>
+        }
+    }
+
+    private final EvolutionGenome inventory;
+<span class="fc" id="L105">    public PrimitiveTraceMinimalityVerifier(EvolutionGenome inventory) {</span>
+<span class="fc" id="L106">        this.inventory = Objects.requireNonNull(inventory, &quot;inventory&quot;);</span>
+<span class="pc bpc" id="L107" title="2 of 4 branches missed.">        if (inventory.rewrites().stream().anyMatch(gene -&gt; !gene.assumptions().isEmpty())) {</span>
+<span class="nc" id="L108">            throw new IllegalArgumentException(&quot;minimality v1 requires assumption-free primitive genes&quot;);</span>
+        }
+<span class="fc" id="L110">    }</span>
+
+    public Assessment assess(String sourceExpression, List&lt;Transformation&gt; observedPath, Limits limits) {
+<span class="fc" id="L113">        String source = normalize(sourceExpression);</span>
+<span class="fc" id="L114">        var path = List.copyOf(observedPath);</span>
+<span class="fc" id="L115">        Objects.requireNonNull(limits, &quot;limits&quot;);</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (path.size() &gt; 256) throw new IllegalArgumentException(&quot;primitive trace exceeds verification envelope&quot;);</span>
+<span class="fc" id="L117">        var complete = new CompleteSource(inventory, limits);</span>
+        try {
+<span class="fc" id="L119">            replayObserved(source, path, complete);</span>
+<span class="fc" id="L120">        } catch (VerificationLimit exception) {</span>
+<span class="fc" id="L121">            return assessment(source, path, limits, Status.INCONCLUSIVE, List.of(), null, complete, exception.getMessage());</span>
+<span class="fc" id="L122">        }</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        String target = path.isEmpty() ? source : normalize(path.getLast().transformedExpression());</span>
+<span class="fc" id="L124">        int shorterBound = Math.max(0, path.size() - 1);</span>
+<span class="fc" id="L125">        var oracle = new BoundedReachabilityOracle().analyze(source, target, AssumptionSignature.ofExpressions(List.of()), complete,</span>
+<span class="fc" id="L126">            new BoundedReachabilityOracle.Budget(shorterBound, shorterBound, limits.maximumStates(), limits.maximumTransitions()));</span>
+<span class="pc bpc" id="L127" title="2 of 5 branches missed.">        return switch (oracle.status()) {</span>
+<span class="fc" id="L128">            case UNREACHABLE_IN_COMPLETE_BOUNDED_CLOSURE -&gt; assessment(source, path, limits,</span>
+                Status.SHORTEST_CONFIRMED, path, oracle, complete, &quot;ALL_SHORTER_PRIMITIVE_PATHS_EXCLUDED&quot;);
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            case REACHABLE -&gt; assessment(source, path, limits, path.isEmpty() ? Status.SHORTEST_CONFIRMED : Status.SHORTER_PATH_FOUND,</span>
+<span class="fc" id="L131">                recoverWitness(oracle.witness().orElseThrow(), complete), oracle, complete, &quot;SHORTEST_PRIMITIVE_WITNESS_RETAINED&quot;);</span>
+<span class="fc" id="L132">            case BUDGET_INCONCLUSIVE -&gt; assessment(source, path, limits, Status.INCONCLUSIVE, List.of(), oracle, complete, oracle.detailCode());</span>
+<span class="nc" id="L133">            case TECHNICAL_FAILURE -&gt; assessment(source, path, limits,</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">                complete.limitReached ? Status.INCONCLUSIVE : Status.TECHNICAL_FAILURE, List.of(), oracle, complete, oracle.technicalDetail());</span>
+<span class="nc" id="L135">            case REACHABLE_ONLY_WITH_ADDITIONAL_ASSUMPTIONS -&gt; throw new IllegalStateException(&quot;unconditional inventory added assumptions&quot;);</span>
+        };
+    }
+
+    /** Recompute a retained assessment against this inventory; changed inventories cannot reuse its authority. */
+    public void verify(Assessment assessment) {
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (!inventory.contentHash().equals(assessment.inventoryHash())) throw new IllegalArgumentException(&quot;minimality inventory changed&quot;);</span>
+<span class="fc" id="L142">        var actual = assess(assessment.source, assessment.observedPath, assessment.limits());</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        if (!actual.toCanonicalJson().equals(assessment.toCanonicalJson())) throw new IllegalArgumentException(&quot;minimality replay mismatch&quot;);</span>
+<span class="fc" id="L144">    }</span>
+
+    private Assessment assessment(String source, List&lt;Transformation&gt; path, Limits limits, Status status,
+            List&lt;Transformation&gt; shortest, BoundedReachabilityOracle.Result oracle, CompleteSource complete, String detail) {
+<span class="fc" id="L148">        return new Assessment(inventory.contentHash(), source, path, limits, status, shortest, oracle, complete.work, detail);</span>
+    }
+
+    private static void replayObserved(String source, List&lt;Transformation&gt; path, CompleteSource complete) {
+<span class="fc" id="L152">        String current = source;</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        for (var step : path) {</span>
+<span class="pc bpc" id="L154" title="1 of 4 branches missed.">            if (step.primitiveStepCount() != 1 || step.exactTheoryStepCount() != 0</span>
+<span class="pc bpc" id="L155" title="2 of 4 branches missed.">                    || step.provenance() instanceof TransformationProvenance.Sequence || !step.assumptions().isEmpty()) {</span>
+<span class="fc" id="L156">                throw new IllegalArgumentException(&quot;minimality requires a real primitive trace&quot;);</span>
+            }
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            if (!complete.transform(current).contains(step)) throw new IllegalArgumentException(&quot;primitive trace replay mismatch&quot;);</span>
+<span class="fc" id="L159">            current = normalize(step.transformedExpression());</span>
+<span class="fc" id="L160">        }</span>
+<span class="fc" id="L161">    }</span>
+
+    private static List&lt;Transformation&gt; recoverWitness(BoundedReachabilityOracle.Witness witness, CompleteSource complete) {
+<span class="fc" id="L164">        List&lt;Transformation&gt; path = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (int i = 0; i &lt; witness.edges().size(); i++) {</span>
+<span class="fc" id="L166">            var edge = witness.edges().get(i);</span>
+<span class="fc" id="L167">            var candidates = complete.retained.get(witness.states().get(i).expression());</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            path.add(candidates.stream().filter(step -&gt; step.rule().equals(edge.ruleId())</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">                &amp;&amp; normalize(step.transformedExpression()).equals(edge.transformedExpression())).findFirst().orElseThrow());</span>
+        }
+<span class="fc" id="L171">        return List.copyOf(path);</span>
+    }
+
+    private static final class CompleteSource implements TransformationEngine {
+        private final MeasuredTransformationEngine engine;
+        private final Limits limits;
+<span class="fc" id="L177">        private final Map&lt;String, List&lt;Transformation&gt;&gt; retained = new HashMap&lt;&gt;();</span>
+        private long work;
+        private boolean limitReached;
+<span class="fc" id="L180">        private CompleteSource(EvolutionGenome inventory, Limits limits) {</span>
+<span class="fc" id="L181">            this.limits = limits;</span>
+            // One extra candidate detects truncation; growth is never used to prune a shorter path.
+<span class="fc" id="L183">            engine = MeasuredTransformationEngines.counting(new PreparedAstRewriteTransformationEngine(</span>
+<span class="fc" id="L184">                new EvolutionGenomeCompiler().compile(inventory).rules(), Integer.MAX_VALUE, limits.maximumCandidatesPerState() + 1));</span>
+<span class="fc" id="L185">        }</span>
+        @Override public List&lt;Transformation&gt; transform(String expression) {
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            requireWithin(nodeCount(new ExpressionParser().parseTerm(expression)) &lt;= limits.maximumAstNodes(), &quot;AST_NODE_LIMIT&quot;);</span>
+<span class="fc" id="L188">            var batch = engine.transformMeasured(expression);</span>
+<span class="fc" id="L189">            work = Math.addExact(work, batch.workMetrics().totalWorkUnits());</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            requireWithin(work &lt;= limits.maximumSourceWork(), &quot;SOURCE_WORK_LIMIT&quot;);</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            requireWithin(batch.transformations().size() &lt;= limits.maximumCandidatesPerState(), &quot;CANDIDATE_LIMIT&quot;);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">            for (var step : batch.transformations()) {</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">                requireWithin(nodeCount(new ExpressionParser().parseTerm(step.transformedExpression())) &lt;= limits.maximumAstNodes(), &quot;AST_NODE_LIMIT&quot;);</span>
+<span class="fc" id="L194">            }</span>
+<span class="fc" id="L195">            retained.put(expression, batch.transformations());</span>
+<span class="fc" id="L196">            return batch.transformations();</span>
+        }
+        private void requireWithin(boolean condition, String reason) {
+<span class="fc bfc" id="L199" title="All 2 branches covered.">            if (!condition) { limitReached = true; throw new VerificationLimit(reason); }</span>
+<span class="fc" id="L200">        }</span>
+    }
+
+    private static final class VerificationLimit extends RuntimeException {
+<span class="fc" id="L204">        private VerificationLimit(String reason) { super(reason); }</span>
+    }
+
+    private static String normalize(String expression) {
+<span class="fc" id="L208">        return ExpressionFormatter.format(new ExpressionParser().parseTerm(expression));</span>
+    }
+
+    private static long nodeCount(Expr expression) {
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) return 1 + nodeCount(binary.left()) + nodeCount(binary.right());</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) return 1 + function.arguments().stream().mapToLong(PrimitiveTraceMinimalityVerifier::nodeCount).sum();</span>
+<span class="fc" id="L214">        return 1;</span>
+    }
+
+    static void writeLimits(JsonWriter value, Limits limits) {
+<span class="fc" id="L218">        value.property(&quot;maximumStates&quot;, limits.maximumStates()).property(&quot;maximumTransitions&quot;, limits.maximumTransitions())</span>
+<span class="fc" id="L219">            .property(&quot;maximumCandidatesPerState&quot;, limits.maximumCandidatesPerState()).property(&quot;maximumAstNodes&quot;, limits.maximumAstNodes())</span>
+<span class="fc" id="L220">            .property(&quot;maximumSourceWork&quot;, limits.maximumSourceWork());</span>
+<span class="fc" id="L221">    }</span>
+
+    private static void writeStep(JsonWriter value, Transformation step) {
+<span class="fc" id="L224">        value.property(&quot;rule&quot;, step.rule()).property(&quot;output&quot;, step.transformedExpression()).property(&quot;applicationKey&quot;, step.applicationKey());</span>
+<span class="fc" id="L225">    }</span>
+
+    private static void writeOracle(JsonWriter value, BoundedReachabilityOracle.Result result) {
+<span class="fc" id="L228">        var work = result.work();</span>
+<span class="fc" id="L229">        value.property(&quot;oracleId&quot;, result.oracleId()).property(&quot;status&quot;, result.status().name())</span>
+<span class="fc" id="L230">            .property(&quot;shorterDepthBound&quot;, result.budget().maxDepth()).property(&quot;shorterPrimitiveBound&quot;, result.budget().maxPrimitivePathWork())</span>
+<span class="fc" id="L231">            .property(&quot;detailCode&quot;, result.detailCode()).property(&quot;technicalDetail&quot;, result.technicalDetail())</span>
+<span class="fc" id="L232">            .object(&quot;work&quot;, out -&gt; out.property(&quot;expandedStates&quot;, work.expandedStates()).property(&quot;generatedTransitions&quot;, work.generatedTransitions())</span>
+<span class="fc" id="L233">                .property(&quot;discoveredStates&quot;, work.discoveredStates()).property(&quot;enqueuedTransitions&quot;, work.enqueuedTransitions())</span>
+<span class="fc" id="L234">                .property(&quot;dominatedTransitions&quot;, work.dominatedTransitions()).property(&quot;outsidePrimitiveWorkTransitions&quot;, work.outsidePrimitiveWorkTransitions())</span>
+<span class="fc" id="L235">                .property(&quot;visitedStateLimitTransitions&quot;, work.visitedStateLimitTransitions()).property(&quot;supersededStates&quot;, work.supersededStates())</span>
+<span class="fc" id="L236">                .property(&quot;depthBoundaryStates&quot;, work.depthBoundaryStates()).property(&quot;primitiveWorkBoundaryStates&quot;, work.primitiveWorkBoundaryStates())</span>
+<span class="fc" id="L237">                .property(&quot;maxFrontierSize&quot;, work.maxFrontierSize()).property(&quot;generatedTransitionLimitReached&quot;, work.generatedTransitionLimitReached())</span>
+<span class="fc" id="L238">                .property(&quot;visitedStateLimitReached&quot;, work.visitedStateLimitReached()))</span>
+<span class="fc" id="L239">            .array(&quot;states&quot;, values -&gt; result.states().forEach(state -&gt; values.objectValue(out -&gt; out.property(&quot;id&quot;, state.id())</span>
+<span class="fc" id="L240">                .property(&quot;expression&quot;, state.expression()).property(&quot;depth&quot;, state.depth()).property(&quot;primitiveSteps&quot;, state.primitivePathWork())</span>
+<span class="fc" id="L241">                .property(&quot;nonDominatedAtTermination&quot;, state.nonDominatedAtTermination()))))</span>
+<span class="fc" id="L242">            .array(&quot;edges&quot;, values -&gt; result.edges().forEach(edge -&gt; values.objectValue(out -&gt; out.property(&quot;id&quot;, edge.id())</span>
+<span class="fc" id="L243">                .property(&quot;from&quot;, edge.fromStateId()).property(&quot;to&quot;, edge.proposedStateId()).property(&quot;rule&quot;, edge.ruleId())</span>
+<span class="fc" id="L244">                .property(&quot;output&quot;, edge.transformedExpression()).property(&quot;primitiveSteps&quot;, edge.primitiveStepCount())</span>
+<span class="fc" id="L245">                .property(&quot;disposition&quot;, edge.disposition().name()))));</span>
+<span class="fc" id="L246">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

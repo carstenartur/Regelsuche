@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TraceStrategyDispatchExample.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">TraceStrategyDispatchExample.java</span></div><h1>TraceStrategyDispatchExample.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.TraceRewriteStrategyLearner.Input;
+import de.regelsuche.evolution.TraceStrategyDispatchLearner.FrozenPolicy;
+import de.regelsuche.evolution.TraceStrategyDispatchLearner.Observation;
+import de.regelsuche.evolution.TraceStrategyDispatchLearner.Profile;
+import de.regelsuche.json.JsonWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/** New public development batch, fixed independently of the optimizer's measured outcomes. */
+public final class TraceStrategyDispatchExample {
+    public static final String REVISION = &quot;regelsuche.trace-strategy-dispatch-comparison/v2&quot;;
+    private TraceStrategyDispatchExample() {}
+<span class="fc" id="L20">    public record Case(Input input, String family) {}</span>
+<span class="fc" id="L21">    public record Row(Case example, Profile profile, Observation observation) {}</span>
+
+    public static List&lt;Input&gt; selectionInputs() {
+<span class="fc" id="L24">        return List.of(new Input(&quot;select-offset&quot;, &quot;(a+b)*(a-b)+b*b+23&quot;),</span>
+            new Input(&quot;select-offset-two&quot;, &quot;(c+d)*(c-d)+d*d+31&quot;),
+            new Input(&quot;select-scale&quot;, &quot;7*((a+b)*(a-b)+b*b)&quot;),
+            new Input(&quot;select-product&quot;, &quot;((a+b)*(a-b)+b*b)*(a+5)&quot;),
+            new Input(&quot;select-compound&quot;, &quot;((a*b+c)*(a*b-c)+c*c)+13&quot;),
+            new Input(&quot;select-residual&quot;, &quot;(a+b)*(a-b)+b*(b+1)+19&quot;),
+            new Input(&quot;select-factor&quot;, &quot;a*a+a*b+17&quot;),
+            new Input(&quot;select-unchanged&quot;, &quot;a+29&quot;));
+    }
+
+    public static TraceStrategyDispatchLearner.Limits limits() {
+<span class="fc" id="L35">        return new TraceStrategyDispatchLearner.Limits(TraceStrategyTransferExample.limits().trainingBudget(), 12, 16, 32);</span>
+    }
+
+    public static List&lt;Case&gt; evaluationInputs() {
+<span class="fc" id="L39">        List&lt;Case&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        for (int i = 0; i &lt; 32; i++) {</span>
+<span class="fc" id="L41">            int n = 1000 + i;</span>
+<span class="fc" id="L42">            add(result, &quot;offset&quot;, i, &quot;((x+y)*(x-y)+y*y)+&quot; + n);</span>
+<span class="fc" id="L43">            add(result, &quot;scale&quot;, i, (n + 2) + &quot;*((x+y)*(x-y)+y*y)&quot;);</span>
+<span class="fc" id="L44">            add(result, &quot;product&quot;, i, &quot;((x+y)*(x-y)+y*y)*(x+&quot; + n + &quot;)&quot;);</span>
+<span class="fc" id="L45">            add(result, &quot;compound&quot;, i, &quot;((u*v+w)*(u*v-w)+w*w)+&quot; + n);</span>
+<span class="fc" id="L46">            add(result, &quot;multiple-sites&quot;, i, &quot;((x+y)*(x-y)+y*y)+((z+1)*(z-1)+1)+&quot; + n);</span>
+<span class="fc" id="L47">            add(result, &quot;noncancelling&quot;, i, &quot;(x+y)*(x-y)+y*(y+1)+&quot; + n);</span>
+<span class="fc" id="L48">            add(result, &quot;factor&quot;, i, &quot;(x*x+x*y)+&quot; + n);</span>
+<span class="fc" id="L49">            add(result, &quot;unchanged&quot;, i, &quot;x+&quot; + n);</span>
+<span class="fc" id="L50">            add(result, &quot;same-hint-mismatch&quot;, i, &quot;(x+y)*(x-y)+z*z+&quot; + (5000 + i));</span>
+        }
+<span class="fc" id="L52">        return List.copyOf(result);</span>
+    }
+
+    private static void add(List&lt;Case&gt; cases, String family, int index, String expression) {
+<span class="fc" id="L56">        cases.add(new Case(new Input(family + &quot;-&quot; + index, expression), family));</span>
+<span class="fc" id="L57">    }</span>
+
+    public static String protocol() {
+<span class="fc" id="L60">        return new JsonWriter().beginObject().property(&quot;schema&quot;, REVISION)</span>
+<span class="fc" id="L61">            .property(&quot;formationProtocol&quot;, TraceStrategyTransferExample.protocol())</span>
+<span class="fc" id="L62">            .property(&quot;optimizer&quot;, TraceStrategyDispatchLearner.REVISION)</span>
+<span class="fc" id="L63">            .property(&quot;continuationBackend&quot;, de.regelsuche.search.program.CompiledLinearRewriteEngine.REVISION)</span>
+<span class="fc" id="L64">            .property(&quot;backend&quot;, &quot;PREPARED&quot;).property(&quot;goal&quot;, &quot;TARGET_FREE&quot;)</span>
+<span class="fc" id="L65">            .property(&quot;split&quot;, &quot;PUBLIC_DEVELOPMENT;SEPARATE_FORMATION_AND_SELECTION_TRAIN;SAME_FIXED_APPLICATION_BATCH_WITH_MINIMALITY_GATE&quot;)</span>
+<span class="fc" id="L66">            .property(&quot;successRule&quot;, &quot;NO_SCORE_REGRESSIONS_VS_FLAT_GREEDY;LOWER_TOTAL_MEASURED_WORK;REPORT_AMORTIZATION_SEPARATELY&quot;)</span>
+<span class="fc" id="L67">            .property(&quot;reportPolicy&quot;, &quot;ALL_288_CASES_ALL_FOUR_PROFILES_NO_RESULT_SELECTION&quot;)</span>
+<span class="fc" id="L68">            .object(&quot;limits&quot;, value -&gt; TraceStrategyDispatchLearner.writeLimits(value, limits()))</span>
+<span class="fc" id="L69">            .stringArray(&quot;profiles&quot;, java.util.Arrays.stream(Profile.values()).map(Enum::name).toList())</span>
+<span class="fc" id="L70">            .array(&quot;selectionTrain&quot;, values -&gt; selectionInputs().forEach(input -&gt; values.objectValue(value -&gt;</span>
+<span class="fc" id="L71">                value.property(&quot;id&quot;, input.id()).property(&quot;input&quot;, input.expression()))))</span>
+<span class="fc" id="L72">            .array(&quot;application&quot;, values -&gt; evaluationInputs().forEach(input -&gt; values.objectValue(value -&gt;</span>
+<span class="fc" id="L73">                value.property(&quot;id&quot;, input.input().id()).property(&quot;input&quot;, input.input().expression()).property(&quot;family&quot;, input.family()))))</span>
+<span class="fc" id="L74">            .endObject().toString();</span>
+    }
+
+    public record Report(String protocol, FrozenPolicy policy, List&lt;Row&gt; rows) {
+<span class="fc" id="L78">        public Report { rows = List.copyOf(rows); }</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        public long work(Profile profile) { return rows.stream().filter(row -&gt; row.profile() == profile)</span>
+<span class="fc" id="L80">            .mapToLong(row -&gt; row.observation().measuredWork()).reduce(0, Math::addExact); }</span>
+        public long regressions(Profile profile) {
+<span class="fc" id="L82">            Map&lt;String, Integer&gt; baseline = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            rows.stream().filter(row -&gt; row.profile() == Profile.FLAT_GREEDY).forEach(row -&gt;</span>
+<span class="fc" id="L84">                baseline.put(row.example().input().id(), row.observation().search().bestState().score().weightedTotal()));</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            return rows.stream().filter(row -&gt; row.profile() == profile).filter(row -&gt;</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">                row.observation().search().bestState().score().weightedTotal() &gt; baseline.get(row.example().input().id())).count();</span>
+        }
+<span class="pc bpc" id="L88" title="2 of 4 branches missed.">        public boolean passes() { return regressions(Profile.LEARNED_DISPATCH) == 0 &amp;&amp; work(Profile.LEARNED_DISPATCH) &lt; work(Profile.FLAT_GREEDY); }</span>
+        public String toCanonicalJson() {
+<span class="fc" id="L90">            return new JsonWriter().beginObject().property(&quot;schema&quot;, REVISION)</span>
+<span class="fc" id="L91">                .property(&quot;protocolHash&quot;, SchematicProofPlan.hash(protocol)).property(&quot;policyHash&quot;, policy.contentHash())</span>
+<span class="fc" id="L92">                .property(&quot;passesDevelopmentCriterion&quot;, passes()).property(&quot;learningWork&quot;, policy.learningWork())</span>
+<span class="pc bpc" id="L93" title="2 of 4 branches missed.">                .property(&quot;amortizedOnThisBatch&quot;, passes() &amp;&amp; policy.learningWork() + work(Profile.LEARNED_DISPATCH) &lt; work(Profile.FLAT_GREEDY))</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">                .array(&quot;profiles&quot;, values -&gt; { for (var profile : Profile.values()) values.objectValue(value -&gt;</span>
+<span class="fc" id="L95">                    value.property(&quot;profile&quot;, profile.name()).property(&quot;work&quot;, work(profile)).property(&quot;scoreRegressions&quot;, regressions(profile))); })</span>
+<span class="fc" id="L96">                .array(&quot;rows&quot;, values -&gt; rows.forEach(row -&gt; values.objectValue(value -&gt; value</span>
+<span class="fc" id="L97">                    .property(&quot;family&quot;, row.example().family()).property(&quot;profile&quot;, row.profile().name())</span>
+<span class="fc" id="L98">                    .property(&quot;observation&quot;, row.observation().toCanonicalJson()))))</span>
+<span class="fc" id="L99">                .endObject().toString();</span>
+        }
+<span class="fc" id="L101">        public String contentHash() { return SchematicProofPlan.hash(toCanonicalJson()); }</span>
+        public String summaryJson() {
+<span class="fc" id="L103">            return new JsonWriter().beginObject().property(&quot;schema&quot;, REVISION).property(&quot;reportHash&quot;, contentHash())</span>
+<span class="fc" id="L104">                .property(&quot;protocolHash&quot;, SchematicProofPlan.hash(protocol)).property(&quot;policyHash&quot;, policy.contentHash())</span>
+<span class="fc" id="L105">                .property(&quot;cases&quot;, rows.size() / Profile.values().length).property(&quot;rows&quot;, rows.size())</span>
+<span class="fc" id="L106">                .property(&quot;passesDevelopmentCriterion&quot;, passes()).property(&quot;learningWork&quot;, policy.learningWork())</span>
+<span class="fc" id="L107">                .property(&quot;formationMinimalityWork&quot;, policy.formation().trainingMinimalityWorkUnits())</span>
+<span class="fc" id="L108">                .array(&quot;families&quot;, values -&gt; rows.stream().map(row -&gt; row.example().family()).distinct().sorted().forEach(family -&gt;</span>
+<span class="fc" id="L109">                    values.objectValue(value -&gt; {</span>
+<span class="fc" id="L110">                        value.property(&quot;family&quot;, family);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                        for (var profile : Profile.values()) value.property(profile.name(), rows.stream().filter(row -&gt;</span>
+<span class="fc bfc" id="L112" title="All 4 branches covered.">                            row.example().family().equals(family) &amp;&amp; row.profile() == profile)</span>
+<span class="fc" id="L113">                            .mapToLong(row -&gt; row.observation().measuredWork()).sum());</span>
+<span class="fc" id="L114">                    })))</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                .array(&quot;profiles&quot;, values -&gt; { for (var profile : Profile.values()) values.objectValue(value -&gt; value</span>
+<span class="fc" id="L116">                    .property(&quot;profile&quot;, profile.name()).property(&quot;work&quot;, work(profile)).property(&quot;scoreRegressions&quot;, regressions(profile))); })</span>
+<span class="fc" id="L117">                .endObject().toString();</span>
+        }
+    }
+
+    public static FrozenPolicy train() {
+<span class="fc" id="L122">        var formation = new TraceRewriteStrategyLearner().learn(TraceStrategyTransferExample.inventory(),</span>
+<span class="fc" id="L123">            TraceStrategyTransferExample.trainingInputs(), TraceStrategyTransferExample.limits());</span>
+<span class="fc" id="L124">        return new TraceStrategyDispatchLearner().train(formation, selectionInputs(), limits());</span>
+    }
+
+    public static Report run() {
+<span class="fc" id="L128">        String frozenProtocol = protocol();</span>
+<span class="fc" id="L129">        var policy = train();</span>
+<span class="fc" id="L130">        var learner = new TraceStrategyDispatchLearner();</span>
+<span class="fc" id="L131">        var prepared = new java.util.EnumMap&lt;Profile, TraceStrategyDispatchLearner.PreparedPolicy&gt;(Profile.class);</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        for (var profile : Profile.values()) prepared.put(profile, learner.prepare(policy, profile));</span>
+<span class="fc" id="L133">        List&lt;Row&gt; rows = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L134" title="All 4 branches covered.">        for (var example : evaluationInputs()) for (var profile : Profile.values()) {</span>
+<span class="fc" id="L135">            rows.add(new Row(example, profile, prepared.get(profile).apply(example.input())));</span>
+        }
+<span class="fc" id="L137">        return new Report(frozenProtocol, policy, rows);</span>
+    }
+
+    public static String markdown(Report report) {
+<span class="fc" id="L141">        var out = new StringBuilder(&quot;# Conditional continuation: fixed development comparison\n\n&quot;)</span>
+<span class="fc" id="L142">            .append(&quot;All 288 fixed polynomial inputs and four profiles are retained. This repeats the public development batch with a mandatory primitive minimality gate in formation. It is not a fresh holdout, a sealed FINAL TEST or independent mathematical families.\n\n&quot;)</span>
+<span class="fc" id="L143">            .append(&quot;The learned dispatcher reuses an actual primitive candidate and executes only a selected continuation. All one-successor profiles use the same ranking and budgets. FLAT_EXHAUSTIVE is retained as an additional stronger search control.\n\n&quot;)</span>
+<span class="fc" id="L144">            .append(&quot;| Profile | Search mechanics + exact audit calls | Score regressions vs FLAT_GREEDY |\n|---|---:|---:|\n&quot;);</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        for (var profile : Profile.values()) out.append(&quot;| &quot;).append(profile).append(&quot; | &quot;).append(report.work(profile))</span>
+<span class="fc" id="L146">            .append(&quot; | &quot;).append(report.regressions(profile)).append(&quot; |\n&quot;);</span>
+<span class="fc" id="L147">        out.append(&quot;\nEach family has 32 inputs. Work includes the cases where a learned hint fails.\n\n| Family | Exhaustive | Greedy | Learned dispatch | Ungated |\n|---|---:|---:|---:|---:|\n&quot;);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        for (var family : report.rows().stream().map(row -&gt; row.example().family()).distinct().sorted().toList()) {</span>
+<span class="fc" id="L149">            out.append(&quot;| &quot;).append(family).append(&quot; |&quot;);</span>
+<span class="fc bfc" id="L150" title="All 4 branches covered.">            for (var profile : Profile.values()) out.append(' ').append(report.rows().stream().filter(row -&gt; row.profile() == profile</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">                &amp;&amp; row.example().family().equals(family)).mapToLong(row -&gt; row.observation().measuredWork()).sum()).append(&quot; |&quot;);</span>
+<span class="fc" id="L152">            out.append('\n');</span>
+<span class="fc" id="L153">        }</span>
+<span class="fc" id="L154">        out.append(&quot;\nFormation work: &quot;).append(report.policy().formationWork())</span>
+<span class="fc" id="L155">            .append(&quot; (including primitive minimality verification: &quot;).append(report.policy().formation().trainingMinimalityWorkUnits()).append(')')</span>
+<span class="fc" id="L156">            .append(&quot;; dispatch training including rejected trials and context collection: &quot;).append(report.policy().dispatchLearningWork())</span>
+<span class="fc" id="L157">            .append(&quot;; total counted learning work: &quot;).append(report.policy().learningWork()).append(&quot;.\n\n&quot;)</span>
+<span class="fc" id="L158">            .append(&quot;Development criterion passed: &quot;).append(report.passes()).append(&quot;. Learning plus application cheaper on this batch: &quot;)</span>
+<span class="pc bpc" id="L159" title="2 of 4 branches missed.">            .append(report.passes() &amp;&amp; report.policy().learningWork() + report.work(Profile.LEARNED_DISPATCH) &lt; report.work(Profile.FLAT_GREEDY))</span>
+<span class="fc" id="L160">            .append(&quot;.\n\nThese units are not CPU time. Complete parsing, identity projection, compilation and BigInteger work remain outside this ledger. All output paths are exact-audited. A heuristic route can lose quality on unseen inputs; this batch cannot prove general optimality.\n\n&quot;)</span>
+<span class="fc" id="L161">            .append(&quot;## Frozen routes\n\n&quot;);</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        for (var route : report.policy().routes()) out.append(&quot;- Available-gene mask &quot;).append(route.contextMask()).append(&quot;: &quot;)</span>
+<span class="fc" id="L163">            .append(String.join(&quot; → &quot;, route.sequence())).append('\n');</span>
+<span class="fc" id="L164">        return out.toString();</span>
+    }
+
+    public static Path write(Report report, Path output) throws IOException {
+<span class="fc" id="L168">        Map&lt;String, String&gt; artifacts = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L169">        artifacts.put(&quot;protocol.json&quot;, report.protocol());</span>
+<span class="fc" id="L170">        artifacts.put(&quot;policy.json&quot;, report.policy().toCanonicalJson());</span>
+<span class="fc" id="L171">        artifacts.put(&quot;formation.json&quot;, report.policy().formation().toCanonicalJson());</span>
+<span class="fc" id="L172">        artifacts.put(&quot;report.json&quot;, report.toCanonicalJson());</span>
+<span class="fc" id="L173">        artifacts.put(&quot;summary.json&quot;, report.summaryJson());</span>
+<span class="fc" id="L174">        artifacts.put(&quot;report.md&quot;, markdown(report));</span>
+<span class="fc" id="L175">        artifacts.put(&quot;index.html&quot;, html(report));</span>
+<span class="fc bfc" id="L176" title="All 4 branches covered.">        for (var trial : report.policy().trials()) for (var observation : trial.observations()) artifacts.put(</span>
+<span class="fc" id="L177">            &quot;train-&quot; + trial.id() + &quot;-&quot; + observation.input().id() + &quot;.search.json&quot;, observation.search().toCanonicalJson());</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        for (var observation : report.policy().formation().observations()) {</span>
+<span class="fc" id="L179">            artifacts.put(&quot;formation-&quot; + observation.input().id() + &quot;.search.json&quot;, observation.search().toCanonicalJson());</span>
+<span class="fc" id="L180">            observation.minimality().ifPresent(proof -&gt; artifacts.put(&quot;formation-&quot; + observation.input().id() + &quot;.minimality.json&quot;, proof.toCanonicalJson()));</span>
+<span class="fc" id="L181">        }</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        for (var row : report.rows()) artifacts.put(row.example().input().id() + &quot;-&quot; + row.profile().name() + &quot;.search.json&quot;,</span>
+<span class="fc" id="L183">            row.observation().search().toCanonicalJson());</span>
+<span class="fc" id="L184">        return TraceStrategyTransferExample.writeArtifacts(report.contentHash(), artifacts, output, REVISION);</span>
+    }
+
+    static String html(Report report) {
+<span class="fc" id="L188">        var out = new StringBuilder(&quot;&lt;!doctype html&gt;&lt;html lang=\&quot;de\&quot;&gt;&lt;meta charset=\&quot;utf-8\&quot;&gt;&lt;meta name=\&quot;viewport\&quot; content=\&quot;width=device-width,initial-scale=1\&quot;&gt;&lt;title&gt;Regelsuche · Gezielte Strategien&lt;/title&gt;&quot;)</span>
+<span class="fc" id="L189">            .append(&quot;&lt;style&gt;body{font:17px/1.5 system-ui;max-width:1150px;margin:36px auto;padding:0 20px;background:#f7f9fa;color:#172b36}table{width:100%;border-collapse:collapse;margin:16px 0}th,td{text-align:left;border-bottom:1px solid #ccd9df;padding:10px;overflow-wrap:anywhere}details{background:white;border:1px solid #ccd9df;border-radius:8px;padding:14px;margin:12px 0}summary{cursor:pointer;font-weight:600}code{white-space:pre-wrap;overflow-wrap:anywhere}small{color:#455e6b}input{font:inherit;padding:10px;width:90%;max-width:500px}li{margin:10px 0}.table{overflow-x:auto}h1{line-height:1.2}&lt;/style&gt;&quot;)</span>
+<span class="fc" id="L190">            .append(&quot;&lt;h1&gt;Gelernte Strategien gezielt einsetzen&lt;/h1&gt;&lt;p&gt;288 feste Polynomaufgaben, vier Verfahren, gleiche Budgets. Einzelne Fälle und jeder primitive Rechenschritt lassen sich unten prüfen.&lt;/p&gt;&quot;)</span>
+<span class="fc" id="L191">            .append(&quot;&lt;p&gt;Vor der Bildung gelernter Folgen werden kürzere primitive Wege geprüft. Ungeklärte Folgen werden nicht übernommen; die Prüfkosten zählen zur Lernarbeit. Die Nachweise gelten für die konkreten Trainingsausdrücke und das festgehaltene Regelinventar.&lt;/p&gt;&quot;)</span>
+<span class="fc" id="L192">            .append(&quot;&lt;p&gt;Das Training entscheidet, bei welchen verfügbaren Regeln eine gelernte Folge fortgesetzt wird. Ein vorhandener erster Schritt wird wiederverwendet; bei fehlender Fortsetzung bleiben die Einzelregeln verfügbar.&lt;/p&gt;&quot;)</span>
+<span class="fc" id="L193">            .append(&quot;&lt;div class=\&quot;table\&quot;&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Verfahren&lt;/th&gt;&lt;th&gt;Gezählte Arbeit&lt;/th&gt;&lt;th&gt;Schlechterer Score als Greedy&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&quot;);</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        for (var profile : Profile.values()) out.append(&quot;&lt;tr&gt;&lt;td&gt;&quot;).append(profileLabel(profile)).append(&quot;&lt;/td&gt;&lt;td&gt;&quot;)</span>
+<span class="fc" id="L195">            .append(report.work(profile)).append(&quot;&lt;/td&gt;&lt;td&gt;&quot;).append(report.regressions(profile)).append(&quot;&lt;/td&gt;&lt;/tr&gt;&quot;);</span>
+<span class="fc" id="L196">        out.append(&quot;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;p&gt;Einmalige gezählte Lernarbeit: &quot;).append(report.policy().learningWork())</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            .append(&quot;. Entwicklungskriterium erfüllt: &quot;).append(report.passes() ? &quot;ja&quot; : &quot;nein&quot;)</span>
+<span class="fc" id="L198">            .append(&quot;. Lernen plus Anwendung auf diesem Bestand günstiger als Greedy: &quot;)</span>
+<span class="pc bpc" id="L199" title="2 of 4 branches missed.">            .append(report.passes() &amp;&amp; report.policy().learningWork() + report.work(Profile.LEARNED_DISPATCH) &lt; report.work(Profile.FLAT_GREEDY) ? &quot;ja&quot; : &quot;nein&quot;)</span>
+<span class="fc" id="L200">            .append(&quot;.&lt;/p&gt;&lt;p&gt;&lt;small&gt;Öffentlicher Entwicklungsvergleich bekannter algebraischer Bausteine. Gezählte Sucharbeit und Prüfschritte sind keine Laufzeiten oder vollständigen CPU-Kosten. Keine allgemeine Überlegenheit und kein versiegelter Abschlusstest.&lt;/small&gt;&lt;/p&gt;&quot;)</span>
+<span class="fc" id="L201">            .append(&quot;&lt;label for=\&quot;filter\&quot;&gt;Aufgabe oder Ausdruck suchen&lt;/label&gt;&lt;p&gt;&lt;input id=\&quot;filter\&quot; type=\&quot;search\&quot; placeholder=\&quot;z. B. product oder same-hint\&quot;&gt;&lt;/p&gt;&quot;);</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        for (var example : evaluationInputs()) {</span>
+<span class="fc" id="L203">            out.append(&quot;&lt;details data-case&gt;&lt;summary&gt;&quot;).append(TraceStrategyTransferExample.escape(example.input().id()))</span>
+<span class="fc" id="L204">                .append(&quot; · &lt;code&gt;&quot;).append(TraceStrategyTransferExample.escape(example.input().expression())).append(&quot;&lt;/code&gt;&lt;/summary&gt;&quot;);</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">            for (var row : report.rows().stream().filter(value -&gt; value.example().equals(example)).toList()) {</span>
+<span class="fc" id="L206">                var state = row.observation().search().bestState();</span>
+<span class="fc" id="L207">                out.append(&quot;&lt;details&gt;&lt;summary&gt;&quot;).append(profileLabel(row.profile())).append(&quot; · Arbeit &quot;)</span>
+<span class="fc" id="L208">                    .append(row.observation().measuredWork()).append(&quot;&lt;/summary&gt;&lt;p&gt;Ergebnis: &lt;code&gt;&quot;)</span>
+<span class="fc" id="L209">                    .append(TraceStrategyTransferExample.escape(state.expression())).append(&quot;&lt;/code&gt;&lt;/p&gt;&lt;p&gt;Primitive Schritte: &quot;)</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">                    .append(state.primitiveDepth()).append(&quot; · Programm verwendet: &quot;).append(state.programUsed() ? &quot;ja&quot; : &quot;nein&quot;)</span>
+<span class="fc" id="L211">                    .append(&quot;&lt;/p&gt;&lt;ol&gt;&lt;li&gt;&lt;code&gt;&quot;).append(TraceStrategyTransferExample.escape(state.path().getFirst())).append(&quot;&lt;/code&gt;&lt;/li&gt;&quot;);</span>
+<span class="fc" id="L212">                TraceStrategyTransferExample.appendPrimitiveSteps(out, state.transformations());</span>
+<span class="fc" id="L213">                out.append(&quot;&lt;/ol&gt;&lt;p&gt;&lt;a href=\&quot;&quot;).append(example.input().id()).append('-').append(row.profile())</span>
+<span class="fc" id="L214">                    .append(&quot;.search.json\&quot;&gt;Vollständige Suche und Replay-Daten&lt;/a&gt;&lt;/p&gt;&lt;/details&gt;&quot;);</span>
+<span class="fc" id="L215">            }</span>
+<span class="fc" id="L216">            out.append(&quot;&lt;/details&gt;&quot;);</span>
+<span class="fc" id="L217">        }</span>
+<span class="fc" id="L218">        return out.append(&quot;&lt;p&gt;&lt;a href=\&quot;report.md\&quot;&gt;Bericht&lt;/a&gt; · &lt;a href=\&quot;report.json\&quot;&gt;Alle Vergleichsdaten&lt;/a&gt; · &lt;a href=\&quot;policy.json\&quot;&gt;Training und Auswahl&lt;/a&gt; · &lt;a href=\&quot;manifest.json\&quot;&gt;Hashmanifest&lt;/a&gt;&lt;/p&gt;&quot;)</span>
+<span class="fc" id="L219">            .append(&quot;&lt;script&gt;document.getElementById('filter').addEventListener('input',function(){const q=this.value.toLowerCase();document.querySelectorAll('[data-case]').forEach(d=&gt;{d.hidden=!d.firstElementChild.textContent.toLowerCase().includes(q)})});&lt;/script&gt;&lt;/html&gt;&quot;).toString();</span>
+    }
+
+    private static String profileLabel(Profile profile) {
+<span class="fc bfc" id="L223" title="All 4 branches covered.">        return switch (profile) {</span>
+<span class="fc" id="L224">            case FLAT_EXHAUSTIVE -&gt; &quot;Vollständige flache Suche&quot;;</span>
+<span class="fc" id="L225">            case FLAT_GREEDY -&gt; &quot;Einzelregeln: bester nächster Schritt&quot;;</span>
+<span class="fc" id="L226">            case LEARNED_DISPATCH -&gt; &quot;Gelernte bedingte Fortsetzung&quot;;</span>
+<span class="fc" id="L227">            case UNGATED_CONTINUATIONS -&gt; &quot;Fortsetzungen ohne gelernte Auswahl&quot;;</span>
+        };
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="nc bnc" id="L232" title="All 4 branches missed.">        if (args.length == 1 &amp;&amp; args[0].equals(&quot;--protocol&quot;)) {</span>
+<span class="nc" id="L233">            System.out.print(protocol());</span>
+<span class="nc" id="L234">            return;</span>
+        }
+<span class="nc bnc" id="L236" title="All 4 branches missed.">        if (args.length == 1 &amp;&amp; args[0].equals(&quot;--train-only&quot;)) {</span>
+<span class="nc" id="L237">            var trained = train();</span>
+<span class="nc" id="L238">            System.out.println(trained.toCanonicalJson());</span>
+<span class="nc" id="L239">            return;</span>
+        }
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        if (args.length != 1) throw new IllegalArgumentException(&quot;usage: TraceStrategyDispatchExample OUTPUT_DIRECTORY&quot;);</span>
+<span class="nc" id="L242">        var report = run();</span>
+<span class="nc" id="L243">        System.out.println(markdown(report));</span>
+<span class="nc" id="L244">        System.out.println(write(report, Path.of(args[0])).resolve(&quot;index.html&quot;).toAbsolutePath());</span>
+<span class="nc" id="L245">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

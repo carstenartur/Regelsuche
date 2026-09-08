@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CompiledLinearRewriteEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.program</a> &gt; <span class="el_source">CompiledLinearRewriteEngine.java</span></div><h1>CompiledLinearRewriteEngine.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.program;
+
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.MeasuredTransformationEngine;
+import de.regelsuche.transform.PreparedAstRewriteTransformationEngine;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationBatch;
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+
+/**
+ * Compiles a flat Source/Sequence program to a bounded source pipeline once.
+ * Execution retains all primitive paths but does not traverse interpreter nodes.
+ * Branching, guards, nested programs and theory sources use the ordinary interpreter.
+ */
+public final class CompiledLinearRewriteEngine implements MeasuredTransformationEngine {
+    public static final String REVISION = &quot;regelsuche.compiled-linear-rewrite/v1&quot;;
+    private final String programId;
+    private final List&lt;RewriteProgram.Source&gt; sources;
+    private final int maximumCandidates;
+
+<span class="fc" id="L24">    public CompiledLinearRewriteEngine(RewriteProgram program, int maximumCandidates) {</span>
+<span class="pc bpc" id="L25" title="2 of 4 branches missed.">        if (maximumCandidates &lt; 1 || maximumCandidates &gt; 128) throw new IllegalArgumentException(&quot;invalid pipeline candidate bound&quot;);</span>
+<span class="fc" id="L26">        this.maximumCandidates = maximumCandidates;</span>
+<span class="fc" id="L27">        this.programId = program.id();</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        List&lt;RewriteProgram&gt; nodes = program instanceof RewriteProgram.Sequence sequence ? sequence.steps() : List.of(program);</span>
+<span class="pc bpc" id="L29" title="2 of 4 branches missed.">        if (nodes.isEmpty() || nodes.size() &gt; 8) throw new IllegalArgumentException(&quot;linear pipeline requires one to eight sources&quot;);</span>
+<span class="fc" id="L30">        List&lt;RewriteProgram.Source&gt; compiled = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        for (var node : nodes) {</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">            if (!(node instanceof RewriteProgram.Source source)</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">                    || !(source.engine() instanceof PreparedAstRewriteTransformationEngine</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">                        || source.engine() instanceof AstRewriteTransformationEngine)) {</span>
+<span class="fc" id="L35">                throw new IllegalArgumentException(&quot;linear compilation supports plain primitive AST sources only&quot;);</span>
+            }
+<span class="fc" id="L37">            compiled.add(source);</span>
+<span class="fc" id="L38">        }</span>
+<span class="fc" id="L39">        sources = List.copyOf(compiled);</span>
+<span class="fc" id="L40">    }</span>
+
+    @Override
+    public TransformationBatch transformMeasured(String expression) {
+<span class="fc" id="L44">        expression = java.util.Objects.requireNonNull(expression, &quot;expression&quot;).trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (expression.isEmpty()) throw new IllegalArgumentException(&quot;expression must not be blank&quot;);</span>
+<span class="fc" id="L46">        List&lt;RewriteCandidate&gt; current = List.of();</span>
+<span class="fc" id="L47">        long calls = 0, emitted = 0, composed = 0, duplicates = 0;</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        for (int index = 0; index &lt; sources.size(); index++) {</span>
+<span class="fc" id="L49">            var source = sources.get(index);</span>
+<span class="fc" id="L50">            List&lt;RewriteCandidate&gt; next = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">            int prefixes = index == 0 ? 1 : current.size();</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            for (int p = 0; p &lt; prefixes; p++) {</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">                String input = index == 0 ? expression : current.get(p).outputExpression();</span>
+<span class="fc" id="L54">                var steps = new ArrayList&lt;&gt;(source.engine().transform(input));</span>
+<span class="fc" id="L55">                Transformation.requirePrimitiveOnly(steps);</span>
+<span class="fc" id="L56">                steps.sort(RewriteProgramInterpreter.TRANSFORMATION_ORDER);</span>
+<span class="fc" id="L57">                calls++;</span>
+<span class="fc" id="L58">                emitted = Math.addExact(emitted, steps.size());</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">                for (var step : steps) {</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">                    if (next.size() &gt;= maximumCandidates) throw new IllegalArgumentException(&quot;linear pipeline candidate bound exceeded&quot;);</span>
+<span class="fc" id="L61">                    var suffix = new RewriteCandidate(source.id(), input, step.transformedExpression(), List.of(step));</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">                    next.add(index == 0 ? suffix : current.get(p).append(suffix, programId));</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">                    if (index != 0) composed++;</span>
+<span class="fc" id="L64">                }</span>
+            }
+<span class="fc" id="L66">            current = retainStageCandidates(next, index);</span>
+<span class="fc" id="L67">            duplicates = Math.addExact(duplicates, next.size() - current.size());</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            if (current.isEmpty()) break;</span>
+        }
+<span class="fc" id="L70">        return new TransformationBatch(current.stream().map(candidate -&gt; candidate.withOriginNodeId(programId).toTransformation()).toList(),</span>
+            new TransformationWorkMetrics(1, 0, calls, emitted, composed, 0, 0, 0, 0, 0, 0, 0, 0, duplicates));
+    }
+
+    private List&lt;RewriteCandidate&gt; retainStageCandidates(List&lt;RewriteCandidate&gt; candidates, int index) {
+        // The interpreter composes every first-Source prefix before deduplicating a Sequence stage.
+<span class="fc bfc" id="L76" title="All 4 branches covered.">        if (index == 0 &amp;&amp; sources.size() &gt; 1) return List.copyOf(candidates);</span>
+<span class="fc" id="L77">        var distinct = new LinkedHashMap&lt;RewriteCandidate.Identity, RewriteCandidate&gt;();</span>
+<span class="fc" id="L78">        candidates.forEach(candidate -&gt; distinct.putIfAbsent(candidate.identity(), candidate));</span>
+<span class="fc" id="L79">        return List.copyOf(distinct.values());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

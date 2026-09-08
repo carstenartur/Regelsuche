@@ -1,6 +1,6 @@
 # Discovery- und Forschungsstand
 
-**Stand: 7. September 2026**
+**Stand: 8. September 2026**
 
 Diese Übersicht trennt ausgelieferte Fähigkeiten, Entwicklungen nach dem
 Release, begrenzte Projektnachweise und noch nicht ausgeführte Studien.
@@ -33,6 +33,7 @@ ist kein Ersatz für dieses Experiment.
 | Historische Komposition | Elf-Schritt-Brahmagupta–Fibonacci-Pfad mit zweimaliger Anwendung derselben gelernten Ergänzungsregel | Deklarierte Phasenfolge; unrestricted Best-First blieb bei 20.000 Zuständen ohne Fund |
 | Resttermkomposition | Disjunkte Summandenpaare und Vorzeichen können über exakte Nullrestprüfung ohne Zielausdruck ausgewählt werden | Strategie und vorbereitende Strukturwahl sind noch nicht selbst gelernt |
 | Schematische Pläne | Typisierte Lücken, endliche Koeffizienten-/Vorzeichensuche und verifier-gebundene Kandidatenevidence | Vorgegebene Ansatzgrammatik ist keine autonom erfundene Taktik |
+| Gelernte Regelfolgen | Verzweigende Programme aus zielausdrucksfreien primitiven TRAIN-Spuren und getrennt trainierte Fortsetzungsauswahl | Auf 288 neuen Entwicklungsfällen 1,4 % weniger gezählte Anwendungsarbeit als Greedy, gleiche Scores; Lernkosten noch nicht amortisiert, keine unabhängig zurückgehaltenen Mathematikfamilien |
 | Java-SDK | Eigenständige Java-25-Domänen, Fassade, Assertions und Provider-SPI | Lokale Maven-Bereitstellung; öffentliche stabile Release-API noch nicht zugesagt |
 | Externe Neuheit | Eigener, noch offener Literatur-/Expertenprüfpfad | Keine weltweite Neuheitsbehauptung |
 
@@ -78,6 +79,37 @@ wählen. Das ist datenabhängige Auswahl, nicht das Erlernen der Ansatzgrammatik
 einer verzweigenden Taktik oder der allgemeinen Resttermstrategie. Neue
 Koeffizienten derselben Familie ersetzen keinen unberührten FINAL TEST.
 Reproduktion und Grenzen: [Polynomstrategien aus Trainingsaufgaben](finite-polynomial-strategy-selection.md).
+
+## Gelernte Regelfolgen aus Suchspuren
+
+Der zusätzliche [Strategievergleich](trace-strategy-transfer.md) bildet aus
+beobachteten Regelfolgen einen Präfixbaum mit `Sequence` und `Choice` im
+vorhandenen Programm-IR. Die Programmstruktur hängt tatsächlich vom Training
+ab; neue Ausdrücke erhalten frisch ausgeführte primitive Pfade. Acht öffentliche
+Entwicklungsaufgaben werden in drei Profilen einschließlich Negativ- und
+unveränderter Kontrollfälle ausgewertet. Im unterstützten Bestand findet jedes
+Profil dieselben Endausdrücke; das gelernte Programm kostet mehr Sucharbeit.
+Das ergänzt die Ausführungsinfrastruktur um begrenztes Lernen und eine
+reproduzierbare Demo. Es schließt den offenen Nachweis einer selbst erlernten
+familienübergreifenden Taktik unter vergleichbarer Gesamtarbeit nicht ab.
+
+Die anschließende [bedingte Fortsetzungsauswahl](conditional-strategy-dispatch.md)
+verwendet vorhandene primitive Kandidaten erneut und führt eine kompilierte
+Fortsetzung nur bei einem auf getrenntem TRAIN akzeptierten Kontext aus. Die
+neue Fallserie wurde vor ihrer Anwendung festgelegt und enthält auch passende
+Regelhinweise mit unpassenden Bindungen. Gegenüber einer starken Greedy-Kontrolle
+sinkt die gezählte Anwendungsarbeit von 8.960 auf 8.832 bei unveränderten Scores.
+Alle 1.152 Vergleichszeilen bleiben erhalten. Die einmaligen 1.166 Einheiten
+Lernarbeit sind zusätzlich zu zahlen; dies ist noch kein positiver Gesamtkosten-
+oder Laufzeitnachweis. Der ursprüngliche negative Zusatzprogrammvergleich bleibt
+unverändert reproduzierbar.
+
+Bei der [Bildung gelernter Folgen](primitive-trace-minimality.md) ist die Prüfung
+auf kürzere primitive Verbindungen jetzt verpflichtend. Der Nachweis bindet die
+konkreten TRAIN-Endpunkte und das atomare Inventar. Kürzere Wege ersetzen
+beobachtete Umwege; Ressourcenabbrüche ergeben keine Freigabe. Die zusätzlichen
+84 Prüfeinheiten sind in der Lernbilanz enthalten. Dies beweist keinen globalen
+Mindestabstand für jede spätere Variablenbelegung.
 
 ## Was historische Wiederentdeckung hier bedeutet
 

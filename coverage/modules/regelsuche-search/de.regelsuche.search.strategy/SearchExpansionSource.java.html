@@ -13,6 +13,7 @@ import de.regelsuche.transform.ExecutionWork;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationWorkMetrics;
 import de.regelsuche.transform.MeasuredTransformationEngine;
+import de.regelsuche.transform.PrimitiveBudgetedTransformationEngine;
 import java.util.List;
 import java.util.Objects;
 
@@ -22,78 +23,80 @@ public sealed interface SearchExpansionSource {
 
     WorkRevision workRevision();
 
-<span class="fc" id="L25">    enum WorkRevision {</span>
-<span class="fc" id="L26">        MECHANICAL_V1(&quot;regelsuche.search-work/v1&quot;),</span>
-<span class="fc" id="L27">        MIXED_V2(&quot;regelsuche.search-work/v2&quot;);</span>
+<span class="fc" id="L26">    enum WorkRevision {</span>
+<span class="fc" id="L27">        MECHANICAL_V1(&quot;regelsuche.search-work/v1&quot;),</span>
+<span class="fc" id="L28">        MIXED_V2(&quot;regelsuche.search-work/v2&quot;);</span>
 
         private final String schema;
 
-<span class="fc" id="L31">        WorkRevision(String schema) { this.schema = schema; }</span>
+<span class="fc" id="L32">        WorkRevision(String schema) { this.schema = schema; }</span>
 
-<span class="nc" id="L33">        public String schema() { return schema; }</span>
+<span class="fc" id="L34">        public String schema() { return schema; }</span>
     }
 
     /** Frozen mechanical accounting for historical primitive-only evaluations. */
     record Measured(MeasuredTransformationEngine engine) implements SearchExpansionSource {
-<span class="fc" id="L38">        public Measured { Objects.requireNonNull(engine, &quot;engine&quot;); }</span>
+<span class="fc" id="L39">        public Measured { Objects.requireNonNull(engine, &quot;engine&quot;); }</span>
 
         @Override public RewriteExecution expand(String expression, PathBudget remainingPathBudget) {
-<span class="pc bpc" id="L41" title="1 of 2 branches missed.">            if (engine instanceof ProgrammedTransformationEngine programmed) {</span>
-<span class="nc" id="L42">                return programmed.execute(expression);</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">            if (engine instanceof ProgrammedTransformationEngine programmed) {</span>
+<span class="nc" id="L43">                return programmed.execute(expression);</span>
             }
-<span class="fc" id="L44">            var batch = engine.transformMeasured(expression);</span>
-<span class="fc" id="L45">            var candidates = batch.transformations().stream()</span>
-<span class="fc" id="L46">                .map(step -&gt; new RewriteCandidate(&quot;search-source&quot;, expression,</span>
-<span class="fc" id="L47">                    step.transformedExpression(), List.of(step))).toList();</span>
-<span class="fc" id="L48">            return new RewriteExecution(candidates, true, batch.workMetrics());</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">            var batch = engine instanceof PrimitiveBudgetedTransformationEngine budgeted</span>
+<span class="nc" id="L46">                ? budgeted.transformMeasured(expression, remainingPathBudget.primitiveRewriteUnits())</span>
+<span class="fc" id="L47">                : engine.transformMeasured(expression);</span>
+<span class="fc" id="L48">            var candidates = batch.transformations().stream()</span>
+<span class="fc" id="L49">                .map(step -&gt; new RewriteCandidate(&quot;search-source&quot;, expression,</span>
+<span class="fc" id="L50">                    step.transformedExpression(), List.of(step))).toList();</span>
+<span class="fc" id="L51">            return new RewriteExecution(candidates, true, batch.workMetrics());</span>
         }
 
-<span class="fc" id="L51">        @Override public WorkRevision workRevision() { return WorkRevision.MECHANICAL_V1; }</span>
+<span class="fc" id="L54">        @Override public WorkRevision workRevision() { return WorkRevision.MECHANICAL_V1; }</span>
     }
 
     /** Uses ordinary Source nodes, including verified theory, under explicit authority. */
     record Program(RewriteProgram program) implements SearchExpansionSource {
-<span class="nc" id="L56">        public Program { Objects.requireNonNull(program, &quot;program&quot;); }</span>
+<span class="nc" id="L59">        public Program { Objects.requireNonNull(program, &quot;program&quot;); }</span>
 
         @Override public RewriteExecution expand(String expression, PathBudget remainingPathBudget) {
-<span class="nc" id="L59">            return new RewriteProgramInterpreter().executeWithWorkBudget(</span>
+<span class="nc" id="L62">            return new RewriteProgramInterpreter().executeWithWorkBudget(</span>
                 program, expression, remainingPathBudget);
         }
 
-<span class="nc" id="L63">        @Override public WorkRevision workRevision() { return WorkRevision.MIXED_V2; }</span>
+<span class="nc" id="L66">        @Override public WorkRevision workRevision() { return WorkRevision.MIXED_V2; }</span>
     }
 
     /** Actual best-first frontier handoff; retains theory evidence and delegated mechanics separately. */
     record ExactPolynomial(ExactPolynomialTransformationSource source) implements SearchExpansionSource {
-<span class="nc" id="L68">        public ExactPolynomial { Objects.requireNonNull(source, &quot;source&quot;); }</span>
+<span class="nc" id="L71">        public ExactPolynomial { Objects.requireNonNull(source, &quot;source&quot;); }</span>
 
         @Override public RewriteExecution expand(String expression, PathBudget remainingPathBudget) {
-<span class="nc" id="L71">            Objects.requireNonNull(remainingPathBudget, &quot;remainingPathBudget&quot;);</span>
-<span class="nc" id="L72">            synchronized (source) {</span>
-<span class="nc" id="L73">                var result = source.transform(expression, remainingPathBudget.exactTheoryWorkUnits());</span>
-<span class="nc" id="L74">                var capability = source.lastVerifiedExecution();</span>
-<span class="nc" id="L75">                List&lt;RewriteCandidate&gt; candidates = capability.map(verified -&gt; {</span>
-<span class="nc bnc" id="L76" title="All 2 branches missed.">                    if (!verified.result().equals(result)) throw new IllegalStateException(&quot;polynomial execution changed during handoff&quot;);</span>
-<span class="nc" id="L77">                    var transformation = Transformation.exactTheory(ExactTheoryEvidence.fromVerified(verified));</span>
-<span class="nc" id="L78">                    return List.of(new RewriteCandidate(source.identity().sourceId(), expression,</span>
-<span class="nc" id="L79">                        transformation.transformedExpression(), List.of(transformation)));</span>
-<span class="nc" id="L80">                }).orElse(List.of());</span>
-<span class="nc" id="L81">                var observations = candidates.stream().map(candidate -&gt;</span>
-<span class="nc" id="L82">                    new RewriteExecution.SourceObservation(candidate, remainingPathBudget,</span>
-<span class="nc" id="L83">                        remainingPathBudget.admits(candidate.executionWork()))).toList();</span>
-<span class="nc" id="L84">                var mathematical = candidates.stream().map(RewriteCandidate::executionWork)</span>
-<span class="nc" id="L85">                    .reduce(ExecutionWork.ZERO, ExecutionWork::plus);</span>
-<span class="nc" id="L86">                var mechanics = TransformationWorkMetrics.flatEngine(candidates.size())</span>
-<span class="nc" id="L87">                    .withDelegatedMechanicalWork(result.mechanicalWorkUnits()).withCandidateWork(mathematical);</span>
-<span class="nc bnc" id="L88" title="All 2 branches missed.">                boolean complete = result.status() != BudgetedTransformationSource.Status.BUDGET_INCONCLUSIVE</span>
-<span class="nc bnc" id="L89" title="All 2 branches missed.">                    &amp;&amp; observations.stream().allMatch(RewriteExecution.SourceObservation::admitted);</span>
-<span class="nc" id="L90">                return new RewriteExecution(observations.stream().filter(RewriteExecution.SourceObservation::admitted)</span>
-<span class="nc" id="L91">                    .map(RewriteExecution.SourceObservation::candidate).toList(), complete, mechanics, observations,</span>
+<span class="nc" id="L74">            Objects.requireNonNull(remainingPathBudget, &quot;remainingPathBudget&quot;);</span>
+<span class="nc" id="L75">            synchronized (source) {</span>
+<span class="nc" id="L76">                var result = source.transform(expression, remainingPathBudget.exactTheoryWorkUnits());</span>
+<span class="nc" id="L77">                var capability = source.lastVerifiedExecution();</span>
+<span class="nc" id="L78">                List&lt;RewriteCandidate&gt; candidates = capability.map(verified -&gt; {</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">                    if (!verified.result().equals(result)) throw new IllegalStateException(&quot;polynomial execution changed during handoff&quot;);</span>
+<span class="nc" id="L80">                    var transformation = Transformation.exactTheory(ExactTheoryEvidence.fromVerified(verified));</span>
+<span class="nc" id="L81">                    return List.of(new RewriteCandidate(source.identity().sourceId(), expression,</span>
+<span class="nc" id="L82">                        transformation.transformedExpression(), List.of(transformation)));</span>
+<span class="nc" id="L83">                }).orElse(List.of());</span>
+<span class="nc" id="L84">                var observations = candidates.stream().map(candidate -&gt;</span>
+<span class="nc" id="L85">                    new RewriteExecution.SourceObservation(candidate, remainingPathBudget,</span>
+<span class="nc" id="L86">                        remainingPathBudget.admits(candidate.executionWork()))).toList();</span>
+<span class="nc" id="L87">                var mathematical = candidates.stream().map(RewriteCandidate::executionWork)</span>
+<span class="nc" id="L88">                    .reduce(ExecutionWork.ZERO, ExecutionWork::plus);</span>
+<span class="nc" id="L89">                var mechanics = TransformationWorkMetrics.flatEngine(candidates.size())</span>
+<span class="nc" id="L90">                    .withDelegatedMechanicalWork(result.mechanicalWorkUnits()).withCandidateWork(mathematical);</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">                boolean complete = result.status() != BudgetedTransformationSource.Status.BUDGET_INCONCLUSIVE</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                    &amp;&amp; observations.stream().allMatch(RewriteExecution.SourceObservation::admitted);</span>
+<span class="nc" id="L93">                return new RewriteExecution(observations.stream().filter(RewriteExecution.SourceObservation::admitted)</span>
+<span class="nc" id="L94">                    .map(RewriteExecution.SourceObservation::candidate).toList(), complete, mechanics, observations,</span>
                     remainingPathBudget);
             }
         }
 
-<span class="nc" id="L96">        @Override public WorkRevision workRevision() { return WorkRevision.MIXED_V2; }</span>
+<span class="nc" id="L99">        @Override public WorkRevision workRevision() { return WorkRevision.MIXED_V2; }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

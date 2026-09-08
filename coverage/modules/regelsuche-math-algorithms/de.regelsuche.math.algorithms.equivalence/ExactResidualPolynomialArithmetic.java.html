@@ -93,7 +93,7 @@ import java.util.Objects;
                 &quot;exponent lacks exact provenance&quot;))
 <span class="fc" id="L94">            .exactValue();</span>
 <span class="pc bpc" id="L95" title="1 of 4 branches missed.">        if (!value.isInteger() || value.numerator().signum() &lt; 0</span>
-<span class="pc bpc" id="L96" title="1 of 2 branches missed.">                || value.numerator().bitLength() &gt; 6</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">                || value.numerator().bitLength() &gt; 6</span>
 <span class="fc bfc" id="L97" title="All 2 branches covered.">                || value.numerator().intValue() &gt; MAX_EXPONENT) {</span>
 <span class="fc" id="L98">            throw new IllegalArgumentException(&quot;unsupported exact exponent&quot;);</span>
         }

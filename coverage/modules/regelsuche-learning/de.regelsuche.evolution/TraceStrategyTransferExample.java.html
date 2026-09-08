@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TraceStrategyTransferExample.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">TraceStrategyTransferExample.java</span></div><h1>TraceStrategyTransferExample.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.TraceRewriteStrategyLearner.Application;
+import de.regelsuche.evolution.TraceRewriteStrategyLearner.FrozenStrategy;
+import de.regelsuche.evolution.TraceRewriteStrategyLearner.Input;
+import de.regelsuche.evolution.TraceRewriteStrategyLearner.Limits;
+import de.regelsuche.evolution.TraceRewriteStrategyLearner.Profile;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Budget;
+import de.regelsuche.transform.RewriteKind;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/**
+ * Executable development comparison, deliberately separate from the sealed
+ * flagship FINAL TEST. Profiles, inputs and budgets are fixed before training.
+ * The learner receives only TRAIN; labels and comparisons are report metadata.
+ */
+public final class TraceStrategyTransferExample {
+    public static final String REVISION = &quot;regelsuche.trace-strategy-transfer-development/v2&quot;;
+    private static final String INVENTORY_PROTOCOL_REVISION = &quot;regelsuche.trace-strategy-transfer-development/v1&quot;;
+<span class="fc" id="L29">    private static final Budget BUDGET = Budget.primitive(6, 80, 32, 6, 30_000);</span>
+    private TraceStrategyTransferExample() {}
+
+    public record Case(String id, String family, String expression) {
+<span class="fc" id="L33">        public Case { id = SchematicProofPlan.requireId(id, &quot;case id&quot;); }</span>
+    }
+<span class="fc" id="L35">    public record Row(Case example, Profile profile, Application application, String unsupportedReason) {}</span>
+    public record Report(String protocol, FrozenStrategy strategy, List&lt;Row&gt; rows) {
+<span class="fc" id="L37">        public Report { rows = List.copyOf(rows); }</span>
+        public String toCanonicalJson() {
+<span class="fc" id="L39">            return new JsonWriter().beginObject().property(&quot;schema&quot;, REVISION)</span>
+<span class="fc" id="L40">                .property(&quot;claim&quot;, &quot;DEVELOPMENT_TRANSFER_CHARACTERIZATION;NO_FINAL_TEST_OR_SUPERIORITY_CLAIM&quot;)</span>
+<span class="fc" id="L41">                .property(&quot;protocolHash&quot;, SchematicProofPlan.hash(protocol))</span>
+<span class="fc" id="L42">                .property(&quot;strategyHash&quot;, strategy.contentHash())</span>
+<span class="fc" id="L43">                .array(&quot;rows&quot;, values -&gt; rows.forEach(row -&gt; values.objectValue(value -&gt; {</span>
+<span class="fc" id="L44">                    value.property(&quot;id&quot;, row.example().id()).property(&quot;family&quot;, row.example().family())</span>
+<span class="fc" id="L45">                        .property(&quot;profile&quot;, row.profile().name()).property(&quot;input&quot;, row.example().expression());</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">                    if (row.application() == null) {</span>
+<span class="fc" id="L47">                        value.property(&quot;status&quot;, &quot;DOMAIN_UNSUPPORTED&quot;).property(&quot;reason&quot;, row.unsupportedReason());</span>
+<span class="fc" id="L48">                    } else value.property(&quot;application&quot;, row.application().toCanonicalJson());</span>
+<span class="fc" id="L49">                }))).endObject().toString();</span>
+        }
+<span class="fc" id="L51">        public String contentHash() { return SchematicProofPlan.hash(toCanonicalJson()); }</span>
+    }
+
+    public static List&lt;Input&gt; trainingInputs() {
+<span class="fc" id="L55">        return List.of(</span>
+            new Input(&quot;train-offset&quot;, &quot;(a+b)*(a-b)+b*b+3&quot;),
+            new Input(&quot;train-scale&quot;, &quot;5*((c+d)*(c-d)+d*d)&quot;),
+            new Input(&quot;train-common-factor&quot;, &quot;p*p+p*q+0&quot;),
+            new Input(&quot;train-nested-factor&quot;, &quot;(r*r+r*s)*(t+1)+0&quot;));
+    }
+
+    public static List&lt;Case&gt; evaluationInputs() {
+<span class="fc" id="L63">        return List.of(</span>
+            new Case(&quot;sum-composition&quot;, &quot;sum of independently reducible terms&quot;, &quot;((u+v)*(u-v)+v*v)+u*u&quot;),
+            new Case(&quot;product-composition&quot;, &quot;outer polynomial product&quot;, &quot;((j+k)*(j-k)+k*k)*(j+2)&quot;),
+            new Case(&quot;multiple-instances&quot;, &quot;two independent cancellation sites&quot;, &quot;((x+y)*(x-y)+y*y)+((z+1)*(z-1)+1)&quot;),
+            new Case(&quot;compound-base&quot;, &quot;multivariate product inside a square&quot;, &quot;((u*v+w)*(u*v-w)+w*w)+7&quot;),
+            new Case(&quot;nested-factors&quot;, &quot;repeated factored subexpressions&quot;, &quot;3*(m*m+m*n)+3*(m*m+m*n)&quot;),
+            new Case(&quot;near-miss&quot;, &quot;noncancelling residual&quot;, &quot;(x+y)*(x-y)+y*(y+1)&quot;),
+            new Case(&quot;already-simple&quot;, &quot;unchanged control&quot;, &quot;z+9&quot;),
+            new Case(&quot;unsupported&quot;, &quot;non-polynomial control&quot;, &quot;sin(x)+1&quot;));
+    }
+
+    public static EvolutionGenome inventory() {
+<span class="fc" id="L75">        String trainHash = SchematicProofPlan.hash(trainingJson());</span>
+<span class="fc" id="L76">        var scope = new EvolutionGenome.TrainingScope(EvolutionGenome.SourceSplit.TRAIN, trainHash,</span>
+<span class="fc" id="L77">            SchematicProofPlan.hash(INVENTORY_PROTOCOL_REVISION + &quot;:development-split&quot;),</span>
+<span class="fc" id="L78">            SchematicProofPlan.hash(INVENTORY_PROTOCOL_REVISION + &quot;:no-final-test&quot;),</span>
+<span class="fc" id="L79">            SchematicProofPlan.hash(INVENTORY_PROTOCOL_REVISION + &quot;:fixed-objective&quot;));</span>
+<span class="fc" id="L80">        return EvolutionGenome.create(EvolutionGenome.Objective.OPEN_TARGET_OPERATOR, scope,</span>
+<span class="fc" id="L81">            List.of(</span>
+<span class="fc" id="L82">                gene(&quot;difference-product&quot;, &quot;(?A+?B)*(?A-?B)&quot;, &quot;?A^2-?B^2&quot;),</span>
+<span class="fc" id="L83">                gene(&quot;cancel-addend&quot;, &quot;(?A-?B)+?B&quot;, &quot;?A&quot;),</span>
+<span class="fc" id="L84">                gene(&quot;square-product&quot;, &quot;?A*?A&quot;, &quot;?A^2&quot;),</span>
+<span class="fc" id="L85">                gene(&quot;double-term&quot;, &quot;?A+?A&quot;, &quot;2*?A&quot;),</span>
+<span class="fc" id="L86">                gene(&quot;factor-left&quot;, &quot;?A*?B+?A*?C&quot;, &quot;?A*(?B+?C)&quot;),</span>
+<span class="fc" id="L87">                gene(&quot;factor-right&quot;, &quot;?A*?C+?B*?C&quot;, &quot;(?A+?B)*?C&quot;),</span>
+<span class="fc" id="L88">                gene(&quot;add-zero&quot;, &quot;?A+0&quot;, &quot;?A&quot;),</span>
+<span class="fc" id="L89">                gene(&quot;multiply-one&quot;, &quot;?A*1&quot;, &quot;?A&quot;)),</span>
+<span class="fc" id="L90">            List.of(new EvolutionGenome.FeatureWeight(EvolutionGenome.FitnessSignal.CANDIDATE_COMPLEXITY, -1000)),</span>
+<span class="fc" id="L91">            EvolutionGenome.GuardPolicy.strictDefault(), new EvolutionGenome.ResourceBudget(64, 256, 32, 8, 32),</span>
+<span class="fc" id="L92">            List.of(&quot;core.ast-rewrite&quot;), List.of());</span>
+    }
+
+    private static EvolutionGenome.RewriteGene gene(String id, String source, String target) {
+<span class="fc" id="L96">        return new EvolutionGenome.RewriteGene(id, source, target, RewriteKind.SIMPLIFY, false, -2, 8, 32,</span>
+<span class="fc" id="L97">            List.of(), List.of(EvolutionGenome.EvidenceObligation.SEMANTIC_VALIDATION,</span>
+                EvolutionGenome.EvidenceObligation.COUNTEREXAMPLE_SEARCH,
+                EvolutionGenome.EvidenceObligation.PROOF_OR_CERTIFICATE,
+                EvolutionGenome.EvidenceObligation.NOVELTY_REVIEW,
+                EvolutionGenome.EvidenceObligation.HOLDOUT_EVALUATION));
+    }
+
+<span class="fc" id="L104">    public static Limits limits() { return new Limits(BUDGET, 8, 6, 64); }</span>
+
+    public static String protocol() {
+<span class="fc" id="L107">        return new JsonWriter().beginObject().property(&quot;schema&quot;, REVISION)</span>
+<span class="fc" id="L108">            .property(&quot;information&quot;, &quot;NO_EXTERNAL_TARGET;TARGET_FREE_TRACE_SEARCH;SELECTED_TRAIN_ENDPOINT_FOR_MINIMALITY;EVALUATION_LABELS_REPORT_ONLY&quot;)</span>
+<span class="fc" id="L109">            .property(&quot;split&quot;, &quot;PUBLIC_DEVELOPMENT_CASES;NOT_SEALED_VALIDATION_OR_FINAL_TEST&quot;)</span>
+<span class="fc" id="L110">            .property(&quot;inventory&quot;, inventory().toCanonicalJson()).property(&quot;train&quot;, trainingJson())</span>
+<span class="fc" id="L111">            .object(&quot;learner&quot;, value -&gt; TraceRewriteStrategyLearner.writeLearningProtocol(value, limits()))</span>
+<span class="fc" id="L112">            .property(&quot;objective&quot;, &quot;EXPRESSION_SCORE_PLUS_2_PER_PRIMITIVE_PLUS_5_PER_EXPANDING_STEP&quot;)</span>
+<span class="fc" id="L113">            .property(&quot;policy&quot;, &quot;RETAIN_EVERY_PROFILE_AND_CASE_INCLUDING_LOSSES&quot;)</span>
+<span class="fc" id="L114">            .object(&quot;commonBudget&quot;, value -&gt; TraceRewriteStrategyLearner.writeBudget(value, BUDGET))</span>
+<span class="fc" id="L115">            .stringArray(&quot;profiles&quot;, java.util.Arrays.stream(Profile.values()).map(Enum::name).toList())</span>
+<span class="fc" id="L116">            .array(&quot;evaluation&quot;, values -&gt; evaluationInputs().forEach(input -&gt; values.objectValue(value -&gt;</span>
+<span class="fc" id="L117">                value.property(&quot;id&quot;, input.id()).property(&quot;family&quot;, input.family()).property(&quot;source&quot;, input.expression()))))</span>
+<span class="fc" id="L118">            .endObject().toString();</span>
+    }
+
+    private static String trainingJson() {
+<span class="fc" id="L122">        return new JsonWriter().beginObject().array(&quot;inputs&quot;, values -&gt; trainingInputs().forEach(input -&gt;</span>
+<span class="fc" id="L123">            values.objectValue(value -&gt; value.property(&quot;id&quot;, input.id()).property(&quot;source&quot;, input.expression()))))</span>
+<span class="fc" id="L124">            .endObject().toString();</span>
+    }
+
+    public static Report run() {
+<span class="fc" id="L128">        String frozenProtocol = protocol();</span>
+<span class="fc" id="L129">        var learner = new TraceRewriteStrategyLearner();</span>
+<span class="fc" id="L130">        var strategy = learner.learn(inventory(), trainingInputs(), limits());</span>
+<span class="fc" id="L131">        List&lt;Row&gt; rows = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L132">        var analysis = new ExactPolynomialAnalysis();</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (Case input : evaluationInputs()) {</span>
+<span class="fc" id="L134">            String unsupported = &quot;&quot;;</span>
+            // Classify only input-domain rejection. Search, learning, replay and
+            // overlap errors propagate; they cannot become favourable null rows.
+<span class="fc" id="L137">            try { analysis.alphaIdentity(input.expression()); }</span>
+<span class="fc" id="L138">            catch (IllegalArgumentException exception) { unsupported = exception.getMessage(); }</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            for (Profile profile : Profile.values()) {</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">                rows.add(new Row(input, profile, unsupported.isEmpty()</span>
+<span class="fc" id="L141">                    ? learner.apply(strategy, input.expression(), BUDGET, profile) : null, unsupported));</span>
+            }
+<span class="fc" id="L143">        }</span>
+<span class="fc" id="L144">        return new Report(frozenProtocol, strategy, rows);</span>
+    }
+
+    /** Writes a content-addressed run; existing differing files are never replaced. */
+    public static Path write(Report report, Path output) throws IOException {
+<span class="fc" id="L149">        Map&lt;String, String&gt; artifacts = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L150">        artifacts.put(&quot;protocol.json&quot;, report.protocol());</span>
+<span class="fc" id="L151">        artifacts.put(&quot;strategy.json&quot;, report.strategy().toCanonicalJson());</span>
+<span class="fc" id="L152">        artifacts.put(&quot;report.json&quot;, report.toCanonicalJson());</span>
+<span class="fc" id="L153">        artifacts.put(&quot;report.md&quot;, markdown(report));</span>
+<span class="fc" id="L154">        artifacts.put(&quot;index.html&quot;, html(report));</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        for (var observation : report.strategy().observations()) {</span>
+<span class="fc" id="L156">            artifacts.put(observation.input().id() + &quot;.search.json&quot;, observation.search().toCanonicalJson());</span>
+<span class="fc" id="L157">            observation.minimality().ifPresent(proof -&gt; artifacts.put(observation.input().id() + &quot;.minimality.json&quot;, proof.toCanonicalJson()));</span>
+<span class="fc" id="L158">        }</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        for (var row : report.rows()) {</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            if (row.application() != null) artifacts.put(row.example().id() + &quot;-&quot; + row.profile().name().toLowerCase(java.util.Locale.ROOT)</span>
+<span class="fc" id="L161">                + &quot;.search.json&quot;, row.application().search().toCanonicalJson());</span>
+<span class="fc" id="L162">        }</span>
+<span class="fc" id="L163">        return writeArtifacts(report.contentHash(), artifacts, output, REVISION);</span>
+    }
+
+    static Path writeArtifacts(String reportHash, Map&lt;String, String&gt; artifacts, Path output, String revision) throws IOException {
+<span class="fc" id="L167">        String manifest = new JsonWriter().beginObject().property(&quot;schema&quot;, revision).property(&quot;reportHash&quot;, reportHash)</span>
+<span class="fc" id="L168">            .array(&quot;artifacts&quot;, values -&gt; artifacts.forEach((name, content) -&gt; values.objectValue(value -&gt;</span>
+<span class="fc" id="L169">                value.property(&quot;name&quot;, name).property(&quot;sha256&quot;, SchematicProofPlan.hash(content)))))</span>
+<span class="fc" id="L170">            .endObject().toString();</span>
+        // Bind the presentation and artifact set too: a renderer change must
+        // create a new bundle even when all mathematical observations match.
+<span class="fc" id="L173">        Path directory = output.resolve(SchematicProofPlan.hash(manifest).substring(&quot;sha256:&quot;.length()));</span>
+<span class="fc" id="L174">        Files.createDirectories(directory);</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        for (var artifact : artifacts.entrySet()) writeIdentical(directory.resolve(artifact.getKey()), artifact.getValue());</span>
+<span class="fc" id="L176">        writeIdentical(directory.resolve(&quot;manifest.json&quot;), manifest);</span>
+<span class="fc" id="L177">        return directory;</span>
+    }
+
+    private static void writeIdentical(Path path, String content) throws IOException {
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (Files.exists(path)) {</span>
+<span class="pc bpc" id="L182" title="1 of 4 branches missed.">            if (Files.isSymbolicLink(path) || !Files.readString(path, StandardCharsets.UTF_8).equals(content)) {</span>
+<span class="fc" id="L183">                throw new IOException(&quot;existing artifact differs: &quot; + path.getFileName());</span>
+            }
+<span class="fc" id="L185">        } else Files.writeString(path, content, StandardCharsets.UTF_8, java.nio.file.StandardOpenOption.CREATE_NEW);</span>
+<span class="fc" id="L186">    }</span>
+
+    public static String markdown(Report report) {
+<span class="fc" id="L189">        var out = new StringBuilder(&quot;# Learned rewrite strategies: development comparison\n\n&quot;)</span>
+<span class="fc" id="L190">            .append(&quot;The learner infers rule order and branching from target-free TRAIN searches. All profiles receive the same eight rules and search budgets.\n\n&quot;)</span>
+<span class="fc" id="L191">            .append(&quot;These public development cases share algebraic building blocks with TRAIN. They characterize transfer to new compositions and contexts, not independently held-out mathematical families or the flagship FINAL TEST.\n\n&quot;)</span>
+<span class="fc" id="L192">            .append(&quot;## Learned program\n\n```text\n&quot;)</span>
+<span class="fc" id="L193">            .append(report.strategy().plan().map(EvolutionRewriteProgramPlan::toReadableProgram).orElse(&quot;No multistep strategy learned.&quot;))</span>
+<span class="fc" id="L194">            .append(&quot;\n```\n\nTraining search work: &quot;).append(report.strategy().trainingSearchWorkUnits())</span>
+<span class="fc" id="L195">            .append(&quot;; primitive replay work: &quot;).append(report.strategy().trainingReplayWorkUnits())</span>
+<span class="fc" id="L196">            .append(&quot;; exact step checks: &quot;).append(report.strategy().trainingExactAuditCalls())</span>
+<span class="fc" id="L197">            .append(&quot;; primitive minimality verification work: &quot;).append(report.strategy().trainingMinimalityWorkUnits()).append(&quot;.\n\n&quot;)</span>
+<span class="fc" id="L198">            .append(&quot;Only traces with a proved shortest primitive connection for their concrete TRAIN endpoints enter the program. Shorter traces replace detours; inconclusive checks and zero/one-step connections do not form macros. This does not prove minimality for every later substitution.\n\n&quot;)</span>
+<span class="fc" id="L199">            .append(&quot;These dimensions exclude a complete account of identity projection, compiler, parser, BigInteger and model-construction work. They do not establish amortized total-work or runtime superiority.\n\n&quot;)</span>
+<span class="fc" id="L200">            .append(&quot;| Case | Profile | Selected output | Score ↓ | Search work | Primitive steps | Learned/shuffled program used | Status |\n&quot;)</span>
+<span class="fc" id="L201">            .append(&quot;|---|---|---|---:|---:|---:|---|---|\n&quot;);</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        for (var row : report.rows()) {</span>
+<span class="fc" id="L203">            out.append(&quot;| &quot;).append(row.example().id()).append(&quot; | &quot;).append(row.profile()).append(&quot; | &quot;);</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">            if (row.application() == null) out.append(&quot;— | — | — | — | — | DOMAIN_UNSUPPORTED |\n&quot;);</span>
+            else {
+<span class="fc" id="L206">                var result = row.application().search();</span>
+<span class="fc" id="L207">                out.append('`').append(result.bestState().expression()).append(&quot;` | &quot;)</span>
+<span class="fc" id="L208">                    .append(result.bestState().score().weightedTotal()).append(&quot; | &quot;)</span>
+<span class="fc" id="L209">                    .append(result.metrics().chargedSearchWorkUnits()).append(&quot; | &quot;)</span>
+<span class="fc" id="L210">                    .append(result.bestState().primitiveDepth()).append(&quot; | &quot;).append(result.bestState().programUsed())</span>
+<span class="fc" id="L211">                    .append(&quot; | &quot;).append(result.status()).append(&quot; |\n&quot;);</span>
+            }
+<span class="fc" id="L213">        }</span>
+<span class="fc" id="L214">        return out.append(&quot;\nLower score means the frozen project scorer prefers that output; it does not mean a universally simplest expression. Full searches, failed alternatives, primitive lineage and work are retained in the adjacent JSON files. No automatic promotion or external novelty claim is made.\n&quot;).toString();</span>
+    }
+
+    private static String html(Report report) {
+<span class="fc" id="L218">        var out = new StringBuilder(&quot;&lt;!doctype html&gt;&lt;html lang=\&quot;de\&quot;&gt;&lt;meta charset=\&quot;utf-8\&quot;&gt;&lt;meta name=\&quot;viewport\&quot; content=\&quot;width=device-width,initial-scale=1\&quot;&gt;&quot;)</span>
+<span class="fc" id="L219">            .append(&quot;&lt;title&gt;Regelsuche · Gelernte Strategien&lt;/title&gt;&lt;style&gt;body{font:17px/1.55 system-ui;margin:40px auto;padding:0 20px;max-width:1100px;color:#172b36;background:#f7f9fa}h1{line-height:1.2}code,pre{font-size:14px;overflow-wrap:anywhere;white-space:pre-wrap}details{background:white;border:1px solid #ccd9df;padding:16px;margin:14px 0;border-radius:8px}summary{cursor:pointer;font-weight:600}li{margin:8px 0}.note{color:#455e6b}&lt;/style&gt;&quot;)</span>
+<span class="fc" id="L220">            .append(&quot;&lt;h1&gt;Aus Suchwegen eine Strategie lernen&lt;/h1&gt;&lt;p&gt;Regelsuche lernt die Reihenfolge und Verzweigung von Regeln aus vier Trainingsaufgaben. Neue Aufgaben werden mit denselben Regeln und Budgets verglichen.&lt;/p&gt;&quot;)</span>
+<span class="fc" id="L221">            .append(&quot;&lt;p class=\&quot;note\&quot;&gt;Entwicklungsvergleich: neue Zusammensetzungen bekannter algebraischer Bausteine. Noch kein unabhängiger Nachweis für andere Mathematikbereiche oder einen allgemeinen Geschwindigkeitsvorteil.&lt;/p&gt;&quot;)</span>
+<span class="fc" id="L222">            .append(&quot;&lt;details open&gt;&lt;summary&gt;Das gelernte Programm&lt;/summary&gt;&lt;pre&gt;&quot;)</span>
+<span class="fc" id="L223">            .append(escape(report.strategy().plan().map(EvolutionRewriteProgramPlan::toReadableProgram).orElse(&quot;Keine mehrstufige Strategie gelernt.&quot;)))</span>
+<span class="fc" id="L224">            .append(&quot;&lt;/pre&gt;&lt;p&gt;Sucharbeit im Training: &quot;).append(report.strategy().trainingSearchWorkUnits())</span>
+<span class="fc" id="L225">            .append(&quot;. Prüf- und weitere Lernkosten stehen getrennt im &lt;a href=\&quot;report.md\&quot;&gt;vollständigen Bericht&lt;/a&gt;.&lt;/p&gt;&lt;/details&gt;&quot;);</span>
+<span class="fc" id="L226">        out.append(&quot;&lt;details&gt;&lt;summary&gt;Geprüfte primitive Mindestlängen im Training&lt;/summary&gt;&lt;ul&gt;&quot;);</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        for (var observation : report.strategy().observations()) observation.minimality().ifPresent(proof -&gt; out.append(&quot;&lt;li&gt;&quot;)</span>
+<span class="fc" id="L228">            .append(escape(observation.input().id())).append(&quot;: beobachtet &quot;).append(proof.observedPrimitiveSteps())</span>
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">            .append(&quot;, geprüftes Minimum &quot;).append(proof.minimumPrimitiveSteps() &lt; 0 ? &quot;ungeklärt&quot; : proof.minimumPrimitiveSteps())</span>
+<span class="fc" id="L230">            .append(&quot; · &lt;a href=\&quot;&quot;).append(observation.input().id()).append(&quot;.minimality.json\&quot;&gt;Nachweis und Prüfkosten&lt;/a&gt;&lt;/li&gt;&quot;));</span>
+<span class="fc" id="L231">        out.append(&quot;&lt;/ul&gt;&lt;p&gt;Gilt für die konkreten Trainingsausdrücke und dieses atomare Inventar; kein pauschaler Mindestabstand für spätere Variablenbelegungen.&lt;/p&gt;&lt;/details&gt;&quot;);</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        for (var row : report.rows()) {</span>
+<span class="fc" id="L233">            out.append(&quot;&lt;details&gt;&lt;summary&gt;&quot;).append(escape(row.example().id())).append(&quot; · &quot;).append(row.profile()).append(&quot;&lt;/summary&gt;&lt;p&gt;Ausgang: &lt;code&gt;&quot;)</span>
+<span class="fc" id="L234">                .append(escape(row.example().expression())).append(&quot;&lt;/code&gt;&lt;/p&gt;&quot;);</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">            if (row.application() == null) out.append(&quot;&lt;p&gt;Dieser Ausdruck liegt außerhalb des unterstützten Polynomfragments.&lt;/p&gt;&quot;);</span>
+            else {
+<span class="fc" id="L237">                var state = row.application().search().bestState();</span>
+<span class="fc" id="L238">                out.append(&quot;&lt;p&gt;Ergebnis: &lt;code&gt;&quot;).append(escape(state.expression())).append(&quot;&lt;/code&gt;&lt;/p&gt;&lt;p&gt;Sucharbeit: &quot;)</span>
+<span class="fc" id="L239">                    .append(row.application().search().metrics().chargedSearchWorkUnits()).append(&quot; · Primitive Schritte: &quot;)</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">                    .append(state.primitiveDepth()).append(&quot; · Programm verwendet: &quot;).append(state.programUsed() ? &quot;ja&quot; : &quot;nein&quot;)</span>
+<span class="fc" id="L241">                    .append(&quot;&lt;/p&gt;&lt;ol&gt;&quot;);</span>
+<span class="fc" id="L242">                out.append(&quot;&lt;li&gt;&lt;code&gt;&quot;).append(escape(state.path().getFirst())).append(&quot;&lt;/code&gt;&lt;/li&gt;&quot;);</span>
+<span class="fc" id="L243">                appendPrimitiveSteps(out, state.transformations());</span>
+<span class="fc" id="L244">                out.append(&quot;&lt;/ol&gt;&quot;);</span>
+            }
+<span class="fc" id="L246">            out.append(&quot;&lt;/details&gt;&quot;);</span>
+<span class="fc" id="L247">        }</span>
+<span class="fc" id="L248">        return out.append(&quot;&lt;p&gt;&lt;a href=\&quot;report.json\&quot;&gt;Vergleichsdaten&lt;/a&gt; · &lt;a href=\&quot;strategy.json\&quot;&gt;Strategie und Herkunft&lt;/a&gt; · &lt;a href=\&quot;manifest.json\&quot;&gt;Nachweise&lt;/a&gt;&lt;/p&gt;&lt;/html&gt;&quot;).toString();</span>
+    }
+
+    static String escape(String value) {
+<span class="fc" id="L252">        return value.replace(&quot;&amp;&quot;, &quot;&amp;amp;&quot;).replace(&quot;&lt;&quot;, &quot;&amp;lt;&quot;).replace(&quot;&gt;&quot;, &quot;&amp;gt;&quot;).replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;);</span>
+    }
+
+    static void appendPrimitiveSteps(StringBuilder out, List&lt;de.regelsuche.transform.Transformation&gt; steps) {
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        for (var step : steps) {</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">            if (step.provenance() instanceof de.regelsuche.transform.TransformationProvenance.Sequence sequence) {</span>
+<span class="fc" id="L258">                appendPrimitiveSteps(out, sequence.steps());</span>
+            } else {
+<span class="fc" id="L260">                out.append(&quot;&lt;li&gt;&lt;code&gt;&quot;).append(escape(step.transformedExpression()))</span>
+<span class="fc" id="L261">                    .append(&quot;&lt;/code&gt;&lt;br&gt;&lt;small&gt;Regel: &quot;).append(escape(step.rule()))</span>
+<span class="fc" id="L262">                    .append(&quot; · Anwendung: &quot;).append(escape(step.applicationKey())).append(&quot;&lt;/small&gt;&lt;/li&gt;&quot;);</span>
+            }
+<span class="fc" id="L264">        }</span>
+<span class="fc" id="L265">    }</span>
+
+    public static void main(String[] args) throws IOException {
+<span class="nc bnc" id="L268" title="All 2 branches missed.">        if (args.length != 1) throw new IllegalArgumentException(&quot;usage: TraceStrategyTransferExample OUTPUT_DIRECTORY&quot;);</span>
+<span class="nc" id="L269">        Path directory = write(run(), Path.of(args[0]));</span>
+<span class="nc" id="L270">        System.out.println(directory.resolve(&quot;index.html&quot;).toAbsolutePath());</span>
+<span class="nc" id="L271">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -286,18 +286,18 @@ public final class EvolutionGenomeCompiler {
             }
 <span class="fc" id="L287">            String identifier = readIdentifier();</span>
 <span class="pc bpc" id="L288" title="1 of 2 branches missed.">            if (!identifier.isEmpty()) {</span>
-<span class="pc bpc" id="L289" title="1 of 2 branches missed.">                if (peek('(')) {</span>
-<span class="nc" id="L290">                    consume();</span>
-<span class="nc" id="L291">                    List&lt;PatternExpr&gt; arguments = new ArrayList&lt;&gt;();</span>
-<span class="nc bnc" id="L292" title="All 2 branches missed.">                    if (!peek(')')) {</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">                if (peek('(')) {</span>
+<span class="fc" id="L290">                    consume();</span>
+<span class="fc" id="L291">                    List&lt;PatternExpr&gt; arguments = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">                    if (!peek(')')) {</span>
                         do {
-<span class="nc" id="L294">                            arguments.add(parseExpression());</span>
-<span class="nc bnc" id="L295" title="All 2 branches missed.">                        } while (consumeIf(','));</span>
+<span class="fc" id="L294">                            arguments.add(parseExpression());</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">                        } while (consumeIf(','));</span>
                     }
-<span class="nc" id="L297">                    expect(')');</span>
-<span class="nc" id="L298">                    return PatternExpr.fn(</span>
+<span class="fc" id="L297">                    expect(')');</span>
+<span class="fc" id="L298">                    return PatternExpr.fn(</span>
                         identifier,
-<span class="nc" id="L300">                        arguments.toArray(PatternExpr[]::new));</span>
+<span class="fc" id="L300">                        arguments.toArray(PatternExpr[]::new));</span>
                 }
 <span class="fc" id="L302">                return PatternExpr.variable(identifier);</span>
             }
@@ -341,11 +341,11 @@ public final class EvolutionGenomeCompiler {
         }
 
         private boolean consumeIf(char expected) {
-<span class="pc bpc" id="L344" title="1 of 2 branches missed.">            if (peek(expected)) {</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">            if (peek(expected)) {</span>
 <span class="fc" id="L345">                consume();</span>
 <span class="fc" id="L346">                return true;</span>
             }
-<span class="nc" id="L348">            return false;</span>
+<span class="fc" id="L348">            return false;</span>
         }
 
         private void expect(char expected) {

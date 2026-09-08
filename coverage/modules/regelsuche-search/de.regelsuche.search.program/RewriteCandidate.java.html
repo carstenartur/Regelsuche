@@ -149,9 +149,9 @@ public record RewriteCandidate(
 
     private RewriteKind combinedKind() {
 <span class="fc" id="L151">        RewriteKind first = steps.get(0).kind();</span>
-<span class="pc bpc" id="L152" title="2 of 4 branches missed.">        return steps.stream().allMatch(step -&gt; step.kind() == first)</span>
+<span class="fc bfc" id="L152" title="All 4 branches covered.">        return steps.stream().allMatch(step -&gt; step.kind() == first)</span>
 <span class="fc" id="L153">            ? first</span>
-<span class="nc" id="L154">            : RewriteKind.NORMALIZE;</span>
+<span class="fc" id="L154">            : RewriteKind.NORMALIZE;</span>
     }
 
     private static int saturatedAdd(int left, int right) {
