@@ -30,10 +30,11 @@ import java.util.TreeSet;
  * Learns a branching rule schedule from real, target-free primitive searches.
  * The supplied polynomial rules stay fixed: this learner induces program
  * topology, not new identities. All executions use the existing interpreter
- * and work-budget frontier. No target or evaluation family enters training.
+ * and work-budget frontier. No external target or evaluation family enters
+ * training; minimality checks use only an endpoint selected by the TRAIN search.
  */
 public final class TraceRewriteStrategyLearner {
-    public static final String REVISION = "regelsuche.trace-rewrite-strategy-learner/v1";
+    public static final String REVISION = "regelsuche.trace-rewrite-strategy-learner/v2";
     private static final long SHUFFLE_SEED = 0x74726163654cL;
     private final ExactPolynomialAnalysis exact = new ExactPolynomialAnalysis();
 
@@ -45,9 +46,13 @@ public final class TraceRewriteStrategyLearner {
     }
 
     public record Limits(Budget trainingBudget, int maximumInputs, int maximumTraceSteps,
-                         int maximumProgramNodes) {
+                         int maximumProgramNodes, PrimitiveTraceMinimalityVerifier.Limits minimalityLimits) {
+        public Limits(Budget trainingBudget, int maximumInputs, int maximumTraceSteps, int maximumProgramNodes) {
+            this(trainingBudget, maximumInputs, maximumTraceSteps, maximumProgramNodes, PrimitiveTraceMinimalityVerifier.Limits.defaults());
+        }
         public Limits {
             Objects.requireNonNull(trainingBudget, "trainingBudget");
+            Objects.requireNonNull(minimalityLimits, "minimalityLimits");
             if (maximumInputs < 2 || maximumInputs > 32 || maximumTraceSteps < 2 || maximumTraceSteps > 8
                     || maximumProgramNodes < 3 || maximumProgramNodes > 128
                     || trainingBudget.maxPrimitiveSteps() > maximumTraceSteps
@@ -63,8 +68,12 @@ public final class TraceRewriteStrategyLearner {
 
     /** Failed, unchanged and budget-limited training searches remain in the model. */
     public record Observation(Input input, String alphaIdentity, Result search,
-                              List<String> geneSequence, long replayWorkUnits, int exactAuditCalls) {
-        public Observation { geneSequence = List.copyOf(geneSequence); }
+                              List<String> geneSequence, long replayWorkUnits, int exactAuditCalls,
+                              Optional<PrimitiveTraceMinimalityVerifier.Assessment> minimality) {
+        public Observation {
+            geneSequence = List.copyOf(geneSequence);
+            minimality = Objects.requireNonNull(minimality, "minimality");
+        }
         public String searchHash() { return SchematicProofPlan.hash(search.toCanonicalJson()); }
     }
 
@@ -108,6 +117,10 @@ public final class TraceRewriteStrategyLearner {
         public int trainingExactAuditCalls() {
             return observations.stream().mapToInt(Observation::exactAuditCalls).sum();
         }
+        public long trainingMinimalityWorkUnits() {
+            return observations.stream().mapToLong(o -> o.minimality().map(PrimitiveTraceMinimalityVerifier.Assessment::measuredWork)
+                .orElse(0L)).reduce(0L, Math::addExact);
+        }
 
         private String render() {
             var json = new JsonWriter().beginObject().property("schema", REVISION)
@@ -117,6 +130,9 @@ public final class TraceRewriteStrategyLearner {
                 .property("identityRevision", ExactPolynomialAnalysis.REVISION)
                 .property("formation", "TARGET_FREE_SCORER_SELECTED_PRIMITIVE_TRACES")
                 .property("topology", "OBSERVED_RULE_SEQUENCES_SHARED_PREFIX_CHOICE")
+                .property("minimalityRevision", PrimitiveTraceMinimalityVerifier.REVISION)
+                .property("minimalityScope", PrimitiveTraceMinimalityVerifier.SCOPE)
+                .property("formationGate", "SHORTEST_VERIFIED_TRACE_ONLY;SHORTEN_OR_REJECT;INCONCLUSIVE_REJECTED")
                 .property("objective", "EXPRESSION_SCORE_PLUS_2_PER_PRIMITIVE_PLUS_5_PER_EXPANDING_STEP")
                 .property("shuffleSeed", SHUFFLE_SEED)
                 .property("shufflePolicy", "FIXED_SEED_FISHER_YATES;ROTATE_UNCHANGED_SEQUENCE_ONCE")
@@ -128,8 +144,10 @@ public final class TraceRewriteStrategyLearner {
                 .property("trainingSearchWorkUnits", trainingSearchWorkUnits())
                 .property("trainingReplayWorkUnits", trainingReplayWorkUnits())
                 .property("trainingExactAuditCalls", trainingExactAuditCalls())
+                .property("trainingMinimalityWorkUnits", trainingMinimalityWorkUnits())
+                .object("minimalityLimits", value -> PrimitiveTraceMinimalityVerifier.writeLimits(value, limits.minimalityLimits()))
                 .property("inventoryIdentityChecks", inventory.rewrites().size())
-                .property("workClaim", "SEARCH_MECHANICS_AND_AUDIT_CALLS;NOT_COMPLETE_CPU_OR_LEARNING_COST")
+                .property("workClaim", "SEARCH_MECHANICS_MINIMALITY_EVENTS_AND_AUDIT_CALLS;NOT_COMPLETE_CPU_OR_LEARNING_COST")
                 .stringArray("excludedAlphaPolynomialIdentities", excludedIdentities)
                 .property("plan", plan.map(EvolutionRewriteProgramPlan::toCanonicalJson).orElse(""))
                 .property("shuffledPlan", shuffled.map(EvolutionRewriteProgramPlan::toCanonicalJson).orElse(""))
@@ -140,7 +158,8 @@ public final class TraceRewriteStrategyLearner {
                         .property("selectedOutput", o.search().bestState().expression())
                         .stringArray("geneSequence", o.geneSequence())
                         .property("replayWorkUnits", o.replayWorkUnits())
-                        .property("exactAuditCalls", o.exactAuditCalls()))));
+                        .property("exactAuditCalls", o.exactAuditCalls())
+                        .property("minimality", o.minimality().map(PrimitiveTraceMinimalityVerifier.Assessment::toCanonicalJson).orElse("")))));
             return json.endObject().toString();
         }
     }
@@ -192,38 +211,10 @@ public final class TraceRewriteStrategyLearner {
             identities.put(input.id(), identity);
         }
         var flat = flat(inventory);
+        var minimality = new PrimitiveTraceMinimalityVerifier(inventory);
         List<Observation> observations = new ArrayList<>();
         for (Input input : ordered) {
-            Result result = search(input.expression(), flat, limits.trainingBudget());
-            var selected = result.bestState();
-            List<String> sequence = new ArrayList<>();
-            String current = selected.path().getFirst();
-            long replayWork = 0;
-            int audits = 0;
-            for (var step : selected.transformations()) {
-                RewriteRule rule = rules.get(step.rule());
-                if (rule == null || step.primitiveStepCount() != 1 || step.exactTheoryStepCount() != 0
-                        || !step.assumptions().isEmpty()) {
-                    throw new IllegalArgumentException("training path is not a supported primitive trace");
-                }
-                var replay = MeasuredTransformationEngines.counting(new AstRewriteTransformationEngine(
-                    List.of(rule), inventory.budget().maxAstGrowthPerStep(), inventory.budget().maxCandidatesPerState()))
-                    .transformMeasured(current);
-                replayWork = Math.addExact(replayWork, replay.workMetrics().totalWorkUnits());
-                if (!replay.transformations().contains(step)) throw new IllegalArgumentException("primitive replay mismatch");
-                exact.requireEquivalent(current, step.transformedExpression());
-                audits++;
-                sequence.add(genes.get(step.rule()));
-                current = step.transformedExpression();
-            }
-            // Exclude every observed value, including unsuccessfully explored alternatives.
-            for (var state : result.exploredStates()) excluded.add(exact.alphaIdentity(state.expression()));
-            for (String state : selected.path()) excluded.add(exact.alphaIdentity(state));
-            if (sequence.size() < 2 || sequence.size() > limits.maximumTraceSteps()
-                    || new ExpressionScorer().score(input.expression()).weightedTotal() <= selected.score().weightedTotal()) {
-                sequence = List.of();
-            }
-            observations.add(new Observation(input, identities.get(input.id()), result, sequence, replayWork, audits));
+            observations.add(observeTraining(input, identities.get(input.id()), inventory, limits, genes, rules, flat, minimality, excluded));
         }
         List<List<String>> sequences = observations.stream().map(Observation::geneSequence)
             .filter(s -> !s.isEmpty()).distinct().toList();
@@ -240,6 +231,53 @@ public final class TraceRewriteStrategyLearner {
         }
         return new FrozenStrategy(inventory, limits, observations, excluded, plan,
             compileTopology(inventory, shuffledSequences, limits.maximumProgramNodes()));
+    }
+
+    private Observation observeTraining(Input input, String identity, EvolutionGenome inventory, Limits limits,
+            Map<String, String> genes, Map<String, RewriteRule> rules, MeasuredTransformationEngine flat,
+            PrimitiveTraceMinimalityVerifier verifier, Set<String> excluded) {
+        Result result = search(input.expression(), flat, limits.trainingBudget());
+        var selected = result.bestState();
+        var replay = replayTraining(inventory, selected.path().getFirst(), selected.transformations(), rules);
+        // Exclude every observed value, including unsuccessfully explored alternatives.
+        for (var state : result.exploredStates()) excluded.add(exact.alphaIdentity(state.expression()));
+        for (String state : selected.path()) excluded.add(exact.alphaIdentity(state));
+        List<String> sequence = List.of();
+        Optional<PrimitiveTraceMinimalityVerifier.Assessment> assessment = Optional.empty();
+        int steps = selected.transformations().size();
+        if (steps >= 2 && steps <= limits.maximumTraceSteps()
+                && new ExpressionScorer().score(input.expression()).weightedTotal() > selected.score().weightedTotal()) {
+            var checked = verifier.assess(selected.path().getFirst(), selected.transformations(), limits.minimalityLimits());
+            assessment = Optional.of(checked);
+            if (checked.status() == PrimitiveTraceMinimalityVerifier.Status.TECHNICAL_FAILURE) {
+                throw new IllegalStateException("primitive minimality verification failed: " + checked.toCanonicalJson());
+            }
+            if (checked.reusableMultistepTrace()) sequence = checked.shortestPath().stream().map(step -> genes.get(step.rule())).toList();
+        }
+        return new Observation(input, identity, result, sequence, replay.work(), replay.audits(), assessment);
+    }
+
+    private record TraceReplay(long work, int audits) {}
+
+    private TraceReplay replayTraining(EvolutionGenome inventory, String source,
+            List<de.regelsuche.transform.Transformation> steps, Map<String, RewriteRule> rules) {
+        String current = source;
+        long replayWork = 0;
+        int audits = 0;
+        for (var step : steps) {
+            RewriteRule rule = rules.get(step.rule());
+            if (rule == null || step.primitiveStepCount() != 1 || step.exactTheoryStepCount() != 0 || !step.assumptions().isEmpty()) {
+                throw new IllegalArgumentException("training path is not a supported primitive trace");
+            }
+            var replay = MeasuredTransformationEngines.counting(new AstRewriteTransformationEngine(
+                List.of(rule), inventory.budget().maxAstGrowthPerStep(), inventory.budget().maxCandidatesPerState())).transformMeasured(current);
+            replayWork = Math.addExact(replayWork, replay.workMetrics().totalWorkUnits());
+            if (!replay.transformations().contains(step)) throw new IllegalArgumentException("primitive replay mismatch");
+            exact.requireEquivalent(current, step.transformedExpression());
+            audits++;
+            current = step.transformedExpression();
+        }
+        return new TraceReplay(replayWork, audits);
     }
 
     public Application apply(FrozenStrategy strategy, String source, Budget budget, Profile profile) {
@@ -357,6 +395,8 @@ public final class TraceRewriteStrategyLearner {
             .property("shufflePolicy", "FIXED_SEED_FISHER_YATES;ROTATE_UNCHANGED_SEQUENCE_ONCE")
             .property("maximumInputs", limits.maximumInputs()).property("maximumTraceSteps", limits.maximumTraceSteps())
             .property("maximumProgramNodes", limits.maximumProgramNodes())
+            .property("minimalityRevision", PrimitiveTraceMinimalityVerifier.REVISION)
+            .object("minimalityLimits", value -> PrimitiveTraceMinimalityVerifier.writeLimits(value, limits.minimalityLimits()))
             .object("trainingBudget", value -> writeBudget(value, limits.trainingBudget()));
     }
 

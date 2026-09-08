@@ -41,6 +41,10 @@ class TraceRewriteStrategyLearnerTest {
             if (!observation.geneSequence().isEmpty()) {
                 assertTrue(observation.geneSequence().size() >= 2);
                 assertEquals(observation.search().bestState().primitiveDepth(), observation.geneSequence().size());
+                var proof = observation.minimality().orElseThrow();
+                assertTrue(proof.minimumProved());
+                assertEquals(observation.geneSequence().size(), proof.minimumPrimitiveSteps());
+                assertEquals(strategy.inventory().contentHash(), proof.inventoryHash());
             }
             assertEquals(observation.search().bestState().primitiveDepth(), observation.exactAuditCalls());
             assertTrue(observation.replayWorkUnits() > 0);
@@ -52,6 +56,45 @@ class TraceRewriteStrategyLearnerTest {
             }
         }
         assertTrue(strategy.trainingSearchWorkUnits() > strategy.trainingReplayWorkUnits());
+        assertTrue(strategy.trainingMinimalityWorkUnits() > 0);
+    }
+
+    @Test
+    void inconclusiveMinimalityCannotProduceALearnedProgram() {
+        var original = strategy.limits();
+        var limited = new TraceRewriteStrategyLearner.Limits(original.trainingBudget(), original.maximumInputs(),
+            original.maximumTraceSteps(), original.maximumProgramNodes(), new PrimitiveTraceMinimalityVerifier.Limits(1, 65_536, 512, 1024, 500_000));
+        var rejected = LEARNER.learn(strategy.inventory(), TraceStrategyTransferExample.trainingInputs(), limited);
+        assertTrue(rejected.plan().isEmpty());
+        assertTrue(rejected.shuffledPlan().isEmpty());
+        assertTrue(rejected.observations().stream().allMatch(o -> o.geneSequence().isEmpty()));
+        assertTrue(rejected.observations().stream().flatMap(o -> o.minimality().stream()).allMatch(proof ->
+            proof.status() == PrimitiveTraceMinimalityVerifier.Status.INCONCLUSIVE));
+        assertTrue(rejected.trainingMinimalityWorkUnits() > 0, "rejected checks remain charged");
+    }
+
+    @Test
+    void formationUsesTheShortestTraceEvenWhenOrdinarySearchExcludesTheShortcut() {
+        var original = strategy.inventory();
+        var shortcut = new EvolutionGenome.RewriteGene("shortcut", "(?A^2-?B^2)+?B*?B", "?A^2",
+            de.regelsuche.transform.RewriteKind.EXPAND, false, -2, 8, 32, List.of(), original.rewrites().getFirst().evidenceObligations());
+        var genes = new ArrayList<>(original.rewrites());
+        genes.add(shortcut);
+        var inventory = original.withRewrites(genes);
+        var originalLimits = strategy.limits();
+        var limits = new TraceRewriteStrategyLearner.Limits(Budget.primitive(6, 80, 32, 0, 30_000),
+            originalLimits.maximumInputs(), originalLimits.maximumTraceSteps(), originalLimits.maximumProgramNodes());
+        var inputs = TraceStrategyTransferExample.trainingInputs().subList(0, 2);
+        var shortest = LEARNER.learn(inventory, inputs, limits);
+        for (var observation : shortest.observations()) {
+            assertEquals(3, observation.search().bestState().primitiveDepth());
+            assertEquals(PrimitiveTraceMinimalityVerifier.Status.SHORTER_PATH_FOUND, observation.minimality().orElseThrow().status());
+            assertEquals(List.of("difference-product", "shortcut"), observation.geneSequence());
+        }
+        genes.set(genes.size() - 1, shortcut.withPatterns("(?A+?B)*(?A-?B)+?B*?B", "?A^2"));
+        var redundant = LEARNER.learn(original.withRewrites(genes), inputs, limits);
+        assertTrue(redundant.plan().isEmpty(), "an existing one-step connection cannot become a new macro");
+        assertTrue(redundant.observations().stream().allMatch(o -> o.minimality().orElseThrow().minimumPrimitiveSteps() == 1));
     }
 
     @Test

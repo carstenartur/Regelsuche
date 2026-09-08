@@ -24,11 +24,22 @@ class TraceStrategyDispatchExampleTest {
         while (repository != null && !Files.isRegularFile(repository.resolve("settings.gradle"))) repository = repository.getParent();
         assertNotNull(repository);
         assertEquals(Files.readString(repository.resolve("docs/generated/trace-strategy-dispatch-protocol.json")),
-            TraceStrategyDispatchExample.protocol(), "protocol was fixed before application");
+            TraceStrategyDispatchExample.protocol(), "retained protocol must match the executed comparison");
+        var mapper = new ObjectMapper();
+        var originalProtocol = mapper.readTree(Files.readString(repository.resolve("docs/generated/strategy-history-v1/trace-strategy-dispatch-protocol.json")));
+        var currentProtocol = mapper.readTree(TraceStrategyDispatchExample.protocol());
+        assertEquals(originalProtocol.get("application"), currentProtocol.get("application"), "no application cases may be changed for the new gate");
+        assertEquals(originalProtocol.get("selectionTrain"), currentProtocol.get("selectionTrain"));
+        assertEquals(mapper.readTree(originalProtocol.get("formationProtocol").asText()).get("inventory"),
+            mapper.readTree(currentProtocol.get("formationProtocol").asText()).get("inventory"));
         var report = TraceStrategyDispatchExample.run();
         assertEquals(Files.readString(repository.resolve("docs/generated/trace-strategy-dispatch-reference.json")), report.summaryJson());
         assertEquals(Files.readString(repository.resolve("docs/generated/trace-strategy-dispatch-reference.md")), TraceStrategyDispatchExample.markdown(report));
         assertEquals(1152, report.rows().size());
+        var historical = mapper.readTree(Files.readString(repository.resolve("docs/generated/strategy-history-v1/trace-strategy-dispatch-reference.json")));
+        assertEquals(historical.get("profiles"), mapper.readTree(report.summaryJson()).get("profiles"));
+        assertEquals(historical.get("families"), mapper.readTree(report.summaryJson()).get("families"));
+        assertTrue(report.policy().learningWork() > historical.get("learningWork").asLong(), "minimality verification must be paid");
         assertTrue(report.passes());
         assertTrue(report.work(Profile.LEARNED_DISPATCH) < report.work(Profile.UNGATED_CONTINUATIONS));
         assertTrue(report.policy().learningWork() + report.work(Profile.LEARNED_DISPATCH) > report.work(Profile.FLAT_GREEDY),
@@ -61,7 +72,6 @@ class TraceStrategyDispatchExampleTest {
 
         Path directory = TraceStrategyDispatchExample.write(report, output);
         assertEquals(directory, TraceStrategyDispatchExample.write(report, output));
-        var mapper = new ObjectMapper();
         String manifestText = Files.readString(directory.resolve("manifest.json"));
         var manifest = mapper.readTree(manifestText);
         assertEquals(report.contentHash(), manifest.get("reportHash").asText());

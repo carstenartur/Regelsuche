@@ -1,6 +1,6 @@
 # Conditional continuation: fixed development comparison
 
-All 288 fixed polynomial inputs and four profiles are retained. This repeats the public development batch with a mandatory primitive minimality gate in formation. It is not a fresh holdout, a sealed FINAL TEST or independent mathematical families.
+All 288 new polynomial inputs and four profiles are retained. These are public development compositions of known building blocks, not a sealed FINAL TEST or independent mathematical families.
 
 The learned dispatcher reuses an actual primitive candidate and executes only a selected continuation. All one-successor profiles use the same ranking and budgets. FLAT_EXHAUSTIVE is retained as an additional stronger search control.
 
@@ -25,7 +25,7 @@ Each family has 32 inputs. Work includes the cases where a learned hint fails.
 | scale | 1408 | 1248 | 1088 | 1088 |
 | unchanged | 192 | 192 | 192 | 192 |
 
-Formation work: 316 (including primitive minimality verification: 84); dispatch training including rejected trials and context collection: 850; total counted learning work: 1166.
+Formation work: 232; dispatch training including rejected trials and context collection: 850; total counted learning work: 1082.
 
 Development criterion passed: true. Learning plus application cheaper on this batch: false.
 

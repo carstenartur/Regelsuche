@@ -23,9 +23,7 @@ choice {
 
 ```
 
-Training search work: 188; primitive replay work: 27; exact step checks: 9; primitive minimality verification work: 84.
-
-Only traces with a proved shortest primitive connection for their concrete TRAIN endpoints enter the program. Shorter traces replace detours; inconclusive checks and zero/one-step connections do not form macros. This does not prove minimality for every later substitution.
+Training search work: 188; primitive replay work: 27; exact step checks: 9.
 
 These dimensions exclude a complete account of identity projection, compiler, parser, BigInteger and model-construction work. They do not establish amortized total-work or runtime superiority.
 

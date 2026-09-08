@@ -39,7 +39,11 @@ Die kleine [Referenz](generated/trace-strategy-dispatch-reference.json) bindet
 über den vollständigen Berichtshash alle 1.152 Ergebniszeilen. Sie und der
 [generierte Bericht](generated/trace-strategy-dispatch-reference.md) werden gegen
 einen frischen Lauf geprüft. Das [Protokoll](generated/trace-strategy-dispatch-protocol.json)
-wurde vor der ersten Ausführung dieses Anwendungsbestands festgeschrieben.
+wurde für Version 1 vor der ersten Ausführung dieses Anwendungsbestands
+festgeschrieben. Version 2 wiederholt dieselben Eingaben mit verpflichtender
+Minimalitätsprüfung bei der Formierung. Die unveränderten
+[Referenzen der Version 1](generated/strategy-history-v1/trace-strategy-dispatch-reference.md)
+bleiben erhalten; der erneute Lauf ist kein neuer Holdout.
 
 ## Was sich in der Ausführung ändert
 
@@ -48,7 +52,8 @@ wurde vor der ersten Ausführung dieses Anwendungsbestands festgeschrieben.
    verfügbaren Regeln. Die Fortsetzung beginnt hinter einem tatsächlich
    erzeugten ersten Schritt; sie berechnet diesen nicht nochmals.
 2. **Nutzbare Kontexte aus TRAIN wählen.** Die Formierung verwendet die vier
-   bisherigen Aufgaben. Acht mathematisch getrennte weitere TRAIN-Aufgaben
+   bisherigen Aufgaben und übernimmt nur [geprüfte kürzeste primitive Folgen](primitive-trace-minimality.md).
+   Acht mathematisch getrennte weitere TRAIN-Aufgaben
    dienen der Auswahl. Für jede mögliche zusätzliche Route wird die gesamte
    Auswahlserie ausgeführt. Nur eine strikte Arbeitsreduktion ohne schlechteren
    Score auf irgendeiner Trainingsaufgabe wird akzeptiert. Auch abgelehnte
@@ -117,13 +122,15 @@ Negative und bereits einfache Ausdrücke sind enthalten.
 
 ## Kosten und Aussagegrenze
 
-Die Formierung kostet 232 Einheiten, die Auswahl einschließlich verworfener
-Versuche weitere 850. Damit stehen 1.082 einmalige Lernarbeitseinheiten 128
+Die Formierung kostet 316 Einheiten, davon 84 für die zusätzliche
+Minimalitätsprüfung. Die Auswahl einschließlich verworfener Versuche kostet
+weitere 850. Damit stehen 1.166 einmalige Lernarbeitseinheiten 128
 gesparten Anwendungseinheiten pro 288er-Serie gegenüber. **Lernen plus Anwendung
-kostet hier 9.914 gegenüber 8.960 Einheiten der Greedy-Kontrolle.** Bei exakt
-gleichem Aufgabenmix wären rechnerisch neun solche Serien nötig, um die gezählten
+kostet hier 9.998 gegenüber 8.960 Einheiten der Greedy-Kontrolle.** Bei exakt
+gleichem Aufgabenmix wären rechnerisch zehn solche Serien nötig, um die gezählten
 Lernkosten einzuspielen. Das ist eine Extrapolation, kein ausgeführter Nachweis
-über 2.592 neue Aufgaben.
+über 2.880 neue Aufgaben. Die ursprüngliche Version 1 ohne diese Prüfung kostete
+1.082 Lerneinheiten; ihre Anwendungswerte sind unverändert geblieben.
 
 Die Bilanz enthält die vorhandenen mechanischen Suchereignisse, Kontextprüfungen,
 Sortierung, verworfene Kandidaten und exakte Prüfaufrufe. Sie ist keine Laufzeit-
@@ -152,8 +159,10 @@ Prioritätswert.
 
 Ein weiterführender Nutzenwert sollte sowohl die ersparte Suche ohne die Brücke
 als auch die danach erreichbaren nützlichen Darstellungen berücksichtigen. Die
-Länge einer bekannten Herleitung ist nur eine obere Schranke für die kürzeste
-primitive Verbindung. Umwege und Zyklen dürfen den Wert nicht erhöhen. Der
+Länge einer bekannten Herleitung ist zunächst eine obere Schranke für die
+kürzeste primitive Verbindung. Seit Version 2 muss die Regelbildung diesen
+Abstand prüfen: Sie kürzt Umwege auf die bewiesene kürzeste Folge und verwirft
+ungeklärte Fälle sowie Verbindungen mit null oder einem Schritt. Der
 bisherige Mining-`CompressionScore` schätzt die Pfadlänge zudem aus Pfadkennungen;
 das ersetzt keine gemessene Suche mit und ohne die Regel.
 

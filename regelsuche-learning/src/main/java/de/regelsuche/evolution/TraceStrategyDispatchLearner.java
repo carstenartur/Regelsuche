@@ -107,8 +107,8 @@ public final class TraceStrategyDispatchLearner {
             return Math.addExact(contextCollectionWork, trials.stream().mapToLong(Trial::measuredWork).reduce(0, Math::addExact));
         }
         public long formationWork() {
-            return Math.addExact(Math.addExact(formation.trainingSearchWorkUnits(), formation.trainingReplayWorkUnits()),
-                formation.trainingExactAuditCalls() + formation.inventory().rewrites().size());
+            return Math.addExact(Math.addExact(Math.addExact(formation.trainingSearchWorkUnits(), formation.trainingReplayWorkUnits()),
+                formation.trainingExactAuditCalls() + formation.inventory().rewrites().size()), formation.trainingMinimalityWorkUnits());
         }
         public long learningWork() { return Math.addExact(formationWork(), dispatchLearningWork()); }
         public String toCanonicalJson() { return json; }

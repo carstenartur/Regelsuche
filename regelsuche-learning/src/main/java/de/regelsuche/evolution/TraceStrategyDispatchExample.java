@@ -15,7 +15,7 @@ import java.util.TreeMap;
 
 /** New public development batch, fixed independently of the optimizer's measured outcomes. */
 public final class TraceStrategyDispatchExample {
-    public static final String REVISION = "regelsuche.trace-strategy-dispatch-comparison/v1";
+    public static final String REVISION = "regelsuche.trace-strategy-dispatch-comparison/v2";
     private TraceStrategyDispatchExample() {}
     public record Case(Input input, String family) {}
     public record Row(Case example, Profile profile, Observation observation) {}
@@ -62,7 +62,7 @@ public final class TraceStrategyDispatchExample {
             .property("optimizer", TraceStrategyDispatchLearner.REVISION)
             .property("continuationBackend", de.regelsuche.search.program.CompiledLinearRewriteEngine.REVISION)
             .property("backend", "PREPARED").property("goal", "TARGET_FREE")
-            .property("split", "PUBLIC_DEVELOPMENT;SEPARATE_FORMATION_AND_SELECTION_TRAIN;NEW_FIXED_APPLICATION_BATCH")
+            .property("split", "PUBLIC_DEVELOPMENT;SEPARATE_FORMATION_AND_SELECTION_TRAIN;SAME_FIXED_APPLICATION_BATCH_WITH_MINIMALITY_GATE")
             .property("successRule", "NO_SCORE_REGRESSIONS_VS_FLAT_GREEDY;LOWER_TOTAL_MEASURED_WORK;REPORT_AMORTIZATION_SEPARATELY")
             .property("reportPolicy", "ALL_288_CASES_ALL_FOUR_PROFILES_NO_RESULT_SELECTION")
             .object("limits", value -> TraceStrategyDispatchLearner.writeLimits(value, limits()))
@@ -104,6 +104,7 @@ public final class TraceStrategyDispatchExample {
                 .property("protocolHash", SchematicProofPlan.hash(protocol)).property("policyHash", policy.contentHash())
                 .property("cases", rows.size() / Profile.values().length).property("rows", rows.size())
                 .property("passesDevelopmentCriterion", passes()).property("learningWork", policy.learningWork())
+                .property("formationMinimalityWork", policy.formation().trainingMinimalityWorkUnits())
                 .array("families", values -> rows.stream().map(row -> row.example().family()).distinct().sorted().forEach(family ->
                     values.objectValue(value -> {
                         value.property("family", family);
@@ -138,7 +139,7 @@ public final class TraceStrategyDispatchExample {
 
     public static String markdown(Report report) {
         var out = new StringBuilder("# Conditional continuation: fixed development comparison\n\n")
-            .append("All 288 new polynomial inputs and four profiles are retained. These are public development compositions of known building blocks, not a sealed FINAL TEST or independent mathematical families.\n\n")
+            .append("All 288 fixed polynomial inputs and four profiles are retained. This repeats the public development batch with a mandatory primitive minimality gate in formation. It is not a fresh holdout, a sealed FINAL TEST or independent mathematical families.\n\n")
             .append("The learned dispatcher reuses an actual primitive candidate and executes only a selected continuation. All one-successor profiles use the same ranking and budgets. FLAT_EXHAUSTIVE is retained as an additional stronger search control.\n\n")
             .append("| Profile | Search mechanics + exact audit calls | Score regressions vs FLAT_GREEDY |\n|---|---:|---:|\n");
         for (var profile : Profile.values()) out.append("| ").append(profile).append(" | ").append(report.work(profile))
@@ -151,6 +152,7 @@ public final class TraceStrategyDispatchExample {
             out.append('\n');
         }
         out.append("\nFormation work: ").append(report.policy().formationWork())
+            .append(" (including primitive minimality verification: ").append(report.policy().formation().trainingMinimalityWorkUnits()).append(')')
             .append("; dispatch training including rejected trials and context collection: ").append(report.policy().dispatchLearningWork())
             .append("; total counted learning work: ").append(report.policy().learningWork()).append(".\n\n")
             .append("Development criterion passed: ").append(report.passes()).append(". Learning plus application cheaper on this batch: ")
@@ -173,8 +175,10 @@ public final class TraceStrategyDispatchExample {
         artifacts.put("index.html", html(report));
         for (var trial : report.policy().trials()) for (var observation : trial.observations()) artifacts.put(
             "train-" + trial.id() + "-" + observation.input().id() + ".search.json", observation.search().toCanonicalJson());
-        for (var observation : report.policy().formation().observations()) artifacts.put(
-            "formation-" + observation.input().id() + ".search.json", observation.search().toCanonicalJson());
+        for (var observation : report.policy().formation().observations()) {
+            artifacts.put("formation-" + observation.input().id() + ".search.json", observation.search().toCanonicalJson());
+            observation.minimality().ifPresent(proof -> artifacts.put("formation-" + observation.input().id() + ".minimality.json", proof.toCanonicalJson()));
+        }
         for (var row : report.rows()) artifacts.put(row.example().input().id() + "-" + row.profile().name() + ".search.json",
             row.observation().search().toCanonicalJson());
         return TraceStrategyTransferExample.writeArtifacts(report.contentHash(), artifacts, output, REVISION);
@@ -183,7 +187,8 @@ public final class TraceStrategyDispatchExample {
     static String html(Report report) {
         var out = new StringBuilder("<!doctype html><html lang=\"de\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Regelsuche · Gezielte Strategien</title>")
             .append("<style>body{font:17px/1.5 system-ui;max-width:1150px;margin:36px auto;padding:0 20px;background:#f7f9fa;color:#172b36}table{width:100%;border-collapse:collapse;margin:16px 0}th,td{text-align:left;border-bottom:1px solid #ccd9df;padding:10px;overflow-wrap:anywhere}details{background:white;border:1px solid #ccd9df;border-radius:8px;padding:14px;margin:12px 0}summary{cursor:pointer;font-weight:600}code{white-space:pre-wrap;overflow-wrap:anywhere}small{color:#455e6b}input{font:inherit;padding:10px;width:90%;max-width:500px}li{margin:10px 0}.table{overflow-x:auto}h1{line-height:1.2}</style>")
-            .append("<h1>Gelernte Strategien gezielt einsetzen</h1><p>288 neue Polynomaufgaben, vier Verfahren, gleiche Budgets. Einzelne Fälle und jeder primitive Rechenschritt lassen sich unten prüfen.</p>")
+            .append("<h1>Gelernte Strategien gezielt einsetzen</h1><p>288 feste Polynomaufgaben, vier Verfahren, gleiche Budgets. Einzelne Fälle und jeder primitive Rechenschritt lassen sich unten prüfen.</p>")
+            .append("<p>Vor der Bildung gelernter Folgen werden kürzere primitive Wege geprüft. Ungeklärte Folgen werden nicht übernommen; die Prüfkosten zählen zur Lernarbeit. Die Nachweise gelten für die konkreten Trainingsausdrücke und das festgehaltene Regelinventar.</p>")
             .append("<p>Das Training entscheidet, bei welchen verfügbaren Regeln eine gelernte Folge fortgesetzt wird. Ein vorhandener erster Schritt wird wiederverwendet; bei fehlender Fortsetzung bleiben die Einzelregeln verfügbar.</p>")
             .append("<div class=\"table\"><table><thead><tr><th>Verfahren</th><th>Gezählte Arbeit</th><th>Schlechterer Score als Greedy</th></tr></thead><tbody>");
         for (var profile : Profile.values()) out.append("<tr><td>").append(profileLabel(profile)).append("</td><td>")

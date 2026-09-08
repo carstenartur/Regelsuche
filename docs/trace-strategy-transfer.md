@@ -38,7 +38,8 @@ aufklappen. Auch die inneren Schritte einer Programmkante bleiben sichtbar.
 
 Das Verzeichnis wird nach dem Hash des Artefaktmanifests benannt. Es enthält `protocol.json`,
 `strategy.json`, `report.json`, `report.md`, `index.html`, alle vier Trainings-
-und 21 unterstützten Anwendungssuchen sowie ein abschließendes Hashmanifest.
+und 21 unterstützten Anwendungssuchen, die drei Minimalitätsnachweise sowie ein
+abschließendes Hashmanifest.
 Eine Wiederholung muss dieselben Bytes erzeugen; abweichende vorhandene Dateien
 werden nicht überschrieben. Die JSON-Artefakte schaffen allein keine ausführbare
 oder mathematische Autorität: Replay rekonstruiert die Quellen aus dem geprüften
@@ -56,7 +57,10 @@ Inventar und führt sie erneut aus.
 3. Der jeweils ausgewählte Pfad wird mit seinen tatsächlichen primitiven Regeln
    erneut ausgeführt und jeder Schritt exakt geprüft. Auch unveränderte,
    einstufige und budgetbegrenzte Beobachtungen bleiben gespeichert. Nur
-   verbessernde Pfade mit mindestens zwei Schritten tragen zum Programm bei.
+   verbessernde Pfade mit mindestens zwei Schritten kommen für das Programm infrage.
+   Seit Version 2 muss zusätzlich eine [Minimalitätsprüfung](primitive-trace-minimality.md)
+   die kürzeste primitive Verbindung für die ausgewählten TRAIN-Endpunkte
+   nachweisen. Kürzere Folgen ersetzen Umwege; ungeklärte Fälle werden abgelehnt.
 4. Gleiche Präfixe der beobachteten Regelfolgen werden zusammengefasst. Daraus
    entstehen `Source`, `Sequence` und `Choice` im vorhandenen
    `EvolutionRewriteProgramPlan`; Compiler und Interpreter werden wiederverwendet.

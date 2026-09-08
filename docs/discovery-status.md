@@ -99,10 +99,17 @@ Fortsetzung nur bei einem auf getrenntem TRAIN akzeptierten Kontext aus. Die
 neue Fallserie wurde vor ihrer Anwendung festgelegt und enthält auch passende
 Regelhinweise mit unpassenden Bindungen. Gegenüber einer starken Greedy-Kontrolle
 sinkt die gezählte Anwendungsarbeit von 8.960 auf 8.832 bei unveränderten Scores.
-Alle 1.152 Vergleichszeilen bleiben erhalten. Die einmaligen 1.082 Einheiten
+Alle 1.152 Vergleichszeilen bleiben erhalten. Die einmaligen 1.166 Einheiten
 Lernarbeit sind zusätzlich zu zahlen; dies ist noch kein positiver Gesamtkosten-
 oder Laufzeitnachweis. Der ursprüngliche negative Zusatzprogrammvergleich bleibt
 unverändert reproduzierbar.
+
+Bei der [Bildung gelernter Folgen](primitive-trace-minimality.md) ist die Prüfung
+auf kürzere primitive Verbindungen jetzt verpflichtend. Der Nachweis bindet die
+konkreten TRAIN-Endpunkte und das atomare Inventar. Kürzere Wege ersetzen
+beobachtete Umwege; Ressourcenabbrüche ergeben keine Freigabe. Die zusätzlichen
+84 Prüfeinheiten sind in der Lernbilanz enthalten. Dies beweist keinen globalen
+Mindestabstand für jede spätere Variablenbelegung.
 
 ## Was historische Wiederentdeckung hier bedeutet
 

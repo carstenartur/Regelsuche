@@ -111,6 +111,11 @@ Ergebnisqualität insgesamt **1,4 % weniger gezählte Arbeit als die starke
 Greedy-Kontrolle**. Die einmaligen Lernkosten sind auf diesem Bestand noch nicht
 eingespielt. Die neue Demo zeigt auch irreführende Hinweise und teurere Einzelfälle.
 
+Die [Regelbildung prüft kürzere primitive Wege](docs/primitive-trace-minimality.md),
+bevor sie eine Umformungsfolge übernimmt. Ein beobachteter 20-Schritt-Umweg darf
+dadurch keinen Wert von 20 erhalten, wenn zwei Schritte genügen. Ungeklärte
+Minimalität führt zur Ablehnung; Nachweise und Prüfkosten werden gespeichert.
+
 ## Workbench statt Konsolenausgabe
 
 Browser-E2E-Tests prüfen die sichtbaren Abläufe und erzeugen dieselben

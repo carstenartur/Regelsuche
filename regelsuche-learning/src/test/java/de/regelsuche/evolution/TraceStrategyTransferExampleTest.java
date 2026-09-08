@@ -80,7 +80,15 @@ class TraceStrategyTransferExampleTest {
         assertEquals(directory, TraceStrategyTransferExample.write(repeated, output));
         var manifest = new ObjectMapper().readTree(Files.readString(directory.resolve("manifest.json")));
         assertEquals(report.contentHash(), manifest.get("reportHash").asText());
-        assertEquals(30, manifest.get("artifacts").size());
+        assertEquals(33, manifest.get("artifacts").size());
+        for (var observation : report.strategy().observations()) {
+            if (observation.minimality().isPresent()) {
+                var proof = observation.minimality().orElseThrow();
+                assertTrue(proof.reusableMultistepTrace());
+                new PrimitiveTraceMinimalityVerifier(inventory).verify(proof);
+                assertEquals(proof.toCanonicalJson(), Files.readString(directory.resolve(observation.input().id() + ".minimality.json")));
+            }
+        }
         for (var artifact : manifest.get("artifacts")) {
             assertEquals(artifact.get("sha256").asText(), SchematicProofPlan.hash(
                 Files.readString(directory.resolve(artifact.get("name").asText()))));

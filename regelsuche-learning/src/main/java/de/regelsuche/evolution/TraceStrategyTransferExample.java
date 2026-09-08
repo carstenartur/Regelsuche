@@ -24,7 +24,8 @@ import java.util.TreeMap;
  * The learner receives only TRAIN; labels and comparisons are report metadata.
  */
 public final class TraceStrategyTransferExample {
-    public static final String REVISION = "regelsuche.trace-strategy-transfer-development/v1";
+    public static final String REVISION = "regelsuche.trace-strategy-transfer-development/v2";
+    private static final String INVENTORY_PROTOCOL_REVISION = "regelsuche.trace-strategy-transfer-development/v1";
     private static final Budget BUDGET = Budget.primitive(6, 80, 32, 6, 30_000);
     private TraceStrategyTransferExample() {}
 
@@ -73,9 +74,9 @@ public final class TraceStrategyTransferExample {
     public static EvolutionGenome inventory() {
         String trainHash = SchematicProofPlan.hash(trainingJson());
         var scope = new EvolutionGenome.TrainingScope(EvolutionGenome.SourceSplit.TRAIN, trainHash,
-            SchematicProofPlan.hash(REVISION + ":development-split"),
-            SchematicProofPlan.hash(REVISION + ":no-final-test"),
-            SchematicProofPlan.hash(REVISION + ":fixed-objective"));
+            SchematicProofPlan.hash(INVENTORY_PROTOCOL_REVISION + ":development-split"),
+            SchematicProofPlan.hash(INVENTORY_PROTOCOL_REVISION + ":no-final-test"),
+            SchematicProofPlan.hash(INVENTORY_PROTOCOL_REVISION + ":fixed-objective"));
         return EvolutionGenome.create(EvolutionGenome.Objective.OPEN_TARGET_OPERATOR, scope,
             List.of(
                 gene("difference-product", "(?A+?B)*(?A-?B)", "?A^2-?B^2"),
@@ -104,7 +105,7 @@ public final class TraceStrategyTransferExample {
 
     public static String protocol() {
         return new JsonWriter().beginObject().property("schema", REVISION)
-            .property("information", "NO_TARGET_IN_TRAIN_OR_APPLICATION;EVALUATION_LABELS_REPORT_ONLY")
+            .property("information", "NO_EXTERNAL_TARGET;TARGET_FREE_TRACE_SEARCH;SELECTED_TRAIN_ENDPOINT_FOR_MINIMALITY;EVALUATION_LABELS_REPORT_ONLY")
             .property("split", "PUBLIC_DEVELOPMENT_CASES;NOT_SEALED_VALIDATION_OR_FINAL_TEST")
             .property("inventory", inventory().toCanonicalJson()).property("train", trainingJson())
             .object("learner", value -> TraceRewriteStrategyLearner.writeLearningProtocol(value, limits()))
@@ -153,6 +154,7 @@ public final class TraceStrategyTransferExample {
         artifacts.put("index.html", html(report));
         for (var observation : report.strategy().observations()) {
             artifacts.put(observation.input().id() + ".search.json", observation.search().toCanonicalJson());
+            observation.minimality().ifPresent(proof -> artifacts.put(observation.input().id() + ".minimality.json", proof.toCanonicalJson()));
         }
         for (var row : report.rows()) {
             if (row.application() != null) artifacts.put(row.example().id() + "-" + row.profile().name().toLowerCase(java.util.Locale.ROOT)
@@ -191,7 +193,9 @@ public final class TraceStrategyTransferExample {
             .append(report.strategy().plan().map(EvolutionRewriteProgramPlan::toReadableProgram).orElse("No multistep strategy learned."))
             .append("\n```\n\nTraining search work: ").append(report.strategy().trainingSearchWorkUnits())
             .append("; primitive replay work: ").append(report.strategy().trainingReplayWorkUnits())
-            .append("; exact step checks: ").append(report.strategy().trainingExactAuditCalls()).append(".\n\n")
+            .append("; exact step checks: ").append(report.strategy().trainingExactAuditCalls())
+            .append("; primitive minimality verification work: ").append(report.strategy().trainingMinimalityWorkUnits()).append(".\n\n")
+            .append("Only traces with a proved shortest primitive connection for their concrete TRAIN endpoints enter the program. Shorter traces replace detours; inconclusive checks and zero/one-step connections do not form macros. This does not prove minimality for every later substitution.\n\n")
             .append("These dimensions exclude a complete account of identity projection, compiler, parser, BigInteger and model-construction work. They do not establish amortized total-work or runtime superiority.\n\n")
             .append("| Case | Profile | Selected output | Score ↓ | Search work | Primitive steps | Learned/shuffled program used | Status |\n")
             .append("|---|---|---|---:|---:|---:|---|---|\n");
@@ -219,6 +223,12 @@ public final class TraceStrategyTransferExample {
             .append(escape(report.strategy().plan().map(EvolutionRewriteProgramPlan::toReadableProgram).orElse("Keine mehrstufige Strategie gelernt.")))
             .append("</pre><p>Sucharbeit im Training: ").append(report.strategy().trainingSearchWorkUnits())
             .append(". Prüf- und weitere Lernkosten stehen getrennt im <a href=\"report.md\">vollständigen Bericht</a>.</p></details>");
+        out.append("<details><summary>Geprüfte primitive Mindestlängen im Training</summary><ul>");
+        for (var observation : report.strategy().observations()) observation.minimality().ifPresent(proof -> out.append("<li>")
+            .append(escape(observation.input().id())).append(": beobachtet ").append(proof.observedPrimitiveSteps())
+            .append(", geprüftes Minimum ").append(proof.minimumPrimitiveSteps() < 0 ? "ungeklärt" : proof.minimumPrimitiveSteps())
+            .append(" · <a href=\"").append(observation.input().id()).append(".minimality.json\">Nachweis und Prüfkosten</a></li>"));
+        out.append("</ul><p>Gilt für die konkreten Trainingsausdrücke und dieses atomare Inventar; kein pauschaler Mindestabstand für spätere Variablenbelegungen.</p></details>");
         for (var row : report.rows()) {
             out.append("<details><summary>").append(escape(row.example().id())).append(" · ").append(row.profile()).append("</summary><p>Ausgang: <code>")
                 .append(escape(row.example().expression())).append("</code></p>");
