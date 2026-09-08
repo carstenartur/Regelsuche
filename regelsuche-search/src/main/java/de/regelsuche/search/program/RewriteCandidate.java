@@ -2,6 +2,8 @@ package de.regelsuche.search.program;
 
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationProvenance;
+import de.regelsuche.transform.ExecutionWork;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -26,6 +28,14 @@ public record RewriteCandidate(
         if (steps.isEmpty()) {
             throw new IllegalArgumentException("steps must not be empty");
         }
+        String current = inputExpression;
+        for (Transformation step : steps) {
+            step.provenance().requireSource(current);
+            current = step.transformedExpression();
+        }
+        if (!current.equals(outputExpression)) {
+            throw new IllegalArgumentException("candidate output differs from its final step");
+        }
     }
 
     public List<String> ruleIds() {
@@ -41,6 +51,15 @@ public record RewriteCandidate(
 
     public Transformation lastStep() {
         return steps.get(steps.size() - 1);
+    }
+
+    public ExecutionWork executionWork() {
+        return steps.stream().map(Transformation::executionWork).reduce(ExecutionWork.ZERO, ExecutionWork::plus);
+    }
+
+    public TransformationProvenance provenance() {
+        return steps.size() == 1 ? steps.getFirst().provenance()
+            : new TransformationProvenance.Sequence(inputExpression, steps);
     }
 
     public RewriteCandidate append(RewriteCandidate suffix, String newOriginNodeId) {
@@ -69,10 +88,9 @@ public record RewriteCandidate(
     }
 
     /**
-     * Converts the path into the ordinary transformation model consumed by all
-     * existing search strategies. Primitive candidates are preserved exactly;
-     * multi-step candidates become explicit macro-like transformations whose
-     * structured primitive lineage remains visible to work-aware search.
+     * Converts the path into the canonical transformation model. Single steps
+     * are preserved exactly; compositions retain every intermediate application.
+     * A mixed transformation requires a consumer with explicit theory authority.
      */
     public Transformation toTransformation() {
         if (steps.size() == 1) {
@@ -109,15 +127,24 @@ public record RewriteCandidate(
             assumptions,
             combinedValue(steps.stream().map(Transformation::packId).toList()),
             combinedValue(steps.stream().map(Transformation::license).toList()),
-            primitiveRuleIds()
+            primitiveRuleIds(),
+            provenance()
         );
     }
 
-    String fingerprint() {
+    Identity identity() {
+        return new Identity(inputExpression, outputExpression, provenance());
+    }
+
+    record Identity(String inputExpression, String outputExpression, TransformationProvenance provenance) {}
+
+    String orderingKey() {
         return outputExpression + "\u0000"
             + steps.stream().map(Transformation::applicationKey)
                 .reduce((left, right) -> left + "\u0001" + right)
-                .orElse("");
+                .orElse("")
+            + (steps.stream().noneMatch(step -> step.exactTheoryStepCount() > 0)
+                ? "" : "\u0000" + provenance().contentHash());
     }
 
     private RewriteKind combinedKind() {

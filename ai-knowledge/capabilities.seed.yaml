@@ -382,8 +382,8 @@
 - id: schematic-exact-plan-replay
   label: "Schematic exact-plan resolution, replay and budgeted source"
   description: "Creates content-addressed schematic proof plans, resolves finite polynomial coefficient and sign holes exhaustively, replays complete plan runs under bound solver and resolver revisions, and exposes one explicitly selected verifier-owned result through a non-primitive budgeted exact-theory source."
-  modules: [regelsuche-learning, regelsuche-math-algorithms, regelsuche-search]
-  ownerModules: [regelsuche-learning, regelsuche-search]
+  modules: [regelsuche-core, regelsuche-learning, regelsuche-math-algorithms, regelsuche-search]
+  ownerModules: [regelsuche-core, regelsuche-learning, regelsuche-search]
   typePatterns:
     - 'SchematicProofPlan*'
     - 'ExactFinitePolynomialPlan*'
@@ -391,12 +391,19 @@
     - 'ExactFinitePolynomialResolvedCandidate'
     - 'BudgetedTransformationSource*'
     - 'VerifiedFinitePolynomialCandidateSource'
+    - 'VerifiedFinitePolynomialTransformationEngine'
+    - 'FinitePolynomialTheoryEvidenceProvider'
+    - 'ExactTheoryEvidence*'
+    - 'TransformationProvenance'
+    - 'ExecutionWork'
+    - 'WorkAwareTransformationEngine'
   testPatterns:
     - 'SchematicProofPlan*Test'
     - 'ExactFinitePolynomialPlan*Test'
     - 'ExactFinitePolynomialHoleSolverTest'
     - 'BudgetedTransformationSource*Test'
     - 'VerifiedFinitePolynomialCandidateSourceTest'
+    - 'TransformationProvenanceTest'
   docPatterns:
     - docs/schematic-proof-plan-ir.md
     - docs/schematic-proof-plan-residual-composition.md
@@ -404,6 +411,7 @@
     - docs/exact-finite-polynomial-plan-resolution.md
     - docs/exact-finite-polynomial-plan-replay-receipt.md
     - docs/budgeted-exact-theory-source.md
+    - docs/mixed-rewrite-program-execution.md
   evidenceTypes:
     - validation-evidence
   tags: [schematic-plan, exact-solver, replay, exact-theory, budgeted-execution, reproducibility]

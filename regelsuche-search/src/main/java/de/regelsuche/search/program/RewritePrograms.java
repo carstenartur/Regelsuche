@@ -113,7 +113,7 @@ public final class RewritePrograms {
                 candidate.toTransformation().estimatedCostDelta())
             .thenComparing(candidate -> candidate.toTransformation().rule())
             .thenComparing(RewriteCandidate::outputExpression)
-            .thenComparing(RewriteCandidate::fingerprint);
+            .thenComparing(RewriteCandidate::orderingKey);
     }
 
     public static Comparator<RewriteCandidate> preferRuleOrder(List<String> ruleIds) {
@@ -125,7 +125,7 @@ public final class RewritePrograms {
             })
             .thenComparing(candidate -> candidate.lastStep().rule())
             .thenComparing(RewriteCandidate::outputExpression)
-            .thenComparing(RewriteCandidate::fingerprint);
+            .thenComparing(RewriteCandidate::orderingKey);
     }
 
     public static Predicate<RewriteCandidate> equivalencePreserving() {

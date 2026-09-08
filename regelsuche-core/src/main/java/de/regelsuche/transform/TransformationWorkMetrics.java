@@ -21,7 +21,8 @@ public record TransformationWorkMetrics(
     long repeatEndpoints,
     long alternativeSelections,
     long alternativesSkipped,
-    long duplicateCandidatesDropped
+    long duplicateCandidatesDropped,
+    ExecutionWork candidateWork
 ) {
     public static final TransformationWorkMetrics ZERO =
         new TransformationWorkMetrics(
@@ -29,6 +30,7 @@ public record TransformationWorkMetrics(
             0, 0, 0, 0, 0, 0, 0);
 
     public TransformationWorkMetrics {
+        candidateWork = java.util.Objects.requireNonNull(candidateWork, "candidateWork");
         requireNonNegative(engineInvocations, "engineInvocations");
         requireNonNegative(programNodeVisits, "programNodeVisits");
         requireNonNegative(sourceInvocations, "sourceInvocations");
@@ -49,6 +51,18 @@ public record TransformationWorkMetrics(
             throw new IllegalArgumentException(
                 "requirementRejections must not exceed requirementEvaluations");
         }
+    }
+
+    /** Frozen v1 constructor: historical mechanical reports retain their scalar formula. */
+    public TransformationWorkMetrics(long engineInvocations, long programNodeVisits, long sourceInvocations,
+            long sourceCandidates, long composedCandidates, long requirementEvaluations,
+            long requirementRejections, long priorityCandidatesOrdered, long prunedCandidates,
+            long repeatIterations, long repeatEndpoints, long alternativeSelections,
+            long alternativesSkipped, long duplicateCandidatesDropped) {
+        this(engineInvocations, programNodeVisits, sourceInvocations, sourceCandidates, composedCandidates,
+            requirementEvaluations, requirementRejections, priorityCandidatesOrdered, prunedCandidates,
+            repeatIterations, repeatEndpoints, alternativeSelections, alternativesSkipped,
+            duplicateCandidatesDropped, ExecutionWork.ZERO);
     }
 
     /** Work accounting for one ordinary, non-program engine invocation. */
@@ -91,7 +105,7 @@ public record TransformationWorkMetrics(
             add(repeatEndpoints, other.repeatEndpoints),
             add(alternativeSelections, other.alternativeSelections),
             add(alternativesSkipped, other.alternativesSkipped),
-            add(duplicateCandidatesDropped, other.duplicateCandidatesDropped));
+            add(duplicateCandidatesDropped, other.duplicateCandidatesDropped), candidateWork.plus(other.candidateWork));
     }
 
     public TransformationWorkMetrics withDuplicateCandidatesDropped(
@@ -112,7 +126,19 @@ public record TransformationWorkMetrics(
             repeatEndpoints,
             alternativeSelections,
             alternativesSkipped,
-            add(duplicateCandidatesDropped, additional));
+            add(duplicateCandidatesDropped, additional), candidateWork);
+    }
+
+    public TransformationWorkMetrics withCandidateWork(ExecutionWork work) {
+        return new TransformationWorkMetrics(engineInvocations, programNodeVisits, sourceInvocations,
+            sourceCandidates, composedCandidates, requirementEvaluations, requirementRejections,
+            priorityCandidatesOrdered, prunedCandidates, repeatIterations, repeatEndpoints,
+            alternativeSelections, alternativesSkipped, duplicateCandidatesDropped, work);
+    }
+
+    /** v2 includes all observed mathematical candidate work, even if later discarded. */
+    public long totalWorkUnitsV2() {
+        return Math.addExact(totalWorkUnits(), candidateWork.canonicalWorkUnits());
     }
 
     /**

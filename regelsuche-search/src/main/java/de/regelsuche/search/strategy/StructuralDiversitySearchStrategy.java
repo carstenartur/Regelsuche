@@ -91,7 +91,7 @@ public final class StructuralDiversitySearchStrategy implements SearchStrategy {
         Set<String> visited
     ) {
         List<Transformation> transformations = new ArrayList<>(
-            problem.engine().transform(current.expression()));
+            problem.transformations(current.expression()));
         transformations.sort(Comparator
             .comparing(Transformation::rule)
             .thenComparing(Transformation::transformedExpression)

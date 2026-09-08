@@ -2,6 +2,10 @@ package de.regelsuche.search.program;
 
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationWorkMetrics;
+import de.regelsuche.transform.ExecutionWork;
+import de.regelsuche.transform.WorkAwareTransformationEngine;
+import de.regelsuche.transform.MeasuredTransformationEngine;
+import de.regelsuche.search.program.BudgetedRewriteProgramExecution.PathBudget;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -12,10 +16,9 @@ import java.util.Objects;
 /**
  * Deterministic interpreter for the Java-internal rewrite program model.
  *
- * <p>The ordinary interpreter composes primitive or proof-expandable
- * {@link Transformation} instances. Exact-theory sources use a separate,
- * explicitly budgeted entries and are never converted into ordinary
- * transformations by this class.</p>
+ * <p>Ordinary execution remains primitive-only. The explicit work-budget entry
+ * composes the same Transformation/RewriteCandidate model with verifier-backed
+ * exact theory. The frozen BudgetedSource protocol retains its separate entry.</p>
  */
 public final class RewriteProgramInterpreter {
     private static final Comparator<Transformation> TRANSFORMATION_ORDER =
@@ -42,19 +45,35 @@ public final class RewriteProgramInterpreter {
         RewriteTraceLevel traceLevel,
         RewriteTraceSink traceSink
     ) {
+        return executeInternal(program, expression, null, traceLevel, traceSink);
+    }
+
+    public RewriteExecution executeWithWorkBudget(RewriteProgram program, String expression, PathBudget budget) {
+        return executeWithWorkBudget(program, expression, budget, RewriteTraceLevel.OFF, RewriteTraceSink.noOp());
+    }
+
+    public RewriteExecution executeWithWorkBudget(RewriteProgram program, String expression, PathBudget budget,
+                                                 RewriteTraceLevel traceLevel, RewriteTraceSink traceSink) {
+        return executeInternal(program, expression, Objects.requireNonNull(budget, "budget"), traceLevel, traceSink);
+    }
+
+    private RewriteExecution executeInternal(RewriteProgram program, String expression, PathBudget budget,
+                                             RewriteTraceLevel traceLevel, RewriteTraceSink traceSink) {
         Objects.requireNonNull(program, "program");
         Objects.requireNonNull(traceLevel, "traceLevel");
         Objects.requireNonNull(traceSink, "traceSink");
-        rejectBudgetedSources(program);
+        rejectBudgetedSources(program, budget != null);
         String normalizedExpression = normalizeExpression(expression);
         Context context = new Context(traceLevel, traceSink);
-        Evaluation evaluation = evaluate(program, normalizedExpression, context);
+        Evaluation evaluation = evaluate(program, normalizedExpression, context, budget);
         List<RewriteCandidate> candidates = distinct(
             evaluation.candidates(), context);
         return new RewriteExecution(
             candidates,
             evaluation.complete(),
-            context.workMetrics()
+            context.workMetrics(),
+            context.observations,
+            budget
         );
     }
 
@@ -103,7 +122,8 @@ public final class RewriteProgramInterpreter {
     private Evaluation evaluate(
         RewriteProgram program,
         String inputExpression,
-        Context context
+        Context context,
+        PathBudget budget
     ) {
         context.programNodeVisited();
         context.summary(
@@ -119,24 +139,24 @@ public final class RewriteProgramInterpreter {
 
         Evaluation evaluation = switch (program) {
             case RewriteProgram.Source source ->
-                evaluateSource(source, inputExpression, context);
+                evaluateSource(source, inputExpression, context, budget);
             case RewriteProgram.BudgetedSource ignored ->
                 throw new IllegalStateException(
                     "budgeted source passed the unbudgeted preflight");
             case RewriteProgram.Choice choice ->
-                evaluateChoice(choice, inputExpression, context);
+                evaluateChoice(choice, inputExpression, context, budget);
             case RewriteProgram.FirstApplicable firstApplicable ->
-                evaluateFirstApplicable(firstApplicable, inputExpression, context);
+                evaluateFirstApplicable(firstApplicable, inputExpression, context, budget);
             case RewriteProgram.Sequence sequence ->
-                evaluateSequence(sequence, inputExpression, context);
+                evaluateSequence(sequence, inputExpression, context, budget);
             case RewriteProgram.Repeat repeat ->
-                evaluateRepeat(repeat, inputExpression, context);
+                evaluateRepeat(repeat, inputExpression, context, budget);
             case RewriteProgram.Require require ->
-                evaluateRequire(require, inputExpression, context);
+                evaluateRequire(require, inputExpression, context, budget);
             case RewriteProgram.Prioritize prioritize ->
-                evaluatePrioritize(prioritize, inputExpression, context);
+                evaluatePrioritize(prioritize, inputExpression, context, budget);
             case RewriteProgram.Prune prune ->
-                evaluatePrune(prune, inputExpression, context);
+                evaluatePrune(prune, inputExpression, context, budget);
         };
 
         List<String> rules = evaluation.candidates().size() == 1
@@ -161,21 +181,41 @@ public final class RewriteProgramInterpreter {
     private Evaluation evaluateSource(
         RewriteProgram.Source source,
         String inputExpression,
-        Context context
+        Context context,
+        PathBudget budget
     ) {
         context.sourceInvoked();
+        if (budget != null && source.engine() instanceof ProgrammedTransformationEngine nested) {
+            // Recurse with the same context: a batch projection would lose
+            // completeness, discarded evidence and the caller's remaining budget.
+            return evaluate(nested.program(), inputExpression, context, budget);
+        }
+        List<Transformation> emitted;
+        if (budget != null && source.engine() instanceof MeasuredTransformationEngine measured) {
+            var batch = measured.transformMeasured(inputExpression);
+            if (!batch.workMetrics().candidateWork().equals(ExecutionWork.ZERO)) {
+                throw new IllegalArgumentException("nested mathematical batches require retained execution observations");
+            }
+            context.delegatedWork = context.delegatedWork.plus(batch.workMetrics());
+            emitted = batch.transformations();
+        } else {
+            emitted = source.engine() instanceof WorkAwareTransformationEngine workAware
+                ? workAware.verifiedTransformations(inputExpression) : source.engine().transform(inputExpression);
+        }
         List<Transformation> transformations = new ArrayList<>(
             Objects.requireNonNull(
-                source.engine().transform(inputExpression),
+                emitted,
                 "TransformationEngine.transform must not return null"
             )
         );
         transformations.forEach(transformation ->
             Objects.requireNonNull(transformation, "transformation"));
+        if (budget == null) Transformation.requirePrimitiveOnly(transformations);
         transformations.sort(TRANSFORMATION_ORDER);
         context.sourceCandidates(transformations.size());
 
         List<RewriteCandidate> candidates = new ArrayList<>(transformations.size());
+        boolean complete = true;
         for (Transformation transformation : transformations) {
             RewriteCandidate candidate = new RewriteCandidate(
                 source.id(),
@@ -183,30 +223,45 @@ public final class RewriteProgramInterpreter {
                 transformation.transformedExpression(),
                 List.of(transformation)
             );
+            if (budget != null) {
+                boolean admitted = budget.admits(candidate.executionWork());
+                context.observations.add(new RewriteExecution.SourceObservation(candidate, budget, admitted));
+                context.candidateWork = context.candidateWork.plus(candidate.executionWork());
+                if (!admitted) {
+                    complete = false;
+                    context.summary(RewriteTraceEventType.WORK_BUDGET_REJECTED, source, inputExpression,
+                        candidate.outputExpression(), candidate.primitiveRuleIds(), 1, false,
+                        candidate.provenance().toCanonicalJson());
+                    continue;
+                }
+            }
             candidates.add(candidate);
             context.full(
-                RewriteTraceEventType.SOURCE_CANDIDATE,
+                transformation.exactTheoryStepCount() > 0 ? RewriteTraceEventType.EXACT_THEORY_CANDIDATE
+                    : RewriteTraceEventType.SOURCE_CANDIDATE,
                 source,
                 inputExpression,
                 candidate.outputExpression(),
-                candidate.ruleIds(),
+                transformation.exactTheoryStepCount() > 0 ? candidate.primitiveRuleIds() : candidate.ruleIds(),
                 1,
                 true,
-                transformation.applicationKey()
+                transformation.exactTheoryStepCount() > 0 ? candidate.provenance().toCanonicalJson()
+                    : transformation.applicationKey()
             );
         }
-        return new Evaluation(candidates, true);
+        return new Evaluation(candidates, complete);
     }
 
     private Evaluation evaluateChoice(
         RewriteProgram.Choice choice,
         String inputExpression,
-        Context context
+        Context context,
+        PathBudget budget
     ) {
         List<RewriteCandidate> candidates = new ArrayList<>();
         boolean complete = true;
         for (RewriteProgram alternative : choice.alternatives()) {
-            Evaluation evaluated = evaluate(alternative, inputExpression, context);
+            Evaluation evaluated = evaluate(alternative, inputExpression, context, budget);
             candidates.addAll(evaluated.candidates());
             complete &= evaluated.complete();
         }
@@ -216,14 +271,16 @@ public final class RewriteProgramInterpreter {
     private Evaluation evaluateFirstApplicable(
         RewriteProgram.FirstApplicable firstApplicable,
         String inputExpression,
-        Context context
+        Context context,
+        PathBudget budget
     ) {
         boolean complete = true;
         for (int index = 0; index < firstApplicable.alternatives().size(); index++) {
             RewriteProgram alternative = firstApplicable.alternatives().get(index);
-            Evaluation evaluated = evaluate(alternative, inputExpression, context);
+            Evaluation evaluated = evaluate(alternative, inputExpression, context, budget);
             complete &= evaluated.complete();
             if (evaluated.candidates().isEmpty()) {
+                if (budget != null && !evaluated.complete()) return evaluated;
                 continue;
             }
 
@@ -263,9 +320,10 @@ public final class RewriteProgramInterpreter {
     private Evaluation evaluateSequence(
         RewriteProgram.Sequence sequence,
         String inputExpression,
-        Context context
+        Context context,
+        PathBudget budget
     ) {
-        Evaluation first = evaluate(sequence.steps().get(0), inputExpression, context);
+        Evaluation first = evaluate(sequence.steps().get(0), inputExpression, context, budget);
         List<RewriteCandidate> current = first.candidates();
         boolean complete = first.complete();
 
@@ -273,7 +331,7 @@ public final class RewriteProgramInterpreter {
             RewriteProgram step = sequence.steps().get(index);
             List<RewriteCandidate> next = new ArrayList<>();
             for (RewriteCandidate prefix : current) {
-                Evaluation suffixes = evaluate(step, prefix.outputExpression(), context);
+                Evaluation suffixes = evaluate(step, prefix.outputExpression(), context, remaining(budget, prefix));
                 complete &= suffixes.complete();
                 for (RewriteCandidate suffix : suffixes.candidates()) {
                     context.composedCandidate();
@@ -294,7 +352,8 @@ public final class RewriteProgramInterpreter {
     private Evaluation evaluateRepeat(
         RewriteProgram.Repeat repeat,
         String inputExpression,
-        Context context
+        Context context,
+        PathBudget budget
     ) {
         List<RewriteCandidate> frontier = List.of();
         List<RewriteCandidate> endpoints = new ArrayList<>();
@@ -304,7 +363,7 @@ public final class RewriteProgramInterpreter {
             context.repeatIteration();
             List<RewriteCandidate> next = new ArrayList<>();
             if (iteration == 1) {
-                Evaluation evaluated = evaluate(repeat.body(), inputExpression, context);
+                Evaluation evaluated = evaluate(repeat.body(), inputExpression, context, budget);
                 next.addAll(evaluated.candidates());
                 complete &= evaluated.complete();
             } else {
@@ -312,7 +371,8 @@ public final class RewriteProgramInterpreter {
                     Evaluation suffixes = evaluate(
                         repeat.body(),
                         prefix.outputExpression(),
-                        context
+                        context,
+                        remaining(budget, prefix)
                     );
                     complete &= suffixes.complete();
                     for (RewriteCandidate suffix : suffixes.candidates()) {
@@ -349,9 +409,10 @@ public final class RewriteProgramInterpreter {
     private Evaluation evaluateRequire(
         RewriteProgram.Require require,
         String inputExpression,
-        Context context
+        Context context,
+        PathBudget budget
     ) {
-        Evaluation evaluated = evaluate(require.body(), inputExpression, context);
+        Evaluation evaluated = evaluate(require.body(), inputExpression, context, budget);
         List<RewriteCandidate> accepted = new ArrayList<>();
         for (RewriteCandidate candidate : evaluated.candidates()) {
             context.requirementEvaluated();
@@ -377,14 +438,15 @@ public final class RewriteProgramInterpreter {
     private Evaluation evaluatePrioritize(
         RewriteProgram.Prioritize prioritize,
         String inputExpression,
-        Context context
+        Context context,
+        PathBudget budget
     ) {
-        Evaluation evaluated = evaluate(prioritize.body(), inputExpression, context);
+        Evaluation evaluated = evaluate(prioritize.body(), inputExpression, context, budget);
         List<RewriteCandidate> candidates = new ArrayList<>(evaluated.candidates());
         context.priorityCandidatesOrdered(candidates.size());
         candidates.sort(
             prioritize.comparator()
-                .thenComparing(RewriteCandidate::fingerprint)
+                .thenComparing(RewriteCandidate::orderingKey)
         );
         return new Evaluation(candidates, evaluated.complete());
     }
@@ -392,9 +454,10 @@ public final class RewriteProgramInterpreter {
     private Evaluation evaluatePrune(
         RewriteProgram.Prune prune,
         String inputExpression,
-        Context context
+        Context context,
+        PathBudget budget
     ) {
-        Evaluation evaluated = evaluate(prune.body(), inputExpression, context);
+        Evaluation evaluated = evaluate(prune.body(), inputExpression, context, budget);
         if (evaluated.candidates().size() <= prune.maxCandidates()) {
             return evaluated;
         }
@@ -417,10 +480,19 @@ public final class RewriteProgramInterpreter {
         return new Evaluation(retained, false);
     }
 
-    private static void rejectBudgetedSources(RewriteProgram program) {
+    private static PathBudget remaining(PathBudget budget, RewriteCandidate prefix) {
+        return budget == null ? null : budget.after(prefix.executionWork());
+    }
+
+    private static void rejectBudgetedSources(RewriteProgram program, boolean allowWorkAware) {
         switch (program) {
-            case RewriteProgram.Source ignored -> {
-                // Ordinary source: admitted by the ordinary interpreter.
+            case RewriteProgram.Source source -> {
+                if (!allowWorkAware && source.engine() instanceof WorkAwareTransformationEngine) {
+                    throw new IllegalArgumentException("verified theory Source requires executeWithWorkBudget");
+                }
+                if (source.engine() instanceof ProgrammedTransformationEngine nested) {
+                    rejectBudgetedSources(nested.program(), allowWorkAware);
+                }
             }
             case RewriteProgram.BudgetedSource ignored ->
                 throw new IllegalArgumentException(
@@ -428,21 +500,21 @@ public final class RewriteProgramInterpreter {
                         + "executeBudgetedSource or executeBudgeted with explicit budgets");
             case RewriteProgram.Choice choice ->
                 choice.alternatives().forEach(
-                    RewriteProgramInterpreter::rejectBudgetedSources);
+                    child -> rejectBudgetedSources(child, allowWorkAware));
             case RewriteProgram.FirstApplicable firstApplicable ->
                 firstApplicable.alternatives().forEach(
-                    RewriteProgramInterpreter::rejectBudgetedSources);
+                    child -> rejectBudgetedSources(child, allowWorkAware));
             case RewriteProgram.Sequence sequence ->
                 sequence.steps().forEach(
-                    RewriteProgramInterpreter::rejectBudgetedSources);
+                    child -> rejectBudgetedSources(child, allowWorkAware));
             case RewriteProgram.Repeat repeat ->
-                rejectBudgetedSources(repeat.body());
+                rejectBudgetedSources(repeat.body(), allowWorkAware);
             case RewriteProgram.Require require ->
-                rejectBudgetedSources(require.body());
+                rejectBudgetedSources(require.body(), allowWorkAware);
             case RewriteProgram.Prioritize prioritize ->
-                rejectBudgetedSources(prioritize.body());
+                rejectBudgetedSources(prioritize.body(), allowWorkAware);
             case RewriteProgram.Prune prune ->
-                rejectBudgetedSources(prune.body());
+                rejectBudgetedSources(prune.body(), allowWorkAware);
         }
     }
 
@@ -450,9 +522,9 @@ public final class RewriteProgramInterpreter {
         List<RewriteCandidate> candidates,
         Context context
     ) {
-        Map<String, RewriteCandidate> distinct = new LinkedHashMap<>();
+        Map<RewriteCandidate.Identity, RewriteCandidate> distinct = new LinkedHashMap<>();
         for (RewriteCandidate candidate : candidates) {
-            distinct.putIfAbsent(candidate.fingerprint(), candidate);
+            distinct.putIfAbsent(candidate.identity(), candidate);
         }
         context.duplicateCandidatesDropped(candidates.size() - distinct.size());
         return List.copyOf(distinct.values());
@@ -479,6 +551,9 @@ public final class RewriteProgramInterpreter {
     private static final class Context {
         private final RewriteTraceLevel level;
         private final RewriteTraceSink sink;
+        private final List<RewriteExecution.SourceObservation> observations = new ArrayList<>();
+        private ExecutionWork candidateWork = ExecutionWork.ZERO;
+        private TransformationWorkMetrics delegatedWork = TransformationWorkMetrics.ZERO;
         private long sequence;
         private long programNodeVisits;
         private long sourceInvocations;
@@ -568,7 +643,7 @@ public final class RewriteProgramInterpreter {
                 repeatEndpoints,
                 alternativeSelections,
                 alternativesSkipped,
-                duplicateCandidatesDropped);
+                duplicateCandidatesDropped, candidateWork).plus(delegatedWork);
         }
 
         private void summary(
