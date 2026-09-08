@@ -152,9 +152,19 @@ public final class TraceStrategyDispatchLearner {
             }
         }
         var executable = new Executable(formation);
-        List<Trial> trials = new ArrayList<>();
         var baseline = observe(executable, ordered, limits.budget(), List.of(), Profile.FLAT_GREEDY);
-        trials.add(new Trial("baseline", List.of(), baseline, false));
+        var contexts = collectContexts(executable, baseline, limits.maximumContexts());
+        var selection = selectRoutes(executable, ordered, limits, baseline, contexts.masks());
+        for (var trial : selection.trials()) for (var observation : trial.observations()) {
+            for (var state : observation.search().exploredStates()) exclusions.add(exact.alphaIdentity(state.expression()));
+        }
+        return new FrozenPolicy(formation, limits, selection.routes(), selection.trials(), exclusions, contexts.work());
+    }
+
+    private record ContextCollection(List<Long> masks, long work) {}
+    private record RouteSelection(List<Route> routes, List<Trial> trials) {}
+
+    private static ContextCollection collectContexts(Executable executable, List<Observation> baseline, int maximumContexts) {
         var contexts = new TreeSet<Long>();
         long collectionWork = 0;
         for (var observation : baseline) {
@@ -166,7 +176,14 @@ public final class TraceStrategyDispatchLearner {
                 if (context != 0) contexts.add(context);
             }
         }
-        if (contexts.size() > limits.maximumContexts()) throw new IllegalArgumentException("dispatch context limit exceeded");
+        if (contexts.size() > maximumContexts) throw new IllegalArgumentException("dispatch context limit exceeded");
+        return new ContextCollection(contexts.stream().toList(), collectionWork);
+    }
+
+    private static RouteSelection selectRoutes(Executable executable, List<Input> inputs, Limits limits,
+            List<Observation> baseline, List<Long> contexts) {
+        List<Trial> trials = new ArrayList<>();
+        trials.add(new Trial("baseline", List.of(), baseline, false));
         List<Route> selected = new ArrayList<>();
         long bestWork = totalWork(baseline);
         for (long context : contexts) {
@@ -176,22 +193,22 @@ public final class TraceStrategyDispatchLearner {
                 var candidate = new ArrayList<>(selected.stream().filter(route -> route.contextMask() != context).toList());
                 candidate.add(new Route(context, continuation.sequence()));
                 candidate.sort(Comparator.comparingLong(Route::contextMask));
-                var observations = observe(executable, ordered, limits.budget(), candidate, Profile.LEARNED_DISPATCH);
-                boolean noninferior = true;
-                for (int i = 0; i < baseline.size(); i++) {
-                    noninferior &= observations.get(i).search().bestState().score().weightedTotal()
-                        <= baseline.get(i).search().bestState().score().weightedTotal();
-                }
+                var observations = observe(executable, inputs, limits.budget(), candidate, Profile.LEARNED_DISPATCH);
                 long work = totalWork(observations);
-                boolean accepted = noninferior && work < bestWork;
+                boolean accepted = scoresNoWorse(observations, baseline) && work < bestWork;
                 trials.add(new Trial("route-" + trials.size(), candidate, observations, accepted));
                 if (accepted) { selected = candidate; bestWork = work; }
             }
         }
-        for (var trial : trials) for (var observation : trial.observations()) {
-            for (var state : observation.search().exploredStates()) exclusions.add(exact.alphaIdentity(state.expression()));
+        return new RouteSelection(List.copyOf(selected), List.copyOf(trials));
+    }
+
+    private static boolean scoresNoWorse(List<Observation> observations, List<Observation> baseline) {
+        for (int i = 0; i < baseline.size(); i++) {
+            if (observations.get(i).search().bestState().score().weightedTotal()
+                    > baseline.get(i).search().bestState().score().weightedTotal()) return false;
         }
-        return new FrozenPolicy(formation, limits, selected, trials, exclusions, collectionWork);
+        return true;
     }
 
     public Observation apply(FrozenPolicy policy, Input input, Profile profile) {

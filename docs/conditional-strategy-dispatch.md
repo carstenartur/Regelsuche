@@ -138,3 +138,29 @@ Bindungsbedingungen und eine umfassendere Kostenbilanz. Der hier gelieferte
 Baustein macht diesen verbleibenden Engpass sichtbar, statt jedes wiederverwendete
 Makro automatisch als Erfolg zu zählen. #874, #235 und #533 bleiben damit breiter
 als dieser Entwicklungsnachweis.
+
+## Welche Bewertung trägt eine gelernte Brücke?
+
+Bewertungen existieren bereits an mehreren Stellen: `InterestingnessScore`
+ordnet Mining-Hypothesen nach Kompression, Wiederverwendbarkeit und weiteren
+Eigenschaften. `SearchPolicyModel.RuleStatistics` speichert beobachtete Erfolge,
+Fehlalternativen und mittlere Scoreänderungen; die empirische Suchpolicy kann
+damit anwendbare Regeln priorisieren. Die vorliegende Fortsetzungsauswahl
+speichert dagegen vollständige TRAIN-Versuche und eine akzeptierte Route pro
+Regelkontext. Sie übernimmt diese anderen Bewertungen noch nicht als laufenden
+Prioritätswert.
+
+Ein weiterführender Nutzenwert sollte sowohl die ersparte Suche ohne die Brücke
+als auch die danach erreichbaren nützlichen Darstellungen berücksichtigen. Die
+Länge einer bekannten Herleitung ist nur eine obere Schranke für die kürzeste
+primitive Verbindung. Umwege und Zyklen dürfen den Wert nicht erhöhen. Der
+bisherige Mining-`CompressionScore` schätzt die Pfadlänge zudem aus Pfadkennungen;
+das ersetzt keine gemessene Suche mit und ohne die Regel.
+
+Für die Priorisierung wäre deshalb ein nach Richtung und Anwendungskontext
+getrennter Erwartungswert sinnvoll: beobachteter späterer Nutzen und ersparte
+Sucharbeit, abzüglich Matching- und Ausführungskosten, mit ausgewiesener
+Evidenzmenge. Eine längere oder zunächst kompliziertere Darstellung kann dabei
+wertvoll sein, wenn sie beispielsweise Faktorisierung oder einen anderen
+Lösungsweg ermöglicht. Diese fortlaufende Brückenbewertung ist durch den
+vorliegenden Vergleich noch nicht implementiert oder qualifiziert.
