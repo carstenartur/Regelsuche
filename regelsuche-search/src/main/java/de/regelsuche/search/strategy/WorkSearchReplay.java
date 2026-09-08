@@ -68,6 +68,7 @@ public final class WorkSearchReplay {
     private static void writeConfiguration(JsonWriter json, Result result) {
         var configuration = result.configuration();
         var budget = configuration.budget();
+        if (configuration.targetExpression().isEmpty()) json.property("goalMode", "TARGET_FREE");
         json.property("inputExpression", configuration.inputExpression()).property("targetExpression", configuration.targetExpression())
             .property("workRevision", configuration.workRevision().schema())
             .property("maxPrimitiveSteps", budget.maxPrimitiveSteps()).property("maxExactTheoryWorkUnits", budget.maxExactTheoryWorkUnits())

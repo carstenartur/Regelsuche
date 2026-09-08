@@ -207,7 +207,7 @@ public final class WorkBudgetBestFirstSearchStrategy {
     }
 
     private static boolean isTarget(State state, Problem problem) {
-        return state.expression().equals(problem.targetExpression());
+        return !problem.targetFree() && state.expression().equals(problem.targetExpression());
     }
 
     private static Result finish(Problem problem, SearchContext context) {
@@ -310,6 +310,9 @@ public final class WorkBudgetBestFirstSearchStrategy {
         String target,
         ExpressionCanonicalizer canonicalizer
     ) {
+        if (target.isEmpty()) {
+            return 0;
+        }
         if (expression.equals(target)) {
             return 0;
         }
@@ -378,7 +381,9 @@ public final class WorkBudgetBestFirstSearchStrategy {
     ) {
         public Problem {
             inputExpression = normalize(inputExpression, "inputExpression");
-            targetExpression = normalize(targetExpression, "targetExpression");
+            // The empty string is reserved for the named target-free factory.
+            // Whitespace and null remain invalid accidental targets.
+            targetExpression = "".equals(targetExpression) ? "" : normalize(targetExpression, "targetExpression");
             Objects.requireNonNull(source, "source");
             Objects.requireNonNull(scorer, "scorer");
             Objects.requireNonNull(canonicalizer, "canonicalizer");
@@ -389,6 +394,14 @@ public final class WorkBudgetBestFirstSearchStrategy {
         }
 
         boolean mixedWork() { return source.workRevision() == WorkRevision.MIXED_V2; }
+
+        /** Explore under the ordinary budgets and retain the scorer-selected best state. */
+        public static Problem withoutTarget(String inputExpression, SearchExpansionSource source,
+                ExpressionScorer scorer, ExpressionCanonicalizer canonicalizer, Budget budget) {
+            return new Problem(inputExpression, "", source, scorer, canonicalizer, budget);
+        }
+
+        public boolean targetFree() { return targetExpression.isEmpty(); }
     }
 
     /** Total work budget including a worst-case exact path-audit reserve. */

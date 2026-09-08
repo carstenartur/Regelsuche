@@ -17,6 +17,7 @@ können als neue Strategien wiederverwendet werden.
 [Workbench](docs/web-workbench.md) ·
 [Discovery Gallery](docs/demo-gallery.md) ·
 [Java Discovery SDK](docs/java-discovery-sdk.md) ·
+[Strategien lernen und vergleichen](docs/trace-strategy-transfer.md) ·
 [Aktueller Forschungsstand](docs/discovery-status.md) ·
 [Architektur](docs/architecture.md) ·
 [Unabhängig reproduzieren](docs/independent-reproduction.md)
@@ -94,6 +95,13 @@ Jede spätere Anwendung löst ihre Koeffizienten neu und prüft die erzeugten
 Schritte erneut. Die gemeinsamen Vorlagen bewahren Herkunft, Anwendbarkeit und
 Trainingsausschlüsse. Die Beispiele derselben quadratischen Familie belegen
 noch keine Übertragung auf andere Familien oder einen allgemeinen Effizienzgewinn.
+
+Der [ausführbare Strategievergleich](docs/trace-strategy-transfer.md) lernt
+auch verzweigende Regelfolgen aus zielausdrucksfreien Suchwegen. Er vergleicht
+deren Anwendung auf neue Zusammensetzungen mit denselben Einzelregeln und
+einer veränderten Regelreihenfolge. Die HTML-Demo zeigt jeden primitiven Schritt.
+Der aktuelle Entwicklungsbestand liefert gleiche Ergebnisse bei **mehr
+Sucharbeit** mit dem gelernten Programm; alle Vergleichszeilen bleiben sichtbar.
 
 ## Workbench statt Konsolenausgabe
 

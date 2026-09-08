@@ -1,6 +1,6 @@
 # Discovery- und Forschungsstand
 
-**Stand: 7. September 2026**
+**Stand: 8. September 2026**
 
 Diese Übersicht trennt ausgelieferte Fähigkeiten, Entwicklungen nach dem
 Release, begrenzte Projektnachweise und noch nicht ausgeführte Studien.
@@ -33,6 +33,7 @@ ist kein Ersatz für dieses Experiment.
 | Historische Komposition | Elf-Schritt-Brahmagupta–Fibonacci-Pfad mit zweimaliger Anwendung derselben gelernten Ergänzungsregel | Deklarierte Phasenfolge; unrestricted Best-First blieb bei 20.000 Zuständen ohne Fund |
 | Resttermkomposition | Disjunkte Summandenpaare und Vorzeichen können über exakte Nullrestprüfung ohne Zielausdruck ausgewählt werden | Strategie und vorbereitende Strukturwahl sind noch nicht selbst gelernt |
 | Schematische Pläne | Typisierte Lücken, endliche Koeffizienten-/Vorzeichensuche und verifier-gebundene Kandidatenevidence | Vorgegebene Ansatzgrammatik ist keine autonom erfundene Taktik |
+| Gelernte Regelfolgen | Verzweigende Programme aus zielausdrucksfreien primitiven TRAIN-Spuren; Replay auf neuen Zusammensetzungen | Im öffentlichen Entwicklungsvergleich gleiche Ergebnisse bei höherer Sucharbeit; keine unabhängig zurückgehaltenen Mathematikfamilien |
 | Java-SDK | Eigenständige Java-25-Domänen, Fassade, Assertions und Provider-SPI | Lokale Maven-Bereitstellung; öffentliche stabile Release-API noch nicht zugesagt |
 | Externe Neuheit | Eigener, noch offener Literatur-/Expertenprüfpfad | Keine weltweite Neuheitsbehauptung |
 
@@ -78,6 +79,19 @@ wählen. Das ist datenabhängige Auswahl, nicht das Erlernen der Ansatzgrammatik
 einer verzweigenden Taktik oder der allgemeinen Resttermstrategie. Neue
 Koeffizienten derselben Familie ersetzen keinen unberührten FINAL TEST.
 Reproduktion und Grenzen: [Polynomstrategien aus Trainingsaufgaben](finite-polynomial-strategy-selection.md).
+
+## Gelernte Regelfolgen aus Suchspuren
+
+Der zusätzliche [Strategievergleich](trace-strategy-transfer.md) bildet aus
+beobachteten Regelfolgen einen Präfixbaum mit `Sequence` und `Choice` im
+vorhandenen Programm-IR. Die Programmstruktur hängt tatsächlich vom Training
+ab; neue Ausdrücke erhalten frisch ausgeführte primitive Pfade. Acht öffentliche
+Entwicklungsaufgaben werden in drei Profilen einschließlich Negativ- und
+unveränderter Kontrollfälle ausgewertet. Im unterstützten Bestand findet jedes
+Profil dieselben Endausdrücke; das gelernte Programm kostet mehr Sucharbeit.
+Das ergänzt die Ausführungsinfrastruktur um begrenztes Lernen und eine
+reproduzierbare Demo. Es schließt den offenen Nachweis einer selbst erlernten
+familienübergreifenden Taktik unter vergleichbarer Gesamtarbeit nicht ab.
 
 ## Was historische Wiederentdeckung hier bedeutet
 
