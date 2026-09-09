@@ -13,14 +13,26 @@ Auch die Startseite verlinkt die Demo.
 2. **Training und Transfer ausführen:** Der Server führt den
    [öffentlichen Vergleich](representation-strategy-transfer.md) aus, friert
    seine Policy ein und zeigt sämtliche Trainings- und Auswertungsversuche.
-   Die Tabelle enthält Lern- und Prüfkosten. Der aktuelle Satz zeigt keinen
-   zusätzlichen Vorteil des Lernens gegenüber der festen Auswahlregel.
-   Die Diagnose weist den verbleibenden Auswahlspielraum und den Aufwand des
-   vollständigen zweiten Lösungsverfahrens gesondert aus. Hier bleibt kein
-   Spielraum für eine bessere Auswahl unter den drei gemessenen Verfahren.
+   Die Tabelle trennt wiederkehrende Anwendungsarbeit von den einmaligen
+   Trainingskosten. Gegen die statische DIRECT-Strategie reduziert die gelernte
+   Auswahl die Anwendungsarbeit im aktuellen Entwicklungssatz um 4.964 Einheiten
+   beziehungsweise 5,94 %. Bei derselben mittleren Einsparung amortisiert sich
+   der einmalige Lernaufwand rechnerisch nach etwa 108 Anwendungen. FIXED_AUTO
+   ist dagegen eine handgeschriebene Expertenreferenz, die bereits dieselbe
+   Schwelle 8 verwendet; sie ist keine Kontrolle „ohne Lernen“. Die Diagnose
+   weist den verbleibenden Auswahlspielraum und den Aufwand des vollständigen
+   zweiten Lösungsverfahrens gesondert aus.
 3. **Nachweis exportieren und erneut prüfen:** Ein gespeichertes Lösungsartefakt
    lässt sich nach einem Serverneustart vollständig wiederholen. Veränderte
    Quellen, Budgets, Entscheidungen, Schritte oder Ergebnisse werden abgelehnt.
+
+Dieser Darstellungsversuch lernt nur eine Auswahlbedingung zwischen bereits
+vorhandenen Lösungswegen. Er testet **nicht**, ob das Erlernen mathematischer
+Regeln die Fähigkeiten von Regelsuche erweitert. Für diese andere Frage enthält
+das Projekt die [generationenübergreifende Regelgewinnung](generational-rule-mining.md):
+Deren Reachability-Test verlangt einen Fall, den das Basisinventar unter dem
+vorgegebenen Budget nicht erreicht, der aber mit dem angesammelten gelernten
+Regelwissen erreichbar wird.
 
 Eigene rationale lineare Gleichungen können in das Eingabefeld geschrieben
 werden. Nichtlineare, nicht unterstützte oder erschöpfte Versuche erhalten
