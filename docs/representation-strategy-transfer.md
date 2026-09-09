@@ -19,7 +19,7 @@ Der Auswertungssatz enthält 42 Aufgaben: je acht Fälle für Koeffizientenvergl
 Rekurrenzblöcke, redundante Bedingungen, freie Parameter und verbundene Systeme
 sowie zwei negative Kontrollen (nichtlinear und außerhalb der rationalen Domäne).
 Rekurrenzblöcke haben drei statt der in den zerlegbaren Trainingsfällen
-vorkommenden ein oder zwei Variablen je Block. Das ist ein begrenzter Transfer
+vorkommenden zwei Variablen je Block. Das ist ein begrenzter Transfer
 innerhalb rationaler linearer Algebra, kein domänenübergreifender Beweisfund.
 Sortierte exakte Alpha-Polynomidentitäten der einzelnen Gleichungen schließen
 umbenannte und umsortierte Trainingskopien aus. Dieses konservative Kriterium

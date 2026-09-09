@@ -1,5 +1,9 @@
 # Python-authored Discovery domains
 
+For a directly installable Python HTTP client, exact linear solutions and
+offline rational proof checking, see [Python client](python-client.md).
+The domain-authoring adapter described below remains a separate SDK extension.
+
 `PythonDiscoveryDomain<C,K>` is a transport-neutral adapter in the existing
 `regelsuche-discovery-sdk`. It adds no interpreter or third-party dependency.
 The paired Primachsenraum integration uses the real shared GraalPy runtime;

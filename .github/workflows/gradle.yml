@@ -174,12 +174,15 @@ jobs:
             org.codehaus.mojo:exec-maven-plugin:3.5.0:java
       - name: Verify the complete Maven product and Docker contract
         run: mvn --batch-mode --no-transfer-progress -Pfull verify
+      - name: Verify the installed Python client against the distributed Java product
+        run: bash scripts/verify-python-client.sh
       - name: Retain Maven product verification evidence
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: maven-product-verification
           path: |
+            build/reports/python-client/**
             **/target/surefire-reports/**
             **/target/failsafe-reports/**
             **/target/discovery-artifacts/**

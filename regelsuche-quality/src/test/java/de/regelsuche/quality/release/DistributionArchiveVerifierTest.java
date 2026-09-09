@@ -35,7 +35,7 @@ class DistributionArchiveVerifierTest {
         for (String version : List.of(VERSION, VERSION + "-SNAPSHOT")) {
             Fixture fixture = fixture(version);
             var report = DistributionArchiveVerifier.verify(fixture.root, version);
-            assertEquals(10, report.files());
+            assertEquals(21, report.files());
             assertEquals(2, report.runtimeLibraries());
             assertEquals(1, report.productModules());
             assertTrue(report.inventorySha256().matches("[0-9a-f]{64}"));
@@ -343,6 +343,13 @@ class DistributionArchiveVerifierTest {
             for (String name : List.of("README.md", "LICENSE", "CITATION.cff", "CITATION.md", "codemeta.json")) {
                 source(name, name, "fixture " + name + "\n");
             }
+            for (String name : List.of("python/README.md", "python/LICENSE", "python/pyproject.toml",
+                    "python/src/regelsuche/__init__.py", "python/src/regelsuche/__main__.py",
+                    "python/src/regelsuche/client.py", "python/src/regelsuche/verify.py",
+                    "python/src/regelsuche/py.typed", "python/examples/linear_systems.py", "docs/python-client.md")) {
+                source(name, name, "fixture " + name + "\n");
+            }
+            source("examples/LinearSolve.java", "examples/external-consumers/LinearSolve.java", "class LinearSolve {}\n");
             source("bin/regelsuche", "app/src/main/scripts/regelsuche", "#!/bin/sh\nexec java example\n");
             source("bin/regelsuche.bat", "app/src/main/scripts/regelsuche.bat", "@echo off\r\njava example\r\n");
             Path openapi = root.resolve("app/src/main/resources/web/openapi/openapi.json");
@@ -380,7 +387,9 @@ class DistributionArchiveVerifierTest {
                 }
             }
             ByteArrayOutputStream tar = new ByteArrayOutputStream();
-            for (String dir : List.of(prefix, prefix + "bin/", prefix + "lib/")) {
+            for (String dir : List.of(prefix, prefix + "bin/", prefix + "lib/", prefix + "examples/",
+                    prefix + "python/", prefix + "python/src/", prefix + "python/src/regelsuche/",
+                    prefix + "python/examples/", prefix + "docs/")) {
                 tarMember(tar, new TarMember(dir, new byte[0], '5', directoryMode));
             }
             for (var entry : tarFiles.entrySet()) {

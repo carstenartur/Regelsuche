@@ -1,6 +1,6 @@
 # Discovery- und Forschungsstand
 
-**Stand: 8. September 2026**
+**Stand: 9. September 2026**
 
 Diese Übersicht trennt ausgelieferte Fähigkeiten, Entwicklungen nach dem
 Release, begrenzte Projektnachweise und noch nicht ausgeführte Studien.
@@ -28,6 +28,9 @@ ist kein Ersatz für dieses Experiment.
 | Exakte Polynome | Parsergebundene Literalprovenienz, native begrenzte univariate Faktorisierung über `Z[x]` und `Q[x]`, endliche Körper, Hensel-Lifting und Rekombination | Keine allgemeine multivariate Faktorisierung; Backend-Vollständigkeit ist nicht automatisch unabhängig zertifiziert |
 | Faktorisierung im AST | Verifier-gebundene Ersetzung auch ausgewählter verschachtelter Vorkommen mit Kontextprüfung | Ein Budgetabbruch ist kein Irreduzibilitätsbeweis |
 | Gleichungssysteme | Exaktes `A*x=b`, Blockzerlegung, RREF, Lösungsklassifikation und explizite Eigenproblemrollen | Keine Physik allein aus Symbolnamen, kein allgemeiner nichtlinearer Solver |
+| Automatische Darstellungswahl | Quellengestützte unabhängige Blöcke vor Eliminierung; direkter, Matrix- und Blockvergleich mit vollständigem Replay | Rund 6 % weniger gezählte Arbeit im öffentlichen Entwicklungssatz; keine Laufzeitmessung oder globale Optimalität |
+| Gelernte Darstellungsauswahl | Eingefrorene Bedingung aus 18 verifizierten Trainingstrials; 42 weitere Aufgaben und sechs Profile | Begrenzter Transfer innerhalb linearer Algebra; kein Zusatzgewinn gegenüber fester Auswahl, Lernkosten nicht amortisiert |
+| Externer linearer Client | Installierbares Python-Paket, Java-Beispiel, Browserdemo und unabhängiger rationaler Prüfer | Exakte begrenzte affine Lösungsmengen; keine PyPI-Veröffentlichung oder Lean-Kernprüfung behauptet |
 | Vorbereitung | Native Exact-Spezialisten, Guards, lokale Pattern-Bridges und Unified Coordinator | Allgemeines Defaultprofil und gemeinsame Multi-Principal-Ausführung bleiben gesondert zu qualifizieren |
 | Regelmining | Eingefrorene Generationen, exakte Patternprüfung und kumulativer Wiederverwendungsaudit | Experimentelle Schatteninventare; Tiefenbudget-Erfolg ist keine allgemeine Reduktion der Gesamtarbeit |
 | Historische Komposition | Elf-Schritt-Brahmagupta–Fibonacci-Pfad mit zweimaliger Anwendung derselben gelernten Ergänzungsregel | Deklarierte Phasenfolge; unrestricted Best-First blieb bei 20.000 Zuständen ohne Fund |

@@ -17,6 +17,8 @@ können als neue Strategien wiederverwendet werden.
 [Workbench](docs/web-workbench.md) ·
 [Discovery Gallery](docs/demo-gallery.md) ·
 [Java Discovery SDK](docs/java-discovery-sdk.md) ·
+[Python-Client](docs/python-client.md) ·
+[Darstellungen und Transferdemo](docs/representation-transfer-demo.md) ·
 [Strategien lernen und vergleichen](docs/trace-strategy-transfer.md) ·
 [Aktueller Forschungsstand](docs/discovery-status.md) ·
 [Architektur](docs/architecture.md) ·
@@ -44,6 +46,22 @@ Best-First, Beam, `A*`, Monte Carlo und Equality Saturation können auf denselbe
 expliziten Zuständen und Kanten arbeiten. Die grafische Workbench verbindet
 Suchgraph, Pfade, Replay, AST-Regelradar, Kandidaten, Proof-Jobs und Exporte in
 einem Ablauf.
+
+## Darstellungen wählen, übertragen und unabhängig prüfen
+
+Für rationale lineare Systeme kann Regelsuche unabhängige Gleichungsblöcke
+bereits aus der Quelle erkennen und getrennt lösen. Ein begrenzter Lerner
+gewinnt die Auswahlbedingung aus überprüften Trainingsläufen. Die
+[Browserdemo](docs/representation-transfer-demo.md) zeigt beide Wege, den
+eingefrorenen Transfervergleich und exportierbare Nachweise.
+
+Im aktuellen öffentlichen Entwicklungssatz spart die feste automatische
+Darstellungswahl rund 6 % gezählte Arbeit einschließlich zusätzlicher
+Prüfverfahren. Das Lernen bringt gegenüber dieser festen Auswahl noch
+keinen zusätzlichen Kostenvorteil. Alle Trainingskosten und negativen
+Kontrollen stehen im [vollständigen Vergleich](docs/representation-strategy-transfer.md).
+Der installierbare [Python-Client](docs/python-client.md) prüft die vollständigen
+rationalen Lösungsmengen unabhängig vom Java-Server.
 
 ## Beispiel: eine versteckte Faktorisierung als Suchraum
 

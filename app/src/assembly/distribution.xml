@@ -11,6 +11,12 @@
   <baseDirectory>regelsuche-${releaseVersion}</baseDirectory>
   <files>
     <file>
+      <source>${project.parent.basedir}/examples/external-consumers/LinearSolve.java</source>
+      <outputDirectory>examples</outputDirectory>
+      <destName>LinearSolve.java</destName>
+      <fileMode>0644</fileMode>
+    </file>
+    <file>
       <source>${project.build.directory}/${project.build.finalName}.jar</source>
       <outputDirectory>.</outputDirectory>
       <destName>regelsuche.jar</destName>
@@ -51,6 +57,16 @@
         <include>CITATION.cff</include>
         <include>CITATION.md</include>
         <include>codemeta.json</include>
+        <include>python/README.md</include>
+        <include>python/LICENSE</include>
+        <include>python/pyproject.toml</include>
+        <include>python/src/regelsuche/__init__.py</include>
+        <include>python/src/regelsuche/__main__.py</include>
+        <include>python/src/regelsuche/client.py</include>
+        <include>python/src/regelsuche/verify.py</include>
+        <include>python/src/regelsuche/py.typed</include>
+        <include>python/examples/linear_systems.py</include>
+        <include>docs/python-client.md</include>
       </includes>
       <fileMode>0644</fileMode>
     </fileSet>
