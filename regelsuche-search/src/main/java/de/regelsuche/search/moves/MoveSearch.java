@@ -96,8 +96,8 @@ public final class MoveSearch {
         root = new MoveState(root.expression(), 0, 0, "", root.assumptions(), rootValue.capabilities().keySet(), 0);
         assessments.put(root, rootValue);
         var frontier = new PriorityQueue<Ticket>(Comparator.comparingDouble(Ticket::priority).thenComparingLong(Ticket::serial));
-        long serial = 0;
-        frontier.add(new Ticket(new Node(root, 0, List.of(), rootValue), 0, serial++)); visited.add(new Identity(root, 0));
+        long[] serial = {0};
+        frontier.add(new Ticket(new Node(root, 0, List.of(), rootValue), 0, serial[0]++)); visited.add(new Identity(root, 0));
         boolean complete = true;
         var outcome = Outcome.BOUNDED_EXHAUSTED;
         List<WitnessStep> witness = List.of();
@@ -118,41 +118,49 @@ public final class MoveSearch {
                     ? new StagedMovePicker(problem.providers(), problem.policy(), node.state, problem.context())
                     : new EagerMovePicker(problem.providers(), problem.policy(), node.state, problem.context());
             }
-            var next = node.picker.next(); ledger.collect(node); node.pulls++;
-            // Atomic providers report actual overrun; such runs cannot claim a budget-respecting success.
-            if (ledger.total() > budget.totalWork()) { outcome = Outcome.WORK_EXHAUSTED; complete = false; break; }
-            if (next.isEmpty()) {
+            var expansion = expand(problem, node, ledger, events, visited, frontier, serial, assessments);
+            if (expansion == Expansion.WORK_LIMIT) { outcome = Outcome.WORK_EXHAUSTED; complete = false; break; }
+            if (expansion == Expansion.REJECTED_PROOF) complete = false;
+            if (expansion == Expansion.EXHAUSTED) {
                 complete &= node.picker.complete();
-                if (node.enqueued == 0 && node.picker.complete()) { ledger.deadEnds++; deadEnds.add(node.state); }
-                continue;
+                if (node.enqueued == 0 && node.picker.complete()) { ledger.deadEnds++; deadEnds.add(node.state);  }
             }
-            var move = next.orElseThrow(); ledger.consumed++; ledger.search++;
-            var admission = admit(problem, node, move, visited, ledger);
-            var decision = admission.decision();
-            var verification = admission.verification();
-            var child = admission.child();
-            var delta = new HashSet<>(child.capabilities()); delta.removeAll(node.state.capabilities());
-            move = move.withCapabilityDelta(delta);
-            if (decision == Decision.PROOF_REJECTED || decision == Decision.ASSUMPTION_REJECTED) complete = false;
-            if (decision == Decision.ENQUEUED) {
-                visited.add(new Identity(child, admission.theoryWork())); node.enqueued++; assessments.put(child, admission.value());
-                var path = new ArrayList<>(node.path); path.add(new WitnessStep(node.state, child, move, verification));
-                frontier.add(new Ticket(new Node(child, admission.theoryWork(), List.copyOf(path), admission.value()),
-                    child.expression().equals(problem.context().goal()) ? -Double.MAX_VALUE : priority(problem, child, admission.value()), serial++));
-            }
-            if (decision != Decision.ENQUEUED) ledger.discarded++;
-            events.add(new Event(node.state, move, decision, verification));
-            if (decision == Decision.WORK_LIMIT) { outcome = Outcome.WORK_EXHAUSTED; complete = false; break; }
-            int stage = node.picker instanceof StagedMovePicker staged ? staged.nextStage() : 0;
-            // Parent widening stays on the frontier, so promising children can finish before later stages open.
-            double continuation = problem.mode() == Mode.COMPLETE_BOUNDED_REFERENCE ? node.state.searchDepth()
-                : priority(problem, node.state, node.value) + 1 + stage + node.pulls / 2.0;
-            frontier.add(new Ticket(node, continuation, serial++)); ledger.search++;
         }
         if (outcome == Outcome.BOUNDED_EXHAUSTED && !complete) outcome = Outcome.INCONCLUSIVE;
         return new Result(outcome, witness, events, reached, deadEnds, new Metrics(ledger.generated, ledger.consumed, ledger.discarded,
             ledger.generated - ledger.consumed, ledger.duplicates, ledger.deadEnds, ledger.explored, ledger.expanded,
             ledger.primitive, ledger.search, ledger.verification, hit, primitiveHit, ledger.matches), complete, assessments);
+    }
+    private enum Expansion { MORE, EXHAUSTED, REJECTED_PROOF, WORK_LIMIT }
+    private static Expansion expand(Problem problem, Node node, Ledger ledger, List<Event> events,
+            Set<Identity> visited, PriorityQueue<Ticket> frontier, long[] serial, Map<MoveState, StateValue.Assessment> assessments) {
+        var next = node.picker.next(); ledger.collect(node); node.pulls++;
+        // Atomic providers report actual overrun; such runs cannot claim a budget-respecting success.
+        if (ledger.total() > problem.budget().totalWork()) return Expansion.WORK_LIMIT;
+        if (next.isEmpty()) return Expansion.EXHAUSTED;
+        var move = next.orElseThrow(); ledger.consumed++; ledger.search++;
+        var admission = admit(problem, node, move, visited, ledger);
+        var decision = admission.decision();
+        var verification = admission.verification();
+        var child = admission.child();
+        var delta = new HashSet<>(child.capabilities()); delta.removeAll(node.state.capabilities());
+        move = move.withCapabilityDelta(delta);
+        boolean proofRejected = decision == Decision.PROOF_REJECTED || decision == Decision.ASSUMPTION_REJECTED;
+        if (decision == Decision.ENQUEUED) {
+            visited.add(new Identity(child, admission.theoryWork())); node.enqueued++; assessments.put(child, admission.value());
+            var path = new ArrayList<>(node.path); path.add(new WitnessStep(node.state, child, move, verification));
+            frontier.add(new Ticket(new Node(child, admission.theoryWork(), List.copyOf(path), admission.value()),
+                child.expression().equals(problem.context().goal()) ? -Double.MAX_VALUE : priority(problem, child, admission.value()), serial[0]++));
+        }
+        if (decision != Decision.ENQUEUED) ledger.discarded++;
+        events.add(new Event(node.state, move, decision, verification));
+        if (decision == Decision.WORK_LIMIT) return Expansion.WORK_LIMIT;
+        int stage = node.picker instanceof StagedMovePicker staged ? staged.nextStage() : 0;
+        // Parent widening stays on the frontier, so promising children can finish before later stages open.
+        double continuation = problem.mode() == Mode.COMPLETE_BOUNDED_REFERENCE ? node.state.searchDepth()
+            : priority(problem, node.state, node.value) + 1 + stage + node.pulls / 2.0;
+        frontier.add(new Ticket(node, continuation, serial[0]++)); ledger.search++;
+        return proofRejected ? Expansion.REJECTED_PROOF : Expansion.MORE;
     }
     private record Admission(MoveState child, long theoryWork, Decision decision, MoveVerifier.Verification verification, StateValue.Assessment value) {}
     private static Admission admit(Problem problem, Node node, SearchMove move, Set<Identity> visited, Ledger ledger) {
