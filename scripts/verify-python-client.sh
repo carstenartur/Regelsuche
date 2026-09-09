@@ -2,8 +2,9 @@
 set -euo pipefail
 task_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 task_reports="$task_root/build/reports/python-client"
-task_work="$task_root/build/tmp/python-client-validation"
-mkdir -p "$task_reports/wheels" "$task_work"
+task_work_root="$task_root/build/tmp/python-client-validation"
+mkdir -p "$task_reports/wheels" "$task_work_root"
+task_work="$(mktemp -d "$task_work_root/run.XXXXXX")"
 python3 -m venv "$task_work/build-venv"
 "$task_work/build-venv/bin/python" -m pip wheel "$task_root/python" --no-deps --wheel-dir "$task_reports/wheels" > "$task_reports/build.log" 2>&1
 python3 -m venv "$task_work/venv"

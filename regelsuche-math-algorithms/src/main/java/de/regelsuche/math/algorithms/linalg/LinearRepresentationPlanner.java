@@ -1,6 +1,7 @@
 package de.regelsuche.math.algorithms.linalg;
 
 import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Equation;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
@@ -93,6 +94,10 @@ public final class LinearRepresentationPlanner {
         for (String text : source) validateText(text);
         var parser = new ExpressionParser();
         List<Equation> equations = source.stream().map(parser::parseEquation).toList();
+        for (Equation equation : equations) {
+            powerWeight(equation.left(), 0);
+            powerWeight(equation.right(), 0);
+        }
         Counter counter = new Counter(budget);
         Set<String> variables = new TreeSet<>();
         List<List<Integer>> blocks = new ArrayList<>();
@@ -280,6 +285,38 @@ public final class LinearRepresentationPlanner {
             if (c == '(' && ++depth > 64) throw new IllegalArgumentException("Expression nesting exceeds 64");
             if (c == ')') depth--;
         }
+        var numbers = java.util.regex.Pattern.compile(
+            "(?i)(?<![a-z_0-9])(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:e([+-]?[0-9]+))?").matcher(text);
+        while (numbers.find()) {
+            if (numbers.group().length() > 128) throw new IllegalArgumentException("Numeric literal exceeds 128 characters");
+            if (numbers.group(1) != null) {
+                java.math.BigInteger exponent = new java.math.BigInteger(numbers.group(1));
+                if (exponent.abs().compareTo(java.math.BigInteger.valueOf(64)) > 0)
+                    throw new IllegalArgumentException("Decimal exponent exceeds 64");
+            }
+        }
+    }
+    // Syntactic input bound: nested constant powers must not evade a mechanical operation budget.
+    private static int powerWeight(Expr expression, int depth) {
+        if (depth > 64) throw new IllegalArgumentException("Expression depth exceeds 64");
+        if (expression instanceof BinaryExpr binary) {
+            int left = powerWeight(binary.left(), depth + 1);
+            int right = powerWeight(binary.right(), depth + 1);
+            if (binary.operator() != BinaryOperator.POW) return Math.max(left, right);
+            int factor = 64;
+            if (binary.right() instanceof NumberExpr number && number.value().isInteger()) {
+                var absolute = number.value().numerator().abs();
+                factor = absolute.compareTo(java.math.BigInteger.valueOf(64)) > 0 ? 64 : Math.max(1, absolute.intValue());
+            }
+            if (left * factor > 64) throw new IllegalArgumentException("Nested power weight exceeds 64");
+            return Math.max(left * factor, right);
+        }
+        if (expression instanceof FunctionExpr function) {
+            int maximum = 1;
+            for (Expr argument : function.arguments()) maximum = Math.max(maximum, powerWeight(argument, depth + 1));
+            return maximum;
+        }
+        return 1;
     }
     private static void checkBudget(int budget) {
         if (budget < 0 || budget > MAX_BUDGET) throw new IllegalArgumentException("Budget must be between 0 and 1000000");

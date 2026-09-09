@@ -64,5 +64,7 @@ class LinearRepresentationPlannerTest {
         assertEquals(new LinearRepresentationPlanner.Audit("NOT_SOLVED", 0, Optional.empty()), planner.audit(exhausted, 0));
         assertThrows(IllegalArgumentException.class, () -> planner.solve(List.of(), Route.AUTO, 1));
         assertThrows(IllegalArgumentException.class, () -> planner.solve(PAIRS, Route.AUTO, -1));
+        assertThrows(IllegalArgumentException.class, () -> planner.solve(List.of("1e1000000000*x=1"), Route.AUTO, 20_000));
+        assertThrows(IllegalArgumentException.class, () -> planner.solve(List.of("((2^64)^64)*x=1"), Route.AUTO, 20_000));
     }
 }

@@ -22,6 +22,12 @@ ihren Arbeitsverbrauch. Parsing, Speicherverwaltung, Hashing und die
 Bitkomplexität rationaler Arithmetik sind nicht Bestandteil dieser Metrik.
 Aus ihr folgt keine Aussage über Laufzeit oder asymptotische Komplexität.
 
+Zusätzliche syntaktische Eingabeschranken begrenzen Literale auf 128 Zeichen,
+Dezimalexponenten auf Betrag 64 und das Produkt ineinander verschachtelter
+Potenzgewichte auf 64. So können große konstante Potenztürme nicht mit wenigen
+gezählten Operationen in die Eliminierung gelangen. Dies ist keine allgemeine
+Bitkomplexitäts- oder Speicherbudgetierung der vorhandenen Solverspezialisten.
+
 `audit` verwendet zusätzlich ein anderes vollständiges Verfahren: Matrix/RREF
 für direkte oder blockweise Lösungen und skalare Elimination für die
 Matrixroute. Seine Kosten werden getrennt ausgewiesen und müssen in einem
