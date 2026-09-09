@@ -5,20 +5,23 @@ import json
 from pathlib import Path
 import sys
 
+if not __debug__:
+    raise RuntimeError("verify-learned-scheduling.py must not run with Python assertions disabled")
+
 root = Path(sys.argv[1])
-manifest = json.loads((root / 'manifest.json').read_text())
+manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))
 assert manifest['schema'] == 'regelsuche.learned-scheduling-manifest/v1'
 for name, digest in manifest['files'].items():
     assert name != 'walltime-diagnostic.csv'
     assert 'sha256:' + hashlib.sha256((root / name).read_bytes()).hexdigest() == digest, name
-protocol = json.loads((root / 'protocol.json').read_text())
-summary = json.loads((root / 'summary.json').read_text())
-rows = [json.loads(path.read_text()) for path in sorted((root / 'runs').glob('*.json'))]
+protocol = json.loads((root / 'protocol.json').read_text(encoding='utf-8'))
+summary = json.loads((root / 'summary.json').read_text(encoding='utf-8'))
+rows = [json.loads(path.read_text(encoding='utf-8')) for path in sorted((root / 'runs').glob('*.json'))]
 expected = {(case['id'], config['id'], int(budget)) for case in protocol['cases']
             for config in protocol['configurations'] for budget in protocol['budgets']}
 actual = {(row['caseId'], row['configuration'], row['budget']) for row in rows}
 assert actual == expected and len(rows) == len(expected) == summary['rows']
-model = json.loads((root / 'model.json').read_text())
+model = json.loads((root / 'model.json').read_text(encoding='utf-8'))
 frozen_ids = {trace['id'] for trace in model['traces']}
 by_id = {row['id']: row for row in rows}
 for row in rows:
