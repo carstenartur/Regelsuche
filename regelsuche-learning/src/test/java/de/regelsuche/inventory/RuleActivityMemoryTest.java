@@ -10,6 +10,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class RuleActivityMemoryTest {
+    @Test void invalidTrainFeedbackDoesNotAgeOrMeterTheMemory() {
+        var memory = new RuleActivityMemory(List.of("rule"));
+        var initial = memory.freeze();
+        assertThrows(IllegalArgumentException.class, () -> memory.observe(null, MoveContext.Phase.TRAIN, Map.of()));
+        assertEquals(initial, memory.freeze()); assertEquals(0, memory.measuredWork());
+        assertThrows(IllegalArgumentException.class, () -> memory.observe(successfulRun(), MoveContext.Phase.TRAIN, null));
+        assertEquals(initial, memory.freeze()); assertEquals(0, memory.measuredWork());
+        memory.observe(successfulRun(), MoveContext.Phase.TRAIN, Map.of());
+        assertTrue(memory.measuredWork() > 0);
+    }
     @TempDir Path directory;
     private MoveSearch.Result successfulRun() {
         var descriptor = new MoveProvider.Descriptor("rule", "family", SearchMove.SourceKind.LEARNED,

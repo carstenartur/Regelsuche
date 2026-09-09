@@ -36,18 +36,27 @@ public final class RuleHistoryMemory {
         public static Snapshot load(Path path) throws IOException { return mapper().readValue(path.toFile(), Snapshot.class); }
     }
     private final Map<String, Stats> families = new TreeMap<>(), continuations = new TreeMap<>();
+    private long measuredWork;
     public Snapshot freeze() { return new Snapshot("regelsuche.rule-history/v1", families, continuations); }
+    /** TRAIN context inspection and two retained table-entry updates per observation. */
+    public long measuredWork() { return measuredWork; }
     public void observe(MoveSearch.Result result, MoveContext.Phase phase, Map<String, Long> pairedWorkSavings) {
         if (phase != MoveContext.Phase.TRAIN) throw new IllegalArgumentException("history updates require TRAIN");
+        if (result == null || pairedWorkSavings == null) throw new IllegalArgumentException("feedback result and savings are required");
         if (pairedWorkSavings.values().stream().anyMatch(value -> value == null || value < 0)) throw new IllegalArgumentException("invalid measured work saving");
         var successful = result.witness(); var credited = new java.util.HashSet<String>();
+        var contexts = new java.util.HashMap<MoveState, StructuralMoveContext>();
+        var deadEnds = new java.util.HashSet<>(result.deadEndStates());
         for (var event : result.events()) {
-            String context = StructuralMoveContext.of(event.source()).key();
+            var structure = contexts.computeIfAbsent(event.source(), source -> {
+                var inspected = StructuralMoveContext.of(source);
+                measuredWork = Math.addExact(measuredWork, 2L * inspected.visitedNodes());
+                return inspected;
+            });
+            String context = structure.key();
             var witness = successful.stream().filter(step -> step.source().equals(event.source()) && step.move().equals(event.move())).findFirst();
             boolean won = witness.isPresent();
-            boolean dead = event.decision() == MoveSearch.Decision.ENQUEUED && result.deadEndStates().stream()
-                .anyMatch(state -> state.expression().equals(event.move().transformation().transformedExpression())
-                    && state.previousRule().equals(event.move().ruleId()) && state.searchDepth() == event.source().searchDepth() + 1);
+            boolean dead = event.decision() == MoveSearch.Decision.ENQUEUED && deadEnds.contains(event.target());
             boolean failed = dead || event.decision() == MoveSearch.Decision.PROOF_REJECTED
                 || event.decision() == MoveSearch.Decision.ASSUMPTION_REJECTED;
             boolean duplicate = event.decision() == MoveSearch.Decision.DUPLICATE;
@@ -55,7 +64,8 @@ public final class RuleHistoryMemory {
                 .filter(capability -> !step.source().capabilities().contains(capability)).count()).orElse(0L);
             long saved = won && credited.add(event.move().ruleId()) ? pairedWorkSavings.getOrDefault(event.move().ruleId(), 0L) : 0;
             var delta = new Stats(1, won ? 1 : 0, failed ? 1 : 0, duplicate ? 1 : 0, unlocks, saved,
-                event.verification() == null ? 0 : event.verification().work());
+                event.verificationResult().map(MoveVerifier.Verification::work).orElse(0L));
+            measuredWork = Math.addExact(measuredWork, 2);
             families.merge(key(context, "", event.move().ruleFamily()), delta, RuleHistoryMemory::plus);
             continuations.merge(key(context, event.source().previousRule(), event.move().ruleId()), delta, RuleHistoryMemory::plus);
         }
