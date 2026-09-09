@@ -159,15 +159,17 @@ command above, or without package credentials by selecting the explicit local
 composite build. Authentication changes how Gradle resolves the plugin; it does
 not change which tasks, assertions or artifact contracts are executed.
 
-## Baseline for the public SDK extension
+## Baseline for learned-rule scheduling
 
 The trend baseline is the independently green main commit
-`ce751b60859a44019bbb0e71968f6fe499256f2a`, before the SDK extension.
-Its complete [CI run 34276563499](https://github.com/carstenartur/Regelsuche/actions/runs/34276563499)
+`b0fc59be75d61e5005a924d853780225651eb334`, after #951/#952 and before #953.
+Its complete [CI run 34372553674](https://github.com/carstenartur/Regelsuche/actions/runs/34372553674)
 passed all authorities. The committed values are the unchanged metrics from
-that run's `repository-verification` artifact, SHA-256
-`feec45ac7238eb8e813edaf4faf4c6a988b2e5c68bf39cdfc9acfecb84b4af65`.
-The SDK is measured against this prior green state, with the existing trend
-and method-complexity thresholds. The `public-java-sdk` capability links its
+that run's `repository-verification` artifact (ID `10113524705`, ZIP SHA-256
+`4a61caa5d905a54d4031dc3bfef8d32caa01d55758a5a9623005678ac8856635`).
+The values are `current` in `build/ai-knowledge/trend.json`; no value from the
+scheduling implementation is included. The scheduling chain is measured against
+this prior green state, with the existing trend and method-complexity thresholds.
+The `public-java-sdk` capability links its
 public entry points, contract tests and tutorials. Moving `RuleFileParser`
 changes only its source path in the existing hotspot inventory.

@@ -54,3 +54,31 @@ production search policy unchanged. Later PRs add a neutral move model, scoped
 utility evidence, lazy scheduling, activity, history, executable landmarks and a
 separate frozen evaluation protocol. Mathematical authority is never inferred
 from a useful heuristic score.
+
+## PR 2: a common evidence-bearing move boundary
+
+`regelsuche-search` owns `SearchMove`, `MoveProvider`, `MovePriorityPolicy`,
+`MovePicker`, source-only `MoveState` and goal/assumption `MoveContext`. The first
+picker is explicitly eager, providing a control for the later lazy implementation.
+It evaluates each score once and preserves inventory order for equal scores.
+Provider batch work is charged once; the generation cost attached to each move
+describes that shared batch, not an additional per-move charge. Unknown
+verification cost is -1, not zero.
+
+`MoveProviders.from` exposes the base engine and individual hypotheses instead
+of executing the old wrapper's global append limit. Inventory macro wrappers
+expose the same provider contract. `DiscoveryEngineFactory.createMoveEngine`
+uses this common boundary and a caller-supplied policy; its experimental engine
+rejects the PRODUCTION phase pending the separate #745 qualification. The old
+engine entry points remain the historical/production controls until that gate.
+Opaque engines do not assert complete successor enumeration.
+
+The `ReusableRule` value object now belongs to Learning, with its existing Java
+package and constructors retained. `DynamicOperatorCompiler.compile(rule)`
+preserves the entire rule evidence, including confidence, supporting observations,
+assumptions and provenance. A quarantined dynamic operator remains empirical
+even if its old transformation flag or inventory metadata looks stronger.
+Supporting path IDs alone do not become an instantiated primitive expansion.
+Actual program moves keep their complete typed primitive sequence. These
+descriptors carry evidence for later verification; they do not grant production
+authority or replace an independent verifier.

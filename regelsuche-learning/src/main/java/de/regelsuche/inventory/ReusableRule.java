@@ -197,4 +197,12 @@ public record ReusableRule(
     public String assumptionFingerprint() {
         return AssumptionSignature.ofExpressions(assumptions).fingerprint();
     }
+
+    /** Search projection preserves observations without asserting primitive minimality or proof authority. */
+    public de.regelsuche.search.moves.SearchMove.ValueEvidence moveValueEvidence() {
+        return new de.regelsuche.search.moves.SearchMove.ValueEvidence(
+            Double.isFinite(confidenceScore) ? confidenceScore : 0,
+            Double.isFinite(averageImprovement) ? averageImprovement : 0,
+            Math.max(supportingExamples, occurrenceCount), -1, 1, false, canonicalHash);
+    }
 }
