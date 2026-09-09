@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.math.algorithms.equivalence.ExactPolynomialResidualComposer.Effect;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -113,5 +114,17 @@ class ExactResidualSourceProvenanceTest {
             () -> arithmetic.parse("(x+y+z+w)^32"));
         assertEquals(arithmetic.parse("(x+y)^2"),
             arithmetic.parse("x^2+2*x*y+y^2"));
+    }
+
+    @Test
+    void chargesPowerAccumulatorOnceWithoutRecountingTheFinalPolynomial() {
+        AtomicLong observedWork = new AtomicLong();
+        var measured = new ExactResidualPolynomialArithmetic(observedWork::set);
+
+        measured.parse("x^0");
+        assertEquals(5L, observedWork.get());
+
+        measured.parse("(x+y)^2");
+        assertEquals(16L, observedWork.get());
     }
 }
