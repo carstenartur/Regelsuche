@@ -1,6 +1,7 @@
 // One binary/source gate under the existing checkout-owned CI authority.
 repositories { mavenCentral() }
-configurations { sdkApiDiffTool }
+// The classifier already bundles its runtime; resolve exactly this executable JAR.
+configurations { sdkApiDiffTool { transitive = false } }
 dependencies { sdkApiDiffTool 'com.github.siom79.japicmp:japicmp:0.26.2:jar-with-dependencies' }
 
 def sdkApiModules = [
