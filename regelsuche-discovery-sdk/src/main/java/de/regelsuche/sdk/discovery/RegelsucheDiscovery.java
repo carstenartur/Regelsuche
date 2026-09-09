@@ -24,9 +24,19 @@ public final class RegelsucheDiscovery {
         return new Request<>(domain);
     }
 
-    /** Starts the exact registered domain, retaining its provider artifact in evidence. */
+    /**
+     * Starts an exact catalog registration and retains its host-observed provider artifact in evidence.
+     * Manual registrations without observed artifact provenance are rejected rather than silently
+     * degrading the evidence contract.
+     */
     public static Request<?, ?, ?> forRegistration(DiscoveryDomainCatalog.Registration registration) {
-        return forDomain(Objects.requireNonNull(registration, "registration").domain());
+        var checked = Objects.requireNonNull(registration, "registration");
+        if (checked.artifact().isEmpty()) {
+            throw new IllegalArgumentException(
+                "registration must carry host-observed provider artifact provenance"
+            );
+        }
+        return forDomain(checked.domain());
     }
 
     /** Loads discovery-domain providers visible to the context class loader. */

@@ -4,19 +4,27 @@ import de.regelsuche.json.JsonWriter;
 import de.regelsuche.sdk.discovery.*;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /** Host-enabled domain selection; HTTP input can never enable arbitrary provider classes. */
 final class DiscoveryDomainWorkbench {
+    private static final Map<HostConfiguration, DiscoveryDomainWorkbench> HOSTS =
+        new ConcurrentHashMap<>();
+
     private final DiscoveryDomainCatalog catalog;
 
     DiscoveryDomainWorkbench(DiscoveryDomainCatalog catalog) { this.catalog = catalog; }
 
     static DiscoveryDomainWorkbench forHost(ClassLoader loader, String enabledClasses) {
+        Objects.requireNonNull(loader, "loader");
         Set<String> enabled = Arrays.stream(enabledClasses.split(",", -1)).map(String::trim)
             .filter(value -> !value.isEmpty()).collect(Collectors.toUnmodifiableSet());
-        return new DiscoveryDomainWorkbench(DiscoveryDomainCatalog.load(loader, enabled));
+        var key = new HostConfiguration(loader, enabled);
+        return HOSTS.computeIfAbsent(key, configuration -> new DiscoveryDomainWorkbench(
+            DiscoveryDomainCatalog.load(configuration.loader(), configuration.enabled())));
     }
 
     String catalogJson() {
@@ -50,5 +58,8 @@ final class DiscoveryDomainWorkbench {
             throw new IllegalArgumentException(name + " must be non-empty text");
         }
         return value;
+    }
+
+    private record HostConfiguration(ClassLoader loader, Set<String> enabled) {
     }
 }

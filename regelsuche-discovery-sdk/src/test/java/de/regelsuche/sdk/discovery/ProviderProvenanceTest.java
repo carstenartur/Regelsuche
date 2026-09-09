@@ -41,6 +41,14 @@ class ProviderProvenanceTest {
         assertEquals("first", shortRun.evidence().domainEvidence().properties().get("sdk.provider.id"));
     }
 
+    @Test void rejectsManualRegistrationWithoutObservedArtifactProvenance() {
+        var manual = new DiscoveryDomainCatalog.Registration(
+            "manual-provider", "1", "source-reference", DiscoverySdkTest.sampleDomain());
+        var error = assertThrows(IllegalArgumentException.class,
+            () -> RegelsucheDiscovery.forRegistration(manual));
+        assertTrue(error.getMessage().contains("host-observed provider artifact provenance"));
+    }
+
     @Test void rejectsIncompatibleProviderBeforeCallingItsDomainFactory() {
         var provider = new DiscoveryDomainProvider() {
             public String id() { return "future-provider"; }

@@ -52,6 +52,12 @@ class DiscoveryDomainWorkbenchTest {
             getClass().getClassLoader(), "not.installed.Provider"));
     }
 
+    @Test void reusesWorkbenchForTheSameHostConfiguration() {
+        var loader = getClass().getClassLoader();
+        assertSame(DiscoveryDomainWorkbench.forHost(loader, ""),
+            DiscoveryDomainWorkbench.forHost(loader, "  "));
+    }
+
     @Test void runsOnlyHostSelectedDomainAndKeepsNegativeEvidence() {
         var service = new DiscoveryDomainWorkbench(DiscoveryDomainCatalog.fromProviders(List.of(new Provider())));
         assertTrue(service.catalogJson().contains("artifactSha256"));

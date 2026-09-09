@@ -6,7 +6,6 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.ServiceLoader;
 import java.util.Set;
 
@@ -67,7 +66,9 @@ public final class DiscoveryCli {
                     case INVALID_SEED -> 6;
                 };
             }
-            out.println("Usage: domains list [provider.class] | domains run provider.class "
+            out.println("Usage: list [provider.class] | run provider.class "
+                + "domain-id@revision campaign-id seed.txt evidence.json [small|tiny]");
+            out.println("From the Regelsuche app: domains list [provider.class] | domains run provider.class "
                 + "domain-id@revision campaign-id seed.txt evidence.json [small|tiny]");
             return 1;
         } catch (IOException | IllegalArgumentException | IllegalStateException | java.util.ServiceConfigurationError ex) {

@@ -21,6 +21,8 @@ class DiscoveryCliTest {
         assertTrue(output.toString().contains("sdk-multiplier-search@v1"));
         assertTrue(output.toString().contains("artifact=sha256:"));
         assertEquals(1, execute());
+        assertTrue(output.toString().contains("Usage: list [provider.class]"));
+        assertTrue(output.toString().contains("From the Regelsuche app: domains list [provider.class]"));
         assertEquals(1, execute("list", "missing.Provider"));
     }
     @Test void retainsEvidenceForConfirmedAndBudgetExhaustedRuns(@TempDir Path temp) throws Exception {
