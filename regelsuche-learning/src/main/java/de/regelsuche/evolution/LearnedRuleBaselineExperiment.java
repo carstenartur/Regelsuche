@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 
 /** Frozen diagnostic control before introducing a learned scheduling policy (#953, #696, #235). */
 public final class LearnedRuleBaselineExperiment {
-    public static final String REVISION = "regelsuche.learned-rule-baseline/v1";
+    public static final String REVISION = "regelsuche.learned-rule-baseline/v2";
     public static final List<Long> WORK_BUDGETS = List.of(128L, 512L, 2048L, 30_000L);
     private static final List<String> FAMILIES = TraceStrategyTransferExample.inventory().rewrites().stream()
         .map(EvolutionGenome.RewriteGene::geneId).toList();
@@ -61,6 +61,7 @@ public final class LearnedRuleBaselineExperiment {
             .property("workScope", SearchRunDiagnostics.WORK_SCOPE)
             .property("verification", "EXACT_POLYNOMIAL_CHECK_PER_RETAINED_PRIMITIVE_EDGE;SAME_FOR_ALL_PROFILES")
             .property("primitiveBudget", 6).property("stateBudget", 80).property("candidateBudget", 32)
+            .property("maxExpandingSteps", 6)
             .stringArray("profiles", java.util.Arrays.stream(LearnedSearchProfile.values()).map(Enum::name).toList())
             .stringArray("workBudgets", WORK_BUDGETS.stream().map(Object::toString).toList())
             .array("cases", values -> cases().forEach(c -> values.objectValue(value ->

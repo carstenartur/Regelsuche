@@ -44,6 +44,7 @@ public final class RuleActivityMemory {
     }
     private final Map<String, Entry> rules = new TreeMap<>();
     private long epoch;
+    private long measuredWork;
     /** IDs come from the caller's validated durable inventory. Their presence grants no execution authority. */
     public RuleActivityMemory(Collection<String> inventoryIds) {
         for (String id : inventoryIds) {
@@ -53,16 +54,21 @@ public final class RuleActivityMemory {
     }
     public RuleActivityMemory(Snapshot snapshot) { rules.putAll(snapshot.rules()); epoch = snapshot.epoch(); }
     public Snapshot freeze() { return new Snapshot("regelsuche.rule-activity/v1", epoch, rules); }
+    /** TRAIN memory-entry updates, including aging; separate from search and proof work. */
+    public long measuredWork() { return measuredWork; }
     public void age(MoveContext.Phase phase) {
         requireTrain(phase); epoch = Math.addExact(epoch, 1); rules.replaceAll((id, entry) -> entry.decay());
+        measuredWork = Math.addExact(measuredWork, rules.size());
     }
     /** Only completed witness edges count as successes; budget-cut enqueues are not failures or dead ends. */
     public void observe(MoveSearch.Result result, MoveContext.Phase phase, Map<String, Long> pairedWorkSavings) {
         requireTrain(phase);
+        if (result == null || pairedWorkSavings == null) throw new IllegalArgumentException("feedback result and savings are required");
         if (pairedWorkSavings.values().stream().anyMatch(value -> value == null || value < 0)) throw new IllegalArgumentException("negative measured saving");
         age(phase);
         for (var event : result.events()) {
             var entry = rules.get(event.move().ruleId()); if (entry == null) continue;
+            measuredWork = Math.addExact(measuredWork, 1);
             boolean duplicate = event.decision() == MoveSearch.Decision.DUPLICATE;
             boolean failure = event.decision() == MoveSearch.Decision.PROOF_REJECTED || event.decision() == MoveSearch.Decision.ASSUMPTION_REJECTED;
             double penalty = duplicate ? 1 : failure ? 3 + Math.log1p(event.move().applicationCost()) : 0;
@@ -72,12 +78,14 @@ public final class RuleActivityMemory {
         }
         for (var state : result.deadEndStates()) {
             var entry = rules.get(state.previousRule()); if (entry == null) continue;
+            measuredWork = Math.addExact(measuredWork, 1);
             rules.put(state.previousRule(), new Entry(entry.activity() - 3, entry.applications(), entry.successes(), entry.failures(),
-                entry.duplicates(), entry.deadEnds() + 1, entry.capabilityUnlocks(), entry.measuredWorkSaved(), entry.lastUsedEpoch()));
+                entry.duplicates(), entry.deadEnds() + 1, entry.capabilityUnlocks(), entry.measuredWorkSaved(), epoch));
         }
         var credited = new java.util.HashSet<String>();
         for (var step : result.witness()) {
             String id = step.move().ruleId(); var entry = rules.get(id); if (entry == null) continue;
+            measuredWork = Math.addExact(measuredWork, 1);
             long saved = credited.add(id) ? pairedWorkSavings.getOrDefault(id, 0L) : 0;
             long unlocks = step.target().capabilities().stream().filter(capability -> !step.source().capabilities().contains(capability)).count();
             rules.put(id, new Entry(entry.activity() + 2 + 4 * unlocks + Math.log1p(saved), entry.applications(), entry.successes() + 1,

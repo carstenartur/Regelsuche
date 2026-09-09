@@ -19,7 +19,7 @@ public record SearchRunDiagnostics(
         int firstHitPrimitiveDepth, int deepestPrimitiveDepth, long primitiveWork,
         long searchWork, long verificationWork, Map<String, Long> matchesByRuleFamily,
         Map<String, Long> rejectionsByReason, List<LearnedContribution> learnedContributions) {
-    public static final String REVISION = "regelsuche.search-run-diagnostics/v1";
+    public static final String REVISION = "regelsuche.search-run-diagnostics/v2";
     public static final String MATCH_SCOPE = "RETURNED_SOURCE_MATCHES_BY_RULE_FAMILY;NOT_INTERNAL_MATCH_ATTEMPTS";
     public static final String WORK_SCOPE = "V1_SOURCE_CANDIDATES_PLUS_OTHER_MECHANICAL_EVENTS_PLUS_PRIMITIVE_AUDIT_CALLS;NOT_CPU_WORK";
 
@@ -59,9 +59,9 @@ public record SearchRunDiagnostics(
         long generated = result.metrics().generatedTransformations();
         var hit = result.reachedState();
         long primitive = result.metrics().transformationWork().sourceCandidates();
+        rejections.put("INTERNAL_DUPLICATE_CANDIDATES_DROPPED", result.metrics().transformationWork().duplicateCandidatesDropped());
         return new SearchRunDiagnostics(generated, consumed, enqueued, generated - enqueued,
-            generated - consumed, rejections.getOrDefault("DUPLICATE", 0L)
-                + result.metrics().transformationWork().duplicateCandidatesDropped(),
+            generated - consumed, rejections.getOrDefault("DUPLICATE", 0L),
             countDeadEnds(result), result.exploredStates().size(), result.metrics().expandedStates(),
             hit == null ? -1 : hit.edgeDepth(), hit == null ? -1 : hit.primitiveDepth(),
             result.exploredStates().stream().mapToInt(WorkBudgetBestFirstSearchStrategy.State::primitiveDepth).max().orElse(0),

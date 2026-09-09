@@ -10,6 +10,20 @@ import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
 class StagedMoveSearchTest {
+    @Test void contextValidationAndOptionalVerificationAreExplicit() {
+        var error = assertThrows(NullPointerException.class, () -> new MoveSearch.Problem("a", null, List.of(),
+            MovePriorityPolicy.INVENTORY_ORDER, GRAPH, state -> 0, MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED,
+            new MoveSearch.Budget(1, 1, 0, 10, 100)));
+        assertEquals("context", error.getMessage());
+        var repeated = provider("rule", SearchMove.SourceKind.PRIMITIVE, s -> s.equals("a")
+            ? List.of(new Transformation("rule", "b"), new Transformation("rule", "b")) : List.of(), true);
+        var result = search(List.of(repeated), "absent", MoveSearch.Scheduling.STAGED, MoveSearch.Mode.FAST, 1000);
+        var duplicate = result.events().stream().filter(event -> event.decision() == MoveSearch.Decision.DUPLICATE).findFirst().orElseThrow();
+        assertTrue(duplicate.verificationResult().isEmpty()); assertEquals("b", duplicate.target().expression());
+        assertEquals(1, duplicate.target().primitiveDepth());
+        var empty = new StagedMovePicker(List.of(), MovePriorityPolicy.INVENTORY_ORDER, MoveState.root("a"), MoveContext.frozen("b"));
+        assertEquals(MovePriorityPolicy.Stage.values().length, empty.nextStage());
+    }
     // Synthetic graph admission is deliberately separate from the real polynomial verifier's tests.
     private static final MoveVerifier GRAPH = (state, move, context) -> new MoveVerifier.Verification(true,
         move.transformation().primitiveStepCount(), List.of("synthetic-graph-edge"), "TEST_FIXTURE");

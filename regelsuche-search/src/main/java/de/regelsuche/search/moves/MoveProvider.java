@@ -14,7 +14,7 @@ public interface MoveProvider {
             SearchMove.ProofStrength proofStrength, List<String> requiredAssumptions,
             SearchMove.ValueEvidence valueEvidence, String provenanceId) {
         public Descriptor {
-            if (id == null || id.isBlank() || ruleFamily == null || ruleFamily.isBlank() || provenanceId == null) {
+            if (id == null || id.isBlank() || ruleFamily == null || ruleFamily.isBlank() || provenanceId == null || provenanceId.isBlank()) {
                 throw new IllegalArgumentException("provider identity is required");
             }
             Objects.requireNonNull(sourceKind, "sourceKind");
