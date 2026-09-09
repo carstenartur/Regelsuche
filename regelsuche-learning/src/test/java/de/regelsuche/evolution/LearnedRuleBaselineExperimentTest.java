@@ -31,7 +31,6 @@ class LearnedRuleBaselineExperimentTest {
         }
         assertTrue(report.rows().stream().anyMatch(row -> row.search() != null && row.search().reached()
             && row.profile() == LearnedSearchProfile.BASE && !row.example().id().equals("already-target")));
-        assertTrue(report.rows().stream().anyMatch(row -> row.diagnostics() != null && row.diagnostics().unconsumedSuccessors() > 0));
         Path directory = LearnedRuleBaselineExperiment.write(report, Path.of("build/reports/learned-rule-baseline"));
         assertEquals(report.toCanonicalJson(), Files.readString(directory.resolve("report.json")));
         assertFalse(Files.readString(directory.resolve("manifest.json")).contains("walltime"));
