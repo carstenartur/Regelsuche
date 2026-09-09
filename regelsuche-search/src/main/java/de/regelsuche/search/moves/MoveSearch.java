@@ -117,29 +117,16 @@ public final class MoveSearch {
                 continue;
             }
             var move = next.orElseThrow(); ledger.consumed++; ledger.search++;
-            var step = move.transformation();
-            long depth = (long) node.state.primitiveDepth() + step.primitiveStepCount();
-            long theory = Math.addExact(node.theoryWork, step.executionWork().exactTheoryWorkUnits());
-            Decision decision;
-            MoveVerifier.Verification verification = null;
-            var child = new MoveState(step.transformedExpression(), node.state.searchDepth() + 1,
-                (int) Math.min(Integer.MAX_VALUE, depth), move.ruleId(), node.state.assumptions(), Set.of(), 0);
-            var identity = new Identity(child, theory);
-            if (depth > budget.maxPrimitiveSteps() || theory > budget.maxTheoryWork()) decision = Decision.PATH_BOUND;
-            else if (!problem.context().carries(move.assumptions(), node.state)) { decision = Decision.ASSUMPTION_REJECTED; complete = false; }
-            else if (visited.contains(identity)) { decision = Decision.DUPLICATE; ledger.duplicates++; }
-            else if (ledger.total() >= budget.totalWork()) decision = Decision.WORK_LIMIT;
-            else {
-                verification = problem.verifier().verify(node.state, move, problem.context());
-                ledger.verification = Math.addExact(ledger.verification, verification.work());
-                if (ledger.total() > budget.totalWork()) decision = Decision.WORK_LIMIT;
-                else if (!verification.accepted()) { decision = Decision.PROOF_REJECTED; complete = false; }
-                else {
-                    decision = Decision.ENQUEUED; visited.add(identity); node.enqueued++;
-                    var path = new ArrayList<>(node.path); path.add(new WitnessStep(node.state, child, move, verification));
-                    frontier.add(new Ticket(new Node(child, theory, List.copyOf(path)),
-                        child.expression().equals(problem.context().goal()) ? -Double.MAX_VALUE : priority(problem, child), serial++));
-                }
+            var admission = admit(problem, node, move, visited, ledger);
+            var decision = admission.decision();
+            var verification = admission.verification();
+            var child = admission.child();
+            if (decision == Decision.PROOF_REJECTED || decision == Decision.ASSUMPTION_REJECTED) complete = false;
+            if (decision == Decision.ENQUEUED) {
+                visited.add(new Identity(child, admission.theoryWork())); node.enqueued++;
+                var path = new ArrayList<>(node.path); path.add(new WitnessStep(node.state, child, move, verification));
+                frontier.add(new Ticket(new Node(child, admission.theoryWork(), List.copyOf(path)),
+                    child.expression().equals(problem.context().goal()) ? -Double.MAX_VALUE : priority(problem, child), serial++));
             }
             if (decision != Decision.ENQUEUED) ledger.discarded++;
             events.add(new Event(node.state, move, decision, verification));
@@ -154,6 +141,27 @@ public final class MoveSearch {
         return new Result(outcome, witness, events, reached, deadEnds, new Metrics(ledger.generated, ledger.consumed, ledger.discarded,
             ledger.generated - ledger.consumed, ledger.duplicates, ledger.deadEnds, ledger.explored, ledger.expanded,
             ledger.primitive, ledger.search, ledger.verification, hit, primitiveHit, ledger.matches), complete);
+    }
+    private record Admission(MoveState child, long theoryWork, Decision decision, MoveVerifier.Verification verification) {}
+    private static Admission admit(Problem problem, Node node, SearchMove move, Set<Identity> visited, Ledger ledger) {
+        var step = move.transformation();
+        long depth = (long) node.state.primitiveDepth() + step.primitiveStepCount();
+        long theory = Math.addExact(node.theoryWork, step.executionWork().exactTheoryWorkUnits());
+        var child = new MoveState(step.transformedExpression(), node.state.searchDepth() + 1,
+            (int) Math.min(Integer.MAX_VALUE, depth), move.ruleId(), node.state.assumptions(), Set.of(), 0);
+        Decision decision;
+        MoveVerifier.Verification verification = null;
+        if (depth > problem.budget().maxPrimitiveSteps() || theory > problem.budget().maxTheoryWork()) decision = Decision.PATH_BOUND;
+        else if (!problem.context().carries(move.assumptions(), node.state)) decision = Decision.ASSUMPTION_REJECTED;
+        else if (visited.contains(new Identity(child, theory))) { decision = Decision.DUPLICATE; ledger.duplicates++; }
+        else if (ledger.total() >= problem.budget().totalWork()) decision = Decision.WORK_LIMIT;
+        else {
+            verification = problem.verifier().verify(node.state, move, problem.context());
+            ledger.verification = Math.addExact(ledger.verification, verification.work());
+            decision = ledger.total() > problem.budget().totalWork() ? Decision.WORK_LIMIT
+                : verification.accepted() ? Decision.ENQUEUED : Decision.PROOF_REJECTED;
+        }
+        return new Admission(child, theory, decision, verification);
     }
     private static double priority(Problem problem, MoveState state) {
         double score = problem.mode() == Mode.COMPLETE_BOUNDED_REFERENCE ? state.searchDepth() : problem.stateScore().applyAsDouble(state);
