@@ -26,11 +26,13 @@ def package(root, repository, version, output):
     policy = json.loads((root / 'config/sdk/public-api.json').read_text())
     members = {}
     ledger = {}
+    requires_parent = False
     namespace = {'m': 'http://maven.apache.org/POM/4.0.0'}
     for module in policy['modules'] + ['regelsuche-bom']:
         directory = repository / 'de/regelsuche' / module / version
         pom = single(directory, f'{module}-*.pom')
         model = ET.fromstring(pom.read_bytes())
+        requires_parent |= model.find('m:parent', namespace) is not None
         declared_version = model.findtext('m:version', namespaces=namespace)
         if declared_version is None:
             declared_version = model.findtext('m:parent/m:version', namespaces=namespace)
@@ -70,8 +72,10 @@ def package(root, repository, version, output):
     parent_dir = repository / 'de/regelsuche/regelsuche-parent' / version
     if parent_dir.exists():
         parent = single(parent_dir, 'regelsuche-parent-*.pom')
+        if ET.fromstring(parent.read_bytes()).findtext('m:version', namespaces=namespace) != version:
+            raise ValueError('parent POM version differs from SDK version')
         members[f'repository/de/regelsuche/regelsuche-parent/{version}/regelsuche-parent-{version}.pom'] = parent.read_bytes()
-    elif any(b'<parent>' in data for name, data in members.items() if name.endswith('.pom')):
+    elif requires_parent:
         raise ValueError('published SDK POM requires missing regelsuche-parent')
     mapping = {**policy, 'productVersion': version, 'artifacts': ledger,
                'distribution': 'GitHub Release SDK archive', 'publicMavenCentral': False}

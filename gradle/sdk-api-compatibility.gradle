@@ -1,4 +1,5 @@
 // One binary/source gate under the existing checkout-owned CI authority.
+repositories { mavenCentral() }
 configurations { sdkApiDiffTool }
 dependencies { sdkApiDiffTool 'com.github.siom79.japicmp:japicmp:0.26.2:jar-with-dependencies' }
 

@@ -10,6 +10,17 @@ def verify_pinned_consumer(project: Path):
     manifest = json.loads((project / 'SOURCE.json').read_text())
     if manifest['commit'] != PRIMACHSENRAUM_COMMIT or manifest['repository'] != 'https://github.com/carstenartur/primachsenraum':
         raise ValueError('unexpected Primachsenraum source revision')
+    actual_files = set()
+    for file in project.rglob('*'):
+        relative = file.relative_to(project)
+        if any(part in ('build', 'target', '.gradle') for part in relative.parts):
+            continue
+        if file.is_symlink():
+            raise ValueError('consumer source must not contain symlinks')
+        if file.is_file():
+            actual_files.add(relative.as_posix())
+    if actual_files != set(manifest['files']) | {'SOURCE.json'}:
+        raise ValueError('independent consumer source set differs from the pinned snapshot')
     for relative, expected in manifest['files'].items():
         path = Path(relative)
         if path.is_absolute() or '..' in path.parts:

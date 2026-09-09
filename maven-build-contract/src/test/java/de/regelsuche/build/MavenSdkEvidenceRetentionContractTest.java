@@ -26,11 +26,15 @@ class MavenSdkEvidenceRetentionContractTest {
     );
     private static final List<String> EXCLUDED = List.of(
         "!build/reports/student-java-sdk/isolated-gradle-user-home/**",
-        "!build/reports/student-java-sdk/generated-gradle-user-home/**"
+        "!build/reports/student-java-sdk/generated-gradle-user-home/**",
+        "!build/reports/student-java-sdk/hello-rule-java25-gradle-cache/**",
+        "!build/reports/student-java-sdk/finite-difference-domain-java25-gradle-cache/**",
+        "!build/reports/student-java-sdk/solver-adapter-java25-gradle-cache/**",
+        "!build/reports/student-java-sdk/number-theory-plan-java25-gradle-cache/**"
     );
 
     @Test
-    void excludesOnlyTheTwoDisposableSdkCachesAfterAllEvidencePatterns()
+    void excludesOnlyTheSixDisposableSdkCachesAfterAllEvidencePatterns()
             throws Exception {
         String configured = System.getProperty("regelsuche.repositoryRoot");
         assertTrue(configured != null && !configured.isBlank(),
@@ -79,7 +83,7 @@ class MavenSdkEvidenceRetentionContractTest {
 
     private static void validatePatterns(List<String> patterns) {
         assertEquals(expectedPatterns(), patterns,
-            "retain every evidence category; exclude only the two SDK cache trees last");
+            "retain every evidence category; exclude only the six SDK cache trees last");
     }
 
     private static List<String> expectedPatterns() {

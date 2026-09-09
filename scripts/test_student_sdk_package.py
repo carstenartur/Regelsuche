@@ -64,7 +64,7 @@ class SdkPackageTest(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             package.package(self.root, self.repo, self.version, one)
 
-    def test_missing_sources_or_parent_prevents_publication(self):
+    def test_missing_sources_prevents_publication(self):
         source = next(self.repo.rglob('*-sources.jar'))
         source.unlink()
         with self.assertRaisesRegex(ValueError, 'sources'):
@@ -75,6 +75,23 @@ class SdkPackageTest(unittest.TestCase):
         pom = next(self.repo.rglob('regelsuche-bom-*.pom'))
         pom.write_text(pom.read_text().replace('0.5.0', '0.6.0'))
         with self.assertRaisesRegex(ValueError, 'POM version'):
+            package.package(self.root, self.repo, self.version, self.root / 'invalid.zip')
+
+    def test_modified_or_extra_independent_consumer_source_is_rejected(self):
+        consumer = self.root / 'examples/external-consumers/number-theory-plan-java25'
+        extra = consumer / 'Unexpected.java'
+        extra.write_text('class Unexpected {}')
+        with self.assertRaisesRegex(ValueError, 'source set'):
+            package.package(self.root, self.repo, self.version, self.root / 'invalid.zip')
+        extra.unlink()
+        (consumer / 'build.gradle').write_text('changed')
+        with self.assertRaisesRegex(ValueError, 'Git blob'):
+            package.package(self.root, self.repo, self.version, self.root / 'invalid.zip')
+
+    def test_missing_inherited_parent_is_rejected(self):
+        pom = next(self.repo.rglob('regelsuche-discovery-sdk-*.pom'))
+        pom.write_text(pom.read_text().replace('<version>', '<parent><version>').replace('</version>', '</version></parent>'))
+        with self.assertRaisesRegex(ValueError, 'missing regelsuche-parent'):
             package.package(self.root, self.repo, self.version, self.root / 'invalid.zip')
 
     def test_invalid_version_is_rejected(self):

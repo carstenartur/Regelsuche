@@ -59,7 +59,7 @@ def main():
              '-d', str(classes), *map(str, sources)], root)
         old_jar = work / 'api-0.4.0.jar'
         run(['jar', '--create', '--file', str(old_jar), '-C', str(classes), '.'], root)
-        include = ';'.join(['de.regelsuche.sdk.discovery', *(
+        include = ';'.join([*policy['stablePackages'], *(
             'de.regelsuche.plugin.' + name for name in policy['stablePluginClasses'])])
         command = ['java', '-jar', str(args.japicmp), '--old', str(old_jar),
                    '--new', ';'.join(str(jar.resolve()) for jar in args.new_jars),

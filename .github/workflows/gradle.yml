@@ -34,10 +34,6 @@ jobs:
         with: { distribution: temurin, java-version: '25' }
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
         with: { cache-cleanup: on-success }
-      - name: Verify public Java SDK before the full repository authority
-        run: |
-          ./gradlew --no-daemon --no-configuration-cache --console=plain \
-            :regelsuche-discovery-sdk:test :regelsuche-plugin-api:test packageStudentJavaSdk
       - name: Install checkout prerequisites
         run: |
           sudo apt-get update
@@ -73,7 +69,10 @@ jobs:
             docs/generated/**
             !build/reports/student-java-sdk/isolated-gradle-user-home/**
             !build/reports/student-java-sdk/generated-gradle-user-home/**
-            !build/reports/student-java-sdk/*-gradle-cache/**
+            !build/reports/student-java-sdk/hello-rule-java25-gradle-cache/**
+            !build/reports/student-java-sdk/finite-difference-domain-java25-gradle-cache/**
+            !build/reports/student-java-sdk/solver-adapter-java25-gradle-cache/**
+            !build/reports/student-java-sdk/number-theory-plan-java25-gradle-cache/**
           include-hidden-files: true
           if-no-files-found: warn
 

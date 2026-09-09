@@ -41,6 +41,8 @@ class MavenBuildContractTest {
         "regelsuche-learning",
         "regelsuche-discovery",
         "regelsuche-discovery-sdk",
+        "regelsuche-plugin-api",
+        "regelsuche-bom",
         "regelsuche-experiments",
         "regelsuche-cli",
         "regelsuche-quality",
