@@ -15,6 +15,17 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class SearchRunDiagnosticsTest {
+    @Test void internalDuplicateDropsNeverInflateFrontierDuplicates() {
+        de.regelsuche.transform.MeasuredTransformationEngine engine = expression -> new de.regelsuche.transform.TransformationBatch(
+            expression.equals("a") ? List.of(step("one", "b"), step("two", "b")) : List.of(),
+            new de.regelsuche.transform.TransformationWorkMetrics(1, 0, 1, expression.equals("a") ? 2 : 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, expression.equals("a") ? 9 : 0));
+        var result = new WorkBudgetBestFirstSearchStrategy().search(new Problem("a", "absent",
+            new SearchExpansionSource.Measured(engine), new ExpressionScorer(), new ExpressionCanonicalizer(), Budget.primitive(2, 12, 10, 2, 1000)));
+        var diagnostic = SearchRunDiagnostics.observe(result, id -> id, Set.of(), 0);
+        assertEquals(2, diagnostic.generatedSuccessors()); assertEquals(1, diagnostic.duplicateSuccessors());
+        assertEquals(9L, diagnostic.rejectionsByReason().get("INTERNAL_DUPLICATE_CANDIDATES_DROPPED"));
+    }
     private static Transformation step(String id, String target) {
         return new Transformation(id, target, RewriteKind.NORMALIZE, false, 0, true, id + ":" + target);
     }
