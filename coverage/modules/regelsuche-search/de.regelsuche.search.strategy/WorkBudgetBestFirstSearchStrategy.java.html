@@ -113,8 +113,8 @@ import java.util.Set;
 <span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (context.metrics.workBudgetExceeded) {</span>
 <span class="nc" id="L114">                return LoopAction.STOP;</span>
             }
-<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            if (accepted &gt;= problem.budget().maxCandidatesPerState()) {</span>
-<span class="nc" id="L117">                return context.prune(problem, PruneKind.CANDIDATE_BUDGET);</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (accepted &gt;= problem.budget().maxCandidatesPerState()) {</span>
+<span class="fc" id="L117">                return context.prune(problem, PruneKind.CANDIDATE_BUDGET);</span>
             }
 <span class="fc" id="L119">            CandidateAction action = processCandidate(</span>
                 problem, context, current, transformation);
@@ -849,7 +849,7 @@ import java.util.Set;
         }
 
         private void increment(PruneKind kind) {
-<span class="pc bpc" id="L852" title="6 of 8 branches missed.">            switch (kind) {</span>
+<span class="pc bpc" id="L852" title="5 of 8 branches missed.">            switch (kind) {</span>
 <span class="fc" id="L853">                case DUPLICATE -&gt; metrics.duplicatePrunes = add(</span>
                     metrics.duplicatePrunes, 1);
                 case REPEATED_APPLICATION -&gt;
@@ -862,7 +862,7 @@ import java.util.Set;
 <span class="fc" id="L862">                case PRIMITIVE_BUDGET -&gt; metrics.primitiveBudgetPrunes = add(</span>
                     metrics.primitiveBudgetPrunes, 1);
 <span class="nc" id="L864">                case PATH_WORK_BUDGET -&gt; metrics.pathWorkBudgetPrunes = add(metrics.pathWorkBudgetPrunes, 1);</span>
-<span class="nc" id="L865">                case CANDIDATE_BUDGET -&gt; metrics.candidateBudgetPrunes = add(</span>
+<span class="fc" id="L865">                case CANDIDATE_BUDGET -&gt; metrics.candidateBudgetPrunes = add(</span>
                     metrics.candidateBudgetPrunes, 1);
             }
 <span class="fc" id="L868">        }</span>

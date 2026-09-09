@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LearnedRuleBaselineExperiment.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">LearnedRuleBaselineExperiment.java</span></div><h1>LearnedRuleBaselineExperiment.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.strategy.SearchExpansionSource;
+import de.regelsuche.search.strategy.SearchRunDiagnostics;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Budget;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Problem;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Result;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.MeasuredTransformationEngine;
+import de.regelsuche.transform.MeasuredTransformationEngines;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
+
+/** Frozen diagnostic control before introducing a learned scheduling policy (#953, #696, #235). */
+public final class LearnedRuleBaselineExperiment {
+    public static final String REVISION = &quot;regelsuche.learned-rule-baseline/v2&quot;;
+<span class="fc" id="L31">    public static final List&lt;Long&gt; WORK_BUDGETS = List.of(128L, 512L, 2048L, 30_000L);</span>
+<span class="fc" id="L32">    private static final List&lt;String&gt; FAMILIES = TraceStrategyTransferExample.inventory().rewrites().stream()</span>
+<span class="fc" id="L33">        .map(EvolutionGenome.RewriteGene::geneId).toList();</span>
+    private LearnedRuleBaselineExperiment() {}
+
+<span class="fc" id="L36">    public record Case(String id, String source, String target) {}</span>
+<span class="fc" id="L37">    public record Row(Case example, LearnedSearchProfile profile, long budget, Result search,</span>
+                      SearchRunDiagnostics diagnostics, String unsupportedReason, long wallNanos) {
+<span class="fc" id="L39">        public String id() { return example.id() + &quot;-&quot; + profile.name().toLowerCase(Locale.ROOT) + &quot;-&quot; + budget; }</span>
+    }
+
+    public static List&lt;Case&gt; cases() {
+<span class="fc" id="L43">        return List.of(</span>
+            new Case(&quot;sum-composition&quot;, &quot;((u+v)*(u-v)+v*v)+u*u&quot;, &quot;2*u^2&quot;),
+            new Case(&quot;product-composition&quot;, &quot;((j+k)*(j-k)+k*k)*(j+2)&quot;, &quot;j^2*(j+2)&quot;),
+            new Case(&quot;compound-base&quot;, &quot;((u*v+w)*(u*v-w)+w*w)+7&quot;, &quot;(u*v)^2+7&quot;),
+            new Case(&quot;factor-context&quot;, &quot;3*(m*m+m*n)&quot;, &quot;3*(m*(m+n))&quot;),
+            new Case(&quot;near-miss&quot;, &quot;(x+y)*(x-y)+y*(y+1)&quot;, &quot;x^2&quot;),
+            new Case(&quot;already-target&quot;, &quot;z+9&quot;, &quot;z+9&quot;),
+            new Case(&quot;unsupported&quot;, &quot;sin(x)+1&quot;, &quot;sin(x)&quot;));
+    }
+
+    /** All targets and budgets are fixed independently of the TRAIN result. */
+    public static String protocol() {
+<span class="fc" id="L55">        return new JsonWriter().beginObject().property(&quot;schema&quot;, REVISION)</span>
+<span class="fc" id="L56">            .property(&quot;claim&quot;, &quot;PUBLIC_DEVELOPMENT_DIAGNOSIS;NOT_SEALED_FINAL_TEST;NO_POLICY_PROMOTION&quot;)</span>
+<span class="fc" id="L57">            .property(&quot;rankedPolicy&quot;, &quot;IDENTICAL_TO_LEARNED_NAIVE&quot;)</span>
+<span class="fc" id="L58">            .property(&quot;expert&quot;, &quot;HANDWRITTEN_PRIMITIVE_SEQUENCE_REFERENCE;NOT_AN_UNLEARNED_BASELINE&quot;)</span>
+<span class="fc" id="L59">            .property(&quot;inventoryHash&quot;, TraceStrategyTransferExample.inventory().contentHash())</span>
+<span class="fc" id="L60">            .property(&quot;trainingProtocolHash&quot;, SchematicProofPlan.hash(TraceStrategyTransferExample.protocol()))</span>
+<span class="fc" id="L61">            .property(&quot;workScope&quot;, SearchRunDiagnostics.WORK_SCOPE)</span>
+<span class="fc" id="L62">            .property(&quot;verification&quot;, &quot;EXACT_POLYNOMIAL_CHECK_PER_RETAINED_PRIMITIVE_EDGE;SAME_FOR_ALL_PROFILES&quot;)</span>
+<span class="fc" id="L63">            .property(&quot;primitiveBudget&quot;, 6).property(&quot;stateBudget&quot;, 80).property(&quot;candidateBudget&quot;, 32)</span>
+<span class="fc" id="L64">            .property(&quot;maxExpandingSteps&quot;, 6)</span>
+<span class="fc" id="L65">            .stringArray(&quot;profiles&quot;, java.util.Arrays.stream(LearnedSearchProfile.values()).map(Enum::name).toList())</span>
+<span class="fc" id="L66">            .stringArray(&quot;workBudgets&quot;, WORK_BUDGETS.stream().map(Object::toString).toList())</span>
+<span class="fc" id="L67">            .array(&quot;cases&quot;, values -&gt; cases().forEach(c -&gt; values.objectValue(value -&gt;</span>
+<span class="fc" id="L68">                value.property(&quot;id&quot;, c.id()).property(&quot;source&quot;, c.source()).property(&quot;target&quot;, c.target()))))</span>
+<span class="fc" id="L69">            .endObject().toString();</span>
+    }
+
+    public record Report(String protocol, TraceRewriteStrategyLearner.FrozenStrategy knowledge, List&lt;Row&gt; rows) {
+<span class="fc" id="L73">        public Report { rows = List.copyOf(rows); }</span>
+        public String toCanonicalJson() {
+<span class="fc" id="L75">            return new JsonWriter().beginObject().property(&quot;schema&quot;, REVISION)</span>
+<span class="fc" id="L76">                .property(&quot;protocolHash&quot;, SchematicProofPlan.hash(protocol)).property(&quot;knowledgeHash&quot;, knowledge.contentHash())</span>
+<span class="fc" id="L77">                .property(&quot;trainingSearchWork&quot;, knowledge.trainingSearchWorkUnits())</span>
+<span class="fc" id="L78">                .property(&quot;trainingReplayWork&quot;, knowledge.trainingReplayWorkUnits())</span>
+<span class="fc" id="L79">                .property(&quot;trainingMinimalityWork&quot;, knowledge.trainingMinimalityWorkUnits())</span>
+<span class="fc" id="L80">                .property(&quot;trainingVerificationCalls&quot;, knowledge.trainingExactAuditCalls())</span>
+<span class="fc" id="L81">                .property(&quot;trainingCostScope&quot;, &quot;RETAINED_SEARCH_REPLAY_MINIMALITY_AND_AUDIT_EVENTS;EXCLUDES_COMPILATION_AND_IDENTITY_PROJECTION&quot;)</span>
+<span class="fc" id="L82">                .array(&quot;rows&quot;, values -&gt; rows.forEach(row -&gt; values.objectValue(value -&gt; {</span>
+<span class="fc" id="L83">                    value.property(&quot;id&quot;, row.id()).property(&quot;case&quot;, row.example().id()).property(&quot;profile&quot;, row.profile().name())</span>
+<span class="fc" id="L84">                        .property(&quot;workBudget&quot;, row.budget()).property(&quot;unsupportedReason&quot;, row.unsupportedReason());</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">                    if (row.search() == null) value.property(&quot;status&quot;, &quot;DOMAIN_UNSUPPORTED&quot;).nullProperty(&quot;diagnostics&quot;);</span>
+<span class="fc" id="L86">                    else value.property(&quot;status&quot;, row.search().status().name()).property(&quot;reached&quot;, row.search().reached())</span>
+<span class="fc" id="L87">                        .property(&quot;searchHash&quot;, SchematicProofPlan.hash(row.search().toCanonicalJson()))</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                        .property(&quot;withinTotalBudget&quot;, row.diagnostics().totalWork() &lt;= row.budget())</span>
+<span class="fc" id="L89">                        .property(&quot;diagnostics&quot;, row.diagnostics().toCanonicalJson());</span>
+<span class="fc" id="L90">                }))).endObject().toString();</span>
+        }
+    }
+
+    public static Report run() {
+<span class="fc" id="L95">        String frozenProtocol = protocol();</span>
+<span class="fc" id="L96">        var knowledge = new TraceRewriteStrategyLearner().learn(TraceStrategyTransferExample.inventory(),</span>
+<span class="fc" id="L97">            TraceStrategyTransferExample.trainingInputs(), TraceStrategyTransferExample.limits());</span>
+<span class="fc" id="L98">        var rows = new ArrayList&lt;Row&gt;();</span>
+<span class="fc bfc" id="L99" title="All 6 branches covered.">        for (Case example : cases()) for (long budget : WORK_BUDGETS) for (var profile : LearnedSearchProfile.values()) {</span>
+<span class="fc" id="L100">            rows.add(runCase(knowledge, example, profile, budget));</span>
+        }
+<span class="fc" id="L102">        return new Report(frozenProtocol, knowledge, rows);</span>
+    }
+
+    public static Row runCase(TraceRewriteStrategyLearner.FrozenStrategy knowledge, Case example,
+            LearnedSearchProfile profile, long workBudget) {
+<span class="fc" id="L107">        var exact = new ExactPolynomialAnalysis();</span>
+        String identity;
+<span class="fc" id="L109">        try { identity = exact.alphaIdentity(example.source()); }</span>
+<span class="fc" id="L110">        catch (IllegalArgumentException unsupported) {</span>
+<span class="fc" id="L111">            return new Row(example, profile, workBudget, null, null, unsupported.getMessage(), 0);</span>
+<span class="fc" id="L112">        }</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (knowledge.excludedIdentities().contains(identity)) throw new IllegalArgumentException(&quot;TRAIN overlap: &quot; + example.id());</span>
+<span class="fc" id="L114">        var engine = engine(knowledge, profile);</span>
+<span class="fc" id="L115">        var budget = Budget.primitive(6, 80, 32, 6, workBudget);</span>
+<span class="fc" id="L116">        long start = System.nanoTime();</span>
+<span class="fc" id="L117">        var search = new WorkBudgetBestFirstSearchStrategy().search(new Problem(format(example.source()), format(example.target()),</span>
+            new SearchExpansionSource.Measured(engine), new ExpressionScorer(), new ExpressionCanonicalizer(), budget));
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        var retained = search.reached() ? search.reachedState() : search.bestState();</span>
+<span class="fc" id="L120">        int audits = new TraceRewriteStrategyLearner().audit(retained.path().getFirst(), retained.transformations());</span>
+<span class="fc" id="L121">        long nanos = System.nanoTime() - start;</span>
+<span class="fc" id="L122">        var learnedIds = search.expansions().stream().flatMap(e -&gt; e.execution().transformations().stream())</span>
+<span class="fc" id="L123">            .map(de.regelsuche.transform.Transformation::rule)</span>
+<span class="fc bfc" id="L124" title="All 4 branches covered.">            .filter(id -&gt; profile.usesFrozenLearning() &amp;&amp; id.startsWith(&quot;program:&quot;)).collect(Collectors.toSet());</span>
+<span class="fc" id="L125">        var diagnostics = SearchRunDiagnostics.observe(search, id -&gt; family(id, profile), learnedIds, audits);</span>
+<span class="pc bpc" id="L126" title="1 of 4 branches missed.">        if (search.reached() &amp;&amp; diagnostics.totalWork() &gt; workBudget) throw new IllegalStateException(&quot;success exceeds total audit-inclusive budget&quot;);</span>
+<span class="fc" id="L127">        return new Row(example, profile, workBudget, search, diagnostics, &quot;&quot;, nanos);</span>
+    }
+
+    public static MeasuredTransformationEngine engine(TraceRewriteStrategyLearner.FrozenStrategy knowledge,
+            LearnedSearchProfile profile) {
+<span class="fc" id="L132">        var inventory = knowledge.inventory();</span>
+<span class="fc" id="L133">        var base = MeasuredTransformationEngines.counting(new AstRewriteTransformationEngine(</span>
+<span class="fc" id="L134">            new EvolutionGenomeCompiler().compile(inventory).rules(), inventory.budget().maxAstGrowthPerStep(),</span>
+<span class="fc" id="L135">            inventory.budget().maxCandidatesPerState()));</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (profile == LearnedSearchProfile.BASE) return base;</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        var plan = profile == LearnedSearchProfile.EXPERT ? java.util.Optional.of(expertPlan(inventory)) : knowledge.plan();</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        return plan.isEmpty() ? base : MeasuredTransformationEngines.union(base,</span>
+<span class="fc" id="L139">            new EvolutionRewriteProgramCompiler().compile(inventory, plan.orElseThrow()).engine());</span>
+    }
+
+    public static EvolutionRewriteProgramPlan expertPlan(EvolutionGenome inventory) {
+<span class="fc" id="L143">        var cancel = new EvolutionRewriteProgramPlan.Sequence(&quot;expert-cancellation&quot;, List.of(</span>
+<span class="fc" id="L144">            new EvolutionRewriteProgramPlan.Source(&quot;expert-difference-product&quot;, List.of(&quot;difference-product&quot;)),</span>
+<span class="fc" id="L145">            new EvolutionRewriteProgramPlan.Source(&quot;expert-square-product&quot;, List.of(&quot;square-product&quot;)),</span>
+<span class="fc" id="L146">            new EvolutionRewriteProgramPlan.Source(&quot;expert-cancel-addend&quot;, List.of(&quot;cancel-addend&quot;))));</span>
+<span class="fc" id="L147">        return EvolutionRewriteProgramPlan.create(inventory, new EvolutionRewriteProgramPlan.Choice(&quot;expert-book&quot;, List.of(</span>
+<span class="fc" id="L148">            cancel, new EvolutionRewriteProgramPlan.Source(&quot;expert-factors&quot;, List.of(&quot;factor-left&quot;, &quot;factor-right&quot;)))), 64, 64);</span>
+    }
+
+    private static String family(String id, LearnedSearchProfile profile) {
+<span class="fc bfc" id="L152" title="All 4 branches covered.">        if (id.startsWith(&quot;program:&quot;)) return profile == LearnedSearchProfile.EXPERT ? &quot;HANDWRITTEN_PROGRAM&quot; : &quot;FROZEN_LEARNED_PROGRAM&quot;;</span>
+<span class="pc bpc" id="L153" title="1 of 4 branches missed.">        for (String family : FAMILIES) if (id.endsWith(&quot;_&quot; + family)) return family;</span>
+<span class="nc" id="L154">        return id;</span>
+    }
+
+<span class="fc" id="L157">    private static String format(String expression) { return ExpressionFormatter.format(new ExpressionParser().parseTerm(expression)); }</span>
+
+    public static Path write(Report report, Path output) throws IOException {
+<span class="fc" id="L160">        Map&lt;String, String&gt; artifacts = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L161">        artifacts.put(&quot;protocol.json&quot;, report.protocol());</span>
+<span class="fc" id="L162">        artifacts.put(&quot;knowledge.json&quot;, report.knowledge().toCanonicalJson());</span>
+<span class="fc" id="L163">        artifacts.put(&quot;report.json&quot;, report.toCanonicalJson());</span>
+<span class="fc bfc" id="L164" title="All 4 branches covered.">        for (var row : report.rows()) if (row.search() != null) artifacts.put(row.id() + &quot;.search.json&quot;, row.search().toCanonicalJson());</span>
+<span class="fc" id="L165">        Path directory = TraceStrategyTransferExample.writeArtifacts(SchematicProofPlan.hash(report.toCanonicalJson()), artifacts, output, REVISION);</span>
+        // Volatile diagnostics deliberately do not enter the reproducible manifest or scientific work totals.
+<span class="fc" id="L167">        var wall = new StringBuilder(&quot;run,wallNanos\n&quot;);</span>
+<span class="fc" id="L168">        report.rows().forEach(row -&gt; wall.append(row.id()).append(',').append(row.wallNanos()).append('\n'));</span>
+<span class="fc" id="L169">        Files.writeString(output.resolve(&quot;walltime-diagnostic.csv&quot;), wall);</span>
+<span class="fc" id="L170">        return directory;</span>
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        Path output = args.length == 0 ? Path.of(&quot;build/reports/learned-rule-baseline&quot;) : Path.of(args[0]);</span>
+<span class="nc" id="L175">        System.out.println(write(run(), output));</span>
+<span class="nc" id="L176">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

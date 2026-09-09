@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchRunDiagnostics.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.strategy</a> &gt; <span class="el_source">SearchRunDiagnostics.java</span></div><h1>SearchRunDiagnostics.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.strategy;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.transform.Transformation;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+/** Observations of the existing frontier, without changing its policy or replay bytes. */
+public record SearchRunDiagnostics(
+        long generatedSuccessors, long consumedSuccessors, long enqueuedSuccessors,
+        long discardedSuccessors, long unconsumedSuccessors, long duplicateSuccessors,
+        long deadEnds, int exploredStates, long expandedStates, int firstHitDepth,
+        int firstHitPrimitiveDepth, int deepestPrimitiveDepth, long primitiveWork,
+        long searchWork, long verificationWork, Map&lt;String, Long&gt; matchesByRuleFamily,
+        Map&lt;String, Long&gt; rejectionsByReason, List&lt;LearnedContribution&gt; learnedContributions) {
+    public static final String REVISION = &quot;regelsuche.search-run-diagnostics/v2&quot;;
+    public static final String MATCH_SCOPE = &quot;RETURNED_SOURCE_MATCHES_BY_RULE_FAMILY;NOT_INTERNAL_MATCH_ATTEMPTS&quot;;
+    public static final String WORK_SCOPE = &quot;V1_SOURCE_CANDIDATES_PLUS_OTHER_MECHANICAL_EVENTS_PLUS_PRIMITIVE_AUDIT_CALLS;NOT_CPU_WORK&quot;;
+
+<span class="fc" id="L26">    public SearchRunDiagnostics {</span>
+<span class="pc bpc" id="L27" title="8 of 16 branches missed.">        if (generatedSuccessors &lt; consumedSuccessors || consumedSuccessors &lt; enqueuedSuccessors</span>
+                || discardedSuccessors != generatedSuccessors - enqueuedSuccessors
+                || unconsumedSuccessors != generatedSuccessors - consumedSuccessors
+                || enqueuedSuccessors &lt; 0 || primitiveWork &lt; 0 || searchWork &lt; 0 || verificationWork &lt; 0) {
+<span class="nc" id="L31">            throw new IllegalArgumentException(&quot;inconsistent successor or work accounting&quot;);</span>
+        }
+<span class="fc" id="L33">        matchesByRuleFamily = java.util.Collections.unmodifiableMap(new TreeMap&lt;&gt;(matchesByRuleFamily));</span>
+<span class="fc" id="L34">        rejectionsByReason = java.util.Collections.unmodifiableMap(new TreeMap&lt;&gt;(rejectionsByReason));</span>
+<span class="fc" id="L35">        learnedContributions = List.copyOf(learnedContributions);</span>
+<span class="fc" id="L36">    }</span>
+
+    /** One retained learned edge, including its full charged primitive path length. */
+<span class="fc" id="L39">    public record LearnedContribution(String ruleId, String from, String to,</span>
+                                      int searchDepth, int primitiveSteps) {}
+
+    public static SearchRunDiagnostics observe(WorkBudgetBestFirstSearchStrategy.Result result,
+            Function&lt;String, String&gt; familyOf, Set&lt;String&gt; learnedRuleIds, long primitiveAuditCalls) {
+<span class="fc" id="L44">        Objects.requireNonNull(result, &quot;result&quot;);</span>
+<span class="fc" id="L45">        Objects.requireNonNull(familyOf, &quot;familyOf&quot;);</span>
+<span class="fc" id="L46">        Objects.requireNonNull(learnedRuleIds, &quot;learnedRuleIds&quot;);</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (result.metrics().workRevision() != SearchExpansionSource.WorkRevision.MECHANICAL_V1) {</span>
+<span class="nc" id="L48">            throw new IllegalArgumentException(&quot;v1 diagnostic cost partition requires the historical mechanical ledger&quot;);</span>
+        }
+<span class="fc" id="L50">        var matches = new TreeMap&lt;String, Long&gt;();</span>
+<span class="fc" id="L51">        result.expansions().forEach(expansion -&gt; expansion.execution().transformations().forEach(step -&gt;</span>
+<span class="fc" id="L52">            matches.merge(Objects.requireNonNull(familyOf.apply(step.rule())), 1L, Math::addExact)));</span>
+<span class="fc" id="L53">        var rejections = new TreeMap&lt;String, Long&gt;();</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        result.candidateDecisions().stream().filter(d -&gt; d.outcome() != WorkBudgetBestFirstSearchStrategy.Decision.ENQUEUED)</span>
+<span class="fc" id="L55">            .forEach(d -&gt; rejections.merge(d.outcome().name(), 1L, Math::addExact));</span>
+<span class="fc" id="L56">        long consumed = result.candidateDecisions().size();</span>
+<span class="fc" id="L57">        long enqueued = result.candidateDecisions().stream()</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">            .filter(d -&gt; d.outcome() == WorkBudgetBestFirstSearchStrategy.Decision.ENQUEUED).count();</span>
+<span class="fc" id="L59">        long generated = result.metrics().generatedTransformations();</span>
+<span class="fc" id="L60">        var hit = result.reachedState();</span>
+<span class="fc" id="L61">        long primitive = result.metrics().transformationWork().sourceCandidates();</span>
+<span class="fc" id="L62">        rejections.put(&quot;INTERNAL_DUPLICATE_CANDIDATES_DROPPED&quot;, result.metrics().transformationWork().duplicateCandidatesDropped());</span>
+<span class="fc" id="L63">        return new SearchRunDiagnostics(generated, consumed, enqueued, generated - enqueued,</span>
+<span class="fc" id="L64">            generated - consumed, rejections.getOrDefault(&quot;DUPLICATE&quot;, 0L),</span>
+<span class="fc" id="L65">            countDeadEnds(result), result.exploredStates().size(), result.metrics().expandedStates(),</span>
+<span class="fc bfc" id="L66" title="All 4 branches covered.">            hit == null ? -1 : hit.edgeDepth(), hit == null ? -1 : hit.primitiveDepth(),</span>
+<span class="fc" id="L67">            result.exploredStates().stream().mapToInt(WorkBudgetBestFirstSearchStrategy.State::primitiveDepth).max().orElse(0),</span>
+<span class="fc" id="L68">            primitive, result.metrics().chargedSearchWorkUnits() - primitive, primitiveAuditCalls,</span>
+<span class="fc" id="L69">            matches, rejections, contributions(hit, learnedRuleIds));</span>
+    }
+
+    private static long countDeadEnds(WorkBudgetBestFirstSearchStrategy.Result result) {
+<span class="fc" id="L73">        var decisions = result.candidateDecisions().stream()</span>
+<span class="fc" id="L74">            .collect(Collectors.groupingBy(WorkBudgetBestFirstSearchStrategy.CandidateDecision::source));</span>
+<span class="fc" id="L75">        return result.expansions().stream().filter(expansion -&gt; {</span>
+<span class="fc" id="L76">            var consumed = decisions.getOrDefault(expansion.source(), List.of());</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            return expansion.execution().complete()</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">                &amp;&amp; consumed.size() == expansion.execution().transformations().size()</span>
+<span class="pc bpc" id="L79" title="1 of 4 branches missed.">                &amp;&amp; consumed.stream().allMatch(d -&gt; switch (d.outcome()) {</span>
+<span class="nc" id="L80">                    case DUPLICATE, REPEATED_APPLICATION, SAME_EXPRESSION -&gt; true;</span>
+<span class="fc" id="L81">                    default -&gt; false;</span>
+                });
+<span class="fc" id="L83">        }).map(WorkBudgetBestFirstSearchStrategy.ExpansionObservation::source).distinct().count();</span>
+    }
+
+    private static List&lt;LearnedContribution&gt; contributions(WorkBudgetBestFirstSearchStrategy.State hit,
+            Set&lt;String&gt; learnedRuleIds) {
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (hit == null) return List.of();</span>
+<span class="fc" id="L89">        var rows = new ArrayList&lt;LearnedContribution&gt;();</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        for (int i = 0; i &lt; hit.transformations().size(); i++) {</span>
+<span class="fc" id="L91">            Transformation step = hit.transformations().get(i);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (learnedRuleIds.contains(step.rule())) rows.add(new LearnedContribution(step.rule(),</span>
+<span class="fc" id="L93">                hit.path().get(i), step.transformedExpression(), i + 1, step.primitiveStepCount()));</span>
+        }
+<span class="fc" id="L95">        return List.copyOf(rows);</span>
+    }
+
+    /** Mean admitted successors per expanded state; not a fitted tree-depth estimate. */
+    public double effectiveBranchingFactor() {
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        return expandedStates == 0 ? 0.0 : (double) enqueuedSuccessors / expandedStates;</span>
+    }
+
+<span class="fc" id="L103">    public long totalWork() { return Math.addExact(Math.addExact(primitiveWork, searchWork), verificationWork); }</span>
+
+    public String toCanonicalJson() {
+<span class="fc" id="L106">        var json = new JsonWriter().beginObject().property(&quot;schema&quot;, REVISION)</span>
+<span class="fc" id="L107">            .property(&quot;matchScope&quot;, MATCH_SCOPE).property(&quot;workScope&quot;, WORK_SCOPE)</span>
+<span class="fc" id="L108">            .property(&quot;successorScope&quot;, &quot;SOURCE_OUTPUT_TO_FRONTIER;DISCARDED_INCLUDES_NEVER_CONSUMED&quot;)</span>
+<span class="fc" id="L109">            .property(&quot;generatedSuccessors&quot;, generatedSuccessors).property(&quot;consumedSuccessors&quot;, consumedSuccessors)</span>
+<span class="fc" id="L110">            .property(&quot;enqueuedSuccessors&quot;, enqueuedSuccessors).property(&quot;discardedSuccessors&quot;, discardedSuccessors)</span>
+<span class="fc" id="L111">            .property(&quot;unconsumedSuccessors&quot;, unconsumedSuccessors).property(&quot;duplicateSuccessors&quot;, duplicateSuccessors)</span>
+<span class="fc" id="L112">            .property(&quot;deadEnds&quot;, deadEnds).property(&quot;exploredStates&quot;, exploredStates).property(&quot;expandedStates&quot;, expandedStates)</span>
+<span class="fc" id="L113">            .property(&quot;effectiveBranchingFactor&quot;, effectiveBranchingFactor())</span>
+<span class="fc" id="L114">            .property(&quot;branchingDefinition&quot;, &quot;ENQUEUED_SUCCESSORS_DIVIDED_BY_EXPANDED_STATES&quot;)</span>
+<span class="fc" id="L115">            .property(&quot;firstHitDepth&quot;, firstHitDepth).property(&quot;firstHitPrimitiveDepth&quot;, firstHitPrimitiveDepth)</span>
+<span class="fc" id="L116">            .property(&quot;deepestPrimitiveDepth&quot;, deepestPrimitiveDepth).property(&quot;primitiveWork&quot;, primitiveWork)</span>
+<span class="fc" id="L117">            .property(&quot;searchWork&quot;, searchWork).property(&quot;verificationWork&quot;, verificationWork).property(&quot;totalWork&quot;, totalWork())</span>
+<span class="fc" id="L118">            .object(&quot;matchesByRuleFamily&quot;, value -&gt; matchesByRuleFamily.forEach(value::property))</span>
+<span class="fc" id="L119">            .object(&quot;rejectionsByReason&quot;, value -&gt; rejectionsByReason.forEach(value::property))</span>
+<span class="pc" id="L120">            .array(&quot;learnedContributions&quot;, values -&gt; learnedContributions.forEach(row -&gt; values.objectValue(value -&gt;</span>
+<span class="nc" id="L121">                value.property(&quot;ruleId&quot;, row.ruleId()).property(&quot;from&quot;, row.from()).property(&quot;to&quot;, row.to())</span>
+<span class="nc" id="L122">                    .property(&quot;searchDepth&quot;, row.searchDepth()).property(&quot;primitiveSteps&quot;, row.primitiveSteps()))));</span>
+<span class="fc" id="L123">        return json.endObject().toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
