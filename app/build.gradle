@@ -13,6 +13,8 @@ def vendorKatexDir = vendorWebRoot.dir('katex')
 def vendorCytoscapeDir = vendorWebRoot.dir('cytoscape')
 
 dependencies {
+    implementation project(':regelsuche-discovery-sdk')
+    implementation project(':regelsuche-plugin-api')
     implementation project(':regelsuche-core')
     implementation project(':regelsuche-egraph')
     implementation project(':regelsuche-search')

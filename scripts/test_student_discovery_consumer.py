@@ -43,6 +43,8 @@ class StudentDiscoveryConsumerTest(unittest.TestCase):
         self.output = self.root / verifier.OUTPUT_RELATIVE
         self.write(self.repository / "keep.txt", "published artifacts")
         self.write(self.source / "keep.txt", "maintained consumer")
+        for name in ("hello-rule-java25", "finite-difference-domain-java25", "solver-adapter-java25", "number-theory-plan-java25"):
+            self.write(self.root / "examples/external-consumers" / name / "keep.txt", "maintained consumer")
         self.write(self.root / verifier.GENERATOR_RELATIVE, "# fixture generator\n")
         self.write(self.root / "release.properties", "version=0.4.0-SNAPSHOT\n")
 
@@ -136,9 +138,14 @@ class StudentDiscoveryConsumerTest(unittest.TestCase):
         second = f"provider={verifier.GENERATED_PROVIDER} outcome=CONFIRMED multiplier=2"
         with patch.object(sys, "argv", self.argv()), \
                 patch.object(verifier, "artifact_files", return_value={}), \
+                patch.object(verifier, "verify_pinned_consumer", return_value={}), \
                 patch.object(verifier, "execute_consumer", side_effect=[
                     (first, "external dependencies", []),
-                    (second, "generated dependencies", [])]) as consumers, \
+                    (second, "generated dependencies", []),
+                    ("rule=hello-add-zero replay=VERIFIED", "plugin dependencies", []),
+                    ("outcome=CONFIRMED sdk.provider.artifactSha256", "domain dependencies", []),
+                    ("outcome=CONFIRMED outcome=REFUTED sdk.provider.artifactSha256", "solver dependencies", []),
+                    ("provider=primachsenraum-number-theory-provider bases=[2, 3] 2047 falsePrimes=0 falseCompositeDecisions=0", "number theory dependencies", [])]) as consumers, \
                 patch.object(verifier, "verify_generated_project_shape", return_value={}), \
                 patch.object(verifier, "run", side_effect=[
                     "generated", "java.specification.version = 25\n"]) as commands, \
@@ -148,8 +155,10 @@ class StudentDiscoveryConsumerTest(unittest.TestCase):
         self.assertEqual([sys.executable, str(self.root / verifier.GENERATOR_RELATIVE)], command[:2])
         self.assertEqual(str(self.output / "generated-starter"), command[command.index("--output") + 1])
         self.assertEqual(self.root, commands.call_args_list[0].args[1])
-        self.assertEqual(2, consumers.call_count)
-        first_call, second_call = [call.args for call in consumers.call_args_list]
+        self.assertEqual(6, consumers.call_count)
+        first_call, second_call = [call.args for call in consumers.call_args_list[:2]]
+        caches = [call.args[4] for call in consumers.call_args_list]
+        self.assertEqual(6, len(set(caches)))
         self.assertEqual(self.output / "isolated-gradle-user-home", first_call[4])
         self.assertEqual(self.output / "generated-gradle-user-home", second_call[4])
         wrapper = "gradlew.bat" if os.name == "nt" else "gradlew"

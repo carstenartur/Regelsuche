@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+ <modelVersion>4.0.0</modelVersion>
+ <parent><groupId>de.regelsuche</groupId><artifactId>regelsuche-parent</artifactId><version>0.5.0-SNAPSHOT</version></parent>
+ <artifactId>regelsuche-plugin-api</artifactId>
+ <name>Regelsuche Plugin API</name>
+ <dependencies><dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-search</artifactId></dependency></dependencies>
+<profiles>
+    <profile><id>sdk-release</id><build><plugins>
+      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-source-plugin</artifactId>
+        <executions><execution><id>sdk-sources</id><goals><goal>jar-no-fork</goal></goals></execution></executions></plugin>
+      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-javadoc-plugin</artifactId>
+        <configuration><doclint>none</doclint><notimestamp>true</notimestamp><detectLinks>false</detectLinks></configuration>
+        <executions><execution><id>sdk-javadoc</id><goals><goal>jar</goal></goals></execution></executions></plugin>
+    </plugins></build></profile>
+</profiles>
+</project>

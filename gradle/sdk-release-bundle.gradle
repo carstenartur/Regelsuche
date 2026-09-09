@@ -1,0 +1,19 @@
+def packageStudentJavaSdk = tasks.register('packageStudentJavaSdk', Exec) {
+    group = 'distribution'
+    description = 'Packages the SDK Maven repository, sources, API docs and standalone examples.'
+    dependsOn 'verifyStudentJavaSdkConsumer', 'verifySdkApiCompatibility'
+    workingDir rootDir
+    outputs.upToDateWhen { false }
+    doFirst {
+        def releaseProperties = new Properties()
+        file('release.properties').withInputStream { releaseProperties.load(it) }
+        def version = releaseProperties.getProperty('version')
+        def output = layout.buildDirectory.file("distributions/regelsuche-sdk-${version}.zip").get().asFile
+        // Only this task's fixed output is replaced; the packaging script refuses overwrite.
+        delete output
+        commandLine 'python3', 'scripts/package-student-sdk.py', '--root', rootDir.absolutePath,
+            '--repository', layout.buildDirectory.dir('student-sdk-repository').get().asFile.absolutePath,
+            '--version', version, '--output', output.absolutePath
+    }
+}
+tasks.named('ciCheck') { dependsOn packageStudentJavaSdk }

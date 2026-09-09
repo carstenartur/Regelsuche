@@ -26,6 +26,8 @@
     <module>regelsuche-learning</module>
     <module>regelsuche-discovery</module>
     <module>regelsuche-discovery-sdk</module>
+    <module>regelsuche-plugin-api</module>
+    <module>regelsuche-bom</module>
     <module>regelsuche-experiments</module>
     <module>regelsuche-cli</module>
     <module>regelsuche-quality</module>
@@ -66,6 +68,8 @@
     <maven.assembly.plugin.version>3.7.1</maven.assembly.plugin.version>
     <maven.install.plugin.version>3.1.4</maven.install.plugin.version>
     <maven.deploy.plugin.version>3.1.4</maven.deploy.plugin.version>
+    <maven.source.plugin.version>3.4.0</maven.source.plugin.version>
+    <maven.javadoc.plugin.version>3.12.0</maven.javadoc.plugin.version>
     <maven.site.plugin.version>3.22.0</maven.site.plugin.version>
     <maven.enforcer.plugin.version>3.6.3</maven.enforcer.plugin.version>
     <jacoco.version>0.8.15</jacoco.version>
@@ -117,6 +121,7 @@
       <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-learning</artifactId><version>${project.version}</version></dependency>
       <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-discovery</artifactId><version>${project.version}</version></dependency>
       <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-discovery-sdk</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-plugin-api</artifactId><version>${project.version}</version></dependency>
       <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-experiments</artifactId><version>${project.version}</version></dependency>
       <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-cli</artifactId><version>${project.version}</version></dependency>
       <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-quality</artifactId><version>${project.version}</version></dependency>
@@ -146,6 +151,8 @@
         <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-assembly-plugin</artifactId><version>${maven.assembly.plugin.version}</version></plugin>
         <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-install-plugin</artifactId><version>${maven.install.plugin.version}</version></plugin>
         <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-deploy-plugin</artifactId><version>${maven.deploy.plugin.version}</version></plugin>
+        <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-source-plugin</artifactId><version>${maven.source.plugin.version}</version></plugin>
+        <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-javadoc-plugin</artifactId><version>${maven.javadoc.plugin.version}</version></plugin>
         <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-site-plugin</artifactId><version>${maven.site.plugin.version}</version></plugin>
         <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-enforcer-plugin</artifactId><version>${maven.enforcer.plugin.version}</version></plugin>
         <plugin><groupId>org.jacoco</groupId><artifactId>jacoco-maven-plugin</artifactId><version>${jacoco.version}</version></plugin>

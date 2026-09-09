@@ -8,7 +8,9 @@ def sdkModules = [
     'regelsuche-search',
     'regelsuche-validation',
     'regelsuche-discovery',
-    'regelsuche-discovery-sdk'
+    'regelsuche-discovery-sdk',
+    'regelsuche-plugin-api',
+    'regelsuche-bom'
 ]
 def publicationTaskPaths = sdkModules.collect {
     ":${it}:publishMavenJavaPublicationToStudentSdkRepository"
@@ -36,13 +38,16 @@ def verifySdkStarter = tasks.register('verifyStudentDiscoveryStarter', Exec) {
     commandLine(
         pythonExecutable, '-B', '-m', 'unittest', 'discover',
         '-s', file('scripts').absolutePath,
-        '-p', 'test_student_discovery_*.py', '-v'
+        '-p', 'test_student_*.py', '-v'
     )
     inputs.files(
         'scripts/create-student-discovery-domain.py',
         'scripts/verify-student-java-sdk-consumer.py',
         'scripts/test_student_discovery_starter.py',
-        'scripts/test_student_discovery_consumer.py'
+        'scripts/test_student_discovery_consumer.py',
+        'scripts/package-student-sdk.py',
+        'scripts/student_sdk_source.py',
+        'scripts/test_student_sdk_package.py'
     )
 }
 
@@ -82,7 +87,7 @@ def verifySdkConsumer = tasks.register(
     inputs.file('scripts/verify-student-java-sdk-consumer.py')
     inputs.files('gradlew', 'gradlew.bat', 'gradle/wrapper/gradle-wrapper.jar',
         'gradle/wrapper/gradle-wrapper.properties')
-    inputs.dir('examples/external-consumers/geometric-sequence-domain-java25')
+    inputs.dir('examples/external-consumers')
     outputs.file(new File(reportDirectory, 'consumer-report.json'))
     outputs.upToDateWhen { false }
 }

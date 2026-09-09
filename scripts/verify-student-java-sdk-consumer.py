@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 from typing import Callable, Mapping
+from student_sdk_source import verify_pinned_consumer
 
 SDK_MODULES = (
     "regelsuche-core",
@@ -338,6 +339,26 @@ def main() -> int:
             f"{generated_forbidden}"
         )
 
+    progressive = {}
+    for name, expected in (
+        ("hello-rule-java25", ("rule=hello-add-zero", "replay=VERIFIED")),
+        ("finite-difference-domain-java25", ("outcome=CONFIRMED", "sdk.provider.artifactSha256")),
+        ("solver-adapter-java25", ("outcome=CONFIRMED", "outcome=REFUTED", "sdk.provider.artifactSha256")),
+        ("number-theory-plan-java25", ("provider=primachsenraum-number-theory-provider", "bases=[2, 3]", "2047", "falsePrimes=0", "falseCompositeDecisions=0")),
+    ):
+        if name == "number-theory-plan-java25":
+            verify_pinned_consumer(root / "examples/external-consumers" / name)
+        project = output / name
+        shutil.copytree(root / "examples/external-consumers" / name, project)
+        consumer_log, dependency_log, rejected = execute_consumer(
+            arguments.gradle, project, repository, version, output / (name + "-gradle-cache"))
+        require_output(consumer_log, expected, name)
+        if rejected:
+            raise RuntimeError(f"{name} has forbidden runtime dependencies: {rejected}")
+        (output / (name + ".log")).write_text(consumer_log, encoding="utf-8")
+        (output / (name + "-dependencies.log")).write_text(dependency_log, encoding="utf-8")
+        progressive[name] = "success"
+
     java_feature = int(
         run(["java", "-XshowSettings:properties", "-version"], root)
         .split("java.specification.version = ", 1)[1]
@@ -366,6 +387,7 @@ def main() -> int:
         "confirmedCandidate": "multiplier=2",
         "requiredOutcomes": ["CONFIRMED", "REFUTED", "BUDGET_EXHAUSTED"],
         "generatedStarter": generated_manifest,
+        "progressiveConsumers": progressive,
         "generatedBuildTool": "PINNED_GRADLE_WRAPPER",
         "forbiddenRuntimeDependenciesObserved": sorted(
             set(forbidden + generated_forbidden)

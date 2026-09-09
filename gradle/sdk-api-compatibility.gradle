@@ -1,0 +1,26 @@
+// One binary/source gate under the existing checkout-owned CI authority.
+configurations { sdkApiDiffTool }
+dependencies { sdkApiDiffTool 'com.github.siom79.japicmp:japicmp:0.26.2:jar-with-dependencies' }
+
+def sdkApiModules = [
+    'regelsuche-core', 'regelsuche-egraph', 'regelsuche-search', 'regelsuche-validation',
+    'regelsuche-discovery', 'regelsuche-discovery-sdk', 'regelsuche-plugin-api'
+]
+def verifySdkApiCompatibility = tasks.register('verifySdkApiCompatibility', Exec) {
+    group = 'verification'
+    description = 'Checks public Java API compatibility against the pinned 0.4.0 release.'
+    dependsOn sdkApiModules.collect { ":${it}:jar" }
+    workingDir rootDir
+    outputs.upToDateWhen { false }
+    doFirst {
+        def external = project(':regelsuche-discovery-sdk').configurations.runtimeClasspath
+            .resolvedConfiguration.resolvedArtifacts
+            .findAll { it.moduleVersion.id.group != 'de.regelsuche' && !(it.id.componentIdentifier instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier) }
+            .collect { it.file.absolutePath }.join(File.pathSeparator)
+        def jars = sdkApiModules.collect { project(":${it}").tasks.named('jar').get().archiveFile.get().asFile.absolutePath }
+        commandLine(['python3', 'scripts/verify-sdk-api-compatibility.py', '--root', rootDir.absolutePath,
+            '--japicmp', configurations.sdkApiDiffTool.singleFile.absolutePath,
+            '--external-classpath', external, '--new-jars'] + jars)
+    }
+}
+tasks.named('ciCheck') { dependsOn verifySdkApiCompatibility }

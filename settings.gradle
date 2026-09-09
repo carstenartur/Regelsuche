@@ -126,6 +126,8 @@ gradle.beforeProject { candidate ->
         candidate.apply from: new File(
             settingsDir,
             'gradle/student-sdk-consumer-verification.gradle')
+        candidate.apply from: new File(settingsDir, 'gradle/sdk-api-compatibility.gradle')
+        candidate.apply from: new File(settingsDir, 'gradle/sdk-release-bundle.gradle')
         candidate.apply from: new File(
             settingsDir,
             'gradle/sympy-factorization-verification.gradle')
@@ -148,7 +150,8 @@ gradle.beforeProject { candidate ->
             ':regelsuche-search',
             ':regelsuche-validation',
             ':regelsuche-discovery',
-            ':regelsuche-discovery-sdk'
+            ':regelsuche-discovery-sdk',
+            ':regelsuche-plugin-api'
         ]) {
         candidate.apply from: new File(
             settingsDir,
@@ -187,6 +190,8 @@ include(
     'regelsuche-cli',
     'regelsuche-discovery',
     'regelsuche-discovery-sdk',
+    'regelsuche-plugin-api',
+    'regelsuche-bom',
     'regelsuche-quality',
     'regelsuche-benchmarks',
     'app'
