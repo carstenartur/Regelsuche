@@ -2,12 +2,13 @@
 (() => {
   const $ = id => document.getElementById(id);
   const number = value => Number(value).toLocaleString('de-DE');
+  const percent = value => Number(value).toLocaleString('de-DE', {maximumFractionDigits: 1});
   let currentArtifact = null;
   let study = null;
   const text = (tag, value) => { const node = document.createElement(tag); node.textContent = value; return node; };
   async function request(path, body) {
     const response = await fetch(path, body === undefined ? {} : {
-      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
     });
     if (!response.ok) throw new Error(await response.text());
     return response.json();
@@ -82,14 +83,21 @@
         for (const value of [profile.profile, number(profile.applicationWork), number(profile.includingLearningWork), `${profile.verifiedSolutions} / ${study.summary.applicationCases}`]) row.append(text('td', value));
         $('profileRows').append(row);
       }
-      $('learningStatus').textContent = `Eingefrorene Auswahl: unabhängige Blöcke ab ${study.policy.minimumVariables} Variablen. Lernkosten: ${number(study.summary.learningWork)}.`;
+      $('learningStatus').textContent = `Eingefrorene Auswahl: unabhängige Blöcke ab ${study.policy.minimumVariables} Variablen. Einmalige Lernkosten: ${number(study.summary.learningWork)}.`;
+      const direct = study.summary.profiles.find(p => p.profile === 'DIRECT');
       const learned = study.summary.profiles.find(p => p.profile === 'LEARNED');
       const fixed = study.summary.profiles.find(p => p.profile === 'FIXED_AUTO');
-      $('learningConclusion').textContent = learned.includingLearningWork < fixed.includingLearningWork
-        ? 'In diesem Entwicklungssatz benötigt das Lernen einschließlich Trainingskosten weniger Arbeit als die feste Auswahl.'
-        : 'In diesem Entwicklungssatz bringt das Lernen einschließlich Trainingskosten keinen zusätzlichen Kostenvorteil gegenüber der festen Auswahl.';
+      const saved = direct.applicationWork - learned.applicationWork;
+      const savedPercent = 100 * saved / direct.applicationWork;
+      const breakEvenCases = saved > 0
+        ? Math.ceil(study.summary.learningWork * study.summary.applicationCases / saved)
+        : null;
+      const expertDifference = learned.applicationWork - fixed.applicationWork;
+      $('learningConclusion').textContent = saved > 0
+        ? `Gegen die statische DIRECT-Baseline spart die gelernte Auswahl ${number(saved)} Arbeitseinheiten (${percent(savedPercent)} %). Die einmaligen Trainingskosten amortisieren sich bei derselben mittleren Einsparung nach etwa ${number(breakEvenCases)} Anwendungen. FIXED_AUTO ist dagegen eine handgeschriebene Expertenreferenz und enthält hier bereits exakt dieselbe Schwelle; die verbleibenden ${number(expertDifference)} Einheiten sind die gezählten Auswahlkosten des Lerners.`
+        : 'Auf diesem Entwicklungssatz spart die gelernte Auswahl gegenüber der statischen DIRECT-Baseline keine Anwendungsarbeit.';
       const diagnosis = study.diagnosis;
-      $('selectionHeadroom').textContent = `Unter den tatsächlich ausgeführten, bestätigten Wegen kann eine nachträglich perfekte Auswahl gegenüber FIXED_AUTO ${number(diagnosis.avoidableFixedWork)} Einheiten auf ${diagnosis.comparableVerifiedCases} vergleichbaren Fällen sparen und ${diagnosis.additionalSolvableCases} weitere Fälle lösen. ${diagnosis.casesWithoutVerifiedRoute} Fälle haben keinen bestätigten Weg. Diese Rückschau ist keine trainierbare Policy und keine globale Optimalitätsaussage.`;
+      $('selectionHeadroom').textContent = `Unter den tatsächlich ausgeführten, bestätigten Wegen kann eine nachträglich perfekte Auswahl gegenüber der handgeschriebenen Expertenreferenz FIXED_AUTO ${number(diagnosis.avoidableFixedWork)} Einheiten auf ${diagnosis.comparableVerifiedCases} vergleichbaren Fällen sparen und ${diagnosis.additionalSolvableCases} weitere Fälle lösen. ${diagnosis.casesWithoutVerifiedRoute} Fälle haben keinen bestätigten Weg. Diese Rückschau ist keine trainierbare Policy und keine globale Optimalitätsaussage.`;
       const learnedWork = diagnosis.work.find(p => p.profile === 'LEARNED');
       $('verificationCost').textContent = `Beim gelernten Profil: ${number(learnedWork.constructionWork)} Einheiten Konstruktion, ${number(learnedWork.auditWork)} zusätzliche Prüfung, ${number(learnedWork.selectionWork)} Auswahl. Die Prüfung löst das ganze System erneut; eine kürzere Konstruktion beseitigt diese Arbeit nicht.`;
       $('learningDiagnosis').textContent = JSON.stringify(diagnosis, null, 2);
