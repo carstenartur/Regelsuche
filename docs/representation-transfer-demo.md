@@ -15,6 +15,9 @@ Auch die Startseite verlinkt die Demo.
    seine Policy ein und zeigt sämtliche Trainings- und Auswertungsversuche.
    Die Tabelle enthält Lern- und Prüfkosten. Der aktuelle Satz zeigt keinen
    zusätzlichen Vorteil des Lernens gegenüber der festen Auswahlregel.
+   Die Diagnose weist den verbleibenden Auswahlspielraum und den Aufwand des
+   vollständigen zweiten Lösungsverfahrens gesondert aus. Hier bleibt kein
+   Spielraum für eine bessere Auswahl unter den drei gemessenen Verfahren.
 3. **Nachweis exportieren und erneut prüfen:** Ein gespeichertes Lösungsartefakt
    lässt sich nach einem Serverneustart vollständig wiederholen. Veränderte
    Quellen, Budgets, Entscheidungen, Schritte oder Ergebnisse werden abgelehnt.

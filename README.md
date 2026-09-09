@@ -60,6 +60,9 @@ Darstellungswahl rund 6 % gezählte Arbeit einschließlich zusätzlicher
 Prüfverfahren. Das Lernen bringt gegenüber dieser festen Auswahl noch
 keinen zusätzlichen Kostenvorteil. Alle Trainingskosten und negativen
 Kontrollen stehen im [vollständigen Vergleich](docs/representation-strategy-transfer.md).
+Die [Ursachenanalyse](docs/representation-learning-diagnosis.md) zeigt: Die feste
+Regel wählt bereits durchgehend den günstigsten gemessenen Weg. Gelernt wird
+hier eine Auswahlbedingung; mathematische Verfahren sind schon vorgegeben.
 Der installierbare [Python-Client](docs/python-client.md) prüft die vollständigen
 rationalen Lösungsmengen unabhängig vom Java-Server.
 

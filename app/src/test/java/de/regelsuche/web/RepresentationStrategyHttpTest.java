@@ -53,6 +53,9 @@ class RepresentationStrategyHttpTest {
         assertEquals(first.body(), get("/api/representations/study").body());
         var study = new JsonReader(first.body()).readObject();
         assertEquals(252, ((java.util.List<?>) study.get("rows")).size());
+        var diagnosis = (Map<?, ?>) study.get("diagnosis");
+        assertEquals(0L, ((Number) diagnosis.get("avoidableFixedWork")).longValue());
+        assertEquals(false, diagnosis.get("learnsMathematicalProcedures"));
         assertEquals(405, get("/api/representations/solve").statusCode());
         assertEquals(405, post("/api/representations/study", "{}").statusCode());
         var page = get("/static/strategy-demo.html");

@@ -48,6 +48,13 @@ Lösungsmengen; die beiden negativen Kontrollen bleiben in jedem Profil erhalten
 Die Null bei `regressions` zählt verlorene verifizierte Abschlüsse gegenüber
 DIRECT, nicht einzelne Fälle mit höheren Arbeitskosten.
 
+Die [Ursachenanalyse](representation-learning-diagnosis.md) zeigt, dass die feste
+Wahl auf allen 40 gelösten Fällen bereits dem günstigsten tatsächlich
+verifizierten Verfahren entspricht. Ein reiner Auswahllerner hat dort keinen
+zusätzlichen Spielraum. Die Konstruktion allein spart 17,8 % gegenüber DIRECT;
+das unveränderte zweite Lösungsverfahren zur Prüfung dominiert die Gesamtarbeit.
+Dieser Versuch ist deshalb kein Vergleich mit und ohne mathematisches Wissen.
+
 Die Bilanz umfasst alle Trainingstrials, Fitvergleiche, Anwendung, Auswahl,
 Darstellungsvorbereitung, Komposition und zusätzliche algorithmische Audits.
 Das Konstruktionsbudget beträgt 20.000, das getrennte Auditbudget 200.000.
@@ -62,5 +69,7 @@ Berichts, einschließlich fehlgeschlagener Versuche. Referenzdateien:
 [Protokoll](generated/representation-transfer-protocol.json),
 [Zusammenfassung](generated/representation-transfer-summary.json),
 [Manifest](generated/representation-transfer-manifest.json).
+Die zusätzlich erzeugte [Diagnose](generated/representation-transfer-diagnosis.json)
+zerlegt die Kosten und quantifiziert nachträglich den verbleibenden Auswahlspielraum.
 Die [Browserdemo](representation-transfer-demo.md) führt die aktuelle Studie aus
 und exportiert den vollständigen Bericht.

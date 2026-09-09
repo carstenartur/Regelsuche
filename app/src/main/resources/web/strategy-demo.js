@@ -88,6 +88,11 @@
       $('learningConclusion').textContent = learned.includingLearningWork < fixed.includingLearningWork
         ? 'In diesem Entwicklungssatz benötigt das Lernen einschließlich Trainingskosten weniger Arbeit als die feste Auswahl.'
         : 'In diesem Entwicklungssatz bringt das Lernen einschließlich Trainingskosten keinen zusätzlichen Kostenvorteil gegenüber der festen Auswahl.';
+      const diagnosis = study.diagnosis;
+      $('selectionHeadroom').textContent = `Unter den tatsächlich ausgeführten, bestätigten Wegen kann eine nachträglich perfekte Auswahl gegenüber FIXED_AUTO ${number(diagnosis.avoidableFixedWork)} Einheiten auf ${diagnosis.comparableVerifiedCases} vergleichbaren Fällen sparen und ${diagnosis.additionalSolvableCases} weitere Fälle lösen. ${diagnosis.casesWithoutVerifiedRoute} Fälle haben keinen bestätigten Weg. Diese Rückschau ist keine trainierbare Policy und keine globale Optimalitätsaussage.`;
+      const learnedWork = diagnosis.work.find(p => p.profile === 'LEARNED');
+      $('verificationCost').textContent = `Beim gelernten Profil: ${number(learnedWork.constructionWork)} Einheiten Konstruktion, ${number(learnedWork.auditWork)} zusätzliche Prüfung, ${number(learnedWork.selectionWork)} Auswahl. Die Prüfung löst das ganze System erneut; eine kürzere Konstruktion beseitigt diese Arbeit nicht.`;
+      $('learningDiagnosis').textContent = JSON.stringify(diagnosis, null, 2);
       $('case').replaceChildren();
       for (const row of study.rows.filter(row => row.profile === 'DIRECT')) {
         const option = text('option', `${row.task.family} · ${row.task.id}`); option.value = row.task.id; $('case').append(option);

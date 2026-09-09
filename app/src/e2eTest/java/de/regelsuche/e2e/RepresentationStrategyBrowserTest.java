@@ -52,6 +52,8 @@ class RepresentationStrategyBrowserTest {
         page.waitForFunction("!document.querySelector('#studyResults').hidden");
         assertEquals(6, page.locator("#profileRows tr").count());
         assertTrue(page.locator("#learningStatus").textContent().contains("Eingefrorene Auswahl"));
+        assertTrue(page.locator("#selectionHeadroom").textContent().contains("0 Einheiten auf 40"));
+        assertTrue(page.locator("#verificationCost").textContent().contains("zusätzliche Prüfung"));
         var download = page.waitForDownload(() -> page.locator("#export").click());
         Path artifact = temporary.resolve("solution.json"); download.saveAs(artifact);
         page.reload(); page.locator("#import").setInputFiles(artifact);

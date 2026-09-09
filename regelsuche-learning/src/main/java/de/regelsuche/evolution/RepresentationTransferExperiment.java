@@ -129,6 +129,7 @@ public final class RepresentationTransferExperiment {
             .property("protocolHash", LinearRepresentationJson.hash(protocolJson()))
             .property("policyHash", policyHash(study.policy))
             .object("summary", w -> writeSummary(w, study))
+            .object("diagnosis", w -> RepresentationLearningDiagnosis.write(w, RepresentationLearningDiagnosis.analyze(study)))
             .object("policy", w -> writePolicy(w, study.policy))
             .array("training", w -> study.policy.observations().forEach(observation -> w.objectValue(o -> o
                 .property("trainingIndex", observation.trainingIndex())
@@ -160,6 +161,7 @@ public final class RepresentationTransferExperiment {
             .property("protocolHash", LinearRepresentationJson.hash(protocolJson()))
             .property("policyHash", policyHash(study.policy))
             .property("studyHash", LinearRepresentationJson.hash(toJson(study)))
+            .property("diagnosisHash", LinearRepresentationJson.hash(RepresentationLearningDiagnosis.toJson(study)))
             .property("summaryHash", LinearRepresentationJson.hash(summaryJson(study))).endObject().toString() + "\n";
     }
     public static void main(String[] args) throws IOException {
@@ -171,6 +173,7 @@ public final class RepresentationTransferExperiment {
         Study study = new RepresentationTransferExperiment().run();
         Files.writeString(directory.resolve("representation-transfer-study.json"), toJson(study));
         Files.writeString(directory.resolve("representation-transfer-summary.json"), summaryJson(study));
+        Files.writeString(directory.resolve("representation-transfer-diagnosis.json"), RepresentationLearningDiagnosis.toJson(study));
         Files.writeString(directory.resolve("representation-transfer-manifest.json"), manifestJson(study));
     }
 }
