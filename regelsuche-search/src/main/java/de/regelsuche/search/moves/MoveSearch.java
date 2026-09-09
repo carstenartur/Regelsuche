@@ -42,9 +42,9 @@ public final class MoveSearch {
         public long totalWork() { return Math.addExact(Math.addExact(primitiveWork, searchWork), verificationWork); }
         public double effectiveBranchingFactor() { return expandedStates == 0 ? 0 : (double) (consumedSuccessors - discardedSuccessors) / expandedStates; }
     }
-    public record Result(Outcome outcome, List<WitnessStep> witness, List<Event> events, Set<MoveState> reachedStates,
+    public record Result(Outcome outcome, List<WitnessStep> witness, List<Event> events, Set<MoveState> reachedStates, List<MoveState> deadEndStates,
             Metrics metrics, boolean completeBoundedRelation) {
-        public Result { witness = List.copyOf(witness); events = List.copyOf(events); reachedStates = Set.copyOf(reachedStates); }
+        public Result { witness = List.copyOf(witness); events = List.copyOf(events); reachedStates = Set.copyOf(reachedStates); deadEndStates = List.copyOf(deadEndStates); }
         public boolean reached() { return outcome == Outcome.TARGET_REACHED; }
     }
     private static final class Node {
@@ -81,6 +81,7 @@ public final class MoveSearch {
         var budget = problem.budget();
         var ledger = new Ledger();
         var events = new ArrayList<Event>();
+        var deadEnds = new ArrayList<MoveState>();
         var reached = new HashSet<MoveState>();
         var visited = new HashSet<Identity>();
         var root = new MoveState(problem.source(), 0, 0, "", problem.context().initialAssumptions(), Set.of(), 0);
@@ -112,7 +113,7 @@ public final class MoveSearch {
             if (ledger.total() > budget.totalWork()) { outcome = Outcome.WORK_EXHAUSTED; complete = false; break; }
             if (next.isEmpty()) {
                 complete &= node.picker.complete();
-                if (node.enqueued == 0 && node.picker.complete()) ledger.deadEnds++;
+                if (node.enqueued == 0 && node.picker.complete()) { ledger.deadEnds++; deadEnds.add(node.state); }
                 continue;
             }
             var move = next.orElseThrow(); ledger.consumed++; ledger.search++;
@@ -150,7 +151,7 @@ public final class MoveSearch {
             frontier.add(new Ticket(node, continuation, serial++)); ledger.search++;
         }
         if (outcome == Outcome.BOUNDED_EXHAUSTED && !complete) outcome = Outcome.INCONCLUSIVE;
-        return new Result(outcome, witness, events, reached, new Metrics(ledger.generated, ledger.consumed, ledger.discarded,
+        return new Result(outcome, witness, events, reached, deadEnds, new Metrics(ledger.generated, ledger.consumed, ledger.discarded,
             ledger.generated - ledger.consumed, ledger.duplicates, ledger.deadEnds, ledger.explored, ledger.expanded,
             ledger.primitive, ledger.search, ledger.verification, hit, primitiveHit, ledger.matches), complete);
     }
