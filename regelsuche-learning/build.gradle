@@ -57,6 +57,15 @@ tasks.register('strategyTransferDemo', JavaExec) {
     args layout.buildDirectory.dir('reports/strategy-transfer').get().asFile.absolutePath
 }
 
+tasks.register('learnedRuleBaseline', JavaExec) {
+    group = 'verification'
+    description = 'Writes the frozen BASE/NAIVE/RANKED/EXPERT branching and work diagnosis.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.evolution.LearnedRuleBaselineExperiment'
+    args layout.buildDirectory.dir('reports/learned-rule-baseline').get().asFile.absolutePath
+}
+
 tasks.register('strategyDispatchDemo', JavaExec) {
     group = 'application'
     description = 'Writes the fixed comparison of trained conditional continuations with strong primitive controls.'
