@@ -11,7 +11,7 @@ def packageStudentJavaSdk = tasks.register('packageStudentJavaSdk', Exec) {
         def output = layout.buildDirectory.file("distributions/regelsuche-sdk-${version}.zip").get().asFile
         // Only this task's fixed output is replaced; the packaging script refuses overwrite.
         delete output
-        commandLine 'python3', 'scripts/package-student-sdk.py', '--root', rootDir.absolutePath,
+        commandLine 'python3', '-B', 'scripts/package-student-sdk.py', '--root', rootDir.absolutePath,
             '--repository', layout.buildDirectory.dir('student-sdk-repository').get().asFile.absolutePath,
             '--version', version, '--output', output.absolutePath
     }

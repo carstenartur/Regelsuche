@@ -76,7 +76,7 @@ def verifySdkConsumer = tasks.register(
     dependsOn verifySdkStarter
     workingDir rootDir
     commandLine(
-        pythonExecutable,
+        pythonExecutable, '-B',
         file('scripts/verify-student-java-sdk-consumer.py').absolutePath,
         '--repository-root', rootDir.absolutePath,
         '--gradle', gradleExecutable,

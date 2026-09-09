@@ -86,7 +86,10 @@ def package(root, repository, version, output):
               'docs/java-sdk-quickstart.md', 'docs/java-sdk-api-policy.md',
               'docs/java-sdk-domain-tutorial.md', 'docs/java-sdk-human-dx.md']
     for name in inputs:
-        members[name] = (root / name).read_bytes()
+        data = (root / name).read_bytes()
+        if name.endswith('.md'):
+            data = data.replace(b'0.5.0-SNAPSHOT', version.encode())
+        members[name] = data
     for example in EXAMPLES:
         source = root / 'examples/external-consumers' / example
         if example == 'number-theory-plan-java25':

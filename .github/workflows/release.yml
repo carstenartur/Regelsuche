@@ -470,7 +470,7 @@ jobs:
             mvn --batch-mode --no-transfer-progress -Psdk-release \
               -pl regelsuche-discovery-sdk,regelsuche-plugin-api,regelsuche-bom -am \
               -Dmaven.repo.local="$SDK_REPOSITORY" -DskipTests install
-            python3 scripts/package-student-sdk.py \
+            python3 -B scripts/package-student-sdk.py \
               --repository "$SDK_REPOSITORY" --version "$VERSION" \
               --output "app/target/regelsuche-sdk-${VERSION}.zip"
           fi
