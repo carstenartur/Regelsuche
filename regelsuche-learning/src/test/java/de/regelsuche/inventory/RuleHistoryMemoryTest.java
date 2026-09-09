@@ -10,6 +10,27 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class RuleHistoryMemoryTest {
+    @Test void sameExpressionAndSearchDepthDoNotConflateDifferentPrimitiveBudgetStates() {
+        var longPath = new de.regelsuche.search.program.RewriteCandidate("shared", "a", "b", List.of(
+            new Transformation("first", "x"), new Transformation("second", "y"), new Transformation("third", "b"))).toTransformation();
+        var descriptor = new MoveProvider.Descriptor("shared", "shared", SearchMove.SourceKind.LEARNED,
+            SearchMove.ProofStrength.REPLAYABLE, List.of(), SearchMove.ValueEvidence.UNKNOWN, "fixture");
+        var shared = new EngineMoveProvider(descriptor, source -> source.equals("a")
+            ? List.of(new Transformation("shared", "b"), longPath) : List.of(), true);
+        var finish = provider("finish", source -> source.equals("b") ? List.of(new Transformation("finish", "c")) : List.of());
+        var result = new MoveSearch().search(new MoveSearch.Problem("a", MoveContext.frozen("absent"), List.of(shared, finish),
+            MovePriorityPolicy.INVENTORY_ORDER, (s, m, c) -> new MoveVerifier.Verification(true, 1, List.of("fixture"), "TEST_ONLY"),
+            s -> 0, MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED, new MoveSearch.Budget(3, 4, 0, 20, 10000)));
+        assertTrue(result.completeBoundedRelation());
+        assertEquals(List.of(3), result.deadEndStates().stream().filter(state -> state.expression().equals("b")).map(MoveState::primitiveDepth).toList());
+        var memory = new RuleHistoryMemory(); memory.observe(result, MoveContext.Phase.TRAIN, Map.of());
+        var stats = memory.freeze().family(StructuralMoveContext.of(MoveState.root("a")).key(), "shared");
+        assertEquals(2, stats.applications()); assertEquals(1, stats.failure());
+        assertEquals(2L * result.events().size() + 2L * result.events().stream().map(MoveSearch.Event::source).distinct()
+            .map(StructuralMoveContext::of).mapToLong(StructuralMoveContext::visitedNodes).sum(), memory.measuredWork());
+        var activity = new RuleActivityMemory(List.of("shared")); activity.observe(result, MoveContext.Phase.TRAIN, Map.of());
+        assertEquals(activity.freeze().epoch(), activity.freeze().rules().get("shared").lastUsedEpoch());
+    }
     @TempDir Path directory;
     private static MoveProvider provider(String id, de.regelsuche.transform.TransformationEngine engine) {
         return new EngineMoveProvider(new MoveProvider.Descriptor(id, id, SearchMove.SourceKind.PRIMITIVE,

@@ -17,7 +17,8 @@ public interface StateValue {
     record Assessment(int complexity, double value, long searchWork, long primitiveWork, Map<String, Capability> capabilities) {
         public static final Assessment EMPTY = new Assessment(0, 0, 0, 0, Map.of());
         public Assessment {
-            if (complexity < 0 || !Double.isFinite(value) || searchWork < 0 || primitiveWork < 0)
+            if (complexity < 0 || !Double.isFinite(value) || searchWork < 0 || primitiveWork < 0 || capabilities == null
+                    || capabilities.entrySet().stream().anyMatch(entry -> entry.getKey() == null || entry.getKey().isBlank() || entry.getValue() == null))
                 throw new IllegalArgumentException("invalid state assessment");
             capabilities = java.util.Collections.unmodifiableMap(new TreeMap<>(capabilities));
         }

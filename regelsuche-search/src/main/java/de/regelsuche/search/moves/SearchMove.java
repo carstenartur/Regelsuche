@@ -22,11 +22,10 @@ public record SearchMove(Transformation transformation, SourceKind sourceKind, S
         public ValueEvidence {
             if (!Double.isFinite(confidence) || confidence < 0 || confidence > 1
                     || !Double.isFinite(legacyAverageImprovement) || supportingObservations < 0
-                    || bestKnownPrimitiveSteps < -1 || macroSearchDepth < 1
+                    || bestKnownPrimitiveSteps < -1 || macroSearchDepth < 1 || evidenceId == null
                     || (boundedMinimumProved && (bestKnownPrimitiveSteps < 0 || evidenceId == null || evidenceId.isBlank()))) {
                 throw new IllegalArgumentException("invalid move value evidence");
             }
-            evidenceId = Objects.requireNonNull(evidenceId, "evidenceId");
         }
         public int knownDepthCompression() { return Math.max(0, bestKnownPrimitiveSteps - macroSearchDepth); }
     }
