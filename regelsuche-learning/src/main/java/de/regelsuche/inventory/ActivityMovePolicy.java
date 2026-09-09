@@ -4,6 +4,7 @@ import de.regelsuche.search.moves.*;
 
 /** Frozen activity changes order only. Even COLD and SHADOW providers remain enumerable. */
 public record ActivityMovePolicy(RuleActivityMemory.Snapshot activity, MovePriorityPolicy delegate) implements MovePriorityPolicy {
+    @Override public long contextWork(MoveState state, MoveContext context) { return delegate.contextWork(state, context); }
     @Override public double score(SearchMove move, MoveState state, MoveContext context) {
         return delegate.score(move, state, context) + bonus(move.ruleId());
     }

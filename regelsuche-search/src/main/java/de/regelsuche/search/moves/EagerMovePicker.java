@@ -16,7 +16,7 @@ public final class EagerMovePicker implements MovePicker {
 
     public EagerMovePicker(List<MoveProvider> providers, MovePriorityPolicy policy, MoveState state, MoveContext context) {
         var ranked = new ArrayList<Ranked>();
-        var measured = TransformationWorkMetrics.ZERO;
+        var measured = TransformationWorkMetrics.ZERO.withDelegatedMechanicalWork(policy.contextWork(state, context));
         boolean exhaustive = true;
         for (var provider : List.copyOf(providers)) {
             var batch = provider.candidates(state, context);

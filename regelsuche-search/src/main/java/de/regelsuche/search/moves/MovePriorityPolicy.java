@@ -15,5 +15,7 @@ public interface MovePriorityPolicy {
         };
     }
     default double providerScore(MoveProvider.Descriptor provider, MoveState state, MoveContext context) { return 0; }
+    /** Mechanical feature work, charged once per state/picker; implementations may memoize immutable features. */
+    default long contextWork(MoveState state, MoveContext context) { return 0; }
     MovePriorityPolicy INVENTORY_ORDER = (move, state, context) -> 0;
 }

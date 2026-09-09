@@ -33,7 +33,7 @@ public final class StagedMovePicker implements MovePicker {
         for (var provider : List.copyOf(providers)) lanes.add(new Lane(provider,
             policy.stage(provider.descriptor(), state, context).ordinal(), policy.providerScore(provider.descriptor(), state, context)));
         lanes.sort(Comparator.comparingInt((Lane lane) -> lane.stage).thenComparing(Comparator.comparingDouble((Lane lane) -> lane.score).reversed()));
-        work = ordering(providers.size());
+        work = ordering(providers.size()).withDelegatedMechanicalWork(policy.contextWork(state, context));
     }
 
     @Override public Optional<SearchMove> next() {
