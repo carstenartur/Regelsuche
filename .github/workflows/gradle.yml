@@ -58,6 +58,7 @@ jobs:
           name: ${{ github.event_name == 'create' && github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1' && format('proof-carrying-showcase-train-freeze-{0}-{1}', github.sha, github.run_id) || 'repository-verification' }}
           path: |
             build/logs/**
+            build/distributions/regelsuche-sdk-*.zip
             build/reports/**
             build/ai-knowledge/**
             build/independent-reproduction/**
@@ -177,7 +178,7 @@ jobs:
             -f playwright-bootstrap/pom.xml \
             org.codehaus.mojo:exec-maven-plugin:3.5.0:java
       - name: Verify the complete Maven product and Docker contract
-        run: mvn --batch-mode --no-transfer-progress -Pfull verify
+        run: mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify
       - name: Retain Maven product verification evidence
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

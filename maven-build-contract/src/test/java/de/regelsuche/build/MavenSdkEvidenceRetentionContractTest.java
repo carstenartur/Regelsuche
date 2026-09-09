@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 class MavenSdkEvidenceRetentionContractTest {
     private static final List<String> RETAINED = List.of(
         "build/logs/**",
+        "build/distributions/regelsuche-sdk-*.zip",
         "build/reports/**",
         "build/ai-knowledge/**",
         "build/independent-reproduction/**",

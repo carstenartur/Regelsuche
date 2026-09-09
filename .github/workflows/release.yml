@@ -381,7 +381,7 @@ jobs:
           && steps.release-state.outputs.skip_tests != 'true'
         run: |
           set -euo pipefail
-          mvn --batch-mode --no-transfer-progress -Pfull verify
+          mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify
 
       - name: Run emergency assembly-only verification
         if: >-

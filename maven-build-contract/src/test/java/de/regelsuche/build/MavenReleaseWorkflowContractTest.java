@@ -32,7 +32,7 @@ class MavenReleaseWorkflowContractTest {
             "release notes must be selected from the exact release version"
         );
         assertTrue(
-            workflow.contains("mvn --batch-mode --no-transfer-progress -Pfull verify"),
+            workflow.contains("mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify"),
             "release must repeat the complete Maven product and Docker contract"
         );
         assertTrue(
