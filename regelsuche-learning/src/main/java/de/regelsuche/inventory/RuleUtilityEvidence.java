@@ -23,8 +23,8 @@ public record RuleUtilityEvidence(String schema, int observedPathSteps, int best
     public record ReferenceScope(String primitiveInventoryHash, String source, String target, String relationScope,
             String limitsJson, String assessmentHash, boolean observedReplayVerified, long referenceWork) {
         public ReferenceScope {
-            for (String value : List.of(primitiveInventoryHash, source, target, relationScope, limitsJson, assessmentHash)) {
-                if (value.isBlank()) throw new IllegalArgumentException("reference scope must be explicit");
+            for (String value : new String[]{primitiveInventoryHash, source, target, relationScope, limitsJson, assessmentHash}) {
+                if (value == null || value.isBlank()) throw new IllegalArgumentException("reference scope must be explicit");
             }
             if (referenceWork < 0) throw new IllegalArgumentException("negative reference work");
         }

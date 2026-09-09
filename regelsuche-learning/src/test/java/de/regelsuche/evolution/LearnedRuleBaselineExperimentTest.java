@@ -11,6 +11,7 @@ class LearnedRuleBaselineExperimentTest {
     @Test
     void fourProfilesShareGoalsBudgetsAndPrimitiveAuditStrengthWithRankedInitiallyIdenticalToNaive() throws Exception {
         var report = LearnedRuleBaselineExperiment.run();
+        assertTrue(report.protocol().contains("\"maxExpandingSteps\":6"));
         assertEquals(LearnedRuleBaselineExperiment.cases().size() * 4 * 4, report.rows().size());
         assertTrue(report.knowledge().plan().isPresent(), "the comparison must contain actual frozen TRAIN knowledge");
         assertEquals(16, report.rows().stream().filter(row -> row.search() == null).count());
