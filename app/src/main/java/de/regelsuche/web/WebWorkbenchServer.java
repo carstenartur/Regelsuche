@@ -379,7 +379,8 @@ public class WebWorkbenchServer {
             if ("GET".equals(exchange.getRequestMethod())) {
                 sendJson(exchange, 200, workbench.catalogJson());
             } else {
-                var input = new StreamingJsonRequestBody(1024 * 1024).readObject(exchange);
+                var input = new StreamingJsonRequestBody(Math.min(
+                    1024 * 1024, securityConfig.maxRequestBytes())).readObject(exchange);
                 sendJson(exchange, 200, workbench.run(input));
             }
         } catch (IllegalArgumentException | IllegalStateException | java.util.ServiceConfigurationError exception) {
