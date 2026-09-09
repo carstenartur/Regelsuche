@@ -44,6 +44,11 @@ public class GoalAwareMacroMoveSelector {
     private final double minImprovement;
     private final int minOccurrences;
 
+    /** Unranked enabled inventory for the common MovePicker; assumptions are checked by each provider. */
+    public List<ReusableRule> inventoryRules() {
+        return inventory.findAll().stream().filter(rule -> inventory.isEnabled(rule.id())).toList();
+    }
+
     public GoalAwareMacroMoveSelector(RuleInventoryRepository inventory) {
         this(inventory, DEFAULT_MIN_CONFIDENCE, DEFAULT_MIN_IMPROVEMENT, DEFAULT_MIN_OCCURRENCES);
     }

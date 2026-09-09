@@ -54,3 +54,103 @@ production search policy unchanged. Later PRs add a neutral move model, scoped
 utility evidence, lazy scheduling, activity, history, executable landmarks and a
 separate frozen evaluation protocol. Mathematical authority is never inferred
 from a useful heuristic score.
+
+## PR 2: a common evidence-bearing move boundary
+
+`regelsuche-search` owns `SearchMove`, `MoveProvider`, `MovePriorityPolicy`,
+`MovePicker`, source-only `MoveState` and goal/assumption `MoveContext`. The first
+picker is explicitly eager, providing a control for the later lazy implementation.
+It evaluates each score once and preserves inventory order for equal scores.
+Provider batch work is charged once; the generation cost attached to each move
+describes that shared batch, not an additional per-move charge. Unknown
+verification cost is -1, not zero.
+
+`MoveProviders.from` exposes the base engine and individual hypotheses instead
+of executing the old wrapper's global append limit. Inventory macro wrappers
+expose the same provider contract. `DiscoveryEngineFactory.createMoveEngine`
+uses this common boundary and a caller-supplied policy; its experimental engine
+rejects the PRODUCTION phase pending the separate #745 qualification. The old
+engine entry points remain the historical/production controls until that gate.
+Opaque engines do not assert complete successor enumeration.
+
+The `ReusableRule` value object now belongs to Learning, with its existing Java
+package and constructors retained. `DynamicOperatorCompiler.compile(rule)`
+preserves the entire rule evidence, including confidence, supporting observations,
+assumptions and provenance. A quarantined dynamic operator remains empirical
+even if its old transformation flag or inventory metadata looks stronger.
+Supporting path IDs alone do not become an instantiated primitive expansion.
+Actual program moves keep their complete typed primitive sequence. These
+descriptors carry evidence for later verification; they do not grant production
+authority or replace an independent verifier.
+
+## PR 3: persisted utility and concrete primitive reference evidence
+
+`RuleUtilityAssessor` uses the existing complete primitive trace verifier, with
+the new macro excluded by construction: its inventory contains only the frozen
+primitive genes. `RuleUtilityEvidence` retains the observed path length, best
+known primitive connection, known compression, minimum-proof flag, application
+and replay work, outcome counters, capability observations, confidence and an
+inventory/endpoints/budget-bound reference receipt. An observed 20-step path
+with a proved 2-step primitive connection has compression 1, not 19; its retained
+original proof still has 20 primitive replay edges. Actual application audits
+continue to measure the path used, including any shortened proof.
+
+If the observed path replay completes but reference exploration exhausts a
+limit, that path remains a known upper bound (for example 7), while
+`boundedMinimumProved` is false. If even the observed replay exceeds its limit,
+the best known length remains -1. The finite reference scope never becomes a
+universal minimum claim about every substitution into a generalized rule.
+Reference work is retained separately; unknown application/replay work is -1.
+
+Utility survives all rule-copy methods, compilation, JSON inventory snapshots,
+export/import and the Neo4j adapter. Older records load with unknown utility.
+The adapters also retain confidence, occurrences, supporting path IDs and
+assumptions that older export/Neo4j paths omitted. Malformed distance claims are
+rejected. Imported utility remains scheduling data: neither deserialization,
+high confidence nor frequent usage authorizes a mathematical rule or RewriteProgram.
+
+## PR 4: lazy stages and suspended expansion
+
+`WorkBudgetBestFirstSearchStrategy.search(MoveSearch.Problem)` exposes the opt-in scheduler through the existing search entry point and `TransformationSearchService.searchMoves`. A frontier ticket can represent either a new state or a suspended parent expansion. A verified goal child wins before the parent opens later providers. `StagedMovePicker` orders provider metadata first, opens batches only on demand, and gives a primitive lane a turn after two valuable learned candidates, including within large learned batches. Eager enumeration remains an explicit control.
+
+The reference mode never drops a provider due to its priority. Its declared relation is bounded by primitive depth, search depth and theory path work; complete per-rule AST providers remove hidden candidate/growth caps. Work/state exhaustion, opaque providers and rejected proof/assumption claims are inconclusive, never proofs of unreachability. State identity includes depth, previous rule, assumptions, capabilities, debt and theory work. Reference inclusion is evaluated on exhausted bounded closures, not falsely asserted for two runs truncated by equal work limits.
+
+The new event ledger separately records generated mathematical application work, source/scheduling events and independent verifier work. All generated moves, including unused batch tails, are charged. A provider is currently an atomic batch: its measured overrun is retained and makes the run fail its work budget before a goal can be accepted. These deterministic event units are not CPU instructions or walltime. The polynomial admission implementation replays every leaf against the frozen primitive inventory and checks exact identity with measured node/term work; imported labels and utility never authorize a move. Existing v1/v2 reports and production defaults retain their established behavior.
+
+## PR 5: rule activity without proof promotion
+
+`RuleActivityMemory` persists a versioned sidecar keyed by durable inventory identity. HOT/WARM/COLD/SHADOW are derived from explicit activity observations, with deterministic 0.95 decay per TRAIN epoch. Only retained successful witness edges receive success credit; duplicates and fully inspected dead ends receive penalties. Budget-cut enqueues are not mislabeled dead ends. Measured paired work savings are supplied separately and never inferred from the observed trace length. Unused rules remain in the inventory.
+
+`ActivityMovePolicy` takes an immutable snapshot and moves cold/shadow learned providers to exploration. It cannot remove providers, alter assumptions, grant replay authority or change proof status. Frozen evaluation and production phases reject all memory updates before mutation. Snapshot round trips, decay, reference enumeration of cold knowledge, retained empirical proof labels and TEST immutability are covered by tests. Production admission remains the independent #745 boundary.
+
+## PR 6: contextual history and continuations
+
+`StructuralMoveContext` records root operator, bounded syntactic polynomial degree (unknown explicitly), variable count, product/power structure, repeated subtrees, assumptions and currently known capabilities. Context identity omits variable spelling. `RuleHistoryMemory` persists both `(context, family)` and `(previousRule, nextRule, context)` tables, including successful witness use, failed admission/inspected dead ends, duplicate rate, measured work savings, capability unlocks and verification work. All updates require TRAIN.
+
+`HistoryMovePolicy` exposes its eight fixed weights and per-move feature vector. Compression, context/continuation history, capability/goal progress and proof descriptors compete with branching, failure and verification cost. A supported successful continuation can enter the principal stage, while expensive and exploratory providers retain their cost stage. Structural feature work is charged once per state/picker. The read-through feature cache is recreated per run and never changes weights or observations. The policy composes with immutable activity snapshots; there is no neural model or TEST adaptation.
+
+Tests establish continuation transfer within context, absence of credit in a different context, duplicate/dead-end feedback, persistence, alpha-renaming invariance, explicit unsupported degree, feature-work accounting and TEST immutability. The frozen mathematical evaluation in PR 8 consumes these exact policy interfaces; PR 1's historical eager control remains reproducible.
+
+## PR 7: executable capability landmarks and state value
+
+The optional neutral `StateValue` interface reports source-bound applicability witnesses, structural complexity and separately measured inspection/application work. `PrimitiveCapabilityLandmarks` accepts only exact rule objects present in a complete registered AST provider. It checks applicability and carried assumptions, executes a non-identity local witness and records the subtree path plus before/after expression. No matrix, eigenproblem or telescoping claim is made without its executable provider.
+
+The frontier subtracts capability value from the ordinary state score in FAST mode. New capabilities are retained on the move, state, witness and report, and feed the TRAIN activity/history tables. `complexityDebt` increases with positive structural growth and is repaid by subsequent simplification; a declared debt bound restricts the search relation independently of proof acceptance. Reference mode ignores state utility ordering preferences but obeys the same declared debt bound. Probe work and candidate overruns remain in the shared total-work ledger.
+
+A real polynomial test follows `x^2 -> (x^2-1)+1 -> (x+1)*(x-1)+1`. The longer intermediate unlocks the actual difference-of-squares factorizer, has a better capability-aware state value and retains two independently replayed primitive proofs. Zero debt blocks the bridge explicitly. Missing/fictitious provider registrations are rejected. New application defaults remain opt-in pending the held-out comparison and #745.
+
+## PR 8: frozen knowledge search study
+
+Run `./gradlew :regelsuche-learning:learnedSchedulingStudy` and `python3 scripts/verify-learned-scheduling.py regelsuche-learning/build/reports/learned-scheduling`. Normal learning tests also produce the full evidence set; `check` verifies it independently.
+
+The protocol fixes eight held-out tasks, six total-work budgets (256 through 16384), BASE/LEARNED_NAIVE/LEARNED_RANKED/EXPERT and seven controls/ablations before evaluation. The same frozen primitive and learned sequence inventory is shared by NAIVE and RANKED. BASE_STAGED isolates lazy scheduling without learned knowledge; NAIVE_STAGED and the five single-feature ablations expose utility, history, continuation, activity and landmark effects. All profiles receive the same targets, primitive depth, work bounds, assumptions and independent exact primitive replay. Sources overlapping any TRAIN observation or PR 1 development source are rejected. The public corpus is reproducible and held out from TRAIN, not a sealed final test.
+
+Five fixed TRAIN feedback epochs freeze activity/history before TEST. The learned providers execute the actual shortest primitive sequences retained by the target-free learner, with each trace's scoped bounded-reference utility. Utility transferred to a new input is a ranking estimate; the TRAIN bounded-minimum proof is not a universal shortest-path theorem. The expert book is handwritten and marked as such. Complete sequence providers retain every finite primitive path and charge failed intermediate prefixes as well as completed endpoints. This closes a measured-work gap that would otherwise hide unsuccessful macro work.
+
+Artifacts retain every row, separate primitive/search/verification work, explored/expanded states, successor consumption and unused tails, branching, first-hit depths, duplicates, learned-rule hit rate, capability unlocks, regressions, all primitive witnesses, actual TRAIN runs and bounded reference closures. A content-hash manifest excludes walltime. Scientific candidate qualification requires zero correctness/assumption regressions, completed reference inclusion, noninferiority at every budget and a real newly reachable witness containing frozen learned knowledge. More than 10% search-work reduction on commonly solved rows is also reported; losses are never removed.
+
+Protocol v3 closes the original TRAIN accounting gap: optional exact-algebra node/term and alpha-renaming receipts, observed replay primitive work and supplementary bounded-reference inspection/frontier work are retained separately from frozen historical v1/v2 artifacts. The report sums these observed components with all scheduling TRAIN runs. It calculates canonical-work query amortization for the preregistered maximum-budget, commonly solved held-out population, or reports no payback if paired savings are nonpositive. These are the same declared hot-path event units used for evaluation, not CPU or walltime costs; compilation, serialization and coefficient bit complexity remain outside that ledger. Production qualification remains false pending #745, regardless of the development scientific gate. No neural search, general e-graph lane or proof-plan learning is enabled.
+
+Before any evaluation executed, protocol v2 corrected two intake errors found against the visible TRAIN definition: the weighted example originally reduced to the TRAIN polynomial `5*x^2`, and the factor example exceeded the alpha-identity verifier's four-variable scope. The final sources are disjoint under exact polynomial alpha identity; targets, rows, budgets and weights have not been tuned from outcomes. `RuleUtilityFeedback` also merges actual TRAIN applications, successes, duplicates, dead ends and capability observations into the persisted utility record while preserving its original bounded-reference claim, confidence and proof replay requirement.
+
+Review correction v4 retains each event's full attempted target state, so history never confuses a dead end with another state having the same expression/search depth but a different primitive budget, assumptions, capabilities or debt. Unperformed verification has an explicit optional accessor and serializes as null, not a zero-cost proof. Primitive-lane selection uses an ordered queue without changing candidate order. TRAIN accounting additionally meters activity/aging entry updates, memoized history context inspection/table updates and utility observation inspection. The earlier v3 result is retained in PR #961; tasks, budgets and ranking weights are unchanged in v4. Historical v1/v2 search replays remain unchanged; the initial diagnostic's own v2 schema separates internal dropped duplicates from frontier duplicates and declares its existing expanding-step bound.

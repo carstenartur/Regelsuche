@@ -51,6 +51,15 @@ class PrimitiveTraceMinimalityVerifierTest {
         assertTrue(assessment.reusableMultistepTrace());
         assertTrue(assessment.shortestPath().stream().allMatch(step -> step.rule().endsWith("_multiply-one")));
         assertEquals(2, assessment.oracle().orElseThrow().witness().orElseThrow().primitiveSteps());
+        var utility = new RuleUtilityAssessor().fromReference(assessment, 1);
+        assertEquals(20, utility.observedPathSteps());
+        assertEquals(2, utility.bestKnownPrimitiveSteps());
+        assertEquals(1, utility.knownDepthCompression());
+        assertEquals(20, utility.proofReplayWork(), "the retained original proof does not become free");
+        assertTrue(utility.boundedMinimumProved());
+        assertEquals(inventory.contentHash(), utility.reference().primitiveInventoryHash());
+        assertEquals(assessment.contentHash(), utility.reference().assessmentHash());
+        assertEquals(utility, de.regelsuche.inventory.RuleUtilityEvidence.fromJson(utility.toCanonicalJson()));
         verifier.verify(assessment);
     }
 
@@ -67,6 +76,9 @@ class PrimitiveTraceMinimalityVerifierTest {
         assertTrue(assessment.oracle().orElseThrow().closureComplete());
         assertEquals(19, assessment.oracle().orElseThrow().budget().maxPrimitivePathWork());
         assertTrue(assessment.measuredWork() > 20);
+        var utility = new RuleUtilityAssessor().fromReference(assessment, 1);
+        assertEquals(19, utility.knownDepthCompression());
+        assertTrue(utility.boundedMinimumProved());
         verifier.verify(assessment);
         assertThrows(IllegalArgumentException.class, () -> new PrimitiveTraceMinimalityVerifier(inventory(true)).verify(assessment));
     }
@@ -86,7 +98,25 @@ class PrimitiveTraceMinimalityVerifierTest {
             assertFalse(assessment.minimumProved());
             assertFalse(assessment.reusableMultistepTrace());
             assertTrue(assessment.shortestPath().isEmpty());
+            var utility = new RuleUtilityAssessor().fromReference(assessment, -1);
+            assertFalse(utility.boundedMinimumProved());
+            assertEquals(assessment.observedReplayVerified() ? 20 : -1, utility.bestKnownPrimitiveSteps());
         }
+    }
+
+    @Test
+    void aReplayedSevenStepUpperBoundSurvivesAnInconclusiveReferenceSearch() {
+        var inventory = inventory(false);
+        var source = wrap("x", 7);
+        var assessed = new RuleUtilityAssessor().assess(inventory, source, longPath(inventory, source, 7),
+            new Limits(4096, 0, 512, 1024, 500_000), 2);
+        assertEquals(Status.INCONCLUSIVE, assessed.reference().status());
+        assertTrue(assessed.reference().observedReplayVerified());
+        assertFalse(assessed.utility().boundedMinimumProved());
+        assertEquals(7, assessed.utility().bestKnownPrimitiveSteps());
+        assertEquals(7, assessed.utility().proofReplayWork());
+        assertEquals(6, assessed.utility().knownDepthCompression());
+        assertEquals(assessed.utility(), de.regelsuche.inventory.RuleUtilityEvidence.fromJson(assessed.utility().toCanonicalJson()));
     }
 
     @Test

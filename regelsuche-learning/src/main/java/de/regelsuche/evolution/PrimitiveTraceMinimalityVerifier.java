@@ -55,11 +55,12 @@ public final class PrimitiveTraceMinimalityVerifier {
         private final List<Transformation> shortestPath;
         private final Optional<BoundedReachabilityOracle.Result> oracle;
         private final long sourceWork;
+        private final long sourceSupplementaryWork;
         private final String detail;
 
         private Assessment(String inventoryHash, String source, List<Transformation> observedPath, Limits limits,
                 Status status, List<Transformation> shortestPath, BoundedReachabilityOracle.Result oracle,
-                long sourceWork, String detail) {
+                long sourceWork, long sourceSupplementaryWork, String detail) {
             this.inventoryHash = inventoryHash;
             this.source = source;
             this.observedPath = List.copyOf(observedPath);
@@ -68,12 +69,16 @@ public final class PrimitiveTraceMinimalityVerifier {
             this.shortestPath = List.copyOf(shortestPath);
             this.oracle = Optional.ofNullable(oracle);
             this.sourceWork = sourceWork;
+            this.sourceSupplementaryWork = sourceSupplementaryWork;
             this.detail = detail;
         }
         public String inventoryHash() { return inventoryHash; }
         public String source() { return source; }
         public String target() { return observedPath.isEmpty() ? source : normalize(observedPath.getLast().transformedExpression()); }
         public int observedPrimitiveSteps() { return observedPath.size(); }
+        /** An oracle is created only after the complete observed path has replayed successfully. */
+        public boolean observedReplayVerified() { return oracle.isPresent(); }
+        public List<Transformation> observedPath() { return observedPath; }
         public Limits limits() { return limits; }
         public Status status() { return status; }
         public boolean minimumProved() { return status == Status.SHORTEST_CONFIRMED || status == Status.SHORTER_PATH_FOUND; }
@@ -84,6 +89,14 @@ public final class PrimitiveTraceMinimalityVerifier {
         public long measuredWork() {
             return Math.addExact(sourceWork, oracle.map(value -> (long) value.work().expandedStates()
                 + value.work().generatedTransitions() + value.work().discoveredStates()).orElse(0L));
+        }
+        /** Primitive application/AST inspection and remaining oracle events, outside the historical v1 scalar. */
+        public long supplementaryWork() {
+            return Math.addExact(sourceSupplementaryWork, oracle.map(value -> {
+                var work = value.work();
+                return (long) work.enqueuedTransitions() + work.dominatedTransitions() + work.outsidePrimitiveWorkTransitions()
+                    + work.visitedStateLimitTransitions() + work.supersededStates() + work.depthBoundaryStates() + work.primitiveWorkBoundaryStates();
+            }).orElse(0L));
         }
         public String contentHash() { return SchematicProofPlan.hash(toCanonicalJson()); }
         public String toCanonicalJson() {
@@ -145,7 +158,7 @@ public final class PrimitiveTraceMinimalityVerifier {
 
     private Assessment assessment(String source, List<Transformation> path, Limits limits, Status status,
             List<Transformation> shortest, BoundedReachabilityOracle.Result oracle, CompleteSource complete, String detail) {
-        return new Assessment(inventory.contentHash(), source, path, limits, status, shortest, oracle, complete.work, detail);
+        return new Assessment(inventory.contentHash(), source, path, limits, status, shortest, oracle, complete.work, complete.supplementaryWork, detail);
     }
 
     private static void replayObserved(String source, List<Transformation> path, CompleteSource complete) {
@@ -176,6 +189,7 @@ public final class PrimitiveTraceMinimalityVerifier {
         private final Limits limits;
         private final Map<String, List<Transformation>> retained = new HashMap<>();
         private long work;
+        private long supplementaryWork;
         private boolean limitReached;
         private CompleteSource(EvolutionGenome inventory, Limits limits) {
             this.limits = limits;
@@ -184,16 +198,22 @@ public final class PrimitiveTraceMinimalityVerifier {
                 new EvolutionGenomeCompiler().compile(inventory).rules(), Integer.MAX_VALUE, limits.maximumCandidatesPerState() + 1));
         }
         @Override public List<Transformation> transform(String expression) {
-            requireWithin(nodeCount(new ExpressionParser().parseTerm(expression)) <= limits.maximumAstNodes(), "AST_NODE_LIMIT");
+            requireWithin(inspect(expression) <= limits.maximumAstNodes(), "AST_NODE_LIMIT");
             var batch = engine.transformMeasured(expression);
             work = Math.addExact(work, batch.workMetrics().totalWorkUnits());
+            supplementaryWork = Math.addExact(supplementaryWork, batch.workMetrics().sourceCandidates());
             requireWithin(work <= limits.maximumSourceWork(), "SOURCE_WORK_LIMIT");
             requireWithin(batch.transformations().size() <= limits.maximumCandidatesPerState(), "CANDIDATE_LIMIT");
             for (var step : batch.transformations()) {
-                requireWithin(nodeCount(new ExpressionParser().parseTerm(step.transformedExpression())) <= limits.maximumAstNodes(), "AST_NODE_LIMIT");
+                requireWithin(inspect(step.transformedExpression()) <= limits.maximumAstNodes(), "AST_NODE_LIMIT");
             }
             retained.put(expression, batch.transformations());
             return batch.transformations();
+        }
+        private long inspect(String expression) {
+            long nodes = nodeCount(new ExpressionParser().parseTerm(expression));
+            supplementaryWork = Math.addExact(supplementaryWork, nodes);
+            return nodes;
         }
         private void requireWithin(boolean condition, String reason) {
             if (!condition) { limitReached = true; throw new VerificationLimit(reason); }

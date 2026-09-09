@@ -24,4 +24,17 @@ class ExactPolynomialAnalysisTest {
         assertThrows(IllegalArgumentException.class, () -> analysis.alphaIdentity("a+b+c+d+e"));
         assertThrows(IllegalArgumentException.class, () -> analysis.alphaIdentity("x^999999999"));
     }
+
+    @Test
+    void optionalWorkReceiptCountsActualAlgebraAndRenamingWithoutChangingMathematicalResults() {
+        var work = new java.util.concurrent.atomic.AtomicLong();
+        var measured = new ExactPolynomialAnalysis(work::addAndGet);
+        measured.requireEquivalent("(x+y)^2", "x*x+2*x*y+y*y");
+        long proofWork = work.get(); assertTrue(proofWork > 2);
+        assertEquals(analysis.alphaIdentity("(x+y)^2"), measured.alphaIdentity("(x+y)^2"));
+        assertTrue(work.get() > proofWork);
+        long beforeFailure = work.get();
+        assertThrows(IllegalArgumentException.class, () -> measured.requireEquivalent("x+1", "x+2"));
+        assertTrue(work.get() > beforeFailure, "unsuccessful exact work remains observed");
+    }
 }

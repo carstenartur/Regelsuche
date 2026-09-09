@@ -52,6 +52,28 @@ class Neo4jExpressionGraphStoreTest {
         query("MATCH (n) DETACH DELETE n", Map.of());
     }
 
+    @Test
+    void ruleInventoryRoundTripsUtilityAssumptionsAndActivityInputsAcrossReconnect() {
+        var utility = new de.regelsuche.inventory.RuleUtilityEvidence(
+            de.regelsuche.inventory.RuleUtilityEvidence.REVISION, 0, -1, false, 1, 5, 8,
+            4, 2, 1, 1, 9, List.of("factor"), 1, 0.8, 6, null);
+        var rule = new de.regelsuche.inventory.ReusableRule("learned-factor", "A*B+A*C", "A*(B+C)", List.of(),
+            de.regelsuche.validation.CandidateProofStatus.OBSERVED, de.regelsuche.mining.RuleStatus.NEW,
+            3, 8, java.time.Instant.EPOCH, "pattern-hash", null, 4, 6, List.of("path"), 0.8, List.of("x != 0"), utility);
+        try (var inventory = new de.regelsuche.inventory.Neo4jRuleInventoryRepository(uri(), "neo4j", PASSWORD)) {
+            inventory.save(rule);
+            inventory.setEnabled(rule.id(), false);
+        }
+        try (var inventory = new de.regelsuche.inventory.Neo4jRuleInventoryRepository(uri(), "neo4j", PASSWORD)) {
+            assertEquals(rule, inventory.findById(rule.id()).orElseThrow());
+            org.junit.jupiter.api.Assertions.assertFalse(inventory.isEnabled(rule.id()));
+            inventory.recordUsage(rule.id(), java.time.Instant.EPOCH);
+            assertEquals(utility, inventory.findById(rule.id()).orElseThrow().utilityEvidence());
+            assertEquals(de.regelsuche.validation.CandidateProofStatus.OBSERVED,
+                inventory.findById(rule.id()).orElseThrow().proofStatus());
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void reusesLegacyOrEmptyIdentityWithoutOverwritingParallelExecutions(boolean initialized) {

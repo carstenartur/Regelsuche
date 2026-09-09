@@ -36,7 +36,9 @@ import java.util.TreeSet;
 public final class TraceRewriteStrategyLearner {
     public static final String REVISION = "regelsuche.trace-rewrite-strategy-learner/v2";
     private static final long SHUFFLE_SEED = 0x74726163654cL;
-    private final ExactPolynomialAnalysis exact = new ExactPolynomialAnalysis();
+    private long exactWork;
+    private long replayPrimitiveWork;
+    private final ExactPolynomialAnalysis exact = new ExactPolynomialAnalysis(units -> exactWork = Math.addExact(exactWork, units));
 
     public record Input(String id, String expression) {
         public Input {
@@ -86,16 +88,20 @@ public final class TraceRewriteStrategyLearner {
         private final Optional<EvolutionRewriteProgramPlan> plan;
         private final Optional<EvolutionRewriteProgramPlan> shuffled;
         private final String canonicalJson;
+        private final long exactWork;
+        private final long replayPrimitiveWork;
 
         private FrozenStrategy(EvolutionGenome inventory, Limits limits, List<Observation> observations,
                 Set<String> excludedIdentities, Optional<EvolutionRewriteProgramPlan> plan,
-                Optional<EvolutionRewriteProgramPlan> shuffled) {
+                Optional<EvolutionRewriteProgramPlan> shuffled, long exactWork, long replayPrimitiveWork) {
             this.inventory = inventory;
             this.limits = limits;
             this.observations = List.copyOf(observations);
             this.excludedIdentities = excludedIdentities.stream().sorted().toList();
             this.plan = plan;
             this.shuffled = shuffled;
+            this.exactWork = exactWork;
+            this.replayPrimitiveWork = replayPrimitiveWork;
             canonicalJson = render();
         }
 
@@ -110,6 +116,15 @@ public final class TraceRewriteStrategyLearner {
         public long trainingSearchWorkUnits() {
             return observations.stream().mapToLong(o -> o.search().metrics().chargedSearchWorkUnits())
                 .reduce(0L, Math::addExact);
+        }
+        /** Supplementary observed accounting; frozen historical JSON and mathematical identity stay unchanged. */
+        public long trainingExactWorkUnits() { return exactWork; }
+        public long trainingReplayPrimitiveWorkUnits() { return replayPrimitiveWork; }
+        public long trainingPrimitiveWorkUnits() {
+            return observations.stream().mapToLong(value -> value.search().metrics().transformationWork().sourceCandidates()).sum();
+        }
+        public long trainingReferenceSupplementaryWorkUnits() {
+            return observations.stream().mapToLong(value -> value.minimality().map(PrimitiveTraceMinimalityVerifier.Assessment::supplementaryWork).orElse(0L)).sum();
         }
         public long trainingReplayWorkUnits() {
             return observations.stream().mapToLong(Observation::replayWorkUnits).reduce(0L, Math::addExact);
@@ -183,6 +198,7 @@ public final class TraceRewriteStrategyLearner {
     }
 
     public FrozenStrategy learn(EvolutionGenome inventory, List<Input> inputs, Limits limits) {
+        exactWork = 0; replayPrimitiveWork = 0;
         Objects.requireNonNull(inventory, "inventory");
         Objects.requireNonNull(limits, "limits");
         if (inventory.trainingScope().sourceSplit() != EvolutionGenome.SourceSplit.TRAIN
@@ -230,7 +246,7 @@ public final class TraceRewriteStrategyLearner {
             shuffledSequences.add(List.copyOf(shuffled));
         }
         return new FrozenStrategy(inventory, limits, observations, excluded, plan,
-            compileTopology(inventory, shuffledSequences, limits.maximumProgramNodes()));
+            compileTopology(inventory, shuffledSequences, limits.maximumProgramNodes()), exactWork, replayPrimitiveWork);
     }
 
     private Observation observeTraining(Input input, String identity, EvolutionGenome inventory, Limits limits,
@@ -272,6 +288,7 @@ public final class TraceRewriteStrategyLearner {
             var replay = MeasuredTransformationEngines.counting(new AstRewriteTransformationEngine(
                 List.of(rule), inventory.budget().maxAstGrowthPerStep(), inventory.budget().maxCandidatesPerState())).transformMeasured(current);
             replayWork = Math.addExact(replayWork, replay.workMetrics().totalWorkUnits());
+            replayPrimitiveWork = Math.addExact(replayPrimitiveWork, replay.workMetrics().sourceCandidates());
             if (!replay.transformations().contains(step)) throw new IllegalArgumentException("primitive replay mismatch");
             exact.requireEquivalent(current, step.transformedExpression());
             audits++;

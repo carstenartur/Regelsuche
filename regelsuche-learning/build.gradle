@@ -207,3 +207,22 @@ rootProject.tasks.named('check') {
         verifyIndependentInterestingnessReview,
         verifyRewriteProgramWorkEvidence
 }
+
+tasks.register('learnedSchedulingStudy', JavaExec) {
+    group = 'verification'
+    description = 'Runs the frozen mathematical BASE/NAIVE/RANKED/EXPERT study and scheduling ablations.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.evolution.LearnedSchedulingStudy'
+    args layout.buildDirectory.dir('reports/learned-scheduling').get().asFile.absolutePath
+}
+
+tasks.register('verifyLearnedSchedulingEvidence', Exec) {
+    group = 'verification'
+    description = 'Independently checks every frozen scheduling row, work sum, witness receipt and hash.'
+    dependsOn tasks.named('test')
+    workingDir rootProject.rootDir
+    commandLine 'python3', rootProject.file('scripts/verify-learned-scheduling.py').absolutePath,
+        layout.buildDirectory.dir('reports/learned-scheduling').get().asFile.absolutePath
+}
+tasks.named('check') { dependsOn tasks.named('verifyLearnedSchedulingEvidence') }
