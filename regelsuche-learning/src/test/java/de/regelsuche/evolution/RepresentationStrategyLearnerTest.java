@@ -37,6 +37,47 @@ class RepresentationStrategyLearnerTest {
         assertEquals(artifact, LinearRepresentationJson.replay(new JsonReader(artifact).readObject()));
     }
 
+    @Test void learnedSelectorBeatsStaticBaselineAndExpertReferenceIsNotAnUnlearnedBaseline() {
+        var study = new RepresentationTransferExperiment().run();
+        var direct = study.summaries().stream()
+            .filter(summary -> summary.profile() == RepresentationStrategyLearner.Profile.DIRECT)
+            .findFirst().orElseThrow();
+        var fixed = study.summaries().stream()
+            .filter(summary -> summary.profile() == RepresentationStrategyLearner.Profile.FIXED_AUTO)
+            .findFirst().orElseThrow();
+        var learned = study.summaries().stream()
+            .filter(summary -> summary.profile() == RepresentationStrategyLearner.Profile.LEARNED)
+            .findFirst().orElseThrow();
+
+        long savedAgainstStaticBaseline = direct.applicationWork() - learned.applicationWork();
+        assertTrue(savedAgainstStaticBaseline > 0,
+            "The learned selector must be compared with a static route baseline, not only with an expert rule");
+
+        long learnedSelectionWork = study.rows().stream()
+            .filter(row -> row.profile() == RepresentationStrategyLearner.Profile.LEARNED)
+            .mapToLong(row -> row.application().selectionWork()).sum();
+        assertEquals(learnedSelectionWork, learned.applicationWork() - fixed.applicationWork(),
+            "FIXED_AUTO and LEARNED choose the same routes here; their difference is selector accounting only");
+        for (var task : RepresentationTransferExperiment.evaluation()) {
+            var fixedRoute = study.rows().stream().filter(row -> row.task().id().equals(task.id())
+                && row.profile() == RepresentationStrategyLearner.Profile.FIXED_AUTO)
+                .map(row -> row.application().result().selected()).findFirst().orElseThrow();
+            var learnedRoute = study.rows().stream().filter(row -> row.task().id().equals(task.id())
+                && row.profile() == RepresentationStrategyLearner.Profile.LEARNED)
+                .map(row -> row.application().result().selected()).findFirst().orElseThrow();
+            assertEquals(fixedRoute, learnedRoute);
+        }
+
+        long breakEvenCases = (study.policy().learningWork() * (long) RepresentationTransferExperiment.evaluation().size()
+            + savedAgainstStaticBaseline - 1) / savedAgainstStaticBaseline;
+        assertEquals(108, breakEvenCases,
+            "One-time training cost must be amortized over repeated deployment, not charged as a permanent penalty");
+
+        String diagnosis = RepresentationLearningDiagnosis.toJson(study);
+        assertTrue(diagnosis.contains("\"learnsMathematicalProcedures\":false"));
+        assertTrue(diagnosis.contains("\"knowledgeAblation\":false"));
+    }
+
     @Test void excludesRenamedReorderedTrainingEquationsAndBindsArtifacts() {
         assertEquals(RepresentationStrategyLearner.identity(List.of("x+y=3", "x-y=1")),
             RepresentationStrategyLearner.identity(List.of("a-b=1", "b+a=3")));
