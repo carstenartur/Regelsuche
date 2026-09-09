@@ -20,11 +20,12 @@ group = 'de.regelsuche'
 version = sdkVersion
 
 pluginManager.withPlugin('java') {
-    if (project.path == ':regelsuche-discovery-sdk') {
-        java {
-            withSourcesJar()
-            withJavadocJar()
-        }
+    java {
+        withSourcesJar()
+        withJavadocJar()
+    }
+    tasks.withType(Javadoc).configureEach {
+        options.addStringOption('Xdoclint:none', '-quiet')
     }
 
     publishing {

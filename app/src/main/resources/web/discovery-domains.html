@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Eigene Discovery-Domänen – Regelsuche</title>
+  <link rel="stylesheet" href="style.css"><link rel="stylesheet" href="discovery-domains.css">
+  <script defer src="discovery-domains.js"></script>
+</head>
+<body>
+<header><div class="brand"><a href="/">← Regelsuche Workbench</a>
+  <h1>Eigene Discovery-Domänen</h1><p>Eine installierte Domäne auswählen, einen begrenzten Lauf starten und die Nachweise behalten.</p>
+</div></header>
+<main class="sdk-domain-workbench">
+  <form id="domainForm" class="card">
+    <label class="field">Domäne<select id="domainChoice" required></select></label>
+    <p id="domainOrigin" class="hint"></p>
+    <label class="field">Name des Laufs<input id="campaign" value="mein-discovery-lauf" required pattern="[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}"></label>
+    <label class="field">Startdaten der Domäne<textarea id="seed" rows="5" required placeholder="Die Startdaten müssen zum Eingabeformat der gewählten Domäne passen."></textarea></label>
+    <label class="field">Suchbudget<select id="budget"><option value="small">Kleiner Suchlauf</option><option value="tiny">Minimales Budget zum Ausprobieren</option></select></label>
+    <button id="startDomain" type="submit" disabled>Lauf starten</button>
+  </form>
+  <p id="domainStatus" role="status" aria-live="polite">Installierte Domänen werden geladen …</p>
+  <section class="card" id="domainResult" hidden>
+    <h2 id="outcome"></h2><p id="interpretation"></p><p id="certificate"></p>
+    <h3>Gegenbeispiele</h3><ul id="counterexamples"></ul>
+    <button id="downloadEvidence" type="button">Vollständige Evidence herunterladen</button>
+    <details><summary>Nachweisdetails</summary><pre id="evidence"></pre></details>
+  </section>
+</main>
+</body></html>

@@ -29,6 +29,113 @@
     {"name": "Rule Radar", "description": "Positionsgebundene AST-Kandidaten, Anwendung und begrenzte Suche."}
   ],
   "paths": {
+    "/api/discovery-domains": {
+      "get": {
+        "tags": [
+          "Plugins"
+        ],
+        "operationId": "listInstalledDiscoveryDomains",
+        "summary": "Vom Host aktivierte Discovery-Domänen anzeigen",
+        "x-regelsuche-context": "/api/discovery-domains",
+        "responses": {
+          "200": {
+            "description": "API-Revision und aktivierte Domain-/Provider-Identitäten mit Artefakt-SHA-256",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestText"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          }
+        }
+      }
+    },
+    "/api/discovery-domains/run": {
+      "post": {
+        "tags": [
+          "Plugins"
+        ],
+        "operationId": "runInstalledDiscoveryDomain",
+        "summary": "Explizit aktivierte Discovery-Domäne mit festem Budget ausführen",
+        "x-regelsuche-context": "/api/discovery-domains",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "providerId",
+                  "domainId",
+                  "revision",
+                  "campaignId",
+                  "seed",
+                  "budget"
+                ],
+                "properties": {
+                  "providerId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "domainId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "revision": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "campaignId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "seed": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "budget": {
+                    "type": "string",
+                    "enum": [
+                      "small",
+                      "tiny"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Kanonische Run-Evidence einschließlich bestätigter, widerlegter und unentschiedener Zustände",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestText"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          }
+        }
+      }
+    },
     "/api/representations/solve": {
       "post": {
         "tags": [

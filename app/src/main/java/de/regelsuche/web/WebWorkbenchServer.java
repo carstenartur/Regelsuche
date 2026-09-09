@@ -325,6 +325,7 @@ public class WebWorkbenchServer {
         handlers.put("/api/didactic", this::handleDidactic);
         handlers.put("/api/inspect", this::handleInspect);
         handlers.put("/api/representations", this::handleMatrixRepresentations);
+        handlers.put("/api/discovery-domains", this::handleDiscoveryDomains);
         handlers.put("/api/rule-radar", ruleRadarHandler);
         handlers.put(
             REPRESENTATION_RUN_CONTEXT,
@@ -369,6 +370,22 @@ public class WebWorkbenchServer {
                 sendStatus(exchange, 400, "invalid JSON request body");
             }
         };
+    }
+
+    private void handleDiscoveryDomains(HttpExchange exchange) throws IOException {
+        try {
+            var workbench = DiscoveryDomainWorkbench.forHost(getClass().getClassLoader(),
+                System.getProperty("regelsuche.discovery.providers", ""));
+            if ("GET".equals(exchange.getRequestMethod())) {
+                sendJson(exchange, 200, workbench.catalogJson());
+            } else {
+                var input = new StreamingJsonRequestBody(Math.min(
+                    1024 * 1024, securityConfig.maxRequestBytes())).readObject(exchange);
+                sendJson(exchange, 200, workbench.run(input));
+            }
+        } catch (IllegalArgumentException | IllegalStateException | java.util.ServiceConfigurationError exception) {
+            sendStatus(exchange, 400, exception.getMessage());
+        }
     }
 
     private void handleMatrixRepresentations(HttpExchange exchange) throws IOException {

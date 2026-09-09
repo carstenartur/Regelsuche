@@ -20,8 +20,10 @@ bin/regelsuche serve --port 8080
 Für ein Wheel aus dem Quellcheckout:
 
 ```sh
-python -m pip wheel ./python --no-deps --wheel-dir dist
-python -m pip install dist/regelsuche_client-0.1.0-py3-none-any.whl
+wheel_dir="$(mktemp -d)"
+python -m pip wheel ./python --no-deps --wheel-dir "$wheel_dir"
+python -m pip install "$wheel_dir"/regelsuche_client-*.whl
+rm -rf -- "$wheel_dir"
 ```
 
 Der Build verwendet die in `python/pyproject.toml` fixierte setuptools-Version.

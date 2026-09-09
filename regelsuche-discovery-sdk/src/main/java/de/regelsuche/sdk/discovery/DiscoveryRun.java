@@ -16,6 +16,7 @@ public final class DiscoveryRun<C, K> {
     private final Optional<C> selectedCandidate;
     private final Optional<K> selectedCertificate;
     private final DomainDiscoveryEvidence evidence;
+    private final java.util.function.Supplier<DiscoveryRun<C, K>> replayRunner;
 
     DiscoveryRun(
         Optional<C> selectedCandidate,
@@ -24,6 +25,18 @@ public final class DiscoveryRun<C, K> {
         CanonicalCodec<C> candidateCodec,
         CanonicalCodec<K> certificateCodec
     ) {
+        this(selectedCandidate, selectedCertificate, evidence, candidateCodec, certificateCodec, null);
+    }
+
+    DiscoveryRun(
+        Optional<C> selectedCandidate,
+        Optional<K> selectedCertificate,
+        DomainDiscoveryEvidence evidence,
+        CanonicalCodec<C> candidateCodec,
+        CanonicalCodec<K> certificateCodec,
+        java.util.function.Supplier<DiscoveryRun<C, K>> replayRunner
+    ) {
+        this.replayRunner = replayRunner;
         this.selectedCandidate = Objects.requireNonNull(
             selectedCandidate,
             "selectedCandidate"
@@ -110,6 +123,37 @@ public final class DiscoveryRun<C, K> {
         evidence.resources().forEach(line ->
             work.put(line.resource(), line.executed()));
         return java.util.Collections.unmodifiableMap(work);
+    }
+
+    /**
+     * Executes the captured domain, seed and budgets again, requiring identical
+     * canonical evidence. This repeats callbacks and their work; it is a
+     * determinism check, not an independent proof of arbitrary provider code.
+     */
+    public DiscoveryRun<C, K> replay() {
+        if (replayRunner == null) throw new IllegalStateException("run has no captured replay recipe");
+        DiscoveryRun<C, K> replayed = replayRunner.get();
+        if (!canonicalEvidence().equals(replayed.canonicalEvidence())) {
+            throw new IllegalStateException("replay evidence differs: expected " + evidence.contentHash()
+                + ", observed " + replayed.evidence().contentHash());
+        }
+        return replayed;
+    }
+
+    /** Assumptions retained on accepted and rejected transitions, in canonical order. */
+    public List<String> assumptions() {
+        return evidence.transitions().stream().flatMap(trace -> trace.assumptions().stream())
+            .distinct().sorted().toList();
+    }
+
+    /** Canonical evidence bytes, suitable for independent checking and retention. */
+    public byte[] evidenceBytes() {
+        return canonicalEvidence().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    /** Writes evidence to a new file; never overwrites an existing artifact. */
+    public java.nio.file.Path writeEvidence(java.nio.file.Path path) throws java.io.IOException {
+        return java.nio.file.Files.write(path, evidenceBytes(), java.nio.file.StandardOpenOption.CREATE_NEW);
     }
 
     /** Canonical JSON including the evidence content hash. */
