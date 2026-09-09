@@ -8,6 +8,7 @@ import java.util.Optional;
 
 /** Opens provider batches on demand. Metadata ordering never invokes an engine. */
 public final class StagedMovePicker implements MovePicker {
+    private static final int EXHAUSTED_STAGE = MovePriorityPolicy.Stage.values().length;
     private record Ranked(SearchMove move, double score) {}
     private static final class Lane {
         final MoveProvider provider;
@@ -20,6 +21,7 @@ public final class StagedMovePicker implements MovePicker {
         }
     }
     private final List<Lane> lanes = new ArrayList<>();
+    private final java.util.ArrayDeque<Lane> primitiveLanes = new java.util.ArrayDeque<>();
     private final List<SearchMove> generated = new ArrayList<>();
     private final MovePriorityPolicy policy;
     private final MoveState state;
@@ -33,14 +35,14 @@ public final class StagedMovePicker implements MovePicker {
         for (var provider : List.copyOf(providers)) lanes.add(new Lane(provider,
             policy.stage(provider.descriptor(), state, context).ordinal(), policy.providerScore(provider.descriptor(), state, context)));
         lanes.sort(Comparator.comparingInt((Lane lane) -> lane.stage).thenComparing(Comparator.comparingDouble((Lane lane) -> lane.score).reversed()));
-        work = ordering(providers.size());
+        lanes.stream().filter(lane -> lane.provider.descriptor().sourceKind() == SearchMove.SourceKind.PRIMITIVE).forEach(primitiveLanes::addLast);
+        work = ordering(providers.size()).withDelegatedMechanicalWork(policy.contextWork(state, context));
     }
 
     @Override public Optional<SearchMove> next() {
         while (!lanes.isEmpty()) {
             // A large learned batch cannot monopolize candidate consumption before primitive mathematics.
-            Lane lane = valuableBurst >= 2 ? lanes.stream()
-                .filter(value -> value.stage == MovePriorityPolicy.Stage.NORMAL_PRIMITIVE.ordinal()).findFirst().orElse(lanes.getFirst())
+            Lane lane = valuableBurst >= 2 && !primitiveLanes.isEmpty() ? primitiveLanes.getFirst()
                 : lanes.getFirst();
             if (lane.moves == null) {
                 var batch = lane.provider.candidates(state, context);
@@ -55,15 +57,19 @@ public final class StagedMovePicker implements MovePicker {
                 ranked.sort(Comparator.comparingDouble(Ranked::score).reversed());
                 lane.moves = ranked.stream().map(Ranked::move).toList();
             }
-            if (lane.cursor == lane.moves.size()) { lanes.remove(lane); continue; }
+            if (lane.cursor == lane.moves.size()) {
+                lanes.remove(lane);
+                if (primitiveLanes.peekFirst() == lane) primitiveLanes.removeFirst();
+                continue;
+            }
             var result = lane.moves.get(lane.cursor++);
-            if (lane.stage == MovePriorityPolicy.Stage.VALUABLE_LEARNED.ordinal()) valuableBurst++;
-            else if (lane.stage == MovePriorityPolicy.Stage.NORMAL_PRIMITIVE.ordinal()) valuableBurst = 0;
+            if (lane.provider.descriptor().sourceKind() == SearchMove.SourceKind.LEARNED) valuableBurst++;
+            else if (lane.provider.descriptor().sourceKind() == SearchMove.SourceKind.PRIMITIVE) valuableBurst = 0;
             return Optional.of(result);
         }
         return Optional.empty();
     }
-    public int nextStage() { return lanes.isEmpty() ? 6 : lanes.getFirst().stage; }
+    public int nextStage() { return lanes.isEmpty() ? EXHAUSTED_STAGE : lanes.getFirst().stage; }
     @Override public TransformationWorkMetrics workMetrics() { return work; }
     @Override public List<SearchMove> generatedMoves() { return List.copyOf(generated); }
     @Override public boolean complete() { return lanes.isEmpty() && exhaustive; }

@@ -25,6 +25,8 @@ public final class MoveSearch {
     public record Problem(String source, MoveContext context, List<MoveProvider> providers, MovePriorityPolicy policy,
             MoveVerifier verifier, ToDoubleFunction<MoveState> stateScore, Mode mode, Scheduling scheduling, Budget budget) {
         public Problem {
+            java.util.Objects.requireNonNull(context, "context");
+            java.util.Objects.requireNonNull(providers, "providers");
             providers = List.copyOf(providers);
             java.util.Objects.requireNonNull(verifier); java.util.Objects.requireNonNull(policy);
             java.util.Objects.requireNonNull(stateScore); java.util.Objects.requireNonNull(mode);
@@ -33,7 +35,11 @@ public final class MoveSearch {
                 throw new IllegalArgumentException("experimental scheduling is not production-qualified (#745)");
         }
     }
-    public record Event(MoveState source, SearchMove move, Decision decision, MoveVerifier.Verification verification) {}
+    /** The full attempted target identity is retained even when admission rejects it. */
+    public record Event(MoveState source, MoveState target, SearchMove move, Decision decision, MoveVerifier.Verification verification) {
+        /** Empty means NOT_PERFORMED, not a failed or free mathematical verification. JSON retains explicit null. */
+        public java.util.Optional<MoveVerifier.Verification> verificationResult() { return java.util.Optional.ofNullable(verification); }
+    }
     public record WitnessStep(MoveState source, MoveState target, SearchMove move, MoveVerifier.Verification verification) {}
     public record Metrics(long generatedSuccessors, long consumedSuccessors, long discardedSuccessors, long unconsumedSuccessors,
             long duplicates, long deadEnds, long exploredStates, long expandedStates, long primitiveWork, long searchWork,
@@ -140,7 +146,7 @@ public final class MoveSearch {
                 child.expression().equals(problem.context().goal()) ? -Double.MAX_VALUE : priority(problem, child), serial[0]++));
         }
         if (decision != Decision.ENQUEUED) ledger.discarded++;
-        events.add(new Event(node.state, move, decision, verification));
+        events.add(new Event(node.state, child, move, decision, verification));
         if (decision == Decision.WORK_LIMIT) return Expansion.WORK_LIMIT;
         int stage = node.picker instanceof StagedMovePicker staged ? staged.nextStage() : 0;
         // Parent widening stays on the frontier, so promising children can finish before later stages open.
