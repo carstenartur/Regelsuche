@@ -180,6 +180,8 @@ stehen unter [Java-internal Rewrite Programs](docs/java-rewrite-programs.md) und
 
 ### Eigene Discovery-Domänen mit dem Java-SDK
 
+Neu: [Java-Quickstart](docs/java-sdk-quickstart.md), [Domain-Tutorial](docs/java-sdk-domain-tutorial.md) und [API-Vertrag](docs/java-sdk-api-policy.md). Regel-Plugins verwenden jetzt das eigenständige `regelsuche-plugin-api`; Provider-Evidence bindet die beobachteten Artefaktbytes.
+
 Das headless nutzbare Java-25-SDK lässt eigene Zustände, Übergänge,
 Gegenbeispielsuchen und Zertifikate in normalem Java definieren, ohne Webserver
 oder Persistenz einzubinden. So sieht ein Lauf im

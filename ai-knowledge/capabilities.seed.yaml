@@ -508,3 +508,33 @@
   evidenceTypes:
     - validation-evidence
   tags: [schematic-plan, exact-solver, replay, exact-theory, budgeted-execution, reproducibility]
+
+- id: public-java-sdk
+  label: "Standalone Java SDK and external mathematical extensions"
+  description: "Publishes the headless discovery facade and plugin contracts with an explicit API revision, provider artifact evidence, independent consumer builds and release documentation. Provider loading does not grant mathematical authority."
+  modules: [regelsuche-discovery-sdk, regelsuche-plugin-api, app]
+  ownerModules: [regelsuche-discovery-sdk, regelsuche-plugin-api]
+  typePatterns:
+    - 'RegelsucheDiscovery'
+    - 'DiscoveryDomainBuilder'
+    - 'DiscoveryDomainProvider'
+    - 'DiscoveryDomainCatalog'
+    - 'DiscoveryRun'
+    - 'ProviderProvenance'
+    - 'RegelsuchePlugin'
+    - 'DiscoveryCli'
+    - 'DiscoveryDomainWorkbench'
+  testPatterns:
+    - 'DiscoverySdkTest'
+    - 'ProviderProvenanceTest'
+    - 'PluginApiContractTest'
+    - 'DiscoveryCliTest'
+    - 'DiscoveryDomainWorkbenchTest'
+  docPatterns:
+    - docs/java-discovery-sdk.md
+    - docs/java-sdk-quickstart.md
+    - docs/java-sdk-domain-tutorial.md
+    - docs/java-sdk-api-policy.md
+  evidenceTypes:
+    - discovery-evidence
+  tags: [sdk, plugins, discovery, external-consumers]

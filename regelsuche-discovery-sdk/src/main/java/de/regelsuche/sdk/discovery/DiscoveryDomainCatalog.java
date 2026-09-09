@@ -32,11 +32,32 @@ public final class DiscoveryDomainCatalog {
 
     /** Loads providers with an explicit class loader. */
     public static DiscoveryDomainCatalog load(ClassLoader classLoader) {
+        return load(classLoader, null);
+    }
+
+    /**
+     * Loads only explicitly enabled provider class names. An empty set disables
+     * all providers; null retains the embedding application's classpath policy.
+     * Selection is not a security sandbox for enabled code.
+     */
+    public static DiscoveryDomainCatalog load(ClassLoader classLoader, java.util.Set<String> enabledClasses) {
         Objects.requireNonNull(classLoader, "classLoader");
+        java.util.Set<String> enabled = enabledClasses == null ? null : java.util.Set.copyOf(enabledClasses);
+        java.util.Set<String> found = new java.util.HashSet<>();
         List<DiscoveryDomainProvider> providers = new ArrayList<>();
         try {
-            ServiceLoader.load(DiscoveryDomainProvider.class, classLoader)
-                .forEach(providers::add);
+            for (var entry : ServiceLoader.load(DiscoveryDomainProvider.class, classLoader).stream().toList()) {
+                String name = entry.type().getName();
+                if (enabled == null || enabled.contains(name)) {
+                    found.add(name);
+                    providers.add(entry.get());
+                }
+            }
+            if (enabled != null && !found.equals(enabled)) {
+                var missing = new java.util.TreeSet<>(enabled);
+                missing.removeAll(found);
+                throw new IllegalArgumentException("enabled provider classes not installed: " + missing);
+            }
         } catch (ServiceConfigurationError error) {
             throw new IllegalStateException(
                 "failed to load discovery-domain providers",
@@ -72,10 +93,15 @@ public final class DiscoveryDomainCatalog {
                     "duplicate discovery provider id: " + providerId
                 );
             }
+            if (!DiscoveryApi.VERSION.equals(provider.apiVersion())) {
+                throw new IllegalArgumentException("incompatible discovery provider " + providerId
+                    + ": requires API " + provider.apiVersion() + ", runtime API " + DiscoveryApi.VERSION);
+            }
             normalizedProviders.add(new ProviderEntry(
                 providerId,
                 providerVersion,
                 normalizeProvenance(provider.provenance()),
+                ProviderProvenance.capture(provider.getClass()),
                 provider
             ));
         }
@@ -103,7 +129,9 @@ public final class DiscoveryDomainCatalog {
                     provider.id(),
                     provider.version(),
                     provider.provenance(),
-                    domain
+                    new ProviderDomain<>(domain, provider.artifact().properties(
+                        provider.id(), provider.version(), provider.provenance()),
+                        () -> ProviderProvenance.capture(provider.provider().getClass()))
                 );
                 Registration previous = domains.putIfAbsent(key, registration);
                 if (previous != null) {
@@ -150,6 +178,7 @@ public final class DiscoveryDomainCatalog {
         String id,
         String version,
         String provenance,
+        ProviderProvenance artifact,
         DiscoveryDomainProvider provider
     ) {
     }
@@ -161,6 +190,12 @@ public final class DiscoveryDomainCatalog {
         String providerProvenance,
         DiscoveryDomain<?, ?, ?> domain
     ) {
+        /** Host-observed artifact for catalog-loaded domains; empty for manual entries. */
+        public Optional<ProviderProvenance> artifact() {
+            return domain instanceof ProviderDomain<?, ?, ?> registered
+                ? Optional.of(registered.artifact()) : Optional.empty();
+        }
+
         public Registration {
             requireIdentifier(providerId, "providerId");
             requireIdentifier(providerVersion, "providerVersion");

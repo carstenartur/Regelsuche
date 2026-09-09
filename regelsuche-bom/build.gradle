@@ -1,0 +1,22 @@
+plugins { id 'java-platform'; id 'maven-publish' }
+def releaseProperties = new Properties()
+rootProject.file('release.properties').withInputStream { releaseProperties.load(it) }
+group = 'de.regelsuche'
+version = releaseProperties.getProperty('version')
+dependencies { constraints {
+    api "de.regelsuche:regelsuche-core:${project.version}"
+    api "de.regelsuche:regelsuche-egraph:${project.version}"
+    api "de.regelsuche:regelsuche-search:${project.version}"
+    api "de.regelsuche:regelsuche-validation:${project.version}"
+    api "de.regelsuche:regelsuche-discovery:${project.version}"
+    api "de.regelsuche:regelsuche-discovery-sdk:${project.version}"
+    api "de.regelsuche:regelsuche-plugin-api:${project.version}"
+ } }
+publishing {
+    publications { mavenJava(MavenPublication) { from components.javaPlatform } }
+    repositories { maven {
+        name = 'studentSdk'
+        url = providers.gradleProperty('studentSdkRepository').map { file(it) }
+            .getOrElse(rootProject.layout.buildDirectory.dir('student-sdk-repository').get().asFile)
+    } }
+}

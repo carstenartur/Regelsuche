@@ -6,7 +6,7 @@ import java.util.Set;
 /** Registry of top-level command names understood by the CLI entry point. */
 public final class CliCommandRegistry {
     private static final CliCommandRegistry DEFAULT = new CliCommandRegistry(Set.of(
-        "discover", "transform", "inventory", "path", "benchmark", "serve", "explain", "plugins", "rules", "representations"
+        "discover", "domains", "transform", "inventory", "path", "benchmark", "serve", "explain", "plugins", "rules", "representations"
     ));
 
     private final Set<String> commands;

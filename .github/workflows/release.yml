@@ -381,7 +381,7 @@ jobs:
           && steps.release-state.outputs.skip_tests != 'true'
         run: |
           set -euo pipefail
-          mvn --batch-mode --no-transfer-progress -Pfull verify
+          mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify
 
       - name: Run emergency assembly-only verification
         if: >-
@@ -458,6 +458,23 @@ jobs:
             -DskipTests \
             package
 
+      - name: Build independent Java SDK distribution
+        if: steps.release-state.outputs.publication_required == 'true'
+        env:
+          VERSION: ${{ steps.release-state.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          # Old tags predate the SDK archive contract and remain replayable.
+          if [[ -f config/sdk/public-api.json ]]; then
+            SDK_REPOSITORY="${RUNNER_TEMP}/regelsuche-sdk-release-repository"
+            mvn --batch-mode --no-transfer-progress -Psdk-release \
+              -pl regelsuche-discovery-sdk,regelsuche-plugin-api,regelsuche-bom -am \
+              -Dmaven.repo.local="$SDK_REPOSITORY" -DskipTests install
+            python3 -B scripts/package-student-sdk.py \
+              --repository "$SDK_REPOSITORY" --version "$VERSION" \
+              --output "app/target/regelsuche-sdk-${VERSION}.zip"
+          fi
+
       - name: Collect and inspect release artifacts
         if: steps.release-state.outputs.publication_required == 'true'
         id: artifacts
@@ -513,6 +530,12 @@ jobs:
           validate_archive_root tar "$TAR" "regelsuche-${VERSION}/"
 
           cp "$JAR" "$TAR" "$ZIP" release-artifacts/
+          if [[ -f config/sdk/public-api.json ]]; then
+            SDK="app/target/regelsuche-sdk-${VERSION}.zip"
+            test -s "$SDK"
+            validate_archive_root zip "$SDK" "regelsuche-sdk-${VERSION}/"
+            cp "$SDK" release-artifacts/
+          fi
           {
             echo "version=${VERSION}"
             echo "tag=${TAG}"
@@ -533,6 +556,9 @@ jobs:
               "regelsuche-${VERSION}.tar" \
               "regelsuche-${VERSION}.zip" \
               > SHA256SUMS.txt
+            if [[ -f "regelsuche-sdk-${VERSION}.zip" ]]; then
+              sha256sum -- "regelsuche-sdk-${VERSION}.zip" >> SHA256SUMS.txt
+            fi
           )
           echo "name=regelsuche-${VERSION}-artifacts" >> "$GITHUB_OUTPUT"
 
@@ -618,6 +644,10 @@ jobs:
             "regelsuche-${VERSION}.jar" \
             "regelsuche-${VERSION}.tar" \
             "regelsuche-${VERSION}.zip" | sort)
+
+          if [[ -f config/sdk/public-api.json ]]; then
+            EXPECTED=$(printf '%s\n' "$EXPECTED" "regelsuche-sdk-${VERSION}.zip" | sort)
+          fi
 
           ACTUAL=''
           for attempt in {1..10}; do

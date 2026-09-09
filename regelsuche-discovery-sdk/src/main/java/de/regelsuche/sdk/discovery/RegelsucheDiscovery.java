@@ -24,6 +24,21 @@ public final class RegelsucheDiscovery {
         return new Request<>(domain);
     }
 
+    /**
+     * Starts an exact catalog registration and retains its host-observed provider artifact in evidence.
+     * Manual registrations without observed artifact provenance are rejected rather than silently
+     * degrading the evidence contract.
+     */
+    public static Request<?, ?, ?> forRegistration(DiscoveryDomainCatalog.Registration registration) {
+        var checked = Objects.requireNonNull(registration, "registration");
+        if (checked.artifact().isEmpty()) {
+            throw new IllegalArgumentException(
+                "registration must carry host-observed provider artifact provenance"
+            );
+        }
+        return forDomain(checked.domain());
+    }
+
     /** Loads discovery-domain providers visible to the context class loader. */
     public static DiscoveryDomainCatalog loadDomains() {
         return DiscoveryDomainCatalog.load();
@@ -86,6 +101,7 @@ public final class RegelsucheDiscovery {
                     "seed domain does not match the selected domain"
                 );
             }
+            if (domain instanceof ProviderDomain<?, ?, ?> registered) registered.validateArtifact();
             DomainDiscoveryRunner.RunResult<C, K> result =
                 new DomainDiscoveryRunner().run(
                     campaignId,
@@ -93,12 +109,17 @@ public final class RegelsucheDiscovery {
                     seed,
                     budget
                 );
+            String replayCampaign = campaignId;
+            DiscoverySeed replaySeed = seed;
+            DiscoveryBudget replayBudget = budget;
             return new DiscoveryRun<>(
                 result.selectedCandidate(),
                 result.selectedCertificate(),
                 result.evidence(),
                 domain.candidateCodec(),
-                domain.certificateCodec()
+                domain.certificateCodec(),
+                () -> RegelsucheDiscovery.forDomain(domain).campaign(replayCampaign)
+                    .seed(replaySeed).budget(replayBudget).run()
             );
         }
 

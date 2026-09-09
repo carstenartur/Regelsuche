@@ -25,6 +25,8 @@ COPY regelsuche-release/build.gradle ./regelsuche-release/build.gradle
 COPY regelsuche-cli/build.gradle ./regelsuche-cli/build.gradle
 COPY regelsuche-discovery/build.gradle ./regelsuche-discovery/build.gradle
 COPY regelsuche-discovery-sdk/build.gradle ./regelsuche-discovery-sdk/build.gradle
+COPY regelsuche-plugin-api/build.gradle ./regelsuche-plugin-api/build.gradle
+COPY regelsuche-bom/build.gradle ./regelsuche-bom/build.gradle
 COPY regelsuche-quality/build.gradle ./regelsuche-quality/build.gradle
 COPY regelsuche-benchmarks/build.gradle ./regelsuche-benchmarks/build.gradle
 
@@ -51,6 +53,8 @@ COPY regelsuche-release ./regelsuche-release
 COPY regelsuche-cli ./regelsuche-cli
 COPY regelsuche-discovery ./regelsuche-discovery
 COPY regelsuche-discovery-sdk ./regelsuche-discovery-sdk
+COPY regelsuche-plugin-api ./regelsuche-plugin-api
+COPY regelsuche-bom ./regelsuche-bom
 COPY regelsuche-quality ./regelsuche-quality
 COPY regelsuche-benchmarks ./regelsuche-benchmarks
 

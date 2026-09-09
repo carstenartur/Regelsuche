@@ -40,15 +40,16 @@ class OpenApiRouteRegistryTest {
     void loadsEveryCanonicalOperationAndContext() {
         OpenApiRouteRegistry registry = OpenApiRouteRegistry.load();
 
-        assertEquals(60, registry.routes().size());
-        assertEquals(24, registry.contexts().size());
+        assertEquals(62, registry.routes().size());
+        assertEquals(25, registry.contexts().size());
         assertTrue(registry.contexts().containsAll(Set.of(
             "/api/search",
             "/api/paths",
             "/api/proof/jobs",
             "/api/didactic",
             "/api/rule-radar",
-            "/api/discovery-runs"
+            "/api/discovery-runs",
+            "/api/discovery-domains"
         )));
     }
 
@@ -76,6 +77,10 @@ class OpenApiRouteRegistryTest {
             "listRepresentationDiscoveryRuns");
         assertAllowed(registry, "/api/discovery-runs", "/api/discovery-runs", "POST",
             "retainRepresentationDiscoveryRun");
+        assertAllowed(registry, "/api/discovery-domains", "/api/discovery-domains", "GET",
+            "listInstalledDiscoveryDomains");
+        assertAllowed(registry, "/api/discovery-domains", "/api/discovery-domains/run", "POST",
+            "runInstalledDiscoveryDomain");
         assertAllowed(
             registry,
             "/api/discovery-runs",

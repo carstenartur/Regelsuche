@@ -16,11 +16,8 @@ public final class GeometricSequenceExample {
             GeometricSequenceDomainProvider.REVISION
         ).orElseThrow();
 
-        DiscoveryRun<
-            GeometricSequenceDomainProvider.Plan,
-            GeometricSequenceDomainProvider.Certificate
-        > run = RegelsucheDiscovery
-            .forDomain(GeometricSequenceDomainProvider.domain())
+        var run = RegelsucheDiscovery
+            .forRegistration(registration)
             .campaign("external-geometric-sequence-demo")
             .seed(
                 "powers-of-two",

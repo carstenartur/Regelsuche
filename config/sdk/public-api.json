@@ -1,0 +1,59 @@
+{
+  "schema": "regelsuche.public-api/v1",
+  "discoveryApiVersion": "1",
+  "pluginApiVersion": "1",
+  "coreCompatibility": "1.0.0",
+  "javaRelease": 25,
+  "bom": "de.regelsuche:regelsuche-bom",
+  "modules": [
+    "regelsuche-core",
+    "regelsuche-egraph",
+    "regelsuche-search",
+    "regelsuche-validation",
+    "regelsuche-discovery",
+    "regelsuche-discovery-sdk",
+    "regelsuche-plugin-api"
+  ],
+  "stablePackages": [
+    "de.regelsuche.api",
+    "de.regelsuche.sdk.discovery"
+  ],
+  "stablePluginClasses": [
+    "AstVisitorContext",
+    "AstVisitorPhase",
+    "AstVisitorPlugin",
+    "AstVisitorRegistry",
+    "CostFunction",
+    "CostFunctionRegistry",
+    "ExamplePackage",
+    "ExampleRegistry",
+    "ExplanationProvider",
+    "ExplanationRegistry",
+    "Heuristic",
+    "HeuristicRegistry",
+    "MacroRegistry",
+    "ParserExtension",
+    "ParserExtensionRegistry",
+    "PatternBasedTransformation",
+    "PatternTransformation",
+    "PluginDependency",
+    "PluginExtension",
+    "PluginExtensionRegistry",
+    "RegelsuchePlugin",
+    "Renderer",
+    "RendererRegistry",
+    "RuleFileParser",
+    "RuleMacro",
+    "RuleRegistry",
+    "SearchStrategy",
+    "SearchStrategyRegistry",
+    "TransformationContext",
+    "TransformationMatchContext",
+    "TransformationRegistry"
+  ],
+  "incubatingPackages": [
+    "de.regelsuche.sdk.discovery.python",
+    "de.regelsuche.sdk.discovery.cli"
+  ],
+  "deprecationPolicy": "No binary or source incompatible changes in a supported API revision. Deprecate for one full product minor release before removal in a new API revision."
+}

@@ -18,6 +18,11 @@ public interface DiscoveryDomainProvider {
         return "1";
     }
 
+    /** Required SDK SPI revision. An unsupported revision is rejected before domains() runs. */
+    default String apiVersion() {
+        return DiscoveryApi.VERSION;
+    }
+
     /** Human-auditable source or release reference; may be empty locally. */
     default String provenance() {
         return "";
