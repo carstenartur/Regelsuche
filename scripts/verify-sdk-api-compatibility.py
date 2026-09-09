@@ -61,17 +61,27 @@ def main():
         run(['jar', '--create', '--file', str(old_jar), '-C', str(classes), '.'], root)
         include = ';'.join([*policy['stablePackages'], *(
             'de.regelsuche.plugin.' + name for name in policy['stablePluginClasses'])])
+        # Filtering the compared API does not place its excluded dependency
+        # classes in japicmp's class pools. Resolve each side from its own
+        # complete archives, while keeping current code off the old classpath.
+        old_classpath = os.pathsep.join([str(old_jar), args.external_classpath])
+        new_classpath = os.pathsep.join([
+            *(str(jar.resolve()) for jar in args.new_jars), args.external_classpath])
         command = ['java', '-jar', str(args.japicmp), '--old', str(old_jar),
                    '--new', ';'.join(str(jar.resolve()) for jar in args.new_jars),
-                   '--old-classpath', args.external_classpath,
-                   '--new-classpath', args.external_classpath,
+                   '--old-classpath', old_classpath,
+                   '--new-classpath', new_classpath,
                    '--include', include, '--include-exclusively', '--access-modifier', 'protected',
                    '--error-on-binary-incompatibility', '--error-on-source-incompatibility',
                    '--html-file', str(report / 'api-diff.html'), '--xml-file', str(report / 'api-diff.xml')]
         # CLI uses -a for access; the long spelling is not part of its contract.
         command[command.index('--access-modifier')] = '-a'
-        with (report / 'api-diff.txt').open('w') as output:
-            subprocess.run(command, cwd=root, stdout=output, stderr=subprocess.STDOUT, check=True)
+        output_path = report / 'api-diff.txt'
+        with output_path.open('w') as output:
+            result = subprocess.run(command, cwd=root, stdout=output, stderr=subprocess.STDOUT)
+        if result.returncode:
+            print(output_path.read_text(), flush=True)
+            result.check_returncode()
         (report / 'baseline.json').write_text(json.dumps({
             'release': '0.4.0', 'commit': BASELINE, 'result': 'compatible',
             'checked': ['binary', 'source'], 'tool': 'japicmp-0.26.2',
