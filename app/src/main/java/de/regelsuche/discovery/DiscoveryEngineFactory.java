@@ -23,6 +23,16 @@ public final class DiscoveryEngineFactory {
         return create(baseEngine, options, null);
     }
 
+    /** Explicit experimental scheduling entry point; the production default awaits #953/#745 qualification. */
+    public de.regelsuche.search.moves.ProviderTransformationEngine createMoveEngine(
+        TransformationEngine baseEngine, DiscoveryOptions options, GoalAwareMacroMoveSelector macroSelector,
+        de.regelsuche.search.moves.MovePriorityPolicy policy, de.regelsuche.search.moves.MoveContext context
+    ) {
+        var inventory = create(baseEngine, options, macroSelector);
+        return new de.regelsuche.search.moves.ProviderTransformationEngine(
+            de.regelsuche.search.moves.MoveProviders.from(inventory), policy, context);
+    }
+
     public TransformationEngine create(
         TransformationEngine baseEngine,
         DiscoveryOptions options,
