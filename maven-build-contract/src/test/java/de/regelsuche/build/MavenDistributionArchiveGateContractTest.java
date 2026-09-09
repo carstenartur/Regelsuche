@@ -12,6 +12,20 @@ import org.w3c.dom.NodeList;
 
 class MavenDistributionArchiveGateContractTest {
     @Test
+    void fullLifecycleRunsTheInstalledClientAfterPackaging() throws Exception {
+        Element execution = execution("regelsuche-quality-aggregate/pom.xml", "verify-installed-python-client");
+        assertEquals("verify", text(execution, "phase"));
+        assertEquals("test", value(execution, "goals", "goal"));
+        Element configuration = child(execution, "configuration");
+        assertEquals("de.regelsuche.quality.aggregate.MavenPythonClientDistributionIT", text(configuration, "test"));
+        assertEquals("false", text(configuration, "skipTests"));
+        assertEquals("false", text(configuration, "skip"));
+        assertEquals("true", text(configuration, "failIfNoSpecifiedTests"));
+        var xpath = XPathFactory.newInstance().newXPath();
+        assertEquals("full", xpath.evaluate("ancestor::*[local-name()='profile']/*[local-name()='id']", execution));
+    }
+
+    @Test
     void recordsAnUncachedTransitiveRuntimeClasspathBeforeAssembly() throws Exception {
         Element execution = execution("app/pom.xml", "record-current-runtime-classpath");
         assertEquals("prepare-package", text(execution, "phase"));
