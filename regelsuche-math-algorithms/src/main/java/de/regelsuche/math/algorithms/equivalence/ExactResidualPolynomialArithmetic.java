@@ -110,6 +110,7 @@ final class ExactResidualPolynomialArithmetic {
 
     private static Polynomial power(Polynomial base, int exponent, Work work) {
         Polynomial result = Polynomial.constant(Rational.ONE);
+        work.terms = Math.addExact(work.terms, result.termCount());
         Polynomial factor = base;
         int remaining = exponent;
         while (remaining != 0) {
@@ -121,7 +122,6 @@ final class ExactResidualPolynomialArithmetic {
                 factor = multiply(factor, factor, work);
             }
         }
-        work.terms = Math.addExact(work.terms, result.termCount());
         return result;
     }
 
