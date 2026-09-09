@@ -1,11 +1,18 @@
-# Warum der Darstellungslerner keinen zusätzlichen Gewinn zeigt
+# Was der Darstellungslerner tatsächlich zeigt
 
 Der aktuelle Versuch untersucht **die Auswahl bereits implementierter Verfahren**.
 Er prüft nicht, ob Regelsuche durch neu gelerntes mathematisches Wissen mehr
 Aufgaben lösen kann. Diese Unterscheidung ist für die ursprüngliche Forschungsfrage
 entscheidend; die Umsetzung von #952 deckt davon nur einen engen Teil ab.
 
-## Drei nachgewiesene Ursachen
+Die Rohdaten zeigen dabei keinen generellen Nachteil des Lernens: Gegen die
+statische DIRECT-Strategie sinkt die Anwendungsarbeit von 83.508 auf 78.544
+Einheiten, also um **4.964 Einheiten bzw. 5,94 %**. Das scheinbar schlechtere
+Ergebnis entsteht nur, wenn der Lerner mit einer bereits handoptimierten
+Expertenregel verglichen und zusätzlich der gesamte einmalige Trainingsaufwand
+auf den ersten kleinen Auswertungsbatch gebucht wird.
+
+## Drei Ursachen für den scheinbar fehlenden Gewinn
 
 **Das mathematische Wissen ist schon vor dem Training vorhanden.** Alle Profile
 verwenden handgeschriebene exakte Solver. Blockerkennung, Zerlegung, Lösung und
@@ -24,7 +31,9 @@ zwischen diesen Verfahren auswählt, kann auf diesen Beobachtungen gegenüber
 FIXED_AUTO somit **null zusätzliche Arbeit sparen und null weitere Fälle lösen**.
 Das gilt für diese Verfahren, Budgets und Aufgaben; es beweist keine globale
 Optimalität. Die feste Regel wurde anhand von Entwicklungsfällen gewählt und
-ist eine legitime Expertenreferenz, aber keine Kontrolle ohne gelerntes Wissen.
+ist eine legitime **Expertenreferenz**, aber keine Kontrolle ohne Lernen oder
+ohne mathematisches Wissen. Sie enthält mit Schwelle 8 bereits genau die
+Entscheidungsgrenze, die der Lerner aus den Trainingsdaten wiederfindet.
 
 **Ein vollständiges zweites Lösungsverfahren dominiert die Kosten.** Die Zerlegung
 der tatsächlich ausgeführten Arbeit ergibt:
@@ -37,27 +46,51 @@ der tatsächlich ausgeführten Arbeit ergibt:
 
 Die Konstruktion spart gegenüber DIRECT rund **17,8 %**. Das zusätzliche Audit
 löst das gesamte System erneut und macht rund **70,3 %** der Anwendungsarbeit
-von LEARNED aus. Die Gesamtersparnis der festen Auswahl sinkt dadurch auf rund
-6,0 %. DIRECT und MATRIX haben dieselbe Gesamtsumme, weil jeweils das andere
-Verfahren zusätzlich auditiert; ihre Konstruktionskosten sind keineswegs gleich.
-Die 12.685 einmaligen Lerneinheiten kommen weiterhin vollständig hinzu.
+von LEARNED aus. Dadurch erscheint die Verbesserung im Aggregat kleiner. DIRECT
+und MATRIX haben dieselbe Gesamtsumme, weil jeweils das andere Verfahren
+zusätzlich auditiert; ihre Konstruktionskosten sind keineswegs gleich.
+
+Die 84 Einheiten Differenz zwischen FIXED_AUTO und LEARNED sind exakt zwei
+gezählte Auswahleinheiten pro 42 Auswertungsfälle. Beide Profile wählen hier
+dieselben mathematischen Wege. Die Differenz ist daher kein Beleg dafür, dass
+der gelernte Weg schlechter wäre.
+
+## Einmalige Lernkosten korrekt amortisieren
+
+Die 12.685 Lerneinheiten fallen beim Training einmal an. Werden sie vollständig
+auf die ersten 42 Anwendungen gebucht, steigt deren Gesamtbilanz für LEARNED auf
+91.229 Einheiten. Das beantwortet nur die Frage, ob sich das Training bereits
+in diesem ersten kleinen Batch bezahlt gemacht hat.
+
+Gegen DIRECT spart LEARNED im gemessenen Satz durchschnittlich etwa 118,19
+Arbeitseinheiten pro Anwendung. Bei derselben mittleren Einsparung ist der
+12.685-Einheiten-Aufwand nach ungefähr **108 vergleichbaren Anwendungen**
+amortisiert. Diese Zahl ist eine transparente Break-even-Rechnung, keine
+Extrapolation der zukünftigen Aufgabenverteilung. Entscheidend ist die Trennung
+von **einmaliger Lernarbeit** und **wiederkehrender Anwendungsarbeit**.
 
 ## Was daraus folgt
 
 Der Versuch belegt einen begrenzten Nutzen der Repräsentationswahl und deren
-Erlernbarkeit. Er liefert keine Evidenz gegen den Nutzen mathematischen Lernens.
-Auch eine längere Trainingsphase oder ein aufwendigerer Auswahllerner würde den
-fehlenden Spielraum gegenüber dieser festen Regel nicht beseitigen. Mehr
-Anwendungsfälle können Trainingskosten nur dann amortisieren, wenn gegenüber
-der jeweiligen Referenz eine wiederkehrende Ersparnis existiert.
+Erlernbarkeit. Er liefert **keine Evidenz gegen den Nutzen mathematischen
+Lernens** und auch keine Evidenz dafür, dass Lernen kontraproduktiv wäre. Gegen
+eine statische Strategie ist der gelernte Dispatcher bereits günstiger; gegen
+eine Expertenregel, die dieselbe Entscheidung von Hand vorwegnimmt, kann er
+naturgemäß keinen zusätzlichen algorithmischen Vorteil erzeugen.
 
 Regelsuche hat daneben bereits andere Lernbausteine, insbesondere
-[aus Spuren abgeleitete Polynompläne](trace-derived-polynomial-plans.md) und
-[gelernte Regelfolgen](trace-strategy-transfer.md). Die Diagnose dieses
-Darstellungsversuchs darf nicht auf alle Lernkomponenten übertragen werden.
-Der Polynomplanlerner abstrahiert bislang vor allem Koeffizienten in festen
-Syntaxformen und benötigt anschließend neue Solver- und Prüfläufe. Diese
-Bausteine sind im hier gemessenen Schwellenwertlerner nicht integriert.
+[aus Spuren abgeleitete Polynompläne](trace-derived-polynomial-plans.md),
+[gelernte Regelfolgen](trace-strategy-transfer.md) und die
+[generationenübergreifende Regelgewinnung](generational-rule-mining.md). Die
+Diagnose dieses Darstellungsversuchs darf nicht auf diese Lernkomponenten
+übertragen werden.
+
+Für die stärkere Forschungsfrage existiert sogar bereits ein expliziter
+Regressionstest: `GenerationalRuleMiningCampaignTest` verlangt, dass das
+Basisinventar ein Ziel unter dem festgelegten Budget **nicht** erreicht, während
+das über Generationen angesammelte gelernte Regelinventar es erreicht und damit
+eine vorher unerreichbare Form neu erreichbar macht. Das ist genau die Art von
+Fähigkeitsgewinn, die bei echtem mathematischem Lernen erwartet wird.
 
 ## Nötige Änderung des Lernexperiments
 
@@ -87,8 +120,8 @@ Bausteine sind im hier gemessenen Schwellenwertlerner nicht integriert.
    verwenden. Größere Suchräume allein sind noch kein Nutzennachweis.
 
 Diese Änderungen am eigentlichen mathematischen Lernen sind **offene Arbeit**.
-Die neue Diagnose implementiert noch keinen stärkeren Lerner. Sie verhindert,
-dass wir einen bereits ausgeschöpften Auswahlvergleich als Test dieser
+Die Diagnose implementiert noch keinen stärkeren Lerner. Sie verhindert, dass
+wir einen bereits ausgeschöpften Expertenvergleich als Test dieser
 weitergehenden Forschungsfrage interpretieren.
 
 ## Reproduktion und Grenzen der Diagnose
