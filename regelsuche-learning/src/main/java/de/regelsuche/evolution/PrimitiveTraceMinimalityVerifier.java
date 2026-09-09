@@ -74,6 +74,9 @@ public final class PrimitiveTraceMinimalityVerifier {
         public String source() { return source; }
         public String target() { return observedPath.isEmpty() ? source : normalize(observedPath.getLast().transformedExpression()); }
         public int observedPrimitiveSteps() { return observedPath.size(); }
+        /** An oracle is created only after the complete observed path has replayed successfully. */
+        public boolean observedReplayVerified() { return oracle.isPresent(); }
+        public List<Transformation> observedPath() { return observedPath; }
         public Limits limits() { return limits; }
         public Status status() { return status; }
         public boolean minimumProved() { return status == Status.SHORTEST_CONFIRMED || status == Status.SHORTER_PATH_FOUND; }

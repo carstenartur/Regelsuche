@@ -119,7 +119,12 @@ public class DefaultTransformationImportService implements TransformationImportS
             parseInstant(values.get("createdAt"), Instant.EPOCH),
             stringValue(values.get("canonicalHash"), ""),
             values.get("lastUsedAt") == null ? null : parseInstant(values.get("lastUsedAt"), null),
-            intValue(values.get("usageCount"), 0)
+            intValue(values.get("usageCount"), 0),
+            intValue(values.get("occurrenceCount"), 0),
+            stringList(values.get("supportingPathIds")),
+            doubleValue(values.get("confidenceScore"), 0d),
+            stringList(values.get("assumptions")),
+            de.regelsuche.inventory.RuleUtilityEvidence.fromValue(values.get("utilityEvidence"))
         );
     }
 

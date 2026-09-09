@@ -82,3 +82,29 @@ Supporting path IDs alone do not become an instantiated primitive expansion.
 Actual program moves keep their complete typed primitive sequence. These
 descriptors carry evidence for later verification; they do not grant production
 authority or replace an independent verifier.
+
+## PR 3: persisted utility and concrete primitive reference evidence
+
+`RuleUtilityAssessor` uses the existing complete primitive trace verifier, with
+the new macro excluded by construction: its inventory contains only the frozen
+primitive genes. `RuleUtilityEvidence` retains the observed path length, best
+known primitive connection, known compression, minimum-proof flag, application
+and replay work, outcome counters, capability observations, confidence and an
+inventory/endpoints/budget-bound reference receipt. An observed 20-step path
+with a proved 2-step primitive connection has compression 1, not 19; its retained
+original proof still has 20 primitive replay edges. Actual application audits
+continue to measure the path used, including any shortened proof.
+
+If the observed path replay completes but reference exploration exhausts a
+limit, that path remains a known upper bound (for example 7), while
+`boundedMinimumProved` is false. If even the observed replay exceeds its limit,
+the best known length remains -1. The finite reference scope never becomes a
+universal minimum claim about every substitution into a generalized rule.
+Reference work is retained separately; unknown application/replay work is -1.
+
+Utility survives all rule-copy methods, compilation, JSON inventory snapshots,
+export/import and the Neo4j adapter. Older records load with unknown utility.
+The adapters also retain confidence, occurrences, supporting path IDs and
+assumptions that older export/Neo4j paths omitted. Malformed distance claims are
+rejected. Imported utility remains scheduling data: neither deserialization,
+high confidence nor frequent usage authorizes a mathematical rule or RewriteProgram.

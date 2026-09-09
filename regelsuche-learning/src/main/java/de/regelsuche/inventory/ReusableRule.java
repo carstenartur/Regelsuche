@@ -22,9 +22,11 @@ public record ReusableRule(
     int occurrenceCount,
     List<String> supportingPathIds,
     double confidenceScore,
-    List<String> assumptions
+    List<String> assumptions,
+    RuleUtilityEvidence utilityEvidence
 ) {
     public ReusableRule {
+        utilityEvidence = utilityEvidence == null ? RuleUtilityEvidence.UNKNOWN : utilityEvidence;
         if (id == null || id.isBlank() || leftPattern == null || rightPattern == null) {
             throw new IllegalArgumentException("id and patterns are required");
         }
@@ -45,6 +47,16 @@ public record ReusableRule(
             // Clamp instead of throwing so adapters loading legacy data don't blow up.
             confidenceScore = Math.max(0.0, Math.min(1.0, confidenceScore));
         }
+    }
+
+    /** Older persisted/API rules have unknown utility, not an inferred primitive distance. */
+    public ReusableRule(String id, String leftPattern, String rightPattern, List<String> parameterRelations,
+        CandidateProofStatus proofStatus, RuleStatus knownRuleStatus, int supportingExamples, double averageImprovement,
+        Instant createdAt, String canonicalHash, Instant lastUsedAt, int usageCount, int occurrenceCount,
+        List<String> supportingPathIds, double confidenceScore, List<String> assumptions) {
+        this(id, leftPattern, rightPattern, parameterRelations, proofStatus, knownRuleStatus, supportingExamples,
+            averageImprovement, createdAt, canonicalHash, lastUsedAt, usageCount, occurrenceCount, supportingPathIds,
+            confidenceScore, assumptions, RuleUtilityEvidence.UNKNOWN);
     }
 
     public ReusableRule(
@@ -155,7 +167,8 @@ public record ReusableRule(
             occurrenceCount,
             supportingPathIds,
             confidenceScore,
-            assumptions
+            assumptions,
+            utilityEvidence
         );
     }
 
@@ -182,7 +195,8 @@ public record ReusableRule(
             newOccurrenceCount,
             mergedSupportingPathIds,
             newConfidenceScore,
-            assumptions
+            assumptions,
+            utilityEvidence
         );
     }
 
@@ -190,7 +204,7 @@ public record ReusableRule(
         return new ReusableRule(
             id, leftPattern, rightPattern, parameterRelations, proofStatus, knownRuleStatus,
             supportingExamples, averageImprovement, createdAt, canonicalHash, lastUsedAt,
-            usageCount, occurrenceCount, supportingPathIds, confidenceScore, newAssumptions
+            usageCount, occurrenceCount, supportingPathIds, confidenceScore, newAssumptions, utilityEvidence
         );
     }
 
@@ -200,9 +214,18 @@ public record ReusableRule(
 
     /** Search projection preserves observations without asserting primitive minimality or proof authority. */
     public de.regelsuche.search.moves.SearchMove.ValueEvidence moveValueEvidence() {
+        double confidence = Double.isFinite(confidenceScore) ? confidenceScore : 0;
         return new de.regelsuche.search.moves.SearchMove.ValueEvidence(
-            Double.isFinite(confidenceScore) ? confidenceScore : 0,
+            utilityEvidence.hasReferenceEvidence() ? Math.min(confidence, utilityEvidence.confidence()) : confidence,
             Double.isFinite(averageImprovement) ? averageImprovement : 0,
-            Math.max(supportingExamples, occurrenceCount), -1, 1, false, canonicalHash);
+            utilityEvidence.hasReferenceEvidence() ? utilityEvidence.evidenceCount() : Math.max(supportingExamples, occurrenceCount),
+            utilityEvidence.bestKnownPrimitiveSteps(), utilityEvidence.macroSearchDepth(), utilityEvidence.boundedMinimumProved(),
+            utilityEvidence.reference() == null ? canonicalHash : utilityEvidence.reference().assessmentHash());
+    }
+
+    public ReusableRule withUtilityEvidence(RuleUtilityEvidence evidence) {
+        return new ReusableRule(id, leftPattern, rightPattern, parameterRelations, proofStatus, knownRuleStatus,
+            supportingExamples, averageImprovement, createdAt, canonicalHash, lastUsedAt, usageCount,
+            occurrenceCount, supportingPathIds, confidenceScore, assumptions, evidence);
     }
 }
