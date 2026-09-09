@@ -34,6 +34,10 @@ import java.util.Set;
  * mechanical formula remains available for frozen historical evaluations.</p>
  */
 public final class WorkBudgetBestFirstSearchStrategy {
+    /** Experimental evidence-bearing scheduler; legacy v1/v2 callers retain their frozen protocol. */
+    public de.regelsuche.search.moves.MoveSearch.Result search(de.regelsuche.search.moves.MoveSearch.Problem problem) {
+        return new de.regelsuche.search.moves.MoveSearch().search(problem);
+    }
     public Result search(Problem problem) {
         Objects.requireNonNull(problem, "problem");
         State root = State.root(problem);

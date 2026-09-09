@@ -108,3 +108,11 @@ The adapters also retain confidence, occurrences, supporting path IDs and
 assumptions that older export/Neo4j paths omitted. Malformed distance claims are
 rejected. Imported utility remains scheduling data: neither deserialization,
 high confidence nor frequent usage authorizes a mathematical rule or RewriteProgram.
+
+## PR 4: lazy stages and suspended expansion
+
+`WorkBudgetBestFirstSearchStrategy.search(MoveSearch.Problem)` exposes the opt-in scheduler through the existing search entry point and `TransformationSearchService.searchMoves`. A frontier ticket can represent either a new state or a suspended parent expansion. A verified goal child wins before the parent opens later providers. `StagedMovePicker` orders provider metadata first, opens batches only on demand, and gives a primitive lane a turn after two valuable learned candidates, including within large learned batches. Eager enumeration remains an explicit control.
+
+The reference mode never drops a provider due to its priority. Its declared relation is bounded by primitive depth, search depth and theory path work; complete per-rule AST providers remove hidden candidate/growth caps. Work/state exhaustion, opaque providers and rejected proof/assumption claims are inconclusive, never proofs of unreachability. State identity includes depth, previous rule, assumptions, capabilities, debt and theory work. Reference inclusion is evaluated on exhausted bounded closures, not falsely asserted for two runs truncated by equal work limits.
+
+The new event ledger separately records generated mathematical application work, source/scheduling events and independent verifier work. All generated moves, including unused batch tails, are charged. A provider is currently an atomic batch: its measured overrun is retained and makes the run fail its work budget before a goal can be accepted. These deterministic event units are not CPU instructions or walltime. The polynomial admission implementation replays every leaf against the frozen primitive inventory and checks exact identity with measured node/term work; imported labels and utility never authorize a move. Existing v1/v2 reports and production defaults retain their established behavior.

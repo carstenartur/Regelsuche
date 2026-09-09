@@ -18,6 +18,7 @@ public record ProviderTransformationEngine(List<MoveProvider> moveProviders, Mov
         }
     }
     public MovePicker picker(MoveState state) { return new EagerMovePicker(moveProviders, policy, state, context); }
+    public MovePicker stagedPicker(MoveState state) { return new StagedMovePicker(moveProviders, policy, state, context); }
     @Override public TransformationBatch transformMeasured(String expression) {
         var picker = picker(MoveState.root(expression));
         var steps = new ArrayList<de.regelsuche.transform.Transformation>();
