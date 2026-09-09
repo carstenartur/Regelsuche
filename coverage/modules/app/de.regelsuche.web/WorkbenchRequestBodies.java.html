@@ -24,162 +24,166 @@ final class WorkbenchRequestBodies {
 <span class="fc" id="L24">        return de.regelsuche.math.algorithms.linalg.MatrixPreparationJson.readRequest(json.readObject(exchange));</span>
     }
 
-    java.util.Map&lt;String, Object&gt; readMatrixRepresentationArtifact(HttpExchange exchange) throws IOException {
+    java.util.Map&lt;String, Object&gt; readLinearRepresentation(HttpExchange exchange) throws IOException {
 <span class="fc" id="L28">        return json.readObject(exchange);</span>
+    }
+
+    java.util.Map&lt;String, Object&gt; readMatrixRepresentationArtifact(HttpExchange exchange) throws IOException {
+<span class="fc" id="L32">        return json.readObject(exchange);</span>
     }
 
     private final StreamingJsonRequestBody json;
 
-<span class="fc" id="L33">    WorkbenchRequestBodies(StreamingJsonRequestBody json) {</span>
-<span class="fc" id="L34">        this.json = Objects.requireNonNull(json, &quot;json&quot;);</span>
-<span class="fc" id="L35">    }</span>
+<span class="fc" id="L37">    WorkbenchRequestBodies(StreamingJsonRequestBody json) {</span>
+<span class="fc" id="L38">        this.json = Objects.requireNonNull(json, &quot;json&quot;);</span>
+<span class="fc" id="L39">    }</span>
 
     SearchRequest readSearch(HttpExchange exchange) throws IOException {
-<span class="fc" id="L38">        return json.readObject(exchange, object -&gt; {</span>
-<span class="fc" id="L39">            String expression = &quot;&quot;;</span>
-<span class="fc" id="L40">            String type = InputType.TERM.name();</span>
-<span class="fc" id="L41">            String profile = SearchProfile.FAST_SIMPLIFY.name();</span>
-<span class="fc" id="L42">            String goal = &quot;&quot;;</span>
-<span class="fc bfc" id="L43" title="All 2 branches covered.">            while (object.nextField()) {</span>
-<span class="pc bpc" id="L44" title="7 of 18 branches missed.">                switch (object.fieldName()) {</span>
-<span class="fc" id="L45">                    case &quot;expression&quot; -&gt; expression = stringOr(</span>
-<span class="fc" id="L46">                        object.readNullableString(), &quot;&quot;);</span>
-<span class="nc" id="L47">                    case &quot;type&quot; -&gt; type = stringOr(</span>
-<span class="nc" id="L48">                        object.readNullableString(), InputType.TERM.name());</span>
-<span class="fc" id="L49">                    case &quot;profile&quot; -&gt; profile = stringOr(</span>
-<span class="fc" id="L50">                        object.readNullableString(),</span>
-<span class="fc" id="L51">                        SearchProfile.FAST_SIMPLIFY.name());</span>
-<span class="fc" id="L52">                    case &quot;goal&quot; -&gt; goal = stringOr(</span>
-<span class="fc" id="L53">                        object.readNullableString(), &quot;&quot;);</span>
-<span class="fc" id="L54">                    default -&gt; object.skipValue();</span>
-<span class="fc" id="L55">                }</span>
+<span class="fc" id="L42">        return json.readObject(exchange, object -&gt; {</span>
+<span class="fc" id="L43">            String expression = &quot;&quot;;</span>
+<span class="fc" id="L44">            String type = InputType.TERM.name();</span>
+<span class="fc" id="L45">            String profile = SearchProfile.FAST_SIMPLIFY.name();</span>
+<span class="fc" id="L46">            String goal = &quot;&quot;;</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">            while (object.nextField()) {</span>
+<span class="pc bpc" id="L48" title="7 of 18 branches missed.">                switch (object.fieldName()) {</span>
+<span class="fc" id="L49">                    case &quot;expression&quot; -&gt; expression = stringOr(</span>
+<span class="fc" id="L50">                        object.readNullableString(), &quot;&quot;);</span>
+<span class="nc" id="L51">                    case &quot;type&quot; -&gt; type = stringOr(</span>
+<span class="nc" id="L52">                        object.readNullableString(), InputType.TERM.name());</span>
+<span class="fc" id="L53">                    case &quot;profile&quot; -&gt; profile = stringOr(</span>
+<span class="fc" id="L54">                        object.readNullableString(),</span>
+<span class="fc" id="L55">                        SearchProfile.FAST_SIMPLIFY.name());</span>
+<span class="fc" id="L56">                    case &quot;goal&quot; -&gt; goal = stringOr(</span>
+<span class="fc" id="L57">                        object.readNullableString(), &quot;&quot;);</span>
+<span class="fc" id="L58">                    default -&gt; object.skipValue();</span>
+<span class="fc" id="L59">                }</span>
             }
-<span class="fc" id="L57">            return new SearchRequest(expression, type, profile, goal);</span>
+<span class="fc" id="L61">            return new SearchRequest(expression, type, profile, goal);</span>
         });
     }
 
     DiscoverRequest readDiscover(HttpExchange exchange) throws IOException {
-<span class="fc" id="L62">        return json.readObject(exchange, object -&gt; {</span>
-<span class="fc" id="L63">            int min = 1;</span>
-<span class="fc" id="L64">            int max = 3;</span>
-<span class="fc bfc" id="L65" title="All 2 branches covered.">            while (object.nextField()) {</span>
-<span class="pc bpc" id="L66" title="2 of 10 branches missed.">                switch (object.fieldName()) {</span>
-<span class="fc" id="L67">                    case &quot;min&quot; -&gt; min = intOr(object.readNullableInt(), 1);</span>
-<span class="fc" id="L68">                    case &quot;max&quot; -&gt; max = intOr(object.readNullableInt(), 3);</span>
-<span class="fc" id="L69">                    default -&gt; object.skipValue();</span>
-<span class="fc" id="L70">                }</span>
+<span class="fc" id="L66">        return json.readObject(exchange, object -&gt; {</span>
+<span class="fc" id="L67">            int min = 1;</span>
+<span class="fc" id="L68">            int max = 3;</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            while (object.nextField()) {</span>
+<span class="pc bpc" id="L70" title="2 of 10 branches missed.">                switch (object.fieldName()) {</span>
+<span class="fc" id="L71">                    case &quot;min&quot; -&gt; min = intOr(object.readNullableInt(), 1);</span>
+<span class="fc" id="L72">                    case &quot;max&quot; -&gt; max = intOr(object.readNullableInt(), 3);</span>
+<span class="fc" id="L73">                    default -&gt; object.skipValue();</span>
+<span class="fc" id="L74">                }</span>
             }
-<span class="fc" id="L72">            return new DiscoverRequest(min, max);</span>
+<span class="fc" id="L76">            return new DiscoverRequest(min, max);</span>
         });
     }
 
     InventoryImportRequest readInventoryImport(HttpExchange exchange)
             throws IOException {
-<span class="fc" id="L78">        return json.readObject(exchange, object -&gt; {</span>
-<span class="fc" id="L79">            String source = &quot;&quot;;</span>
-<span class="fc bfc" id="L80" title="All 2 branches covered.">            while (object.nextField()) {</span>
-<span class="fc bfc" id="L81" title="All 2 branches covered.">                if (object.fieldName().equals(&quot;json&quot;)) {</span>
-<span class="fc" id="L82">                    source = stringOr(object.readNullableString(), &quot;&quot;);</span>
+<span class="fc" id="L82">        return json.readObject(exchange, object -&gt; {</span>
+<span class="fc" id="L83">            String source = &quot;&quot;;</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            while (object.nextField()) {</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">                if (object.fieldName().equals(&quot;json&quot;)) {</span>
+<span class="fc" id="L86">                    source = stringOr(object.readNullableString(), &quot;&quot;);</span>
                 } else {
-<span class="fc" id="L84">                    object.skipValue();</span>
+<span class="fc" id="L88">                    object.skipValue();</span>
                 }
             }
-<span class="fc" id="L87">            return new InventoryImportRequest(source);</span>
+<span class="fc" id="L91">            return new InventoryImportRequest(source);</span>
         });
     }
 
     InspectApplyRequest readInspectApply(HttpExchange exchange)
             throws IOException {
-<span class="fc" id="L93">        return json.readObject(exchange, object -&gt; {</span>
-<span class="fc" id="L94">            String expression = &quot;&quot;;</span>
-<span class="fc" id="L95">            String pathKey = &quot;&quot;;</span>
-<span class="fc" id="L96">            String matchId = &quot;&quot;;</span>
-<span class="fc" id="L97">            int matchIndex = -1;</span>
-<span class="fc bfc" id="L98" title="All 2 branches covered.">            while (object.nextField()) {</span>
-<span class="pc bpc" id="L99" title="4 of 18 branches missed.">                switch (object.fieldName()) {</span>
-<span class="fc" id="L100">                    case &quot;expression&quot; -&gt; expression = stringOr(</span>
-<span class="fc" id="L101">                        object.readNullableString(), &quot;&quot;);</span>
-<span class="fc" id="L102">                    case &quot;pathKey&quot; -&gt; pathKey = stringOr(</span>
-<span class="fc" id="L103">                        object.readNullableString(), &quot;&quot;);</span>
-<span class="fc" id="L104">                    case &quot;matchId&quot; -&gt; matchId = stringOr(</span>
+<span class="fc" id="L97">        return json.readObject(exchange, object -&gt; {</span>
+<span class="fc" id="L98">            String expression = &quot;&quot;;</span>
+<span class="fc" id="L99">            String pathKey = &quot;&quot;;</span>
+<span class="fc" id="L100">            String matchId = &quot;&quot;;</span>
+<span class="fc" id="L101">            int matchIndex = -1;</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            while (object.nextField()) {</span>
+<span class="pc bpc" id="L103" title="4 of 18 branches missed.">                switch (object.fieldName()) {</span>
+<span class="fc" id="L104">                    case &quot;expression&quot; -&gt; expression = stringOr(</span>
 <span class="fc" id="L105">                        object.readNullableString(), &quot;&quot;);</span>
-<span class="pc" id="L106">                    case &quot;matchIndex&quot; -&gt; matchIndex = intOr(</span>
-<span class="nc" id="L107">                        object.readNullableInt(), -1);</span>
-<span class="fc" id="L108">                    default -&gt; object.skipValue();</span>
-<span class="fc" id="L109">                }</span>
+<span class="fc" id="L106">                    case &quot;pathKey&quot; -&gt; pathKey = stringOr(</span>
+<span class="fc" id="L107">                        object.readNullableString(), &quot;&quot;);</span>
+<span class="fc" id="L108">                    case &quot;matchId&quot; -&gt; matchId = stringOr(</span>
+<span class="fc" id="L109">                        object.readNullableString(), &quot;&quot;);</span>
+<span class="pc" id="L110">                    case &quot;matchIndex&quot; -&gt; matchIndex = intOr(</span>
+<span class="nc" id="L111">                        object.readNullableInt(), -1);</span>
+<span class="fc" id="L112">                    default -&gt; object.skipValue();</span>
+<span class="fc" id="L113">                }</span>
             }
-<span class="fc" id="L111">            return new InspectApplyRequest(</span>
+<span class="fc" id="L115">            return new InspectApplyRequest(</span>
                 expression, pathKey, matchId, matchIndex);
         });
     }
 
     DidacticStepRequest readDidacticStep(HttpExchange exchange)
             throws IOException {
-<span class="fc" id="L118">        return json.readObject(exchange, object -&gt; {</span>
-<span class="fc" id="L119">            String currentExpression = &quot;&quot;;</span>
-<span class="fc" id="L120">            String studentStep = &quot;&quot;;</span>
-<span class="fc" id="L121">            String difficulty = &quot;MITTELSTUFE&quot;;</span>
-<span class="fc bfc" id="L122" title="All 2 branches covered.">            while (object.nextField()) {</span>
-<span class="pc bpc" id="L123" title="3 of 14 branches missed.">                switch (object.fieldName()) {</span>
-<span class="fc" id="L124">                    case &quot;currentExpression&quot; -&gt; currentExpression = stringOr(</span>
-<span class="fc" id="L125">                        object.readNullableString(), &quot;&quot;);</span>
-<span class="fc" id="L126">                    case &quot;studentStep&quot; -&gt; studentStep = stringOr(</span>
-<span class="fc" id="L127">                        object.readNullableString(), &quot;&quot;);</span>
-<span class="fc" id="L128">                    case &quot;difficulty&quot; -&gt; difficulty = stringOr(</span>
-<span class="fc" id="L129">                        object.readNullableString(), &quot;MITTELSTUFE&quot;);</span>
-<span class="fc" id="L130">                    default -&gt; object.skipValue();</span>
-<span class="fc" id="L131">                }</span>
+<span class="fc" id="L122">        return json.readObject(exchange, object -&gt; {</span>
+<span class="fc" id="L123">            String currentExpression = &quot;&quot;;</span>
+<span class="fc" id="L124">            String studentStep = &quot;&quot;;</span>
+<span class="fc" id="L125">            String difficulty = &quot;MITTELSTUFE&quot;;</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            while (object.nextField()) {</span>
+<span class="pc bpc" id="L127" title="3 of 14 branches missed.">                switch (object.fieldName()) {</span>
+<span class="fc" id="L128">                    case &quot;currentExpression&quot; -&gt; currentExpression = stringOr(</span>
+<span class="fc" id="L129">                        object.readNullableString(), &quot;&quot;);</span>
+<span class="fc" id="L130">                    case &quot;studentStep&quot; -&gt; studentStep = stringOr(</span>
+<span class="fc" id="L131">                        object.readNullableString(), &quot;&quot;);</span>
+<span class="fc" id="L132">                    case &quot;difficulty&quot; -&gt; difficulty = stringOr(</span>
+<span class="fc" id="L133">                        object.readNullableString(), &quot;MITTELSTUFE&quot;);</span>
+<span class="fc" id="L134">                    default -&gt; object.skipValue();</span>
+<span class="fc" id="L135">                }</span>
             }
-<span class="fc" id="L133">            return new DidacticStepRequest(</span>
+<span class="fc" id="L137">            return new DidacticStepRequest(</span>
                 currentExpression, studentStep, difficulty);
         });
     }
 
     DidacticHintRequest readDidacticHint(HttpExchange exchange)
             throws IOException {
-<span class="fc" id="L140">        return json.readObject(exchange, object -&gt; {</span>
-<span class="fc" id="L141">            String currentExpression = &quot;&quot;;</span>
-<span class="fc" id="L142">            String pedagogyProfile = &quot;SCHOOL&quot;;</span>
-<span class="fc bfc" id="L143" title="All 2 branches covered.">            while (object.nextField()) {</span>
-<span class="pc bpc" id="L144" title="2 of 10 branches missed.">                switch (object.fieldName()) {</span>
-<span class="fc" id="L145">                    case &quot;currentExpression&quot; -&gt; currentExpression = stringOr(</span>
-<span class="fc" id="L146">                        object.readNullableString(), &quot;&quot;);</span>
-<span class="fc" id="L147">                    case &quot;pedagogyProfile&quot; -&gt; pedagogyProfile = stringOr(</span>
-<span class="fc" id="L148">                        object.readNullableString(), &quot;SCHOOL&quot;);</span>
-<span class="fc" id="L149">                    default -&gt; object.skipValue();</span>
-<span class="fc" id="L150">                }</span>
+<span class="fc" id="L144">        return json.readObject(exchange, object -&gt; {</span>
+<span class="fc" id="L145">            String currentExpression = &quot;&quot;;</span>
+<span class="fc" id="L146">            String pedagogyProfile = &quot;SCHOOL&quot;;</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            while (object.nextField()) {</span>
+<span class="pc bpc" id="L148" title="2 of 10 branches missed.">                switch (object.fieldName()) {</span>
+<span class="fc" id="L149">                    case &quot;currentExpression&quot; -&gt; currentExpression = stringOr(</span>
+<span class="fc" id="L150">                        object.readNullableString(), &quot;&quot;);</span>
+<span class="fc" id="L151">                    case &quot;pedagogyProfile&quot; -&gt; pedagogyProfile = stringOr(</span>
+<span class="fc" id="L152">                        object.readNullableString(), &quot;SCHOOL&quot;);</span>
+<span class="fc" id="L153">                    default -&gt; object.skipValue();</span>
+<span class="fc" id="L154">                }</span>
             }
-<span class="fc" id="L152">            return new DidacticHintRequest(</span>
+<span class="fc" id="L156">            return new DidacticHintRequest(</span>
                 currentExpression, pedagogyProfile);
         });
     }
 
     ProofBridgeRequest readProofBridge(HttpExchange exchange)
             throws IOException {
-<span class="fc" id="L159">        return json.readObject(exchange, object -&gt; {</span>
-<span class="fc" id="L160">            String leftPattern = &quot;&quot;;</span>
-<span class="fc" id="L161">            String rightPattern = &quot;&quot;;</span>
-<span class="fc" id="L162">            String tool = &quot;&quot;;</span>
-<span class="fc" id="L163">            String backend = &quot;&quot;;</span>
-<span class="fc" id="L164">            List&lt;Assumption&gt; assumptions = List.of();</span>
-<span class="fc bfc" id="L165" title="All 2 branches covered.">            while (object.nextField()) {</span>
-<span class="pc bpc" id="L166" title="8 of 22 branches missed.">                switch (object.fieldName()) {</span>
-<span class="fc" id="L167">                    case &quot;leftPattern&quot; -&gt; leftPattern = stringOr(</span>
-<span class="fc" id="L168">                        object.readNullableString(), &quot;&quot;);</span>
-<span class="fc" id="L169">                    case &quot;rightPattern&quot; -&gt; rightPattern = stringOr(</span>
-<span class="fc" id="L170">                        object.readNullableString(), &quot;&quot;);</span>
-<span class="fc" id="L171">                    case &quot;tool&quot; -&gt; tool = stringOr(</span>
+<span class="fc" id="L163">        return json.readObject(exchange, object -&gt; {</span>
+<span class="fc" id="L164">            String leftPattern = &quot;&quot;;</span>
+<span class="fc" id="L165">            String rightPattern = &quot;&quot;;</span>
+<span class="fc" id="L166">            String tool = &quot;&quot;;</span>
+<span class="fc" id="L167">            String backend = &quot;&quot;;</span>
+<span class="fc" id="L168">            List&lt;Assumption&gt; assumptions = List.of();</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            while (object.nextField()) {</span>
+<span class="pc bpc" id="L170" title="8 of 22 branches missed.">                switch (object.fieldName()) {</span>
+<span class="fc" id="L171">                    case &quot;leftPattern&quot; -&gt; leftPattern = stringOr(</span>
 <span class="fc" id="L172">                        object.readNullableString(), &quot;&quot;);</span>
-<span class="nc" id="L173">                    case &quot;backend&quot; -&gt; backend = stringOr(</span>
-<span class="nc" id="L174">                        object.readNullableString(), &quot;&quot;);</span>
-<span class="fc" id="L175">                    case &quot;assumptions&quot; -&gt; assumptions = readAssumptions(object);</span>
-<span class="fc" id="L176">                    default -&gt; object.skipValue();</span>
-<span class="fc" id="L177">                }</span>
+<span class="fc" id="L173">                    case &quot;rightPattern&quot; -&gt; rightPattern = stringOr(</span>
+<span class="fc" id="L174">                        object.readNullableString(), &quot;&quot;);</span>
+<span class="fc" id="L175">                    case &quot;tool&quot; -&gt; tool = stringOr(</span>
+<span class="fc" id="L176">                        object.readNullableString(), &quot;&quot;);</span>
+<span class="nc" id="L177">                    case &quot;backend&quot; -&gt; backend = stringOr(</span>
+<span class="nc" id="L178">                        object.readNullableString(), &quot;&quot;);</span>
+<span class="fc" id="L179">                    case &quot;assumptions&quot; -&gt; assumptions = readAssumptions(object);</span>
+<span class="fc" id="L180">                    default -&gt; object.skipValue();</span>
+<span class="fc" id="L181">                }</span>
             }
-<span class="fc" id="L179">            return new ProofBridgeRequest(</span>
+<span class="fc" id="L183">            return new ProofBridgeRequest(</span>
                 leftPattern,
                 rightPattern,
-<span class="fc" id="L182">                firstNonBlank(tool, backend, &quot;lean4&quot;),</span>
+<span class="fc" id="L186">                firstNonBlank(tool, backend, &quot;lean4&quot;),</span>
                 assumptions
             );
         });
@@ -187,53 +191,53 @@ final class WorkbenchRequestBodies {
 
     ProofJobCreateRequest readProofJobCreate(HttpExchange exchange)
             throws IOException {
-<span class="fc" id="L190">        return json.readObject(exchange, object -&gt; {</span>
-<span class="fc" id="L191">            String leftPattern = &quot;&quot;;</span>
-<span class="fc" id="L192">            String rightPattern = &quot;&quot;;</span>
-<span class="fc" id="L193">            int priority = 0;</span>
-<span class="fc" id="L194">            String worker = &quot;&quot;;</span>
-<span class="fc" id="L195">            List&lt;Assumption&gt; assumptions = List.of();</span>
-<span class="fc bfc" id="L196" title="All 2 branches covered.">            while (object.nextField()) {</span>
-<span class="pc bpc" id="L197" title="5 of 22 branches missed.">                switch (object.fieldName()) {</span>
-<span class="fc" id="L198">                    case &quot;leftPattern&quot; -&gt; leftPattern = stringOr(</span>
-<span class="fc" id="L199">                        object.readNullableString(), &quot;&quot;);</span>
-<span class="fc" id="L200">                    case &quot;rightPattern&quot; -&gt; rightPattern = stringOr(</span>
-<span class="fc" id="L201">                        object.readNullableString(), &quot;&quot;);</span>
-<span class="fc" id="L202">                    case &quot;priority&quot; -&gt; priority = intOr(</span>
-<span class="fc" id="L203">                        object.readNullableInt(), 0);</span>
-<span class="fc" id="L204">                    case &quot;worker&quot; -&gt; worker = stringOr(</span>
+<span class="fc" id="L194">        return json.readObject(exchange, object -&gt; {</span>
+<span class="fc" id="L195">            String leftPattern = &quot;&quot;;</span>
+<span class="fc" id="L196">            String rightPattern = &quot;&quot;;</span>
+<span class="fc" id="L197">            int priority = 0;</span>
+<span class="fc" id="L198">            String worker = &quot;&quot;;</span>
+<span class="fc" id="L199">            List&lt;Assumption&gt; assumptions = List.of();</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            while (object.nextField()) {</span>
+<span class="pc bpc" id="L201" title="5 of 22 branches missed.">                switch (object.fieldName()) {</span>
+<span class="fc" id="L202">                    case &quot;leftPattern&quot; -&gt; leftPattern = stringOr(</span>
+<span class="fc" id="L203">                        object.readNullableString(), &quot;&quot;);</span>
+<span class="fc" id="L204">                    case &quot;rightPattern&quot; -&gt; rightPattern = stringOr(</span>
 <span class="fc" id="L205">                        object.readNullableString(), &quot;&quot;);</span>
-<span class="fc" id="L206">                    case &quot;assumptions&quot; -&gt; assumptions = readAssumptions(object);</span>
-<span class="fc" id="L207">                    default -&gt; object.skipValue();</span>
-<span class="fc" id="L208">                }</span>
+<span class="fc" id="L206">                    case &quot;priority&quot; -&gt; priority = intOr(</span>
+<span class="fc" id="L207">                        object.readNullableInt(), 0);</span>
+<span class="fc" id="L208">                    case &quot;worker&quot; -&gt; worker = stringOr(</span>
+<span class="fc" id="L209">                        object.readNullableString(), &quot;&quot;);</span>
+<span class="fc" id="L210">                    case &quot;assumptions&quot; -&gt; assumptions = readAssumptions(object);</span>
+<span class="fc" id="L211">                    default -&gt; object.skipValue();</span>
+<span class="fc" id="L212">                }</span>
             }
-<span class="fc" id="L210">            return new ProofJobCreateRequest(</span>
+<span class="fc" id="L214">            return new ProofJobCreateRequest(</span>
                 leftPattern, rightPattern, priority, worker, assumptions);
         });
     }
 
     private static String stringOr(String value, String fallback) {
-<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        return value == null ? fallback : value;</span>
-    }
-
-    private static int intOr(Integer value, int fallback) {
 <span class="pc bpc" id="L220" title="1 of 2 branches missed.">        return value == null ? fallback : value;</span>
     }
 
+    private static int intOr(Integer value, int fallback) {
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        return value == null ? fallback : value;</span>
+    }
+
     private static String firstNonBlank(String... values) {
-<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        for (String value : values) {</span>
-<span class="pc bpc" id="L225" title="1 of 4 branches missed.">            if (value != null &amp;&amp; !value.isBlank()) {</span>
-<span class="fc" id="L226">                return value;</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">        for (String value : values) {</span>
+<span class="pc bpc" id="L229" title="1 of 4 branches missed.">            if (value != null &amp;&amp; !value.isBlank()) {</span>
+<span class="fc" id="L230">                return value;</span>
             }
         }
-<span class="nc" id="L229">        return &quot;&quot;;</span>
+<span class="nc" id="L233">        return &quot;&quot;;</span>
     }
 
     private static List&lt;Assumption&gt; readAssumptions(
         StreamingJsonRequestBody.ObjectCursor object
     ) throws IOException {
-<span class="fc" id="L235">        return object.readStringOrObjectArray(</span>
-<span class="fc" id="L236">            value -&gt; createAssumption(&quot;CUSTOM_PREDICATE&quot;, value, List.of()),</span>
+<span class="fc" id="L239">        return object.readStringOrObjectArray(</span>
+<span class="fc" id="L240">            value -&gt; createAssumption(&quot;CUSTOM_PREDICATE&quot;, value, List.of()),</span>
             WorkbenchRequestBodies::decodeAssumption
         );
     }
@@ -241,20 +245,20 @@ final class WorkbenchRequestBodies {
     private static Assumption decodeAssumption(
         StreamingJsonRequestBody.ObjectCursor object
     ) throws IOException {
-<span class="fc" id="L244">        String kind = &quot;CUSTOM_PREDICATE&quot;;</span>
-<span class="fc" id="L245">        String expression = &quot;&quot;;</span>
-<span class="fc" id="L246">        List&lt;String&gt; symbols = List.of();</span>
-<span class="fc bfc" id="L247" title="All 2 branches covered.">        while (object.nextField()) {</span>
-<span class="pc bpc" id="L248" title="1 of 4 branches missed.">            switch (object.fieldName()) {</span>
-<span class="fc" id="L249">                case &quot;kind&quot; -&gt; kind = stringOr(</span>
-<span class="fc" id="L250">                    object.readNullableString(), &quot;CUSTOM_PREDICATE&quot;);</span>
-<span class="fc" id="L251">                case &quot;expression&quot; -&gt; expression = stringOr(</span>
-<span class="fc" id="L252">                    object.readNullableString(), &quot;&quot;);</span>
-<span class="fc" id="L253">                case &quot;symbols&quot; -&gt; symbols = object.readStringArray();</span>
-<span class="nc" id="L254">                default -&gt; object.skipValue();</span>
-<span class="fc" id="L255">            }</span>
+<span class="fc" id="L248">        String kind = &quot;CUSTOM_PREDICATE&quot;;</span>
+<span class="fc" id="L249">        String expression = &quot;&quot;;</span>
+<span class="fc" id="L250">        List&lt;String&gt; symbols = List.of();</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        while (object.nextField()) {</span>
+<span class="pc bpc" id="L252" title="1 of 4 branches missed.">            switch (object.fieldName()) {</span>
+<span class="fc" id="L253">                case &quot;kind&quot; -&gt; kind = stringOr(</span>
+<span class="fc" id="L254">                    object.readNullableString(), &quot;CUSTOM_PREDICATE&quot;);</span>
+<span class="fc" id="L255">                case &quot;expression&quot; -&gt; expression = stringOr(</span>
+<span class="fc" id="L256">                    object.readNullableString(), &quot;&quot;);</span>
+<span class="fc" id="L257">                case &quot;symbols&quot; -&gt; symbols = object.readStringArray();</span>
+<span class="nc" id="L258">                default -&gt; object.skipValue();</span>
+<span class="fc" id="L259">            }</span>
         }
-<span class="fc" id="L257">        return createAssumption(kind, expression, symbols);</span>
+<span class="fc" id="L261">        return createAssumption(kind, expression, symbols);</span>
     }
 
     private static Assumption createAssumption(
@@ -262,37 +266,37 @@ final class WorkbenchRequestBodies {
         String rawExpression,
         List&lt;String&gt; rawSymbols
     ) throws StreamingJsonRequestBody.MalformedJsonRequestException {
-<span class="pc bpc" id="L265" title="1 of 2 branches missed.">        String expression = rawExpression == null ? &quot;&quot; : rawExpression.trim();</span>
-<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        if (expression.isEmpty()) {</span>
-<span class="nc" id="L267">            throw new StreamingJsonRequestBody.MalformedJsonRequestException(</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">        String expression = rawExpression == null ? &quot;&quot; : rawExpression.trim();</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">        if (expression.isEmpty()) {</span>
+<span class="nc" id="L271">            throw new StreamingJsonRequestBody.MalformedJsonRequestException(</span>
                 &quot;assumption expression must not be blank&quot;);
         }
-<span class="pc bpc" id="L270" title="2 of 4 branches missed.">        String kindName = rawKind == null || rawKind.isBlank()</span>
-<span class="nc" id="L271">            ? &quot;CUSTOM_PREDICATE&quot;</span>
-<span class="fc" id="L272">            : rawKind.trim().toUpperCase(Locale.ROOT).replace('-', '_');</span>
-<span class="pc bpc" id="L273" title="2 of 3 branches missed.">        kindName = switch (kindName) {</span>
-<span class="nc" id="L274">            case &quot;CUSTOM&quot; -&gt; &quot;CUSTOM_PREDICATE&quot;;</span>
-<span class="nc" id="L275">            case &quot;DOMAIN&quot; -&gt; &quot;DOMAIN_MEMBERSHIP&quot;;</span>
-<span class="fc" id="L276">            default -&gt; kindName;</span>
+<span class="pc bpc" id="L274" title="2 of 4 branches missed.">        String kindName = rawKind == null || rawKind.isBlank()</span>
+<span class="nc" id="L275">            ? &quot;CUSTOM_PREDICATE&quot;</span>
+<span class="fc" id="L276">            : rawKind.trim().toUpperCase(Locale.ROOT).replace('-', '_');</span>
+<span class="pc bpc" id="L277" title="2 of 3 branches missed.">        kindName = switch (kindName) {</span>
+<span class="nc" id="L278">            case &quot;CUSTOM&quot; -&gt; &quot;CUSTOM_PREDICATE&quot;;</span>
+<span class="nc" id="L279">            case &quot;DOMAIN&quot; -&gt; &quot;DOMAIN_MEMBERSHIP&quot;;</span>
+<span class="fc" id="L280">            default -&gt; kindName;</span>
         };
         Assumption.Kind kind;
         try {
-<span class="fc" id="L280">            kind = Assumption.Kind.valueOf(kindName);</span>
-<span class="nc" id="L281">        } catch (IllegalArgumentException exception) {</span>
+<span class="fc" id="L284">            kind = Assumption.Kind.valueOf(kindName);</span>
+<span class="nc" id="L285">        } catch (IllegalArgumentException exception) {</span>
             // Retain the historical API behaviour: unknown custom labels are
             // accepted as free-form predicates instead of becoming 500s.
-<span class="nc" id="L284">            kind = Assumption.Kind.CUSTOM_PREDICATE;</span>
-<span class="fc" id="L285">        }</span>
-<span class="pc bpc" id="L286" title="1 of 2 branches missed.">        List&lt;String&gt; symbols = rawSymbols == null</span>
-<span class="nc" id="L287">            ? List.of()</span>
-<span class="fc" id="L288">            : List.copyOf(new LinkedHashSet&lt;&gt;(rawSymbols.stream()</span>
-<span class="pc bpc" id="L289" title="2 of 4 branches missed.">                .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
-<span class="fc" id="L290">                .map(String::trim)</span>
-<span class="fc" id="L291">                .toList()));</span>
-<span class="fc" id="L292">        return new Assumption(kind, expression, symbols);</span>
+<span class="nc" id="L288">            kind = Assumption.Kind.CUSTOM_PREDICATE;</span>
+<span class="fc" id="L289">        }</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">        List&lt;String&gt; symbols = rawSymbols == null</span>
+<span class="nc" id="L291">            ? List.of()</span>
+<span class="fc" id="L292">            : List.copyOf(new LinkedHashSet&lt;&gt;(rawSymbols.stream()</span>
+<span class="pc bpc" id="L293" title="2 of 4 branches missed.">                .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L294">                .map(String::trim)</span>
+<span class="fc" id="L295">                .toList()));</span>
+<span class="fc" id="L296">        return new Assumption(kind, expression, symbols);</span>
     }
 
-<span class="fc" id="L295">    record SearchRequest(</span>
+<span class="fc" id="L299">    record SearchRequest(</span>
         String expression,
         String type,
         String profile,
@@ -300,13 +304,13 @@ final class WorkbenchRequestBodies {
     ) {
     }
 
-<span class="fc" id="L303">    record DiscoverRequest(int min, int max) {</span>
+<span class="fc" id="L307">    record DiscoverRequest(int min, int max) {</span>
     }
 
-<span class="fc" id="L306">    record InventoryImportRequest(String json) {</span>
+<span class="fc" id="L310">    record InventoryImportRequest(String json) {</span>
     }
 
-<span class="fc" id="L309">    record InspectApplyRequest(</span>
+<span class="fc" id="L313">    record InspectApplyRequest(</span>
         String expression,
         String pathKey,
         String matchId,
@@ -314,14 +318,14 @@ final class WorkbenchRequestBodies {
     ) {
     }
 
-<span class="fc" id="L317">    record DidacticStepRequest(</span>
+<span class="fc" id="L321">    record DidacticStepRequest(</span>
         String currentExpression,
         String studentStep,
         String difficulty
     ) {
     }
 
-<span class="fc" id="L324">    record DidacticHintRequest(</span>
+<span class="fc" id="L328">    record DidacticHintRequest(</span>
         String currentExpression,
         String pedagogyProfile
     ) {
@@ -333,9 +337,9 @@ final class WorkbenchRequestBodies {
         String tool,
         List&lt;Assumption&gt; assumptions
     ) {
-<span class="fc" id="L336">        ProofBridgeRequest {</span>
-<span class="fc" id="L337">            assumptions = List.copyOf(assumptions);</span>
-<span class="fc" id="L338">        }</span>
+<span class="fc" id="L340">        ProofBridgeRequest {</span>
+<span class="fc" id="L341">            assumptions = List.copyOf(assumptions);</span>
+<span class="fc" id="L342">        }</span>
     }
 
     record ProofJobCreateRequest(
@@ -345,9 +349,9 @@ final class WorkbenchRequestBodies {
         String worker,
         List&lt;Assumption&gt; assumptions
     ) {
-<span class="fc" id="L348">        ProofJobCreateRequest {</span>
-<span class="fc" id="L349">            assumptions = List.copyOf(assumptions);</span>
-<span class="fc" id="L350">        }</span>
+<span class="fc" id="L352">        ProofJobCreateRequest {</span>
+<span class="fc" id="L353">            assumptions = List.copyOf(assumptions);</span>
+<span class="fc" id="L354">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

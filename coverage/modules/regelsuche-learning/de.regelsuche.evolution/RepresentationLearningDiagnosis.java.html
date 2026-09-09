@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RepresentationLearningDiagnosis.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">RepresentationLearningDiagnosis.java</span></div><h1>RepresentationLearningDiagnosis.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.RepresentationStrategyLearner.Profile;
+import de.regelsuche.evolution.RepresentationTransferExperiment.Row;
+import de.regelsuche.evolution.RepresentationTransferExperiment.Study;
+import de.regelsuche.json.JsonWriter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/** Post-evaluation diagnosis, never a training feature or executable selection policy.
+ * The hindsight bound covers only the three actually measured routes at the same
+ * construction budget, and only compares costs when both solutions are verified.
+ */
+public final class RepresentationLearningDiagnosis {
+    private RepresentationLearningDiagnosis() { }
+<span class="fc" id="L20">    private static final List&lt;Profile&gt; ROUTES = List.of(Profile.DIRECT, Profile.MATRIX, Profile.BLOCKS);</span>
+
+<span class="fc" id="L22">    public record Work(Profile profile, long construction, long audit, long selection) {</span>
+<span class="fc" id="L23">        public long application() { return construction + audit + selection; }</span>
+    }
+<span class="fc" id="L25">    public record CaseBound(String id, boolean fixedVerified, boolean anyRouteVerified,</span>
+                            long fixedWork, long bestVerifiedRouteWork, String bestVerifiedRoute) { }
+    public record Diagnosis(List&lt;Work&gt; work, List&lt;CaseBound&gt; cases, int comparableCases,
+                            int unverifiedCases, int additionalSolvableCases,
+                            int cheaperVerifiedCases, long avoidableFixedWork,
+                            int learnedChoiceDifferences) {
+<span class="fc" id="L31">        public Diagnosis { work = List.copyOf(work); cases = List.copyOf(cases); }</span>
+    }
+
+    public static Diagnosis analyze(Study study) {
+<span class="fc" id="L35">        Map&lt;String, Map&lt;Profile, Row&gt;&gt; cases = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        for (Row row : study.rows()) {</span>
+<span class="fc" id="L37">            Row previous = cases.computeIfAbsent(row.task().id(), ignored -&gt; new EnumMap&lt;&gt;(Profile.class))</span>
+<span class="fc" id="L38">                .putIfAbsent(row.profile(), row);</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            if (previous != null) throw new IllegalArgumentException(&quot;Duplicate case/profile observation&quot;);</span>
+<span class="fc" id="L40">        }</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (cases.isEmpty()) throw new IllegalArgumentException(&quot;No application observations&quot;);</span>
+<span class="fc" id="L42">        List&lt;CaseBound&gt; bounds = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L43">        int comparable = 0, unverified = 0, additional = 0, cheaper = 0, differences = 0;</span>
+<span class="fc" id="L44">        long avoidable = 0;</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (var entry : cases.entrySet()) {</span>
+<span class="fc" id="L46">            Map&lt;Profile, Row&gt; profiles = entry.getValue();</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">            if (profiles.size() != Profile.values().length)</span>
+<span class="fc" id="L48">                throw new IllegalArgumentException(&quot;Incomplete profile comparison&quot;);</span>
+<span class="fc" id="L49">            Row fixed = profiles.get(Profile.FIXED_AUTO);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            for (Row row : profiles.values()) {</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">                if (!row.task().equals(fixed.task())</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">                        || !row.application().result().source().equals(fixed.task().equations())</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">                        || row.application().result().budget() != fixed.application().result().budget())</span>
+<span class="nc" id="L54">                    throw new IllegalArgumentException(&quot;Unmatched task or construction budget&quot;);</span>
+<span class="fc" id="L55">            }</span>
+<span class="fc" id="L56">            if (profiles.get(Profile.LEARNED).application().result().selected()</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">                    != fixed.application().result().selected()) differences++;</span>
+<span class="fc" id="L58">            var best = ROUTES.stream().map(profiles::get).filter(RepresentationLearningDiagnosis::verified)</span>
+<span class="fc" id="L59">                .min(Comparator.comparingInt(row -&gt; row.application().totalWork()));</span>
+<span class="fc" id="L60">            boolean fixedVerified = verified(fixed);</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">            if (best.isEmpty()) unverified++;</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            else if (!fixedVerified) additional++;</span>
+            else {
+<span class="fc" id="L64">                comparable++;</span>
+<span class="fc" id="L65">                long saved = (long) fixed.application().totalWork() - best.orElseThrow().application().totalWork();</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">                if (saved &gt; 0) { cheaper++; avoidable += saved; }</span>
+            }
+<span class="fc" id="L68">            bounds.add(new CaseBound(entry.getKey(), fixedVerified, best.isPresent(), fixed.application().totalWork(),</span>
+<span class="fc" id="L69">                best.map(row -&gt; (long) row.application().totalWork()).orElse(-1L),</span>
+<span class="fc" id="L70">                best.map(row -&gt; row.profile().name()).orElse(&quot;NONE&quot;)));</span>
+<span class="fc" id="L71">        }</span>
+<span class="fc" id="L72">        List&lt;Work&gt; work = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        for (Profile profile : Profile.values()) {</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            var rows = study.rows().stream().filter(row -&gt; row.profile() == profile).toList();</span>
+<span class="fc" id="L75">            work.add(new Work(profile,</span>
+<span class="fc" id="L76">                rows.stream().mapToLong(row -&gt; row.application().result().totalWork()).sum(),</span>
+<span class="fc" id="L77">                rows.stream().mapToLong(row -&gt; row.application().audit().work()).sum(),</span>
+<span class="fc" id="L78">                rows.stream().mapToLong(row -&gt; row.application().selectionWork()).sum()));</span>
+        }
+<span class="fc" id="L80">        return new Diagnosis(work, bounds, comparable, unverified, additional, cheaper, avoidable, differences);</span>
+    }
+
+    private static boolean verified(Row row) {
+<span class="pc bpc" id="L84" title="1 of 4 branches missed.">        return row.application().result().status().equals(&quot;SOLVED&quot;) &amp;&amp; row.application().audit().verified();</span>
+    }
+
+    public static String toJson(Study study) {
+<span class="fc" id="L88">        JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L89">        write(writer, analyze(study));</span>
+<span class="fc" id="L90">        return writer.endObject().toString() + &quot;\n&quot;;</span>
+    }
+
+    static void write(JsonWriter writer, Diagnosis diagnosis) {
+<span class="fc" id="L94">        writer.property(&quot;schema&quot;, &quot;regelsuche.representation-learning-diagnosis/v1&quot;)</span>
+<span class="fc" id="L95">            .property(&quot;purpose&quot;, &quot;POST_EVALUATION_DIAGNOSIS_NOT_A_POLICY&quot;)</span>
+<span class="fc" id="L96">            .property(&quot;learnedQuantity&quot;, &quot;One minimum-variable threshold from six candidates&quot;)</span>
+<span class="fc" id="L97">            .property(&quot;learnsMathematicalProcedures&quot;, false)</span>
+<span class="fc" id="L98">            .property(&quot;knowledgeAblation&quot;, false)</span>
+<span class="fc" id="L99">            .property(&quot;referenceKnowledge&quot;, &quot;Handwritten exact solvers, decomposition, composition and development-tuned selection&quot;)</span>
+<span class="fc" id="L100">            .property(&quot;boundScope&quot;, &quot;Verified DIRECT/MATRIX/BLOCKS executions at the recorded budgets; no global algorithmic optimum&quot;)</span>
+<span class="fc" id="L101">            .property(&quot;comparableVerifiedCases&quot;, diagnosis.comparableCases)</span>
+<span class="fc" id="L102">            .property(&quot;casesWithoutVerifiedRoute&quot;, diagnosis.unverifiedCases)</span>
+<span class="fc" id="L103">            .property(&quot;additionalSolvableCases&quot;, diagnosis.additionalSolvableCases)</span>
+<span class="fc" id="L104">            .property(&quot;cheaperVerifiedCases&quot;, diagnosis.cheaperVerifiedCases)</span>
+<span class="fc" id="L105">            .property(&quot;avoidableFixedWork&quot;, diagnosis.avoidableFixedWork)</span>
+<span class="fc" id="L106">            .property(&quot;learnedChoiceDifferences&quot;, diagnosis.learnedChoiceDifferences)</span>
+<span class="fc" id="L107">            .array(&quot;work&quot;, w -&gt; diagnosis.work.forEach(work -&gt; w.objectValue(p -&gt; p</span>
+<span class="fc" id="L108">                .property(&quot;profile&quot;, work.profile.name()).property(&quot;constructionWork&quot;, work.construction)</span>
+<span class="fc" id="L109">                .property(&quot;auditWork&quot;, work.audit).property(&quot;selectionWork&quot;, work.selection)</span>
+<span class="fc" id="L110">                .property(&quot;applicationWork&quot;, work.application()))))</span>
+<span class="fc" id="L111">            .array(&quot;cases&quot;, w -&gt; diagnosis.cases.forEach(bound -&gt; w.objectValue(c -&gt; c</span>
+<span class="fc" id="L112">                .property(&quot;id&quot;, bound.id).property(&quot;fixedVerified&quot;, bound.fixedVerified)</span>
+<span class="fc" id="L113">                .property(&quot;anyRouteVerified&quot;, bound.anyRouteVerified).property(&quot;fixedWork&quot;, bound.fixedWork)</span>
+<span class="fc" id="L114">                .property(&quot;bestVerifiedRouteWork&quot;, bound.bestVerifiedRouteWork)</span>
+<span class="fc" id="L115">                .property(&quot;bestVerifiedRoute&quot;, bound.bestVerifiedRoute))));</span>
+<span class="fc" id="L116">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -169,16 +169,16 @@ import java.util.TreeSet;
 <span class="fc bfc" id="L169" title="All 2 branches covered.">        if (expression instanceof NumberExpr) {</span>
 <span class="fc" id="L170">            return;</span>
         }
-<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
 <span class="fc" id="L173">            collectVariables(binary.left(), target, work);</span>
 <span class="fc" id="L174">            collectVariables(binary.right(), target, work);</span>
 <span class="fc" id="L175">            return;</span>
         }
-<span class="nc bnc" id="L177" title="All 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
-<span class="nc bnc" id="L178" title="All 2 branches missed.">            for (Expr argument : function.arguments()) {</span>
-<span class="nc" id="L179">                collectVariables(argument, target, work);</span>
-<span class="nc" id="L180">            }</span>
-<span class="nc" id="L181">            return;</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            for (Expr argument : function.arguments()) {</span>
+<span class="fc" id="L179">                collectVariables(argument, target, work);</span>
+<span class="fc" id="L180">            }</span>
+<span class="fc" id="L181">            return;</span>
         }
 <span class="nc" id="L183">        throw new UnsupportedExpression(&quot;UNKNOWN_EXPRESSION_NODE&quot;);</span>
     }
@@ -232,8 +232,8 @@ import java.util.TreeSet;
             }
 <span class="fc" id="L233">            return AffineForm.variable(variable.name());</span>
         }
-<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr) {</span>
-<span class="nc" id="L236">            throw new UnsupportedExpression(</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        if (expression instanceof FunctionExpr) {</span>
+<span class="fc" id="L236">            throw new UnsupportedExpression(</span>
                 &quot;FUNCTION_OUTSIDE_DIRECT_AFFINE_FRAGMENT&quot;);
         }
 <span class="pc bpc" id="L239" title="1 of 2 branches missed.">        if (!(expression instanceof BinaryExpr binary)) {</span>
@@ -451,8 +451,8 @@ import java.util.TreeSet;
 <span class="fc" id="L451">        List&lt;Pivot&gt; pivots = new ArrayList&lt;&gt;();</span>
 <span class="fc" id="L452">        int pivotRow = 0;</span>
 <span class="fc bfc" id="L453" title="All 2 branches covered.">        for (String variable : variables) {</span>
-<span class="pc bpc" id="L454" title="1 of 2 branches missed.">            if (pivotRow &gt;= equations.size()) {</span>
-<span class="nc" id="L455">                break;</span>
+<span class="fc bfc" id="L454" title="All 2 branches covered.">            if (pivotRow &gt;= equations.size()) {</span>
+<span class="fc" id="L455">                break;</span>
             }
 <span class="fc" id="L457">            int candidate = findPivot(</span>
                 equations,

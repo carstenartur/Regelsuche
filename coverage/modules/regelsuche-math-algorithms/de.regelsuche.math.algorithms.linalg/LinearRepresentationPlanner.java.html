@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LinearRepresentationPlanner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">LinearRepresentationPlanner.java</span></div><h1>LinearRepresentationPlanner.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Equation;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactVector;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.SolutionClassification;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.representation.RepresentationBridge.Budget;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+
+/** Source-only representation selection followed by bounded exact solving.
+ * Parsing and integer bit complexity are outside the mechanical work metric.
+ * No matrix, rank computation or solution is consulted while preparing a plan.
+ */
+<span class="fc" id="L29">public final class LinearRepresentationPlanner {</span>
+<span class="fc" id="L30">    public enum Route { DIRECT, MATRIX, BLOCKS, AUTO }</span>
+    public static final int MAX_BUDGET = 1_000_000;
+
+    /** Only this planner can construct a plan, so its source partition cannot be forged. */
+    public static final class Plan {
+        private final List&lt;String&gt; source;
+        private final List&lt;Equation&gt; equations;
+        private final List&lt;String&gt; variables;
+        private final List&lt;List&lt;Integer&gt;&gt; blocks;
+        private final int work;
+        private final String status;
+        private Plan(List&lt;String&gt; source, List&lt;Equation&gt; equations, List&lt;String&gt; variables,
+<span class="fc" id="L42">                     List&lt;List&lt;Integer&gt;&gt; blocks, int work, String status) {</span>
+<span class="fc" id="L43">            this.source = List.copyOf(source);</span>
+<span class="fc" id="L44">            this.equations = List.copyOf(equations);</span>
+<span class="fc" id="L45">            this.variables = List.copyOf(variables);</span>
+<span class="fc" id="L46">            this.blocks = blocks.stream().map(List::copyOf).toList();</span>
+<span class="fc" id="L47">            this.work = work;</span>
+<span class="fc" id="L48">            this.status = status;</span>
+<span class="fc" id="L49">        }</span>
+<span class="nc" id="L50">        public List&lt;String&gt; source() { return source; }</span>
+<span class="nc" id="L51">        public List&lt;String&gt; variables() { return variables; }</span>
+<span class="fc" id="L52">        public List&lt;List&lt;Integer&gt;&gt; blocks() { return blocks; }</span>
+<span class="nc" id="L53">        public int work() { return work; }</span>
+<span class="nc" id="L54">        public String status() { return status; }</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        public boolean independent() { return blocks.size() &gt; 1; }</span>
+    }
+
+    public record Step(List&lt;Integer&gt; sourceRows, String route, String status, int work,
+                       List&lt;String&gt; operations) {
+<span class="fc" id="L60">        public Step {</span>
+<span class="fc" id="L61">            sourceRows = List.copyOf(sourceRows);</span>
+<span class="fc" id="L62">            operations = List.copyOf(operations);</span>
+<span class="fc" id="L63">        }</span>
+    }
+    public record Result(List&lt;String&gt; source, Route requested, Route selected, String status,
+                         List&lt;String&gt; variables, List&lt;List&lt;Integer&gt;&gt; blocks, int budget,
+                         int preparationWork, int executionWork, int compositionWork,
+                         List&lt;Step&gt; steps, Optional&lt;ExactLinearSolutionConsequence&gt; solution) {
+<span class="fc" id="L69">        public Result {</span>
+<span class="fc" id="L70">            source = List.copyOf(source);</span>
+<span class="fc" id="L71">            variables = List.copyOf(variables);</span>
+<span class="fc" id="L72">            blocks = blocks.stream().map(List::copyOf).toList();</span>
+<span class="fc" id="L73">            steps = List.copyOf(steps);</span>
+<span class="fc" id="L74">            Objects.requireNonNull(solution);</span>
+<span class="pc bpc" id="L75" title="5 of 10 branches missed.">            if (budget &lt; 0 || preparationWork &lt; 0 || executionWork &lt; 0 || compositionWork &lt; 0</span>
+                    || (long) preparationWork + executionWork + compositionWork &gt; budget
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">                    || status.equals(&quot;SOLVED&quot;) != solution.isPresent()) {</span>
+<span class="nc" id="L78">                throw new IllegalArgumentException(&quot;Invalid result/work ledger&quot;);</span>
+            }
+<span class="fc" id="L80">        }</span>
+<span class="fc" id="L81">        public int totalWork() { return preparationWork + executionWork + compositionWork; }</span>
+    }
+    public record Audit(String status, int work, Optional&lt;Result&gt; reference) {
+<span class="fc" id="L84">        public Audit { Objects.requireNonNull(reference); }</span>
+<span class="fc" id="L85">        public boolean verified() { return status.equals(&quot;VERIFIED&quot;); }</span>
+    }
+
+    public Plan prepare(List&lt;String&gt; input, int budget) {
+<span class="fc" id="L89">        checkBudget(budget);</span>
+<span class="fc" id="L90">        List&lt;String&gt; source = List.copyOf(input);</span>
+<span class="pc bpc" id="L91" title="1 of 4 branches missed.">        if (source.isEmpty() || source.size() &gt; 16) {</span>
+<span class="fc" id="L92">            throw new IllegalArgumentException(&quot;Expected 1 to 16 equations&quot;);</span>
+        }
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        for (String text : source) validateText(text);</span>
+<span class="fc" id="L95">        var parser = new ExpressionParser();</span>
+<span class="fc" id="L96">        List&lt;Equation&gt; equations = source.stream().map(parser::parseEquation).toList();</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        for (Equation equation : equations) {</span>
+<span class="fc" id="L98">            powerWeight(equation.left(), 0);</span>
+<span class="fc" id="L99">            powerWeight(equation.right(), 0);</span>
+<span class="fc" id="L100">        }</span>
+<span class="fc" id="L101">        Counter counter = new Counter(budget);</span>
+<span class="fc" id="L102">        Set&lt;String&gt; variables = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L103">        List&lt;List&lt;Integer&gt;&gt; blocks = new ArrayList&lt;&gt;();</span>
+        try {
+<span class="fc" id="L105">            List&lt;Set&lt;String&gt;&gt; supports = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            for (Equation equation : equations) {</span>
+<span class="fc" id="L107">                Set&lt;String&gt; support = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L108">                collect(equation.left(), support, counter, 0);</span>
+<span class="fc" id="L109">                collect(equation.right(), support, counter, 0);</span>
+<span class="fc" id="L110">                variables.addAll(support);</span>
+<span class="fc" id="L111">                supports.add(support);</span>
+<span class="fc" id="L112">            }</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (variables.size() &gt; 16) throw new IllegalArgumentException(&quot;At most 16 variables&quot;);</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            if (variables.isEmpty()) return new Plan(source, equations, List.of(), List.of(),</span>
+                counter.used, &quot;NOT_APPLICABLE&quot;);
+<span class="fc" id="L116">            int[] parent = new int[source.size()];</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            for (int i = 0; i &lt; parent.length; i++) parent[i] = i;</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            for (int i = 0; i &lt; parent.length; i++) {</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">                for (int j = i + 1; j &lt; parent.length; j++) {</span>
+<span class="fc" id="L120">                    boolean intersects = false;</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">                    for (String variable : supports.get(i)) {</span>
+<span class="fc" id="L122">                        counter.consume(1);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">                        if (supports.get(j).contains(variable)) intersects = true;</span>
+<span class="fc" id="L124">                    }</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">                    if (intersects) parent[root(parent, j)] = root(parent, i);</span>
+                }
+            }
+<span class="fc" id="L128">            Map&lt;Integer, List&lt;Integer&gt;&gt; groups = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L129">            List&lt;Integer&gt; constants = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            for (int i = 0; i &lt; parent.length; i++) {</span>
+<span class="fc" id="L131">                counter.consume(1);</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">                if (supports.get(i).isEmpty()) constants.add(i);</span>
+<span class="fc" id="L133">                else groups.computeIfAbsent(root(parent, i), key -&gt; new ArrayList&lt;&gt;()).add(i);</span>
+            }
+            // Constant rows, including contradictions, remain in the first nonempty component.
+<span class="fc" id="L136">            groups.values().iterator().next().addAll(constants);</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            for (List&lt;Integer&gt; rows : groups.values()) {</span>
+<span class="fc" id="L138">                Collections.sort(rows);</span>
+<span class="fc" id="L139">                blocks.add(List.copyOf(rows));</span>
+<span class="fc" id="L140">            }</span>
+<span class="fc" id="L141">            return new Plan(source, equations, List.copyOf(variables), blocks, counter.used, &quot;PREPARED&quot;);</span>
+<span class="fc" id="L142">        } catch (Exhausted exception) {</span>
+<span class="fc" id="L143">            return new Plan(source, equations, List.copyOf(variables), List.of(), counter.used,</span>
+                &quot;BUDGET_INCONCLUSIVE&quot;);
+        }
+    }
+
+    public Result solve(List&lt;String&gt; source, Route route, int budget) {
+<span class="fc" id="L149">        return execute(prepare(source, budget), route, budget);</span>
+    }
+
+    public Result execute(Plan plan, Route route, int budget) {
+<span class="fc" id="L153">        Objects.requireNonNull(plan);</span>
+<span class="fc" id="L154">        Objects.requireNonNull(route);</span>
+<span class="fc" id="L155">        checkBudget(budget);</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (budget &lt; plan.work) throw new IllegalArgumentException(&quot;Budget smaller than preparation work&quot;);</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        Route selected = route == Route.AUTO</span>
+<span class="fc bfc" id="L158" title="All 4 branches covered.">            ? plan.independent() &amp;&amp; plan.variables.size() &gt;= 8 ? Route.BLOCKS : Route.DIRECT : route;</span>
+<span class="fc" id="L159">        Counter work = new Counter(budget);</span>
+<span class="fc" id="L160">        work.consume(plan.work);</span>
+<span class="fc" id="L161">        List&lt;Step&gt; steps = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L162">        List&lt;Local&gt; solved = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L163">        String status = plan.status;</span>
+<span class="fc" id="L164">        int execution = 0;</span>
+<span class="fc" id="L165">        int composition = 0;</span>
+<span class="fc" id="L166">        Optional&lt;ExactLinearSolutionConsequence&gt; solution = Optional.empty();</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (status.equals(&quot;PREPARED&quot;)) {</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            List&lt;List&lt;Integer&gt;&gt; groups = selected == Route.BLOCKS ? plan.blocks</span>
+<span class="fc" id="L169">                : List.of(java.util.stream.IntStream.range(0, plan.source.size()).boxed().toList());</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            for (List&lt;Integer&gt; rows : groups) {</span>
+<span class="fc" id="L171">                List&lt;Equation&gt; equations = rows.stream().map(plan.equations::get).toList();</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">                Local local = run(equations, plan.variables, selected == Route.DIRECT, work.remaining());</span>
+<span class="fc" id="L173">                work.consume(local.work);</span>
+<span class="fc" id="L174">                execution += local.work;</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">                steps.add(new Step(rows, selected == Route.DIRECT ? &quot;DIRECT&quot; : &quot;MATRIX&quot;,</span>
+                    local.status, local.work, local.operations));
+<span class="fc" id="L177">                status = local.status;</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">                if (!status.equals(&quot;SOLVED&quot;)) break;</span>
+<span class="fc" id="L179">                solved.add(local);</span>
+<span class="fc" id="L180">            }</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">            if (status.equals(&quot;SOLVED&quot;)) {</span>
+<span class="fc" id="L182">                int before = work.used;</span>
+                try {
+<span class="fc bfc" id="L184" title="All 2 branches covered.">                    solution = Optional.of(selected == Route.BLOCKS</span>
+<span class="fc" id="L185">                        ? compose(plan.variables, solved, work) : solved.getFirst().solution.orElseThrow());</span>
+<span class="fc" id="L186">                } catch (Exhausted exception) {</span>
+<span class="fc" id="L187">                    status = &quot;BUDGET_INCONCLUSIVE&quot;;</span>
+<span class="fc" id="L188">                }</span>
+<span class="fc" id="L189">                composition = work.used - before;</span>
+            }
+        }
+<span class="fc" id="L192">        return new Result(plan.source, route, selected, status, plan.variables, plan.blocks, budget,</span>
+            plan.work, execution, composition, steps, solution);
+    }
+
+    /** Recompute a complete artifact, including failed work and the selection decision. */
+    public boolean verify(Result result) {
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">        if (result == null) return false;</span>
+<span class="fc" id="L199">        try { return solve(result.source, result.requested, result.budget).equals(result); }</span>
+<span class="nc" id="L200">        catch (RuntimeException exception) { return false; }</span>
+    }
+
+    /** Separate algorithmic audit: full matrix for scalar/block construction, scalar for matrix. */
+    public Audit audit(Result result, int budget) {
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (!result.status.equals(&quot;SOLVED&quot;)) return new Audit(&quot;NOT_SOLVED&quot;, 0, Optional.empty());</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        Result reference = solve(result.source, result.selected == Route.MATRIX ? Route.DIRECT : Route.MATRIX, budget);</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">        String status = reference.solution.isEmpty() ? &quot;INCONCLUSIVE&quot;</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">            : reference.solution.equals(result.solution) ? &quot;VERIFIED&quot; : &quot;MISMATCH&quot;;</span>
+<span class="fc" id="L209">        return new Audit(status, reference.totalWork(), Optional.of(reference));</span>
+    }
+
+<span class="fc" id="L212">    private record Local(String status, int work, Optional&lt;ExactLinearSolutionConsequence&gt; solution,</span>
+                         List&lt;String&gt; freeVariables, List&lt;String&gt; operations) { }
+    private static Local run(List&lt;Equation&gt; equations, List&lt;String&gt; variables, boolean direct, int budget) {
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        if (direct) {</span>
+<span class="fc" id="L216">            var result = new DirectScalarEliminationSolver().solve(</span>
+                new DirectScalarEliminationSolver.Source(equations, variables), new Budget(budget));
+<span class="fc" id="L218">            return new Local(result.status().name(), result.work().consumedWorkUnits(), result.consequence(),</span>
+<span class="fc" id="L219">                List.of(), result.certificate().map(c -&gt; c.canonicalOperations()).orElse(List.of()));</span>
+        }
+<span class="fc" id="L221">        var matrix = new LinearSystemRepresentationBridge().analyze(equations, new Budget(budget));</span>
+<span class="fc" id="L222">        int spent = matrix.work().consumedWorkUnits();</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        if (!matrix.represented()) return new Local(matrix.status().name(), spent, Optional.empty(), List.of(), List.of());</span>
+<span class="fc" id="L224">        var result = new ExactRrefSolver().solve(matrix.representation().orElseThrow(), new Budget(budget - spent));</span>
+<span class="fc" id="L225">        spent += result.work().consumedWorkUnits();</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        if (result.reduction().isEmpty()) return new Local(result.status().name(), spent, Optional.empty(), List.of(), List.of());</span>
+<span class="fc" id="L227">        var reduction = result.reduction().orElseThrow();</span>
+<span class="fc" id="L228">        return new Local(&quot;SOLVED&quot;, spent, Optional.of(ExactLinearSolutionConsequence.fromRref(reduction)),</span>
+<span class="fc" id="L229">            reduction.freeVariableColumns().stream().map(reduction.variables()::get).toList(),</span>
+<span class="fc" id="L230">            reduction.rowOperations().stream().map(Object::toString).toList());</span>
+    }
+
+    private static ExactLinearSolutionConsequence compose(List&lt;String&gt; variables, List&lt;Local&gt; parts, Counter work) {
+<span class="fc" id="L234">        List&lt;Rational&gt; particular = new ArrayList&lt;&gt;(Collections.nCopies(variables.size(), Rational.ZERO));</span>
+<span class="fc" id="L235">        Map&lt;Integer, ExactVector&gt; basis = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L236">        boolean inconsistent = false;</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        for (Local part : parts) {</span>
+<span class="fc" id="L238">            var consequence = part.solution.orElseThrow();</span>
+<span class="fc" id="L239">            work.consume(1);</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            if (consequence.classification() == SolutionClassification.INCONSISTENT) {</span>
+<span class="fc" id="L241">                inconsistent = true;</span>
+<span class="fc" id="L242">                continue;</span>
+            }
+<span class="fc bfc" id="L244" title="All 2 branches covered.">            for (int i = 0; i &lt; consequence.variables().size(); i++) {</span>
+<span class="fc" id="L245">                work.consume(1);</span>
+<span class="fc" id="L246">                particular.set(variables.indexOf(consequence.variables().get(i)), consequence.particularSolution().orElseThrow().get(i));</span>
+            }
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            for (int b = 0; b &lt; consequence.nullspaceBasis().size(); b++) {</span>
+<span class="fc" id="L249">                List&lt;Rational&gt; vector = new ArrayList&lt;&gt;(Collections.nCopies(variables.size(), Rational.ZERO));</span>
+<span class="fc" id="L250">                work.consume(variables.size());</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">                for (int i = 0; i &lt; consequence.variables().size(); i++) {</span>
+<span class="fc" id="L252">                    work.consume(1);</span>
+<span class="fc" id="L253">                    vector.set(variables.indexOf(consequence.variables().get(i)), consequence.nullspaceBasis().get(b).get(i));</span>
+                }
+<span class="fc" id="L255">                basis.put(variables.indexOf(part.freeVariables.get(b)), new ExactVector(vector));</span>
+            }
+<span class="fc" id="L257">        }</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        if (inconsistent) return new ExactLinearSolutionConsequence(variables, SolutionClassification.INCONSISTENT,</span>
+<span class="fc" id="L259">            Optional.empty(), List.of(), Optional.of(Rational.ONE));</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        return new ExactLinearSolutionConsequence(variables, basis.isEmpty() ? SolutionClassification.UNIQUE</span>
+<span class="fc" id="L261">            : SolutionClassification.UNDERDETERMINED, Optional.of(new ExactVector(particular)),</span>
+<span class="fc" id="L262">            List.copyOf(basis.values()), Optional.empty());</span>
+    }
+
+    private static void collect(Expr expression, Set&lt;String&gt; names, Counter work, int depth) {
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        if (depth &gt; 64) throw new IllegalArgumentException(&quot;Expression depth exceeds 64&quot;);</span>
+<span class="fc" id="L267">        work.consume(1);</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) names.add(variable.name());</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        else if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L270">            collect(binary.left(), names, work, depth + 1);</span>
+<span class="fc" id="L271">            collect(binary.right(), names, work, depth + 1);</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">            for (Expr argument : function.arguments()) collect(argument, names, work, depth + 1);</span>
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">        } else if (!(expression instanceof NumberExpr)) throw new IllegalArgumentException(&quot;Unknown expression node&quot;);</span>
+<span class="fc" id="L275">    }</span>
+    private static int root(int[] parent, int i) {
+<span class="fc bfc" id="L277" title="All 2 branches covered.">        while (parent[i] != i) i = parent[i];</span>
+<span class="fc" id="L278">        return i;</span>
+    }
+    private static void validateText(String text) {
+<span class="pc bpc" id="L281" title="3 of 6 branches missed.">        if (text == null || text.isBlank() || text.length() &gt; 512)</span>
+<span class="nc" id="L282">            throw new IllegalArgumentException(&quot;Each equation must contain 1 to 512 characters&quot;);</span>
+<span class="fc" id="L283">        int depth = 0;</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">        for (char c : text.toCharArray()) {</span>
+<span class="pc bpc" id="L285" title="1 of 4 branches missed.">            if (c == '(' &amp;&amp; ++depth &gt; 64) throw new IllegalArgumentException(&quot;Expression nesting exceeds 64&quot;);</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">            if (c == ')') depth--;</span>
+        }
+<span class="fc" id="L288">        var numbers = java.util.regex.Pattern.compile(</span>
+<span class="fc" id="L289">            &quot;(?i)(?&lt;![a-z_0-9])(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:e([+-]?[0-9]+))?&quot;).matcher(text);</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">        while (numbers.find()) {</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">            if (numbers.group().length() &gt; 128) throw new IllegalArgumentException(&quot;Numeric literal exceeds 128 characters&quot;);</span>
+<span class="fc bfc" id="L292" title="All 2 branches covered.">            if (numbers.group(1) != null) {</span>
+<span class="fc" id="L293">                java.math.BigInteger exponent = new java.math.BigInteger(numbers.group(1));</span>
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">                if (exponent.abs().compareTo(java.math.BigInteger.valueOf(64)) &gt; 0)</span>
+<span class="fc" id="L295">                    throw new IllegalArgumentException(&quot;Decimal exponent exceeds 64&quot;);</span>
+<span class="nc" id="L296">            }</span>
+        }
+<span class="fc" id="L298">    }</span>
+    // Syntactic input bound: nested constant powers must not evade a mechanical operation budget.
+    private static int powerWeight(Expr expression, int depth) {
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">        if (depth &gt; 64) throw new IllegalArgumentException(&quot;Expression depth exceeds 64&quot;);</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L303">            int left = powerWeight(binary.left(), depth + 1);</span>
+<span class="fc" id="L304">            int right = powerWeight(binary.right(), depth + 1);</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">            if (binary.operator() != BinaryOperator.POW) return Math.max(left, right);</span>
+<span class="fc" id="L306">            int factor = 64;</span>
+<span class="pc bpc" id="L307" title="2 of 4 branches missed.">            if (binary.right() instanceof NumberExpr number &amp;&amp; number.value().isInteger()) {</span>
+<span class="fc" id="L308">                var absolute = number.value().numerator().abs();</span>
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">                factor = absolute.compareTo(java.math.BigInteger.valueOf(64)) &gt; 0 ? 64 : Math.max(1, absolute.intValue());</span>
+            }
+<span class="fc bfc" id="L311" title="All 2 branches covered.">            if (left * factor &gt; 64) throw new IllegalArgumentException(&quot;Nested power weight exceeds 64&quot;);</span>
+<span class="fc" id="L312">            return Math.max(left * factor, right);</span>
+        }
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L315">            int maximum = 1;</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">            for (Expr argument : function.arguments()) maximum = Math.max(maximum, powerWeight(argument, depth + 1));</span>
+<span class="fc" id="L317">            return maximum;</span>
+        }
+<span class="fc" id="L319">        return 1;</span>
+    }
+    private static void checkBudget(int budget) {
+<span class="pc bpc" id="L322" title="1 of 4 branches missed.">        if (budget &lt; 0 || budget &gt; MAX_BUDGET) throw new IllegalArgumentException(&quot;Budget must be between 0 and 1000000&quot;);</span>
+<span class="fc" id="L323">    }</span>
+    private static final class Counter {
+        private final int limit;
+        private int used;
+<span class="fc" id="L327">        private Counter(int limit) { this.limit = limit; }</span>
+<span class="fc" id="L328">        private int remaining() { return limit - used; }</span>
+        private void consume(int amount) {
+<span class="fc bfc" id="L330" title="All 2 branches covered.">            if (amount &gt; remaining()) { used = limit; throw new Exhausted(); }</span>
+<span class="fc" id="L331">            used += amount;</span>
+<span class="fc" id="L332">        }</span>
+    }
+    private static final class Exhausted extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

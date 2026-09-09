@@ -98,64 +98,68 @@ public class CliRouter {
     }
 
     private int runRepresentations(String[] args) {
-<span class="pc bpc" id="L101" title="2 of 6 branches missed.">        if (args.length != 2 || !(args[0].equals(&quot;analyze&quot;) || args[0].equals(&quot;replay&quot;))) {</span>
-<span class="nc" id="L102">            out.println(&quot;Usage: representations analyze &lt;request.json&gt; | replay &lt;artifact.json&gt;&quot;);</span>
+<span class="pc bpc" id="L101" title="2 of 4 branches missed.">        if (args.length != 2 || !java.util.Set.of(&quot;analyze&quot;, &quot;replay&quot;, &quot;solve&quot;, &quot;verify-solution&quot;).contains(args[0])) {</span>
+<span class="nc" id="L102">            out.println(&quot;Usage: representations analyze|solve &lt;request.json&gt; | replay|verify-solution &lt;artifact.json&gt;&quot;);</span>
 <span class="nc" id="L103">            return 1;</span>
         }
 <span class="fc" id="L105">        try (var input = java.nio.file.Files.newInputStream(java.nio.file.Path.of(args[1]))) {</span>
 <span class="fc" id="L106">            var json = new de.regelsuche.web.StreamingJsonRequestBody(4 * 1024 * 1024).readObject(input);</span>
-<span class="fc bfc" id="L107" title="All 2 branches covered.">            if (args[0].equals(&quot;replay&quot;)) {</span>
-<span class="fc" id="L108">                out.print(de.regelsuche.math.algorithms.linalg.MatrixPreparationJson.replay(json));</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            if (args[0].equals(&quot;solve&quot;)) {</span>
+<span class="nc" id="L108">                out.print(de.regelsuche.math.algorithms.linalg.LinearRepresentationJson.solve(json));</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            } else if (args[0].equals(&quot;verify-solution&quot;)) {</span>
+<span class="nc" id="L110">                out.print(de.regelsuche.math.algorithms.linalg.LinearRepresentationJson.replay(json));</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            } else if (args[0].equals(&quot;replay&quot;)) {</span>
+<span class="fc" id="L112">                out.print(de.regelsuche.math.algorithms.linalg.MatrixPreparationJson.replay(json));</span>
             } else {
-<span class="fc" id="L110">                var request = de.regelsuche.math.algorithms.linalg.MatrixPreparationJson.readRequest(json);</span>
-<span class="fc" id="L111">                var result = new de.regelsuche.math.algorithms.linalg.MatrixPreparation().analyze(request);</span>
-<span class="fc" id="L112">                out.print(de.regelsuche.math.algorithms.linalg.MatrixPreparationJson.toJson(result));</span>
+<span class="fc" id="L114">                var request = de.regelsuche.math.algorithms.linalg.MatrixPreparationJson.readRequest(json);</span>
+<span class="fc" id="L115">                var result = new de.regelsuche.math.algorithms.linalg.MatrixPreparation().analyze(request);</span>
+<span class="fc" id="L116">                out.print(de.regelsuche.math.algorithms.linalg.MatrixPreparationJson.toJson(result));</span>
             }
-<span class="fc" id="L114">            return 0;</span>
-<span class="fc" id="L115">        } catch (java.io.IOException | IllegalArgumentException | ArithmeticException exception) {</span>
-<span class="fc" id="L116">            out.println(&quot;Representation request failed: &quot; + exception.getMessage());</span>
-<span class="fc" id="L117">            return 1;</span>
+<span class="fc" id="L118">            return 0;</span>
+<span class="fc" id="L119">        } catch (java.io.IOException | IllegalArgumentException | ArithmeticException exception) {</span>
+<span class="fc" id="L120">            out.println(&quot;Representation request failed: &quot; + exception.getMessage());</span>
+<span class="fc" id="L121">            return 1;</span>
         }
     }
 
     public int run(String[] args) {
         try {
-<span class="fc" id="L123">            String command = args[0].toLowerCase(Locale.ROOT);</span>
-<span class="fc" id="L124">            String[] rest = Arrays.copyOfRange(args, 1, args.length);</span>
-<span class="pc bpc" id="L125" title="8 of 12 branches missed.">            return switch (command) {</span>
-<span class="fc" id="L126">                case &quot;discover&quot; -&gt; runDiscover(rest);</span>
-<span class="nc" id="L127">                case &quot;domains&quot; -&gt; de.regelsuche.sdk.discovery.cli.DiscoveryCli.execute(</span>
-<span class="nc" id="L128">                    rest, out, Thread.currentThread().getContextClassLoader());</span>
-<span class="nc" id="L129">                case &quot;transform&quot; -&gt; runTransform(rest);</span>
-<span class="nc" id="L130">                case &quot;inventory&quot; -&gt; runInventory(rest);</span>
-<span class="nc" id="L131">                case &quot;path&quot; -&gt; runPath(rest);</span>
-<span class="nc" id="L132">                case &quot;benchmark&quot; -&gt; runBenchmark(rest);</span>
-<span class="nc" id="L133">                case &quot;serve&quot; -&gt; runServe(rest);</span>
-<span class="nc" id="L134">                case &quot;explain&quot; -&gt; runExplain(rest);</span>
-<span class="fc" id="L135">                case &quot;plugins&quot; -&gt; runPlugins(rest);</span>
-<span class="fc" id="L136">                case &quot;rules&quot; -&gt; runRules(rest);</span>
-<span class="fc" id="L137">                case &quot;representations&quot; -&gt; runRepresentations(rest);</span>
+<span class="fc" id="L127">            String command = args[0].toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L128">            String[] rest = Arrays.copyOfRange(args, 1, args.length);</span>
+<span class="pc bpc" id="L129" title="8 of 12 branches missed.">            return switch (command) {</span>
+<span class="fc" id="L130">                case &quot;discover&quot; -&gt; runDiscover(rest);</span>
+<span class="nc" id="L131">                case &quot;domains&quot; -&gt; de.regelsuche.sdk.discovery.cli.DiscoveryCli.execute(</span>
+<span class="nc" id="L132">                    rest, out, Thread.currentThread().getContextClassLoader());</span>
+<span class="nc" id="L133">                case &quot;transform&quot; -&gt; runTransform(rest);</span>
+<span class="nc" id="L134">                case &quot;inventory&quot; -&gt; runInventory(rest);</span>
+<span class="nc" id="L135">                case &quot;path&quot; -&gt; runPath(rest);</span>
+<span class="nc" id="L136">                case &quot;benchmark&quot; -&gt; runBenchmark(rest);</span>
+<span class="nc" id="L137">                case &quot;serve&quot; -&gt; runServe(rest);</span>
+<span class="nc" id="L138">                case &quot;explain&quot; -&gt; runExplain(rest);</span>
+<span class="fc" id="L139">                case &quot;plugins&quot; -&gt; runPlugins(rest);</span>
+<span class="fc" id="L140">                case &quot;rules&quot; -&gt; runRules(rest);</span>
+<span class="fc" id="L141">                case &quot;representations&quot; -&gt; runRepresentations(rest);</span>
                 default -&gt; {
-<span class="nc" id="L139">                    out.println(&quot;Unknown command: &quot; + command);</span>
-<span class="nc" id="L140">                    yield 1;</span>
+<span class="nc" id="L143">                    out.println(&quot;Unknown command: &quot; + command);</span>
+<span class="nc" id="L144">                    yield 1;</span>
                 }
             };
         } finally {
-<span class="fc bfc" id="L144" title="All 2 branches covered.">            if (ownsResources) {</span>
-<span class="fc" id="L145">                close(graphStore);</span>
-<span class="fc" id="L146">                close(inventoryRepository);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            if (ownsResources) {</span>
+<span class="fc" id="L149">                close(graphStore);</span>
+<span class="fc" id="L150">                close(inventoryRepository);</span>
             }
         }
     }
 
     private int runDiscover(String[] args) {
-<span class="fc" id="L152">        CliOptions options = CliOptions.parse(args);</span>
-<span class="fc" id="L153">        int min = Integer.parseInt(options.getOrDefault(&quot;min&quot;, &quot;1&quot;));</span>
-<span class="fc" id="L154">        int max = Integer.parseInt(options.getOrDefault(&quot;max&quot;, &quot;3&quot;));</span>
-<span class="fc" id="L155">        List&lt;String&gt; formats = options.csv(&quot;export&quot;);</span>
-<span class="fc" id="L156">        String directory = options.getOrDefault(&quot;dir&quot;, ExportFileService.DEFAULT_DIRECTORY);</span>
+<span class="fc" id="L156">        CliOptions options = CliOptions.parse(args);</span>
+<span class="fc" id="L157">        int min = Integer.parseInt(options.getOrDefault(&quot;min&quot;, &quot;1&quot;));</span>
+<span class="fc" id="L158">        int max = Integer.parseInt(options.getOrDefault(&quot;max&quot;, &quot;3&quot;));</span>
+<span class="fc" id="L159">        List&lt;String&gt; formats = options.csv(&quot;export&quot;);</span>
+<span class="fc" id="L160">        String directory = options.getOrDefault(&quot;dir&quot;, ExportFileService.DEFAULT_DIRECTORY);</span>
 
-<span class="fc" id="L158">        RuleDiscoveryService discovery = new RuleDiscoveryService(</span>
+<span class="fc" id="L162">        RuleDiscoveryService discovery = new RuleDiscoveryService(</span>
             new AlgebraicExampleGenerator(),
             new AstRewriteTransformationEngine(),
             new SymPyEquivalenceService(),
@@ -164,212 +168,212 @@ public class CliRouter {
             new RuleCandidateMiner(new KnownRuleRepository()),
             RuleCandidateListener.NOOP,
             new de.regelsuche.search.strategy.BestFirstSearchStrategy(),
-<span class="fc" id="L167">            DiscoverySettings.collectingEquivalentPaths()</span>
+<span class="fc" id="L171">            DiscoverySettings.collectingEquivalentPaths()</span>
         );
 
         try {
-<span class="fc" id="L171">            List&lt;RuleCandidate&gt; candidates = discovery.discover(min, max);</span>
-<span class="fc" id="L172">            out.println(&quot;Found &quot; + candidates.size() + &quot; rule candidate(s).&quot;);</span>
-<span class="fc" id="L173">            List&lt;DiscoveredTransformation&gt; transformations = graphStore.discoveredTransformations();</span>
-<span class="fc" id="L174">            transformations.stream()</span>
-<span class="fc" id="L175">                .max((a, b) -&gt; Integer.compare(a.totalImprovement(), b.totalImprovement()))</span>
-<span class="fc" id="L176">                .ifPresent(best -&gt; out.println(&quot;Best improvement: &quot;</span>
-<span class="fc" id="L177">                    + best.originalExpression() + &quot; -&gt; &quot; + best.improvedExpression()</span>
-<span class="fc" id="L178">                    + &quot; (Δ=&quot; + best.totalImprovement() + &quot;)&quot;));</span>
-<span class="pc bpc" id="L179" title="2 of 4 branches missed.">            if (candidates.isEmpty() &amp;&amp; transformations.isEmpty()) {</span>
-<span class="nc" id="L180">                out.println(&quot;Hinweis: Keine Regel und keine Verbesserung gefunden. &quot;</span>
+<span class="fc" id="L175">            List&lt;RuleCandidate&gt; candidates = discovery.discover(min, max);</span>
+<span class="fc" id="L176">            out.println(&quot;Found &quot; + candidates.size() + &quot; rule candidate(s).&quot;);</span>
+<span class="fc" id="L177">            List&lt;DiscoveredTransformation&gt; transformations = graphStore.discoveredTransformations();</span>
+<span class="fc" id="L178">            transformations.stream()</span>
+<span class="fc" id="L179">                .max((a, b) -&gt; Integer.compare(a.totalImprovement(), b.totalImprovement()))</span>
+<span class="fc" id="L180">                .ifPresent(best -&gt; out.println(&quot;Best improvement: &quot;</span>
+<span class="fc" id="L181">                    + best.originalExpression() + &quot; -&gt; &quot; + best.improvedExpression()</span>
+<span class="fc" id="L182">                    + &quot; (Δ=&quot; + best.totalImprovement() + &quot;)&quot;));</span>
+<span class="pc bpc" id="L183" title="2 of 4 branches missed.">            if (candidates.isEmpty() &amp;&amp; transformations.isEmpty()) {</span>
+<span class="nc" id="L184">                out.println(&quot;Hinweis: Keine Regel und keine Verbesserung gefunden. &quot;</span>
                     + &quot;Bereich (--min/--max) oder Suchtiefe erhöhen.&quot;);
             }
 
-<span class="pc bpc" id="L184" title="1 of 2 branches missed.">            if (!formats.isEmpty()) {</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">            if (!formats.isEmpty()) {</span>
                 try {
-<span class="fc" id="L186">                    List&lt;Path&gt; written = exportFileService.writeAll(</span>
-<span class="fc" id="L187">                        Paths.get(directory),</span>
+<span class="fc" id="L190">                    List&lt;Path&gt; written = exportFileService.writeAll(</span>
+<span class="fc" id="L191">                        Paths.get(directory),</span>
                         formats,
                         transformations,
                         candidates,
-<span class="fc" id="L191">                        inventoryRepository.findAll()</span>
+<span class="fc" id="L195">                        inventoryRepository.findAll()</span>
                     );
-<span class="fc bfc" id="L193" title="All 2 branches covered.">                    for (Path path : written) {</span>
-<span class="fc" id="L194">                        out.println(&quot;Exported &quot; + transformations.size()</span>
-<span class="fc" id="L195">                            + &quot; transformations to &quot; + path.toAbsolutePath());</span>
-<span class="fc" id="L196">                    }</span>
-<span class="nc" id="L197">                } catch (Exception ex) {</span>
-<span class="nc" id="L198">                    out.println(&quot;Export failed: &quot; + ex.getMessage());</span>
-<span class="nc" id="L199">                    return 2;</span>
-<span class="fc" id="L200">                }</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">                    for (Path path : written) {</span>
+<span class="fc" id="L198">                        out.println(&quot;Exported &quot; + transformations.size()</span>
+<span class="fc" id="L199">                            + &quot; transformations to &quot; + path.toAbsolutePath());</span>
+<span class="fc" id="L200">                    }</span>
+<span class="nc" id="L201">                } catch (Exception ex) {</span>
+<span class="nc" id="L202">                    out.println(&quot;Export failed: &quot; + ex.getMessage());</span>
+<span class="nc" id="L203">                    return 2;</span>
+<span class="fc" id="L204">                }</span>
             }
-<span class="fc" id="L202">            return 0;</span>
+<span class="fc" id="L206">            return 0;</span>
         } finally {
-<span class="fc" id="L204">            discovery.shutdown();</span>
+<span class="fc" id="L208">            discovery.shutdown();</span>
         }
     }
 
     private int runTransform(String[] args) {
-<span class="nc bnc" id="L209" title="All 2 branches missed.">        if (args.length == 0) {</span>
-<span class="nc" id="L210">            out.println(&quot;Usage: transform &lt;expression&gt;&quot;);</span>
-<span class="nc" id="L211">            return 1;</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">        if (args.length == 0) {</span>
+<span class="nc" id="L214">            out.println(&quot;Usage: transform &lt;expression&gt;&quot;);</span>
+<span class="nc" id="L215">            return 1;</span>
         }
-<span class="nc" id="L213">        String expression = String.join(&quot; &quot;, args);</span>
-<span class="nc" id="L214">        try (PluginRuntime runtime = new PluginRuntime(PluginRuntimeConfig.defaults())) {</span>
-<span class="nc" id="L215">            TransformationEngine pluginEngine = runtime.createTransformationEngine();</span>
-<span class="nc" id="L216">            TransformationEngine symPyEngine = new SymPyTransformationEngine();</span>
-<span class="nc" id="L217">            TransformationEngine engine = expr -&gt; {</span>
-<span class="nc" id="L218">                LinkedHashSet&lt;Transformation&gt; combined = new LinkedHashSet&lt;&gt;(symPyEngine.transform(expr));</span>
-<span class="nc" id="L219">                combined.addAll(pluginEngine.transform(expr));</span>
-<span class="nc" id="L220">                return new ArrayList&lt;&gt;(combined);</span>
+<span class="nc" id="L217">        String expression = String.join(&quot; &quot;, args);</span>
+<span class="nc" id="L218">        try (PluginRuntime runtime = new PluginRuntime(PluginRuntimeConfig.defaults())) {</span>
+<span class="nc" id="L219">            TransformationEngine pluginEngine = runtime.createTransformationEngine();</span>
+<span class="nc" id="L220">            TransformationEngine symPyEngine = new SymPyTransformationEngine();</span>
+<span class="nc" id="L221">            TransformationEngine engine = expr -&gt; {</span>
+<span class="nc" id="L222">                LinkedHashSet&lt;Transformation&gt; combined = new LinkedHashSet&lt;&gt;(symPyEngine.transform(expr));</span>
+<span class="nc" id="L223">                combined.addAll(pluginEngine.transform(expr));</span>
+<span class="nc" id="L224">                return new ArrayList&lt;&gt;(combined);</span>
             };
-<span class="nc" id="L222">            TransformationSearchService service = new TransformationSearchService(</span>
+<span class="nc" id="L226">            TransformationSearchService service = new TransformationSearchService(</span>
                 engine,
                 graphStore,
                 new SearchHeuristic(5, 500, 2),
                 new ConsoleNotifier()
             );
-<span class="nc" id="L228">            service.submit(new InputRequest(InputType.TERM, expression)).join();</span>
-<span class="nc" id="L229">            service.getBestSolution().ifPresentOrElse(</span>
-<span class="nc" id="L230">                best -&gt; out.println(&quot;Best simplification: &quot; + best.simplifiedExpression()),</span>
-<span class="nc" id="L231">                () -&gt; out.println(&quot;No simplification found yet&quot;)</span>
+<span class="nc" id="L232">            service.submit(new InputRequest(InputType.TERM, expression)).join();</span>
+<span class="nc" id="L233">            service.getBestSolution().ifPresentOrElse(</span>
+<span class="nc" id="L234">                best -&gt; out.println(&quot;Best simplification: &quot; + best.simplifiedExpression()),</span>
+<span class="nc" id="L235">                () -&gt; out.println(&quot;No simplification found yet&quot;)</span>
             );
-<span class="nc" id="L233">            service.shutdown();</span>
-<span class="nc" id="L234">            return 0;</span>
+<span class="nc" id="L237">            service.shutdown();</span>
+<span class="nc" id="L238">            return 0;</span>
         }
     }
 
     private int runPlugins(String[] args) {
-<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        String sub = args.length == 0 ? &quot;list&quot; : args[0].toLowerCase(Locale.ROOT);</span>
-<span class="fc" id="L240">        CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, Math.min(1, args.length), args.length));</span>
-<span class="fc" id="L241">        Path pluginsDir = Paths.get(options.getOrDefault(&quot;dir&quot;, &quot;plugins&quot;));</span>
-<span class="fc" id="L242">        Path rulesDir = Paths.get(options.getOrDefault(&quot;rules&quot;, &quot;rules&quot;));</span>
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">        String sub = args.length == 0 ? &quot;list&quot; : args[0].toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L244">        CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, Math.min(1, args.length), args.length));</span>
+<span class="fc" id="L245">        Path pluginsDir = Paths.get(options.getOrDefault(&quot;dir&quot;, &quot;plugins&quot;));</span>
+<span class="fc" id="L246">        Path rulesDir = Paths.get(options.getOrDefault(&quot;rules&quot;, &quot;rules&quot;));</span>
 
-<span class="pc bpc" id="L244" title="4 of 5 branches missed.">        switch (sub) {</span>
+<span class="pc bpc" id="L248" title="4 of 5 branches missed.">        switch (sub) {</span>
             case &quot;list&quot; -&gt; {
-<span class="fc" id="L246">                try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(</span>
+<span class="fc" id="L250">                try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(</span>
                     pluginsDir,
                     rulesDir,
                     true,
-<span class="fc" id="L250">                    java.util.Set.of(),</span>
-<span class="fc" id="L251">                    java.util.Set.of()</span>
+<span class="fc" id="L254">                    java.util.Set.of(),</span>
+<span class="fc" id="L255">                    java.util.Set.of()</span>
                 ))) {
-<span class="pc bpc" id="L253" title="1 of 2 branches missed.">                    if (runtime.loadedPlugins().isEmpty()) {</span>
-<span class="nc" id="L254">                        out.println(&quot;No plugins loaded.&quot;);</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">                    if (runtime.loadedPlugins().isEmpty()) {</span>
+<span class="nc" id="L258">                        out.println(&quot;No plugins loaded.&quot;);</span>
                     } else {
-<span class="fc" id="L256">                        runtime.loadedPlugins().forEach(plugin -&gt; {</span>
-<span class="fc" id="L257">                            PluginCatalogEntry entry = PluginCatalogEntry.from(plugin);</span>
-<span class="pc bpc" id="L258" title="1 of 2 branches missed.">                            String capabilities = plugin.capabilities().isEmpty()</span>
-<span class="nc" id="L259">                                ? &quot;-&quot;</span>
-<span class="fc" id="L260">                                : String.join(&quot;, &quot;, plugin.capabilities());</span>
-<span class="fc bfc" id="L261" title="All 2 branches covered.">                            String dependencies = entry.dependencies().isEmpty()</span>
-<span class="fc" id="L262">                                ? &quot;-&quot;</span>
-<span class="fc" id="L263">                                : entry.dependencies().stream()</span>
-<span class="fc" id="L264">                                    .map(dependency -&gt; dependency.pluginId() + &quot; &quot; + dependency.versionConstraint()</span>
-<span class="fc bfc" id="L265" title="All 2 branches covered.">                                        + (dependency.optional() ? &quot; (optional)&quot; : &quot;&quot;)</span>
-<span class="fc" id="L266">                                        + &quot; [&quot; + dependency.status() + &quot;]&quot;)</span>
-<span class="fc" id="L267">                                    .collect(java.util.stream.Collectors.joining(&quot;, &quot;));</span>
-<span class="fc bfc" id="L268" title="All 2 branches covered.">                            String compatibilityIssues = entry.compatibilityIssues().isEmpty()</span>
-<span class="fc" id="L269">                                ? &quot;-&quot;</span>
-<span class="fc" id="L270">                                : String.join(&quot;, &quot;, entry.compatibilityIssues());</span>
-<span class="pc bpc" id="L271" title="1 of 2 branches missed.">                            String provenance = entry.provenance().isBlank() ? &quot;-&quot; : entry.provenance();</span>
-<span class="pc bpc" id="L272" title="1 of 2 branches missed.">                            String trustWarnings = entry.trustWarnings().isEmpty()</span>
+<span class="fc" id="L260">                        runtime.loadedPlugins().forEach(plugin -&gt; {</span>
+<span class="fc" id="L261">                            PluginCatalogEntry entry = PluginCatalogEntry.from(plugin);</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">                            String capabilities = plugin.capabilities().isEmpty()</span>
+<span class="nc" id="L263">                                ? &quot;-&quot;</span>
+<span class="fc" id="L264">                                : String.join(&quot;, &quot;, plugin.capabilities());</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">                            String dependencies = entry.dependencies().isEmpty()</span>
+<span class="fc" id="L266">                                ? &quot;-&quot;</span>
+<span class="fc" id="L267">                                : entry.dependencies().stream()</span>
+<span class="fc" id="L268">                                    .map(dependency -&gt; dependency.pluginId() + &quot; &quot; + dependency.versionConstraint()</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">                                        + (dependency.optional() ? &quot; (optional)&quot; : &quot;&quot;)</span>
+<span class="fc" id="L270">                                        + &quot; [&quot; + dependency.status() + &quot;]&quot;)</span>
+<span class="fc" id="L271">                                    .collect(java.util.stream.Collectors.joining(&quot;, &quot;));</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">                            String compatibilityIssues = entry.compatibilityIssues().isEmpty()</span>
 <span class="fc" id="L273">                                ? &quot;-&quot;</span>
-<span class="pc" id="L274">                                : String.join(&quot;, &quot;, entry.trustWarnings());</span>
-<span class="fc" id="L275">                            out.println(</span>
-<span class="fc" id="L276">                                entry.id() + &quot; &quot; + entry.version()</span>
-<span class="pc bpc" id="L277" title="1 of 2 branches missed.">                                    + &quot; (&quot; + entry.source() + &quot;, &quot; + (entry.enabled() ? &quot;enabled&quot; : &quot;disabled&quot;) + &quot;)&quot;</span>
-<span class="fc" id="L278">                                    + &quot; name=\&quot;&quot; + entry.name() + &quot;\&quot;&quot;</span>
-<span class="fc" id="L279">                                    + &quot; api=&quot; + entry.apiVersion()</span>
-<span class="fc" id="L280">                                    + &quot; minCore=&quot; + entry.minimumCoreVersion()</span>
+<span class="fc" id="L274">                                : String.join(&quot;, &quot;, entry.compatibilityIssues());</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">                            String provenance = entry.provenance().isBlank() ? &quot;-&quot; : entry.provenance();</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">                            String trustWarnings = entry.trustWarnings().isEmpty()</span>
+<span class="fc" id="L277">                                ? &quot;-&quot;</span>
+<span class="pc" id="L278">                                : String.join(&quot;, &quot;, entry.trustWarnings());</span>
+<span class="fc" id="L279">                            out.println(</span>
+<span class="fc" id="L280">                                entry.id() + &quot; &quot; + entry.version()</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">                                    + &quot; (&quot; + entry.source() + &quot;, &quot; + (entry.enabled() ? &quot;enabled&quot; : &quot;disabled&quot;) + &quot;)&quot;</span>
+<span class="fc" id="L282">                                    + &quot; name=\&quot;&quot; + entry.name() + &quot;\&quot;&quot;</span>
+<span class="fc" id="L283">                                    + &quot; api=&quot; + entry.apiVersion()</span>
+<span class="fc" id="L284">                                    + &quot; minCore=&quot; + entry.minimumCoreVersion()</span>
                                     + &quot; capabilities=[&quot; + capabilities + &quot;]&quot;
-<span class="fc" id="L282">                                    + &quot; compatibility=&quot; + entry.compatibility()</span>
+<span class="fc" id="L286">                                    + &quot; compatibility=&quot; + entry.compatibility()</span>
                                     + &quot; compatibilityIssues=[&quot; + compatibilityIssues + &quot;]&quot;
                                     + &quot; dependencies=[&quot; + dependencies + &quot;]&quot;
                                     + &quot; provenance=&quot; + provenance
-<span class="fc" id="L286">                                    + &quot; signaturePresent=&quot; + entry.signaturePresent()</span>
-<span class="fc" id="L287">                                    + &quot; signatureVerified=&quot; + entry.signatureVerified()</span>
-<span class="fc" id="L288">                                    + &quot; trustedSource=&quot; + entry.trustedSource()</span>
+<span class="fc" id="L290">                                    + &quot; signaturePresent=&quot; + entry.signaturePresent()</span>
+<span class="fc" id="L291">                                    + &quot; signatureVerified=&quot; + entry.signatureVerified()</span>
+<span class="fc" id="L292">                                    + &quot; trustedSource=&quot; + entry.trustedSource()</span>
                                     + &quot; warnings=[&quot; + trustWarnings + &quot;]&quot;
                             );
-<span class="fc" id="L291">                        });</span>
+<span class="fc" id="L295">                        });</span>
                     }
-<span class="fc" id="L293">                    runtime.diagnostics().forEach(diagnostic -&gt; out.println(&quot;WARN &quot; + diagnostic.message()));</span>
-<span class="fc" id="L294">                    return 0;</span>
+<span class="fc" id="L297">                    runtime.diagnostics().forEach(diagnostic -&gt; out.println(&quot;WARN &quot; + diagnostic.message()));</span>
+<span class="fc" id="L298">                    return 0;</span>
                 }
             }
             case &quot;reload&quot; -&gt; {
-<span class="nc" id="L298">                try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(</span>
+<span class="nc" id="L302">                try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(</span>
                     pluginsDir,
                     rulesDir,
                     true,
-<span class="nc" id="L302">                    java.util.Set.of(),</span>
-<span class="nc" id="L303">                    java.util.Set.of()</span>
+<span class="nc" id="L306">                    java.util.Set.of(),</span>
+<span class="nc" id="L307">                    java.util.Set.of()</span>
                 ))) {
-<span class="nc" id="L305">                    PluginReloadResult result = runtime.reloadWithResult();</span>
-<span class="nc" id="L306">                    out.println(&quot;Reload complete.&quot;);</span>
-<span class="nc" id="L307">                    result.pluginChanges().forEach(change -&gt; out.println(&quot;  plugin &quot; + change.type() + &quot; &quot; + change.id()));</span>
-<span class="nc" id="L308">                    result.ruleFileChanges().forEach(change -&gt; out.println(&quot;  rulefile &quot; + change.type() + &quot; &quot; + change.id()));</span>
-<span class="nc" id="L309">                    result.diagnostics().forEach(diagnostic -&gt; out.println(&quot;  WARN &quot; + diagnostic.message()));</span>
-<span class="nc" id="L310">                    result.conflicts().forEach(conflict -&gt;</span>
-<span class="nc" id="L311">                        out.println(&quot;  CONFLICT &quot; + String.join(&quot;, &quot;, conflict.ruleIds())));</span>
-<span class="nc" id="L312">                    result.cyclicConflicts().forEach(conflict -&gt;</span>
-<span class="nc" id="L313">                        out.println(&quot;  CYCLE &quot; + String.join(&quot;, &quot;, conflict.ruleIds())));</span>
-<span class="nc" id="L314">                    return 0;</span>
+<span class="nc" id="L309">                    PluginReloadResult result = runtime.reloadWithResult();</span>
+<span class="nc" id="L310">                    out.println(&quot;Reload complete.&quot;);</span>
+<span class="nc" id="L311">                    result.pluginChanges().forEach(change -&gt; out.println(&quot;  plugin &quot; + change.type() + &quot; &quot; + change.id()));</span>
+<span class="nc" id="L312">                    result.ruleFileChanges().forEach(change -&gt; out.println(&quot;  rulefile &quot; + change.type() + &quot; &quot; + change.id()));</span>
+<span class="nc" id="L313">                    result.diagnostics().forEach(diagnostic -&gt; out.println(&quot;  WARN &quot; + diagnostic.message()));</span>
+<span class="nc" id="L314">                    result.conflicts().forEach(conflict -&gt;</span>
+<span class="nc" id="L315">                        out.println(&quot;  CONFLICT &quot; + String.join(&quot;, &quot;, conflict.ruleIds())));</span>
+<span class="nc" id="L316">                    result.cyclicConflicts().forEach(conflict -&gt;</span>
+<span class="nc" id="L317">                        out.println(&quot;  CYCLE &quot; + String.join(&quot;, &quot;, conflict.ruleIds())));</span>
+<span class="nc" id="L318">                    return 0;</span>
                 }
             }
             case &quot;status&quot; -&gt; {
-<span class="nc" id="L318">                try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(</span>
+<span class="nc" id="L322">                try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(</span>
                     pluginsDir,
                     rulesDir,
                     true,
-<span class="nc" id="L322">                    java.util.Set.of(),</span>
-<span class="nc" id="L323">                    java.util.Set.of()</span>
+<span class="nc" id="L326">                    java.util.Set.of(),</span>
+<span class="nc" id="L327">                    java.util.Set.of()</span>
                 ))) {
-<span class="nc" id="L325">                    out.println(&quot;Plugins directory: &quot; + pluginsDir.toAbsolutePath());</span>
-<span class="nc" id="L326">                    out.println(&quot;Rules directory: &quot; + rulesDir.toAbsolutePath());</span>
-<span class="nc" id="L327">                    out.println(&quot;Plugins loaded: &quot; + runtime.loadedPlugins().size());</span>
-<span class="nc" id="L328">                    out.println(&quot;Rules loaded: &quot; + runtime.registeredRules().size());</span>
-<span class="nc" id="L329">                    out.println(&quot;Rule files: &quot; + runtime.loadedRuleFiles().size());</span>
-<span class="nc" id="L330">                    out.println(&quot;Conflicts: &quot; + runtime.conflicts().size());</span>
-<span class="nc" id="L331">                    out.println(&quot;Cyclic conflicts: &quot; + runtime.cyclicConflicts().size());</span>
-<span class="nc" id="L332">                    runtime.diagnostics().forEach(diagnostic -&gt; out.println(&quot;WARN &quot; + diagnostic.message()));</span>
-<span class="nc" id="L333">                    return 0;</span>
+<span class="nc" id="L329">                    out.println(&quot;Plugins directory: &quot; + pluginsDir.toAbsolutePath());</span>
+<span class="nc" id="L330">                    out.println(&quot;Rules directory: &quot; + rulesDir.toAbsolutePath());</span>
+<span class="nc" id="L331">                    out.println(&quot;Plugins loaded: &quot; + runtime.loadedPlugins().size());</span>
+<span class="nc" id="L332">                    out.println(&quot;Rules loaded: &quot; + runtime.registeredRules().size());</span>
+<span class="nc" id="L333">                    out.println(&quot;Rule files: &quot; + runtime.loadedRuleFiles().size());</span>
+<span class="nc" id="L334">                    out.println(&quot;Conflicts: &quot; + runtime.conflicts().size());</span>
+<span class="nc" id="L335">                    out.println(&quot;Cyclic conflicts: &quot; + runtime.cyclicConflicts().size());</span>
+<span class="nc" id="L336">                    runtime.diagnostics().forEach(diagnostic -&gt; out.println(&quot;WARN &quot; + diagnostic.message()));</span>
+<span class="nc" id="L337">                    return 0;</span>
                 }
             }
             case &quot;watch&quot; -&gt; {
-<span class="nc" id="L337">                try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(</span>
+<span class="nc" id="L341">                try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(</span>
                     pluginsDir,
                     rulesDir,
                     true,
-<span class="nc" id="L341">                    java.util.Set.of(),</span>
-<span class="nc" id="L342">                    java.util.Set.of()</span>
+<span class="nc" id="L345">                    java.util.Set.of(),</span>
+<span class="nc" id="L346">                    java.util.Set.of()</span>
                 ))) {
-<span class="nc" id="L344">                    out.println(&quot;Watching &quot; + pluginsDir + &quot; and &quot; + rulesDir + &quot; for changes. Press Ctrl+C to stop.&quot;);</span>
-<span class="nc" id="L345">                    try (PluginDirectoryWatcher watcher = new PluginDirectoryWatcher(</span>
+<span class="nc" id="L348">                    out.println(&quot;Watching &quot; + pluginsDir + &quot; and &quot; + rulesDir + &quot; for changes. Press Ctrl+C to stop.&quot;);</span>
+<span class="nc" id="L349">                    try (PluginDirectoryWatcher watcher = new PluginDirectoryWatcher(</span>
                         runtime,
-<span class="nc" id="L347">                        java.time.Duration.ofMillis(500),</span>
+<span class="nc" id="L351">                        java.time.Duration.ofMillis(500),</span>
                         result -&gt; {
-<span class="nc" id="L349">                            out.println(&quot;[reload] Reload triggered.&quot;);</span>
-<span class="nc" id="L350">                            result.pluginChanges().forEach(change -&gt;</span>
-<span class="nc" id="L351">                                out.println(&quot;  plugin &quot; + change.type() + &quot; &quot; + change.id()));</span>
-<span class="nc" id="L352">                            result.ruleFileChanges().forEach(change -&gt;</span>
-<span class="nc" id="L353">                                out.println(&quot;  rulefile &quot; + change.type() + &quot; &quot; + change.id()));</span>
-<span class="nc" id="L354">                            result.diagnostics().stream()</span>
-<span class="nc bnc" id="L355" title="All 2 branches missed.">                                .filter(diagnostic -&gt; !diagnostic.message().contains(&quot;Activation profile&quot;))</span>
-<span class="nc" id="L356">                                .forEach(diagnostic -&gt; out.println(&quot;  WARN &quot; + diagnostic.message()));</span>
-<span class="nc" id="L357">                        }</span>
+<span class="nc" id="L353">                            out.println(&quot;[reload] Reload triggered.&quot;);</span>
+<span class="nc" id="L354">                            result.pluginChanges().forEach(change -&gt;</span>
+<span class="nc" id="L355">                                out.println(&quot;  plugin &quot; + change.type() + &quot; &quot; + change.id()));</span>
+<span class="nc" id="L356">                            result.ruleFileChanges().forEach(change -&gt;</span>
+<span class="nc" id="L357">                                out.println(&quot;  rulefile &quot; + change.type() + &quot; &quot; + change.id()));</span>
+<span class="nc" id="L358">                            result.diagnostics().stream()</span>
+<span class="nc bnc" id="L359" title="All 2 branches missed.">                                .filter(diagnostic -&gt; !diagnostic.message().contains(&quot;Activation profile&quot;))</span>
+<span class="nc" id="L360">                                .forEach(diagnostic -&gt; out.println(&quot;  WARN &quot; + diagnostic.message()));</span>
+<span class="nc" id="L361">                        }</span>
                     )) {
-<span class="nc" id="L359">                        watcher.start();</span>
-<span class="nc" id="L360">                        Thread.currentThread().join();</span>
-<span class="nc" id="L361">                    } catch (InterruptedException e) {</span>
-<span class="nc" id="L362">                        Thread.currentThread().interrupt();</span>
-<span class="nc" id="L363">                    }</span>
-<span class="nc" id="L364">                    return 0;</span>
-<span class="nc" id="L365">                } catch (IOException ex) {</span>
-<span class="nc" id="L366">                    out.println(&quot;Watch failed: &quot; + ex.getMessage());</span>
-<span class="nc" id="L367">                    return 2;</span>
+<span class="nc" id="L363">                        watcher.start();</span>
+<span class="nc" id="L364">                        Thread.currentThread().join();</span>
+<span class="nc" id="L365">                    } catch (InterruptedException e) {</span>
+<span class="nc" id="L366">                        Thread.currentThread().interrupt();</span>
+<span class="nc" id="L367">                    }</span>
+<span class="nc" id="L368">                    return 0;</span>
+<span class="nc" id="L369">                } catch (IOException ex) {</span>
+<span class="nc" id="L370">                    out.println(&quot;Watch failed: &quot; + ex.getMessage());</span>
+<span class="nc" id="L371">                    return 2;</span>
                 }
             }
             default -&gt; {
-<span class="nc" id="L371">                out.println(&quot;Usage: plugins list|reload|watch|status [--dir PATH] [--rules PATH]&quot;);</span>
-<span class="nc" id="L372">                return 1;</span>
+<span class="nc" id="L375">                out.println(&quot;Usage: plugins list|reload|watch|status [--dir PATH] [--rules PATH]&quot;);</span>
+<span class="nc" id="L376">                return 1;</span>
             }
         }
     }
@@ -379,485 +383,485 @@ public class CliRouter {
      * {@code --enable-pack} and {@code --disable-pack} options.
      */
     private static KnowledgePackSelection parsePackSelection(CliOptions options) {
-<span class="fc" id="L382">        String profileId = options.getOrDefault(&quot;rule-profile&quot;, &quot;&quot;);</span>
-<span class="fc bfc" id="L383" title="All 2 branches covered.">        KnowledgePackSelection selection = profileId.isBlank()</span>
-<span class="fc" id="L384">            ? KnowledgePackSelection.CORE</span>
-<span class="fc" id="L385">            : KnowledgePackSelection.profile(RuleProfile.fromId(profileId));</span>
-<span class="fc bfc" id="L386" title="All 2 branches covered.">        for (String packId : options.csv(&quot;enable-pack&quot;)) {</span>
-<span class="fc" id="L387">            selection = selection.enablePack(packId);</span>
-<span class="fc" id="L388">        }</span>
-<span class="fc bfc" id="L389" title="All 2 branches covered.">        for (String packId : options.csv(&quot;disable-pack&quot;)) {</span>
-<span class="fc" id="L390">            selection = selection.disablePack(packId);</span>
-<span class="fc" id="L391">        }</span>
-<span class="fc" id="L392">        CoreRuleCatalog.enabledPackIds(selection);</span>
-<span class="fc" id="L393">        return selection;</span>
+<span class="fc" id="L386">        String profileId = options.getOrDefault(&quot;rule-profile&quot;, &quot;&quot;);</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        KnowledgePackSelection selection = profileId.isBlank()</span>
+<span class="fc" id="L388">            ? KnowledgePackSelection.CORE</span>
+<span class="fc" id="L389">            : KnowledgePackSelection.profile(RuleProfile.fromId(profileId));</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        for (String packId : options.csv(&quot;enable-pack&quot;)) {</span>
+<span class="fc" id="L391">            selection = selection.enablePack(packId);</span>
+<span class="fc" id="L392">        }</span>
+<span class="fc bfc" id="L393" title="All 2 branches covered.">        for (String packId : options.csv(&quot;disable-pack&quot;)) {</span>
+<span class="fc" id="L394">            selection = selection.disablePack(packId);</span>
+<span class="fc" id="L395">        }</span>
+<span class="fc" id="L396">        CoreRuleCatalog.enabledPackIds(selection);</span>
+<span class="fc" id="L397">        return selection;</span>
     }
 
     private void printCorePacks(KnowledgePackSelection selection) {
-<span class="fc" id="L397">        java.util.Set&lt;String&gt; enabled = CoreRuleCatalog.enabledPackIds(selection);</span>
-<span class="fc bfc" id="L398" title="All 2 branches covered.">        for (CoreRulePack pack : CoreRuleCatalog.packs()) {</span>
-<span class="fc" id="L399">            boolean packEnabled = enabled.contains(pack.packId());</span>
-<span class="fc" id="L400">            out.println(&quot;core-pack &quot; + pack.packId() + &quot; (tier=&quot; + pack.tier().id() + &quot;, &quot;</span>
-<span class="fc bfc" id="L401" title="All 2 branches covered.">                + (packEnabled ? &quot;enabled&quot; : &quot;disabled&quot;) + &quot;, rules=&quot; + pack.ruleIds().size() + &quot;)&quot;);</span>
-<span class="fc bfc" id="L402" title="All 2 branches covered.">            for (String ruleId : pack.ruleIds()) {</span>
-<span class="fc" id="L403">                out.println(&quot;  rule &quot; + ruleId + &quot; (pack=&quot; + pack.packId()</span>
-<span class="fc" id="L404">                    + &quot;, tier=&quot; + pack.tier().id() + &quot;, &quot;</span>
-<span class="fc bfc" id="L405" title="All 2 branches covered.">                    + (packEnabled ? &quot;enabled&quot; : &quot;disabled&quot;) + &quot;)&quot;);</span>
-<span class="fc" id="L406">            }</span>
-<span class="fc" id="L407">        }</span>
-<span class="fc" id="L408">    }</span>
+<span class="fc" id="L401">        java.util.Set&lt;String&gt; enabled = CoreRuleCatalog.enabledPackIds(selection);</span>
+<span class="fc bfc" id="L402" title="All 2 branches covered.">        for (CoreRulePack pack : CoreRuleCatalog.packs()) {</span>
+<span class="fc" id="L403">            boolean packEnabled = enabled.contains(pack.packId());</span>
+<span class="fc" id="L404">            out.println(&quot;core-pack &quot; + pack.packId() + &quot; (tier=&quot; + pack.tier().id() + &quot;, &quot;</span>
+<span class="fc bfc" id="L405" title="All 2 branches covered.">                + (packEnabled ? &quot;enabled&quot; : &quot;disabled&quot;) + &quot;, rules=&quot; + pack.ruleIds().size() + &quot;)&quot;);</span>
+<span class="fc bfc" id="L406" title="All 2 branches covered.">            for (String ruleId : pack.ruleIds()) {</span>
+<span class="fc" id="L407">                out.println(&quot;  rule &quot; + ruleId + &quot; (pack=&quot; + pack.packId()</span>
+<span class="fc" id="L408">                    + &quot;, tier=&quot; + pack.tier().id() + &quot;, &quot;</span>
+<span class="fc bfc" id="L409" title="All 2 branches covered.">                    + (packEnabled ? &quot;enabled&quot; : &quot;disabled&quot;) + &quot;)&quot;);</span>
+<span class="fc" id="L410">            }</span>
+<span class="fc" id="L411">        }</span>
+<span class="fc" id="L412">    }</span>
 
     private int runRules(String[] args) {
-<span class="pc bpc" id="L411" title="1 of 2 branches missed.">        if (args.length == 0) {</span>
-<span class="nc" id="L412">            out.println(&quot;Usage: rules list|packs|validate|conflicts|profiles|debug|import|export&quot;);</span>
-<span class="nc" id="L413">            return 1;</span>
+<span class="pc bpc" id="L415" title="1 of 2 branches missed.">        if (args.length == 0) {</span>
+<span class="nc" id="L416">            out.println(&quot;Usage: rules list|packs|validate|conflicts|profiles|debug|import|export&quot;);</span>
+<span class="nc" id="L417">            return 1;</span>
         }
-<span class="fc" id="L415">        String sub = args[0].toLowerCase(Locale.ROOT);</span>
-<span class="fc" id="L416">        String[] rest = Arrays.copyOfRange(args, 1, args.length);</span>
-<span class="pc bpc" id="L417" title="2 of 9 branches missed.">        return switch (sub) {</span>
-<span class="fc" id="L418">            case &quot;list&quot; -&gt; runRulesList(rest);</span>
-<span class="fc" id="L419">            case &quot;packs&quot; -&gt; runRulesPacks(rest);</span>
-<span class="fc" id="L420">            case &quot;validate&quot; -&gt; runRulesValidate(rest);</span>
-<span class="fc" id="L421">            case &quot;conflicts&quot; -&gt; runRulesConflicts(rest);</span>
-<span class="fc" id="L422">            case &quot;profiles&quot; -&gt; runRulesProfiles(rest);</span>
-<span class="fc" id="L423">            case &quot;import&quot; -&gt; runRulesImportCommand(rest);</span>
-<span class="fc" id="L424">            case &quot;export&quot; -&gt; runRulesExportCommand(rest);</span>
-<span class="nc" id="L425">            case &quot;debug&quot; -&gt; runRulesDebugCommand(rest);</span>
+<span class="fc" id="L419">        String sub = args[0].toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L420">        String[] rest = Arrays.copyOfRange(args, 1, args.length);</span>
+<span class="pc bpc" id="L421" title="2 of 9 branches missed.">        return switch (sub) {</span>
+<span class="fc" id="L422">            case &quot;list&quot; -&gt; runRulesList(rest);</span>
+<span class="fc" id="L423">            case &quot;packs&quot; -&gt; runRulesPacks(rest);</span>
+<span class="fc" id="L424">            case &quot;validate&quot; -&gt; runRulesValidate(rest);</span>
+<span class="fc" id="L425">            case &quot;conflicts&quot; -&gt; runRulesConflicts(rest);</span>
+<span class="fc" id="L426">            case &quot;profiles&quot; -&gt; runRulesProfiles(rest);</span>
+<span class="fc" id="L427">            case &quot;import&quot; -&gt; runRulesImportCommand(rest);</span>
+<span class="fc" id="L428">            case &quot;export&quot; -&gt; runRulesExportCommand(rest);</span>
+<span class="nc" id="L429">            case &quot;debug&quot; -&gt; runRulesDebugCommand(rest);</span>
             default -&gt; {
-<span class="nc" id="L427">                out.println(&quot;Unknown rules command: &quot; + sub);</span>
-<span class="nc" id="L428">                yield 1;</span>
+<span class="nc" id="L431">                out.println(&quot;Unknown rules command: &quot; + sub);</span>
+<span class="nc" id="L432">                yield 1;</span>
             }
         };
     }
 
     private int runRulesList(String[] args) {
-<span class="fc" id="L434">        CliOptions options = CliOptions.parse(args);</span>
-<span class="fc" id="L435">        Path rulesDir = Paths.get(options.getOrDefault(&quot;dir&quot;, &quot;rules&quot;));</span>
-<span class="fc" id="L436">        String profile = options.getOrDefault(&quot;profile&quot;, &quot;&quot;);</span>
-<span class="fc" id="L437">        KnowledgePackSelection selection = parsePackSelectionOrReport(options);</span>
-<span class="pc bpc" id="L438" title="1 of 2 branches missed.">        if (selection == null) {</span>
-<span class="nc" id="L439">            return 1;</span>
+<span class="fc" id="L438">        CliOptions options = CliOptions.parse(args);</span>
+<span class="fc" id="L439">        Path rulesDir = Paths.get(options.getOrDefault(&quot;dir&quot;, &quot;rules&quot;));</span>
+<span class="fc" id="L440">        String profile = options.getOrDefault(&quot;profile&quot;, &quot;&quot;);</span>
+<span class="fc" id="L441">        KnowledgePackSelection selection = parsePackSelectionOrReport(options);</span>
+<span class="pc bpc" id="L442" title="1 of 2 branches missed.">        if (selection == null) {</span>
+<span class="nc" id="L443">            return 1;</span>
         }
-<span class="fc" id="L441">        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(</span>
-<span class="fc" id="L442">            Paths.get(&quot;plugins&quot;),</span>
+<span class="fc" id="L445">        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(</span>
+<span class="fc" id="L446">            Paths.get(&quot;plugins&quot;),</span>
             rulesDir,
             true,
-<span class="fc" id="L445">            java.util.Set.of(),</span>
-<span class="fc" id="L446">            java.util.Set.of(),</span>
+<span class="fc" id="L449">            java.util.Set.of(),</span>
+<span class="fc" id="L450">            java.util.Set.of(),</span>
             profile,
             selection
         ))) {
-<span class="fc" id="L450">            printCorePacks(selection);</span>
-<span class="fc" id="L451">            printRuntimeRules(runtime);</span>
-<span class="fc" id="L452">            printRuntimeExtensions(runtime);</span>
-<span class="fc" id="L453">            RuleInventoryManifest manifest = runtime.ruleInventoryManifest();</span>
-<span class="fc" id="L454">            out.println(&quot;rule-inventory profile=&quot; + manifest.profileId()</span>
-<span class="fc" id="L455">                + &quot; rules=&quot; + manifest.ruleIds().size()</span>
-<span class="fc" id="L456">                + &quot; hash=&quot; + manifest.contentHash());</span>
-<span class="fc" id="L457">            runtime.diagnostics().forEach(diagnostic -&gt; out.println(&quot;WARN &quot; + diagnostic.message()));</span>
-<span class="fc" id="L458">            return 0;</span>
+<span class="fc" id="L454">            printCorePacks(selection);</span>
+<span class="fc" id="L455">            printRuntimeRules(runtime);</span>
+<span class="fc" id="L456">            printRuntimeExtensions(runtime);</span>
+<span class="fc" id="L457">            RuleInventoryManifest manifest = runtime.ruleInventoryManifest();</span>
+<span class="fc" id="L458">            out.println(&quot;rule-inventory profile=&quot; + manifest.profileId()</span>
+<span class="fc" id="L459">                + &quot; rules=&quot; + manifest.ruleIds().size()</span>
+<span class="fc" id="L460">                + &quot; hash=&quot; + manifest.contentHash());</span>
+<span class="fc" id="L461">            runtime.diagnostics().forEach(diagnostic -&gt; out.println(&quot;WARN &quot; + diagnostic.message()));</span>
+<span class="fc" id="L462">            return 0;</span>
         }
     }
 
     private KnowledgePackSelection parsePackSelectionOrReport(CliOptions options) {
         try {
-<span class="fc" id="L464">            return parsePackSelection(options);</span>
-<span class="fc" id="L465">        } catch (IllegalArgumentException ex) {</span>
-<span class="fc" id="L466">            out.println(&quot;ERROR &quot; + ex.getMessage());</span>
-<span class="fc" id="L467">            return null;</span>
+<span class="fc" id="L468">            return parsePackSelection(options);</span>
+<span class="fc" id="L469">        } catch (IllegalArgumentException ex) {</span>
+<span class="fc" id="L470">            out.println(&quot;ERROR &quot; + ex.getMessage());</span>
+<span class="fc" id="L471">            return null;</span>
         }
     }
 
     private void printRuntimeRules(PluginRuntime runtime) {
-<span class="pc bpc" id="L472" title="1 of 2 branches missed.">        if (runtime.registeredRules().isEmpty()) {</span>
-<span class="nc" id="L473">            out.println(&quot;No plugin or rule-file rules loaded.&quot;);</span>
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">        if (runtime.registeredRules().isEmpty()) {</span>
+<span class="nc" id="L477">            out.println(&quot;No plugin or rule-file rules loaded.&quot;);</span>
         } else {
-<span class="fc" id="L475">            runtime.registeredRules().forEach(rule -&gt; out.println(rule.type() + &quot; &quot;</span>
-<span class="fc" id="L476">                + rule.id() + &quot; (&quot; + rule.source() + &quot;, tier=plugin, &quot;</span>
-<span class="fc bfc" id="L477" title="All 2 branches covered.">                + (rule.enabled() ? &quot;enabled&quot; : &quot;disabled&quot;) + &quot;)&quot;));</span>
+<span class="fc" id="L479">            runtime.registeredRules().forEach(rule -&gt; out.println(rule.type() + &quot; &quot;</span>
+<span class="fc" id="L480">                + rule.id() + &quot; (&quot; + rule.source() + &quot;, tier=plugin, &quot;</span>
+<span class="fc bfc" id="L481" title="All 2 branches covered.">                + (rule.enabled() ? &quot;enabled&quot; : &quot;disabled&quot;) + &quot;)&quot;));</span>
         }
-<span class="fc" id="L479">        runtime.macroRegistry().registrations()</span>
-<span class="fc" id="L480">            .forEach(macro -&gt; out.println(&quot;macro &quot; + macro.id() + &quot; (&quot; + macro.source() + &quot;, &quot;</span>
-<span class="fc bfc" id="L481" title="All 2 branches covered.">                + (macro.enabled() ? &quot;enabled&quot; : &quot;disabled&quot;) + &quot;)&quot;));</span>
-<span class="fc" id="L482">    }</span>
+<span class="fc" id="L483">        runtime.macroRegistry().registrations()</span>
+<span class="fc" id="L484">            .forEach(macro -&gt; out.println(&quot;macro &quot; + macro.id() + &quot; (&quot; + macro.source() + &quot;, &quot;</span>
+<span class="fc bfc" id="L485" title="All 2 branches covered.">                + (macro.enabled() ? &quot;enabled&quot; : &quot;disabled&quot;) + &quot;)&quot;));</span>
+<span class="fc" id="L486">    }</span>
 
     private void printRuntimeExtensions(PluginRuntime runtime) {
-<span class="fc" id="L485">        printExtensions(&quot;search-strategy&quot;, runtime.searchStrategyRegistry().registrations());</span>
-<span class="fc" id="L486">        printExtensions(&quot;heuristic&quot;, runtime.heuristicRegistry().registrations());</span>
-<span class="fc" id="L487">        printExtensions(&quot;cost-function&quot;, runtime.costFunctionRegistry().registrations());</span>
-<span class="fc" id="L488">        printExtensions(&quot;renderer&quot;, runtime.rendererRegistry().registrations());</span>
-<span class="fc" id="L489">        printExtensions(&quot;explanation&quot;, runtime.explanationRegistry().registrations());</span>
-<span class="fc" id="L490">        printExtensions(&quot;parser-extension&quot;, runtime.parserExtensionRegistry().registrations());</span>
-<span class="fc" id="L491">        printExtensions(&quot;example&quot;, runtime.exampleRegistry().registrations());</span>
-<span class="fc" id="L492">    }</span>
+<span class="fc" id="L489">        printExtensions(&quot;search-strategy&quot;, runtime.searchStrategyRegistry().registrations());</span>
+<span class="fc" id="L490">        printExtensions(&quot;heuristic&quot;, runtime.heuristicRegistry().registrations());</span>
+<span class="fc" id="L491">        printExtensions(&quot;cost-function&quot;, runtime.costFunctionRegistry().registrations());</span>
+<span class="fc" id="L492">        printExtensions(&quot;renderer&quot;, runtime.rendererRegistry().registrations());</span>
+<span class="fc" id="L493">        printExtensions(&quot;explanation&quot;, runtime.explanationRegistry().registrations());</span>
+<span class="fc" id="L494">        printExtensions(&quot;parser-extension&quot;, runtime.parserExtensionRegistry().registrations());</span>
+<span class="fc" id="L495">        printExtensions(&quot;example&quot;, runtime.exampleRegistry().registrations());</span>
+<span class="fc" id="L496">    }</span>
 
     private int runRulesPacks(String[] args) {
-<span class="fc" id="L495">        KnowledgePackSelection selection = parsePackSelectionOrReport(CliOptions.parse(args));</span>
-<span class="fc bfc" id="L496" title="All 2 branches covered.">        if (selection == null) {</span>
-<span class="fc" id="L497">            return 1;</span>
+<span class="fc" id="L499">        KnowledgePackSelection selection = parsePackSelectionOrReport(CliOptions.parse(args));</span>
+<span class="fc bfc" id="L500" title="All 2 branches covered.">        if (selection == null) {</span>
+<span class="fc" id="L501">            return 1;</span>
         }
-<span class="fc" id="L499">        printCorePacks(selection);</span>
-<span class="fc" id="L500">        return 0;</span>
+<span class="fc" id="L503">        printCorePacks(selection);</span>
+<span class="fc" id="L504">        return 0;</span>
     }
 
     private int runRulesValidate(String[] args) {
-<span class="pc bpc" id="L504" title="1 of 2 branches missed.">        if (args.length == 0) {</span>
-<span class="nc" id="L505">            out.println(&quot;Usage: rules validate &lt;file.regelsuche&gt;&quot;);</span>
-<span class="nc" id="L506">            return 1;</span>
+<span class="pc bpc" id="L508" title="1 of 2 branches missed.">        if (args.length == 0) {</span>
+<span class="nc" id="L509">            out.println(&quot;Usage: rules validate &lt;file.regelsuche&gt;&quot;);</span>
+<span class="nc" id="L510">            return 1;</span>
         }
-<span class="fc" id="L508">        Path file = Paths.get(args[0]);</span>
+<span class="fc" id="L512">        Path file = Paths.get(args[0]);</span>
         try {
-<span class="nc" id="L510">            new PluginRuntime.RuleFileLoader().load(file, new de.regelsuche.plugin.RuleRegistry(),</span>
+<span class="nc" id="L514">            new PluginRuntime.RuleFileLoader().load(file, new de.regelsuche.plugin.RuleRegistry(),</span>
                 new de.regelsuche.plugin.MacroRegistry());
-<span class="nc" id="L512">            out.println(&quot;Rule file is valid: &quot; + file.toAbsolutePath());</span>
-<span class="nc" id="L513">            return 0;</span>
-<span class="fc" id="L514">        } catch (RuleFileParseException ex) {</span>
-<span class="fc" id="L515">            ex.diagnostics().forEach(diagnostic -&gt; out.println(diagnostic.format()));</span>
-<span class="fc" id="L516">            return 2;</span>
+<span class="nc" id="L516">            out.println(&quot;Rule file is valid: &quot; + file.toAbsolutePath());</span>
+<span class="nc" id="L517">            return 0;</span>
+<span class="fc" id="L518">        } catch (RuleFileParseException ex) {</span>
+<span class="fc" id="L519">            ex.diagnostics().forEach(diagnostic -&gt; out.println(diagnostic.format()));</span>
+<span class="fc" id="L520">            return 2;</span>
         }
     }
 
     private int runRulesConflicts(String[] args) {
-<span class="fc" id="L521">        CliOptions options = CliOptions.parse(args);</span>
-<span class="fc" id="L522">        Path rulesDir = Paths.get(options.getOrDefault(&quot;dir&quot;, &quot;rules&quot;));</span>
-<span class="fc" id="L523">        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(</span>
-<span class="fc" id="L524">            Paths.get(&quot;plugins&quot;),</span>
+<span class="fc" id="L525">        CliOptions options = CliOptions.parse(args);</span>
+<span class="fc" id="L526">        Path rulesDir = Paths.get(options.getOrDefault(&quot;dir&quot;, &quot;rules&quot;));</span>
+<span class="fc" id="L527">        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(</span>
+<span class="fc" id="L528">            Paths.get(&quot;plugins&quot;),</span>
             rulesDir,
             true,
-<span class="fc" id="L527">            java.util.Set.of(),</span>
-<span class="fc" id="L528">            java.util.Set.of()</span>
+<span class="fc" id="L531">            java.util.Set.of(),</span>
+<span class="fc" id="L532">            java.util.Set.of()</span>
         ))) {
-<span class="pc bpc" id="L530" title="3 of 4 branches missed.">            if (runtime.conflicts().isEmpty() &amp;&amp; runtime.cyclicConflicts().isEmpty()) {</span>
-<span class="nc" id="L531">                out.println(&quot;No rule conflicts detected.&quot;);</span>
+<span class="pc bpc" id="L534" title="3 of 4 branches missed.">            if (runtime.conflicts().isEmpty() &amp;&amp; runtime.cyclicConflicts().isEmpty()) {</span>
+<span class="nc" id="L535">                out.println(&quot;No rule conflicts detected.&quot;);</span>
             } else {
-<span class="fc" id="L533">                runtime.conflicts().forEach(conflict -&gt; out.println(</span>
+<span class="fc" id="L537">                runtime.conflicts().forEach(conflict -&gt; out.println(</span>
                     &quot;CONFLICT competing rules share source pattern: &quot;
-<span class="fc" id="L535">                        + String.join(&quot;, &quot;, conflict.ruleIds())));</span>
-<span class="fc" id="L536">                runtime.cyclicConflicts().forEach(cycle -&gt; out.println(</span>
+<span class="fc" id="L539">                        + String.join(&quot;, &quot;, conflict.ruleIds())));</span>
+<span class="fc" id="L540">                runtime.cyclicConflicts().forEach(cycle -&gt; out.println(</span>
                     &quot;CYCLE inverse rules can loop indefinitely: &quot;
-<span class="fc" id="L538">                        + String.join(&quot;, &quot;, cycle.ruleIds())));</span>
+<span class="fc" id="L542">                        + String.join(&quot;, &quot;, cycle.ruleIds())));</span>
             }
-<span class="fc" id="L540">            return 0;</span>
+<span class="fc" id="L544">            return 0;</span>
         }
     }
 
     private int runRulesProfiles(String[] args) {
-<span class="fc" id="L545">        CliOptions options = CliOptions.parse(args);</span>
-<span class="fc" id="L546">        Path rulesDir = Paths.get(options.getOrDefault(&quot;dir&quot;, &quot;rules&quot;));</span>
-<span class="fc" id="L547">        String activeProfile = options.getOrDefault(&quot;profile&quot;, &quot;&quot;);</span>
-<span class="fc" id="L548">        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(</span>
-<span class="fc" id="L549">            Paths.get(&quot;plugins&quot;),</span>
+<span class="fc" id="L549">        CliOptions options = CliOptions.parse(args);</span>
+<span class="fc" id="L550">        Path rulesDir = Paths.get(options.getOrDefault(&quot;dir&quot;, &quot;rules&quot;));</span>
+<span class="fc" id="L551">        String activeProfile = options.getOrDefault(&quot;profile&quot;, &quot;&quot;);</span>
+<span class="fc" id="L552">        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(</span>
+<span class="fc" id="L553">            Paths.get(&quot;plugins&quot;),</span>
             rulesDir,
             true,
-<span class="fc" id="L552">            java.util.Set.of(),</span>
-<span class="fc" id="L553">            java.util.Set.of(),</span>
+<span class="fc" id="L556">            java.util.Set.of(),</span>
+<span class="fc" id="L557">            java.util.Set.of(),</span>
             activeProfile
         ))) {
-<span class="pc bpc" id="L556" title="1 of 2 branches missed.">            if (runtime.profiles().isEmpty()) {</span>
-<span class="nc" id="L557">                out.println(&quot;No activation profiles loaded.&quot;);</span>
+<span class="pc bpc" id="L560" title="1 of 2 branches missed.">            if (runtime.profiles().isEmpty()) {</span>
+<span class="nc" id="L561">                out.println(&quot;No activation profiles loaded.&quot;);</span>
             } else {
-<span class="fc" id="L559">                runtime.profiles().forEach(profile -&gt; out.println(</span>
-<span class="fc" id="L560">                    &quot;profile &quot; + profile.id()</span>
-<span class="pc bpc" id="L561" title="1 of 2 branches missed.">                        + (profile.id().equals(runtime.activeProfile()) ? &quot; [active]&quot; : &quot;&quot;)</span>
-<span class="fc" id="L562">                        + &quot; (enable: &quot; + String.join(&quot;, &quot;, profile.enableTags())</span>
-<span class="fc" id="L563">                        + &quot;; disable: &quot; + String.join(&quot;, &quot;, profile.disableTags())</span>
-<span class="fc" id="L564">                        + &quot;; whitelist: &quot; + String.join(&quot;, &quot;, profile.whitelist())</span>
-<span class="fc" id="L565">                        + &quot;; blacklist: &quot; + String.join(&quot;, &quot;, profile.blacklist()) + &quot;)&quot;));</span>
+<span class="fc" id="L563">                runtime.profiles().forEach(profile -&gt; out.println(</span>
+<span class="fc" id="L564">                    &quot;profile &quot; + profile.id()</span>
+<span class="pc bpc" id="L565" title="1 of 2 branches missed.">                        + (profile.id().equals(runtime.activeProfile()) ? &quot; [active]&quot; : &quot;&quot;)</span>
+<span class="fc" id="L566">                        + &quot; (enable: &quot; + String.join(&quot;, &quot;, profile.enableTags())</span>
+<span class="fc" id="L567">                        + &quot;; disable: &quot; + String.join(&quot;, &quot;, profile.disableTags())</span>
+<span class="fc" id="L568">                        + &quot;; whitelist: &quot; + String.join(&quot;, &quot;, profile.whitelist())</span>
+<span class="fc" id="L569">                        + &quot;; blacklist: &quot; + String.join(&quot;, &quot;, profile.blacklist()) + &quot;)&quot;));</span>
             }
-<span class="fc" id="L567">            runtime.diagnostics().forEach(diagnostic -&gt; out.println(&quot;WARN &quot; + diagnostic.message()));</span>
-<span class="fc" id="L568">            return 0;</span>
+<span class="fc" id="L571">            runtime.diagnostics().forEach(diagnostic -&gt; out.println(&quot;WARN &quot; + diagnostic.message()));</span>
+<span class="fc" id="L572">            return 0;</span>
         }
     }
 
     private int runRulesImportCommand(String[] args) {
-<span class="pc bpc" id="L573" title="1 of 2 branches missed.">        if (args.length == 0) {</span>
-<span class="nc" id="L574">            out.println(&quot;Usage: rules import &lt;file-or-dir&gt; [--into rules/]&quot;);</span>
-<span class="nc" id="L575">            return 1;</span>
+<span class="pc bpc" id="L577" title="1 of 2 branches missed.">        if (args.length == 0) {</span>
+<span class="nc" id="L578">            out.println(&quot;Usage: rules import &lt;file-or-dir&gt; [--into rules/]&quot;);</span>
+<span class="nc" id="L579">            return 1;</span>
         }
-<span class="fc" id="L577">        CliOptions options = CliOptions.parse(args);</span>
-<span class="fc" id="L578">        Path source = Paths.get(args[0]);</span>
-<span class="fc" id="L579">        Path targetDir = Paths.get(options.getOrDefault(&quot;into&quot;, &quot;rules&quot;));</span>
-<span class="fc" id="L580">        return runRulesImport(source, targetDir);</span>
+<span class="fc" id="L581">        CliOptions options = CliOptions.parse(args);</span>
+<span class="fc" id="L582">        Path source = Paths.get(args[0]);</span>
+<span class="fc" id="L583">        Path targetDir = Paths.get(options.getOrDefault(&quot;into&quot;, &quot;rules&quot;));</span>
+<span class="fc" id="L584">        return runRulesImport(source, targetDir);</span>
     }
 
     private int runRulesExportCommand(String[] args) {
-<span class="fc" id="L584">        CliOptions options = CliOptions.parse(args);</span>
-<span class="fc" id="L585">        Path rulesDir = Paths.get(options.getOrDefault(&quot;dir&quot;, &quot;rules&quot;));</span>
-<span class="fc" id="L586">        Path outputDir = Paths.get(options.getOrDefault(&quot;out&quot;, &quot;exports&quot;));</span>
-<span class="fc" id="L587">        String profile = options.getOrDefault(&quot;profile&quot;, &quot;&quot;);</span>
-<span class="fc" id="L588">        return runRulesExport(rulesDir, outputDir, profile);</span>
+<span class="fc" id="L588">        CliOptions options = CliOptions.parse(args);</span>
+<span class="fc" id="L589">        Path rulesDir = Paths.get(options.getOrDefault(&quot;dir&quot;, &quot;rules&quot;));</span>
+<span class="fc" id="L590">        Path outputDir = Paths.get(options.getOrDefault(&quot;out&quot;, &quot;exports&quot;));</span>
+<span class="fc" id="L591">        String profile = options.getOrDefault(&quot;profile&quot;, &quot;&quot;);</span>
+<span class="fc" id="L592">        return runRulesExport(rulesDir, outputDir, profile);</span>
     }
 
     private int runRulesDebugCommand(String[] args) {
-<span class="nc bnc" id="L592" title="All 2 branches missed.">        if (args.length == 0) {</span>
-<span class="nc" id="L593">            out.println(&quot;Usage: rules debug &lt;expression&gt; [--dir rules/]&quot;);</span>
-<span class="nc" id="L594">            return 1;</span>
+<span class="nc bnc" id="L596" title="All 2 branches missed.">        if (args.length == 0) {</span>
+<span class="nc" id="L597">            out.println(&quot;Usage: rules debug &lt;expression&gt; [--dir rules/]&quot;);</span>
+<span class="nc" id="L598">            return 1;</span>
         }
-<span class="nc" id="L596">        CliOptions options = CliOptions.parse(args);</span>
-<span class="nc" id="L597">        Path rulesDir = Paths.get(options.getOrDefault(&quot;dir&quot;, &quot;rules&quot;));</span>
-<span class="nc" id="L598">        return runRulesDebug(args[0], rulesDir);</span>
+<span class="nc" id="L600">        CliOptions options = CliOptions.parse(args);</span>
+<span class="nc" id="L601">        Path rulesDir = Paths.get(options.getOrDefault(&quot;dir&quot;, &quot;rules&quot;));</span>
+<span class="nc" id="L602">        return runRulesDebug(args[0], rulesDir);</span>
     }
 
     private int runInventory(String[] args) {
-<span class="nc bnc" id="L602" title="All 2 branches missed.">        if (args.length == 0) {</span>
-<span class="nc" id="L603">            out.println(&quot;Usage: inventory list|export|enable|disable|import|tag&quot;);</span>
-<span class="nc" id="L604">            return 1;</span>
+<span class="nc bnc" id="L606" title="All 2 branches missed.">        if (args.length == 0) {</span>
+<span class="nc" id="L607">            out.println(&quot;Usage: inventory list|export|enable|disable|import|tag&quot;);</span>
+<span class="nc" id="L608">            return 1;</span>
         }
-<span class="nc" id="L606">        String sub = args[0].toLowerCase(Locale.ROOT);</span>
-<span class="nc" id="L607">        String[] rest = Arrays.copyOfRange(args, 1, args.length);</span>
-<span class="nc bnc" id="L608" title="All 7 branches missed.">        switch (sub) {</span>
+<span class="nc" id="L610">        String sub = args[0].toLowerCase(Locale.ROOT);</span>
+<span class="nc" id="L611">        String[] rest = Arrays.copyOfRange(args, 1, args.length);</span>
+<span class="nc bnc" id="L612" title="All 7 branches missed.">        switch (sub) {</span>
             case &quot;list&quot; -&gt; {
-<span class="nc" id="L610">                List&lt;ReusableRule&gt; rules = inventoryRepository.findAll();</span>
-<span class="nc bnc" id="L611" title="All 2 branches missed.">                if (rules.isEmpty()) {</span>
-<span class="nc" id="L612">                    out.println(&quot;Inventory is empty.&quot;);</span>
+<span class="nc" id="L614">                List&lt;ReusableRule&gt; rules = inventoryRepository.findAll();</span>
+<span class="nc bnc" id="L615" title="All 2 branches missed.">                if (rules.isEmpty()) {</span>
+<span class="nc" id="L616">                    out.println(&quot;Inventory is empty.&quot;);</span>
                 } else {
-<span class="nc" id="L614">                    rules.forEach(rule -&gt; {</span>
-<span class="nc bnc" id="L615" title="All 2 branches missed.">                        String enabled = inventoryRepository.isEnabled(rule.id()) ? &quot;enabled&quot; : &quot;disabled&quot;;</span>
-<span class="nc bnc" id="L616" title="All 2 branches missed.">                        String tags = inventoryRepository.tagsOf(rule.id()).isEmpty()</span>
-<span class="nc" id="L617">                            ? &quot;&quot;</span>
-<span class="nc" id="L618">                            : &quot; tags=&quot; + inventoryRepository.tagsOf(rule.id());</span>
-<span class="nc" id="L619">                        out.println(rule.id() + &quot;: &quot;</span>
-<span class="nc" id="L620">                            + rule.leftPattern() + &quot; -&gt; &quot; + rule.rightPattern()</span>
-<span class="nc" id="L621">                            + &quot; (&quot; + rule.proofStatus() + &quot;, usage=&quot; + rule.usageCount()</span>
+<span class="nc" id="L618">                    rules.forEach(rule -&gt; {</span>
+<span class="nc bnc" id="L619" title="All 2 branches missed.">                        String enabled = inventoryRepository.isEnabled(rule.id()) ? &quot;enabled&quot; : &quot;disabled&quot;;</span>
+<span class="nc bnc" id="L620" title="All 2 branches missed.">                        String tags = inventoryRepository.tagsOf(rule.id()).isEmpty()</span>
+<span class="nc" id="L621">                            ? &quot;&quot;</span>
+<span class="nc" id="L622">                            : &quot; tags=&quot; + inventoryRepository.tagsOf(rule.id());</span>
+<span class="nc" id="L623">                        out.println(rule.id() + &quot;: &quot;</span>
+<span class="nc" id="L624">                            + rule.leftPattern() + &quot; -&gt; &quot; + rule.rightPattern()</span>
+<span class="nc" id="L625">                            + &quot; (&quot; + rule.proofStatus() + &quot;, usage=&quot; + rule.usageCount()</span>
                             + &quot;, &quot; + enabled + &quot;)&quot; + tags);
-<span class="nc" id="L623">                    });</span>
+<span class="nc" id="L627">                    });</span>
                 }
-<span class="nc" id="L625">                return 0;</span>
+<span class="nc" id="L629">                return 0;</span>
             }
             case &quot;enable&quot; -&gt; {
-<span class="nc bnc" id="L628" title="All 2 branches missed.">                if (rest.length == 0) {</span>
-<span class="nc" id="L629">                    out.println(&quot;Usage: inventory enable &lt;ruleId&gt;&quot;);</span>
-<span class="nc" id="L630">                    return 1;</span>
+<span class="nc bnc" id="L632" title="All 2 branches missed.">                if (rest.length == 0) {</span>
+<span class="nc" id="L633">                    out.println(&quot;Usage: inventory enable &lt;ruleId&gt;&quot;);</span>
+<span class="nc" id="L634">                    return 1;</span>
                 }
-<span class="nc" id="L632">                inventoryRepository.setEnabled(rest[0], true);</span>
-<span class="nc" id="L633">                out.println(&quot;Enabled &quot; + rest[0]);</span>
-<span class="nc" id="L634">                return 0;</span>
+<span class="nc" id="L636">                inventoryRepository.setEnabled(rest[0], true);</span>
+<span class="nc" id="L637">                out.println(&quot;Enabled &quot; + rest[0]);</span>
+<span class="nc" id="L638">                return 0;</span>
             }
             case &quot;disable&quot; -&gt; {
-<span class="nc bnc" id="L637" title="All 2 branches missed.">                if (rest.length == 0) {</span>
-<span class="nc" id="L638">                    out.println(&quot;Usage: inventory disable &lt;ruleId&gt;&quot;);</span>
-<span class="nc" id="L639">                    return 1;</span>
+<span class="nc bnc" id="L641" title="All 2 branches missed.">                if (rest.length == 0) {</span>
+<span class="nc" id="L642">                    out.println(&quot;Usage: inventory disable &lt;ruleId&gt;&quot;);</span>
+<span class="nc" id="L643">                    return 1;</span>
                 }
-<span class="nc" id="L641">                inventoryRepository.setEnabled(rest[0], false);</span>
-<span class="nc" id="L642">                out.println(&quot;Disabled &quot; + rest[0]);</span>
-<span class="nc" id="L643">                return 0;</span>
+<span class="nc" id="L645">                inventoryRepository.setEnabled(rest[0], false);</span>
+<span class="nc" id="L646">                out.println(&quot;Disabled &quot; + rest[0]);</span>
+<span class="nc" id="L647">                return 0;</span>
             }
             case &quot;tag&quot; -&gt; {
-<span class="nc bnc" id="L646" title="All 2 branches missed.">                if (rest.length &lt; 2) {</span>
-<span class="nc" id="L647">                    out.println(&quot;Usage: inventory tag &lt;ruleId&gt; &lt;tag&gt;&quot;);</span>
-<span class="nc" id="L648">                    return 1;</span>
+<span class="nc bnc" id="L650" title="All 2 branches missed.">                if (rest.length &lt; 2) {</span>
+<span class="nc" id="L651">                    out.println(&quot;Usage: inventory tag &lt;ruleId&gt; &lt;tag&gt;&quot;);</span>
+<span class="nc" id="L652">                    return 1;</span>
                 }
-<span class="nc" id="L650">                inventoryRepository.addTag(rest[0], rest[1]);</span>
-<span class="nc" id="L651">                out.println(&quot;Tagged &quot; + rest[0] + &quot; with &quot; + rest[1]);</span>
-<span class="nc" id="L652">                return 0;</span>
+<span class="nc" id="L654">                inventoryRepository.addTag(rest[0], rest[1]);</span>
+<span class="nc" id="L655">                out.println(&quot;Tagged &quot; + rest[0] + &quot; with &quot; + rest[1]);</span>
+<span class="nc" id="L656">                return 0;</span>
             }
             case &quot;import&quot; -&gt; {
-<span class="nc bnc" id="L655" title="All 2 branches missed.">                if (rest.length == 0) {</span>
-<span class="nc" id="L656">                    out.println(&quot;Usage: inventory import &lt;file.json&gt;&quot;);</span>
-<span class="nc" id="L657">                    return 1;</span>
+<span class="nc bnc" id="L659" title="All 2 branches missed.">                if (rest.length == 0) {</span>
+<span class="nc" id="L660">                    out.println(&quot;Usage: inventory import &lt;file.json&gt;&quot;);</span>
+<span class="nc" id="L661">                    return 1;</span>
                 }
-<span class="nc" id="L659">                Path source = Paths.get(rest[0]);</span>
+<span class="nc" id="L663">                Path source = Paths.get(rest[0]);</span>
                 try {
-<span class="nc" id="L661">                    String json = java.nio.file.Files.readString(source);</span>
-<span class="nc" id="L662">                    de.regelsuche.export.ExportBundle bundle =</span>
-<span class="nc" id="L663">                        new de.regelsuche.export.DefaultTransformationImportService().importJson(json);</span>
-<span class="nc" id="L664">                    inventoryRepository.importBundle(bundle);</span>
-<span class="nc" id="L665">                    out.println(&quot;Imported &quot; + bundle.reusableRules().size()</span>
-<span class="nc" id="L666">                        + &quot; reusable rule(s) from &quot; + source.toAbsolutePath());</span>
-<span class="nc" id="L667">                    return 0;</span>
-<span class="nc" id="L668">                } catch (Exception ex) {</span>
-<span class="nc" id="L669">                    out.println(&quot;Inventory import failed: &quot; + ex.getMessage());</span>
-<span class="nc" id="L670">                    return 2;</span>
+<span class="nc" id="L665">                    String json = java.nio.file.Files.readString(source);</span>
+<span class="nc" id="L666">                    de.regelsuche.export.ExportBundle bundle =</span>
+<span class="nc" id="L667">                        new de.regelsuche.export.DefaultTransformationImportService().importJson(json);</span>
+<span class="nc" id="L668">                    inventoryRepository.importBundle(bundle);</span>
+<span class="nc" id="L669">                    out.println(&quot;Imported &quot; + bundle.reusableRules().size()</span>
+<span class="nc" id="L670">                        + &quot; reusable rule(s) from &quot; + source.toAbsolutePath());</span>
+<span class="nc" id="L671">                    return 0;</span>
+<span class="nc" id="L672">                } catch (Exception ex) {</span>
+<span class="nc" id="L673">                    out.println(&quot;Inventory import failed: &quot; + ex.getMessage());</span>
+<span class="nc" id="L674">                    return 2;</span>
                 }
             }
             case &quot;export&quot; -&gt; {
-<span class="nc" id="L674">                CliOptions options = CliOptions.parse(rest);</span>
-<span class="nc" id="L675">                String format = options.getOrDefault(&quot;format&quot;, &quot;json&quot;);</span>
-<span class="nc bnc" id="L676" title="All 2 branches missed.">                if (!&quot;json&quot;.equalsIgnoreCase(format)) {</span>
-<span class="nc" id="L677">                    out.println(&quot;Only json format is supported for inventory export&quot;);</span>
-<span class="nc" id="L678">                    return 1;</span>
+<span class="nc" id="L678">                CliOptions options = CliOptions.parse(rest);</span>
+<span class="nc" id="L679">                String format = options.getOrDefault(&quot;format&quot;, &quot;json&quot;);</span>
+<span class="nc bnc" id="L680" title="All 2 branches missed.">                if (!&quot;json&quot;.equalsIgnoreCase(format)) {</span>
+<span class="nc" id="L681">                    out.println(&quot;Only json format is supported for inventory export&quot;);</span>
+<span class="nc" id="L682">                    return 1;</span>
                 }
-<span class="nc" id="L680">                String directory = options.getOrDefault(&quot;dir&quot;, ExportFileService.DEFAULT_DIRECTORY);</span>
+<span class="nc" id="L684">                String directory = options.getOrDefault(&quot;dir&quot;, ExportFileService.DEFAULT_DIRECTORY);</span>
                 try {
-<span class="nc" id="L682">                    List&lt;Path&gt; paths = exportFileService.writeAll(</span>
-<span class="nc" id="L683">                        Paths.get(directory),</span>
-<span class="nc" id="L684">                        List.of(&quot;inventory&quot;),</span>
-<span class="nc" id="L685">                        List.of(),</span>
-<span class="nc" id="L686">                        List.of(),</span>
-<span class="nc" id="L687">                        inventoryRepository.findAll()</span>
+<span class="nc" id="L686">                    List&lt;Path&gt; paths = exportFileService.writeAll(</span>
+<span class="nc" id="L687">                        Paths.get(directory),</span>
+<span class="nc" id="L688">                        List.of(&quot;inventory&quot;),</span>
+<span class="nc" id="L689">                        List.of(),</span>
+<span class="nc" id="L690">                        List.of(),</span>
+<span class="nc" id="L691">                        inventoryRepository.findAll()</span>
                     );
-<span class="nc" id="L689">                    paths.forEach(path -&gt; out.println(&quot;Exported inventory to &quot; + path.toAbsolutePath()));</span>
-<span class="nc" id="L690">                    return 0;</span>
-<span class="nc" id="L691">                } catch (Exception ex) {</span>
-<span class="nc" id="L692">                    out.println(&quot;Inventory export failed: &quot; + ex.getMessage());</span>
-<span class="nc" id="L693">                    return 2;</span>
+<span class="nc" id="L693">                    paths.forEach(path -&gt; out.println(&quot;Exported inventory to &quot; + path.toAbsolutePath()));</span>
+<span class="nc" id="L694">                    return 0;</span>
+<span class="nc" id="L695">                } catch (Exception ex) {</span>
+<span class="nc" id="L696">                    out.println(&quot;Inventory export failed: &quot; + ex.getMessage());</span>
+<span class="nc" id="L697">                    return 2;</span>
                 }
             }
             default -&gt; {
-<span class="nc" id="L697">                out.println(&quot;Unknown inventory command: &quot; + sub);</span>
-<span class="nc" id="L698">                return 1;</span>
+<span class="nc" id="L701">                out.println(&quot;Unknown inventory command: &quot; + sub);</span>
+<span class="nc" id="L702">                return 1;</span>
             }
         }
     }
 
     private int runRulesImport(Path source, Path targetDir) {
         try {
-<span class="fc" id="L705">            Files.createDirectories(targetDir);</span>
-<span class="fc bfc" id="L706" title="All 2 branches covered.">            if (Files.isDirectory(source)) {</span>
-<span class="fc" id="L707">                try (var stream = Files.list(source)) {</span>
-<span class="fc" id="L708">                    List&lt;Path&gt; files = stream</span>
-<span class="fc" id="L709">                        .filter(Files::isRegularFile)</span>
-<span class="fc" id="L710">                        .filter(this::isImportableRuleFile)</span>
-<span class="fc" id="L711">                        .toList();</span>
-<span class="pc bpc" id="L712" title="1 of 2 branches missed.">                    if (files.isEmpty()) {</span>
-<span class="nc" id="L713">                        out.println(&quot;No rule files found in: &quot; + source);</span>
-<span class="nc" id="L714">                        return 1;</span>
+<span class="fc" id="L709">            Files.createDirectories(targetDir);</span>
+<span class="fc bfc" id="L710" title="All 2 branches covered.">            if (Files.isDirectory(source)) {</span>
+<span class="fc" id="L711">                try (var stream = Files.list(source)) {</span>
+<span class="fc" id="L712">                    List&lt;Path&gt; files = stream</span>
+<span class="fc" id="L713">                        .filter(Files::isRegularFile)</span>
+<span class="fc" id="L714">                        .filter(this::isImportableRuleFile)</span>
+<span class="fc" id="L715">                        .toList();</span>
+<span class="pc bpc" id="L716" title="1 of 2 branches missed.">                    if (files.isEmpty()) {</span>
+<span class="nc" id="L717">                        out.println(&quot;No rule files found in: &quot; + source);</span>
+<span class="nc" id="L718">                        return 1;</span>
                     }
-<span class="fc bfc" id="L716" title="All 2 branches covered.">                    for (Path file : files) {</span>
-<span class="fc" id="L717">                        Path target = targetDir.resolve(file.getFileName());</span>
-<span class="fc" id="L718">                        Files.copy(file, target, StandardCopyOption.REPLACE_EXISTING);</span>
-<span class="fc" id="L719">                        out.println(&quot;Imported &quot; + file.getFileName() + &quot; -&gt; &quot; + target);</span>
-<span class="fc" id="L720">                    }</span>
-<span class="nc bnc" id="L721" title="All 2 branches missed.">                }</span>
-<span class="pc bpc" id="L722" title="1 of 2 branches missed.">            } else if (Files.isRegularFile(source)) {</span>
-<span class="fc bfc" id="L723" title="All 2 branches covered.">                if (!isImportableRuleFile(source)) {</span>
-<span class="fc" id="L724">                    out.println(&quot;Unsupported rule file: &quot; + source.getFileName()</span>
+<span class="fc bfc" id="L720" title="All 2 branches covered.">                    for (Path file : files) {</span>
+<span class="fc" id="L721">                        Path target = targetDir.resolve(file.getFileName());</span>
+<span class="fc" id="L722">                        Files.copy(file, target, StandardCopyOption.REPLACE_EXISTING);</span>
+<span class="fc" id="L723">                        out.println(&quot;Imported &quot; + file.getFileName() + &quot; -&gt; &quot; + target);</span>
+<span class="fc" id="L724">                    }</span>
+<span class="nc bnc" id="L725" title="All 2 branches missed.">                }</span>
+<span class="pc bpc" id="L726" title="1 of 2 branches missed.">            } else if (Files.isRegularFile(source)) {</span>
+<span class="fc bfc" id="L727" title="All 2 branches covered.">                if (!isImportableRuleFile(source)) {</span>
+<span class="fc" id="L728">                    out.println(&quot;Unsupported rule file: &quot; + source.getFileName()</span>
                         + &quot; (expected .regelsuche or .rules)&quot;);
-<span class="fc" id="L726">                    return 1;</span>
+<span class="fc" id="L730">                    return 1;</span>
                 }
-<span class="fc" id="L728">                Path target = targetDir.resolve(source.getFileName());</span>
-<span class="fc" id="L729">                Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);</span>
-<span class="fc" id="L730">                out.println(&quot;Imported &quot; + source.getFileName() + &quot; -&gt; &quot; + target);</span>
-<span class="fc" id="L731">            } else {</span>
-<span class="nc" id="L732">                out.println(&quot;Not found: &quot; + source);</span>
-<span class="nc" id="L733">                return 1;</span>
+<span class="fc" id="L732">                Path target = targetDir.resolve(source.getFileName());</span>
+<span class="fc" id="L733">                Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);</span>
+<span class="fc" id="L734">                out.println(&quot;Imported &quot; + source.getFileName() + &quot; -&gt; &quot; + target);</span>
+<span class="fc" id="L735">            } else {</span>
+<span class="nc" id="L736">                out.println(&quot;Not found: &quot; + source);</span>
+<span class="nc" id="L737">                return 1;</span>
             }
-<span class="fc" id="L735">            return 0;</span>
-<span class="nc" id="L736">        } catch (IOException ex) {</span>
-<span class="nc" id="L737">            out.println(&quot;Import failed: &quot; + ex.getMessage());</span>
-<span class="nc" id="L738">            return 2;</span>
+<span class="fc" id="L739">            return 0;</span>
+<span class="nc" id="L740">        } catch (IOException ex) {</span>
+<span class="nc" id="L741">            out.println(&quot;Import failed: &quot; + ex.getMessage());</span>
+<span class="nc" id="L742">            return 2;</span>
         }
     }
 
     private boolean isImportableRuleFile(Path path) {
-<span class="fc" id="L743">        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);</span>
-<span class="fc bfc" id="L744" title="All 4 branches covered.">        return name.endsWith(&quot;.regelsuche&quot;) || name.endsWith(&quot;.rules&quot;);</span>
+<span class="fc" id="L747">        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);</span>
+<span class="fc bfc" id="L748" title="All 4 branches covered.">        return name.endsWith(&quot;.regelsuche&quot;) || name.endsWith(&quot;.rules&quot;);</span>
     }
 
     private int runRulesExport(Path rulesDir, Path outputDir, String profile) {
-<span class="fc" id="L748">        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(</span>
-<span class="fc" id="L749">            Paths.get(&quot;plugins&quot;),</span>
+<span class="fc" id="L752">        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(</span>
+<span class="fc" id="L753">            Paths.get(&quot;plugins&quot;),</span>
             rulesDir,
             true,
-<span class="fc" id="L752">            java.util.Set.of(),</span>
-<span class="fc" id="L753">            java.util.Set.of(),</span>
-<span class="pc bpc" id="L754" title="1 of 2 branches missed.">            profile.isBlank() ? null : profile</span>
+<span class="fc" id="L756">            java.util.Set.of(),</span>
+<span class="fc" id="L757">            java.util.Set.of(),</span>
+<span class="pc bpc" id="L758" title="1 of 2 branches missed.">            profile.isBlank() ? null : profile</span>
         ))) {
-<span class="fc" id="L756">            Files.createDirectories(outputDir);</span>
-<span class="fc" id="L757">            StringBuilder sb = new StringBuilder();</span>
-<span class="fc" id="L758">            sb.append(&quot;# Exported rules&quot;).append(System.lineSeparator());</span>
-<span class="pc bpc" id="L759" title="1 of 2 branches missed.">            if (!profile.isBlank()) {</span>
-<span class="nc" id="L760">                sb.append(&quot;# profile: &quot;).append(profile).append(System.lineSeparator());</span>
+<span class="fc" id="L760">            Files.createDirectories(outputDir);</span>
+<span class="fc" id="L761">            StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L762">            sb.append(&quot;# Exported rules&quot;).append(System.lineSeparator());</span>
+<span class="pc bpc" id="L763" title="1 of 2 branches missed.">            if (!profile.isBlank()) {</span>
+<span class="nc" id="L764">                sb.append(&quot;# profile: &quot;).append(profile).append(System.lineSeparator());</span>
             }
-<span class="fc" id="L762">            sb.append(System.lineSeparator());</span>
-<span class="fc" id="L763">            int exported = 0;</span>
-<span class="fc bfc" id="L764" title="All 2 branches covered.">            for (de.regelsuche.plugin.RuleRegistry.RuleRegistration registration : runtime.ruleRegistry().registrations()) {</span>
-<span class="pc bpc" id="L765" title="1 of 2 branches missed.">                if (!registration.enabled()) {</span>
-<span class="nc" id="L766">                    continue;</span>
+<span class="fc" id="L766">            sb.append(System.lineSeparator());</span>
+<span class="fc" id="L767">            int exported = 0;</span>
+<span class="fc bfc" id="L768" title="All 2 branches covered.">            for (de.regelsuche.plugin.RuleRegistry.RuleRegistration registration : runtime.ruleRegistry().registrations()) {</span>
+<span class="pc bpc" id="L769" title="1 of 2 branches missed.">                if (!registration.enabled()) {</span>
+<span class="nc" id="L770">                    continue;</span>
                 }
-<span class="pc bpc" id="L768" title="1 of 2 branches missed.">                if (registration.rule() instanceof de.regelsuche.transform.PatternRewriteRule rule) {</span>
-<span class="fc" id="L769">                    appendExportedRule(</span>
+<span class="pc bpc" id="L772" title="1 of 2 branches missed.">                if (registration.rule() instanceof de.regelsuche.transform.PatternRewriteRule rule) {</span>
+<span class="fc" id="L773">                    appendExportedRule(</span>
                         sb,
-<span class="fc" id="L771">                        registration.id(),</span>
-<span class="fc" id="L772">                        rule.source(),</span>
-<span class="fc" id="L773">                        rule.target(),</span>
-<span class="fc" id="L774">                        registration.source(),</span>
-<span class="fc" id="L775">                        registration.explanation(),</span>
-<span class="fc" id="L776">                        registration.tags(),</span>
-<span class="fc" id="L777">                        registration.conditions(),</span>
-<span class="fc" id="L778">                        -rule.estimatedCostDelta()</span>
+<span class="fc" id="L775">                        registration.id(),</span>
+<span class="fc" id="L776">                        rule.source(),</span>
+<span class="fc" id="L777">                        rule.target(),</span>
+<span class="fc" id="L778">                        registration.source(),</span>
+<span class="fc" id="L779">                        registration.explanation(),</span>
+<span class="fc" id="L780">                        registration.tags(),</span>
+<span class="fc" id="L781">                        registration.conditions(),</span>
+<span class="fc" id="L782">                        -rule.estimatedCostDelta()</span>
                     );
-<span class="fc" id="L780">                    exported++;</span>
+<span class="fc" id="L784">                    exported++;</span>
                 }
-<span class="fc" id="L782">            }</span>
+<span class="fc" id="L786">            }</span>
             for (de.regelsuche.plugin.TransformationRegistry.TransformationRegistration registration
-<span class="fc bfc" id="L784" title="All 2 branches covered.">                : runtime.transformationRegistry().registrations()) {</span>
-<span class="pc bpc" id="L785" title="1 of 2 branches missed.">                if (!registration.enabled()) {</span>
-<span class="nc" id="L786">                    continue;</span>
+<span class="fc bfc" id="L788" title="All 2 branches covered.">                : runtime.transformationRegistry().registrations()) {</span>
+<span class="pc bpc" id="L789" title="1 of 2 branches missed.">                if (!registration.enabled()) {</span>
+<span class="nc" id="L790">                    continue;</span>
                 }
-<span class="pc bpc" id="L788" title="1 of 2 branches missed.">                if (registration.transformation() instanceof de.regelsuche.plugin.PatternBasedTransformation transformation) {</span>
-<span class="fc" id="L789">                    appendExportedRule(</span>
+<span class="pc bpc" id="L792" title="1 of 2 branches missed.">                if (registration.transformation() instanceof de.regelsuche.plugin.PatternBasedTransformation transformation) {</span>
+<span class="fc" id="L793">                    appendExportedRule(</span>
                         sb,
-<span class="fc" id="L791">                        registration.id(),</span>
-<span class="fc" id="L792">                        transformation.source(),</span>
-<span class="fc" id="L793">                        transformation.target(),</span>
-<span class="fc" id="L794">                        registration.source(),</span>
-<span class="fc" id="L795">                        registration.explanation(),</span>
-<span class="fc" id="L796">                        registration.tags(),</span>
-<span class="fc" id="L797">                        List.of(),</span>
-<span class="fc" id="L798">                        -transformation.estimatedCostDelta()</span>
+<span class="fc" id="L795">                        registration.id(),</span>
+<span class="fc" id="L796">                        transformation.source(),</span>
+<span class="fc" id="L797">                        transformation.target(),</span>
+<span class="fc" id="L798">                        registration.source(),</span>
+<span class="fc" id="L799">                        registration.explanation(),</span>
+<span class="fc" id="L800">                        registration.tags(),</span>
+<span class="fc" id="L801">                        List.of(),</span>
+<span class="fc" id="L802">                        -transformation.estimatedCostDelta()</span>
                     );
-<span class="fc" id="L800">                    exported++;</span>
+<span class="fc" id="L804">                    exported++;</span>
                 }
-<span class="fc" id="L802">            }</span>
-<span class="pc bpc" id="L803" title="1 of 2 branches missed.">            String filename = profile.isBlank()</span>
-<span class="fc" id="L804">                ? &quot;exported-rules.regelsuche&quot;</span>
-<span class="pc" id="L805">                : &quot;exported-rules-&quot; + profile + &quot;.regelsuche&quot;;</span>
-<span class="fc" id="L806">            Path outFile = outputDir.resolve(filename);</span>
-<span class="fc" id="L807">            Files.writeString(outFile, sb.toString());</span>
-<span class="fc" id="L808">            out.println(&quot;Exported &quot; + exported + &quot; rules to &quot; + outFile.toAbsolutePath());</span>
-<span class="fc" id="L809">            runtime.diagnostics().forEach(diagnostic -&gt; out.println(&quot;WARN &quot; + diagnostic.message()));</span>
-<span class="fc" id="L810">            return 0;</span>
-<span class="nc" id="L811">        } catch (IOException ex) {</span>
-<span class="nc" id="L812">            out.println(&quot;Export failed: &quot; + ex.getMessage());</span>
-<span class="nc" id="L813">            return 2;</span>
+<span class="fc" id="L806">            }</span>
+<span class="pc bpc" id="L807" title="1 of 2 branches missed.">            String filename = profile.isBlank()</span>
+<span class="fc" id="L808">                ? &quot;exported-rules.regelsuche&quot;</span>
+<span class="pc" id="L809">                : &quot;exported-rules-&quot; + profile + &quot;.regelsuche&quot;;</span>
+<span class="fc" id="L810">            Path outFile = outputDir.resolve(filename);</span>
+<span class="fc" id="L811">            Files.writeString(outFile, sb.toString());</span>
+<span class="fc" id="L812">            out.println(&quot;Exported &quot; + exported + &quot; rules to &quot; + outFile.toAbsolutePath());</span>
+<span class="fc" id="L813">            runtime.diagnostics().forEach(diagnostic -&gt; out.println(&quot;WARN &quot; + diagnostic.message()));</span>
+<span class="fc" id="L814">            return 0;</span>
+<span class="nc" id="L815">        } catch (IOException ex) {</span>
+<span class="nc" id="L816">            out.println(&quot;Export failed: &quot; + ex.getMessage());</span>
+<span class="nc" id="L817">            return 2;</span>
         }
     }
 
     private int runRulesDebug(String expression, Path rulesDir) {
-<span class="nc" id="L818">        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(</span>
-<span class="nc" id="L819">            Paths.get(&quot;plugins&quot;),</span>
+<span class="nc" id="L822">        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(</span>
+<span class="nc" id="L823">            Paths.get(&quot;plugins&quot;),</span>
             rulesDir,
             true,
-<span class="nc" id="L822">            java.util.Set.of(),</span>
-<span class="nc" id="L823">            java.util.Set.of()</span>
+<span class="nc" id="L826">            java.util.Set.of(),</span>
+<span class="nc" id="L827">            java.util.Set.of()</span>
         ))) {
-<span class="nc" id="L825">            de.regelsuche.plugin.PluginAwareAstRewriteTransformationEngine engine = runtime.createTransformationEngine();</span>
-<span class="nc" id="L826">            engine.enableDebugMode();</span>
-<span class="nc" id="L827">            engine.transform(expression);</span>
-<span class="nc" id="L828">            RuleDebugReport report = engine.lastDebugReport();</span>
-<span class="nc bnc" id="L829" title="All 2 branches missed.">            if (report == null) {</span>
-<span class="nc" id="L830">                out.println(&quot;No debug report generated for: &quot; + expression);</span>
-<span class="nc" id="L831">                return 1;</span>
+<span class="nc" id="L829">            de.regelsuche.plugin.PluginAwareAstRewriteTransformationEngine engine = runtime.createTransformationEngine();</span>
+<span class="nc" id="L830">            engine.enableDebugMode();</span>
+<span class="nc" id="L831">            engine.transform(expression);</span>
+<span class="nc" id="L832">            RuleDebugReport report = engine.lastDebugReport();</span>
+<span class="nc bnc" id="L833" title="All 2 branches missed.">            if (report == null) {</span>
+<span class="nc" id="L834">                out.println(&quot;No debug report generated for: &quot; + expression);</span>
+<span class="nc" id="L835">                return 1;</span>
             }
-<span class="nc" id="L833">            out.println(&quot;Debug report for: &quot; + report.expression());</span>
-<span class="nc" id="L834">            out.println(&quot;Total rule attempts: &quot; + report.totalAttempts());</span>
-<span class="nc" id="L835">            out.println(&quot;Successful applications: &quot; + report.successfulApplications());</span>
-<span class="nc" id="L836">            out.println(&quot;Growth limit rejections: &quot; + report.growthLimitRejections());</span>
-<span class="nc" id="L837">            out.println(&quot;Candidate limit rejections: &quot; + report.candidateLimitRejections());</span>
-<span class="nc" id="L838">            out.println(&quot;Disabled by config: &quot; + report.disabledByConfigRejections());</span>
-<span class="nc" id="L839">            out.println(&quot;Disabled by profile: &quot; + report.disabledByProfileRejections());</span>
-<span class="nc" id="L840">            out.println(&quot;Condition failed: &quot; + report.conditionFailedRejections());</span>
-<span class="nc" id="L841">            out.println(&quot;Cycle risk: &quot; + report.cycleRiskRejections());</span>
-<span class="nc bnc" id="L842" title="All 2 branches missed.">            if (!report.diagnostics().isEmpty()) {</span>
-<span class="nc" id="L843">                out.println();</span>
-<span class="nc" id="L844">                out.println(&quot;Diagnostics:&quot;);</span>
-<span class="nc" id="L845">                report.diagnostics().forEach(diagnostic -&gt; out.println(&quot;  &quot; + diagnostic));</span>
+<span class="nc" id="L837">            out.println(&quot;Debug report for: &quot; + report.expression());</span>
+<span class="nc" id="L838">            out.println(&quot;Total rule attempts: &quot; + report.totalAttempts());</span>
+<span class="nc" id="L839">            out.println(&quot;Successful applications: &quot; + report.successfulApplications());</span>
+<span class="nc" id="L840">            out.println(&quot;Growth limit rejections: &quot; + report.growthLimitRejections());</span>
+<span class="nc" id="L841">            out.println(&quot;Candidate limit rejections: &quot; + report.candidateLimitRejections());</span>
+<span class="nc" id="L842">            out.println(&quot;Disabled by config: &quot; + report.disabledByConfigRejections());</span>
+<span class="nc" id="L843">            out.println(&quot;Disabled by profile: &quot; + report.disabledByProfileRejections());</span>
+<span class="nc" id="L844">            out.println(&quot;Condition failed: &quot; + report.conditionFailedRejections());</span>
+<span class="nc" id="L845">            out.println(&quot;Cycle risk: &quot; + report.cycleRiskRejections());</span>
+<span class="nc bnc" id="L846" title="All 2 branches missed.">            if (!report.diagnostics().isEmpty()) {</span>
+<span class="nc" id="L847">                out.println();</span>
+<span class="nc" id="L848">                out.println(&quot;Diagnostics:&quot;);</span>
+<span class="nc" id="L849">                report.diagnostics().forEach(diagnostic -&gt; out.println(&quot;  &quot; + diagnostic));</span>
             }
-<span class="nc" id="L847">            out.println();</span>
-<span class="nc" id="L848">            out.println(&quot;Rule attempts (first 50):&quot;);</span>
-<span class="nc" id="L849">            report.attempts().stream().limit(50).forEach(attempt -&gt; {</span>
-<span class="nc bnc" id="L850" title="All 6 branches missed.">                String context = &quot;RUNTIME&quot;.equals(attempt.phase()) &amp;&amp; attempt.subtree() != null &amp;&amp; !attempt.subtree().isBlank()</span>
-<span class="nc" id="L851">                    ? &quot; [&quot; + attempt.subtree() + &quot;]&quot; : &quot;&quot;;</span>
-<span class="nc" id="L852">                out.printf(&quot;  %-40s %-8s %-25s %s%s%n&quot;,</span>
-<span class="nc" id="L853">                    attempt.ruleId(),</span>
-<span class="nc bnc" id="L854" title="All 2 branches missed.">                    attempt.matched() ? &quot;APPLIED&quot; : &quot;SKIP&quot;,</span>
-<span class="nc" id="L855">                    attempt.reason(),</span>
-<span class="nc" id="L856">                    attempt.detail(),</span>
+<span class="nc" id="L851">            out.println();</span>
+<span class="nc" id="L852">            out.println(&quot;Rule attempts (first 50):&quot;);</span>
+<span class="nc" id="L853">            report.attempts().stream().limit(50).forEach(attempt -&gt; {</span>
+<span class="nc bnc" id="L854" title="All 6 branches missed.">                String context = &quot;RUNTIME&quot;.equals(attempt.phase()) &amp;&amp; attempt.subtree() != null &amp;&amp; !attempt.subtree().isBlank()</span>
+<span class="nc" id="L855">                    ? &quot; [&quot; + attempt.subtree() + &quot;]&quot; : &quot;&quot;;</span>
+<span class="nc" id="L856">                out.printf(&quot;  %-40s %-8s %-25s %s%s%n&quot;,</span>
+<span class="nc" id="L857">                    attempt.ruleId(),</span>
+<span class="nc bnc" id="L858" title="All 2 branches missed.">                    attempt.matched() ? &quot;APPLIED&quot; : &quot;SKIP&quot;,</span>
+<span class="nc" id="L859">                    attempt.reason(),</span>
+<span class="nc" id="L860">                    attempt.detail(),</span>
                     context);
-<span class="nc" id="L858">            });</span>
-<span class="nc" id="L859">            return 0;</span>
-<span class="nc" id="L860">        }</span>
+<span class="nc" id="L862">            });</span>
+<span class="nc" id="L863">            return 0;</span>
+<span class="nc" id="L864">        }</span>
     }
 
     private void appendExportedRule(
@@ -871,287 +875,287 @@ public class CliRouter {
         List&lt;de.regelsuche.plugin.RuleFileParser.RuleCondition&gt; conditions,
         int priority
     ) {
-<span class="fc" id="L874">        sb.append(&quot;rule &quot;).append(id).append(&quot;:&quot;).append(System.lineSeparator());</span>
-<span class="fc" id="L875">        sb.append(&quot;  pattern: &quot;).append(formatPatternExpr(source)).append(System.lineSeparator());</span>
-<span class="fc" id="L876">        sb.append(&quot;  replace: &quot;).append(formatPatternExpr(target)).append(System.lineSeparator());</span>
-<span class="fc" id="L877">        sb.append(&quot;  direction: forward&quot;).append(System.lineSeparator());</span>
-<span class="fc" id="L878">        sb.append(&quot;  # source: &quot;).append(sourceInfo).append(System.lineSeparator());</span>
-<span class="fc bfc" id="L879" title="All 2 branches covered.">        if (!explanation.isBlank()) {</span>
-<span class="fc" id="L880">            sb.append(&quot;  explanation: \&quot;&quot;)</span>
-<span class="fc" id="L881">                .append(explanation.replace(&quot;\&quot;&quot;, &quot;\\\&quot;&quot;))</span>
-<span class="fc" id="L882">                .append(&quot;\&quot;&quot;)</span>
-<span class="fc" id="L883">                .append(System.lineSeparator());</span>
+<span class="fc" id="L878">        sb.append(&quot;rule &quot;).append(id).append(&quot;:&quot;).append(System.lineSeparator());</span>
+<span class="fc" id="L879">        sb.append(&quot;  pattern: &quot;).append(formatPatternExpr(source)).append(System.lineSeparator());</span>
+<span class="fc" id="L880">        sb.append(&quot;  replace: &quot;).append(formatPatternExpr(target)).append(System.lineSeparator());</span>
+<span class="fc" id="L881">        sb.append(&quot;  direction: forward&quot;).append(System.lineSeparator());</span>
+<span class="fc" id="L882">        sb.append(&quot;  # source: &quot;).append(sourceInfo).append(System.lineSeparator());</span>
+<span class="fc bfc" id="L883" title="All 2 branches covered.">        if (!explanation.isBlank()) {</span>
+<span class="fc" id="L884">            sb.append(&quot;  explanation: \&quot;&quot;)</span>
+<span class="fc" id="L885">                .append(explanation.replace(&quot;\&quot;&quot;, &quot;\\\&quot;&quot;))</span>
+<span class="fc" id="L886">                .append(&quot;\&quot;&quot;)</span>
+<span class="fc" id="L887">                .append(System.lineSeparator());</span>
         }
-<span class="fc bfc" id="L885" title="All 2 branches covered.">        if (priority != 0) {</span>
-<span class="fc" id="L886">            sb.append(&quot;  priority: &quot;).append(priority).append(System.lineSeparator());</span>
+<span class="fc bfc" id="L889" title="All 2 branches covered.">        if (priority != 0) {</span>
+<span class="fc" id="L890">            sb.append(&quot;  priority: &quot;).append(priority).append(System.lineSeparator());</span>
         }
-<span class="pc bpc" id="L888" title="1 of 2 branches missed.">        if (!tags.isEmpty()) {</span>
-<span class="fc" id="L889">            sb.append(&quot;  tags:&quot;).append(System.lineSeparator());</span>
-<span class="fc bfc" id="L890" title="All 2 branches covered.">            for (String tag : tags) {</span>
-<span class="fc" id="L891">                sb.append(&quot;    - &quot;).append(tag).append(System.lineSeparator());</span>
-<span class="fc" id="L892">            }</span>
+<span class="pc bpc" id="L892" title="1 of 2 branches missed.">        if (!tags.isEmpty()) {</span>
+<span class="fc" id="L893">            sb.append(&quot;  tags:&quot;).append(System.lineSeparator());</span>
+<span class="fc bfc" id="L894" title="All 2 branches covered.">            for (String tag : tags) {</span>
+<span class="fc" id="L895">                sb.append(&quot;    - &quot;).append(tag).append(System.lineSeparator());</span>
+<span class="fc" id="L896">            }</span>
         }
-<span class="pc bpc" id="L894" title="1 of 2 branches missed.">        if (!conditions.isEmpty()) {</span>
-<span class="nc" id="L895">            sb.append(&quot;  conditions:&quot;).append(System.lineSeparator());</span>
-<span class="nc bnc" id="L896" title="All 2 branches missed.">            for (de.regelsuche.plugin.RuleFileParser.RuleCondition condition : conditions) {</span>
-<span class="nc" id="L897">                sb.append(&quot;    - &quot;).append(condition.name()).append(&quot;: &quot;).append(condition.value())</span>
-<span class="nc" id="L898">                    .append(System.lineSeparator());</span>
-<span class="nc" id="L899">            }</span>
+<span class="pc bpc" id="L898" title="1 of 2 branches missed.">        if (!conditions.isEmpty()) {</span>
+<span class="nc" id="L899">            sb.append(&quot;  conditions:&quot;).append(System.lineSeparator());</span>
+<span class="nc bnc" id="L900" title="All 2 branches missed.">            for (de.regelsuche.plugin.RuleFileParser.RuleCondition condition : conditions) {</span>
+<span class="nc" id="L901">                sb.append(&quot;    - &quot;).append(condition.name()).append(&quot;: &quot;).append(condition.value())</span>
+<span class="nc" id="L902">                    .append(System.lineSeparator());</span>
+<span class="nc" id="L903">            }</span>
         }
-<span class="fc" id="L901">        sb.append(System.lineSeparator());</span>
-<span class="fc" id="L902">    }</span>
+<span class="fc" id="L905">        sb.append(System.lineSeparator());</span>
+<span class="fc" id="L906">    }</span>
 
     private String formatPatternExpr(de.regelsuche.transform.PatternExpr expr) {
-<span class="fc bfc" id="L905" title="All 2 branches covered.">        if (expr instanceof de.regelsuche.transform.PatternExpr.Placeholder placeholder) {</span>
-<span class="fc" id="L906">            return placeholder.name();</span>
+<span class="fc bfc" id="L909" title="All 2 branches covered.">        if (expr instanceof de.regelsuche.transform.PatternExpr.Placeholder placeholder) {</span>
+<span class="fc" id="L910">            return placeholder.name();</span>
         }
-<span class="fc bfc" id="L908" title="All 2 branches covered.">        if (expr instanceof de.regelsuche.transform.PatternExpr.LiteralNumber number) {</span>
-<span class="fc" id="L909">            return de.regelsuche.parse.ExpressionFormatter.format(</span>
-<span class="fc" id="L910">                new de.regelsuche.ast.NumberExpr(number.value()));</span>
+<span class="fc bfc" id="L912" title="All 2 branches covered.">        if (expr instanceof de.regelsuche.transform.PatternExpr.LiteralNumber number) {</span>
+<span class="fc" id="L913">            return de.regelsuche.parse.ExpressionFormatter.format(</span>
+<span class="fc" id="L914">                new de.regelsuche.ast.NumberExpr(number.value()));</span>
         }
-<span class="pc bpc" id="L912" title="1 of 2 branches missed.">        if (expr instanceof de.regelsuche.transform.PatternExpr.LiteralVariable variable) {</span>
-<span class="nc" id="L913">            return variable.name();</span>
+<span class="pc bpc" id="L916" title="1 of 2 branches missed.">        if (expr instanceof de.regelsuche.transform.PatternExpr.LiteralVariable variable) {</span>
+<span class="nc" id="L917">            return variable.name();</span>
         }
-<span class="fc bfc" id="L915" title="All 2 branches covered.">        if (expr instanceof de.regelsuche.transform.PatternExpr.Operation operation) {</span>
-<span class="fc" id="L916">            return formatOperation(operation);</span>
+<span class="fc bfc" id="L919" title="All 2 branches covered.">        if (expr instanceof de.regelsuche.transform.PatternExpr.Operation operation) {</span>
+<span class="fc" id="L920">            return formatOperation(operation);</span>
         }
-<span class="pc bpc" id="L918" title="1 of 2 branches missed.">        if (expr instanceof de.regelsuche.transform.PatternExpr.Function function) {</span>
-<span class="fc" id="L919">            return function.name() + &quot;(&quot; + function.arguments().stream().map(this::formatPatternExpr)</span>
-<span class="fc" id="L920">                .collect(java.util.stream.Collectors.joining(&quot;, &quot;)) + &quot;)&quot;;</span>
+<span class="pc bpc" id="L922" title="1 of 2 branches missed.">        if (expr instanceof de.regelsuche.transform.PatternExpr.Function function) {</span>
+<span class="fc" id="L923">            return function.name() + &quot;(&quot; + function.arguments().stream().map(this::formatPatternExpr)</span>
+<span class="fc" id="L924">                .collect(java.util.stream.Collectors.joining(&quot;, &quot;)) + &quot;)&quot;;</span>
         }
-<span class="nc" id="L922">        throw new IllegalArgumentException(&quot;Unsupported pattern expression: &quot; + expr);</span>
+<span class="nc" id="L926">        throw new IllegalArgumentException(&quot;Unsupported pattern expression: &quot; + expr);</span>
     }
 
     private String formatOperation(de.regelsuche.transform.PatternExpr.Operation operation) {
-<span class="fc" id="L926">        String left = formatPatternOperand(operation.left(), operation.operator().precedence(), false);</span>
-<span class="fc" id="L927">        String right = formatPatternOperand(operation.right(), operation.operator().precedence(), true);</span>
-<span class="fc" id="L928">        return left + &quot; &quot; + operation.operator().symbol() + &quot; &quot; + right;</span>
+<span class="fc" id="L930">        String left = formatPatternOperand(operation.left(), operation.operator().precedence(), false);</span>
+<span class="fc" id="L931">        String right = formatPatternOperand(operation.right(), operation.operator().precedence(), true);</span>
+<span class="fc" id="L932">        return left + &quot; &quot; + operation.operator().symbol() + &quot; &quot; + right;</span>
     }
 
     private String formatPatternOperand(de.regelsuche.transform.PatternExpr operand, int parentPrecedence, boolean rightSide) {
-<span class="fc" id="L932">        String rendered = formatPatternExpr(operand);</span>
-<span class="fc bfc" id="L933" title="All 2 branches covered.">        if (operand instanceof de.regelsuche.transform.PatternExpr.Operation nested) {</span>
-<span class="fc bfc" id="L934" title="All 4 branches covered.">            boolean needsParentheses = nested.operator().precedence() &lt; parentPrecedence</span>
-<span class="pc bpc" id="L935" title="1 of 2 branches missed.">                || (rightSide &amp;&amp; nested.operator().precedence() == parentPrecedence);</span>
-<span class="fc bfc" id="L936" title="All 2 branches covered.">            if (needsParentheses) {</span>
-<span class="fc" id="L937">                return &quot;(&quot; + rendered + &quot;)&quot;;</span>
+<span class="fc" id="L936">        String rendered = formatPatternExpr(operand);</span>
+<span class="fc bfc" id="L937" title="All 2 branches covered.">        if (operand instanceof de.regelsuche.transform.PatternExpr.Operation nested) {</span>
+<span class="fc bfc" id="L938" title="All 4 branches covered.">            boolean needsParentheses = nested.operator().precedence() &lt; parentPrecedence</span>
+<span class="pc bpc" id="L939" title="1 of 2 branches missed.">                || (rightSide &amp;&amp; nested.operator().precedence() == parentPrecedence);</span>
+<span class="fc bfc" id="L940" title="All 2 branches covered.">            if (needsParentheses) {</span>
+<span class="fc" id="L941">                return &quot;(&quot; + rendered + &quot;)&quot;;</span>
             }
         }
-<span class="fc" id="L940">        return rendered;</span>
+<span class="fc" id="L944">        return rendered;</span>
     }
 
     private void printExtensions(
         String type,
         java.util.List&lt;? extends PluginExtensionRegistry.ExtensionRegistration&lt;?&gt;&gt; registrations
     ) {
-<span class="fc" id="L947">        registrations.forEach(registration -&gt; out.println(type + &quot; &quot; + registration.id() + &quot; (&quot;</span>
-<span class="fc bfc" id="L948" title="All 2 branches covered.">            + registration.source() + &quot;, &quot; + (registration.enabled() ? &quot;enabled&quot; : &quot;disabled&quot;) + &quot;)&quot;));</span>
-<span class="fc" id="L949">    }</span>
+<span class="fc" id="L951">        registrations.forEach(registration -&gt; out.println(type + &quot; &quot; + registration.id() + &quot; (&quot;</span>
+<span class="fc bfc" id="L952" title="All 2 branches covered.">            + registration.source() + &quot;, &quot; + (registration.enabled() ? &quot;enabled&quot; : &quot;disabled&quot;) + &quot;)&quot;));</span>
+<span class="fc" id="L953">    }</span>
 
     private int runBenchmark(String[] args) {
-<span class="nc" id="L952">        CliOptions options = CliOptions.parse(args);</span>
-<span class="nc" id="L953">        de.regelsuche.benchmark.BenchmarkSuite suite = new de.regelsuche.benchmark.BenchmarkSuite();</span>
-<span class="nc" id="L954">        java.util.List&lt;de.regelsuche.benchmark.BenchmarkScenarioResult&gt; results = suite.runAll();</span>
-<span class="nc bnc" id="L955" title="All 2 branches missed.">        for (de.regelsuche.benchmark.BenchmarkScenarioResult result : results) {</span>
-<span class="nc" id="L956">            out.println(&quot;# &quot; + result.name());</span>
-<span class="nc" id="L957">            result.results().forEach(row -&gt; out.println(&quot;  &quot; + row));</span>
-<span class="nc bnc" id="L958" title="All 2 branches missed.">            if (!options.containsKey(&quot;quiet&quot;)) {</span>
-<span class="nc" id="L959">                out.println();</span>
+<span class="nc" id="L956">        CliOptions options = CliOptions.parse(args);</span>
+<span class="nc" id="L957">        de.regelsuche.benchmark.BenchmarkSuite suite = new de.regelsuche.benchmark.BenchmarkSuite();</span>
+<span class="nc" id="L958">        java.util.List&lt;de.regelsuche.benchmark.BenchmarkScenarioResult&gt; results = suite.runAll();</span>
+<span class="nc bnc" id="L959" title="All 2 branches missed.">        for (de.regelsuche.benchmark.BenchmarkScenarioResult result : results) {</span>
+<span class="nc" id="L960">            out.println(&quot;# &quot; + result.name());</span>
+<span class="nc" id="L961">            result.results().forEach(row -&gt; out.println(&quot;  &quot; + row));</span>
+<span class="nc bnc" id="L962" title="All 2 branches missed.">            if (!options.containsKey(&quot;quiet&quot;)) {</span>
+<span class="nc" id="L963">                out.println();</span>
             }
-<span class="nc" id="L961">        }</span>
-<span class="nc bnc" id="L962" title="All 4 branches missed.">        if (options.containsKey(&quot;report&quot;) || options.containsKey(&quot;summary&quot;)) {</span>
-<span class="nc" id="L963">            de.regelsuche.benchmark.BenchmarkReportRenderer renderer =</span>
+<span class="nc" id="L965">        }</span>
+<span class="nc bnc" id="L966" title="All 4 branches missed.">        if (options.containsKey(&quot;report&quot;) || options.containsKey(&quot;summary&quot;)) {</span>
+<span class="nc" id="L967">            de.regelsuche.benchmark.BenchmarkReportRenderer renderer =</span>
                 new de.regelsuche.benchmark.BenchmarkReportRenderer();
             try {
-<span class="nc bnc" id="L966" title="All 2 branches missed.">                if (options.containsKey(&quot;report&quot;)) {</span>
-<span class="nc" id="L967">                    Path reportPath = Paths.get(options.get(&quot;report&quot;));</span>
-<span class="nc" id="L968">                    Files.createDirectories(reportPath.toAbsolutePath().getParent());</span>
-<span class="nc" id="L969">                    Files.writeString(reportPath, renderer.renderMarkdown(results));</span>
-<span class="nc" id="L970">                    out.println(&quot;Wrote benchmark report: &quot; + reportPath);</span>
+<span class="nc bnc" id="L970" title="All 2 branches missed.">                if (options.containsKey(&quot;report&quot;)) {</span>
+<span class="nc" id="L971">                    Path reportPath = Paths.get(options.get(&quot;report&quot;));</span>
+<span class="nc" id="L972">                    Files.createDirectories(reportPath.toAbsolutePath().getParent());</span>
+<span class="nc" id="L973">                    Files.writeString(reportPath, renderer.renderMarkdown(results));</span>
+<span class="nc" id="L974">                    out.println(&quot;Wrote benchmark report: &quot; + reportPath);</span>
                 }
-<span class="nc bnc" id="L972" title="All 2 branches missed.">                if (options.containsKey(&quot;summary&quot;)) {</span>
-<span class="nc" id="L973">                    Path summaryPath = Paths.get(options.get(&quot;summary&quot;));</span>
-<span class="nc" id="L974">                    Files.createDirectories(summaryPath.toAbsolutePath().getParent());</span>
-<span class="nc" id="L975">                    Files.writeString(summaryPath, renderer.renderJsonSummary(results));</span>
-<span class="nc" id="L976">                    out.println(&quot;Wrote benchmark summary: &quot; + summaryPath);</span>
+<span class="nc bnc" id="L976" title="All 2 branches missed.">                if (options.containsKey(&quot;summary&quot;)) {</span>
+<span class="nc" id="L977">                    Path summaryPath = Paths.get(options.get(&quot;summary&quot;));</span>
+<span class="nc" id="L978">                    Files.createDirectories(summaryPath.toAbsolutePath().getParent());</span>
+<span class="nc" id="L979">                    Files.writeString(summaryPath, renderer.renderJsonSummary(results));</span>
+<span class="nc" id="L980">                    out.println(&quot;Wrote benchmark summary: &quot; + summaryPath);</span>
                 }
-<span class="nc" id="L978">            } catch (java.io.IOException ex) {</span>
-<span class="nc" id="L979">                out.println(&quot;Failed to write benchmark artefact: &quot; + ex.getMessage());</span>
-<span class="nc" id="L980">                return 2;</span>
-<span class="nc" id="L981">            }</span>
+<span class="nc" id="L982">            } catch (java.io.IOException ex) {</span>
+<span class="nc" id="L983">                out.println(&quot;Failed to write benchmark artefact: &quot; + ex.getMessage());</span>
+<span class="nc" id="L984">                return 2;</span>
+<span class="nc" id="L985">            }</span>
         }
-<span class="nc" id="L983">        return 0;</span>
+<span class="nc" id="L987">        return 0;</span>
     }
 
     private int runServe(String[] args) {
-<span class="nc" id="L987">        CliOptions options = CliOptions.parse(args);</span>
-<span class="nc" id="L988">        int port = Integer.parseInt(options.getOrDefault(&quot;port&quot;, &quot;8080&quot;));</span>
-<span class="nc" id="L989">        String host = options.getOrDefault(&quot;host&quot;, &quot;127.0.0.1&quot;);</span>
-<span class="nc" id="L990">        de.regelsuche.web.WebSecurityConfig.Builder configBuilder = de.regelsuche.web.WebSecurityConfig.builder();</span>
-<span class="nc" id="L991">        boolean securityEnabled = false;</span>
-<span class="nc bnc" id="L992" title="All 4 branches missed.">        if (options.containsKey(&quot;user&quot;) &amp;&amp; options.containsKey(&quot;password&quot;)) {</span>
-<span class="nc" id="L993">            configBuilder.basicAuth(options.get(&quot;user&quot;), options.get(&quot;password&quot;));</span>
-<span class="nc bnc" id="L994" title="All 2 branches missed.">            if (options.containsKey(&quot;realm&quot;)) {</span>
-<span class="nc" id="L995">                configBuilder.realm(options.get(&quot;realm&quot;));</span>
+<span class="nc" id="L991">        CliOptions options = CliOptions.parse(args);</span>
+<span class="nc" id="L992">        int port = Integer.parseInt(options.getOrDefault(&quot;port&quot;, &quot;8080&quot;));</span>
+<span class="nc" id="L993">        String host = options.getOrDefault(&quot;host&quot;, &quot;127.0.0.1&quot;);</span>
+<span class="nc" id="L994">        de.regelsuche.web.WebSecurityConfig.Builder configBuilder = de.regelsuche.web.WebSecurityConfig.builder();</span>
+<span class="nc" id="L995">        boolean securityEnabled = false;</span>
+<span class="nc bnc" id="L996" title="All 4 branches missed.">        if (options.containsKey(&quot;user&quot;) &amp;&amp; options.containsKey(&quot;password&quot;)) {</span>
+<span class="nc" id="L997">            configBuilder.basicAuth(options.get(&quot;user&quot;), options.get(&quot;password&quot;));</span>
+<span class="nc bnc" id="L998" title="All 2 branches missed.">            if (options.containsKey(&quot;realm&quot;)) {</span>
+<span class="nc" id="L999">                configBuilder.realm(options.get(&quot;realm&quot;));</span>
             }
-<span class="nc" id="L997">            securityEnabled = true;</span>
+<span class="nc" id="L1001">            securityEnabled = true;</span>
         }
-<span class="nc bnc" id="L999" title="All 2 branches missed.">        if (options.containsKey(&quot;keystore&quot;)) {</span>
-<span class="nc" id="L1000">            String storePass = options.getOrDefault(&quot;keystore-password&quot;, &quot;&quot;);</span>
-<span class="nc" id="L1001">            String type = options.getOrDefault(&quot;keystore-type&quot;, &quot;PKCS12&quot;);</span>
-<span class="nc" id="L1002">            configBuilder.tls(Paths.get(options.get(&quot;keystore&quot;)), storePass.toCharArray(), type);</span>
-<span class="nc" id="L1003">            securityEnabled = true;</span>
+<span class="nc bnc" id="L1003" title="All 2 branches missed.">        if (options.containsKey(&quot;keystore&quot;)) {</span>
+<span class="nc" id="L1004">            String storePass = options.getOrDefault(&quot;keystore-password&quot;, &quot;&quot;);</span>
+<span class="nc" id="L1005">            String type = options.getOrDefault(&quot;keystore-type&quot;, &quot;PKCS12&quot;);</span>
+<span class="nc" id="L1006">            configBuilder.tls(Paths.get(options.get(&quot;keystore&quot;)), storePass.toCharArray(), type);</span>
+<span class="nc" id="L1007">            securityEnabled = true;</span>
         }
-<span class="nc bnc" id="L1005" title="All 2 branches missed.">        if (options.containsKey(&quot;max-request-bytes&quot;)) {</span>
+<span class="nc bnc" id="L1009" title="All 2 branches missed.">        if (options.containsKey(&quot;max-request-bytes&quot;)) {</span>
             try {
-<span class="nc" id="L1007">                configBuilder.maxRequestBytes(Integer.parseInt(options.get(&quot;max-request-bytes&quot;)));</span>
-<span class="nc" id="L1008">            } catch (NumberFormatException ex) {</span>
-<span class="nc" id="L1009">                out.println(&quot;Invalid --max-request-bytes: &quot; + options.get(&quot;max-request-bytes&quot;));</span>
-<span class="nc" id="L1010">                return 2;</span>
-<span class="nc" id="L1011">            }</span>
+<span class="nc" id="L1011">                configBuilder.maxRequestBytes(Integer.parseInt(options.get(&quot;max-request-bytes&quot;)));</span>
+<span class="nc" id="L1012">            } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L1013">                out.println(&quot;Invalid --max-request-bytes: &quot; + options.get(&quot;max-request-bytes&quot;));</span>
+<span class="nc" id="L1014">                return 2;</span>
+<span class="nc" id="L1015">            }</span>
         }
-<span class="nc" id="L1013">        de.regelsuche.web.WebSecurityConfig securityConfig = configBuilder.build();</span>
+<span class="nc" id="L1017">        de.regelsuche.web.WebSecurityConfig securityConfig = configBuilder.build();</span>
 
         de.regelsuche.persistence.PersistenceConfig persistenceConfig =
-<span class="nc" id="L1016">            de.regelsuche.persistence.PersistenceConfig.fromEnvironment();</span>
-<span class="nc" id="L1017">        ExpressionGraphStore activeGraphStore = graphStore;</span>
-<span class="nc" id="L1018">        RuleInventoryRepository activeInventory = inventoryRepository;</span>
-<span class="nc" id="L1019">        de.regelsuche.search.memory.SearchMemory activeSearchMemory =</span>
+<span class="nc" id="L1020">            de.regelsuche.persistence.PersistenceConfig.fromEnvironment();</span>
+<span class="nc" id="L1021">        ExpressionGraphStore activeGraphStore = graphStore;</span>
+<span class="nc" id="L1022">        RuleInventoryRepository activeInventory = inventoryRepository;</span>
+<span class="nc" id="L1023">        de.regelsuche.search.memory.SearchMemory activeSearchMemory =</span>
             new de.regelsuche.search.memory.SearchMemory();
-<span class="nc" id="L1021">        de.regelsuche.persistence.PersistenceContext persistenceContext = null;</span>
-<span class="nc bnc" id="L1022" title="All 2 branches missed.">        if (persistenceConfig.mode() != de.regelsuche.persistence.GraphPersistenceMode.IN_MEMORY) {</span>
-<span class="nc" id="L1023">            persistenceContext = de.regelsuche.persistence.PersistenceContext.from(persistenceConfig, out);</span>
-<span class="nc" id="L1024">            activeGraphStore = persistenceContext.graphStore();</span>
-<span class="nc" id="L1025">            activeInventory = persistenceContext.inventoryRepository();</span>
-<span class="nc" id="L1026">            activeSearchMemory = new de.regelsuche.search.memory.SearchMemory(</span>
-<span class="nc" id="L1027">                persistenceContext.transpositionTable());</span>
+<span class="nc" id="L1025">        de.regelsuche.persistence.PersistenceContext persistenceContext = null;</span>
+<span class="nc bnc" id="L1026" title="All 2 branches missed.">        if (persistenceConfig.mode() != de.regelsuche.persistence.GraphPersistenceMode.IN_MEMORY) {</span>
+<span class="nc" id="L1027">            persistenceContext = de.regelsuche.persistence.PersistenceContext.from(persistenceConfig, out);</span>
+<span class="nc" id="L1028">            activeGraphStore = persistenceContext.graphStore();</span>
+<span class="nc" id="L1029">            activeInventory = persistenceContext.inventoryRepository();</span>
+<span class="nc" id="L1030">            activeSearchMemory = new de.regelsuche.search.memory.SearchMemory(</span>
+<span class="nc" id="L1031">                persistenceContext.transpositionTable());</span>
         }
 
-<span class="nc" id="L1030">        de.regelsuche.proof.ProofConfig proofConfig =</span>
-<span class="nc" id="L1031">            de.regelsuche.proof.ProofConfig.fromEnvironment(persistenceConfig.storagePath());</span>
-<span class="nc" id="L1032">        de.regelsuche.proof.ProofWorkbenchService proofWorkbench = null;</span>
-<span class="nc" id="L1033">        de.regelsuche.proof.ProofJobScheduler proofScheduler = null;</span>
-<span class="nc bnc" id="L1034" title="All 2 branches missed.">        if (proofConfig.enabled()) {</span>
+<span class="nc" id="L1034">        de.regelsuche.proof.ProofConfig proofConfig =</span>
+<span class="nc" id="L1035">            de.regelsuche.proof.ProofConfig.fromEnvironment(persistenceConfig.storagePath());</span>
+<span class="nc" id="L1036">        de.regelsuche.proof.ProofWorkbenchService proofWorkbench = null;</span>
+<span class="nc" id="L1037">        de.regelsuche.proof.ProofJobScheduler proofScheduler = null;</span>
+<span class="nc bnc" id="L1038" title="All 2 branches missed.">        if (proofConfig.enabled()) {</span>
             try {
-<span class="nc" id="L1036">                de.regelsuche.proof.JsonFileProofJobRepository jobs =</span>
-<span class="nc" id="L1037">                    new de.regelsuche.proof.JsonFileProofJobRepository(proofConfig.jobStorePath());</span>
-<span class="nc" id="L1038">                de.regelsuche.proof.JsonFileProofCache cache =</span>
-<span class="nc" id="L1039">                    new de.regelsuche.proof.JsonFileProofCache(proofConfig.cachePath());</span>
-<span class="nc" id="L1040">                de.regelsuche.proof.JsonFileProofArtifactRepository artifacts =</span>
-<span class="nc" id="L1041">                    new de.regelsuche.proof.JsonFileProofArtifactRepository(proofConfig.artifactPath());</span>
-<span class="nc" id="L1042">                de.regelsuche.proof.ProofWorker worker = new de.regelsuche.proof.CompositeProofWorker(</span>
-<span class="nc" id="L1043">                    java.util.List.of(</span>
-<span class="nc" id="L1044">                        new de.regelsuche.proof.LeanProofWorker(proofConfig.artifactPath()),</span>
-<span class="nc" id="L1045">                        new de.regelsuche.proof.SmtProofWorker(proofConfig.artifactPath())</span>
+<span class="nc" id="L1040">                de.regelsuche.proof.JsonFileProofJobRepository jobs =</span>
+<span class="nc" id="L1041">                    new de.regelsuche.proof.JsonFileProofJobRepository(proofConfig.jobStorePath());</span>
+<span class="nc" id="L1042">                de.regelsuche.proof.JsonFileProofCache cache =</span>
+<span class="nc" id="L1043">                    new de.regelsuche.proof.JsonFileProofCache(proofConfig.cachePath());</span>
+<span class="nc" id="L1044">                de.regelsuche.proof.JsonFileProofArtifactRepository artifacts =</span>
+<span class="nc" id="L1045">                    new de.regelsuche.proof.JsonFileProofArtifactRepository(proofConfig.artifactPath());</span>
+<span class="nc" id="L1046">                de.regelsuche.proof.ProofWorker worker = new de.regelsuche.proof.CompositeProofWorker(</span>
+<span class="nc" id="L1047">                    java.util.List.of(</span>
+<span class="nc" id="L1048">                        new de.regelsuche.proof.LeanProofWorker(proofConfig.artifactPath()),</span>
+<span class="nc" id="L1049">                        new de.regelsuche.proof.SmtProofWorker(proofConfig.artifactPath())</span>
                     )
                 );
-<span class="nc" id="L1048">                proofScheduler = new de.regelsuche.proof.ProofJobScheduler(</span>
+<span class="nc" id="L1052">                proofScheduler = new de.regelsuche.proof.ProofJobScheduler(</span>
                     worker, jobs, cache, activeInventory, artifacts,
-<span class="nc" id="L1050">                    java.time.Duration.ofSeconds(60)</span>
+<span class="nc" id="L1054">                    java.time.Duration.ofSeconds(60)</span>
                 );
-<span class="nc" id="L1052">                proofScheduler.start();</span>
-<span class="nc" id="L1053">                proofWorkbench = new de.regelsuche.proof.ProofWorkbenchService(</span>
+<span class="nc" id="L1056">                proofScheduler.start();</span>
+<span class="nc" id="L1057">                proofWorkbench = new de.regelsuche.proof.ProofWorkbenchService(</span>
                     proofScheduler, jobs, artifacts);
-<span class="nc" id="L1055">                out.println(&quot;Proof workbench enabled: jobs=&quot; + proofConfig.jobStorePath()</span>
-<span class="nc" id="L1056">                    + &quot;, cache=&quot; + proofConfig.cachePath()</span>
-<span class="nc" id="L1057">                    + &quot;, artifacts=&quot; + proofConfig.artifactPath());</span>
-<span class="nc" id="L1058">            } catch (java.io.IOException ex) {</span>
-<span class="nc" id="L1059">                out.println(&quot;Proof workbench initialisation failed (&quot; + ex.getMessage()</span>
+<span class="nc" id="L1059">                out.println(&quot;Proof workbench enabled: jobs=&quot; + proofConfig.jobStorePath()</span>
+<span class="nc" id="L1060">                    + &quot;, cache=&quot; + proofConfig.cachePath()</span>
+<span class="nc" id="L1061">                    + &quot;, artifacts=&quot; + proofConfig.artifactPath());</span>
+<span class="nc" id="L1062">            } catch (java.io.IOException ex) {</span>
+<span class="nc" id="L1063">                out.println(&quot;Proof workbench initialisation failed (&quot; + ex.getMessage()</span>
                     + &quot;); REST endpoints will report 503.&quot;);
-<span class="nc" id="L1061">            }</span>
+<span class="nc" id="L1065">            }</span>
         }
 
         try {
-<span class="nc" id="L1065">            de.regelsuche.web.WebWorkbenchServer server = new de.regelsuche.web.WebWorkbenchServer(</span>
+<span class="nc" id="L1069">            de.regelsuche.web.WebWorkbenchServer server = new de.regelsuche.web.WebWorkbenchServer(</span>
                 host, port, activeGraphStore, activeInventory, exportService, securityConfig, activeSearchMemory,
                 null, null, proofWorkbench
             );
-<span class="nc" id="L1069">            server.start();</span>
-<span class="nc bnc" id="L1070" title="All 2 branches missed.">            String scheme = securityConfig.isTlsEnabled() ? &quot;https&quot; : &quot;http&quot;;</span>
-<span class="nc" id="L1071">            out.println(&quot;Web workbench listening on &quot; + scheme + &quot;://&quot; + host + &quot;:&quot; + port</span>
-<span class="nc bnc" id="L1072" title="All 2 branches missed.">                + (securityEnabled ? &quot; (secured)&quot; : &quot;&quot;));</span>
-<span class="nc" id="L1073">            out.println(&quot;Press Ctrl+C to stop.&quot;);</span>
+<span class="nc" id="L1073">            server.start();</span>
+<span class="nc bnc" id="L1074" title="All 2 branches missed.">            String scheme = securityConfig.isTlsEnabled() ? &quot;https&quot; : &quot;http&quot;;</span>
+<span class="nc" id="L1075">            out.println(&quot;Web workbench listening on &quot; + scheme + &quot;://&quot; + host + &quot;:&quot; + port</span>
+<span class="nc bnc" id="L1076" title="All 2 branches missed.">                + (securityEnabled ? &quot; (secured)&quot; : &quot;&quot;));</span>
+<span class="nc" id="L1077">            out.println(&quot;Press Ctrl+C to stop.&quot;);</span>
             try {
-<span class="nc" id="L1075">                Thread.currentThread().join();</span>
-<span class="nc" id="L1076">            } catch (InterruptedException ex) {</span>
-<span class="nc" id="L1077">                Thread.currentThread().interrupt();</span>
+<span class="nc" id="L1079">                Thread.currentThread().join();</span>
+<span class="nc" id="L1080">            } catch (InterruptedException ex) {</span>
+<span class="nc" id="L1081">                Thread.currentThread().interrupt();</span>
             } finally {
-<span class="nc" id="L1079">                server.stop();</span>
+<span class="nc" id="L1083">                server.stop();</span>
             }
-<span class="nc" id="L1081">            return 0;</span>
-<span class="nc" id="L1082">        } catch (Exception ex) {</span>
-<span class="nc" id="L1083">            out.println(&quot;serve failed: &quot; + ex.getMessage());</span>
-<span class="nc" id="L1084">            return 2;</span>
+<span class="nc" id="L1085">            return 0;</span>
+<span class="nc" id="L1086">        } catch (Exception ex) {</span>
+<span class="nc" id="L1087">            out.println(&quot;serve failed: &quot; + ex.getMessage());</span>
+<span class="nc" id="L1088">            return 2;</span>
         } finally {
-<span class="nc bnc" id="L1086" title="All 2 branches missed.">            if (proofScheduler != null) {</span>
-<span class="nc" id="L1087">                proofScheduler.close();</span>
+<span class="nc bnc" id="L1090" title="All 2 branches missed.">            if (proofScheduler != null) {</span>
+<span class="nc" id="L1091">                proofScheduler.close();</span>
             }
-<span class="nc bnc" id="L1089" title="All 2 branches missed.">            if (persistenceContext != null) {</span>
-<span class="nc" id="L1090">                persistenceContext.close();</span>
+<span class="nc bnc" id="L1093" title="All 2 branches missed.">            if (persistenceContext != null) {</span>
+<span class="nc" id="L1094">                persistenceContext.close();</span>
             }
         }
     }
 
     private int runExplain(String[] args) {
-<span class="nc bnc" id="L1096" title="All 2 branches missed.">        if (args.length &lt; 1) {</span>
-<span class="nc" id="L1097">            out.println(&quot;Usage: explain &lt;pathId&gt; [--form short|school|expert|latex|json]&quot;);</span>
-<span class="nc" id="L1098">            return 1;</span>
+<span class="nc bnc" id="L1100" title="All 2 branches missed.">        if (args.length &lt; 1) {</span>
+<span class="nc" id="L1101">            out.println(&quot;Usage: explain &lt;pathId&gt; [--form short|school|expert|latex|json]&quot;);</span>
+<span class="nc" id="L1102">            return 1;</span>
         }
-<span class="nc" id="L1100">        String pathId = args[0];</span>
-<span class="nc" id="L1101">        CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 1, args.length));</span>
-<span class="nc" id="L1102">        String formName = options.getOrDefault(&quot;form&quot;, &quot;school&quot;).toUpperCase(Locale.ROOT);</span>
+<span class="nc" id="L1104">        String pathId = args[0];</span>
+<span class="nc" id="L1105">        CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 1, args.length));</span>
+<span class="nc" id="L1106">        String formName = options.getOrDefault(&quot;form&quot;, &quot;school&quot;).toUpperCase(Locale.ROOT);</span>
         de.regelsuche.explain.ExplanationService.Form form;
         try {
-<span class="nc" id="L1105">            form = de.regelsuche.explain.ExplanationService.Form.valueOf(formName);</span>
-<span class="nc" id="L1106">        } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L1107">            out.println(&quot;Unsupported form: &quot; + options.get(&quot;form&quot;));</span>
-<span class="nc" id="L1108">            return 1;</span>
-<span class="nc" id="L1109">        }</span>
-<span class="nc" id="L1110">        Optional&lt;DiscoveredTransformation&gt; match = graphStore.discoveredTransformations().stream()</span>
-<span class="nc" id="L1111">            .filter(transformation -&gt; transformation.id().equals(pathId))</span>
-<span class="nc" id="L1112">            .findFirst();</span>
-<span class="nc bnc" id="L1113" title="All 2 branches missed.">        if (match.isEmpty()) {</span>
-<span class="nc" id="L1114">            out.println(&quot;Path &quot; + pathId + &quot; not found&quot;);</span>
-<span class="nc" id="L1115">            return 1;</span>
+<span class="nc" id="L1109">            form = de.regelsuche.explain.ExplanationService.Form.valueOf(formName);</span>
+<span class="nc" id="L1110">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L1111">            out.println(&quot;Unsupported form: &quot; + options.get(&quot;form&quot;));</span>
+<span class="nc" id="L1112">            return 1;</span>
+<span class="nc" id="L1113">        }</span>
+<span class="nc" id="L1114">        Optional&lt;DiscoveredTransformation&gt; match = graphStore.discoveredTransformations().stream()</span>
+<span class="nc" id="L1115">            .filter(transformation -&gt; transformation.id().equals(pathId))</span>
+<span class="nc" id="L1116">            .findFirst();</span>
+<span class="nc bnc" id="L1117" title="All 2 branches missed.">        if (match.isEmpty()) {</span>
+<span class="nc" id="L1118">            out.println(&quot;Path &quot; + pathId + &quot; not found&quot;);</span>
+<span class="nc" id="L1119">            return 1;</span>
         }
-<span class="nc" id="L1117">        out.println(new de.regelsuche.explain.ExplanationService().renderPath(match.get(), form));</span>
-<span class="nc" id="L1118">        return 0;</span>
+<span class="nc" id="L1121">        out.println(new de.regelsuche.explain.ExplanationService().renderPath(match.get(), form));</span>
+<span class="nc" id="L1122">        return 0;</span>
     }
 
     private int runPath(String[] args) {
-<span class="nc bnc" id="L1122" title="All 4 branches missed.">        if (args.length &lt; 2 || !&quot;show&quot;.equalsIgnoreCase(args[0])) {</span>
-<span class="nc" id="L1123">            out.println(&quot;Usage: path show &lt;pathId&gt; [--format markdown|latex|mermaid|json]&quot;);</span>
-<span class="nc" id="L1124">            return 1;</span>
+<span class="nc bnc" id="L1126" title="All 4 branches missed.">        if (args.length &lt; 2 || !&quot;show&quot;.equalsIgnoreCase(args[0])) {</span>
+<span class="nc" id="L1127">            out.println(&quot;Usage: path show &lt;pathId&gt; [--format markdown|latex|mermaid|json]&quot;);</span>
+<span class="nc" id="L1128">            return 1;</span>
         }
-<span class="nc" id="L1126">        String pathId = args[1];</span>
-<span class="nc" id="L1127">        CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 2, args.length));</span>
-<span class="nc" id="L1128">        String format = options.getOrDefault(&quot;format&quot;, &quot;markdown&quot;);</span>
-<span class="nc" id="L1129">        Optional&lt;DiscoveredTransformation&gt; match = graphStore.discoveredTransformations().stream()</span>
-<span class="nc" id="L1130">            .filter(transformation -&gt; transformation.id().equals(pathId))</span>
-<span class="nc" id="L1131">            .findFirst();</span>
-<span class="nc bnc" id="L1132" title="All 2 branches missed.">        if (match.isEmpty()) {</span>
-<span class="nc" id="L1133">            out.println(&quot;Path &quot; + pathId + &quot; not found&quot;);</span>
-<span class="nc" id="L1134">            return 1;</span>
+<span class="nc" id="L1130">        String pathId = args[1];</span>
+<span class="nc" id="L1131">        CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 2, args.length));</span>
+<span class="nc" id="L1132">        String format = options.getOrDefault(&quot;format&quot;, &quot;markdown&quot;);</span>
+<span class="nc" id="L1133">        Optional&lt;DiscoveredTransformation&gt; match = graphStore.discoveredTransformations().stream()</span>
+<span class="nc" id="L1134">            .filter(transformation -&gt; transformation.id().equals(pathId))</span>
+<span class="nc" id="L1135">            .findFirst();</span>
+<span class="nc bnc" id="L1136" title="All 2 branches missed.">        if (match.isEmpty()) {</span>
+<span class="nc" id="L1137">            out.println(&quot;Path &quot; + pathId + &quot; not found&quot;);</span>
+<span class="nc" id="L1138">            return 1;</span>
         }
-<span class="nc" id="L1136">        List&lt;DiscoveredTransformation&gt; wrapper = List.of(match.get());</span>
-<span class="nc bnc" id="L1137" title="All 5 branches missed.">        switch (format.toLowerCase(Locale.ROOT)) {</span>
-<span class="nc" id="L1138">            case &quot;markdown&quot;, &quot;md&quot; -&gt; out.println(exportService.exportMarkdown(wrapper));</span>
-<span class="nc" id="L1139">            case &quot;latex&quot;, &quot;tex&quot; -&gt; out.println(exportService.exportLatex(wrapper));</span>
-<span class="nc" id="L1140">            case &quot;mermaid&quot;, &quot;mmd&quot; -&gt; out.println(exportService.exportMermaid(wrapper));</span>
-<span class="nc" id="L1141">            case &quot;json&quot; -&gt; out.println(exportService.exportJson(wrapper, List.of(), List.of()));</span>
+<span class="nc" id="L1140">        List&lt;DiscoveredTransformation&gt; wrapper = List.of(match.get());</span>
+<span class="nc bnc" id="L1141" title="All 5 branches missed.">        switch (format.toLowerCase(Locale.ROOT)) {</span>
+<span class="nc" id="L1142">            case &quot;markdown&quot;, &quot;md&quot; -&gt; out.println(exportService.exportMarkdown(wrapper));</span>
+<span class="nc" id="L1143">            case &quot;latex&quot;, &quot;tex&quot; -&gt; out.println(exportService.exportLatex(wrapper));</span>
+<span class="nc" id="L1144">            case &quot;mermaid&quot;, &quot;mmd&quot; -&gt; out.println(exportService.exportMermaid(wrapper));</span>
+<span class="nc" id="L1145">            case &quot;json&quot; -&gt; out.println(exportService.exportJson(wrapper, List.of(), List.of()));</span>
             default -&gt; {
-<span class="nc" id="L1143">                out.println(&quot;Unsupported format: &quot; + format);</span>
-<span class="nc" id="L1144">                return 1;</span>
+<span class="nc" id="L1147">                out.println(&quot;Unsupported format: &quot; + format);</span>
+<span class="nc" id="L1148">                return 1;</span>
             }
         }
-<span class="nc" id="L1147">        return 0;</span>
+<span class="nc" id="L1151">        return 0;</span>
     }
 
     private void close(AutoCloseable resource) {
         try {
-<span class="fc" id="L1152">            resource.close();</span>
-<span class="nc" id="L1153">        } catch (Exception ignored) {</span>
-<span class="fc" id="L1154">        }</span>
-<span class="fc" id="L1155">    }</span>
+<span class="fc" id="L1156">            resource.close();</span>
+<span class="nc" id="L1157">        } catch (Exception ignored) {</span>
+<span class="fc" id="L1158">        }</span>
+<span class="fc" id="L1159">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

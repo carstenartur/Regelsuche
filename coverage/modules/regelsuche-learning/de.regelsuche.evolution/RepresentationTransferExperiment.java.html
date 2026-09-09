@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RepresentationTransferExperiment.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">RepresentationTransferExperiment.java</span></div><h1>RepresentationTransferExperiment.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.RepresentationStrategyLearner.Application;
+import de.regelsuche.evolution.RepresentationStrategyLearner.Policy;
+import de.regelsuche.evolution.RepresentationStrategyLearner.Profile;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.math.algorithms.linalg.LinearRepresentationJson;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+
+/** Public development study; this is not a sealed final holdout or preregistration. */
+<span class="fc" id="L16">public final class RepresentationTransferExperiment {</span>
+    public static final int BUDGET = 20_000;
+    public record Case(String id, String family, List&lt;String&gt; equations, boolean negativeControl) {
+<span class="fc" id="L19">        public Case { equations = List.copyOf(equations); }</span>
+    }
+<span class="fc" id="L21">    public record Row(Case task, Profile profile, Application application) { }</span>
+<span class="fc" id="L22">    public record Summary(Profile profile, long applicationWork, int solved, int regressions) { }</span>
+    public record Study(Policy policy, List&lt;Row&gt; rows, List&lt;Summary&gt; summaries) {
+<span class="fc" id="L24">        public Study { rows = List.copyOf(rows); summaries = List.copyOf(summaries); }</span>
+    }
+
+    public static List&lt;List&lt;String&gt;&gt; training() {
+<span class="fc" id="L28">        return List.of(</span>
+<span class="fc" id="L29">            List.of(&quot;a+b=3&quot;, &quot;a-b=1&quot;),</span>
+<span class="fc" id="L30">            List.of(&quot;a+b+c=6&quot;, &quot;a-b=0&quot;, &quot;b-c=-1&quot;),</span>
+<span class="fc" id="L31">            List.of(&quot;a+b=5&quot;, &quot;a-b=1&quot;, &quot;c+d=9&quot;, &quot;c-d=1&quot;),</span>
+<span class="fc" id="L32">            List.of(&quot;a+b=7&quot;, &quot;a-b=3&quot;, &quot;c+d=11&quot;, &quot;c-d=3&quot;, &quot;e+f=15&quot;, &quot;e-f=3&quot;, &quot;g+h=19&quot;, &quot;g-h=3&quot;),</span>
+<span class="fc" id="L33">            List.of(&quot;a+b=7&quot;, &quot;a-b=3&quot;, &quot;c+d=11&quot;, &quot;c-d=3&quot;, &quot;e+f=15&quot;, &quot;e-f=3&quot;),</span>
+<span class="fc" id="L34">            List.of(&quot;a+b=2&quot;, &quot;b+c=3&quot;, &quot;c+d=4&quot;, &quot;a+2*d=1&quot;));</span>
+    }
+    public static List&lt;Case&gt; evaluation() {
+<span class="fc" id="L37">        List&lt;Case&gt; tasks = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for (int i = 0; i &lt; 8; i++) {</span>
+<span class="fc" id="L39">            int n = 21 + i;</span>
+<span class="fc" id="L40">            List&lt;String&gt; coefficients = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L41">            List&lt;String&gt; recurrences = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L42">            List&lt;String&gt; redundant = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L43">            List&lt;String&gt; free = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">            for (int block = 0; block &lt; 4; block++) {</span>
+<span class="fc" id="L45">                String x = &quot;x&quot; + block, y = &quot;y&quot; + block, z = &quot;z&quot; + block;</span>
+<span class="fc" id="L46">                int rhs = n + block * 7;</span>
+<span class="fc" id="L47">                coefficients.add((block + 2) + &quot;*&quot; + x + &quot;+&quot; + y + &quot;=&quot; + rhs);</span>
+<span class="fc" id="L48">                coefficients.add(x + &quot;-&quot; + y + &quot;=&quot; + (block + 2));</span>
+<span class="fc" id="L49">                recurrences.add(x + &quot;+&quot; + y + &quot;+&quot; + z + &quot;=&quot; + rhs);</span>
+<span class="fc" id="L50">                recurrences.add(y + &quot;-2*&quot; + x + &quot;=1&quot;);</span>
+<span class="fc" id="L51">                recurrences.add(z + &quot;-2*&quot; + y + &quot;=1&quot;);</span>
+<span class="fc" id="L52">                redundant.add(x + &quot;+&quot; + y + &quot;=&quot; + rhs);</span>
+<span class="fc" id="L53">                redundant.add(&quot;2*&quot; + x + &quot;+2*&quot; + y + &quot;=&quot; + 2 * rhs);</span>
+<span class="fc" id="L54">                redundant.add(x + &quot;-&quot; + y + &quot;=4&quot;);</span>
+<span class="fc" id="L55">                free.add((block + 2) + &quot;*&quot; + x + &quot;+&quot; + y + &quot;=&quot; + rhs);</span>
+            }
+<span class="fc" id="L57">            tasks.add(new Case(&quot;coeff-&quot; + i, &quot;coefficient_matching&quot;, coefficients, false));</span>
+<span class="fc" id="L58">            tasks.add(new Case(&quot;recurrence-&quot; + i, &quot;recurrence_blocks&quot;, recurrences, false));</span>
+<span class="fc" id="L59">            tasks.add(new Case(&quot;redundant-&quot; + i, &quot;redundant_constraints&quot;, redundant, false));</span>
+<span class="fc" id="L60">            tasks.add(new Case(&quot;free-&quot; + i, &quot;free_parameters&quot;, free, false));</span>
+<span class="fc" id="L61">            tasks.add(new Case(&quot;connected-&quot; + i, &quot;connected_controls&quot;, List.of(</span>
+                &quot;x+y=&quot; + n, &quot;y+z=7&quot;, &quot;z+w=8&quot;, &quot;x+2*w=6&quot;), false));
+        }
+<span class="fc" id="L64">        tasks.add(new Case(&quot;nonlinear&quot;, &quot;negative_controls&quot;, List.of(&quot;x*y=2&quot;), true));</span>
+<span class="fc" id="L65">        tasks.add(new Case(&quot;function&quot;, &quot;negative_controls&quot;, List.of(&quot;sin(x)=0&quot;), true));</span>
+<span class="fc" id="L66">        return List.copyOf(tasks);</span>
+    }
+
+    public Study run() {
+<span class="fc" id="L70">        var learner = new RepresentationStrategyLearner();</span>
+<span class="fc" id="L71">        Policy policy = learner.fit(training(), BUDGET); // Freeze before any evaluation outcome exists.</span>
+<span class="fc" id="L72">        List&lt;Row&gt; rows = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        for (Case task : evaluation()) {</span>
+<span class="pc bpc" id="L74" title="1 of 4 branches missed.">            if (!task.negativeControl &amp;&amp; policy.trainingIdentities().contains(</span>
+<span class="fc" id="L75">                    RepresentationStrategyLearner.identity(task.equations))) {</span>
+<span class="nc" id="L76">                throw new IllegalStateException(&quot;Training/evaluation overlap: &quot; + task.id);</span>
+            }
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            for (Profile profile : Profile.values()) rows.add(new Row(task, profile,</span>
+<span class="fc" id="L79">                learner.apply(policy, task.equations, profile, BUDGET)));</span>
+<span class="fc" id="L80">        }</span>
+<span class="fc" id="L81">        List&lt;Summary&gt; summaries = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        Set&lt;String&gt; baseline = rows.stream().filter(row -&gt; row.profile == Profile.DIRECT</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            &amp;&amp; row.application.audit().verified()).map(row -&gt; row.task.id).collect(java.util.stream.Collectors.toSet());</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (Profile profile : Profile.values()) {</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            List&lt;Row&gt; selected = rows.stream().filter(row -&gt; row.profile == profile).toList();</span>
+<span class="fc" id="L86">            summaries.add(new Summary(profile, selected.stream().mapToLong(row -&gt; row.application.totalWork()).sum(),</span>
+<span class="fc" id="L87">                (int) selected.stream().filter(row -&gt; row.application.audit().verified()).count(),</span>
+<span class="pc bpc" id="L88" title="1 of 4 branches missed.">                (int) selected.stream().filter(row -&gt; baseline.contains(row.task.id) &amp;&amp; !row.application.audit().verified()).count()));</span>
+        }
+<span class="fc" id="L90">        return new Study(policy, rows, summaries);</span>
+    }
+
+    public static String protocolJson() {
+<span class="fc" id="L94">        JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L95">        writer.property(&quot;schema&quot;, &quot;regelsuche.representation-transfer-protocol/v1&quot;)</span>
+<span class="fc" id="L96">            .property(&quot;purpose&quot;, &quot;PUBLIC_DEVELOPMENT_STUDY&quot;)</span>
+<span class="fc" id="L97">            .property(&quot;constructionBudget&quot;, BUDGET)</span>
+<span class="fc" id="L98">            .property(&quot;auditBudget&quot;, LinearRepresentationJson.AUDIT_BUDGET)</span>
+<span class="fc" id="L99">            .property(&quot;learningScope&quot;, &quot;Finite independent-block/minimum-variable branch; fixed solve/compose skeleton&quot;)</span>
+<span class="fc" id="L100">            .property(&quot;workScope&quot;, &quot;Mechanical solver, preparation, composition, policy selection, fit and audit units; excludes parsing, hashes, split canonicalization and rational bit complexity&quot;)</span>
+<span class="fc" id="L101">            .property(&quot;splitExclusion&quot;, &quot;Sorted row-wise exact alpha-polynomial identities; conservative, not full system equivalence&quot;)</span>
+<span class="fc" id="L102">            .property(&quot;sealedHoldout&quot;, false).property(&quot;externallyPreregistered&quot;, false)</span>
+<span class="fc" id="L103">            .property(&quot;randomSeed&quot;, 730)</span>
+<span class="fc" id="L104">            .array(&quot;thresholdGrammar&quot;, w -&gt; RepresentationStrategyLearner.THRESHOLDS.forEach(w::value))</span>
+<span class="fc" id="L105">            .stringArray(&quot;profiles&quot;, java.util.Arrays.stream(Profile.values()).map(Enum::name).toList())</span>
+<span class="fc" id="L106">            .array(&quot;training&quot;, w -&gt; training().forEach(source -&gt; w.arrayValue(a -&gt; source.forEach(a::value))))</span>
+<span class="fc" id="L107">            .array(&quot;evaluation&quot;, w -&gt; evaluation().forEach(task -&gt; w.objectValue(a -&gt; writeCase(a, task))));</span>
+<span class="fc" id="L108">        return writer.endObject().toString() + &quot;\n&quot;;</span>
+    }
+    public static String summaryJson(Study study) {
+<span class="fc" id="L111">        JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L112">        writeSummary(writer, study);</span>
+<span class="fc" id="L113">        return writer.endObject().toString() + &quot;\n&quot;;</span>
+    }
+    private static void writeSummary(JsonWriter writer, Study study) {
+<span class="fc" id="L116">        writer.property(&quot;schema&quot;, &quot;regelsuche.representation-transfer-summary/v1&quot;)</span>
+<span class="fc" id="L117">            .property(&quot;minimumVariables&quot;, study.policy.minimumVariables())</span>
+<span class="fc" id="L118">            .property(&quot;learningWork&quot;, study.policy.learningWork())</span>
+<span class="fc" id="L119">            .property(&quot;fitWork&quot;, study.policy.fitWork())</span>
+<span class="fc" id="L120">            .property(&quot;applicationCases&quot;, evaluation().size())</span>
+<span class="fc" id="L121">            .array(&quot;profiles&quot;, w -&gt; study.summaries.forEach(summary -&gt; w.objectValue(s -&gt; s</span>
+<span class="fc" id="L122">                .property(&quot;profile&quot;, summary.profile.name()).property(&quot;applicationWork&quot;, summary.applicationWork)</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">                .property(&quot;includingLearningWork&quot;, summary.applicationWork + (summary.profile == Profile.LEARNED ? study.policy.learningWork() : 0))</span>
+<span class="fc" id="L124">                .property(&quot;verifiedSolutions&quot;, summary.solved).property(&quot;regressions&quot;, summary.regressions))));</span>
+<span class="fc" id="L125">    }</span>
+    public static String toJson(Study study) {
+<span class="fc" id="L127">        JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L128">        writer.property(&quot;schema&quot;, &quot;regelsuche.representation-transfer-study/v1&quot;)</span>
+<span class="fc" id="L129">            .property(&quot;protocolHash&quot;, LinearRepresentationJson.hash(protocolJson()))</span>
+<span class="fc" id="L130">            .property(&quot;policyHash&quot;, policyHash(study.policy))</span>
+<span class="fc" id="L131">            .object(&quot;summary&quot;, w -&gt; writeSummary(w, study))</span>
+<span class="fc" id="L132">            .object(&quot;diagnosis&quot;, w -&gt; RepresentationLearningDiagnosis.write(w, RepresentationLearningDiagnosis.analyze(study)))</span>
+<span class="fc" id="L133">            .object(&quot;policy&quot;, w -&gt; writePolicy(w, study.policy))</span>
+<span class="fc" id="L134">            .array(&quot;training&quot;, w -&gt; study.policy.observations().forEach(observation -&gt; w.objectValue(o -&gt; o</span>
+<span class="fc" id="L135">                .property(&quot;trainingIndex&quot;, observation.trainingIndex())</span>
+<span class="fc" id="L136">                .object(&quot;artifact&quot;, a -&gt; LinearRepresentationJson.writeArtifact(a, observation.result(), observation.audit())))))</span>
+<span class="fc" id="L137">            .array(&quot;rows&quot;, w -&gt; study.rows.forEach(row -&gt; w.objectValue(r -&gt; {</span>
+<span class="fc" id="L138">                r.object(&quot;task&quot;, t -&gt; writeCase(t, row.task)).property(&quot;profile&quot;, row.profile.name())</span>
+<span class="fc" id="L139">                    .property(&quot;selectionWork&quot;, row.application.selectionWork()).property(&quot;totalWork&quot;, row.application.totalWork())</span>
+<span class="fc" id="L140">                    .object(&quot;artifact&quot;, a -&gt; LinearRepresentationJson.writeArtifact(a, row.application.result(), row.application.audit()));</span>
+<span class="fc" id="L141">            })));</span>
+<span class="fc" id="L142">        return writer.endObject().toString() + &quot;\n&quot;;</span>
+    }
+    private static void writeCase(JsonWriter writer, Case task) {
+<span class="fc" id="L145">        writer.property(&quot;id&quot;, task.id).property(&quot;family&quot;, task.family).stringArray(&quot;equations&quot;, task.equations)</span>
+<span class="fc" id="L146">            .property(&quot;negativeControl&quot;, task.negativeControl);</span>
+<span class="fc" id="L147">    }</span>
+    private static void writePolicy(JsonWriter writer, Policy policy) {
+<span class="fc" id="L149">        writer.property(&quot;schema&quot;, &quot;regelsuche.representation-policy/v1&quot;)</span>
+<span class="fc" id="L150">            .property(&quot;minimumVariables&quot;, policy.minimumVariables()).property(&quot;fitWork&quot;, policy.fitWork())</span>
+<span class="fc" id="L151">            .property(&quot;learningWork&quot;, policy.learningWork())</span>
+<span class="fc" id="L152">            .stringArray(&quot;trainingIdentities&quot;, policy.trainingIdentities().stream().sorted().toList());</span>
+<span class="fc" id="L153">    }</span>
+    public static String policyHash(Policy policy) {
+<span class="fc" id="L155">        JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L156">        writePolicy(writer, policy);</span>
+<span class="fc" id="L157">        return LinearRepresentationJson.hash(writer.endObject().toString());</span>
+    }
+    public static String manifestJson(Study study) {
+<span class="fc" id="L160">        return new JsonWriter().beginObject().property(&quot;schema&quot;, &quot;regelsuche.representation-transfer-manifest/v1&quot;)</span>
+<span class="fc" id="L161">            .property(&quot;protocolHash&quot;, LinearRepresentationJson.hash(protocolJson()))</span>
+<span class="fc" id="L162">            .property(&quot;policyHash&quot;, policyHash(study.policy))</span>
+<span class="fc" id="L163">            .property(&quot;studyHash&quot;, LinearRepresentationJson.hash(toJson(study)))</span>
+<span class="fc" id="L164">            .property(&quot;diagnosisHash&quot;, LinearRepresentationJson.hash(RepresentationLearningDiagnosis.toJson(study)))</span>
+<span class="fc" id="L165">            .property(&quot;summaryHash&quot;, LinearRepresentationJson.hash(summaryJson(study))).endObject().toString() + &quot;\n&quot;;</span>
+    }
+    public static void main(String[] args) throws IOException {
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        if (args.length != 1) throw new IllegalArgumentException(&quot;Expected output directory&quot;);</span>
+<span class="nc" id="L169">        Path directory = Path.of(args[0]);</span>
+<span class="nc" id="L170">        Files.createDirectories(directory);</span>
+        // Retain the fixed development protocol before fitting or evaluating.
+<span class="nc" id="L172">        Files.writeString(directory.resolve(&quot;representation-transfer-protocol.json&quot;), protocolJson());</span>
+<span class="nc" id="L173">        Study study = new RepresentationTransferExperiment().run();</span>
+<span class="nc" id="L174">        Files.writeString(directory.resolve(&quot;representation-transfer-study.json&quot;), toJson(study));</span>
+<span class="nc" id="L175">        Files.writeString(directory.resolve(&quot;representation-transfer-summary.json&quot;), summaryJson(study));</span>
+<span class="nc" id="L176">        Files.writeString(directory.resolve(&quot;representation-transfer-diagnosis.json&quot;), RepresentationLearningDiagnosis.toJson(study));</span>
+<span class="nc" id="L177">        Files.writeString(directory.resolve(&quot;representation-transfer-manifest.json&quot;), manifestJson(study));</span>
+<span class="nc" id="L178">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

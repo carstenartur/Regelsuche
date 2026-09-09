@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RepresentationStrategyLearner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">RepresentationStrategyLearner.java</span></div><h1>RepresentationStrategyLearner.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.math.algorithms.linalg.LinearRepresentationPlanner;
+import de.regelsuche.math.algorithms.linalg.LinearRepresentationJson;
+import de.regelsuche.math.algorithms.linalg.LinearRepresentationPlanner.Audit;
+import de.regelsuche.math.algorithms.linalg.LinearRepresentationPlanner.Result;
+import de.regelsuche.math.algorithms.linalg.LinearRepresentationPlanner.Route;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+/** Learns one finite branch condition from verified training executions.
+ * The split/solve/compose skeleton and mathematical solvers are fixed.
+ * Evaluation cases are never supplied to fit, and Policy has no mutation API.
+ */
+<span class="fc" id="L18">public final class RepresentationStrategyLearner {</span>
+<span class="fc" id="L19">    public static final List&lt;Integer&gt; THRESHOLDS = List.of(2, 4, 6, 8, 12, 17);</span>
+<span class="fc" id="L20">    public enum Profile { DIRECT, MATRIX, BLOCKS, FIXED_AUTO, RANDOM, LEARNED }</span>
+<span class="fc" id="L21">    public record Observation(int trainingIndex, Result result, Audit audit) {</span>
+<span class="fc" id="L22">        public int totalWork() { return result.totalWork() + audit.work(); }</span>
+    }
+<span class="fc" id="L24">    public record Application(Result result, Audit audit, int selectionWork) {</span>
+<span class="fc" id="L25">        public int totalWork() { return result.totalWork() + audit.work() + selectionWork; }</span>
+    }
+    public static final class Policy {
+        private final int minimumVariables;
+        private final int fitWork;
+        private final List&lt;Observation&gt; observations;
+        private final Set&lt;String&gt; trainingIdentities;
+<span class="fc" id="L32">        private Policy(int minimumVariables, int fitWork, List&lt;Observation&gt; observations, Set&lt;String&gt; identities) {</span>
+<span class="fc" id="L33">            this.minimumVariables = minimumVariables;</span>
+<span class="fc" id="L34">            this.fitWork = fitWork;</span>
+<span class="fc" id="L35">            this.observations = List.copyOf(observations);</span>
+<span class="fc" id="L36">            this.trainingIdentities = Set.copyOf(identities);</span>
+<span class="fc" id="L37">        }</span>
+<span class="fc" id="L38">        public int minimumVariables() { return minimumVariables; }</span>
+<span class="fc" id="L39">        public int fitWork() { return fitWork; }</span>
+<span class="fc" id="L40">        public List&lt;Observation&gt; observations() { return observations; }</span>
+<span class="fc" id="L41">        public Set&lt;String&gt; trainingIdentities() { return trainingIdentities; }</span>
+        public int learningWork() {
+<span class="fc" id="L43">            return fitWork + observations.stream().mapToInt(Observation::totalWork).sum();</span>
+        }
+    }
+
+    public Policy fit(List&lt;List&lt;String&gt;&gt; training, int budget) {
+<span class="pc bpc" id="L48" title="2 of 4 branches missed.">        if (training.isEmpty() || training.size() &gt; 32) throw new IllegalArgumentException(&quot;Expected 1 to 32 training cases&quot;);</span>
+<span class="fc" id="L49">        var planner = new LinearRepresentationPlanner();</span>
+<span class="fc" id="L50">        List&lt;Observation&gt; observations = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L51">        Set&lt;String&gt; identities = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        for (int i = 0; i &lt; training.size(); i++) {</span>
+<span class="fc" id="L53">            String identity = identity(training.get(i));</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            if (!identities.add(identity)) throw new IllegalArgumentException(&quot;Repeated alpha-polynomial training case&quot;);</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            for (Route route : List.of(Route.DIRECT, Route.MATRIX, Route.BLOCKS)) {</span>
+<span class="fc" id="L56">                Result result = planner.solve(training.get(i), route, budget);</span>
+<span class="fc" id="L57">                observations.add(new Observation(i, result, planner.audit(result, LinearRepresentationJson.AUDIT_BUDGET)));</span>
+<span class="fc" id="L58">            }</span>
+        }
+<span class="fc" id="L60">        int best = THRESHOLDS.getFirst();</span>
+<span class="fc" id="L61">        int bestSolved = -1;</span>
+<span class="fc" id="L62">        long bestWork = Long.MAX_VALUE;</span>
+<span class="fc" id="L63">        int fitWork = 0;</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (int threshold : THRESHOLDS) {</span>
+<span class="fc" id="L65">            int solved = 0;</span>
+<span class="fc" id="L66">            long work = 0;</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            for (int i = 0; i &lt; training.size(); i++) {</span>
+<span class="fc" id="L68">                Observation direct = observations.get(i * 3);</span>
+<span class="fc" id="L69">                Result source = direct.result;</span>
+<span class="fc bfc" id="L70" title="All 4 branches covered.">                boolean blocks = source.blocks().size() &gt; 1 &amp;&amp; source.variables().size() &gt;= threshold;</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">                Observation chosen = observations.get(i * 3 + (blocks ? 2 : 0));</span>
+<span class="fc" id="L72">                fitWork += 2;</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">                if (chosen.audit.verified()) solved++;</span>
+<span class="fc" id="L74">                work += chosen.totalWork();</span>
+            }
+<span class="pc bpc" id="L76" title="1 of 6 branches missed.">            if (solved &gt; bestSolved || solved == bestSolved &amp;&amp; work &lt; bestWork) {</span>
+<span class="fc" id="L77">                best = threshold; bestSolved = solved; bestWork = work;</span>
+            }
+<span class="fc" id="L79">        }</span>
+<span class="fc" id="L80">        return new Policy(best, fitWork, observations, identities);</span>
+    }
+
+    public Application apply(Policy policy, List&lt;String&gt; source, Profile profile, int budget) {
+<span class="fc" id="L84">        var planner = new LinearRepresentationPlanner();</span>
+<span class="fc" id="L85">        var plan = planner.prepare(source, budget);</span>
+<span class="fc bfc" id="L86" title="All 4 branches covered.">        int selectionWork = profile == Profile.LEARNED || profile == Profile.RANDOM ? 2 : 0;</span>
+<span class="fc bfc" id="L87" title="All 6 branches covered.">        Route route = switch (profile) {</span>
+<span class="fc" id="L88">            case DIRECT -&gt; Route.DIRECT;</span>
+<span class="fc" id="L89">            case MATRIX -&gt; Route.MATRIX;</span>
+<span class="fc" id="L90">            case BLOCKS -&gt; Route.BLOCKS;</span>
+<span class="fc" id="L91">            case FIXED_AUTO -&gt; Route.AUTO;</span>
+<span class="pc bpc" id="L92" title="1 of 4 branches missed.">            case LEARNED -&gt; plan.independent() &amp;&amp; plan.variables().size() &gt;= policy.minimumVariables</span>
+<span class="fc" id="L93">                ? Route.BLOCKS : Route.DIRECT;</span>
+            // Fixed public source-shape seed; no evaluation outcome is consulted.
+<span class="fc" id="L95">            case RANDOM -&gt; List.of(Route.DIRECT, Route.MATRIX, Route.BLOCKS).get(</span>
+<span class="fc" id="L96">                Math.floorMod(730 + plan.variables().size() * 31 + source.size() * 17 + plan.blocks().size(), 3));</span>
+        };
+        // Selection work is reported separately, like the independent audit.
+<span class="fc" id="L99">        Result result = planner.execute(plan, route, budget);</span>
+<span class="fc" id="L100">        return new Application(result, planner.audit(result, LinearRepresentationJson.AUDIT_BUDGET), selectionWork);</span>
+    }
+
+    /** Conservative row-wise alpha-polynomial exclusion, not system semantic equivalence.
+     * Unsupported identities fail closed instead of establishing disjointness.
+     * Parsing/canonicalization are protocol preprocessing outside solver work units.
+     */
+    public static String identity(List&lt;String&gt; source) {
+<span class="fc" id="L108">        var analysis = new ExactPolynomialAnalysis();</span>
+<span class="fc" id="L109">        List&lt;String&gt; rows = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (String text : source) {</span>
+<span class="fc" id="L111">            String[] equation = text.split(&quot;=&quot;, -1);</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">            if (equation.length != 2) throw new IllegalArgumentException(&quot;Expected equation&quot;);</span>
+<span class="fc" id="L113">            rows.add(analysis.alphaIdentity(&quot;(&quot; + equation[0] + &quot;)-(&quot; + equation[1] + &quot;)&quot;));</span>
+<span class="fc" id="L114">        }</span>
+<span class="fc" id="L115">        return String.join(&quot;\n&quot;, rows.stream().sorted().toList());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
