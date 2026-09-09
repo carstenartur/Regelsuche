@@ -66,4 +66,9 @@ public record SearchMove(Transformation transformation, SourceKind sourceKind, S
         }
         return step.exactTheoryStepCount() == 0 ? List.of(step) : List.of();
     }
+
+    public SearchMove withCapabilityDelta(Set<String> delta) {
+        return new SearchMove(transformation, sourceKind, ruleId, ruleFamily, generationCost, applicationCost, verificationCost,
+            primitiveExpansion, assumptions, proofStrength, provenance, delta, valueEvidence);
+    }
 }
