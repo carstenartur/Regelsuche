@@ -99,6 +99,29 @@
   <profiles>
     <profile>
       <id>full</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>verify-installed-python-client</id>
+                <phase>verify</phase>
+                <goals><goal>test</goal></goals>
+                <configuration>
+                  <test>de.regelsuche.quality.aggregate.MavenPythonClientDistributionIT</test>
+                  <skip>false</skip>
+                  <skipTests>false</skipTests>
+                  <failIfNoTests>true</failIfNoTests>
+                  <failIfNoSpecifiedTests>true</failIfNoSpecifiedTests>
+                  <forkedProcessTimeoutInSeconds>420</forkedProcessTimeoutInSeconds>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
       <properties>
         <regelsuche.slow-test-report.full>true</regelsuche.slow-test-report.full>
         <regelsuche.slow-test-report.modules>

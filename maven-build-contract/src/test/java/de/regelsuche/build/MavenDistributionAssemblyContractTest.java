@@ -39,6 +39,12 @@ import org.xml.sax.InputSource;
 class MavenDistributionAssemblyContractTest {
   private static final String POM =
       "<project xmlns=\"http://maven.apache.org/POM/4.0.0\"><modelVersion>4.0.0</modelVersion>";
+  private static final List<String> CLIENT_PAYLOAD = List.of(
+      "python/README.md", "python/LICENSE", "python/pyproject.toml",
+      "python/src/regelsuche/__init__.py", "python/src/regelsuche/__main__.py",
+      "python/src/regelsuche/client.py", "python/src/regelsuche/verify.py",
+      "python/src/regelsuche/py.typed", "python/examples/linear_systems.py", "docs/python-client.md");
+  private static final String JAVA_EXAMPLE = "examples/external-consumers/LinearSolve.java";
 
   @Test
   void distributionUsesTheCurrentRuntimeGraphRatherThanAStagingDirectory() throws Exception {
@@ -89,6 +95,11 @@ class MavenDistributionAssemblyContractTest {
     String group = "de.regelsuche.assemblyfixture.g" + UUID.randomUUID().toString().replace("-", "");
     for (String name : List.of("README.md", "LICENSE", "CITATION.cff", "CITATION.md", "codemeta.json")) {
       Files.writeString(fixture.resolve(name), "assembly fixture\n");
+    }
+    for (String name : java.util.stream.Stream.concat(CLIENT_PAYLOAD.stream(), java.util.stream.Stream.of(JAVA_EXAMPLE)).toList()) {
+      Path target = fixture.resolve(name);
+      Files.createDirectories(target.getParent());
+      Files.copy(root.resolve(name), target);
     }
     for (String name : List.of("src/assembly/distribution.xml", "src/main/scripts/regelsuche",
         "src/main/scripts/regelsuche.bat")) {
@@ -258,6 +269,10 @@ class MavenDistributionAssemblyContractTest {
     for (String name : List.of("README.md", "LICENSE", "CITATION.cff", "CITATION.md", "codemeta.json")) {
       expectedFiles.put(prefix + name, digest(Files.readAllBytes(fixture.resolve(name))));
     }
+    for (String name : CLIENT_PAYLOAD) {
+      expectedFiles.put(prefix + name, digest(Files.readAllBytes(fixture.resolve(name))));
+    }
+    expectedFiles.put(prefix + "examples/LinearSolve.java", digest(Files.readAllBytes(fixture.resolve(JAVA_EXAMPLE))));
     assertEquals(expectedFiles, zipFiles, "archive membership and bytes must match only the current graph");
   }
 

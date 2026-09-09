@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "regelsuche-client"
+version = "0.1.0"
+description = "Regelsuche HTTP client and independent exact rational solution checker"
+requires-python = ">=3.10"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = []
+
+[project.scripts]
+regelsuche = "regelsuche.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+regelsuche = ["py.typed"]

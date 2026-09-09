@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Darstellungen lernen · Regelsuche</title>
+  <link rel="stylesheet" href="/static/strategy-demo.css">
+  <script src="/static/strategy-demo.js" defer></script>
+</head>
+<body>
+<header><a href="/">Regelsuche / Workbench</a><span>Rationale lineare Algebra</span></header>
+<main>
+  <p class="eyebrow">Von der Struktur zum überprüften Ergebnis</p>
+  <h1>Eine andere Darstellung kann den Lösungsweg verkürzen.</h1>
+  <p class="intro">Erkenne unabhängige Gleichungsblöcke, vergleiche ihre Lösung mit der direkten Elimination
+    und prüfe, was eine gelernte Auswahlregel auf weiteren Aufgaben bringt.</p>
+  <section aria-labelledby="solveTitle">
+    <h2 id="solveTitle">1. Dasselbe Problem, zwei Wege</h2>
+    <p>Die Beispielaufgabe enthält vier Rekurrenzblöcke. Beide Wege erhalten dasselbe Konstruktionsbudget.
+      Das Anschauungsbudget wurde anhand des Beispiels gewählt; die zusätzliche Prüfung wird separat gezählt.</p>
+    <form id="solveForm">
+      <label for="equations">Gleichungen, eine pro Zeile</label>
+      <textarea id="equations" rows="12" spellcheck="false">x0+y0+z0=21
+y0-2*x0=1
+z0-2*y0=1
+x1+y1+z1=28
+y1-2*x1=1
+z1-2*y1=1
+x2+y2+z2=35
+y2-2*x2=1
+z2-2*y2=1
+x3+y3+z3=42
+y3-2*x3=1
+z3-2*y3=1</textarea>
+      <div class="controls">
+        <label for="budget">Konstruktionsbudget <input id="budget" type="number" min="0" max="1000000" value="1100" required></label>
+        <label for="route">Darstellung <select id="route"><option>AUTO</option><option>BLOCKS</option><option>MATRIX</option><option>DIRECT</option></select></label>
+        <button id="solve" type="submit">Wege vergleichen</button>
+      </div>
+    </form>
+    <p id="status" role="status" aria-live="polite">Bereit für die Berechnung.</p>
+    <div id="comparison" class="comparison"></div>
+    <details><summary>Ausgeführte Grundschritte und vollständige Lösung</summary><pre id="evidence">Noch kein Ergebnis.</pre></details>
+    <div class="controls">
+      <button id="export" type="button" disabled>Nachweis exportieren</button>
+      <label class="file-label" for="import">Nachweis erneut prüfen <input id="import" type="file" accept=".json,application/json"></label>
+    </div>
+  </section>
+  <section aria-labelledby="learnTitle">
+    <h2 id="learnTitle">2. Lernen, einfrieren, auf neue Aufgaben anwenden</h2>
+    <p>Sechs Trainingssysteme, sechs Vergleichsprofile und 42 weitere Aufgaben. Die Policy wird vor deren
+      Auswertung eingefroren. Ein öffentlicher Entwicklungssatz innerhalb linearer Algebra.</p>
+    <button id="train" type="button">Training und Transfer ausführen</button>
+    <p id="learningStatus" role="status" aria-live="polite">Der Fit lernt die Mindestgröße für eine Zerlegung. Die Lösungsverfahren sind vorgegeben.</p>
+    <div id="studyResults" hidden>
+      <div class="table-scroll"><table><caption>Alle Kosten des Vergleichs</caption>
+        <thead><tr><th>Profil</th><th>Anwendung + Prüfung</th><th>Einmaliges Training eingerechnet</th><th>Verifiziert</th></tr></thead>
+        <tbody id="profileRows"></tbody>
+      </table></div>
+      <p id="learningConclusion"></p>
+      <h3>Was kann dieser Lerner verbessern?</h3>
+      <p>DIRECT ist hier die statische Vergleichsstrategie. FIXED_AUTO ist keine „ungelernte“ Kontrolle,
+        sondern eine von Entwicklern vorgegebene Expertenregel mit der Schwelle 8. Alle Profile besitzen
+        bereits exakte Lösungsverfahren. Gelernt wird nur die Mindestgröße für eine Blockzerlegung; dieser
+        Vergleich misst deshalb keinen Erwerb mathematischer Verfahren oder Regeln.</p>
+      <p id="selectionHeadroom"></p>
+      <p id="verificationCost"></p>
+      <details><summary>Konstruktion, Prüfung und verbleibender Auswahlspielraum</summary><pre id="learningDiagnosis"></pre></details>
+      <label for="case">Aufgabe und ausgeführte Wege <select id="case"></select></label>
+      <div id="caseResults" class="case-results"></div>
+      <details><summary>Trainingsversuche und Herkunft der Policy</summary><pre id="trainingEvidence"></pre></details>
+      <button id="exportStudy" type="button">Vollständige Studie exportieren</button>
+    </div>
+  </section>
+  <section aria-labelledby="verifyTitle">
+    <h2 id="verifyTitle">3. Außerhalb der Workbench prüfen</h2>
+    <p>Der Python-Client prüft mit eigener rationaler Arithmetik die vollständige Lösungsmenge aus den
+      ursprünglichen Gleichungen. Er benötigt dafür keinen laufenden Java-Server.</p>
+    <pre>python -m regelsuche verify linear-solution.json</pre>
+    <p>Diese Prüfung bestätigt die mathematische Lösung. Die gesamte Herkunft und Kostenbilanz prüft das
+      Java-Replay; ein Lean-Beweis wird hier nicht erzeugt.</p>
+  </section>
+</main>
+<footer>Gezählte mechanische Arbeit ist keine Zeitmessung. Parsing, Hashing und rationale Bitkomplexität sind nicht enthalten.</footer>
+</body>
+</html>

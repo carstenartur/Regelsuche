@@ -39,6 +39,12 @@ public final class DistributionArchiveVerifier {
     private static final List<String> DOCUMENTS = List.of(
         "README.md", "LICENSE", "CITATION.cff", "CITATION.md", "codemeta.json");
     private static final String OPENAPI = "web/openapi/openapi.json";
+    private static final List<String> PYTHON_FILES = List.of(
+        "python/README.md", "python/LICENSE", "python/pyproject.toml",
+        "python/src/regelsuche/__init__.py", "python/src/regelsuche/__main__.py",
+        "python/src/regelsuche/client.py", "python/src/regelsuche/verify.py",
+        "python/src/regelsuche/py.typed", "python/examples/linear_systems.py",
+        "docs/python-client.md");
 
     private DistributionArchiveVerifier() {}
 
@@ -97,6 +103,8 @@ public final class DistributionArchiveVerifier {
         verifyApplication(root, application, version);
         addExpected(files, prefix + "regelsuche.jar", application);
         for (String name : DOCUMENTS) addExpected(files, prefix + name, root.resolve(name));
+        for (String name : PYTHON_FILES) addExpected(files, prefix + name, root.resolve(name));
+        addExpected(files, prefix + "examples/LinearSolve.java", root.resolve("examples/external-consumers/LinearSolve.java"));
         for (String name : List.of("regelsuche", "regelsuche.bat")) {
             addExpected(files, prefix + "bin/" + name, root.resolve("app/src/main/scripts/" + name));
         }
@@ -279,7 +287,7 @@ public final class DistributionArchiveVerifier {
         }
         check(seen.size() < MAX_ENTRIES && seen.add(name), "Duplicate/excessive archive entry: " + name);
         if (directory) {
-            check(name.equals(prefix) || name.equals(prefix + "lib/") || name.equals(prefix + "bin/"),
+            check(expected.keySet().stream().anyMatch(file -> file.startsWith(name)),
                 "Unexpected archive directory: " + name);
         } else {
             check(expected.containsKey(name), "Unexpected archive file: " + name);
