@@ -54,13 +54,15 @@ z3-2*y3=1</textarea>
     <p id="learningStatus" role="status" aria-live="polite">Der Fit lernt die Mindestgröße für eine Zerlegung. Die Lösungsverfahren sind vorgegeben.</p>
     <div id="studyResults" hidden>
       <div class="table-scroll"><table><caption>Alle Kosten des Vergleichs</caption>
-        <thead><tr><th>Profil</th><th>Anwendung + Prüfung</th><th>Mit Lernkosten</th><th>Verifiziert</th></tr></thead>
+        <thead><tr><th>Profil</th><th>Anwendung + Prüfung</th><th>Einmaliges Training eingerechnet</th><th>Verifiziert</th></tr></thead>
         <tbody id="profileRows"></tbody>
       </table></div>
       <p id="learningConclusion"></p>
       <h3>Was kann dieser Lerner verbessern?</h3>
-      <p>Alle Profile besitzen bereits exakte Lösungsverfahren. Gelernt wird nur die Mindestgröße
-        für eine Blockzerlegung. Dieser Vergleich misst keinen Erwerb mathematischer Verfahren.</p>
+      <p>DIRECT ist hier die statische Vergleichsstrategie. FIXED_AUTO ist keine „ungelernte“ Kontrolle,
+        sondern eine von Entwicklern vorgegebene Expertenregel mit der Schwelle 8. Alle Profile besitzen
+        bereits exakte Lösungsverfahren. Gelernt wird nur die Mindestgröße für eine Blockzerlegung; dieser
+        Vergleich misst deshalb keinen Erwerb mathematischer Verfahren oder Regeln.</p>
       <p id="selectionHeadroom"></p>
       <p id="verificationCost"></p>
       <details><summary>Konstruktion, Prüfung und verbleibender Auswahlspielraum</summary><pre id="learningDiagnosis"></pre></details>
