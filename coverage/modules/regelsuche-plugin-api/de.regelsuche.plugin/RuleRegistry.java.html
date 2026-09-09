@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleRegistry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-plugin-api</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">RuleRegistry.java</span></div><h1>RuleRegistry.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import de.regelsuche.transform.RewriteRule;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+@de.regelsuche.api.StableApi(since = &quot;1&quot;)
+<span class="fc" id="L11">public final class RuleRegistry {</span>
+<span class="fc" id="L12">    private final Map&lt;String, MutableRuleRegistration&gt; rules = new LinkedHashMap&lt;&gt;();</span>
+
+    public void register(RewriteRule rule) {
+<span class="fc" id="L15">        register(rule, &quot;plugin&quot;, &quot;&quot;, List.of(), List.of());</span>
+<span class="fc" id="L16">    }</span>
+
+    public void register(RewriteRule rule, String source, String explanation, List&lt;String&gt; tags) {
+<span class="fc" id="L19">        register(rule, source, explanation, tags, List.of());</span>
+<span class="fc" id="L20">    }</span>
+
+    public void register(
+        RewriteRule rule,
+        String source,
+        String explanation,
+        List&lt;String&gt; tags,
+        List&lt;RuleFileParser.RuleCondition&gt; conditions
+    ) {
+<span class="fc" id="L29">        Objects.requireNonNull(rule, &quot;rule&quot;);</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        if (rules.containsKey(rule.id())) {</span>
+<span class="fc" id="L31">            throw new IllegalArgumentException(&quot;Duplicate rule id: &quot; + rule.id());</span>
+        }
+<span class="fc" id="L33">        rules.put(rule.id(), new MutableRuleRegistration(rule, source, explanation, tags, conditions));</span>
+<span class="fc" id="L34">    }</span>
+
+    public void disable(String id) {
+<span class="fc" id="L37">        MutableRuleRegistration registration = rules.get(id);</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (registration != null) {</span>
+<span class="fc" id="L39">            registration.enabled = false;</span>
+        }
+<span class="fc" id="L41">    }</span>
+
+    public List&lt;RewriteRule&gt; enabledRules() {
+<span class="fc" id="L44">        List&lt;RewriteRule&gt; enabled = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (MutableRuleRegistration registration : rules.values()) {</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            if (registration.enabled) {</span>
+<span class="fc" id="L47">                enabled.add(registration.rule);</span>
+            }
+<span class="fc" id="L49">        }</span>
+<span class="fc" id="L50">        return List.copyOf(enabled);</span>
+    }
+
+    public List&lt;RuleRegistration&gt; registrations() {
+<span class="fc" id="L54">        List&lt;RuleRegistration&gt; registrations = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        for (MutableRuleRegistration registration : rules.values()) {</span>
+<span class="fc" id="L56">            registrations.add(registration.snapshot());</span>
+<span class="fc" id="L57">        }</span>
+<span class="fc" id="L58">        return List.copyOf(registrations);</span>
+    }
+
+    public record RuleRegistration(
+        String id,
+        RewriteRule rule,
+        String source,
+        String explanation,
+        List&lt;String&gt; tags,
+        List&lt;RuleFileParser.RuleCondition&gt; conditions,
+        boolean enabled
+    ) {
+<span class="fc" id="L70">        public RuleRegistration {</span>
+<span class="fc" id="L71">            tags = List.copyOf(tags);</span>
+<span class="fc" id="L72">            conditions = List.copyOf(conditions);</span>
+<span class="fc" id="L73">        }</span>
+    }
+
+    private static final class MutableRuleRegistration {
+        private final RewriteRule rule;
+        private final String source;
+        private final String explanation;
+        private final List&lt;String&gt; tags;
+        private final List&lt;RuleFileParser.RuleCondition&gt; conditions;
+<span class="fc" id="L82">        private boolean enabled = true;</span>
+
+        private MutableRuleRegistration(
+            RewriteRule rule,
+            String source,
+            String explanation,
+            List&lt;String&gt; tags,
+            List&lt;RuleFileParser.RuleCondition&gt; conditions
+<span class="fc" id="L90">        ) {</span>
+<span class="fc" id="L91">            this.rule = rule;</span>
+<span class="fc" id="L92">            this.source = source;</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            this.explanation = explanation == null ? &quot;&quot; : explanation;</span>
+<span class="fc" id="L94">            this.tags = List.copyOf(tags);</span>
+<span class="fc" id="L95">            this.conditions = List.copyOf(conditions);</span>
+<span class="fc" id="L96">        }</span>
+
+        private RuleRegistration snapshot() {
+<span class="fc" id="L99">            return new RuleRegistration(rule.id(), rule, source, explanation, tags, conditions, enabled);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

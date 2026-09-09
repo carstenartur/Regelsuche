@@ -18,9 +18,14 @@ public interface DiscoveryDomainProvider {
 <span class="fc" id="L18">        return &quot;1&quot;;</span>
     }
 
+    /** Required SDK SPI revision. An unsupported revision is rejected before domains() runs. */
+    default String apiVersion() {
+<span class="fc" id="L23">        return DiscoveryApi.VERSION;</span>
+    }
+
     /** Human-auditable source or release reference; may be empty locally. */
     default String provenance() {
-<span class="fc" id="L23">        return &quot;&quot;;</span>
+<span class="fc" id="L28">        return &quot;&quot;;</span>
     }
 
     /** Domains supplied by this provider. */

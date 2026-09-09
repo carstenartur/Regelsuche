@@ -253,3 +253,12 @@ Bei jeder neuen Modulabhängigkeit ist zu prüfen:
 
 Eine rein bequeme Zugriffsmöglichkeit ist keine ausreichende Begründung für
 eine neue Kante.
+
+### Public plugin contracts
+
+`regelsuche-plugin-api` owns the portable `RegelsuchePlugin` extension contracts,
+registries and rule DSL parser formerly packaged in `app`. It depends inward on
+`regelsuche-search` and its core/e-graph closure. `app` owns runtime loading,
+trust, watcher and persistence integration and depends on this API. The
+`regelsuche-bom` supplies version alignment, with no runtime bytecode. External
+consumer runtime assertions reject accidental app or persistence dependencies.

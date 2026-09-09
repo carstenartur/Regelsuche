@@ -18,12 +18,14 @@ Der Domänenautor definiert Zustände, legale Übergänge, mindestens eine
 Invariante, Zielfunktion, Kandidatenbildung, Gegenbeispielsuche, unabhängigen
 Evaluator und Zertifikat. Ein leerer Gegenbeispielfund ist niemals ein Beweis.
 
+Weiterführend: [15-Minuten-Quickstart](java-sdk-quickstart.md), [Domain-Tutorial](java-sdk-domain-tutorial.md), [API-Vertrag und Release-Distributionsweg](java-sdk-api-policy.md).
+
 ## Abhängigkeit
 
 Der Checkout veröffentlicht den ersten Slice als
 
 ```text
-de.regelsuche:regelsuche-discovery-sdk:0.4.0-SNAPSHOT
+de.regelsuche:regelsuche-discovery-sdk:0.5.0-SNAPSHOT
 ```
 
 in ein isoliertes lokales Maven-Repository. Ein externer Gradle-Verbraucher
@@ -42,7 +44,7 @@ repositories {
 }
 
 dependencies {
-    implementation "de.regelsuche:regelsuche-discovery-sdk:0.4.0-SNAPSHOT"
+    implementation "de.regelsuche:regelsuche-discovery-sdk:0.5.0-SNAPSHOT"
 }
 ```
 
@@ -162,8 +164,7 @@ META-INF/services/de.regelsuche.sdk.discovery.DiscoveryDomainProvider
 doppelte Kombinationen aus Domain-ID und Revision sowie mehrdeutige
 Komponentenidentitäten werden abgewiesen. Die Auffindbarkeit eines Providers ist
 keine Aussage über Artefaktvertrauen, mathematische Korrektheit, Proof oder
-Promotion. Die Einbettung der Provider-Artefaktprovenienz in jede kanonische
-Run-Evidence bleibt eine getrennte Restarbeit aus #904.
+Promotion. Die registrierte Domäne bindet Provider-ID, API-Revision und den SHA-256 der beobachteten Provider-Artefaktbytes in `sdk.provider.*`-Eigenschaften der Evidence. `forRegistration(...)` führt genau diese Domäne aus; eine neu konstruierte Instanz über `forDomain(...)` behauptet keine Providerregistrierung.
 
 ## Eigenständiges Starterprojekt erzeugen
 
@@ -202,7 +203,7 @@ Nach Bereitstellung des SDK-Repositorys lässt sich das erzeugte Projekt ohne
 cd ../my-first-regelsuche-domain
 ./gradlew clean test run \
   -PregelsucheRepository=/pfad/zum/repository \
-  -PregelsucheVersion=0.4.0-SNAPSHOT
+  -PregelsucheVersion=0.5.0-SNAPSHOT
 ```
 
 Unter Windows wird `gradlew.bat` statt `./gradlew` verwendet. Java 25 und ein
@@ -241,8 +242,8 @@ Sie ersetzen nicht den separaten echten Java-25-Build des generierten Projekts.
 ## Noch nicht enthalten
 
 - ein öffentliches Maven-Central- oder GitHub-Packages-Release;
-- content-addressed Provider-Artefaktprovenienz in jeder Run-Evidence;
-- Workbench-/CLI-Auswahl externer Provider;
+- eine vollständige Attestation aller externen Provider-Abhängigkeiten;
+- eine automatische Freigabe von externem Provider-Code;
 - allgemeine Pareto- oder Optimalitätssuche;
 - eine fertige mathematische Objektbibliothek;
 - automatische Korrektheit beliebiger Erweiterungen.

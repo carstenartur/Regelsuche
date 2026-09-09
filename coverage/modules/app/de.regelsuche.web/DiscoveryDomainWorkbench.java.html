@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryDomainWorkbench.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.web</a> &gt; <span class="el_source">DiscoveryDomainWorkbench.java</span></div><h1>DiscoveryDomainWorkbench.java</h1><pre class="source lang-java linenums">package de.regelsuche.web;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.sdk.discovery.*;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+
+/** Host-enabled domain selection; HTTP input can never enable arbitrary provider classes. */
+final class DiscoveryDomainWorkbench {
+<span class="fc" id="L14">    private static final Map&lt;HostConfiguration, DiscoveryDomainWorkbench&gt; HOSTS =</span>
+        new ConcurrentHashMap&lt;&gt;();
+
+    private final DiscoveryDomainCatalog catalog;
+
+<span class="fc" id="L19">    DiscoveryDomainWorkbench(DiscoveryDomainCatalog catalog) { this.catalog = catalog; }</span>
+
+    static DiscoveryDomainWorkbench forHost(ClassLoader loader, String enabledClasses) {
+<span class="fc" id="L22">        Objects.requireNonNull(loader, &quot;loader&quot;);</span>
+<span class="fc" id="L23">        Set&lt;String&gt; enabled = Arrays.stream(enabledClasses.split(&quot;,&quot;, -1)).map(String::trim)</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">            .filter(value -&gt; !value.isEmpty()).collect(Collectors.toUnmodifiableSet());</span>
+<span class="fc" id="L25">        var key = new HostConfiguration(loader, enabled);</span>
+<span class="fc" id="L26">        return HOSTS.computeIfAbsent(key, configuration -&gt; new DiscoveryDomainWorkbench(</span>
+<span class="fc" id="L27">            DiscoveryDomainCatalog.load(configuration.loader(), configuration.enabled())));</span>
+    }
+
+    String catalogJson() {
+<span class="fc" id="L31">        return new JsonWriter().beginObject().property(&quot;apiVersion&quot;, DiscoveryApi.VERSION)</span>
+<span class="fc" id="L32">            .array(&quot;domains&quot;, array -&gt; catalog.registrations().forEach(entry -&gt; array.objectValue(item -&gt;</span>
+<span class="fc" id="L33">                item.property(&quot;providerId&quot;, entry.providerId()).property(&quot;providerVersion&quot;, entry.providerVersion())</span>
+<span class="fc" id="L34">                    .property(&quot;domainId&quot;, entry.domain().domainId()).property(&quot;revision&quot;, entry.domain().revision())</span>
+<span class="fc" id="L35">                    .property(&quot;artifactSha256&quot;, entry.artifact().orElseThrow().artifactSha256()))))</span>
+<span class="fc" id="L36">            .endObject().toString();</span>
+    }
+
+    String run(Map&lt;String, Object&gt; input) {
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (!input.keySet().equals(Set.of(&quot;providerId&quot;, &quot;domainId&quot;, &quot;revision&quot;, &quot;campaignId&quot;, &quot;seed&quot;, &quot;budget&quot;))) {</span>
+<span class="fc" id="L41">            throw new IllegalArgumentException(&quot;provide providerId, domainId, revision, campaignId, seed and budget only&quot;);</span>
+        }
+<span class="fc" id="L43">        var entry = catalog.find(text(input, &quot;domainId&quot;), text(input, &quot;revision&quot;))</span>
+<span class="fc" id="L44">            .filter(value -&gt; value.providerId().equals(text(input, &quot;providerId&quot;)))</span>
+<span class="fc" id="L45">            .orElseThrow(() -&gt; new IllegalArgumentException(&quot;domain is not enabled by this host&quot;));</span>
+<span class="pc bpc" id="L46" title="1 of 3 branches missed.">        var budget = switch (text(input, &quot;budget&quot;)) {</span>
+<span class="fc" id="L47">            case &quot;small&quot; -&gt; DiscoveryBudgets.small();</span>
+<span class="nc" id="L48">            case &quot;tiny&quot; -&gt; DiscoveryBudgets.tiny();</span>
+<span class="fc" id="L49">            default -&gt; throw new IllegalArgumentException(&quot;budget must be small or tiny&quot;);</span>
+        };
+<span class="fc" id="L51">        return RegelsucheDiscovery.forRegistration(entry).campaign(text(input, &quot;campaignId&quot;))</span>
+<span class="fc" id="L52">            .seed(&quot;workbench-seed&quot;, text(input, &quot;seed&quot;), &quot;discovery-domain-workbench&quot;)</span>
+<span class="fc" id="L53">            .budget(budget).run().canonicalEvidence();</span>
+    }
+
+    private static String text(Map&lt;String, Object&gt; input, String name) {
+<span class="pc bpc" id="L57" title="1 of 4 branches missed.">        if (!(input.get(name) instanceof String value) || value.isBlank()) {</span>
+<span class="fc" id="L58">            throw new IllegalArgumentException(name + &quot; must be non-empty text&quot;);</span>
+        }
+<span class="fc" id="L60">        return value;</span>
+    }
+
+<span class="fc" id="L63">    private record HostConfiguration(ClassLoader loader, Set&lt;String&gt; enabled) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

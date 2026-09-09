@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProviderProvenance.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.discovery</a> &gt; <span class="el_source">ProviderProvenance.java</span></div><h1>ProviderProvenance.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.discovery;
+
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.security.DigestOutputStream;
+import java.security.MessageDigest;
+import java.util.HexFormat;
+import java.util.Map;
+import java.util.TreeMap;
+
+/**
+ * Host-observed bytes of the provider code source. This is provenance, not a
+ * signature, sandbox, dependency-closure attestation or mathematical authority.
+ * Directory digests include sorted relative names and bytes, never local paths.
+ */
+public record ProviderProvenance(
+    String implementationClass, String artifactKind, String artifactSha256
+) {
+<span class="fc" id="L23">    public ProviderProvenance {</span>
+<span class="pc bpc" id="L24" title="1 of 4 branches missed.">        if (implementationClass == null || implementationClass.isBlank()) {</span>
+<span class="fc" id="L25">            throw new IllegalArgumentException(&quot;implementationClass is required&quot;);</span>
+        }
+<span class="fc bfc" id="L27" title="All 4 branches covered.">        if (!&quot;JAR&quot;.equals(artifactKind) &amp;&amp; !&quot;DIRECTORY&quot;.equals(artifactKind)) {</span>
+<span class="fc" id="L28">            throw new IllegalArgumentException(&quot;unsupported provider artifact kind&quot;);</span>
+        }
+<span class="pc bpc" id="L30" title="1 of 4 branches missed.">        if (artifactSha256 == null || !artifactSha256.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="fc" id="L31">            throw new IllegalArgumentException(&quot;provider artifact SHA-256 is required&quot;);</span>
+        }
+<span class="fc" id="L33">    }</span>
+
+    static ProviderProvenance capture(Class&lt;?&gt; implementation) {
+        try {
+<span class="fc" id="L37">            var source = implementation.getProtectionDomain().getCodeSource();</span>
+<span class="pc bpc" id="L38" title="1 of 4 branches missed.">            if (source == null || !&quot;file&quot;.equals(source.getLocation().getProtocol())) {</span>
+<span class="fc" id="L39">                throw new IllegalArgumentException(&quot;provider needs a local JAR or classes directory&quot;);</span>
+            }
+<span class="fc" id="L41">            Path path = Path.of(source.getLocation().toURI());</span>
+<span class="fc" id="L42">            MessageDigest digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+            String kind;
+<span class="fc bfc" id="L44" title="All 2 branches covered.">            if (Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L45">                kind = &quot;JAR&quot;;</span>
+<span class="fc" id="L46">                try (var in = Files.newInputStream(path);</span>
+<span class="fc" id="L47">                     var out = new DigestOutputStream(OutputStream.nullOutputStream(), digest)) {</span>
+<span class="fc" id="L48">                    in.transferTo(out);</span>
+                }
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            } else if (Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L51">                kind = &quot;DIRECTORY&quot;;</span>
+<span class="fc" id="L52">                try (var entries = Files.walk(path);</span>
+<span class="fc" id="L53">                     var out = new DataOutputStream(new DigestOutputStream(</span>
+<span class="fc" id="L54">                         OutputStream.nullOutputStream(), digest))) {</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">                    var files = entries.filter(entry -&gt; !entry.equals(path))</span>
+<span class="fc" id="L56">                        .sorted(java.util.Comparator.comparing(entry -&gt; relative(path, entry))).toList();</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">                    for (Path file : files) {</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">                        if (Files.isSymbolicLink(file)) {</span>
+<span class="nc" id="L59">                            throw new IOException(&quot;symbolic links are not provider artifacts&quot;);</span>
+                        }
+<span class="fc bfc" id="L61" title="All 2 branches covered.">                        if (Files.isDirectory(file, LinkOption.NOFOLLOW_LINKS)) continue;</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                        if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="nc" id="L63">                            throw new IOException(&quot;non-regular provider artifact&quot;);</span>
+                        }
+<span class="fc" id="L65">                        byte[] name = relative(path, file).getBytes(java.nio.charset.StandardCharsets.UTF_8);</span>
+<span class="fc" id="L66">                        out.writeInt(name.length);</span>
+<span class="fc" id="L67">                        out.write(name);</span>
+<span class="fc" id="L68">                        out.writeLong(Files.size(file));</span>
+<span class="fc" id="L69">                        try (var in = Files.newInputStream(file)) { in.transferTo(out); }</span>
+<span class="fc" id="L70">                    }</span>
+                }
+            } else {
+<span class="nc" id="L73">                throw new IOException(&quot;provider code source is unavailable&quot;);</span>
+            }
+<span class="fc" id="L75">            return new ProviderProvenance(implementation.getName(), kind,</span>
+<span class="fc" id="L76">                &quot;sha256:&quot; + HexFormat.of().formatHex(digest.digest()));</span>
+<span class="nc" id="L77">        } catch (java.net.URISyntaxException | java.security.NoSuchAlgorithmException | IOException ex) {</span>
+<span class="nc" id="L78">            throw new IllegalStateException(&quot;cannot fingerprint provider &quot; + implementation.getName(), ex);</span>
+        }
+    }
+
+    private static String relative(Path root, Path entry) {
+<span class="fc" id="L83">        return root.relativize(entry).toString().replace('\\', '/');</span>
+    }
+
+    Map&lt;String, String&gt; properties(String id, String version, String source) {
+<span class="fc" id="L87">        var properties = new TreeMap&lt;String, String&gt;();</span>
+<span class="fc" id="L88">        properties.put(&quot;sdk.provider.id&quot;, id);</span>
+<span class="fc" id="L89">        properties.put(&quot;sdk.provider.version&quot;, version);</span>
+<span class="fc" id="L90">        properties.put(&quot;sdk.provider.apiVersion&quot;, DiscoveryApi.VERSION);</span>
+<span class="fc" id="L91">        properties.put(&quot;sdk.provider.sourceReference&quot;, source);</span>
+<span class="fc" id="L92">        properties.put(&quot;sdk.provider.implementationClass&quot;, implementationClass);</span>
+<span class="fc" id="L93">        properties.put(&quot;sdk.provider.artifactKind&quot;, artifactKind);</span>
+<span class="fc" id="L94">        properties.put(&quot;sdk.provider.artifactSha256&quot;, artifactSha256);</span>
+<span class="fc" id="L95">        properties.put(&quot;sdk.provider.authority&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc" id="L96">        return Map.copyOf(properties);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

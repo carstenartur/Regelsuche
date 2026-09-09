@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProviderDomain.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.discovery</a> &gt; <span class="el_source">ProviderDomain.java</span></div><h1>ProviderDomain.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.discovery;
+
+import de.regelsuche.discovery.domain.DiscoveryDomain;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/** Keeps host-observed provenance attached when a registration's domain is used. */
+final class ProviderDomain&lt;S, C, K&gt; implements DiscoveryDomain&lt;S, C, K&gt; {
+    private final DiscoveryDomain&lt;S, C, K&gt; delegate;
+    private final Map&lt;String, String&gt; provenance;
+    private final java.util.function.Supplier&lt;ProviderProvenance&gt; observedArtifact;
+
+    ProviderDomain(DiscoveryDomain&lt;S, C, K&gt; delegate, Map&lt;String, String&gt; provenance,
+<span class="fc" id="L15">            java.util.function.Supplier&lt;ProviderProvenance&gt; observedArtifact) {</span>
+<span class="fc" id="L16">        this.delegate = delegate;</span>
+<span class="fc" id="L17">        this.provenance = Map.copyOf(provenance);</span>
+<span class="fc" id="L18">        this.observedArtifact = observedArtifact;</span>
+<span class="fc" id="L19">    }</span>
+
+    void validateArtifact() {
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        if (!artifact().equals(observedArtifact.get())) {</span>
+<span class="nc" id="L23">            throw new IllegalStateException(&quot;provider artifact changed after catalog loading&quot;);</span>
+        }
+<span class="fc" id="L25">    }</span>
+
+    ProviderProvenance artifact() {
+<span class="fc" id="L28">        return new ProviderProvenance(provenance.get(&quot;sdk.provider.implementationClass&quot;),</span>
+<span class="fc" id="L29">            provenance.get(&quot;sdk.provider.artifactKind&quot;), provenance.get(&quot;sdk.provider.artifactSha256&quot;));</span>
+    }
+
+<span class="fc" id="L32">    @Override public String domainId() { return delegate.domainId(); }</span>
+<span class="fc" id="L33">    @Override public String revision() { return delegate.revision(); }</span>
+<span class="fc" id="L34">    @Override public String stateType() { return delegate.stateType(); }</span>
+<span class="fc" id="L35">    @Override public String candidateType() { return delegate.candidateType(); }</span>
+<span class="fc" id="L36">    @Override public String certificateType() { return delegate.certificateType(); }</span>
+<span class="fc" id="L37">    @Override public StateGenerator&lt;S&gt; generator() { return delegate.generator(); }</span>
+<span class="fc" id="L38">    @Override public CanonicalCodec&lt;S&gt; stateCodec() { return delegate.stateCodec(); }</span>
+<span class="fc" id="L39">    @Override public List&lt;Invariant&lt;S&gt;&gt; invariants() { return delegate.invariants(); }</span>
+<span class="fc" id="L40">    @Override public List&lt;TransitionOperator&lt;S&gt;&gt; operators() { return delegate.operators(); }</span>
+<span class="fc" id="L41">    @Override public Objective&lt;S&gt; objective() { return delegate.objective(); }</span>
+<span class="fc" id="L42">    @Override public CandidateExtractor&lt;S, C&gt; candidateExtractor() { return delegate.candidateExtractor(); }</span>
+<span class="fc" id="L43">    @Override public CanonicalCodec&lt;C&gt; candidateCodec() { return delegate.candidateCodec(); }</span>
+<span class="fc" id="L44">    @Override public CounterexampleGenerator&lt;C&gt; counterexampleGenerator() { return delegate.counterexampleGenerator(); }</span>
+<span class="fc" id="L45">    @Override public CandidateEvaluator&lt;C, K&gt; evaluator() { return delegate.evaluator(); }</span>
+<span class="fc" id="L46">    @Override public CanonicalCodec&lt;K&gt; certificateCodec() { return delegate.certificateCodec(); }</span>
+<span class="fc" id="L47">    @Override public CertificateRenderer&lt;K&gt; certificateRenderer() { return delegate.certificateRenderer(); }</span>
+
+    @Override public EvidenceAdapter&lt;S, C, K&gt; evidenceAdapter() {
+<span class="fc" id="L50">        var adapter = delegate.evidenceAdapter();</span>
+<span class="fc" id="L51">        return new EvidenceAdapter&lt;&gt;() {</span>
+<span class="fc" id="L52">            @Override public String id() { return adapter.id(); }</span>
+            @Override public DomainPayload adapt(java.util.Optional&lt;S&gt; initial,
+                    java.util.Optional&lt;C&gt; candidate, java.util.Optional&lt;K&gt; certificate) {
+<span class="fc" id="L55">                validateArtifact();</span>
+<span class="fc" id="L56">                var payload = adapter.adapt(initial, candidate, certificate);</span>
+<span class="fc" id="L57">                var properties = new TreeMap&lt;&gt;(payload.properties());</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">                if (properties.keySet().stream().anyMatch(key -&gt; key.startsWith(&quot;sdk.provider.&quot;))) {</span>
+<span class="nc" id="L59">                    throw new IllegalArgumentException(&quot;domain evidence uses reserved sdk.provider. properties&quot;);</span>
+                }
+<span class="fc" id="L61">                properties.putAll(provenance);</span>
+<span class="fc" id="L62">                return new DomainPayload(payload.type(), properties);</span>
+            }
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

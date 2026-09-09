@@ -32,18 +32,39 @@ public final class DiscoveryDomainCatalog {
 
     /** Loads providers with an explicit class loader. */
     public static DiscoveryDomainCatalog load(ClassLoader classLoader) {
-<span class="fc" id="L35">        Objects.requireNonNull(classLoader, &quot;classLoader&quot;);</span>
-<span class="fc" id="L36">        List&lt;DiscoveryDomainProvider&gt; providers = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L35">        return load(classLoader, null);</span>
+    }
+
+    /**
+     * Loads only explicitly enabled provider class names. An empty set disables
+     * all providers; null retains the embedding application's classpath policy.
+     * Selection is not a security sandbox for enabled code.
+     */
+    public static DiscoveryDomainCatalog load(ClassLoader classLoader, java.util.Set&lt;String&gt; enabledClasses) {
+<span class="fc" id="L44">        Objects.requireNonNull(classLoader, &quot;classLoader&quot;);</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        java.util.Set&lt;String&gt; enabled = enabledClasses == null ? null : java.util.Set.copyOf(enabledClasses);</span>
+<span class="fc" id="L46">        java.util.Set&lt;String&gt; found = new java.util.HashSet&lt;&gt;();</span>
+<span class="fc" id="L47">        List&lt;DiscoveryDomainProvider&gt; providers = new ArrayList&lt;&gt;();</span>
         try {
-<span class="fc" id="L38">            ServiceLoader.load(DiscoveryDomainProvider.class, classLoader)</span>
-<span class="fc" id="L39">                .forEach(providers::add);</span>
-<span class="nc" id="L40">        } catch (ServiceConfigurationError error) {</span>
-<span class="nc" id="L41">            throw new IllegalStateException(</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            for (var entry : ServiceLoader.load(DiscoveryDomainProvider.class, classLoader).stream().toList()) {</span>
+<span class="fc" id="L50">                String name = entry.type().getName();</span>
+<span class="fc bfc" id="L51" title="All 4 branches covered.">                if (enabled == null || enabled.contains(name)) {</span>
+<span class="fc" id="L52">                    found.add(name);</span>
+<span class="fc" id="L53">                    providers.add(entry.get());</span>
+                }
+<span class="fc" id="L55">            }</span>
+<span class="fc bfc" id="L56" title="All 4 branches covered.">            if (enabled != null &amp;&amp; !found.equals(enabled)) {</span>
+<span class="fc" id="L57">                var missing = new java.util.TreeSet&lt;&gt;(enabled);</span>
+<span class="fc" id="L58">                missing.removeAll(found);</span>
+<span class="fc" id="L59">                throw new IllegalArgumentException(&quot;enabled provider classes not installed: &quot; + missing);</span>
+            }
+<span class="nc" id="L61">        } catch (ServiceConfigurationError error) {</span>
+<span class="nc" id="L62">            throw new IllegalStateException(</span>
                 &quot;failed to load discovery-domain providers&quot;,
                 error
             );
-<span class="fc" id="L45">        }</span>
-<span class="fc" id="L46">        return fromProviders(providers);</span>
+<span class="fc" id="L66">        }</span>
+<span class="fc" id="L67">        return fromProviders(providers);</span>
     }
 
     /**
@@ -56,100 +77,108 @@ public final class DiscoveryDomainCatalog {
     public static DiscoveryDomainCatalog fromProviders(
             Iterable&lt;? extends DiscoveryDomainProvider&gt; providers
     ) {
-<span class="fc" id="L59">        Objects.requireNonNull(providers, &quot;providers&quot;);</span>
-<span class="fc" id="L60">        List&lt;ProviderEntry&gt; normalizedProviders = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L61">        Map&lt;String, DiscoveryDomainProvider&gt; providerIds = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L80">        Objects.requireNonNull(providers, &quot;providers&quot;);</span>
+<span class="fc" id="L81">        List&lt;ProviderEntry&gt; normalizedProviders = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L82">        Map&lt;String, DiscoveryDomainProvider&gt; providerIds = new LinkedHashMap&lt;&gt;();</span>
 
-<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (DiscoveryDomainProvider provider : providers) {</span>
-<span class="fc" id="L64">            Objects.requireNonNull(provider, &quot;provider&quot;);</span>
-<span class="fc" id="L65">            String providerId = requireIdentifier(provider.id(), &quot;provider id&quot;);</span>
-<span class="fc" id="L66">            String providerVersion = requireIdentifier(</span>
-<span class="fc" id="L67">                provider.version(),</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (DiscoveryDomainProvider provider : providers) {</span>
+<span class="fc" id="L85">            Objects.requireNonNull(provider, &quot;provider&quot;);</span>
+<span class="fc" id="L86">            String providerId = requireIdentifier(provider.id(), &quot;provider id&quot;);</span>
+<span class="fc" id="L87">            String providerVersion = requireIdentifier(</span>
+<span class="fc" id="L88">                provider.version(),</span>
                 &quot;provider version&quot;
             );
-<span class="pc bpc" id="L70" title="1 of 2 branches missed.">            if (providerIds.putIfAbsent(providerId, provider) != null) {</span>
-<span class="nc" id="L71">                throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            if (providerIds.putIfAbsent(providerId, provider) != null) {</span>
+<span class="fc" id="L92">                throw new IllegalArgumentException(</span>
                     &quot;duplicate discovery provider id: &quot; + providerId
                 );
             }
-<span class="fc" id="L75">            normalizedProviders.add(new ProviderEntry(</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            if (!DiscoveryApi.VERSION.equals(provider.apiVersion())) {</span>
+<span class="fc" id="L97">                throw new IllegalArgumentException(&quot;incompatible discovery provider &quot; + providerId</span>
+<span class="fc" id="L98">                    + &quot;: requires API &quot; + provider.apiVersion() + &quot;, runtime API &quot; + DiscoveryApi.VERSION);</span>
+            }
+<span class="fc" id="L100">            normalizedProviders.add(new ProviderEntry(</span>
                 providerId,
                 providerVersion,
-<span class="fc" id="L78">                normalizeProvenance(provider.provenance()),</span>
+<span class="fc" id="L103">                normalizeProvenance(provider.provenance()),</span>
+<span class="fc" id="L104">                ProviderProvenance.capture(provider.getClass()),</span>
                 provider
             ));
-<span class="fc" id="L81">        }</span>
-<span class="fc" id="L82">        normalizedProviders.sort(Comparator.comparing(ProviderEntry::id));</span>
+<span class="fc" id="L107">        }</span>
+<span class="fc" id="L108">        normalizedProviders.sort(Comparator.comparing(ProviderEntry::id));</span>
 
-<span class="fc" id="L84">        Map&lt;String, Registration&gt; domains = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L85" title="All 2 branches covered.">        for (ProviderEntry provider : normalizedProviders) {</span>
-<span class="fc" id="L86">            Collection&lt;DiscoveryDomain&lt;?, ?, ?&gt;&gt; supplied = Objects.requireNonNull(</span>
-<span class="fc" id="L87">                provider.provider().domains(),</span>
+<span class="fc" id="L110">        Map&lt;String, Registration&gt; domains = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        for (ProviderEntry provider : normalizedProviders) {</span>
+<span class="fc" id="L112">            Collection&lt;DiscoveryDomain&lt;?, ?, ?&gt;&gt; supplied = Objects.requireNonNull(</span>
+<span class="fc" id="L113">                provider.provider().domains(),</span>
                 &quot;provider domains&quot;
             );
-<span class="fc" id="L90">            List&lt;DiscoveryDomain&lt;?, ?, ?&gt;&gt; normalizedDomains = new ArrayList&lt;&gt;(supplied);</span>
-<span class="fc" id="L91">            normalizedDomains.forEach(domain -&gt; {</span>
-<span class="fc" id="L92">                Objects.requireNonNull(domain, &quot;provider domain&quot;);</span>
-<span class="fc" id="L93">                domain.descriptor();</span>
-<span class="fc" id="L94">            });</span>
-<span class="fc" id="L95">            normalizedDomains.sort(</span>
-<span class="fc" id="L96">                Comparator.comparing(DiscoveryDomain&lt;?, ?, ?&gt;::domainId)</span>
-<span class="fc" id="L97">                    .thenComparing(DiscoveryDomain&lt;?, ?, ?&gt;::revision)</span>
+<span class="fc" id="L116">            List&lt;DiscoveryDomain&lt;?, ?, ?&gt;&gt; normalizedDomains = new ArrayList&lt;&gt;(supplied);</span>
+<span class="fc" id="L117">            normalizedDomains.forEach(domain -&gt; {</span>
+<span class="fc" id="L118">                Objects.requireNonNull(domain, &quot;provider domain&quot;);</span>
+<span class="fc" id="L119">                domain.descriptor();</span>
+<span class="fc" id="L120">            });</span>
+<span class="fc" id="L121">            normalizedDomains.sort(</span>
+<span class="fc" id="L122">                Comparator.comparing(DiscoveryDomain&lt;?, ?, ?&gt;::domainId)</span>
+<span class="fc" id="L123">                    .thenComparing(DiscoveryDomain&lt;?, ?, ?&gt;::revision)</span>
             );
 
-<span class="fc bfc" id="L100" title="All 2 branches covered.">            for (DiscoveryDomain&lt;?, ?, ?&gt; domain : normalizedDomains) {</span>
-<span class="fc" id="L101">                String key = domain.domainId() + &quot;@&quot; + domain.revision();</span>
-<span class="fc" id="L102">                Registration registration = new Registration(</span>
-<span class="fc" id="L103">                    provider.id(),</span>
-<span class="fc" id="L104">                    provider.version(),</span>
-<span class="fc" id="L105">                    provider.provenance(),</span>
-                    domain
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            for (DiscoveryDomain&lt;?, ?, ?&gt; domain : normalizedDomains) {</span>
+<span class="fc" id="L127">                String key = domain.domainId() + &quot;@&quot; + domain.revision();</span>
+<span class="fc" id="L128">                Registration registration = new Registration(</span>
+<span class="fc" id="L129">                    provider.id(),</span>
+<span class="fc" id="L130">                    provider.version(),</span>
+<span class="fc" id="L131">                    provider.provenance(),</span>
+<span class="fc" id="L132">                    new ProviderDomain&lt;&gt;(domain, provider.artifact().properties(</span>
+<span class="fc" id="L133">                        provider.id(), provider.version(), provider.provenance()),</span>
+<span class="fc" id="L134">                        () -&gt; ProviderProvenance.capture(provider.provider().getClass()))</span>
                 );
-<span class="fc" id="L108">                Registration previous = domains.putIfAbsent(key, registration);</span>
-<span class="pc bpc" id="L109" title="1 of 2 branches missed.">                if (previous != null) {</span>
-<span class="nc" id="L110">                    throw new IllegalArgumentException(</span>
+<span class="fc" id="L136">                Registration previous = domains.putIfAbsent(key, registration);</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">                if (previous != null) {</span>
+<span class="fc" id="L138">                    throw new IllegalArgumentException(</span>
                         &quot;duplicate discovery domain revision: &quot; + key
-<span class="nc" id="L112">                            + &quot; from &quot; + previous.providerId()</span>
-<span class="nc" id="L113">                            + &quot; and &quot; + provider.id()</span>
+<span class="fc" id="L140">                            + &quot; from &quot; + previous.providerId()</span>
+<span class="fc" id="L141">                            + &quot; and &quot; + provider.id()</span>
                     );
                 }
-<span class="fc" id="L116">            }</span>
-<span class="fc" id="L117">        }</span>
-<span class="fc" id="L118">        return new DiscoveryDomainCatalog(new ArrayList&lt;&gt;(domains.values()));</span>
+<span class="fc" id="L144">            }</span>
+<span class="fc" id="L145">        }</span>
+<span class="fc" id="L146">        return new DiscoveryDomainCatalog(new ArrayList&lt;&gt;(domains.values()));</span>
     }
 
     /** All registrations in deterministic provider/domain order. */
     public List&lt;Registration&gt; registrations() {
-<span class="fc" id="L123">        return registrations;</span>
+<span class="fc" id="L151">        return registrations;</span>
     }
 
     /** Finds one exact domain revision. */
     public Optional&lt;Registration&gt; find(String domainId, String revision) {
-<span class="fc" id="L128">        String checkedDomain = requireIdentifier(domainId, &quot;domainId&quot;);</span>
-<span class="fc" id="L129">        String checkedRevision = requireIdentifier(revision, &quot;revision&quot;);</span>
-<span class="fc" id="L130">        return registrations.stream()</span>
-<span class="fc" id="L131">            .filter(registration -&gt;</span>
-<span class="pc bpc" id="L132" title="1 of 2 branches missed.">                registration.domain().domainId().equals(checkedDomain)</span>
-<span class="pc bpc" id="L133" title="1 of 2 branches missed.">                    &amp;&amp; registration.domain().revision().equals(checkedRevision))</span>
-<span class="fc" id="L134">            .findFirst();</span>
+<span class="fc" id="L156">        String checkedDomain = requireIdentifier(domainId, &quot;domainId&quot;);</span>
+<span class="fc" id="L157">        String checkedRevision = requireIdentifier(revision, &quot;revision&quot;);</span>
+<span class="fc" id="L158">        return registrations.stream()</span>
+<span class="fc" id="L159">            .filter(registration -&gt;</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">                registration.domain().domainId().equals(checkedDomain)</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">                    &amp;&amp; registration.domain().revision().equals(checkedRevision))</span>
+<span class="fc" id="L162">            .findFirst();</span>
     }
 
     private static String normalizeProvenance(String value) {
-<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.trim();</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.trim();</span>
     }
 
     private static String requireIdentifier(String value, String name) {
-<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (value == null</span>
-<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                || !value.matches(&quot;[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}&quot;)) {</span>
-<span class="nc" id="L144">            throw new IllegalArgumentException(name + &quot; is not a valid identifier&quot;);</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if (value == null</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">                || !value.matches(&quot;[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}&quot;)) {</span>
+<span class="fc" id="L172">            throw new IllegalArgumentException(name + &quot; is not a valid identifier&quot;);</span>
         }
-<span class="fc" id="L146">        return value;</span>
+<span class="fc" id="L174">        return value;</span>
     }
 
-<span class="fc" id="L149">    private record ProviderEntry(</span>
+<span class="fc" id="L177">    private record ProviderEntry(</span>
         String id,
         String version,
         String provenance,
+        ProviderProvenance artifact,
         DiscoveryDomainProvider provider
     ) {
     }
@@ -161,14 +190,20 @@ public final class DiscoveryDomainCatalog {
         String providerProvenance,
         DiscoveryDomain&lt;?, ?, ?&gt; domain
     ) {
-<span class="fc" id="L164">        public Registration {</span>
-<span class="fc" id="L165">            requireIdentifier(providerId, &quot;providerId&quot;);</span>
-<span class="fc" id="L166">            requireIdentifier(providerVersion, &quot;providerVersion&quot;);</span>
-<span class="pc bpc" id="L167" title="1 of 2 branches missed.">            providerProvenance = providerProvenance == null</span>
-<span class="nc" id="L168">                ? &quot;&quot;</span>
-<span class="fc" id="L169">                : providerProvenance.trim();</span>
-<span class="fc" id="L170">            Objects.requireNonNull(domain, &quot;domain&quot;);</span>
-<span class="fc" id="L171">        }</span>
+        /** Host-observed artifact for catalog-loaded domains; empty for manual entries. */
+        public Optional&lt;ProviderProvenance&gt; artifact() {
+<span class="fc bfc" id="L195" title="All 2 branches covered.">            return domain instanceof ProviderDomain&lt;?, ?, ?&gt; registered</span>
+<span class="fc" id="L196">                ? Optional.of(registered.artifact()) : Optional.empty();</span>
+        }
+
+<span class="fc" id="L199">        public Registration {</span>
+<span class="fc" id="L200">            requireIdentifier(providerId, &quot;providerId&quot;);</span>
+<span class="fc" id="L201">            requireIdentifier(providerVersion, &quot;providerVersion&quot;);</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">            providerProvenance = providerProvenance == null</span>
+<span class="nc" id="L203">                ? &quot;&quot;</span>
+<span class="fc" id="L204">                : providerProvenance.trim();</span>
+<span class="fc" id="L205">            Objects.requireNonNull(domain, &quot;domain&quot;);</span>
+<span class="fc" id="L206">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

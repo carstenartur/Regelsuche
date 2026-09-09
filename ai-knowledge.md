@@ -158,3 +158,16 @@ The exact GitHub execution can be reproduced locally with the released package
 command above, or without package credentials by selecting the explicit local
 composite build. Authentication changes how Gradle resolves the plugin; it does
 not change which tasks, assertions or artifact contracts are executed.
+
+## Baseline for the public SDK extension
+
+The trend baseline is the independently green main commit
+`ce751b60859a44019bbb0e71968f6fe499256f2a`, before the SDK extension.
+Its complete [CI run 34276563499](https://github.com/carstenartur/Regelsuche/actions/runs/34276563499)
+passed all authorities. The committed values are the unchanged metrics from
+that run's `repository-verification` artifact, SHA-256
+`feec45ac7238eb8e813edaf4faf4c6a988b2e5c68bf39cdfc9acfecb84b4af65`.
+The SDK is measured against this prior green state, with the existing trend
+and method-complexity thresholds. The `public-java-sdk` capability links its
+public entry points, contract tests and tutorials. Moving `RuleFileParser`
+changes only its source path in the existing hotspot inventory.

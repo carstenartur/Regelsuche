@@ -1,0 +1,427 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleFileParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-plugin-api</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">RuleFileParser.java</span></div><h1>RuleFileParser.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+@de.regelsuche.api.StableApi(since = &quot;1&quot;)
+<span class="fc" id="L17">public final class RuleFileParser {</span>
+<span class="fc" id="L18">    private static final Pattern HEADER = Pattern.compile(&quot;^(rule|macro|profile)\\s+([A-Za-z0-9_.-]+):\\s*$&quot;);</span>
+<span class="fc" id="L19">    private static final Pattern PROPERTY = Pattern.compile(&quot;^([A-Za-z][A-Za-z0-9_-]*):\\s*(.*)$&quot;);</span>
+<span class="fc" id="L20">    private static final Pattern CONDITION = Pattern.compile(&quot;^([A-Za-z][A-Za-z0-9_.-]*)\\s*:\\s*(\\S.*)$&quot;);</span>
+
+    public RulePackage parse(Path path) {
+        try {
+<span class="fc" id="L24">            return parse(path, Files.readAllLines(path));</span>
+<span class="fc" id="L25">        } catch (IOException ex) {</span>
+<span class="fc" id="L26">            throw new IllegalArgumentException(&quot;Could not read rule file &quot; + path + &quot;: &quot; + ex.getMessage(), ex);</span>
+        }
+    }
+
+    RulePackage parse(Path path, List&lt;String&gt; lines) {
+<span class="fc" id="L31">        List&lt;Entry&gt; entries = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L32">        List&lt;RuleFileDiagnostic&gt; diagnostics = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L33">        Set&lt;String&gt; ids = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L34">        Map&lt;String, String&gt; signatures = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L35">        int index = 0;</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        while (index &lt; lines.size()) {</span>
+<span class="fc" id="L37">            String line = lines.get(index).trim();</span>
+<span class="pc bpc" id="L38" title="1 of 4 branches missed.">            if (line.isEmpty() || line.startsWith(&quot;#&quot;)) {</span>
+<span class="fc" id="L39">                index++;</span>
+<span class="fc" id="L40">                continue;</span>
+            }
+<span class="fc" id="L42">            Matcher header = HEADER.matcher(line);</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            if (!header.matches()) {</span>
+<span class="fc" id="L44">                diagnostics.add(new RuleFileDiagnostic(path, index + 1, Severity.ERROR,</span>
+                    &quot;Expected 'rule &lt;id&gt;:', 'macro &lt;id&gt;:' or 'profile &lt;id&gt;:'&quot;));
+<span class="fc" id="L46">                index++;</span>
+<span class="fc" id="L47">                continue;</span>
+            }
+<span class="fc" id="L49">            String kind = header.group(1);</span>
+<span class="fc" id="L50">            String id = header.group(2);</span>
+<span class="fc" id="L51">            int lineNumber = index + 1;</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">            if (!ids.add(id)) {</span>
+<span class="nc" id="L53">                diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.ERROR,</span>
+                    &quot;Duplicate entry id '&quot; + id + &quot;'&quot;));
+            }
+<span class="fc" id="L56">            index++;</span>
+<span class="fc" id="L57">            Map&lt;String, Object&gt; properties = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">            while (index &lt; lines.size()) {</span>
+<span class="fc" id="L59">                String raw = lines.get(index);</span>
+<span class="fc" id="L60">                String trimmed = raw.trim();</span>
+<span class="pc bpc" id="L61" title="2 of 4 branches missed.">                if (trimmed.isEmpty() || trimmed.startsWith(&quot;#&quot;)) {</span>
+<span class="nc" id="L62">                    index++;</span>
+<span class="nc" id="L63">                    continue;</span>
+                }
+<span class="fc bfc" id="L65" title="All 2 branches covered.">                if (HEADER.matcher(trimmed).matches()) {</span>
+<span class="fc" id="L66">                    break;</span>
+                }
+<span class="fc" id="L68">                Matcher property = PROPERTY.matcher(trimmed);</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">                if (!property.matches()) {</span>
+<span class="nc" id="L70">                    diagnostics.add(new RuleFileDiagnostic(path, index + 1, Severity.ERROR,</span>
+                        &quot;Expected property '&lt;name&gt;: &lt;value&gt;'&quot;));
+<span class="nc" id="L72">                    index++;</span>
+<span class="nc" id="L73">                    continue;</span>
+                }
+<span class="fc" id="L75">                String key = property.group(1);</span>
+<span class="fc" id="L76">                String value = property.group(2).trim();</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">                if (value.isEmpty()) {</span>
+<span class="fc" id="L78">                    List&lt;LineItem&gt; items = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L79">                    int listIndex = index + 1;</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                    while (listIndex &lt; lines.size()) {</span>
+<span class="fc" id="L81">                        String listLine = lines.get(listIndex).trim();</span>
+<span class="pc bpc" id="L82" title="2 of 4 branches missed.">                        if (listLine.isEmpty() || listLine.startsWith(&quot;#&quot;)) {</span>
+<span class="nc" id="L83">                            listIndex++;</span>
+<span class="nc" id="L84">                            continue;</span>
+                        }
+<span class="fc bfc" id="L86" title="All 2 branches covered.">                        if (!listLine.startsWith(&quot;-&quot;)) {</span>
+<span class="fc" id="L87">                            break;</span>
+                        }
+<span class="fc" id="L89">                        items.add(new LineItem(listIndex + 1, stripQuotes(listLine.substring(1).trim())));</span>
+<span class="fc" id="L90">                        listIndex++;</span>
+<span class="fc" id="L91">                    }</span>
+<span class="fc" id="L92">                    properties.put(key, List.copyOf(items));</span>
+<span class="fc" id="L93">                    index = listIndex;</span>
+<span class="fc" id="L94">                    continue;</span>
+                }
+<span class="fc" id="L96">                properties.put(key, stripQuotes(value));</span>
+<span class="fc" id="L97">                index++;</span>
+<span class="fc" id="L98">            }</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            if (&quot;rule&quot;.equals(kind)) {</span>
+<span class="fc" id="L100">                RuleDefinition rule = buildRule(path, lineNumber, id, properties, diagnostics);</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                if (rule != null) {</span>
+<span class="fc" id="L102">                    entries.add(rule);</span>
+<span class="fc" id="L103">                    String signature = rule.pattern();</span>
+<span class="fc" id="L104">                    String existing = signatures.putIfAbsent(signature, rule.id());</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">                    if (existing != null) {</span>
+<span class="nc" id="L106">                        diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.WARNING,</span>
+<span class="nc" id="L107">                            &quot;Rule '&quot; + rule.id() + &quot;' has the same source pattern as '&quot; + existing + &quot;'&quot;));</span>
+                    }
+                }
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            } else if (&quot;macro&quot;.equals(kind)) {</span>
+<span class="fc" id="L111">                MacroDefinition macro = buildMacro(path, lineNumber, id, properties, diagnostics);</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">                if (macro != null) {</span>
+<span class="fc" id="L113">                    entries.add(macro);</span>
+                }
+<span class="fc" id="L115">            } else {</span>
+<span class="fc" id="L116">                ProfileDefinition profile = buildProfile(path, lineNumber, id, properties, diagnostics);</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">                if (profile != null) {</span>
+<span class="fc" id="L118">                        entries.add(profile);</span>
+                }
+            }
+<span class="fc" id="L121">        }</span>
+<span class="fc" id="L122">        return new RulePackage(path, entries, diagnostics);</span>
+    }
+
+    private RuleDefinition buildRule(
+        Path path,
+        int lineNumber,
+        String id,
+        Map&lt;String, Object&gt; properties,
+        List&lt;RuleFileDiagnostic&gt; diagnostics
+    ) {
+<span class="fc" id="L132">        String pattern = stringProperty(&quot;pattern&quot;, properties, path, lineNumber, diagnostics);</span>
+<span class="fc" id="L133">        String replace = stringProperty(&quot;replace&quot;, properties, path, lineNumber, diagnostics);</span>
+<span class="pc bpc" id="L134" title="1 of 4 branches missed.">        if (pattern == null || replace == null) {</span>
+<span class="fc" id="L135">            return null;</span>
+        }
+<span class="fc" id="L137">        List&lt;String&gt; tags = listProperty(&quot;tags&quot;, properties);</span>
+<span class="fc" id="L138">        List&lt;RuleCondition&gt; conditions = conditionProperty(&quot;conditions&quot;, properties, path, lineNumber, diagnostics);</span>
+<span class="fc" id="L139">        String explanation = stringOrDefault(&quot;explanation&quot;, properties, &quot;&quot;);</span>
+<span class="fc" id="L140">        String difficulty = stringOrDefault(&quot;difficulty&quot;, properties, &quot;unspecified&quot;);</span>
+<span class="fc" id="L141">        RuleDirection direction = parseDirection(path, lineNumber, stringOrDefault(&quot;direction&quot;, properties, &quot;forward&quot;), diagnostics);</span>
+<span class="fc" id="L142">        int priority = intOrDefault(path, lineNumber, &quot;priority&quot;, properties, 0, diagnostics);</span>
+<span class="fc" id="L143">        validateKnownProperties(path, lineNumber, properties,</span>
+<span class="fc" id="L144">            Set.of(&quot;pattern&quot;, &quot;replace&quot;, &quot;tags&quot;, &quot;conditions&quot;, &quot;explanation&quot;, &quot;difficulty&quot;, &quot;direction&quot;, &quot;priority&quot;), diagnostics);</span>
+<span class="fc" id="L145">        return new RuleDefinition(id, lineNumber, pattern, replace, direction, priority, tags, conditions, explanation, difficulty);</span>
+    }
+
+    private MacroDefinition buildMacro(
+        Path path,
+        int lineNumber,
+        String id,
+        Map&lt;String, Object&gt; properties,
+        List&lt;RuleFileDiagnostic&gt; diagnostics
+    ) {
+<span class="fc" id="L155">        String input = stringProperty(&quot;input&quot;, properties, path, lineNumber, diagnostics);</span>
+<span class="fc" id="L156">        String output = stringProperty(&quot;output&quot;, properties, path, lineNumber, diagnostics);</span>
+<span class="pc bpc" id="L157" title="1 of 4 branches missed.">        if (input == null || output == null) {</span>
+<span class="fc" id="L158">            return null;</span>
+        }
+<span class="fc" id="L160">        List&lt;String&gt; tags = listProperty(&quot;tags&quot;, properties);</span>
+<span class="fc" id="L161">        String explanation = stringOrDefault(&quot;explanation&quot;, properties, &quot;&quot;);</span>
+<span class="fc" id="L162">        int priority = intOrDefault(path, lineNumber, &quot;priority&quot;, properties, 0, diagnostics);</span>
+<span class="fc" id="L163">        String difficulty = stringOrDefault(&quot;difficulty&quot;, properties, &quot;unspecified&quot;);</span>
+<span class="fc" id="L164">        validateKnownProperties(path, lineNumber, properties,</span>
+<span class="fc" id="L165">            Set.of(&quot;input&quot;, &quot;output&quot;, &quot;tags&quot;, &quot;explanation&quot;, &quot;priority&quot;, &quot;difficulty&quot;), diagnostics);</span>
+<span class="fc" id="L166">        return new MacroDefinition(id, lineNumber, input, output, explanation, tags, priority, difficulty);</span>
+    }
+
+    private ProfileDefinition buildProfile(
+        Path path,
+        int lineNumber,
+        String id,
+        Map&lt;String, Object&gt; properties,
+        List&lt;RuleFileDiagnostic&gt; diagnostics
+    ) {
+<span class="fc" id="L176">        List&lt;String&gt; enableTags = listProperty(&quot;enable_tags&quot;, properties);</span>
+<span class="fc" id="L177">        List&lt;String&gt; disableTags = listProperty(&quot;disable_tags&quot;, properties);</span>
+<span class="fc" id="L178">        List&lt;String&gt; whitelist = combinedListProperty(properties, &quot;whitelist&quot;, &quot;enable_rules&quot;);</span>
+<span class="fc" id="L179">        List&lt;String&gt; blacklist = combinedListProperty(properties, &quot;blacklist&quot;, &quot;disable_rules&quot;);</span>
+<span class="fc" id="L180">        validateKnownProperties(path, lineNumber, properties,</span>
+<span class="fc" id="L181">            Set.of(&quot;enable_tags&quot;, &quot;disable_tags&quot;, &quot;whitelist&quot;, &quot;blacklist&quot;, &quot;enable_rules&quot;, &quot;disable_rules&quot;),</span>
+            diagnostics);
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        for (String ruleId : whitelist) {</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">            if (blacklist.contains(ruleId)) {</span>
+<span class="fc" id="L185">                diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.WARNING,</span>
+                    &quot;Profile '&quot; + id + &quot;' lists '&quot; + ruleId + &quot;' in both whitelist and blacklist; blacklist wins&quot;));
+            }
+<span class="fc" id="L188">        }</span>
+<span class="pc bpc" id="L189" title="4 of 8 branches missed.">        if (enableTags.isEmpty() &amp;&amp; disableTags.isEmpty() &amp;&amp; whitelist.isEmpty() &amp;&amp; blacklist.isEmpty()) {</span>
+<span class="nc" id="L190">            diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.WARNING,</span>
+                &quot;Profile '&quot; + id + &quot;' has no tag or rule-id filters and has no effect&quot;));
+        }
+<span class="fc" id="L193">        return new ProfileDefinition(id, lineNumber, enableTags, disableTags, whitelist, blacklist);</span>
+    }
+
+    private void validateKnownProperties(
+        Path path,
+        int lineNumber,
+        Map&lt;String, Object&gt; properties,
+        Set&lt;String&gt; known,
+        List&lt;RuleFileDiagnostic&gt; diagnostics
+    ) {
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        for (String key : properties.keySet()) {</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">            if (!known.contains(key)) {</span>
+<span class="nc" id="L205">                diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.WARNING,</span>
+                    &quot;Unknown property '&quot; + key + &quot;'&quot;));
+            }
+<span class="fc" id="L208">        }</span>
+<span class="fc" id="L209">    }</span>
+
+    private String stringProperty(
+        String key,
+        Map&lt;String, Object&gt; properties,
+        Path path,
+        int lineNumber,
+        List&lt;RuleFileDiagnostic&gt; diagnostics
+    ) {
+<span class="fc" id="L218">        Object value = properties.get(key);</span>
+<span class="pc bpc" id="L219" title="1 of 4 branches missed.">        if (value instanceof String string &amp;&amp; !string.isBlank()) {</span>
+<span class="fc" id="L220">            return string;</span>
+        }
+<span class="fc" id="L222">        diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.ERROR,</span>
+            &quot;Missing required property '&quot; + key + &quot;'&quot;));
+<span class="fc" id="L224">        return null;</span>
+    }
+
+    private String stringOrDefault(String key, Map&lt;String, Object&gt; properties, String defaultValue) {
+<span class="fc" id="L228">        Object value = properties.get(key);</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        return value instanceof String string ? string : defaultValue;</span>
+    }
+
+    private int intOrDefault(
+        Path path,
+        int lineNumber,
+        String key,
+        Map&lt;String, Object&gt; properties,
+        int defaultValue,
+        List&lt;RuleFileDiagnostic&gt; diagnostics
+    ) {
+<span class="fc" id="L240">        Object value = properties.get(key);</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L242">            return defaultValue;</span>
+        }
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (value instanceof String string) {</span>
+            try {
+<span class="fc" id="L246">                return Integer.parseInt(string);</span>
+<span class="nc" id="L247">            } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L248">                diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.ERROR,</span>
+                    &quot;Property '&quot; + key + &quot;' must be an integer&quot;));
+<span class="nc" id="L250">                return defaultValue;</span>
+            }
+        }
+<span class="nc" id="L253">        diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.ERROR,</span>
+            &quot;Property '&quot; + key + &quot;' must be an integer&quot;));
+<span class="nc" id="L255">        return defaultValue;</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private List&lt;String&gt; listProperty(String key, Map&lt;String, Object&gt; properties) {
+<span class="fc" id="L260">        Object value = properties.get(key);</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">        if (value instanceof List&lt;?&gt; list) {</span>
+<span class="fc" id="L262">            return list.stream()</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">                .map(item -&gt; item instanceof LineItem li ? li.value() : (String) item)</span>
+<span class="fc" id="L264">                .toList();</span>
+        }
+<span class="pc bpc" id="L266" title="3 of 4 branches missed.">        if (value instanceof String string &amp;&amp; !string.isBlank()) {</span>
+<span class="nc" id="L267">            return List.of(stripQuotes(string));</span>
+        }
+<span class="fc" id="L269">        return List.of();</span>
+    }
+
+    private List&lt;String&gt; combinedListProperty(Map&lt;String, Object&gt; properties, String... keys) {
+<span class="fc" id="L273">        List&lt;String&gt; values = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        for (String key : keys) {</span>
+<span class="fc" id="L275">            values.addAll(listProperty(key, properties));</span>
+        }
+<span class="fc" id="L277">        return List.copyOf(values);</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private List&lt;LineItem&gt; lineItemsProperty(String key, Map&lt;String, Object&gt; properties, int defaultLine) {
+<span class="fc" id="L282">        Object value = properties.get(key);</span>
+<span class="fc bfc" id="L283" title="All 2 branches covered.">        if (value instanceof List&lt;?&gt; list) {</span>
+<span class="fc" id="L284">            return list.stream()</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">                .map(item -&gt; item instanceof LineItem li ? li : new LineItem(defaultLine, (String) item))</span>
+<span class="fc" id="L286">                .toList();</span>
+        }
+<span class="pc bpc" id="L288" title="3 of 4 branches missed.">        if (value instanceof String string &amp;&amp; !string.isBlank()) {</span>
+<span class="nc" id="L289">            return List.of(new LineItem(defaultLine, stripQuotes(string)));</span>
+        }
+<span class="fc" id="L291">        return List.of();</span>
+    }
+
+    private List&lt;RuleCondition&gt; conditionProperty(
+        String key,
+        Map&lt;String, Object&gt; properties,
+        Path path,
+        int lineNumber,
+        List&lt;RuleFileDiagnostic&gt; diagnostics
+    ) {
+<span class="fc" id="L301">        List&lt;LineItem&gt; items = lineItemsProperty(key, properties, lineNumber);</span>
+<span class="fc" id="L302">        List&lt;RuleCondition&gt; conditions = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        for (LineItem item : items) {</span>
+<span class="fc" id="L304">            Matcher matcher = CONDITION.matcher(item.value());</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">            if (!matcher.matches()) {</span>
+<span class="fc" id="L306">                diagnostics.add(new RuleFileDiagnostic(path, item.line(), Severity.ERROR,</span>
+<span class="fc" id="L307">                    &quot;Condition '&quot; + item.value() + &quot;' must use '&lt;name&gt;: &lt;value&gt;'&quot;));</span>
+<span class="fc" id="L308">                continue;</span>
+            }
+<span class="fc" id="L310">            conditions.add(new RuleCondition(matcher.group(1), matcher.group(2)));</span>
+<span class="fc" id="L311">        }</span>
+<span class="fc" id="L312">        return List.copyOf(conditions);</span>
+    }
+
+    private RuleDirection parseDirection(
+        Path path,
+        int lineNumber,
+        String direction,
+        List&lt;RuleFileDiagnostic&gt; diagnostics
+    ) {
+        try {
+<span class="fc" id="L322">            return RuleDirection.valueOf(direction.toUpperCase(Locale.ROOT));</span>
+<span class="fc" id="L323">        } catch (IllegalArgumentException ex) {</span>
+<span class="fc" id="L324">            diagnostics.add(new RuleFileDiagnostic(path, lineNumber, Severity.ERROR,</span>
+                &quot;Unknown direction '&quot; + direction + &quot;' (expected forward, backward or both)&quot;));
+<span class="fc" id="L326">            return RuleDirection.FORWARD;</span>
+        }
+    }
+
+    private String stripQuotes(String value) {
+<span class="pc bpc" id="L331" title="1 of 6 branches missed.">        if (value.length() &gt;= 2 &amp;&amp; ((value.startsWith(&quot;\&quot;&quot;) &amp;&amp; value.endsWith(&quot;\&quot;&quot;))</span>
+<span class="pc bpc" id="L332" title="3 of 4 branches missed.">            || (value.startsWith(&quot;'&quot;) &amp;&amp; value.endsWith(&quot;'&quot;)))) {</span>
+<span class="fc" id="L333">            return value.substring(1, value.length() - 1);</span>
+        }
+<span class="fc" id="L335">        return value;</span>
+    }
+
+    /** Pairs a source-file line number with a parsed string value. */
+<span class="fc" id="L339">    private record LineItem(int line, String value) {}</span>
+
+    public sealed interface Entry permits RuleDefinition, MacroDefinition, ProfileDefinition {
+        String id();
+
+        int line();
+    }
+
+<span class="fc" id="L347">    public enum RuleDirection {</span>
+<span class="fc" id="L348">        FORWARD,</span>
+<span class="fc" id="L349">        BACKWARD,</span>
+<span class="fc" id="L350">        BOTH</span>
+    }
+
+<span class="fc" id="L353">    public enum Severity {</span>
+<span class="fc" id="L354">        WARNING,</span>
+<span class="fc" id="L355">        ERROR</span>
+    }
+
+    public record RuleDefinition(
+        String id,
+        int line,
+        String pattern,
+        String replace,
+        RuleDirection direction,
+        int priority,
+        List&lt;String&gt; tags,
+        List&lt;RuleCondition&gt; conditions,
+        String explanation,
+        String difficulty
+    ) implements Entry {
+<span class="fc" id="L370">        public RuleDefinition {</span>
+<span class="fc" id="L371">            tags = List.copyOf(tags);</span>
+<span class="fc" id="L372">            conditions = List.copyOf(conditions);</span>
+<span class="fc" id="L373">        }</span>
+    }
+
+<span class="fc" id="L376">    public record RuleCondition(String name, String value) {</span>
+    }
+
+    public record MacroDefinition(
+        String id,
+        int line,
+        String input,
+        String output,
+        String explanation,
+        List&lt;String&gt; tags,
+        int priority,
+        String difficulty
+    ) implements Entry {
+<span class="fc" id="L389">        public MacroDefinition {</span>
+<span class="fc" id="L390">            tags = List.copyOf(tags);</span>
+<span class="fc" id="L391">        }</span>
+    }
+
+    public record ProfileDefinition(
+        String id,
+        int line,
+        List&lt;String&gt; enableTags,
+        List&lt;String&gt; disableTags,
+        List&lt;String&gt; whitelist,
+        List&lt;String&gt; blacklist
+    ) implements Entry {
+<span class="fc" id="L402">        public ProfileDefinition {</span>
+<span class="fc" id="L403">            enableTags = List.copyOf(enableTags);</span>
+<span class="fc" id="L404">            disableTags = List.copyOf(disableTags);</span>
+<span class="fc" id="L405">            whitelist = List.copyOf(whitelist);</span>
+<span class="fc" id="L406">            blacklist = List.copyOf(blacklist);</span>
+<span class="fc" id="L407">        }</span>
+    }
+
+    public record RulePackage(Path path, List&lt;Entry&gt; entries, List&lt;RuleFileDiagnostic&gt; diagnostics) {
+<span class="fc" id="L411">        public RulePackage {</span>
+<span class="fc" id="L412">            entries = List.copyOf(entries);</span>
+<span class="fc" id="L413">            diagnostics = List.copyOf(diagnostics);</span>
+<span class="fc" id="L414">        }</span>
+
+        public boolean hasErrors() {
+<span class="nc bnc" id="L417" title="All 2 branches missed.">            return diagnostics.stream().anyMatch(diagnostic -&gt; diagnostic.severity() == Severity.ERROR);</span>
+        }
+    }
+
+<span class="fc" id="L421">    public record RuleFileDiagnostic(Path path, int line, Severity severity, String message) {</span>
+        public String format() {
+<span class="nc" id="L423">            return severity + &quot; &quot; + path.getFileName() + &quot;:&quot; + line + &quot; - &quot; + message;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
