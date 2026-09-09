@@ -36,6 +36,8 @@ jobs:
         with: { cache-cleanup: on-success }
       - name: Install checkout prerequisites
         run: |
+          # Chrome is preinstalled by the runner; this checkout installs no Google apt packages.
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
           sudo apt-get update
           # GraalPy isolates native modules beside the private extracted tree
           # and invokes patchelf to relocate each context-local ELF copy.
@@ -94,6 +96,8 @@ jobs:
         with: { cache-cleanup: on-success }
       - name: Install isolated benchmark prerequisites
         run: |
+          # Chrome is preinstalled by the runner; this checkout installs no Google apt packages.
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             patchelf=0.14.3-1 \
@@ -132,6 +136,8 @@ jobs:
         with: { cache-cleanup: on-success }
       - name: Install isolated SymPy runtime prerequisites
         run: |
+          # Chrome is preinstalled by the runner; this checkout installs no Google apt packages.
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             patchelf=0.14.3-1 \
@@ -169,6 +175,8 @@ jobs:
           cache: maven
       - name: Install independent Maven checkout prerequisites
         run: |
+          # Chrome is preinstalled by the runner; this checkout installs no Google apt packages.
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             patchelf=0.14.3-1 \
