@@ -372,10 +372,20 @@ public class WebWorkbenchServer {
     }
 
     private void handleMatrixRepresentations(HttpExchange exchange) throws IOException {
+        String path = exchange.getRequestURI().getPath();
+        if (path.equals("/api/representations/study")) {
+            sendJson(exchange, 200, RepresentationStudy.json());
+            return;
+        }
         boolean replay = exchange.getRequestURI().getPath().endsWith("/replay");
         try {
             String json;
-            if (replay) {
+            if (path.startsWith("/api/representations/solve")) {
+                var body = requestBodies.readLinearRepresentation(exchange);
+                json = replay ? de.regelsuche.math.algorithms.linalg.LinearRepresentationJson.replay(body)
+                    : de.regelsuche.math.algorithms.linalg.LinearRepresentationJson.solve(body);
+                if (replay) exchange.getResponseHeaders().set("X-Representation-Replay", "VERIFIED");
+            } else if (replay) {
                 json = de.regelsuche.math.algorithms.linalg.MatrixPreparationJson.replay(
                     requestBodies.readMatrixRepresentationArtifact(exchange));
                 exchange.getResponseHeaders().set("X-Representation-Replay", "VERIFIED");

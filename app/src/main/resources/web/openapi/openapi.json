@@ -29,6 +29,119 @@
     {"name": "Rule Radar", "description": "Positionsgebundene AST-Kandidaten, Anwendung und begrenzte Suche."}
   ],
   "paths": {
+    "/api/representations/solve": {
+      "post": {
+        "tags": [
+          "Analysis"
+        ],
+        "operationId": "solveLinearRepresentation",
+        "summary": "Rationales lineares System mit automatischer Darstellungswahl lösen",
+        "x-regelsuche-context": "/api/representations",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinearSolveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Kanonisches, vollständig reproduzierbares Darstellungsartefakt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinearSolutionArtifact"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestText"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "409": {
+            "description": "Gespeicherter Nachweis stimmt nicht mit dem vollständigen Replay überein"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          }
+        }
+      }
+    },
+    "/api/representations/solve/replay": {
+      "post": {
+        "tags": [
+          "Analysis"
+        ],
+        "operationId": "replayLinearSolution",
+        "summary": "Vollständiges Lösungsartefakt wiederholen und prüfen",
+        "x-regelsuche-context": "/api/representations",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinearSolutionArtifact"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Kanonisches, vollständig reproduzierbares Darstellungsartefakt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinearSolutionArtifact"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestText"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "409": {
+            "description": "Gespeicherter Nachweis stimmt nicht mit dem vollständigen Replay überein"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          }
+        }
+      }
+    },
+    "/api/representations/study": {
+      "get": {
+        "tags": [
+          "Analysis"
+        ],
+        "operationId": "representationTransferStudy",
+        "summary": "Öffentlichen Trainings- und Transfervergleich ausführen",
+        "x-regelsuche-context": "/api/representations",
+        "responses": {
+          "200": {
+            "description": "Eingefrorene Policy, alle Versuche, Nachweise und Arbeitskosten",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          }
+        }
+      }
+    },
     "/api/representations": {
       "post": {
         "tags": [
@@ -789,6 +902,72 @@
       "Unavailable": {"description": "Funktion ist in der aktuellen Konfiguration deaktiviert oder nicht verfügbar"}
     },
     "schemas": {
+      "LinearSolveRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "equations"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "enum": [
+              "regelsuche.linear-solve-request/v1"
+            ]
+          },
+          "equations": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          },
+          "route": {
+            "type": "string",
+            "enum": [
+              "DIRECT",
+              "MATRIX",
+              "BLOCKS",
+              "AUTO"
+            ],
+            "default": "AUTO"
+          },
+          "maxWorkUnits": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000,
+            "default": 20000
+          }
+        }
+      },
+      "LinearSolutionArtifact": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "contentHash",
+          "evidence"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "enum": [
+              "regelsuche.linear-solution-artifact/v1"
+            ]
+          },
+          "contentHash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "evidence": {
+            "type": "object"
+          }
+        }
+      },
       "MatrixPreparationRequest": {
         "type": "object",
         "additionalProperties": false,

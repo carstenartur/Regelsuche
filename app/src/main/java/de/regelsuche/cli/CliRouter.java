@@ -98,13 +98,17 @@ public class CliRouter {
     }
 
     private int runRepresentations(String[] args) {
-        if (args.length != 2 || !(args[0].equals("analyze") || args[0].equals("replay"))) {
-            out.println("Usage: representations analyze <request.json> | replay <artifact.json>");
+        if (args.length != 2 || !java.util.Set.of("analyze", "replay", "solve", "verify-solution").contains(args[0])) {
+            out.println("Usage: representations analyze|solve <request.json> | replay|verify-solution <artifact.json>");
             return 1;
         }
         try (var input = java.nio.file.Files.newInputStream(java.nio.file.Path.of(args[1]))) {
             var json = new de.regelsuche.web.StreamingJsonRequestBody(4 * 1024 * 1024).readObject(input);
-            if (args[0].equals("replay")) {
+            if (args[0].equals("solve")) {
+                out.print(de.regelsuche.math.algorithms.linalg.LinearRepresentationJson.solve(json));
+            } else if (args[0].equals("verify-solution")) {
+                out.print(de.regelsuche.math.algorithms.linalg.LinearRepresentationJson.replay(json));
+            } else if (args[0].equals("replay")) {
                 out.print(de.regelsuche.math.algorithms.linalg.MatrixPreparationJson.replay(json));
             } else {
                 var request = de.regelsuche.math.algorithms.linalg.MatrixPreparationJson.readRequest(json);

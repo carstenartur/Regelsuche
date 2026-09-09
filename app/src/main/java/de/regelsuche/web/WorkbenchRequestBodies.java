@@ -24,6 +24,10 @@ final class WorkbenchRequestBodies {
         return de.regelsuche.math.algorithms.linalg.MatrixPreparationJson.readRequest(json.readObject(exchange));
     }
 
+    java.util.Map<String, Object> readLinearRepresentation(HttpExchange exchange) throws IOException {
+        return json.readObject(exchange);
+    }
+
     java.util.Map<String, Object> readMatrixRepresentationArtifact(HttpExchange exchange) throws IOException {
         return json.readObject(exchange);
     }
