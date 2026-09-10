@@ -20,6 +20,7 @@ except ImportError as error:
 
 EXPECTED_JSONSCHEMA_VERSION = "4.25.1"
 SHA_PREFIX = "sha256:"
+APPLICABILITY_SEMANTICS = "CANONICAL_PROGRAM_RETURNS_AT_LEAST_ONE_CANDIDATE/v1"
 FILES = {
     "genome": "genome.json",
     "plan": "program-plan.json",
@@ -240,6 +241,8 @@ def verify_bindings(documents: dict[str, dict[str, Any]]) -> None:
                   "receipt candidate binding")
     require_equal(receipt["replayEvidenceHash"], replay["contentHash"],
                   "receipt replay binding")
+    require_equal(receipt["applicabilitySemantics"], APPLICABILITY_SEMANTICS,
+                  "program applicability semantics")
 
     require_equal(mul_leaf["geneId"], "mul-one", "mul leaf gene")
     require_equal(add_leaf["geneId"], "add-zero", "add leaf gene")
@@ -250,6 +253,19 @@ def verify_bindings(documents: dict[str, dict[str, Any]]) -> None:
             "mul-one": mul_leaf["contentHash"],
         },
         "program leaf authorization map",
+    )
+    require_equal(
+        receipt["leafApplicabilitySchemaHashes"],
+        {
+            "add-zero": add_leaf["applicabilitySchemaHash"],
+            "mul-one": mul_leaf["applicabilitySchemaHash"],
+        },
+        "program leaf applicability-schema map",
+    )
+    require_equal(
+        set(receipt["leafAuthorizationHashes"]),
+        set(receipt["leafApplicabilitySchemaHashes"]),
+        "program authorization/applicability subject set",
     )
     promoted = [mul_leaf["promotedRuleId"], add_leaf["promotedRuleId"]]
     require_equal(replay["cases"][0]["candidates"][0]["ruleIds"], promoted,
