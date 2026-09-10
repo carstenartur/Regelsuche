@@ -416,7 +416,7 @@ public final class LearnedPatternRuleAuthorizationService {
     ) {
         Map<String, String> result = new TreeMap<>();
         for (EvolutionSplitManifest.CaseReference reference : cases) {
-            result.put(reference.caseId(), reference.family());
+            result.put(reference.caseId(), reference.familyId());
         }
         return Map.copyOf(result);
     }
