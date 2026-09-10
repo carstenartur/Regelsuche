@@ -117,6 +117,12 @@ public final class LearnedRewriteProgramAuthorizationService {
     /**
      * Replays a stored authorization receipt without trusting its PASS state.
      * Every leaf validity/identity check and every program replay is repeated.
+     *
+     * <p>The reconstruction is performed at the receipt's retained
+     * {@code authorizedAt} instant, matching the learned-pattern authorization
+     * contract. This prevents a self-consistent receipt from claiming issuance
+     * before one of its leaf authorities became valid. The entire reconstructed
+     * receipt must match before current-time usability is checked.</p>
      */
     public Authorization replayStoredAuthorization(
         EvolutionRewriteProgramCandidate candidate,
@@ -128,35 +134,22 @@ public final class LearnedRewriteProgramAuthorizationService {
         Instant asOf
     ) {
         Objects.requireNonNull(receipt, "receipt");
-        receipt.requireUsableAt(asOf, repositoryRevision, candidate);
-        VerifiedProgram verified = verifyProgram(
+        receipt.requireUsableAt(
+            receipt.authorizedAt(),
+            repositoryRevision,
+            candidate);
+        Authorization replayed = authorize(
             candidate,
             leafAuthorizations,
             replayEvidence,
             repositoryRevision,
-            asOf);
-        if (!receipt.replayEvidenceHash().equals(replayEvidence.contentHash())
-                || !receipt.leafAuthorizationHashes().equals(
-                    verified.leaves().authorizationHashes())
-                || !receipt.validUntil().equals(verified.leaves().validUntil())) {
+            receipt.authorizedAt());
+        if (!receipt.equals(replayed.receipt())) {
             throw new IllegalArgumentException(
-                "stored rewrite-program authorization differs from replayed authority");
+                "stored rewrite-program authorization differs from evidence replay");
         }
-        List<String> workRevisions = replayEvidence.cases().stream()
-            .map(LearnedRewriteProgramReplayEvidence.ReplayCase::workRevision)
-            .distinct()
-            .sorted()
-            .toList();
-        if (!receipt.workRevisions().equals(workRevisions)) {
-            throw new IllegalArgumentException(
-                "stored rewrite-program authorization uses different work semantics");
-        }
-        return new Authorization(
-            candidate,
-            verified.compiled(),
-            replayEvidence,
-            verified.leaves().authorizations(),
-            receipt);
+        receipt.requireUsableAt(asOf, repositoryRevision, candidate);
+        return replayed;
     }
 
     private VerifiedProgram verifyProgram(
