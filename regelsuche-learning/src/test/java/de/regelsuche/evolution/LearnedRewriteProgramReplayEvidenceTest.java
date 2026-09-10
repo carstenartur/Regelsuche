@@ -48,6 +48,15 @@ class LearnedRewriteProgramReplayEvidenceTest {
         assertEquals(List.of("promoted_mul", "promoted_add"), result.ruleIds());
         assertEquals(2, result.executionWork().primitiveRewrites());
         assertEquals(2, result.primitiveRuleIds().size());
+        assertEquals("regelsuche.rewrite-program-work/v2", replayCase.workRevision());
+        assertTrue(replayCase.pathBudget().present());
+        assertEquals(
+            fixture.candidate().genome().budget().maxApplicationsPerPath(),
+            replayCase.pathBudget().primitiveRewriteUnits());
+        assertEquals(0, replayCase.pathBudget().exactTheoryWorkUnits());
+        assertTrue(replayCase.workMetrics().candidateWork().canonicalWorkUnits()
+            >= result.executionWork().canonicalWorkUnits(),
+            "authorization replay must account at least the retained mathematical path work");
         assertTrue(replayCase.workMetrics().composedCandidates() > 0);
         assertTrue(replayCase.workMetrics().requirementEvaluations() > 0);
         assertTrue(replayCase.workMetrics().priorityCandidatesOrdered() > 0);
