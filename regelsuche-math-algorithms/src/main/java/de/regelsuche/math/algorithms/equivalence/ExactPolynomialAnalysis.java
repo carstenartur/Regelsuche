@@ -14,7 +14,14 @@ import java.util.Map;
 public final class ExactPolynomialAnalysis {
     public static final String REVISION = "regelsuche.exact-polynomial-analysis/v1";
     public static final int MAX_VARIABLES = 4;
-    private final ExactResidualPolynomialArithmetic arithmetic = new ExactResidualPolynomialArithmetic();
+    private final ExactResidualPolynomialArithmetic arithmetic;
+    private final java.util.function.LongConsumer workObserver;
+    public ExactPolynomialAnalysis() { this(null); }
+    /** Optional exact node/term and alpha-renaming work receipt; mathematical results are unchanged. */
+    public ExactPolynomialAnalysis(java.util.function.LongConsumer workObserver) {
+        this.workObserver = workObserver;
+        arithmetic = new ExactResidualPolynomialArithmetic(workObserver);
+    }
 
     public void requireEquivalent(String source, String candidate) {
         if (!arithmetic.parse(source).equals(arithmetic.parse(candidate))) {
@@ -31,6 +38,7 @@ public final class ExactPolynomialAnalysis {
         }
         List<String> alternatives = new ArrayList<>();
         permute(polynomial, variables, new ArrayList<>(), alternatives);
+        if (workObserver != null) workObserver.accept((long) alternatives.size() * polynomial.termCount());
         return REVISION + ":" + alternatives.stream().min(String::compareTo).orElseThrow();
     }
 

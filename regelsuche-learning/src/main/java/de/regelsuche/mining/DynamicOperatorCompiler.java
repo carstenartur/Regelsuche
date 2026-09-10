@@ -46,6 +46,13 @@ public final class DynamicOperatorCompiler {
 
     private final RulePatternParser patternParser = new RulePatternParser();
 
+    /** Compile an inventory rule without dropping its utility observations, assumptions or provenance. */
+    public CompilationResult compile(de.regelsuche.inventory.ReusableRule rule) {
+        java.util.Objects.requireNonNull(rule, "rule");
+        var compiled = compile(rule.id(), rule.canonicalHash(), rule.leftPattern(), rule.rightPattern());
+        return compiled.isSuccess() ? CompilationResult.success(compiled.operator().orElseThrow().withRuleEvidence(rule)) : compiled;
+    }
+
     /**
      * Compiles a generalized hypothesis into an executable {@link DynamicPatternOperator}.
      *

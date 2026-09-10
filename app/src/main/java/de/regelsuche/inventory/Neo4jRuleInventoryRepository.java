@@ -38,6 +38,11 @@ public class Neo4jRuleInventoryRepository implements RuleInventoryRepository {
             params.put("canonicalHash", rule.canonicalHash() == null ? "" : rule.canonicalHash());
             params.put("usageCount", rule.usageCount());
             params.put("lastUsedAt", rule.lastUsedAt() == null ? null : rule.lastUsedAt().toString());
+            params.put("occurrenceCount", rule.occurrenceCount());
+            params.put("supportingPathIds", rule.supportingPathIds());
+            params.put("confidenceScore", rule.confidenceScore());
+            params.put("assumptions", rule.assumptions());
+            params.put("utilityEvidenceJson", rule.utilityEvidence().toCanonicalJson());
             session.run(
                 "MERGE (rule:ReusableRule {id: $id}) "
                     + "SET rule.leftPattern = $leftPattern, rule.rightPattern = $rightPattern, "
@@ -47,6 +52,9 @@ public class Neo4jRuleInventoryRepository implements RuleInventoryRepository {
                     + "rule.canonicalHash = $canonicalHash, "
                     + "rule.usageCount = $usageCount, "
                     + "rule.lastUsedAt = $lastUsedAt, "
+                    + "rule.occurrenceCount = $occurrenceCount, rule.supportingPathIds = $supportingPathIds, "
+                    + "rule.confidenceScore = $confidenceScore, rule.assumptions = $assumptions, "
+                    + "rule.utilityEvidenceJson = $utilityEvidenceJson, "
                     + "rule.enabled = coalesce(rule.enabled, true), "
                     + "rule.tags = coalesce(rule.tags, [])",
                 params
@@ -63,7 +71,10 @@ public class Neo4jRuleInventoryRepository implements RuleInventoryRepository {
                     + "rule.proofStatus AS proofStatus, rule.knownRuleStatus AS knownRuleStatus, "
                     + "rule.supportingExamples AS supportingExamples, rule.averageImprovement AS averageImprovement, "
                     + "rule.createdAt AS createdAt, rule.canonicalHash AS canonicalHash, "
-                    + "rule.usageCount AS usageCount, rule.lastUsedAt AS lastUsedAt "
+                    + "rule.usageCount AS usageCount, rule.lastUsedAt AS lastUsedAt, "
+                    + "rule.occurrenceCount AS occurrenceCount, rule.supportingPathIds AS supportingPathIds, "
+                    + "rule.confidenceScore AS confidenceScore, rule.assumptions AS assumptions, "
+                    + "rule.utilityEvidenceJson AS utilityEvidenceJson "
                     + "ORDER BY id"
             );
             List<ReusableRule> rules = new ArrayList<>();
@@ -86,7 +97,12 @@ public class Neo4jRuleInventoryRepository implements RuleInventoryRepository {
                     Instant.parse(record.get("createdAt").asString(Instant.EPOCH.toString())),
                     record.get("canonicalHash").asString(""),
                     lastUsed,
-                    record.get("usageCount").asInt(0)
+                    record.get("usageCount").asInt(0),
+                    record.get("occurrenceCount").asInt(0),
+                    record.get("supportingPathIds").isNull() ? List.of() : record.get("supportingPathIds").asList(Value::asString),
+                    record.get("confidenceScore").asDouble(0),
+                    record.get("assumptions").isNull() ? List.of() : record.get("assumptions").asList(Value::asString),
+                    RuleUtilityEvidence.fromJson(record.get("utilityEvidenceJson").asString(""))
                 ));
             }
             return rules;

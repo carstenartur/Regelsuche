@@ -35,7 +35,7 @@ import java.util.Optional;
  * path (or supporting path reconstruction references) for the graph/replay
  * layer.</p>
  */
-public class MacroMoveTransformationEngine implements TransformationEngine {
+public class MacroMoveTransformationEngine implements TransformationEngine, de.regelsuche.search.moves.MoveProviderInventory {
     private final TransformationEngine baseEngine;
     private final GoalAwareMacroMoveSelector selector;
     private final String goalExpression;
@@ -117,6 +117,23 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
             result.addAll(applyMacro(expression, rule));
         }
         return result;
+    }
+
+    /** Common scheduling bypasses both legacy append loops and the selector's old representation heuristic. */
+    @Override
+    public List<de.regelsuche.search.moves.MoveProvider> moveProviders() {
+        var providers = new ArrayList<>(de.regelsuche.search.moves.MoveProviders.from(baseEngine));
+        if (!macroMovesEnabled) return List.copyOf(providers);
+        for (var rule : selector.inventoryRules()) {
+            var descriptor = new de.regelsuche.search.moves.MoveProvider.Descriptor(rule.id(), "inventory-macro",
+                de.regelsuche.search.moves.SearchMove.SourceKind.LEARNED,
+                de.regelsuche.search.moves.SearchMove.ProofStrength.EMPIRICAL, rule.assumptions(),
+                rule.moveValueEvidence(), rule.canonicalHash());
+            // Supporting-path metadata alone is not a replayable primitive proof. Keep it quarantined in the new boundary.
+            providers.add(new de.regelsuche.search.moves.EngineMoveProvider(descriptor,
+                expression -> applyMacro(expression, rule), false));
+        }
+        return List.copyOf(providers);
     }
 
     public Optional<MacroMoveExpansion> expansionFor(String fromExpression, String toExpression, String ruleId) {

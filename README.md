@@ -20,6 +20,7 @@ können als neue Strategien wiederverwendet werden.
 [Python-Client](docs/python-client.md) ·
 [Darstellungen und Transferdemo](docs/representation-transfer-demo.md) ·
 [Strategien lernen und vergleichen](docs/trace-strategy-transfer.md) ·
+[Regeln bewerten und Suche steuern](docs/learned-rule-scheduling.md) ·
 [Aktueller Forschungsstand](docs/discovery-status.md) ·
 [Architektur](docs/architecture.md) ·
 [Unabhängig reproduzieren](docs/independent-reproduction.md)

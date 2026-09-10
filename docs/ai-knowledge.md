@@ -159,15 +159,27 @@ command above, or without package credentials by selecting the explicit local
 composite build. Authentication changes how Gradle resolves the plugin; it does
 not change which tasks, assertions or artifact contracts are executed.
 
-## Baseline for the public SDK extension
+## Baseline for learned-rule scheduling
 
-The trend baseline is the independently green main commit
-`ce751b60859a44019bbb0e71968f6fe499256f2a`, before the SDK extension.
-Its complete [CI run 34276563499](https://github.com/carstenartur/Regelsuche/actions/runs/34276563499)
-passed all authorities. The committed values are the unchanged metrics from
-that run's `repository-verification` artifact, SHA-256
-`feec45ac7238eb8e813edaf4faf4c6a988b2e5c68bf39cdfc9acfecb84b4af65`.
-The SDK is measured against this prior green state, with the existing trend
-and method-complexity thresholds. The `public-java-sdk` capability links its
-public entry points, contract tests and tutorials. Moving `RuleFileParser`
-changes only its source path in the existing hotspot inventory.
+PRs 1–6 were measured against independently green main
+`b0fc59be75d61e5005a924d853780225651eb334` after #951/#952. Its complete
+[CI run 34372553674](https://github.com/carstenartur/Regelsuche/actions/runs/34372553674)
+passed all authorities; the original baseline came from artifact `10113524705`
+(ZIP SHA-256 `4a61caa5d905a54d4031dc3bfef8d32caa01d55758a5a9623005678ac8856635`).
+
+For the subsequent stacked PRs, the baseline advances to the independently
+fully green preceding PR #959 commit
+`fcdd944e6be39b314fb95ab59f5c3cc78c45188d`.
+[CI run 34382028949](https://github.com/carstenartur/Regelsuche/actions/runs/34382028949)
+passed Gradle, Maven/product/Docker, isolated JMH, isolated SymPy and aggregate
+ciCheck before this baseline change. The committed values are copied unchanged
+from `current` in `build/ai-knowledge/trend.json`, artifact `10117201394`
+(ZIP SHA-256 `2754c79aab3b10eb564da5c73211bc6de10c9084687765c493bc95c9980a1864`).
+
+This preserves the incremental quality check for the eight dependent PRs:
+the predecessor passed against the original main baseline, and the new steps
+are measured against that verified predecessor. No metric from a failing
+landmark/evaluation head is used. The 10-unit cognitive-debt, 15000-token,
+concept-radius and method-hotspot limits are unchanged. No hotspot exception
+is added. The `public-java-sdk` capability continues to link its public entry
+points, contract tests and tutorials.

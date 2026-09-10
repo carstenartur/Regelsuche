@@ -21,6 +21,21 @@ class DiscoveryEngineFactoryTest {
     private final TransformationEngine emptyBase = expression -> List.of();
 
     @Test
+    void explicitMoveEngineUnifiesHypothesesAndInventoryMacrosUnderOnePolicy() {
+        var engine = factory.createMoveEngine(emptyBase,
+            DiscoveryOptions.forProfile(DiscoveryProfile.HYPOTHESIS_AND_MACRO_REUSE), macroSelector(),
+            (move, state, context) -> move.sourceKind() == de.regelsuche.search.moves.SearchMove.SourceKind.LEARNED ? 100 : 0,
+            de.regelsuche.search.moves.MoveContext.frozen(""));
+        var picker = engine.picker(de.regelsuche.search.moves.MoveState.root(SUBJECT));
+        var first = picker.next().orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals("sophie_macro", first.ruleId());
+        org.junit.jupiter.api.Assertions.assertEquals(de.regelsuche.search.moves.SearchMove.ProofStrength.EMPIRICAL, first.proofStrength());
+        assertTrue(picker.generatedMoves().stream().anyMatch(move ->
+            move.sourceKind() == de.regelsuche.search.moves.SearchMove.SourceKind.HYPOTHESIS));
+        assertTrue(first.primitiveExpansion().isEmpty(), "inventory metadata alone cannot authorize a primitive replay");
+    }
+
+    @Test
     void pureRewriteDoesNotEmitHypothesisRuleIds() {
         List<Transformation> transformations = factory.create(
             emptyBase,

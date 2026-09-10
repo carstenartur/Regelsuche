@@ -29,6 +29,9 @@ final class ExactResidualPolynomialArithmetic {
     private static final long MAX_TERM_PRODUCTS = 65_536L;
 
     private final ExpressionParser parser = new ExpressionParser();
+    private final java.util.function.LongConsumer workObserver;
+    ExactResidualPolynomialArithmetic() { this(null); }
+    ExactResidualPolynomialArithmetic(java.util.function.LongConsumer workObserver) { this.workObserver = workObserver; }
 
     ExactParsedTerm exactTerm(String expression) {
         Objects.requireNonNull(expression, "expression");
@@ -52,19 +55,23 @@ final class ExactResidualPolynomialArithmetic {
 
     Polynomial parse(String expression) {
         ExactParsedTerm parsed = exactTerm(expression);
-        return convert(parsed.expression(), parsed, new Work());
+        var work = new Work();
+        try { return convert(parsed.expression(), parsed, work); }
+        finally { if (workObserver != null) workObserver.accept(Math.addExact(work.nodes, work.terms)); }
     }
 
     private Polynomial convert(Expr node, ExactParsedTerm parsed, Work work) {
+        work.nodes++;
         if (node instanceof NumberExpr number) {
             // ExactParsedTerm validates that the only unbacked numeric node is
             // the zero synthesized by its own unary-minus parser production.
             ExactRational value = parsed.literalFor(number)
                 .map(ExactParsedTerm.LiteralOccurrence::exactValue)
                 .orElse(ExactRational.ZERO);
-            return checked(Polynomial.constant(Rational.fromExact(value)));
+            return checked(Polynomial.constant(Rational.fromExact(value)), work);
         }
         if (node instanceof VariableExpr variable) {
+            work.terms++;
             return Polynomial.variable(variable.name());
         }
         if (!(node instanceof BinaryExpr binary)) {
@@ -72,12 +79,13 @@ final class ExactResidualPolynomialArithmetic {
         }
         Polynomial left = convert(binary.left(), parsed, work);
         if (binary.operator() == BinaryOperator.POW) {
+            work.nodes++;
             return power(left, exponent(binary.right(), parsed), work);
         }
         Polynomial right = convert(binary.right(), parsed, work);
         return switch (binary.operator()) {
-            case ADD -> add(left, right, false);
-            case SUB -> add(left, right, true);
+            case ADD -> add(left, right, false, work);
+            case SUB -> add(left, right, true, work);
             case MUL -> multiply(left, right, work);
             case DIV -> divide(left, right, work);
             case POW -> throw new IllegalStateException("power handled above");
@@ -102,6 +110,7 @@ final class ExactResidualPolynomialArithmetic {
 
     private static Polynomial power(Polynomial base, int exponent, Work work) {
         Polynomial result = Polynomial.constant(Rational.ONE);
+        work.terms = Math.addExact(work.terms, result.termCount());
         Polynomial factor = base;
         int remaining = exponent;
         while (remaining != 0) {
@@ -117,10 +126,10 @@ final class ExactResidualPolynomialArithmetic {
     }
 
     private static Polynomial add(
-        Polynomial left, Polynomial right, boolean subtract
+        Polynomial left, Polynomial right, boolean subtract, Work work
     ) {
         requireCoefficientRoom(coefficientBits(left) + coefficientBits(right) + 1L);
-        return checked(subtract ? left.subtract(right) : left.add(right));
+        return checked(subtract ? left.subtract(right) : left.add(right), work);
     }
 
     private static Polynomial divide(
@@ -149,10 +158,11 @@ final class ExactResidualPolynomialArithmetic {
         long collisions = Math.min(left.termCount(), right.termCount());
         long bits = (long) coefficientBits(left) + coefficientBits(right);
         requireCoefficientRoom(collisions * (bits + 1L));
-        return checked(left.multiply(right));
+        return checked(left.multiply(right), work);
     }
 
-    private static Polynomial checked(Polynomial polynomial) {
+    private static Polynomial checked(Polynomial polynomial, Work work) {
+        work.terms = Math.addExact(work.terms, polynomial.termCount());
         if (polynomial.termCount() > MAX_TERMS
                 || polynomial.totalDegree() > MAX_DEGREE) {
             throw new IllegalArgumentException("residual polynomial size limit");
@@ -179,6 +189,8 @@ final class ExactResidualPolynomialArithmetic {
 
     private static final class Work {
         private long products;
+        private long nodes;
+        private long terms;
 
         private void consume(long count) {
             if (count > MAX_TERM_PRODUCTS - products) {

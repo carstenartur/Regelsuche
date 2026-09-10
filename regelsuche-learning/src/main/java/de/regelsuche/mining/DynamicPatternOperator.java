@@ -7,6 +7,12 @@ import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.HypothesisOperator;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
+import de.regelsuche.inventory.ReusableRule;
+import de.regelsuche.search.moves.EngineMoveProvider;
+import de.regelsuche.search.moves.MoveContext;
+import de.regelsuche.search.moves.MoveProvider;
+import de.regelsuche.search.moves.MoveState;
+import de.regelsuche.search.moves.SearchMove;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -20,7 +26,7 @@ import java.util.Optional;
  * AST rewrite rule specified entirely by a left-hand pattern and a right-hand
  * template, without requiring a hand-written Java operator class.
  */
-public final class DynamicPatternOperator implements HypothesisOperator {
+public final class DynamicPatternOperator implements HypothesisOperator, MoveProvider {
 
     public static final String RULE_ID_PREFIX = "dynamic_hypothesis_";
 
@@ -33,6 +39,7 @@ public final class DynamicPatternOperator implements HypothesisOperator {
     private final RulePatternNode leftPattern;
     private final RulePatternNode rightPattern;
     private final int maxCandidates;
+    private final ReusableRule reusableRule;
 
     private final RulePatternMatcher matcher = new RulePatternMatcher();
     private final RulePatternInstantiator instantiator = new RulePatternInstantiator();
@@ -49,6 +56,15 @@ public final class DynamicPatternOperator implements HypothesisOperator {
         RulePatternNode leftPattern,
         RulePatternNode rightPattern,
         int maxCandidates
+    ) {
+        this(ruleId, hypothesisId, hypothesisRevision, provenanceHash, leftPatternText, rightPatternText,
+            leftPattern, rightPattern, maxCandidates, null);
+    }
+
+    private DynamicPatternOperator(
+        String ruleId, String hypothesisId, String hypothesisRevision, String provenanceHash,
+        String leftPatternText, String rightPatternText, RulePatternNode leftPattern,
+        RulePatternNode rightPattern, int maxCandidates, ReusableRule reusableRule
     ) {
         if (ruleId == null || ruleId.isBlank()) {
             throw new IllegalArgumentException("ruleId must not be blank");
@@ -68,6 +84,31 @@ public final class DynamicPatternOperator implements HypothesisOperator {
         this.leftPattern = leftPattern;
         this.rightPattern = rightPattern;
         this.maxCandidates = maxCandidates < 1 ? 1 : maxCandidates;
+        this.reusableRule = reusableRule;
+    }
+
+    DynamicPatternOperator withRuleEvidence(ReusableRule rule) {
+        if (!hypothesisId.equals(rule.id())
+                || !leftPatternText.replaceAll("\\s+", "").equals(rule.leftPattern().replaceAll("\\s+", ""))
+                || !rightPatternText.replaceAll("\\s+", "").equals(rule.rightPattern().replaceAll("\\s+", ""))) {
+            throw new IllegalArgumentException("utility evidence belongs to different compiled patterns");
+        }
+        return new DynamicPatternOperator(ruleId, hypothesisId, hypothesisRevision, provenanceHash,
+            leftPatternText, rightPatternText, leftPattern, rightPattern, maxCandidates, rule);
+    }
+
+    public Optional<ReusableRule> reusableRuleEvidence() { return Optional.ofNullable(reusableRule); }
+
+    @Override public Descriptor descriptor() {
+        return new Descriptor(hypothesisId, "dynamic-pattern", reusableRule == null
+            ? SearchMove.SourceKind.HYPOTHESIS : SearchMove.SourceKind.LEARNED,
+            SearchMove.ProofStrength.EMPIRICAL, reusableRule == null ? List.of() : reusableRule.assumptions(),
+            reusableRule == null ? SearchMove.ValueEvidence.UNKNOWN : reusableRule.moveValueEvidence(), provenanceHash);
+    }
+
+    @Override public Batch candidates(MoveState state, MoveContext context) {
+        // Compilation and usefulness do not authorize this quarantined hypothesis.
+        return new EngineMoveProvider(descriptor(), this::generateCandidates, false).candidates(state, context);
     }
 
     public String ruleId() {
@@ -123,7 +164,8 @@ public final class DynamicPatternOperator implements HypothesisOperator {
             true,
             -1,
             true,
-            applicationKey
+            applicationKey,
+            reusableRule == null ? List.of() : reusableRule.assumptions()
         );
         return List.of(transformation).stream()
             .limit(maxCandidates)

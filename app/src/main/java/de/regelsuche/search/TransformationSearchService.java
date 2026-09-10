@@ -106,6 +106,17 @@ public class TransformationSearchService {
         return heuristic;
     }
 
+    /** Explicit experimental route through the same service, with independent evidence admission. */
+    public de.regelsuche.search.moves.MoveSearch.Result searchMoves(String source,
+            de.regelsuche.search.moves.ProviderTransformationEngine providers,
+            de.regelsuche.search.moves.MoveVerifier verifier, de.regelsuche.search.moves.MoveSearch.Budget budget,
+            de.regelsuche.search.moves.MoveSearch.Mode mode) {
+        return new de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy().search(
+            new de.regelsuche.search.moves.MoveSearch.Problem(source, providers.context(), providers.moveProviders(),
+                providers.policy(), verifier, state -> scorer.score(state.expression()).weightedTotal(), mode,
+                de.regelsuche.search.moves.MoveSearch.Scheduling.STAGED, budget));
+    }
+
     public void shutdown() {
         executorService.shutdown();
     }

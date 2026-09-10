@@ -163,6 +163,11 @@ public class DefaultTransformationExportService implements TransformationExportS
             writer.property("lastUsedAt", rule.lastUsedAt().toString());
         }
         writer.property("usageCount", rule.usageCount());
+        writer.property("occurrenceCount", rule.occurrenceCount());
+        writer.stringArray("supportingPathIds", rule.supportingPathIds());
+        writer.property("confidenceScore", rule.confidenceScore());
+        writer.stringArray("assumptions", rule.assumptions());
+        writer.object("utilityEvidence", rule.utilityEvidence()::writeJson);
     }
 
     private void writeCandidate(JsonWriter writer, RuleCandidate candidate) {
