@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.dev/schemas/regelsuche-learned-pattern-rule-authorization-receipt-v1.schema.json",
+  "title": "Regelsuche learned pattern rule authorization receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "authorizerId",
+    "genomeHash",
+    "geneId",
+    "repositoryRevision",
+    "authorizedAt",
+    "validUntil",
+    "evidenceBundleHash",
+    "semanticValidationHash",
+    "counterexampleSearchHash",
+    "holdoutEvaluationHash",
+    "leakageAuditHash",
+    "promotionReceiptHash",
+    "promotedRuleId",
+    "promotedRuleHash",
+    "applicabilitySchemaHash",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.learned-pattern-rule-authorization-receipt/v1"
+    },
+    "authorizerId": {
+      "const": "regelsuche.learned-pattern-rule-authorizer/v1"
+    },
+    "genomeHash": {"$ref": "#/$defs/sha256"},
+    "geneId": {"type": "string", "minLength": 1},
+    "repositoryRevision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "authorizedAt": {"type": "string", "format": "date-time"},
+    "validUntil": {"type": "string", "format": "date-time"},
+    "evidenceBundleHash": {"$ref": "#/$defs/sha256"},
+    "semanticValidationHash": {"$ref": "#/$defs/sha256"},
+    "counterexampleSearchHash": {"$ref": "#/$defs/sha256"},
+    "holdoutEvaluationHash": {"$ref": "#/$defs/sha256"},
+    "leakageAuditHash": {"$ref": "#/$defs/sha256"},
+    "promotionReceiptHash": {"$ref": "#/$defs/sha256"},
+    "promotedRuleId": {"type": "string", "minLength": 1},
+    "promotedRuleHash": {"$ref": "#/$defs/sha256"},
+    "applicabilitySchemaHash": {"$ref": "#/$defs/sha256"},
+    "contentHash": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LearnedPatternAuthorizationJson.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">LearnedPatternAuthorizationJson.java</span></div><h1>LearnedPatternAuthorizationJson.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import java.util.Map;
+
+/** Shared strict canonical JSON support for learned-pattern authorization artifacts. */
+final class LearnedPatternAuthorizationJson {
+<span class="fc" id="L14">    private static final ObjectMapper JSON = new ObjectMapper(</span>
+<span class="fc" id="L15">        JsonFactory.builder()</span>
+<span class="fc" id="L16">            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L17">            .build())</span>
+<span class="fc" id="L18">        .findAndRegisterModules()</span>
+<span class="fc" id="L19">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
+<span class="fc" id="L20">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)</span>
+<span class="fc" id="L21">        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)</span>
+<span class="fc" id="L22">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
+<span class="fc" id="L23">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+
+    private LearnedPatternAuthorizationJson() {
+    }
+
+    static &lt;T&gt; T read(String json, Class&lt;T&gt; type, String name) {
+<span class="pc bpc" id="L29" title="2 of 4 branches missed.">        if (json == null || json.isBlank()) {</span>
+<span class="nc" id="L30">            throw new IllegalArgumentException(name + &quot; JSON must not be blank&quot;);</span>
+        }
+        try {
+<span class="fc" id="L33">            T value = JSON.readValue(json, type);</span>
+<span class="fc" id="L34">            String canonical = write(value);</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">            if (!canonical.equals(json)) {</span>
+<span class="nc" id="L36">                throw new IllegalArgumentException(</span>
+                    name + &quot; JSON is not in canonical encoding&quot;);
+            }
+<span class="fc" id="L39">            return value;</span>
+<span class="fc" id="L40">        } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L41">            throw new IllegalArgumentException(&quot;invalid &quot; + name + &quot; JSON&quot;, exception);</span>
+        }
+    }
+
+    static String write(Object value) {
+        try {
+<span class="fc" id="L47">            return JSON.writeValueAsString(value) + &quot;\n&quot;;</span>
+<span class="nc" id="L48">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L49">            throw new IllegalStateException(</span>
+                &quot;cannot serialize learned authorization artifact&quot;, exception);
+        }
+    }
+
+    static String hash(Map&lt;String, ?&gt; payload) {
+<span class="fc" id="L55">        return EvolutionGenome.hash(write(payload));</span>
+    }
+
+    static String requireText(String value, String field) {
+<span class="pc bpc" id="L59" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L60">            throw new IllegalArgumentException(field + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L62">        return value;</span>
+    }
+
+    static String requireRevision(String value, String field) {
+<span class="pc bpc" id="L66" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;[0-9a-f]{40}&quot;)) {</span>
+<span class="nc" id="L67">            throw new IllegalArgumentException(</span>
+                field + &quot; must be a lowercase commit SHA&quot;);
+        }
+<span class="fc" id="L70">        return value;</span>
+    }
+
+    static void requireHash(String value, String field) {
+<span class="fc" id="L74">        EvolutionGenome.requireSha256(value, field);</span>
+<span class="fc" id="L75">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

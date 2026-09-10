@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LearnedPatternAuthorizationReceipt.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">LearnedPatternAuthorizationReceipt.java</span></div><h1>LearnedPatternAuthorizationReceipt.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import static de.regelsuche.evolution.LearnedPatternAuthorizationJson.hash;
+import static de.regelsuche.evolution.LearnedPatternAuthorizationJson.requireHash;
+import static de.regelsuche.evolution.LearnedPatternAuthorizationJson.requireRevision;
+import static de.regelsuche.evolution.LearnedPatternAuthorizationJson.requireText;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+
+/** Content-addressed production authorization receipt for one learned pattern rule. */
+public record LearnedPatternAuthorizationReceipt(
+    String schema,
+    String authorizerId,
+    String genomeHash,
+    String geneId,
+    String repositoryRevision,
+    Instant authorizedAt,
+    Instant validUntil,
+    String evidenceBundleHash,
+    String semanticValidationHash,
+    String counterexampleSearchHash,
+    String holdoutEvaluationHash,
+    String leakageAuditHash,
+    String promotionReceiptHash,
+    String promotedRuleId,
+    String promotedRuleHash,
+    String applicabilitySchemaHash,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.learned-pattern-rule-authorization-receipt/v1&quot;;
+    public static final String AUTHORIZER_ID =
+        &quot;regelsuche.learned-pattern-rule-authorizer/v1&quot;;
+
+<span class="fc" id="L39">    public LearnedPatternAuthorizationReceipt {</span>
+<span class="pc bpc" id="L40" title="2 of 4 branches missed.">        if (!SCHEMA.equals(schema) || !AUTHORIZER_ID.equals(authorizerId)) {</span>
+<span class="nc" id="L41">            throw new IllegalArgumentException(</span>
+                &quot;learned pattern authorization receipt identity is invalid&quot;);
+        }
+<span class="fc" id="L44">        requireHash(genomeHash, &quot;genomeHash&quot;);</span>
+<span class="fc" id="L45">        requireText(geneId, &quot;geneId&quot;);</span>
+<span class="fc" id="L46">        requireRevision(repositoryRevision, &quot;repositoryRevision&quot;);</span>
+<span class="fc" id="L47">        authorizedAt = Objects.requireNonNull(authorizedAt, &quot;authorizedAt&quot;);</span>
+<span class="fc" id="L48">        validUntil = Objects.requireNonNull(validUntil, &quot;validUntil&quot;);</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (!authorizedAt.isBefore(validUntil)) {</span>
+<span class="nc" id="L50">            throw new IllegalArgumentException(</span>
+                &quot;authorization must expire after authorizedAt&quot;);
+        }
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        for (String value : List.of(</span>
+                evidenceBundleHash,
+                semanticValidationHash,
+                counterexampleSearchHash,
+                holdoutEvaluationHash,
+                leakageAuditHash,
+                promotionReceiptHash,
+                promotedRuleHash,
+                applicabilitySchemaHash,
+                contentHash)) {
+<span class="fc" id="L63">            requireHash(value, &quot;authorization hash&quot;);</span>
+<span class="fc" id="L64">        }</span>
+<span class="fc" id="L65">        requireText(promotedRuleId, &quot;promotedRuleId&quot;);</span>
+<span class="fc" id="L66">        String expected = hash(payload(</span>
+            schema,
+            authorizerId,
+            genomeHash,
+            geneId,
+            repositoryRevision,
+            authorizedAt,
+            validUntil,
+            evidenceBundleHash,
+            semanticValidationHash,
+            counterexampleSearchHash,
+            holdoutEvaluationHash,
+            leakageAuditHash,
+            promotionReceiptHash,
+            promotedRuleId,
+            promotedRuleHash,
+            applicabilitySchemaHash));
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L84">            throw new IllegalArgumentException(</span>
+                &quot;authorization receipt contentHash mismatch&quot;);
+        }
+<span class="fc" id="L87">    }</span>
+
+    static LearnedPatternAuthorizationReceipt create(
+        EvolutionGenome genome,
+        String geneId,
+        String repositoryRevision,
+        Instant authorizedAt,
+        LearnedPatternAuthorizationBundle bundle,
+        EvolutionSplitManifest split,
+        EvolutionValidationSelection validation,
+        EvolutionFinalTestEvaluation holdout,
+        LearnedPatternCounterexampleEvidence counterexample,
+        LearnedPatternRulePromoter.Promotion promotion,
+        String promotedRuleHash
+    ) {
+<span class="fc" id="L102">        Objects.requireNonNull(genome, &quot;genome&quot;);</span>
+<span class="fc" id="L103">        Objects.requireNonNull(bundle, &quot;bundle&quot;);</span>
+<span class="fc" id="L104">        Objects.requireNonNull(split, &quot;split&quot;);</span>
+<span class="fc" id="L105">        Objects.requireNonNull(validation, &quot;validation&quot;);</span>
+<span class="fc" id="L106">        Objects.requireNonNull(holdout, &quot;holdout&quot;);</span>
+<span class="fc" id="L107">        Objects.requireNonNull(counterexample, &quot;counterexample&quot;);</span>
+<span class="fc" id="L108">        Objects.requireNonNull(promotion, &quot;promotion&quot;);</span>
+<span class="fc" id="L109">        requireHash(promotedRuleHash, &quot;promotedRuleHash&quot;);</span>
+<span class="fc" id="L110">        String applicabilityHash = promotion.applicabilitySchema().contentHash();</span>
+<span class="fc" id="L111">        String contentHash = hash(payload(</span>
+            SCHEMA,
+            AUTHORIZER_ID,
+<span class="fc" id="L114">            genome.contentHash(),</span>
+            geneId,
+            repositoryRevision,
+            authorizedAt,
+<span class="fc" id="L118">            bundle.expiresAt(),</span>
+<span class="fc" id="L119">            bundle.contentHash(),</span>
+<span class="fc" id="L120">            validation.contentHash(),</span>
+<span class="fc" id="L121">            counterexample.contentHash(),</span>
+<span class="fc" id="L122">            holdout.contentHash(),</span>
+<span class="fc" id="L123">            split.contentHash(),</span>
+<span class="fc" id="L124">            promotion.receipt().contentHash(),</span>
+<span class="fc" id="L125">            promotion.rule().id(),</span>
+            promotedRuleHash,
+            applicabilityHash));
+<span class="fc" id="L128">        return new LearnedPatternAuthorizationReceipt(</span>
+            SCHEMA,
+            AUTHORIZER_ID,
+<span class="fc" id="L131">            genome.contentHash(),</span>
+            geneId,
+            repositoryRevision,
+            authorizedAt,
+<span class="fc" id="L135">            bundle.expiresAt(),</span>
+<span class="fc" id="L136">            bundle.contentHash(),</span>
+<span class="fc" id="L137">            validation.contentHash(),</span>
+<span class="fc" id="L138">            counterexample.contentHash(),</span>
+<span class="fc" id="L139">            holdout.contentHash(),</span>
+<span class="fc" id="L140">            split.contentHash(),</span>
+<span class="fc" id="L141">            promotion.receipt().contentHash(),</span>
+<span class="fc" id="L142">            promotion.rule().id(),</span>
+            promotedRuleHash,
+            applicabilityHash,
+            contentHash);
+    }
+
+    public static LearnedPatternAuthorizationReceipt fromCanonicalJson(
+        String json
+    ) {
+<span class="fc" id="L151">        return LearnedPatternAuthorizationJson.read(</span>
+            json, LearnedPatternAuthorizationReceipt.class,
+            &quot;authorization receipt&quot;);
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L157">        return LearnedPatternAuthorizationJson.write(this);</span>
+    }
+
+    public void requireUsableAt(
+        Instant asOf,
+        String expectedRepositoryRevision,
+        String expectedPromotedRuleHash
+    ) {
+<span class="fc" id="L165">        Objects.requireNonNull(asOf, &quot;asOf&quot;);</span>
+<span class="pc bpc" id="L166" title="1 of 4 branches missed.">        if (asOf.isBefore(authorizedAt) || !asOf.isBefore(validUntil)) {</span>
+<span class="fc" id="L167">            throw new IllegalArgumentException(</span>
+                &quot;learned rule authorization is not valid at &quot; + asOf);
+        }
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (!repositoryRevision.equals(expectedRepositoryRevision)</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">                || !promotedRuleHash.equals(expectedPromotedRuleHash)) {</span>
+<span class="fc" id="L172">            throw new IllegalArgumentException(</span>
+                &quot;learned rule authorization identity mismatch&quot;);
+        }
+<span class="fc" id="L175">    }</span>
+
+    private static Map&lt;String, Object&gt; payload(
+        String schema,
+        String authorizerId,
+        String genomeHash,
+        String geneId,
+        String repositoryRevision,
+        Instant authorizedAt,
+        Instant validUntil,
+        String evidenceBundleHash,
+        String semanticValidationHash,
+        String counterexampleSearchHash,
+        String holdoutEvaluationHash,
+        String leakageAuditHash,
+        String promotionReceiptHash,
+        String promotedRuleId,
+        String promotedRuleHash,
+        String applicabilitySchemaHash
+    ) {
+<span class="fc" id="L195">        Map&lt;String, Object&gt; value = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L196">        value.put(&quot;applicabilitySchemaHash&quot;, applicabilitySchemaHash);</span>
+<span class="fc" id="L197">        value.put(&quot;authorizedAt&quot;, authorizedAt);</span>
+<span class="fc" id="L198">        value.put(&quot;authorizerId&quot;, authorizerId);</span>
+<span class="fc" id="L199">        value.put(&quot;counterexampleSearchHash&quot;, counterexampleSearchHash);</span>
+<span class="fc" id="L200">        value.put(&quot;evidenceBundleHash&quot;, evidenceBundleHash);</span>
+<span class="fc" id="L201">        value.put(&quot;geneId&quot;, geneId);</span>
+<span class="fc" id="L202">        value.put(&quot;genomeHash&quot;, genomeHash);</span>
+<span class="fc" id="L203">        value.put(&quot;holdoutEvaluationHash&quot;, holdoutEvaluationHash);</span>
+<span class="fc" id="L204">        value.put(&quot;leakageAuditHash&quot;, leakageAuditHash);</span>
+<span class="fc" id="L205">        value.put(&quot;promotedRuleHash&quot;, promotedRuleHash);</span>
+<span class="fc" id="L206">        value.put(&quot;promotedRuleId&quot;, promotedRuleId);</span>
+<span class="fc" id="L207">        value.put(&quot;promotionReceiptHash&quot;, promotionReceiptHash);</span>
+<span class="fc" id="L208">        value.put(&quot;repositoryRevision&quot;, repositoryRevision);</span>
+<span class="fc" id="L209">        value.put(&quot;schema&quot;, schema);</span>
+<span class="fc" id="L210">        value.put(&quot;semanticValidationHash&quot;, semanticValidationHash);</span>
+<span class="fc" id="L211">        value.put(&quot;validUntil&quot;, validUntil);</span>
+<span class="fc" id="L212">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

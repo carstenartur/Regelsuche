@@ -1,17 +1,19 @@
 # Promotion exakt bewiesener gelernter Pattern-Regeln
 
-**Implementierungsstand: 23. August 2026**
+**Implementierungsstand: 10. September 2026**
 
-Diese Seite beschreibt den ersten realen Promotionsadapter zwischen der
-evolutionären Kandidatenschicht und dem kuratierten Regelinventar. Der Adapter
-ist absichtlich eng. Er zeigt, wie eine gelernte Pattern-Regel nach einem
-exakten Identitätsnachweis dieselbe Vorbereitungs- und Replay-Infrastruktur wie
-eine handgeschriebene Regel verwenden kann.
+Diese Seite beschreibt den mathematischen Promotionsadapter zwischen der
+evolutionären Kandidatenschicht und einem exakt bewiesenen Pattern-Regelobjekt.
+Der Adapter ist absichtlich eng. Er zeigt, wie eine gelernte Pattern-Regel nach
+einem exakten Identitätsnachweis dieselbe Vorbereitungs- und Replay-Infrastruktur
+wie eine handgeschriebene Regel verwenden kann.
 
-Er autorisiert **keinen** allgemeinen oder öffentlichen Promotionsclaim. Der
-maschinengebundene Capability-Status `PROMOTION` bleibt `NOT_EVALUATED`, bis ein
-realer Produktionskandidat mit vollständig verifizierten Evidence-Artefakten
-und dem vorgesehenen Release-/Qualification-Lifecycle promoviert wurde.
+Der nackte `LearnedPatternRulePromoter` ist dabei **nicht** die vollständige
+Produktionszulassung. Die darüberliegende
+`LearnedPatternRuleAuthorizationService` lädt und verifiziert die gebundene
+VALIDATION-, Counterexample-, FINAL-TEST- und Leakage-Evidenz und erzeugt ein
+separates Authorization-Receipt. Siehe
+[Learned pattern rule authorization](learned-pattern-rule-authorization.md).
 
 ## Ausführungsgrenze
 
@@ -24,8 +26,8 @@ EvolutionGenome
   -> isEquivalencePreservingByConstruction() == false
 ```
 
-Der neue `LearnedPatternRulePromoter` erzeugt eine neue Regelidentität nur über
-den folgenden, fehlersicher sperrenden Pfad:
+Der `LearnedPatternRulePromoter` erzeugt eine neue Regelidentität nur über den
+folgenden, fehlersicher sperrenden mathematischen Pfad:
 
 ```text
 akzeptiertes TRAIN-Genome und ausgewähltes RewriteGene
@@ -36,6 +38,16 @@ akzeptiertes TRAIN-Genome und ausgewähltes RewriteGene
   -> neuer PatternRewriteRule mit eigener Herkunft
   -> RewriteApplicabilitySchema
   -> PromotionReceipt
+```
+
+Für eine qualifizierte Zulassung folgt darüber:
+
+```text
+native Split-/VALIDATION-/FINAL-TEST-Artefakte
++ deterministisch replayte Counterexample-Evidence
++ Zeit- und Repository-Bindung
+  -> LearnedPatternRuleAuthorizationService
+  -> LearnedPatternAuthorizationReceipt
 ```
 
 Die promovierte Regel ist ein neuer, content-addressed Ausführungsgegenstand.
@@ -119,14 +131,23 @@ Flagship-Experiment ausgewählt wurde.
 - Leakage-Audit;
 - exakte Repository-Revision.
 
-Der aktuelle v1-Promoter **bindet diese SHA-256-Identitäten, lädt oder
-verifiziert die referenzierten Artefakte aber nicht selbst**. Die semantische
-Prüfung dieser Evidence-Roots bleibt Aufgabe des übergeordneten Qualification-
-und Release-Lifecycles. Eine frei erfundene, formal gültige Hashzeichenfolge ist
-also noch keine ausreichende Promotionsevidence.
+Der v1-Promoter bindet diese SHA-256-Identitäten, lädt oder verifiziert die
+referenzierten Artefakte aber bewusst nicht selbst. Seine Aufgabe bleibt der
+mathematische Promotionsnachweis. Eine frei erfundene, formal gültige
+Hashzeichenfolge ist deshalb **keine** ausreichende Produktions-Evidenz.
 
-Das Receipt
-`regelsuche.learned-pattern-rule-promotion-receipt/v1` bindet zusätzlich:
+Die Produktionsgrenze ist nun
+`LearnedPatternRuleAuthorizationService`. Sie rekonstruiert die vorhandenen
+`EvolutionSplitManifest`-, `EvolutionValidationSelection`- und
+`EvolutionFinalTestEvaluation`-Artefakte, prüft deren Cross-Bindings und
+Fallpartitionen, replayt die gene-spezifische Counterexample-Evidence mit dem
+festen deterministischen Budget und ruft erst danach den exakten Promoter auf.
+Ein gespeichertes Authorization-Receipt wird vor späterer Nutzung wiederum
+durch `verifyAuthorization(...)` gegen sämtliche Root-Artefakte und die exakte
+Promotion neu abgespielt.
+
+Das mathematische Promotion-Receipt
+`regelsuche.learned-pattern-rule-promotion-receipt/v1` bindet:
 
 - Genome- und Alpha-Strukturhash;
 - Gene-ID und Preflight-Hash;
@@ -135,13 +156,15 @@ Das Receipt
 - neue Regel-ID und Regel-Content-Hash;
 - Applicability-Schema-Hash.
 
-Der strukturelle JSON-Vertrag steht unter
-[`regelsuche-learned-pattern-rule-promotion-receipt-v1.schema.json`](schemas/regelsuche-learned-pattern-rule-promotion-receipt-v1.schema.json).
-Schema-Validität allein ersetzt keine semantische Receipt-Prüfung.
+Das darüberliegende Authorization-Receipt bindet zusätzlich die verifizierten
+Qualification-Artefakte und deren Gültigkeitsfenster. Sein struktureller Vertrag
+steht unter
+[`regelsuche-learned-pattern-rule-authorization-receipt-v1.schema.json`](schemas/regelsuche-learned-pattern-rule-authorization-receipt-v1.schema.json).
+Schema-Validität allein ersetzt auch dort keine semantische Receipt-Prüfung.
 
 ## Bewusst ausgeschlossene Fälle
 
-Promotion v1 lehnt ab:
+Promotion und Authorization v1 lehnen ab beziehungsweise autorisieren nicht:
 
 - nicht äquivalente Pattern;
 - Funktionen, Division und andere Ausdrücke außerhalb des exakten Fragments;
@@ -149,8 +172,10 @@ Promotion v1 lehnt ab:
 - über Budget liegende Normalformen;
 - Regeln mit Annahmentemplates;
 - Genome mit Preflight-Blockern;
-- komplette `RewriteProgram`s mit `Choice`, `Sequence`, `Repeat` oder mehreren
-  Eintrittspfaden.
+- fehlende, inkonsistente, abgelaufene oder nicht replaybare Qualification-
+  Evidence;
+- komplette `RewriteProgram`s mit `Choice`, `Sequence`, `Repeat`, Guards,
+  Pruning oder mehreren Eintrittspfaden.
 
 Bedingte gelernte Regeln benötigen einen Nachweis, der Annahmen, Definitions-
 bereiche und Discharge-Evidence explizit bindet. Gelernte `RewriteProgram`s
@@ -163,7 +188,9 @@ Die fokussierten Tests laufen mit:
 
 ```bash
 ./gradlew :regelsuche-learning:test \
-  --tests de.regelsuche.evolution.LearnedPatternRulePromoterTest
+  --tests de.regelsuche.evolution.LearnedPatternRulePromoterTest \
+  --tests de.regelsuche.evolution.LearnedPatternRuleAuthorizationServiceTest \
+  --tests de.regelsuche.evolution.LearnedPatternStoredAuthorizationReplayTest
 ```
 
 Der vollständige Repositoryvertrag bleibt:
@@ -174,6 +201,7 @@ Der vollständige Repositoryvertrag bleibt:
 
 ## Siehe auch
 
+- [Learned pattern rule authorization](learned-pattern-rule-authorization.md)
 - [Evolutionary Search](evolutionary-search.md)
 - [Sicherer Regelvorbereitungskoordinator](safe-rule-preparation-coordinator.md)
 - [Rule-directed Preparation Planning](rule-directed-preparation-planning.md)

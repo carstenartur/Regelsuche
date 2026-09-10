@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LearnedPatternCounterexampleEvidence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">LearnedPatternCounterexampleEvidence.java</span></div><h1>LearnedPatternCounterexampleEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import static de.regelsuche.evolution.LearnedPatternAuthorizationJson.hash;
+import static de.regelsuche.evolution.LearnedPatternAuthorizationJson.requireHash;
+import static de.regelsuche.evolution.LearnedPatternAuthorizationJson.requireRevision;
+import static de.regelsuche.evolution.LearnedPatternAuthorizationJson.requireText;
+
+import de.regelsuche.validation.CounterexampleSearchService;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+
+/** Content-addressed, deterministically replayable counterexample-search evidence. */
+public record LearnedPatternCounterexampleEvidence(
+    String schema,
+    String engineId,
+    String genomeHash,
+    String geneId,
+    String repositoryRevision,
+    String sourcePattern,
+    String targetPattern,
+    String leftExpression,
+    String rightExpression,
+    BudgetEvidence budget,
+    CounterexampleSearchService.Status status,
+    List&lt;String&gt; attemptedSources,
+    List&lt;String&gt; inferredAssumptions,
+    String explanation,
+    String resultHash,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.learned-pattern-rule-counterexample-evidence/v1&quot;;
+    public static final String ENGINE_ID =
+        &quot;regelsuche.deterministic-counterexample-search/pattern-authorization-v1&quot;;
+
+<span class="fc" id="L38">    public LearnedPatternCounterexampleEvidence {</span>
+<span class="pc bpc" id="L39" title="2 of 4 branches missed.">        if (!SCHEMA.equals(schema) || !ENGINE_ID.equals(engineId)) {</span>
+<span class="nc" id="L40">            throw new IllegalArgumentException(</span>
+                &quot;unsupported counterexample evidence identity&quot;);
+        }
+<span class="fc" id="L43">        requireHash(genomeHash, &quot;genomeHash&quot;);</span>
+<span class="fc" id="L44">        requireText(geneId, &quot;geneId&quot;);</span>
+<span class="fc" id="L45">        requireRevision(repositoryRevision, &quot;repositoryRevision&quot;);</span>
+<span class="fc" id="L46">        requireText(sourcePattern, &quot;sourcePattern&quot;);</span>
+<span class="fc" id="L47">        requireText(targetPattern, &quot;targetPattern&quot;);</span>
+<span class="fc" id="L48">        requireText(leftExpression, &quot;leftExpression&quot;);</span>
+<span class="fc" id="L49">        requireText(rightExpression, &quot;rightExpression&quot;);</span>
+<span class="fc" id="L50">        budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L51">        status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L52">        attemptedSources = List.copyOf(</span>
+<span class="fc" id="L53">            Objects.requireNonNull(attemptedSources, &quot;attemptedSources&quot;));</span>
+<span class="fc" id="L54">        inferredAssumptions = List.copyOf(</span>
+<span class="fc" id="L55">            Objects.requireNonNull(inferredAssumptions, &quot;inferredAssumptions&quot;));</span>
+<span class="fc" id="L56">        requireText(explanation, &quot;explanation&quot;);</span>
+<span class="fc" id="L57">        requireHash(resultHash, &quot;resultHash&quot;);</span>
+<span class="fc" id="L58">        requireHash(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L59">        String expected = hash(payload(</span>
+            schema,
+            engineId,
+            genomeHash,
+            geneId,
+            repositoryRevision,
+            sourcePattern,
+            targetPattern,
+            leftExpression,
+            rightExpression,
+            budget,
+            status,
+            attemptedSources,
+            inferredAssumptions,
+            explanation,
+            resultHash));
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L76">            throw new IllegalArgumentException(</span>
+                &quot;counterexample evidence contentHash mismatch&quot;);
+        }
+<span class="fc" id="L79">    }</span>
+
+    static LearnedPatternCounterexampleEvidence create(
+        EvolutionGenome genome,
+        EvolutionGenome.RewriteGene gene,
+        String repositoryRevision,
+        String sourcePattern,
+        String targetPattern,
+        String leftExpression,
+        String rightExpression,
+        CounterexampleSearchService.CounterexampleBudget budget,
+        CounterexampleSearchService.CounterexampleSearchResult result
+    ) {
+<span class="fc" id="L92">        Objects.requireNonNull(genome, &quot;genome&quot;);</span>
+<span class="fc" id="L93">        Objects.requireNonNull(gene, &quot;gene&quot;);</span>
+<span class="fc" id="L94">        requireRevision(repositoryRevision, &quot;repositoryRevision&quot;);</span>
+<span class="fc" id="L95">        Objects.requireNonNull(result, &quot;result&quot;);</span>
+<span class="fc" id="L96">        BudgetEvidence retainedBudget = BudgetEvidence.fromBudget(budget);</span>
+<span class="fc" id="L97">        String retainedResultHash = resultHash(result);</span>
+<span class="fc" id="L98">        String contentHash = hash(payload(</span>
+            SCHEMA,
+            ENGINE_ID,
+<span class="fc" id="L101">            genome.contentHash(),</span>
+<span class="fc" id="L102">            gene.geneId(),</span>
+            repositoryRevision,
+            sourcePattern,
+            targetPattern,
+            leftExpression,
+            rightExpression,
+            retainedBudget,
+<span class="fc" id="L109">            result.status(),</span>
+<span class="fc" id="L110">            result.attemptedSources(),</span>
+<span class="fc" id="L111">            result.inferredAssumptions(),</span>
+<span class="fc" id="L112">            result.explanation(),</span>
+            retainedResultHash));
+<span class="fc" id="L114">        return new LearnedPatternCounterexampleEvidence(</span>
+            SCHEMA,
+            ENGINE_ID,
+<span class="fc" id="L117">            genome.contentHash(),</span>
+<span class="fc" id="L118">            gene.geneId(),</span>
+            repositoryRevision,
+            sourcePattern,
+            targetPattern,
+            leftExpression,
+            rightExpression,
+            retainedBudget,
+<span class="fc" id="L125">            result.status(),</span>
+<span class="fc" id="L126">            result.attemptedSources(),</span>
+<span class="fc" id="L127">            result.inferredAssumptions(),</span>
+<span class="fc" id="L128">            result.explanation(),</span>
+            retainedResultHash,
+            contentHash);
+    }
+
+    public static LearnedPatternCounterexampleEvidence fromCanonicalJson(
+        String json
+    ) {
+<span class="fc" id="L136">        return LearnedPatternAuthorizationJson.read(</span>
+            json, LearnedPatternCounterexampleEvidence.class,
+            &quot;counterexample evidence&quot;);
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L142">        return LearnedPatternAuthorizationJson.write(this);</span>
+    }
+
+    void requireSubject(
+        String expectedGenomeHash,
+        String expectedGeneId,
+        String expectedRepositoryRevision,
+        String expectedSourcePattern,
+        String expectedTargetPattern,
+        String expectedLeftExpression,
+        String expectedRightExpression
+    ) {
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (!genomeHash.equals(expectedGenomeHash)</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">                || !geneId.equals(expectedGeneId)</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">                || !repositoryRevision.equals(expectedRepositoryRevision)</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">                || !sourcePattern.equals(expectedSourcePattern)</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">                || !targetPattern.equals(expectedTargetPattern)</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">                || !leftExpression.equals(expectedLeftExpression)</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">                || !rightExpression.equals(expectedRightExpression)) {</span>
+<span class="nc" id="L161">            throw new IllegalArgumentException(</span>
+                &quot;counterexample evidence subject/revision mismatch&quot;);
+        }
+<span class="fc" id="L164">    }</span>
+
+    static String resultHash(
+        CounterexampleSearchService.CounterexampleSearchResult result
+    ) {
+<span class="fc" id="L169">        StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L170">        append(material, result.status().name());</span>
+<span class="fc" id="L171">        appendList(material, result.inferredAssumptions());</span>
+<span class="fc" id="L172">        appendList(material, result.attemptedSources());</span>
+<span class="fc" id="L173">        append(material, result.explanation());</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (result.counterexample().isPresent()) {</span>
+<span class="nc" id="L175">            CounterexampleSearchService.Counterexample counterexample =</span>
+<span class="nc" id="L176">                result.counterexample().orElseThrow();</span>
+<span class="nc" id="L177">            append(material, &quot;COUNTEREXAMPLE&quot;);</span>
+<span class="nc" id="L178">            appendList(material, counterexample.assignments());</span>
+<span class="nc" id="L179">            append(material, counterexample.leftValue());</span>
+<span class="nc" id="L180">            append(material, counterexample.rightValue());</span>
+<span class="nc" id="L181">        } else {</span>
+<span class="fc" id="L182">            append(material, &quot;NO_COUNTEREXAMPLE&quot;);</span>
+        }
+        for (CounterexampleSearchService.TypedAssumption assumption
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">                : result.typedAssumptions()) {</span>
+<span class="nc" id="L186">            append(material, assumption.kind().name());</span>
+<span class="nc" id="L187">            append(material, assumption.normalizedPredicate());</span>
+<span class="nc" id="L188">            append(material, assumption.subjectExpression());</span>
+<span class="nc" id="L189">            appendList(material, assumption.affectedVariables());</span>
+<span class="nc" id="L190">            appendList(material, assumption.evidenceSources());</span>
+            for (CounterexampleSearchService.ProofEncoding proof
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                    : assumption.proofEncodings()) {</span>
+<span class="nc" id="L193">                append(material, proof.dialect());</span>
+<span class="nc" id="L194">                append(material, proof.expression());</span>
+<span class="nc" id="L195">            }</span>
+<span class="nc" id="L196">            append(material, assumption.classification().name());</span>
+<span class="nc" id="L197">        }</span>
+<span class="fc" id="L198">        return EvolutionGenome.hash(material.toString());</span>
+    }
+
+    private static Map&lt;String, Object&gt; payload(
+        String schema,
+        String engineId,
+        String genomeHash,
+        String geneId,
+        String repositoryRevision,
+        String sourcePattern,
+        String targetPattern,
+        String leftExpression,
+        String rightExpression,
+        BudgetEvidence budget,
+        CounterexampleSearchService.Status status,
+        List&lt;String&gt; attemptedSources,
+        List&lt;String&gt; inferredAssumptions,
+        String explanation,
+        String resultHash
+    ) {
+<span class="fc" id="L218">        Map&lt;String, Object&gt; value = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L219">        value.put(&quot;attemptedSources&quot;, attemptedSources);</span>
+<span class="fc" id="L220">        value.put(&quot;budget&quot;, budget);</span>
+<span class="fc" id="L221">        value.put(&quot;engineId&quot;, engineId);</span>
+<span class="fc" id="L222">        value.put(&quot;explanation&quot;, explanation);</span>
+<span class="fc" id="L223">        value.put(&quot;geneId&quot;, geneId);</span>
+<span class="fc" id="L224">        value.put(&quot;genomeHash&quot;, genomeHash);</span>
+<span class="fc" id="L225">        value.put(&quot;inferredAssumptions&quot;, inferredAssumptions);</span>
+<span class="fc" id="L226">        value.put(&quot;leftExpression&quot;, leftExpression);</span>
+<span class="fc" id="L227">        value.put(&quot;repositoryRevision&quot;, repositoryRevision);</span>
+<span class="fc" id="L228">        value.put(&quot;resultHash&quot;, resultHash);</span>
+<span class="fc" id="L229">        value.put(&quot;rightExpression&quot;, rightExpression);</span>
+<span class="fc" id="L230">        value.put(&quot;schema&quot;, schema);</span>
+<span class="fc" id="L231">        value.put(&quot;sourcePattern&quot;, sourcePattern);</span>
+<span class="fc" id="L232">        value.put(&quot;status&quot;, status);</span>
+<span class="fc" id="L233">        value.put(&quot;targetPattern&quot;, targetPattern);</span>
+<span class="fc" id="L234">        return value;</span>
+    }
+
+    private static void appendList(StringBuilder target, List&lt;String&gt; values) {
+<span class="fc" id="L238">        append(target, Integer.toString(values.size()));</span>
+<span class="fc" id="L239">        values.forEach(value -&gt; append(target, value));</span>
+<span class="fc" id="L240">    }</span>
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L243">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L244">    }</span>
+
+    /** Complete counterexample-search budget retained by the evidence. */
+    public record BudgetEvidence(
+        int numericRandomSamples,
+        boolean includeEdgeCases,
+        boolean includeMatrixAssignments,
+        long randomSeed,
+        boolean includeComplexAssignments,
+        boolean includeRationalAssignments,
+        int maxMatrixDimension,
+        long timeoutMillis
+    ) {
+<span class="fc" id="L257">        public BudgetEvidence {</span>
+            // Validate constructor parameters directly. Record fields are assigned
+            // only after the compact-constructor body has completed.
+<span class="fc" id="L260">            new CounterexampleSearchService.CounterexampleBudget(</span>
+                numericRandomSamples,
+                includeEdgeCases,
+                includeMatrixAssignments,
+                randomSeed,
+                includeComplexAssignments,
+                includeRationalAssignments,
+                maxMatrixDimension,
+                timeoutMillis);
+<span class="fc" id="L269">        }</span>
+
+        static BudgetEvidence fromBudget(
+            CounterexampleSearchService.CounterexampleBudget budget
+        ) {
+<span class="fc" id="L274">            Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L275">            return new BudgetEvidence(</span>
+<span class="fc" id="L276">                budget.numericRandomSamples(),</span>
+<span class="fc" id="L277">                budget.includeEdgeCases(),</span>
+<span class="fc" id="L278">                budget.includeMatrixAssignments(),</span>
+<span class="fc" id="L279">                budget.randomSeed(),</span>
+<span class="fc" id="L280">                budget.includeComplexAssignments(),</span>
+<span class="fc" id="L281">                budget.includeRationalAssignments(),</span>
+<span class="fc" id="L282">                budget.maxMatrixDimension(),</span>
+<span class="fc" id="L283">                budget.timeoutMillis());</span>
+        }
+
+        CounterexampleSearchService.CounterexampleBudget toBudget() {
+<span class="fc" id="L287">            return new CounterexampleSearchService.CounterexampleBudget(</span>
+                numericRandomSamples,
+                includeEdgeCases,
+                includeMatrixAssignments,
+                randomSeed,
+                includeComplexAssignments,
+                includeRationalAssignments,
+                maxMatrixDimension,
+                timeoutMillis);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

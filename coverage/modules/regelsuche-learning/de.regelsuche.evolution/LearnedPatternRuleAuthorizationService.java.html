@@ -1,0 +1,589 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LearnedPatternRuleAuthorizationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">LearnedPatternRuleAuthorizationService.java</span></div><h1>LearnedPatternRuleAuthorizationService.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.knowledge.RuleInventoryFingerprint;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.validation.CounterexampleSearchService;
+import de.regelsuche.validation.DeterministicCounterexampleSearchService;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+
+/**
+ * Fail-closed production qualification boundary for an exactly proved learned
+ * pattern rule.
+ *
+ * &lt;p&gt;The service orchestrates existing native evidence models rather than
+ * defining a parallel validation system: split/leakage, VALIDATION selection
+ * and FINAL TEST are reconstructed with their existing codecs. Counterexample
+ * search is replayed deterministically. Only after those checks pass does the
+ * existing exact {@link LearnedPatternRulePromoter} run.&lt;/p&gt;
+ *
+ * &lt;p&gt;This class deliberately does not authorize {@code RewriteProgram}; program
+ * semantics require a separate sequence/choice/repeat/guard/pruning replay
+ * contract under issue #745.&lt;/p&gt;
+ */
+public final class LearnedPatternRuleAuthorizationService {
+    public static final String BUNDLE_SCHEMA =
+        LearnedPatternAuthorizationBundle.SCHEMA;
+    public static final String COUNTEREXAMPLE_SCHEMA =
+        LearnedPatternCounterexampleEvidence.SCHEMA;
+    public static final String COUNTEREXAMPLE_ENGINE_ID =
+        LearnedPatternCounterexampleEvidence.ENGINE_ID;
+    public static final String AUTHORIZATION_RECEIPT_SCHEMA =
+        LearnedPatternAuthorizationReceipt.SCHEMA;
+    public static final String AUTHORIZER_ID =
+        LearnedPatternAuthorizationReceipt.AUTHORIZER_ID;
+
+    /**
+     * The exact promoter proves a commutative polynomial identity. This
+     * supplemental challenge therefore uses deterministic scalar, rational and
+     * complex samples, not noncommutative matrix assignments.
+     */
+    private static final CounterexampleSearchService.CounterexampleBudget
+<span class="fc" id="L56">        AUTHORIZATION_COUNTEREXAMPLE_BUDGET =</span>
+            new CounterexampleSearchService.CounterexampleBudget(
+                64, true, false, 745L, true, true, 0, 0L);
+
+    private final LearnedPatternRulePromoter promoter;
+    private final CounterexampleSearchService counterexamples;
+    private final EvolutionStudyContractCodec studyCodec;
+
+    public LearnedPatternRuleAuthorizationService() {
+<span class="fc" id="L65">        this(</span>
+            new LearnedPatternRulePromoter(),
+            new DeterministicCounterexampleSearchService(),
+            new EvolutionStudyContractCodec());
+<span class="fc" id="L69">    }</span>
+
+    LearnedPatternRuleAuthorizationService(
+        LearnedPatternRulePromoter promoter,
+        CounterexampleSearchService counterexamples,
+        EvolutionStudyContractCodec studyCodec
+<span class="fc" id="L75">    ) {</span>
+<span class="fc" id="L76">        this.promoter = Objects.requireNonNull(promoter, &quot;promoter&quot;);</span>
+<span class="fc" id="L77">        this.counterexamples = Objects.requireNonNull(</span>
+            counterexamples, &quot;counterexamples&quot;);
+<span class="fc" id="L79">        this.studyCodec = Objects.requireNonNull(studyCodec, &quot;studyCodec&quot;);</span>
+<span class="fc" id="L80">    }</span>
+
+    public static CounterexampleSearchService.CounterexampleBudget
+            authorizationCounterexampleBudget() {
+<span class="nc" id="L84">        return AUTHORIZATION_COUNTEREXAMPLE_BUDGET;</span>
+    }
+
+    /** Produces the gene-specific artifact that {@link #authorize} later replays. */
+    public LearnedPatternCounterexampleEvidence evaluateCounterexamples(
+        EvolutionGenome genome,
+        String geneId,
+        String repositoryRevision
+    ) {
+<span class="fc" id="L93">        Objects.requireNonNull(genome, &quot;genome&quot;);</span>
+<span class="fc" id="L94">        EvolutionGenome.RewriteGene gene = gene(genome, geneId);</span>
+<span class="fc" id="L95">        LearnedPatternAuthorizationJson.requireRevision(</span>
+            repositoryRevision, &quot;repositoryRevision&quot;);
+<span class="fc" id="L97">        PatternSubject subject = patternSubject(gene);</span>
+<span class="fc" id="L98">        CounterexampleSearchService.CounterexampleSearchResult result =</span>
+<span class="fc" id="L99">            counterexamples.search(</span>
+                new CounterexampleSearchService.HypothesisInput(
+                    geneId,
+<span class="fc" id="L102">                    subject.leftExpression(),</span>
+<span class="fc" id="L103">                    subject.rightExpression(),</span>
+<span class="fc" id="L104">                    List.of()),</span>
+                AUTHORIZATION_COUNTEREXAMPLE_BUDGET);
+<span class="fc" id="L106">        return LearnedPatternCounterexampleEvidence.create(</span>
+            genome,
+            gene,
+            repositoryRevision,
+<span class="fc" id="L110">            subject.sourcePattern(),</span>
+<span class="fc" id="L111">            subject.targetPattern(),</span>
+<span class="fc" id="L112">            subject.leftExpression(),</span>
+<span class="fc" id="L113">            subject.rightExpression(),</span>
+            AUTHORIZATION_COUNTEREXAMPLE_BUDGET,
+            result);
+    }
+
+    /**
+     * Reconstructs and cross-verifies the complete qualification bundle and
+     * creates a new authorization receipt at the supplied deterministic time.
+     *
+     * @param asOf explicit validity instant; no implicit wall clock participates
+     */
+    public Authorization authorize(
+        EvolutionGenome genome,
+        String geneId,
+        String repositoryRevision,
+        EvidenceFiles evidenceFiles,
+        Instant asOf
+    ) throws IOException {
+<span class="fc" id="L131">        Objects.requireNonNull(genome, &quot;genome&quot;);</span>
+<span class="fc" id="L132">        EvolutionGenome.RewriteGene gene = gene(genome, geneId);</span>
+<span class="fc" id="L133">        LearnedPatternAuthorizationJson.requireRevision(</span>
+            repositoryRevision, &quot;repositoryRevision&quot;);
+<span class="fc" id="L135">        Objects.requireNonNull(evidenceFiles, &quot;evidenceFiles&quot;);</span>
+<span class="fc" id="L136">        Objects.requireNonNull(asOf, &quot;asOf&quot;);</span>
+
+<span class="fc" id="L138">        LearnedPatternAuthorizationBundle bundle =</span>
+<span class="fc" id="L139">            LearnedPatternAuthorizationBundle.fromCanonicalJson(</span>
+<span class="fc" id="L140">                readRegularFile(evidenceFiles.bundle(), &quot;authorization bundle&quot;));</span>
+<span class="fc" id="L141">        bundle.requireUsableAt(</span>
+<span class="fc" id="L142">            asOf, genome.contentHash(), geneId, repositoryRevision);</span>
+
+<span class="fc" id="L144">        EvolutionSplitManifest split = studyCodec.readSplitManifest(</span>
+<span class="fc" id="L145">            readRegularFile(evidenceFiles.splitManifest(), &quot;split manifest&quot;));</span>
+<span class="fc" id="L146">        EvolutionValidationSelection validation =</span>
+<span class="fc" id="L147">            EvolutionValidationSelection.fromCanonicalJson(</span>
+<span class="fc" id="L148">                readRegularFile(</span>
+<span class="fc" id="L149">                    evidenceFiles.validationSelection(),</span>
+                    &quot;validation selection&quot;));
+<span class="fc" id="L151">        EvolutionFinalTestEvaluation holdout =</span>
+<span class="fc" id="L152">            EvolutionFinalTestEvaluation.fromCanonicalJson(</span>
+<span class="fc" id="L153">                readRegularFile(</span>
+<span class="fc" id="L154">                    evidenceFiles.finalTestEvaluation(),</span>
+                    &quot;FINAL TEST evaluation&quot;));
+<span class="fc" id="L156">        LearnedPatternCounterexampleEvidence counterexample =</span>
+<span class="fc" id="L157">            LearnedPatternCounterexampleEvidence.fromCanonicalJson(</span>
+<span class="fc" id="L158">                readRegularFile(</span>
+<span class="fc" id="L159">                    evidenceFiles.counterexampleEvidence(),</span>
+                    &quot;counterexample evidence&quot;));
+
+<span class="fc" id="L162">        requireHash(</span>
+<span class="fc" id="L163">            bundle.splitManifestHash(), split.contentHash(), &quot;split manifest&quot;);</span>
+<span class="fc" id="L164">        requireHash(</span>
+<span class="fc" id="L165">            bundle.validationSelectionHash(),</span>
+<span class="fc" id="L166">            validation.contentHash(),</span>
+            &quot;validation selection&quot;);
+<span class="fc" id="L168">        requireHash(</span>
+<span class="fc" id="L169">            bundle.finalTestEvaluationHash(),</span>
+<span class="fc" id="L170">            holdout.contentHash(),</span>
+            &quot;FINAL TEST evaluation&quot;);
+<span class="fc" id="L172">        requireHash(</span>
+<span class="fc" id="L173">            bundle.counterexampleEvidenceHash(),</span>
+<span class="fc" id="L174">            counterexample.contentHash(),</span>
+            &quot;counterexample evidence&quot;);
+
+<span class="fc" id="L177">        verifySplit(genome, split);</span>
+<span class="fc" id="L178">        EvolutionValidationCandidate selected =</span>
+<span class="fc" id="L179">            verifyValidation(genome, split, validation);</span>
+<span class="fc" id="L180">        verifyHoldout(genome, split, validation, holdout);</span>
+<span class="fc" id="L181">        verifyCounterexample(</span>
+            genome, gene, repositoryRevision, counterexample);
+
+<span class="fc" id="L184">        LearnedPatternRulePromoter.PromotionEvidence promotionEvidence =</span>
+            new LearnedPatternRulePromoter.PromotionEvidence(
+<span class="fc" id="L186">                validation.contentHash(),</span>
+<span class="fc" id="L187">                counterexample.contentHash(),</span>
+<span class="fc" id="L188">                holdout.contentHash(),</span>
+<span class="fc" id="L189">                split.contentHash(),</span>
+                repositoryRevision);
+<span class="fc" id="L191">        LearnedPatternRulePromoter.Promotion promotion =</span>
+<span class="fc" id="L192">            promoter.promote(genome, geneId, promotionEvidence);</span>
+<span class="fc" id="L193">        String promotedRuleHash =</span>
+<span class="fc" id="L194">            RuleInventoryFingerprint.ruleContentHash(promotion.rule());</span>
+<span class="fc" id="L195">        LearnedPatternAuthorizationReceipt receipt =</span>
+<span class="fc" id="L196">            LearnedPatternAuthorizationReceipt.create(</span>
+                genome,
+                geneId,
+                repositoryRevision,
+                asOf,
+                bundle,
+                split,
+                validation,
+                holdout,
+                counterexample,
+                promotion,
+                promotedRuleHash);
+<span class="fc" id="L208">        return new Authorization(</span>
+            promotion,
+            bundle,
+            split,
+            validation,
+            selected,
+            holdout,
+            counterexample,
+            receipt);
+    }
+
+    /**
+     * Loads a retained authorization receipt and replays every authority it
+     * references before admitting the learned rule for use.
+     *
+     * &lt;p&gt;The receipt is not trusted as a capability token by itself. The method
+     * reconstructs the same qualification at the original {@code authorizedAt}
+     * instant, which reloads split/VALIDATION/FINAL-TEST evidence, reruns the
+     * deterministic counterexample search and reruns exact promotion. The
+     * retained and reconstructed receipts must be identical. Only then is the
+     * retained receipt checked at the current explicit {@code asOf} instant.&lt;/p&gt;
+     */
+    public Authorization verifyAuthorization(
+        EvolutionGenome genome,
+        String geneId,
+        String repositoryRevision,
+        EvidenceFiles evidenceFiles,
+        Path authorizationReceipt,
+        Instant asOf
+    ) throws IOException {
+<span class="fc" id="L238">        Objects.requireNonNull(genome, &quot;genome&quot;);</span>
+<span class="fc" id="L239">        LearnedPatternAuthorizationJson.requireText(geneId, &quot;geneId&quot;);</span>
+<span class="fc" id="L240">        LearnedPatternAuthorizationJson.requireRevision(</span>
+            repositoryRevision, &quot;repositoryRevision&quot;);
+<span class="fc" id="L242">        Objects.requireNonNull(evidenceFiles, &quot;evidenceFiles&quot;);</span>
+<span class="fc" id="L243">        Objects.requireNonNull(asOf, &quot;asOf&quot;);</span>
+
+<span class="fc" id="L245">        LearnedPatternAuthorizationReceipt retained =</span>
+<span class="fc" id="L246">            LearnedPatternAuthorizationReceipt.fromCanonicalJson(</span>
+<span class="fc" id="L247">                readRegularFile(</span>
+                    authorizationReceipt,
+                    &quot;learned pattern authorization receipt&quot;));
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">        if (!retained.genomeHash().equals(genome.contentHash())</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">                || !retained.geneId().equals(geneId)</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">                || !retained.repositoryRevision().equals(repositoryRevision)) {</span>
+<span class="nc" id="L253">            throw new IllegalArgumentException(</span>
+                &quot;retained learned-rule authorization subject/revision mismatch&quot;);
+        }
+
+<span class="fc" id="L257">        Authorization replayed = authorize(</span>
+            genome,
+            geneId,
+            repositoryRevision,
+            evidenceFiles,
+<span class="fc" id="L262">            retained.authorizedAt());</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">        if (!retained.equals(replayed.receipt())) {</span>
+<span class="nc" id="L264">            throw new IllegalArgumentException(</span>
+                &quot;retained learned-rule authorization differs from evidence replay&quot;);
+        }
+<span class="fc" id="L267">        retained.requireUsableAt(</span>
+            asOf,
+            repositoryRevision,
+<span class="fc" id="L270">            replayed.receipt().promotedRuleHash());</span>
+<span class="fc" id="L271">        return replayed;</span>
+    }
+
+    private static void verifySplit(
+        EvolutionGenome genome,
+        EvolutionSplitManifest split
+    ) {
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">        if (split.heldOutMaterializationDeferred()) {</span>
+<span class="nc" id="L279">            throw new IllegalArgumentException(</span>
+                &quot;learned-rule authorization requires concrete VALIDATION and FINAL TEST splits&quot;);
+        }
+<span class="fc bfc" id="L282" title="All 2 branches covered.">        if (!genome.trainingScope().equals(split.trainingScope())) {</span>
+<span class="fc" id="L283">            throw new IllegalArgumentException(</span>
+                &quot;split manifest TRAIN scope differs from learned genome&quot;);
+        }
+<span class="fc" id="L286">    }</span>
+
+    private static EvolutionValidationCandidate verifyValidation(
+        EvolutionGenome genome,
+        EvolutionSplitManifest split,
+        EvolutionValidationSelection validation
+    ) {
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">        if (!validation.splitManifestHash().equals(split.contentHash())) {</span>
+<span class="nc" id="L294">            throw new IllegalArgumentException(</span>
+                &quot;validation selection is not bound to the supplied split manifest&quot;);
+        }
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">        if (!validation.hasSelection()</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">                || !validation.selectedGenomeHash().equals(genome.contentHash())) {</span>
+<span class="fc" id="L299">            throw new IllegalArgumentException(</span>
+                &quot;VALIDATION did not select the learned genome being authorized&quot;);
+        }
+<span class="fc" id="L302">        EvolutionValidationCandidate selected = validation.candidates().stream()</span>
+<span class="fc" id="L303">            .filter(candidate -&gt; candidate.genomeHash().equals(genome.contentHash()))</span>
+<span class="fc" id="L304">            .filter(candidate -&gt; candidate.configurationHash().equals(</span>
+<span class="fc" id="L305">                validation.selectedConfigurationHash()))</span>
+<span class="fc" id="L306">            .findFirst()</span>
+<span class="pc" id="L307">            .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                &quot;selected VALIDATION candidate is missing&quot;));
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">        if (!selected.eligible()) {</span>
+<span class="nc" id="L310">            throw new IllegalArgumentException(</span>
+                &quot;selected VALIDATION candidate has correctness/reachability blockers&quot;);
+        }
+
+<span class="fc" id="L314">        Map&lt;String, String&gt; expectedCases = splitCases(split.validationCases());</span>
+<span class="fc" id="L315">        Map&lt;String, String&gt; actualCases = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">        for (EvolutionValidationCaseEvidence evidence : selected.cases()) {</span>
+<span class="fc" id="L317">            actualCases.put(evidence.caseId(), evidence.family());</span>
+<span class="fc" id="L318">        }</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">        if (!expectedCases.equals(actualCases)</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">                || !expectedCases.keySet().equals(</span>
+<span class="fc" id="L321">                    new TreeSet&lt;&gt;(validation.validationCaseIds()))) {</span>
+<span class="fc" id="L322">            throw new IllegalArgumentException(</span>
+                &quot;VALIDATION case identities/families differ from split manifest&quot;);
+        }
+<span class="fc" id="L325">        return selected;</span>
+    }
+
+    private static void verifyHoldout(
+        EvolutionGenome genome,
+        EvolutionSplitManifest split,
+        EvolutionValidationSelection validation,
+        EvolutionFinalTestEvaluation holdout
+    ) {
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">        if (!holdout.splitManifestHash().equals(split.contentHash())</span>
+<span class="pc bpc" id="L335" title="1 of 2 branches missed.">                || !holdout.validationSelectionHash().equals(</span>
+<span class="fc" id="L336">                    validation.contentHash())) {</span>
+<span class="nc" id="L337">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST does not continue the supplied split and VALIDATION selection&quot;);
+        }
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">        if (!holdout.selectedGenomeHash().equals(genome.contentHash())</span>
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">                || !holdout.selectedConfigurationHash().equals(</span>
+<span class="fc" id="L342">                    validation.selectedConfigurationHash())) {</span>
+<span class="nc" id="L343">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST subject differs from the learned genome/configuration&quot;);
+        }
+<span class="fc bfc" id="L346" title="All 2 branches covered.">        if (!holdout.qualificationEligible()) {</span>
+<span class="fc" id="L347">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST contains technical, reachability or correctness blockers&quot;);
+        }
+
+<span class="fc" id="L351">        Map&lt;String, String&gt; expectedCases = splitCases(split.finalTestCases());</span>
+<span class="fc" id="L352">        Map&lt;String, String&gt; actualCases = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">        for (EvolutionFinalTestCaseEvidence evidence : holdout.cases()) {</span>
+<span class="fc" id="L354">            actualCases.put(evidence.caseId(), evidence.family());</span>
+<span class="fc" id="L355">        }</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">        if (!expectedCases.equals(actualCases)</span>
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">                || !expectedCases.keySet().equals(</span>
+<span class="fc" id="L358">                    new TreeSet&lt;&gt;(holdout.finalTestCaseIds()))) {</span>
+<span class="nc" id="L359">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST case identities/families differ from split manifest&quot;);
+        }
+<span class="fc" id="L362">    }</span>
+
+    private void verifyCounterexample(
+        EvolutionGenome genome,
+        EvolutionGenome.RewriteGene gene,
+        String repositoryRevision,
+        LearnedPatternCounterexampleEvidence evidence
+    ) {
+<span class="fc" id="L370">        PatternSubject subject = patternSubject(gene);</span>
+<span class="fc" id="L371">        evidence.requireSubject(</span>
+<span class="fc" id="L372">            genome.contentHash(),</span>
+<span class="fc" id="L373">            gene.geneId(),</span>
+            repositoryRevision,
+<span class="fc" id="L375">            subject.sourcePattern(),</span>
+<span class="fc" id="L376">            subject.targetPattern(),</span>
+<span class="fc" id="L377">            subject.leftExpression(),</span>
+<span class="fc" id="L378">            subject.rightExpression());</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        if (!evidence.budget().toBudget().equals(</span>
+                AUTHORIZATION_COUNTEREXAMPLE_BUDGET)) {
+<span class="nc" id="L381">            throw new IllegalArgumentException(</span>
+                &quot;counterexample evidence uses a non-authorized replay budget&quot;);
+        }
+
+<span class="fc" id="L385">        CounterexampleSearchService.CounterexampleSearchResult replay =</span>
+<span class="fc" id="L386">            counterexamples.search(</span>
+                new CounterexampleSearchService.HypothesisInput(
+<span class="fc" id="L388">                    gene.geneId(),</span>
+<span class="fc" id="L389">                    subject.leftExpression(),</span>
+<span class="fc" id="L390">                    subject.rightExpression(),</span>
+<span class="fc" id="L391">                    List.of()),</span>
+                AUTHORIZATION_COUNTEREXAMPLE_BUDGET);
+<span class="fc bfc" id="L393" title="All 2 branches covered.">        if (!LearnedPatternCounterexampleEvidence.resultHash(replay).equals(</span>
+<span class="fc" id="L394">                    evidence.resultHash())</span>
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">                || replay.status() != evidence.status()</span>
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">                || !replay.attemptedSources().equals(evidence.attemptedSources())</span>
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">                || !replay.inferredAssumptions().equals(</span>
+<span class="fc" id="L398">                    evidence.inferredAssumptions())</span>
+<span class="pc bpc" id="L399" title="1 of 2 branches missed.">                || !replay.explanation().equals(evidence.explanation())) {</span>
+<span class="fc" id="L400">            throw new IllegalArgumentException(</span>
+                &quot;counterexample evidence differs from deterministic replay&quot;);
+        }
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">        if (replay.status()</span>
+                != CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND
+<span class="pc bpc" id="L405" title="1 of 2 branches missed.">                || replay.counterexample().isPresent()</span>
+<span class="pc bpc" id="L406" title="1 of 2 branches missed.">                || replay.attemptedSources().isEmpty()</span>
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">                || !replay.inferredAssumptions().isEmpty()</span>
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">                || !replay.typedAssumptions().isEmpty()) {</span>
+<span class="nc" id="L409">            throw new IllegalArgumentException(</span>
+                &quot;counterexample qualification is not assumption-free and conclusive&quot;);
+        }
+<span class="fc" id="L412">    }</span>
+
+    private static Map&lt;String, String&gt; splitCases(
+        List&lt;EvolutionSplitManifest.CaseReference&gt; cases
+    ) {
+<span class="fc" id="L417">        Map&lt;String, String&gt; result = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L418" title="All 2 branches covered.">        for (EvolutionSplitManifest.CaseReference reference : cases) {</span>
+<span class="fc" id="L419">            result.put(reference.caseId(), reference.familyId());</span>
+<span class="fc" id="L420">        }</span>
+<span class="fc" id="L421">        return Map.copyOf(result);</span>
+    }
+
+    private static EvolutionGenome.RewriteGene gene(
+        EvolutionGenome genome,
+        String geneId
+    ) {
+<span class="fc" id="L428">        LearnedPatternAuthorizationJson.requireText(geneId, &quot;geneId&quot;);</span>
+<span class="fc" id="L429">        return genome.rewrites().stream()</span>
+<span class="fc" id="L430">            .filter(value -&gt; value.geneId().equals(geneId))</span>
+<span class="fc" id="L431">            .findFirst()</span>
+<span class="pc" id="L432">            .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                &quot;unknown rewrite gene: &quot; + geneId));
+    }
+
+    private static PatternSubject patternSubject(
+        EvolutionGenome.RewriteGene gene
+    ) {
+<span class="fc" id="L439">        PatternExpr source = EvolutionGenomeCompiler.parsePattern(</span>
+<span class="fc" id="L440">            gene.sourcePattern());</span>
+<span class="fc" id="L441">        PatternExpr target = EvolutionGenomeCompiler.parsePattern(</span>
+<span class="fc" id="L442">            gene.targetPattern());</span>
+<span class="fc" id="L443">        Set&lt;String&gt; placeholders = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L444">        Set&lt;String&gt; literalVariables = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L445">        collectNames(source, placeholders, literalVariables);</span>
+<span class="fc" id="L446">        collectNames(target, placeholders, literalVariables);</span>
+
+<span class="fc" id="L448">        Map&lt;String, Expr&gt; bindings = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L449">        int index = 0;</span>
+<span class="fc bfc" id="L450" title="All 2 branches covered.">        for (String placeholder : placeholders) {</span>
+            String variable;
+            do {
+<span class="fc" id="L453">                variable = &quot;p&quot; + index++;</span>
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">            } while (literalVariables.contains(variable));</span>
+<span class="fc" id="L455">            bindings.put(placeholder, new VariableExpr(variable));</span>
+<span class="fc" id="L456">        }</span>
+<span class="fc" id="L457">        return new PatternSubject(</span>
+<span class="fc" id="L458">            EvolutionGenomeCompiler.renderPattern(source),</span>
+<span class="fc" id="L459">            EvolutionGenomeCompiler.renderPattern(target),</span>
+<span class="fc" id="L460">            ExpressionFormatter.format(source.instantiate(bindings)),</span>
+<span class="fc" id="L461">            ExpressionFormatter.format(target.instantiate(bindings)));</span>
+    }
+
+    private static void collectNames(
+        PatternExpr expression,
+        Set&lt;String&gt; placeholders,
+        Set&lt;String&gt; literalVariables
+    ) {
+<span class="fc bfc" id="L469" title="All 2 branches covered.">        if (expression instanceof PatternExpr.Placeholder placeholder) {</span>
+<span class="fc" id="L470">            placeholders.add(placeholder.name());</span>
+<span class="fc" id="L471">            return;</span>
+        }
+<span class="pc bpc" id="L473" title="1 of 2 branches missed.">        if (expression instanceof PatternExpr.LiteralVariable variable) {</span>
+<span class="nc" id="L474">            literalVariables.add(variable.name());</span>
+<span class="nc" id="L475">            return;</span>
+        }
+<span class="fc bfc" id="L477" title="All 2 branches covered.">        if (expression instanceof PatternExpr.Operation operation) {</span>
+<span class="fc" id="L478">            collectNames(operation.left(), placeholders, literalVariables);</span>
+<span class="fc" id="L479">            collectNames(operation.right(), placeholders, literalVariables);</span>
+<span class="fc" id="L480">            return;</span>
+        }
+<span class="pc bpc" id="L482" title="1 of 2 branches missed.">        if (expression instanceof PatternExpr.Function function) {</span>
+<span class="nc" id="L483">            function.arguments().forEach(argument -&gt;</span>
+<span class="nc" id="L484">                collectNames(argument, placeholders, literalVariables));</span>
+        }
+<span class="fc" id="L486">    }</span>
+
+    private static String readRegularFile(Path path, String name)
+            throws IOException {
+<span class="fc" id="L490">        Objects.requireNonNull(path, name + &quot; path&quot;);</span>
+<span class="fc" id="L491">        Path normalized = path.toAbsolutePath().normalize();</span>
+<span class="pc bpc" id="L492" title="1 of 4 branches missed.">        if (!Files.isRegularFile(normalized) || Files.isSymbolicLink(normalized)) {</span>
+<span class="fc" id="L493">            throw new IllegalArgumentException(</span>
+                name + &quot; must be a regular non-symlink file: &quot; + normalized);
+        }
+<span class="fc" id="L496">        return Files.readString(normalized, StandardCharsets.UTF_8);</span>
+    }
+
+    private static void requireHash(
+        String expected,
+        String actual,
+        String name
+    ) {
+<span class="fc bfc" id="L504" title="All 2 branches covered.">        if (!expected.equals(actual)) {</span>
+<span class="fc" id="L505">            throw new IllegalArgumentException(name + &quot; hash mismatch&quot;);</span>
+        }
+<span class="fc" id="L507">    }</span>
+
+<span class="fc" id="L509">    private record PatternSubject(</span>
+        String sourcePattern,
+        String targetPattern,
+        String leftExpression,
+        String rightExpression
+    ) {
+    }
+
+    /** Exact files consumed by one authorization attempt. */
+    public record EvidenceFiles(
+        Path bundle,
+        Path splitManifest,
+        Path validationSelection,
+        Path finalTestEvaluation,
+        Path counterexampleEvidence
+    ) {
+<span class="fc" id="L525">        public EvidenceFiles {</span>
+<span class="fc" id="L526">            List&lt;Path&gt; paths = List.of(</span>
+<span class="fc" id="L527">                Objects.requireNonNull(bundle, &quot;bundle&quot;),</span>
+<span class="fc" id="L528">                Objects.requireNonNull(splitManifest, &quot;splitManifest&quot;),</span>
+<span class="fc" id="L529">                Objects.requireNonNull(validationSelection, &quot;validationSelection&quot;),</span>
+<span class="fc" id="L530">                Objects.requireNonNull(finalTestEvaluation, &quot;finalTestEvaluation&quot;),</span>
+<span class="fc" id="L531">                Objects.requireNonNull(counterexampleEvidence, &quot;counterexampleEvidence&quot;));</span>
+<span class="fc" id="L532">            Set&lt;Path&gt; distinct = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L533" title="All 2 branches covered.">            for (Path path : paths) {</span>
+<span class="pc bpc" id="L534" title="1 of 2 branches missed.">                if (!distinct.add(path.toAbsolutePath().normalize())) {</span>
+<span class="nc" id="L535">                    throw new IllegalArgumentException(</span>
+                        &quot;authorization evidence files must be distinct&quot;);
+                }
+<span class="fc" id="L538">            }</span>
+<span class="fc" id="L539">        }</span>
+    }
+
+    /** Fully reconstructed qualification result for one pattern rule. */
+    public record Authorization(
+        LearnedPatternRulePromoter.Promotion promotion,
+        LearnedPatternAuthorizationBundle evidenceBundle,
+        EvolutionSplitManifest splitManifest,
+        EvolutionValidationSelection validationSelection,
+        EvolutionValidationCandidate selectedValidationCandidate,
+        EvolutionFinalTestEvaluation finalTestEvaluation,
+        LearnedPatternCounterexampleEvidence counterexampleEvidence,
+        LearnedPatternAuthorizationReceipt receipt
+    ) {
+<span class="fc" id="L553">        public Authorization {</span>
+<span class="fc" id="L554">            promotion = Objects.requireNonNull(promotion, &quot;promotion&quot;);</span>
+<span class="fc" id="L555">            evidenceBundle = Objects.requireNonNull(</span>
+                evidenceBundle, &quot;evidenceBundle&quot;);
+<span class="fc" id="L557">            splitManifest = Objects.requireNonNull(splitManifest, &quot;splitManifest&quot;);</span>
+<span class="fc" id="L558">            validationSelection = Objects.requireNonNull(</span>
+                validationSelection, &quot;validationSelection&quot;);
+<span class="fc" id="L560">            selectedValidationCandidate = Objects.requireNonNull(</span>
+                selectedValidationCandidate, &quot;selectedValidationCandidate&quot;);
+<span class="fc" id="L562">            finalTestEvaluation = Objects.requireNonNull(</span>
+                finalTestEvaluation, &quot;finalTestEvaluation&quot;);
+<span class="fc" id="L564">            counterexampleEvidence = Objects.requireNonNull(</span>
+                counterexampleEvidence, &quot;counterexampleEvidence&quot;);
+<span class="fc" id="L566">            receipt = Objects.requireNonNull(receipt, &quot;receipt&quot;);</span>
+<span class="pc bpc" id="L567" title="1 of 2 branches missed.">            if (!receipt.evidenceBundleHash().equals(evidenceBundle.contentHash())</span>
+<span class="pc bpc" id="L568" title="1 of 2 branches missed.">                    || !receipt.semanticValidationHash().equals(</span>
+<span class="fc" id="L569">                        validationSelection.contentHash())</span>
+<span class="pc bpc" id="L570" title="1 of 2 branches missed.">                    || !receipt.counterexampleSearchHash().equals(</span>
+<span class="fc" id="L571">                        counterexampleEvidence.contentHash())</span>
+<span class="pc bpc" id="L572" title="1 of 2 branches missed.">                    || !receipt.holdoutEvaluationHash().equals(</span>
+<span class="fc" id="L573">                        finalTestEvaluation.contentHash())</span>
+<span class="pc bpc" id="L574" title="1 of 2 branches missed.">                    || !receipt.leakageAuditHash().equals(</span>
+<span class="fc" id="L575">                        splitManifest.contentHash())</span>
+<span class="pc bpc" id="L576" title="1 of 2 branches missed.">                    || !receipt.promotionReceiptHash().equals(</span>
+<span class="fc" id="L577">                        promotion.receipt().contentHash())</span>
+<span class="pc bpc" id="L578" title="1 of 2 branches missed.">                    || !receipt.promotedRuleId().equals(promotion.rule().id())</span>
+<span class="pc bpc" id="L579" title="1 of 2 branches missed.">                    || !receipt.promotedRuleHash().equals(</span>
+<span class="fc" id="L580">                        RuleInventoryFingerprint.ruleContentHash(promotion.rule()))</span>
+<span class="pc bpc" id="L581" title="1 of 2 branches missed.">                    || !receipt.applicabilitySchemaHash().equals(</span>
+<span class="fc" id="L582">                        promotion.applicabilitySchema().contentHash())) {</span>
+<span class="nc" id="L583">                throw new IllegalArgumentException(</span>
+                    &quot;learned pattern authorization products are inconsistent&quot;);
+            }
+<span class="fc" id="L586">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
