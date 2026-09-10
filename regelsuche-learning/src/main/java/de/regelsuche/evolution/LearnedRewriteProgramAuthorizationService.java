@@ -5,7 +5,6 @@ import de.regelsuche.transform.RewriteRule;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -35,6 +34,8 @@ public final class LearnedRewriteProgramAuthorizationService {
         LearnedRewriteProgramReplayEvidence.SCHEMA;
     public static final String AUTHORIZER_ID =
         LearnedRewriteProgramAuthorizationReceipt.AUTHORIZER_ID;
+    public static final String APPLICABILITY_SEMANTICS =
+        LearnedRewriteProgramAuthorizationReceipt.APPLICABILITY_SEMANTICS;
 
     private final EvolutionRewriteProgramCompiler compiler;
 
@@ -105,7 +106,8 @@ public final class LearnedRewriteProgramAuthorizationService {
                 asOf,
                 validUntil,
                 replayEvidence,
-                verified.leaves().authorizationHashes());
+                verified.leaves().authorizationHashes(),
+                verified.leaves().applicabilitySchemaHashes());
         return new Authorization(
             candidate,
             verified.compiled(),
@@ -213,6 +215,7 @@ public final class LearnedRewriteProgramAuthorizationService {
 
         TreeMap<String, RewriteRule> rules = new TreeMap<>();
         TreeMap<String, String> receiptHashes = new TreeMap<>();
+        TreeMap<String, String> applicabilityHashes = new TreeMap<>();
         ArrayList<LearnedPatternRuleAuthorizationService.Authorization>
             retained = new ArrayList<>();
         Instant validUntil = null;
@@ -242,8 +245,16 @@ public final class LearnedRewriteProgramAuthorizationService {
                 throw new IllegalArgumentException(
                     "learned program leaf is not equivalence preserving: " + geneId);
             }
+            String applicabilityHash =
+                checked.promotion().applicabilitySchema().contentHash();
+            if (!receipt.applicabilitySchemaHash().equals(applicabilityHash)) {
+                throw new IllegalArgumentException(
+                    "leaf applicability schema differs from its authorization receipt: "
+                        + geneId);
+            }
             if (rules.put(geneId, checked.promotion().rule()) != null
-                    || receiptHashes.put(geneId, receipt.contentHash()) != null) {
+                    || receiptHashes.put(geneId, receipt.contentHash()) != null
+                    || applicabilityHashes.put(geneId, applicabilityHash) != null) {
                 throw new IllegalArgumentException(
                     "duplicate leaf authorization for " + geneId);
             }
@@ -253,7 +264,8 @@ public final class LearnedRewriteProgramAuthorizationService {
                     ? receipt.validUntil()
                     : validUntil;
         }
-        if (!rules.keySet().equals(referenced)) {
+        if (!rules.keySet().equals(referenced)
+                || !applicabilityHashes.keySet().equals(referenced)) {
             throw new IllegalArgumentException(
                 "leaf authorization set differs from referenced program genes");
         }
@@ -261,6 +273,7 @@ public final class LearnedRewriteProgramAuthorizationService {
         return new VerifiedLeaves(
             Map.copyOf(rules),
             Map.copyOf(receiptHashes),
+            Map.copyOf(applicabilityHashes),
             List.copyOf(retained),
             Objects.requireNonNull(validUntil, "validUntil"));
     }
@@ -274,6 +287,7 @@ public final class LearnedRewriteProgramAuthorizationService {
     private record VerifiedLeaves(
         Map<String, RewriteRule> rulesByGeneId,
         Map<String, String> authorizationHashes,
+        Map<String, String> applicabilitySchemaHashes,
         List<LearnedPatternRuleAuthorizationService.Authorization> authorizations,
         Instant validUntil
     ) {
@@ -301,6 +315,8 @@ public final class LearnedRewriteProgramAuthorizationService {
             if (!receipt.candidateHash().equals(candidate.contentHash())
                     || !receipt.replayEvidenceHash().equals(
                         replayEvidence.contentHash())
+                    || !APPLICABILITY_SEMANTICS.equals(
+                        receipt.applicabilitySemantics())
                     || !compiledProgram.genomeHash().equals(
                         candidate.genome().contentHash())
                     || !compiledProgram.planHash().equals(
@@ -309,21 +325,40 @@ public final class LearnedRewriteProgramAuthorizationService {
                     "learned rewrite-program authorization products are inconsistent");
             }
             Map<String, String> leaves = new TreeMap<>();
+            Map<String, String> applicability = new TreeMap<>();
             for (LearnedPatternRuleAuthorizationService.Authorization leaf
                     : leafAuthorizations) {
+                String geneId = leaf.receipt().geneId();
                 if (leaves.put(
-                        leaf.receipt().geneId(),
-                        leaf.receipt().contentHash()) != null) {
+                        geneId,
+                        leaf.receipt().contentHash()) != null
+                        || applicability.put(
+                            geneId,
+                            leaf.promotion().applicabilitySchema().contentHash())
+                            != null) {
                     throw new IllegalArgumentException(
                         "duplicate authorized leaf in program result");
                 }
             }
             if (!receipt.leafAuthorizationHashes().equals(leaves)
+                    || !receipt.leafApplicabilitySchemaHashes().equals(
+                        applicability)
                     || !Set.copyOf(compiledProgram.referencedGeneIds())
                         .equals(leaves.keySet())) {
                 throw new IllegalArgumentException(
                     "compiled program, receipt and leaf authorities differ");
             }
+        }
+
+        /**
+         * Program-level applicability is the canonical control-flow semantics,
+         * not a flattened synthetic pattern: at least one candidate survives
+         * the authorized program for the supplied expression.
+         */
+        public boolean isApplicable(String expression) {
+            LearnedPatternAuthorizationJson.requireText(expression, "expression");
+            return !compiledProgram.engine().execute(expression)
+                .candidates().isEmpty();
         }
     }
 }
