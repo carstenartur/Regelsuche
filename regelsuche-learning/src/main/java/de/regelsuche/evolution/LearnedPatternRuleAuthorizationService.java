@@ -1,76 +1,144 @@
 package de.regelsuche.evolution;
 
 import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.StreamReadFeature;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.knowledge.RuleInventoryFingerprint;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.validation.CounterexampleSearchService;
+import de.regelsuche.validation.DeterministicCounterexampleSearchService;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.time.format.DateTimeParseException;
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 /**
- * Fail-closed authorization boundary for exactly proved learned pattern rules.
+ * Fail-closed production authorization boundary for exactly proved learned
+ * pattern rules.
  *
- * <p>The mathematical promoter remains responsible for genome preflight and the
- * exact pattern-identity proof. This service adds the missing semantic evidence
- * boundary: all validation, counterexample, holdout and leakage roots are loaded
- * from disk, structurally and semantically checked, bound to one subject and one
- * repository revision, checked for expiry, and only then handed to the promoter.
- * The resulting receipt authorizes only this narrow assumption-free pattern-rule
- * contract; {@code RewriteProgram}s require a separate program replay contract.</p>
+ * <p>The existing {@link LearnedPatternRulePromoter} remains the mathematical
+ * boundary: genome preflight plus an exact commutative-polynomial identity
+ * proof. This service adds the missing qualification boundary required by
+ * issue #745. It does not trust self-declared PASS envelopes. It reconstructs
+ * the repository's native split, VALIDATION and FINAL TEST artifacts, replays
+ * deterministic counterexample search, cross-checks all identities, and only
+ * then invokes the promoter.</p>
+ *
+ * <p>This class deliberately does not authorize {@code RewriteProgram}. A
+ * program has sequence/choice/repeat/guard/pruning semantics and needs its own
+ * replay contract.</p>
  */
 public final class LearnedPatternRuleAuthorizationService {
-    public static final String EVIDENCE_ROOT_SCHEMA =
-        "regelsuche.learned-rule-promotion-evidence-root/v1";
+    public static final String BUNDLE_SCHEMA =
+        "regelsuche.learned-pattern-rule-authorization-bundle/v1";
+    public static final String COUNTEREXAMPLE_SCHEMA =
+        "regelsuche.learned-pattern-rule-counterexample-evidence/v1";
+    public static final String COUNTEREXAMPLE_ENGINE_ID =
+        "regelsuche.deterministic-counterexample-search/pattern-authorization-v1";
     public static final String AUTHORIZATION_RECEIPT_SCHEMA =
         "regelsuche.learned-pattern-rule-authorization-receipt/v1";
     public static final String AUTHORIZER_ID =
         "regelsuche.learned-pattern-rule-authorizer/v1";
 
-    private static final Set<String> ROOT_FIELDS = Set.of(
-        "schema",
-        "role",
-        "status",
-        "genomeHash",
-        "geneId",
-        "repositoryRevision",
-        "issuedAt",
-        "expiresAt",
-        "artifactHash",
-        "contentHash");
+    /**
+     * Fixed deterministic scalar/commutative challenge budget for promotion.
+     * Matrix assignments are intentionally excluded because the promoted v1
+     * proof contract is the commutative polynomial ring, not matrix algebra.
+     */
+    private static final CounterexampleSearchService.CounterexampleBudget
+        AUTHORIZATION_COUNTEREXAMPLE_BUDGET =
+            new CounterexampleSearchService.CounterexampleBudget(
+                64, true, false, 745L, true, true, 0, 0L);
 
     private static final ObjectMapper JSON = new ObjectMapper(
         JsonFactory.builder()
             .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
-            .build());
+            .build())
+        .findAndRegisterModules()
+        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
+        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 
     private final LearnedPatternRulePromoter promoter;
+    private final CounterexampleSearchService counterexamples;
+    private final EvolutionStudyContractCodec studyCodec;
 
     public LearnedPatternRuleAuthorizationService() {
-        this(new LearnedPatternRulePromoter());
+        this(
+            new LearnedPatternRulePromoter(),
+            new DeterministicCounterexampleSearchService(),
+            new EvolutionStudyContractCodec());
     }
 
-    LearnedPatternRuleAuthorizationService(LearnedPatternRulePromoter promoter) {
+    LearnedPatternRuleAuthorizationService(
+        LearnedPatternRulePromoter promoter,
+        CounterexampleSearchService counterexamples,
+        EvolutionStudyContractCodec studyCodec
+    ) {
         this.promoter = Objects.requireNonNull(promoter, "promoter");
+        this.counterexamples = Objects.requireNonNull(
+            counterexamples, "counterexamples");
+        this.studyCodec = Objects.requireNonNull(studyCodec, "studyCodec");
+    }
+
+    /** Returns the exact replay budget required by this authorization revision. */
+    public static CounterexampleSearchService.CounterexampleBudget
+            authorizationCounterexampleBudget() {
+        return AUTHORIZATION_COUNTEREXAMPLE_BUDGET;
     }
 
     /**
-     * Loads every evidence root and authorizes exactly one learned pattern gene.
+     * Produces the gene-specific counterexample artifact later consumed and
+     * independently replayed by {@link #authorize}.
+     */
+    public CounterexampleEvidence evaluateCounterexamples(
+        EvolutionGenome genome,
+        String geneId,
+        String repositoryRevision
+    ) {
+        Objects.requireNonNull(genome, "genome");
+        EvolutionGenome.RewriteGene gene = gene(genome, geneId);
+        requireRevision(repositoryRevision, "repositoryRevision");
+        PatternSubject subject = patternSubject(gene);
+        CounterexampleSearchService.CounterexampleSearchResult result =
+            counterexamples.search(
+                new CounterexampleSearchService.HypothesisInput(
+                    geneId,
+                    subject.leftExpression(),
+                    subject.rightExpression(),
+                    List.of()),
+                AUTHORIZATION_COUNTEREXAMPLE_BUDGET);
+        return CounterexampleEvidence.create(
+            genome,
+            gene,
+            repositoryRevision,
+            subject,
+            AUTHORIZATION_COUNTEREXAMPLE_BUDGET,
+            result);
+    }
+
+    /**
+     * Loads, reconstructs and cross-verifies every qualification artifact.
      *
-     * @param asOf explicit evaluation instant; never replaced by an implicit wall clock
+     * @param asOf explicit deterministic validity instant; no implicit wall
+     *             clock participates in authorization
      */
     public Authorization authorize(
         EvolutionGenome genome,
@@ -80,156 +148,281 @@ public final class LearnedPatternRuleAuthorizationService {
         Instant asOf
     ) throws IOException {
         Objects.requireNonNull(genome, "genome");
-        requireText(geneId, "geneId");
+        EvolutionGenome.RewriteGene gene = gene(genome, geneId);
         requireRevision(repositoryRevision, "repositoryRevision");
         Objects.requireNonNull(evidenceFiles, "evidenceFiles");
         Objects.requireNonNull(asOf, "asOf");
 
-        EnumMap<EvidenceRole, EvidenceRoot> roots =
-            new EnumMap<>(EvidenceRole.class);
-        roots.put(EvidenceRole.SEMANTIC_VALIDATION, load(
-            evidenceFiles.semanticValidation(),
-            EvidenceRole.SEMANTIC_VALIDATION,
-            genome.contentHash(), geneId, repositoryRevision, asOf));
-        roots.put(EvidenceRole.COUNTEREXAMPLE_SEARCH, load(
-            evidenceFiles.counterexampleSearch(),
-            EvidenceRole.COUNTEREXAMPLE_SEARCH,
-            genome.contentHash(), geneId, repositoryRevision, asOf));
-        roots.put(EvidenceRole.HOLDOUT_EVALUATION, load(
-            evidenceFiles.holdoutEvaluation(),
-            EvidenceRole.HOLDOUT_EVALUATION,
-            genome.contentHash(), geneId, repositoryRevision, asOf));
-        roots.put(EvidenceRole.LEAKAGE_AUDIT, load(
-            evidenceFiles.leakageAudit(),
-            EvidenceRole.LEAKAGE_AUDIT,
-            genome.contentHash(), geneId, repositoryRevision, asOf));
+        EvidenceBundle bundle = EvidenceBundle.fromCanonicalJson(
+            readRegularFile(evidenceFiles.bundle(), "authorization bundle"));
+        bundle.requireUsableAt(
+            asOf, genome.contentHash(), geneId, repositoryRevision);
 
-        LearnedPatternRulePromoter.PromotionEvidence evidence =
+        EvolutionSplitManifest split = studyCodec.readSplitManifest(
+            readRegularFile(evidenceFiles.splitManifest(), "split manifest"));
+        EvolutionValidationSelection validation =
+            EvolutionValidationSelection.fromCanonicalJson(
+                readRegularFile(
+                    evidenceFiles.validationSelection(),
+                    "validation selection"));
+        EvolutionFinalTestEvaluation holdout =
+            EvolutionFinalTestEvaluation.fromCanonicalJson(
+                readRegularFile(
+                    evidenceFiles.finalTestEvaluation(),
+                    "FINAL TEST evaluation"));
+        CounterexampleEvidence counterexample =
+            CounterexampleEvidence.fromCanonicalJson(
+                readRegularFile(
+                    evidenceFiles.counterexampleEvidence(),
+                    "counterexample evidence"));
+
+        requireHashMatch(
+            bundle.splitManifestHash(), split.contentHash(), "split manifest");
+        requireHashMatch(
+            bundle.validationSelectionHash(),
+            validation.contentHash(),
+            "validation selection");
+        requireHashMatch(
+            bundle.finalTestEvaluationHash(),
+            holdout.contentHash(),
+            "FINAL TEST evaluation");
+        requireHashMatch(
+            bundle.counterexampleEvidenceHash(),
+            counterexample.contentHash(),
+            "counterexample evidence");
+
+        verifySplit(genome, split);
+        verifyValidation(genome, split, validation);
+        verifyHoldout(genome, split, validation, holdout);
+        verifyCounterexample(
+            genome, gene, repositoryRevision, counterexample);
+
+        LearnedPatternRulePromoter.PromotionEvidence promotionEvidence =
             new LearnedPatternRulePromoter.PromotionEvidence(
-                roots.get(EvidenceRole.SEMANTIC_VALIDATION).contentHash(),
-                roots.get(EvidenceRole.COUNTEREXAMPLE_SEARCH).contentHash(),
-                roots.get(EvidenceRole.HOLDOUT_EVALUATION).contentHash(),
-                roots.get(EvidenceRole.LEAKAGE_AUDIT).contentHash(),
+                validation.contentHash(),
+                counterexample.contentHash(),
+                holdout.contentHash(),
+                split.contentHash(),
                 repositoryRevision);
         LearnedPatternRulePromoter.Promotion promotion =
-            promoter.promote(genome, geneId, evidence);
+            promoter.promote(genome, geneId, promotionEvidence);
 
-        Instant validUntil = roots.values().stream()
-            .map(EvidenceRoot::expiresAt)
-            .min(Instant::compareTo)
-            .orElseThrow();
         AuthorizationReceipt receipt = AuthorizationReceipt.create(
             genome,
             geneId,
             repositoryRevision,
             asOf,
-            validUntil,
-            roots,
+            bundle,
+            split,
+            validation,
+            holdout,
+            counterexample,
             promotion);
-        return new Authorization(promotion, Map.copyOf(roots), receipt);
+        return new Authorization(
+            promotion,
+            bundle,
+            split,
+            validation,
+            holdout,
+            counterexample,
+            receipt);
     }
 
-    private static EvidenceRoot load(
-        Path path,
-        EvidenceRole expectedRole,
-        String expectedGenomeHash,
-        String expectedGeneId,
-        String expectedRepositoryRevision,
-        Instant asOf
-    ) throws IOException {
-        Path file = requireFile(path, expectedRole.name());
-        ObjectNode value = requireObject(parseStrict(file), expectedRole.name());
-        Set<String> actualFields = new HashSet<>();
-        value.fieldNames().forEachRemaining(actualFields::add);
-        if (!actualFields.equals(ROOT_FIELDS)) {
-            Set<String> missing = new HashSet<>(ROOT_FIELDS);
-            missing.removeAll(actualFields);
-            Set<String> unknown = new HashSet<>(actualFields);
-            unknown.removeAll(ROOT_FIELDS);
+    private static void verifySplit(
+        EvolutionGenome genome,
+        EvolutionSplitManifest split
+    ) {
+        if (split.heldOutMaterializationDeferred()) {
             throw new IllegalArgumentException(
-                "evidence root fields mismatch for " + expectedRole
-                    + ": missing=" + missing + ", unknown=" + unknown);
+                "learned-rule authorization requires concrete VALIDATION and FINAL TEST splits");
         }
-
-        EvidenceRoot root = new EvidenceRoot(
-            requireText(value, "schema"),
-            EvidenceRole.parse(requireText(value, "role")),
-            requireText(value, "status"),
-            requireSha(value, "genomeHash"),
-            requireText(value, "geneId"),
-            requireRevision(value, "repositoryRevision"),
-            requireInstant(value, "issuedAt"),
-            requireInstant(value, "expiresAt"),
-            requireSha(value, "artifactHash"),
-            requireSha(value, "contentHash"));
-
-        if (root.role() != expectedRole) {
+        if (!genome.trainingScope().equals(split.trainingScope())) {
             throw new IllegalArgumentException(
-                "evidence role mismatch: expected " + expectedRole
-                    + ", found " + root.role());
-        }
-        if (!root.genomeHash().equals(expectedGenomeHash)
-                || !root.geneId().equals(expectedGeneId)) {
-            throw new IllegalArgumentException(
-                "evidence subject mismatch for " + expectedRole);
-        }
-        if (!root.repositoryRevision().equals(expectedRepositoryRevision)) {
-            throw new IllegalArgumentException(
-                "evidence repository revision mismatch for " + expectedRole);
-        }
-        if (asOf.isBefore(root.issuedAt())) {
-            throw new IllegalArgumentException(
-                "evidence is not yet valid for " + expectedRole);
-        }
-        if (!asOf.isBefore(root.expiresAt())) {
-            throw new IllegalArgumentException(
-                "evidence expired for " + expectedRole);
-        }
-        return root;
-    }
-
-    private static JsonNode parseStrict(Path path) throws IOException {
-        try (JsonParser parser = JSON.getFactory().createParser(
-                Files.newBufferedReader(path, StandardCharsets.UTF_8))) {
-            JsonNode value = JSON.readTree(parser);
-            if (value == null || parser.nextToken() != null) {
-                throw new IllegalArgumentException(
-                    "evidence root contains trailing JSON content: " + path);
-            }
-            return value;
-        } catch (JsonProcessingException exception) {
-            throw new IllegalArgumentException(
-                "invalid evidence root JSON: " + path, exception);
+                "split manifest TRAIN scope differs from learned genome");
         }
     }
 
-    private static ObjectNode requireObject(JsonNode value, String name) {
-        if (value instanceof ObjectNode object) {
-            return object;
+    private static void verifyValidation(
+        EvolutionGenome genome,
+        EvolutionSplitManifest split,
+        EvolutionValidationSelection validation
+    ) {
+        if (!validation.splitManifestHash().equals(split.contentHash())) {
+            throw new IllegalArgumentException(
+                "validation selection is not bound to the supplied split manifest");
         }
-        throw new IllegalArgumentException(name + " evidence root must be an object");
+        if (!validation.hasSelection()
+                || !validation.selectedGenomeHash().equals(genome.contentHash())) {
+            throw new IllegalArgumentException(
+                "VALIDATION did not select the learned genome being authorized");
+        }
+        EvolutionValidationCandidate selected = validation.candidates().stream()
+            .filter(candidate -> candidate.genomeHash().equals(genome.contentHash()))
+            .filter(candidate -> candidate.configurationHash().equals(
+                validation.selectedConfigurationHash()))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException(
+                "selected VALIDATION candidate is missing"));
+        if (!selected.eligible()) {
+            throw new IllegalArgumentException(
+                "selected VALIDATION candidate has correctness/reachability blockers");
+        }
     }
 
-    private static Path requireFile(Path path, String name) {
+    private static void verifyHoldout(
+        EvolutionGenome genome,
+        EvolutionSplitManifest split,
+        EvolutionValidationSelection validation,
+        EvolutionFinalTestEvaluation holdout
+    ) {
+        if (!holdout.splitManifestHash().equals(split.contentHash())
+                || !holdout.validationSelectionHash().equals(
+                    validation.contentHash())) {
+            throw new IllegalArgumentException(
+                "FINAL TEST does not continue the supplied split and VALIDATION selection");
+        }
+        if (!holdout.selectedGenomeHash().equals(genome.contentHash())
+                || !holdout.selectedConfigurationHash().equals(
+                    validation.selectedConfigurationHash())) {
+            throw new IllegalArgumentException(
+                "FINAL TEST subject differs from the learned genome/configuration");
+        }
+        if (!holdout.qualificationEligible()) {
+            throw new IllegalArgumentException(
+                "FINAL TEST contains technical, reachability or correctness blockers");
+        }
+    }
+
+    private void verifyCounterexample(
+        EvolutionGenome genome,
+        EvolutionGenome.RewriteGene gene,
+        String repositoryRevision,
+        CounterexampleEvidence evidence
+    ) {
+        PatternSubject subject = patternSubject(gene);
+        evidence.requireSubject(
+            genome.contentHash(),
+            gene.geneId(),
+            repositoryRevision,
+            subject);
+        if (!evidence.budget().toBudget().equals(
+                AUTHORIZATION_COUNTEREXAMPLE_BUDGET)) {
+            throw new IllegalArgumentException(
+                "counterexample evidence uses a non-authorized replay budget");
+        }
+
+        CounterexampleSearchService.CounterexampleSearchResult replay =
+            counterexamples.search(
+                new CounterexampleSearchService.HypothesisInput(
+                    gene.geneId(),
+                    subject.leftExpression(),
+                    subject.rightExpression(),
+                    List.of()),
+                AUTHORIZATION_COUNTEREXAMPLE_BUDGET);
+        String replayHash = resultHash(replay);
+        if (!replayHash.equals(evidence.resultHash())
+                || replay.status() != evidence.status()
+                || !replay.attemptedSources().equals(evidence.attemptedSources())
+                || !replay.inferredAssumptions().equals(
+                    evidence.inferredAssumptions())
+                || !replay.explanation().equals(evidence.explanation())) {
+            throw new IllegalArgumentException(
+                "counterexample evidence differs from deterministic replay");
+        }
+        if (replay.status()
+                != CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND
+                || replay.counterexample().isPresent()
+                || replay.attemptedSources().isEmpty()
+                || !replay.inferredAssumptions().isEmpty()
+                || !replay.typedAssumptions().isEmpty()) {
+            throw new IllegalArgumentException(
+                "counterexample qualification is not assumption-free and conclusive");
+        }
+    }
+
+    private static EvolutionGenome.RewriteGene gene(
+        EvolutionGenome genome,
+        String geneId
+    ) {
+        requireText(geneId, "geneId");
+        return genome.rewrites().stream()
+            .filter(value -> value.geneId().equals(geneId))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException(
+                "unknown rewrite gene: " + geneId));
+    }
+
+    private static PatternSubject patternSubject(
+        EvolutionGenome.RewriteGene gene
+    ) {
+        PatternExpr source = EvolutionGenomeCompiler.parsePattern(
+            gene.sourcePattern());
+        PatternExpr target = EvolutionGenomeCompiler.parsePattern(
+            gene.targetPattern());
+        Set<String> placeholders = new TreeSet<>();
+        Set<String> literalVariables = new HashSet<>();
+        collectNames(source, placeholders, literalVariables);
+        collectNames(target, placeholders, literalVariables);
+
+        Map<String, Expr> bindings = new HashMap<>();
+        int index = 0;
+        for (String placeholder : placeholders) {
+            String variable;
+            do {
+                variable = "p" + index++;
+            } while (literalVariables.contains(variable));
+            bindings.put(placeholder, new VariableExpr(variable));
+        }
+        return new PatternSubject(
+            EvolutionGenomeCompiler.renderPattern(source),
+            EvolutionGenomeCompiler.renderPattern(target),
+            ExpressionFormatter.format(source.instantiate(bindings)),
+            ExpressionFormatter.format(target.instantiate(bindings)));
+    }
+
+    private static void collectNames(
+        PatternExpr expression,
+        Set<String> placeholders,
+        Set<String> literalVariables
+    ) {
+        if (expression instanceof PatternExpr.Placeholder placeholder) {
+            placeholders.add(placeholder.name());
+            return;
+        }
+        if (expression instanceof PatternExpr.LiteralVariable variable) {
+            literalVariables.add(variable.name());
+            return;
+        }
+        if (expression instanceof PatternExpr.Operation operation) {
+            collectNames(operation.left(), placeholders, literalVariables);
+            collectNames(operation.right(), placeholders, literalVariables);
+            return;
+        }
+        if (expression instanceof PatternExpr.Function function) {
+            function.arguments().forEach(argument ->
+                collectNames(argument, placeholders, literalVariables));
+        }
+    }
+
+    private static String readRegularFile(Path path, String name)
+            throws IOException {
         Objects.requireNonNull(path, name + " path");
         Path normalized = path.toAbsolutePath().normalize();
-        if (!Files.isRegularFile(normalized)) {
+        if (!Files.isRegularFile(normalized) || Files.isSymbolicLink(normalized)) {
             throw new IllegalArgumentException(
-                name + " evidence root is missing: " + normalized);
+                name + " must be a regular non-symlink file: " + normalized);
         }
-        if (Files.isSymbolicLink(normalized)) {
-            throw new IllegalArgumentException(
-                name + " evidence root must not be a symbolic link");
-        }
-        return normalized;
+        return Files.readString(normalized, StandardCharsets.UTF_8);
     }
 
-    private static String requireText(ObjectNode node, String field) {
-        JsonNode value = node.get(field);
-        if (value == null || !value.isTextual()) {
-            throw new IllegalArgumentException(field + " must be text");
+    private static void requireHashMatch(
+        String expected,
+        String actual,
+        String name
+    ) {
+        if (!expected.equals(actual)) {
+            throw new IllegalArgumentException(name + " hash mismatch");
         }
-        return requireText(value.textValue(), field);
     }
 
     private static String requireText(String value, String field) {
@@ -237,16 +430,6 @@ public final class LearnedPatternRuleAuthorizationService {
             throw new IllegalArgumentException(field + " must not be blank");
         }
         return value;
-    }
-
-    private static String requireSha(ObjectNode node, String field) {
-        String value = requireText(node, field);
-        EvolutionGenome.requireSha256(value, field);
-        return value;
-    }
-
-    private static String requireRevision(ObjectNode node, String field) {
-        return requireRevision(requireText(node, field), field);
     }
 
     private static String requireRevision(String value, String field) {
@@ -257,196 +440,420 @@ public final class LearnedPatternRuleAuthorizationService {
         return value;
     }
 
-    private static Instant requireInstant(ObjectNode node, String field) {
-        String value = requireText(node, field);
+    private static void requireHash(String value, String field) {
+        EvolutionGenome.requireSha256(value, field);
+    }
+
+    private static <T> T readJson(String json, Class<T> type, String name) {
+        if (json == null || json.isBlank()) {
+            throw new IllegalArgumentException(name + " JSON must not be blank");
+        }
         try {
-            return Instant.parse(value);
-        } catch (DateTimeParseException exception) {
-            throw new IllegalArgumentException(
-                field + " must be a canonical UTC instant", exception);
+            return JSON.readValue(json, type);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalArgumentException("invalid " + name + " JSON", exception);
         }
     }
 
-    private static String rootMaterial(
-        String schema,
-        EvidenceRole role,
-        String status,
-        String genomeHash,
-        String geneId,
-        String repositoryRevision,
-        Instant issuedAt,
-        Instant expiresAt,
-        String artifactHash
+    private static String writeJson(Object value) {
+        try {
+            return JSON.writeValueAsString(value) + "\n";
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("cannot serialize authorization evidence", exception);
+        }
+    }
+
+    private static String hashMaterial(Map<String, ?> value) {
+        return EvolutionGenome.hash(writeJson(value));
+    }
+
+    private static String resultHash(
+        CounterexampleSearchService.CounterexampleSearchResult result
     ) {
         StringBuilder material = new StringBuilder();
-        append(material, schema);
-        append(material, role.name());
-        append(material, status);
-        append(material, genomeHash);
-        append(material, geneId);
-        append(material, repositoryRevision);
-        append(material, issuedAt.toString());
-        append(material, expiresAt.toString());
-        append(material, artifactHash);
-        return material.toString();
+        append(material, result.status().name());
+        appendList(material, result.inferredAssumptions());
+        appendList(material, result.attemptedSources());
+        append(material, result.explanation());
+        if (result.counterexample().isPresent()) {
+            CounterexampleSearchService.Counterexample counterexample =
+                result.counterexample().orElseThrow();
+            append(material, "COUNTEREXAMPLE");
+            appendList(material, counterexample.assignments());
+            append(material, counterexample.leftValue());
+            append(material, counterexample.rightValue());
+        } else {
+            append(material, "NO_COUNTEREXAMPLE");
+        }
+        for (CounterexampleSearchService.TypedAssumption assumption
+                : result.typedAssumptions()) {
+            append(material, assumption.kind().name());
+            append(material, assumption.normalizedPredicate());
+            append(material, assumption.subjectExpression());
+            appendList(material, assumption.affectedVariables());
+            appendList(material, assumption.evidenceSources());
+            for (CounterexampleSearchService.ProofEncoding proof
+                    : assumption.proofEncodings()) {
+                append(material, proof.dialect());
+                append(material, proof.expression());
+            }
+            append(material, assumption.classification().name());
+        }
+        return EvolutionGenome.hash(material.toString());
+    }
+
+    private static void appendList(StringBuilder target, List<String> values) {
+        append(target, Integer.toString(values.size()));
+        values.forEach(value -> append(target, value));
     }
 
     private static void append(StringBuilder target, String value) {
         target.append(value.length()).append(':').append(value);
     }
 
-    private static String json(ObjectNode node) {
-        try {
-            return JSON.writeValueAsString(node);
-        } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("cannot serialize canonical evidence", exception);
-        }
+    private record PatternSubject(
+        String sourcePattern,
+        String targetPattern,
+        String leftExpression,
+        String rightExpression
+    ) {
     }
 
-    public enum EvidenceRole {
-        SEMANTIC_VALIDATION("PASSED"),
-        COUNTEREXAMPLE_SEARCH("NO_COUNTEREXAMPLE_FOUND"),
-        HOLDOUT_EVALUATION("PASSED"),
-        LEAKAGE_AUDIT("PASSED");
-
-        private final String acceptedStatus;
-
-        EvidenceRole(String acceptedStatus) {
-            this.acceptedStatus = acceptedStatus;
-        }
-
-        public String acceptedStatus() {
-            return acceptedStatus;
-        }
-
-        static EvidenceRole parse(String value) {
-            try {
-                return EvidenceRole.valueOf(value);
-            } catch (IllegalArgumentException exception) {
-                throw new IllegalArgumentException(
-                    "unsupported evidence role: " + value, exception);
-            }
-        }
-    }
-
-    /** Exact files used for one authorization attempt. */
+    /** Exact files consumed by one authorization attempt. */
     public record EvidenceFiles(
-        Path semanticValidation,
-        Path counterexampleSearch,
-        Path holdoutEvaluation,
-        Path leakageAudit
+        Path bundle,
+        Path splitManifest,
+        Path validationSelection,
+        Path finalTestEvaluation,
+        Path counterexampleEvidence
     ) {
         public EvidenceFiles {
-            List<Path> files = List.of(
-                Objects.requireNonNull(semanticValidation, "semanticValidation"),
-                Objects.requireNonNull(counterexampleSearch, "counterexampleSearch"),
-                Objects.requireNonNull(holdoutEvaluation, "holdoutEvaluation"),
-                Objects.requireNonNull(leakageAudit, "leakageAudit"));
-            Set<Path> identities = new HashSet<>();
-            for (Path file : files) {
-                if (!identities.add(file.toAbsolutePath().normalize())) {
+            List<Path> paths = List.of(
+                Objects.requireNonNull(bundle, "bundle"),
+                Objects.requireNonNull(splitManifest, "splitManifest"),
+                Objects.requireNonNull(validationSelection, "validationSelection"),
+                Objects.requireNonNull(finalTestEvaluation, "finalTestEvaluation"),
+                Objects.requireNonNull(counterexampleEvidence, "counterexampleEvidence"));
+            Set<Path> distinct = new HashSet<>();
+            for (Path path : paths) {
+                if (!distinct.add(path.toAbsolutePath().normalize())) {
                     throw new IllegalArgumentException(
-                        "each promotion evidence role requires a distinct root file");
+                        "authorization evidence files must be distinct");
                 }
             }
         }
     }
 
     /**
-     * Content-addressed semantic root around one independently produced evidence artifact.
+     * Temporal/identity manifest around self-verifying native evidence. It has
+     * no PASS field and therefore cannot replace semantic verification.
      */
-    public record EvidenceRoot(
+    public record EvidenceBundle(
         String schema,
-        EvidenceRole role,
-        String status,
         String genomeHash,
         String geneId,
         String repositoryRevision,
         Instant issuedAt,
         Instant expiresAt,
-        String artifactHash,
+        String splitManifestHash,
+        String validationSelectionHash,
+        String finalTestEvaluationHash,
+        String counterexampleEvidenceHash,
         String contentHash
     ) {
-        public EvidenceRoot {
-            if (!EVIDENCE_ROOT_SCHEMA.equals(schema)) {
+        public EvidenceBundle {
+            if (!BUNDLE_SCHEMA.equals(schema)) {
                 throw new IllegalArgumentException(
-                    "unsupported evidence root schema: " + schema);
+                    "unsupported learned-rule authorization bundle schema");
             }
-            role = Objects.requireNonNull(role, "role");
-            requireText(status, "status");
-            EvolutionGenome.requireSha256(genomeHash, "genomeHash");
+            requireHash(genomeHash, "genomeHash");
             requireText(geneId, "geneId");
             requireRevision(repositoryRevision, "repositoryRevision");
             issuedAt = Objects.requireNonNull(issuedAt, "issuedAt");
             expiresAt = Objects.requireNonNull(expiresAt, "expiresAt");
             if (!issuedAt.isBefore(expiresAt)) {
                 throw new IllegalArgumentException(
-                    "evidence expiresAt must be later than issuedAt");
+                    "authorization bundle expiresAt must be after issuedAt");
             }
-            if (!role.acceptedStatus().equals(status)) {
+            requireHash(splitManifestHash, "splitManifestHash");
+            requireHash(validationSelectionHash, "validationSelectionHash");
+            requireHash(finalTestEvaluationHash, "finalTestEvaluationHash");
+            requireHash(counterexampleEvidenceHash, "counterexampleEvidenceHash");
+            requireHash(contentHash, "contentHash");
+            if (!hashMaterial(payload(
+                    schema, genomeHash, geneId, repositoryRevision,
+                    issuedAt, expiresAt, splitManifestHash,
+                    validationSelectionHash, finalTestEvaluationHash,
+                    counterexampleEvidenceHash)).equals(contentHash)) {
                 throw new IllegalArgumentException(
-                    "non-passing evidence status for " + role + ": " + status);
-            }
-            EvolutionGenome.requireSha256(artifactHash, "artifactHash");
-            EvolutionGenome.requireSha256(contentHash, "contentHash");
-            String expected = EvolutionGenome.hash(rootMaterial(
-                schema, role, status, genomeHash, geneId,
-                repositoryRevision, issuedAt, expiresAt, artifactHash));
-            if (!expected.equals(contentHash)) {
-                throw new IllegalArgumentException(
-                    "evidence root contentHash mismatch for " + role);
+                    "authorization bundle contentHash mismatch");
             }
         }
 
-        public static EvidenceRoot create(
-            EvidenceRole role,
+        public static EvidenceBundle create(
+            EvolutionGenome genome,
+            String geneId,
+            String repositoryRevision,
+            Instant issuedAt,
+            Instant expiresAt,
+            EvolutionSplitManifest split,
+            EvolutionValidationSelection validation,
+            EvolutionFinalTestEvaluation holdout,
+            CounterexampleEvidence counterexample
+        ) {
+            Objects.requireNonNull(genome, "genome");
+            requireText(geneId, "geneId");
+            requireRevision(repositoryRevision, "repositoryRevision");
+            String contentHash = hashMaterial(payload(
+                BUNDLE_SCHEMA, genome.contentHash(), geneId,
+                repositoryRevision, issuedAt, expiresAt,
+                split.contentHash(), validation.contentHash(),
+                holdout.contentHash(), counterexample.contentHash()));
+            return new EvidenceBundle(
+                BUNDLE_SCHEMA, genome.contentHash(), geneId,
+                repositoryRevision, issuedAt, expiresAt,
+                split.contentHash(), validation.contentHash(),
+                holdout.contentHash(), counterexample.contentHash(),
+                contentHash);
+        }
+
+        public static EvidenceBundle fromCanonicalJson(String json) {
+            return readJson(json, EvidenceBundle.class, "authorization bundle");
+        }
+
+        public String toCanonicalJson() {
+            return writeJson(this);
+        }
+
+        void requireUsableAt(
+            Instant asOf,
+            String expectedGenomeHash,
+            String expectedGeneId,
+            String expectedRepositoryRevision
+        ) {
+            if (asOf.isBefore(issuedAt) || !asOf.isBefore(expiresAt)) {
+                throw new IllegalArgumentException(
+                    "authorization evidence bundle is not valid at " + asOf);
+            }
+            if (!genomeHash.equals(expectedGenomeHash)
+                    || !geneId.equals(expectedGeneId)
+                    || !repositoryRevision.equals(expectedRepositoryRevision)) {
+                throw new IllegalArgumentException(
+                    "authorization evidence bundle subject/revision mismatch");
+            }
+        }
+
+        private static Map<String, Object> payload(
+            String schema,
             String genomeHash,
             String geneId,
             String repositoryRevision,
             Instant issuedAt,
             Instant expiresAt,
-            String artifactHash
+            String splitManifestHash,
+            String validationSelectionHash,
+            String finalTestEvaluationHash,
+            String counterexampleEvidenceHash
         ) {
-            String material = rootMaterial(
-                EVIDENCE_ROOT_SCHEMA,
-                role,
-                role.acceptedStatus(),
-                genomeHash,
-                geneId,
-                repositoryRevision,
-                issuedAt,
-                expiresAt,
-                artifactHash);
-            return new EvidenceRoot(
-                EVIDENCE_ROOT_SCHEMA,
-                role,
-                role.acceptedStatus(),
-                genomeHash,
-                geneId,
-                repositoryRevision,
-                issuedAt,
-                expiresAt,
-                artifactHash,
-                EvolutionGenome.hash(material));
-        }
-
-        public String toCanonicalJson() {
-            ObjectNode node = JSON.createObjectNode();
-            node.put("schema", schema);
-            node.put("role", role.name());
-            node.put("status", status);
-            node.put("genomeHash", genomeHash);
-            node.put("geneId", geneId);
-            node.put("repositoryRevision", repositoryRevision);
-            node.put("issuedAt", issuedAt.toString());
-            node.put("expiresAt", expiresAt.toString());
-            node.put("artifactHash", artifactHash);
-            node.put("contentHash", contentHash);
-            return json(node);
+            Map<String, Object> value = new TreeMap<>();
+            value.put("counterexampleEvidenceHash", counterexampleEvidenceHash);
+            value.put("expiresAt", expiresAt);
+            value.put("finalTestEvaluationHash", finalTestEvaluationHash);
+            value.put("geneId", geneId);
+            value.put("genomeHash", genomeHash);
+            value.put("issuedAt", issuedAt);
+            value.put("repositoryRevision", repositoryRevision);
+            value.put("schema", schema);
+            value.put("splitManifestHash", splitManifestHash);
+            value.put("validationSelectionHash", validationSelectionHash);
+            return value;
         }
     }
 
-    /** Narrow authorization receipt; it is not an authorization for learned programs. */
+    /** Replayable counterexample-search evidence for one exact learned gene. */
+    public record CounterexampleEvidence(
+        String schema,
+        String engineId,
+        String genomeHash,
+        String geneId,
+        String repositoryRevision,
+        String sourcePattern,
+        String targetPattern,
+        String leftExpression,
+        String rightExpression,
+        CounterexampleBudgetEvidence budget,
+        CounterexampleSearchService.Status status,
+        List<String> attemptedSources,
+        List<String> inferredAssumptions,
+        String explanation,
+        String resultHash,
+        String contentHash
+    ) {
+        public CounterexampleEvidence {
+            if (!COUNTEREXAMPLE_SCHEMA.equals(schema)
+                    || !COUNTEREXAMPLE_ENGINE_ID.equals(engineId)) {
+                throw new IllegalArgumentException(
+                    "unsupported counterexample evidence identity");
+            }
+            requireHash(genomeHash, "genomeHash");
+            requireText(geneId, "geneId");
+            requireRevision(repositoryRevision, "repositoryRevision");
+            requireText(sourcePattern, "sourcePattern");
+            requireText(targetPattern, "targetPattern");
+            requireText(leftExpression, "leftExpression");
+            requireText(rightExpression, "rightExpression");
+            budget = Objects.requireNonNull(budget, "budget");
+            status = Objects.requireNonNull(status, "status");
+            attemptedSources = List.copyOf(
+                Objects.requireNonNull(attemptedSources, "attemptedSources"));
+            inferredAssumptions = List.copyOf(
+                Objects.requireNonNull(inferredAssumptions, "inferredAssumptions"));
+            requireText(explanation, "explanation");
+            requireHash(resultHash, "resultHash");
+            requireHash(contentHash, "contentHash");
+            if (!hashMaterial(payload(
+                    schema, engineId, genomeHash, geneId,
+                    repositoryRevision, sourcePattern, targetPattern,
+                    leftExpression, rightExpression, budget, status,
+                    attemptedSources, inferredAssumptions, explanation,
+                    resultHash)).equals(contentHash)) {
+                throw new IllegalArgumentException(
+                    "counterexample evidence contentHash mismatch");
+            }
+        }
+
+        private static CounterexampleEvidence create(
+            EvolutionGenome genome,
+            EvolutionGenome.RewriteGene gene,
+            String repositoryRevision,
+            PatternSubject subject,
+            CounterexampleSearchService.CounterexampleBudget budget,
+            CounterexampleSearchService.CounterexampleSearchResult result
+        ) {
+            CounterexampleBudgetEvidence retainedBudget =
+                CounterexampleBudgetEvidence.fromBudget(budget);
+            String retainedResultHash = resultHash(result);
+            String contentHash = hashMaterial(payload(
+                COUNTEREXAMPLE_SCHEMA, COUNTEREXAMPLE_ENGINE_ID,
+                genome.contentHash(), gene.geneId(), repositoryRevision,
+                subject.sourcePattern(), subject.targetPattern(),
+                subject.leftExpression(), subject.rightExpression(),
+                retainedBudget, result.status(), result.attemptedSources(),
+                result.inferredAssumptions(), result.explanation(),
+                retainedResultHash));
+            return new CounterexampleEvidence(
+                COUNTEREXAMPLE_SCHEMA, COUNTEREXAMPLE_ENGINE_ID,
+                genome.contentHash(), gene.geneId(), repositoryRevision,
+                subject.sourcePattern(), subject.targetPattern(),
+                subject.leftExpression(), subject.rightExpression(),
+                retainedBudget, result.status(), result.attemptedSources(),
+                result.inferredAssumptions(), result.explanation(),
+                retainedResultHash, contentHash);
+        }
+
+        public static CounterexampleEvidence fromCanonicalJson(String json) {
+            return readJson(json, CounterexampleEvidence.class,
+                "counterexample evidence");
+        }
+
+        public String toCanonicalJson() {
+            return writeJson(this);
+        }
+
+        void requireSubject(
+            String expectedGenomeHash,
+            String expectedGeneId,
+            String expectedRepositoryRevision,
+            PatternSubject subject
+        ) {
+            if (!genomeHash.equals(expectedGenomeHash)
+                    || !geneId.equals(expectedGeneId)
+                    || !repositoryRevision.equals(expectedRepositoryRevision)
+                    || !sourcePattern.equals(subject.sourcePattern())
+                    || !targetPattern.equals(subject.targetPattern())
+                    || !leftExpression.equals(subject.leftExpression())
+                    || !rightExpression.equals(subject.rightExpression())) {
+                throw new IllegalArgumentException(
+                    "counterexample evidence subject/revision mismatch");
+            }
+        }
+
+        private static Map<String, Object> payload(
+            String schema,
+            String engineId,
+            String genomeHash,
+            String geneId,
+            String repositoryRevision,
+            String sourcePattern,
+            String targetPattern,
+            String leftExpression,
+            String rightExpression,
+            CounterexampleBudgetEvidence budget,
+            CounterexampleSearchService.Status status,
+            List<String> attemptedSources,
+            List<String> inferredAssumptions,
+            String explanation,
+            String resultHash
+        ) {
+            Map<String, Object> value = new TreeMap<>();
+            value.put("attemptedSources", attemptedSources);
+            value.put("budget", budget);
+            value.put("engineId", engineId);
+            value.put("explanation", explanation);
+            value.put("geneId", geneId);
+            value.put("genomeHash", genomeHash);
+            value.put("inferredAssumptions", inferredAssumptions);
+            value.put("leftExpression", leftExpression);
+            value.put("repositoryRevision", repositoryRevision);
+            value.put("resultHash", resultHash);
+            value.put("rightExpression", rightExpression);
+            value.put("schema", schema);
+            value.put("sourcePattern", sourcePattern);
+            value.put("status", status);
+            value.put("targetPattern", targetPattern);
+            return value;
+        }
+    }
+
+    /** Complete deterministic budget retained by counterexample evidence. */
+    public record CounterexampleBudgetEvidence(
+        int numericRandomSamples,
+        boolean includeEdgeCases,
+        boolean includeMatrixAssignments,
+        long randomSeed,
+        boolean includeComplexAssignments,
+        boolean includeRationalAssignments,
+        int maxMatrixDimension,
+        long timeoutMillis
+    ) {
+        public CounterexampleBudgetEvidence {
+            toBudget();
+        }
+
+        static CounterexampleBudgetEvidence fromBudget(
+            CounterexampleSearchService.CounterexampleBudget budget
+        ) {
+            return new CounterexampleBudgetEvidence(
+                budget.numericRandomSamples(),
+                budget.includeEdgeCases(),
+                budget.includeMatrixAssignments(),
+                budget.randomSeed(),
+                budget.includeComplexAssignments(),
+                budget.includeRationalAssignments(),
+                budget.maxMatrixDimension(),
+                budget.timeoutMillis());
+        }
+
+        CounterexampleSearchService.CounterexampleBudget toBudget() {
+            return new CounterexampleSearchService.CounterexampleBudget(
+                numericRandomSamples, includeEdgeCases,
+                includeMatrixAssignments, randomSeed,
+                includeComplexAssignments, includeRationalAssignments,
+                maxMatrixDimension, timeoutMillis);
+        }
+    }
+
+    /** Narrow pattern-rule authorization receipt; never a program receipt. */
     public record AuthorizationReceipt(
         String schema,
         String authorizerId,
@@ -455,10 +862,11 @@ public final class LearnedPatternRuleAuthorizationService {
         String repositoryRevision,
         Instant authorizedAt,
         Instant validUntil,
-        String semanticValidationRootHash,
-        String counterexampleSearchRootHash,
-        String holdoutEvaluationRootHash,
-        String leakageAuditRootHash,
+        String evidenceBundleHash,
+        String semanticValidationHash,
+        String counterexampleSearchHash,
+        String holdoutEvaluationHash,
+        String leakageAuditHash,
         String promotionReceiptHash,
         String promotedRuleId,
         String promotedRuleHash,
@@ -471,7 +879,7 @@ public final class LearnedPatternRuleAuthorizationService {
                 throw new IllegalArgumentException(
                     "learned pattern authorization receipt identity is invalid");
             }
-            EvolutionGenome.requireSha256(genomeHash, "genomeHash");
+            requireHash(genomeHash, "genomeHash");
             requireText(geneId, "geneId");
             requireRevision(repositoryRevision, "repositoryRevision");
             authorizedAt = Objects.requireNonNull(authorizedAt, "authorizedAt");
@@ -481,25 +889,21 @@ public final class LearnedPatternRuleAuthorizationService {
                     "authorization must expire after authorizedAt");
             }
             for (String hash : List.of(
-                    semanticValidationRootHash,
-                    counterexampleSearchRootHash,
-                    holdoutEvaluationRootHash,
-                    leakageAuditRootHash,
-                    promotionReceiptHash,
-                    promotedRuleHash,
-                    applicabilitySchemaHash,
-                    contentHash)) {
-                EvolutionGenome.requireSha256(hash, "authorization hash");
+                    evidenceBundleHash, semanticValidationHash,
+                    counterexampleSearchHash, holdoutEvaluationHash,
+                    leakageAuditHash, promotionReceiptHash,
+                    promotedRuleHash, applicabilitySchemaHash, contentHash)) {
+                requireHash(hash, "authorization hash");
             }
             requireText(promotedRuleId, "promotedRuleId");
-            String expected = EvolutionGenome.hash(material(
-                schema, authorizerId, genomeHash, geneId, repositoryRevision,
-                authorizedAt, validUntil,
-                semanticValidationRootHash, counterexampleSearchRootHash,
-                holdoutEvaluationRootHash, leakageAuditRootHash,
-                promotionReceiptHash, promotedRuleId, promotedRuleHash,
-                applicabilitySchemaHash));
-            if (!expected.equals(contentHash)) {
+            if (!hashMaterial(payload(
+                    schema, authorizerId, genomeHash, geneId,
+                    repositoryRevision, authorizedAt, validUntil,
+                    evidenceBundleHash, semanticValidationHash,
+                    counterexampleSearchHash, holdoutEvaluationHash,
+                    leakageAuditHash, promotionReceiptHash, promotedRuleId,
+                    promotedRuleHash, applicabilitySchemaHash)).equals(
+                        contentHash)) {
                 throw new IllegalArgumentException(
                     "authorization receipt contentHash mismatch");
             }
@@ -510,83 +914,32 @@ public final class LearnedPatternRuleAuthorizationService {
             String geneId,
             String repositoryRevision,
             Instant authorizedAt,
-            Instant validUntil,
-            Map<EvidenceRole, EvidenceRoot> roots,
+            EvidenceBundle bundle,
+            EvolutionSplitManifest split,
+            EvolutionValidationSelection validation,
+            EvolutionFinalTestEvaluation holdout,
+            CounterexampleEvidence counterexample,
             LearnedPatternRulePromoter.Promotion promotion
         ) {
-            String promotionReceiptHash = promotion.receipt().contentHash();
             String promotedRuleHash =
                 RuleInventoryFingerprint.ruleContentHash(promotion.rule());
-            String schemaHash = promotion.applicabilitySchema().contentHash();
-            String material = material(
-                AUTHORIZATION_RECEIPT_SCHEMA,
-                AUTHORIZER_ID,
-                genome.contentHash(),
-                geneId,
-                repositoryRevision,
-                authorizedAt,
-                validUntil,
-                roots.get(EvidenceRole.SEMANTIC_VALIDATION).contentHash(),
-                roots.get(EvidenceRole.COUNTEREXAMPLE_SEARCH).contentHash(),
-                roots.get(EvidenceRole.HOLDOUT_EVALUATION).contentHash(),
-                roots.get(EvidenceRole.LEAKAGE_AUDIT).contentHash(),
-                promotionReceiptHash,
-                promotion.rule().id(),
-                promotedRuleHash,
-                schemaHash);
+            String applicabilityHash = promotion.applicabilitySchema().contentHash();
+            String contentHash = hashMaterial(payload(
+                AUTHORIZATION_RECEIPT_SCHEMA, AUTHORIZER_ID,
+                genome.contentHash(), geneId, repositoryRevision,
+                authorizedAt, bundle.expiresAt(), bundle.contentHash(),
+                validation.contentHash(), counterexample.contentHash(),
+                holdout.contentHash(), split.contentHash(),
+                promotion.receipt().contentHash(), promotion.rule().id(),
+                promotedRuleHash, applicabilityHash));
             return new AuthorizationReceipt(
-                AUTHORIZATION_RECEIPT_SCHEMA,
-                AUTHORIZER_ID,
-                genome.contentHash(),
-                geneId,
-                repositoryRevision,
-                authorizedAt,
-                validUntil,
-                roots.get(EvidenceRole.SEMANTIC_VALIDATION).contentHash(),
-                roots.get(EvidenceRole.COUNTEREXAMPLE_SEARCH).contentHash(),
-                roots.get(EvidenceRole.HOLDOUT_EVALUATION).contentHash(),
-                roots.get(EvidenceRole.LEAKAGE_AUDIT).contentHash(),
-                promotionReceiptHash,
-                promotion.rule().id(),
-                promotedRuleHash,
-                schemaHash,
-                EvolutionGenome.hash(material));
-        }
-
-        private static String material(
-            String schema,
-            String authorizerId,
-            String genomeHash,
-            String geneId,
-            String repositoryRevision,
-            Instant authorizedAt,
-            Instant validUntil,
-            String semanticValidationRootHash,
-            String counterexampleSearchRootHash,
-            String holdoutEvaluationRootHash,
-            String leakageAuditRootHash,
-            String promotionReceiptHash,
-            String promotedRuleId,
-            String promotedRuleHash,
-            String applicabilitySchemaHash
-        ) {
-            StringBuilder material = new StringBuilder();
-            append(material, schema);
-            append(material, authorizerId);
-            append(material, genomeHash);
-            append(material, geneId);
-            append(material, repositoryRevision);
-            append(material, authorizedAt.toString());
-            append(material, validUntil.toString());
-            append(material, semanticValidationRootHash);
-            append(material, counterexampleSearchRootHash);
-            append(material, holdoutEvaluationRootHash);
-            append(material, leakageAuditRootHash);
-            append(material, promotionReceiptHash);
-            append(material, promotedRuleId);
-            append(material, promotedRuleHash);
-            append(material, applicabilitySchemaHash);
-            return material.toString();
+                AUTHORIZATION_RECEIPT_SCHEMA, AUTHORIZER_ID,
+                genome.contentHash(), geneId, repositoryRevision,
+                authorizedAt, bundle.expiresAt(), bundle.contentHash(),
+                validation.contentHash(), counterexample.contentHash(),
+                holdout.contentHash(), split.contentHash(),
+                promotion.receipt().contentHash(), promotion.rule().id(),
+                promotedRuleHash, applicabilityHash, contentHash);
         }
 
         public void requireUsableAt(
@@ -607,38 +960,78 @@ public final class LearnedPatternRuleAuthorizationService {
         }
 
         public String toCanonicalJson() {
-            ObjectNode node = JSON.createObjectNode();
-            node.put("schema", schema);
-            node.put("authorizerId", authorizerId);
-            node.put("genomeHash", genomeHash);
-            node.put("geneId", geneId);
-            node.put("repositoryRevision", repositoryRevision);
-            node.put("authorizedAt", authorizedAt.toString());
-            node.put("validUntil", validUntil.toString());
-            node.put("semanticValidationRootHash", semanticValidationRootHash);
-            node.put("counterexampleSearchRootHash", counterexampleSearchRootHash);
-            node.put("holdoutEvaluationRootHash", holdoutEvaluationRootHash);
-            node.put("leakageAuditRootHash", leakageAuditRootHash);
-            node.put("promotionReceiptHash", promotionReceiptHash);
-            node.put("promotedRuleId", promotedRuleId);
-            node.put("promotedRuleHash", promotedRuleHash);
-            node.put("applicabilitySchemaHash", applicabilitySchemaHash);
-            node.put("contentHash", contentHash);
-            return json(node);
+            return writeJson(this);
+        }
+
+        private static Map<String, Object> payload(
+            String schema,
+            String authorizerId,
+            String genomeHash,
+            String geneId,
+            String repositoryRevision,
+            Instant authorizedAt,
+            Instant validUntil,
+            String evidenceBundleHash,
+            String semanticValidationHash,
+            String counterexampleSearchHash,
+            String holdoutEvaluationHash,
+            String leakageAuditHash,
+            String promotionReceiptHash,
+            String promotedRuleId,
+            String promotedRuleHash,
+            String applicabilitySchemaHash
+        ) {
+            Map<String, Object> value = new TreeMap<>();
+            value.put("applicabilitySchemaHash", applicabilitySchemaHash);
+            value.put("authorizedAt", authorizedAt);
+            value.put("authorizerId", authorizerId);
+            value.put("counterexampleSearchHash", counterexampleSearchHash);
+            value.put("evidenceBundleHash", evidenceBundleHash);
+            value.put("geneId", geneId);
+            value.put("genomeHash", genomeHash);
+            value.put("holdoutEvaluationHash", holdoutEvaluationHash);
+            value.put("leakageAuditHash", leakageAuditHash);
+            value.put("promotedRuleHash", promotedRuleHash);
+            value.put("promotedRuleId", promotedRuleId);
+            value.put("promotionReceiptHash", promotionReceiptHash);
+            value.put("repositoryRevision", repositoryRevision);
+            value.put("schema", schema);
+            value.put("semanticValidationHash", semanticValidationHash);
+            value.put("validUntil", validUntil);
+            return value;
         }
     }
 
     public record Authorization(
         LearnedPatternRulePromoter.Promotion promotion,
-        Map<EvidenceRole, EvidenceRoot> evidenceRoots,
+        EvidenceBundle evidenceBundle,
+        EvolutionSplitManifest splitManifest,
+        EvolutionValidationSelection validationSelection,
+        EvolutionFinalTestEvaluation finalTestEvaluation,
+        CounterexampleEvidence counterexampleEvidence,
         AuthorizationReceipt receipt
     ) {
         public Authorization {
             promotion = Objects.requireNonNull(promotion, "promotion");
-            evidenceRoots = Map.copyOf(
-                Objects.requireNonNull(evidenceRoots, "evidenceRoots"));
+            evidenceBundle = Objects.requireNonNull(
+                evidenceBundle, "evidenceBundle");
+            splitManifest = Objects.requireNonNull(splitManifest, "splitManifest");
+            validationSelection = Objects.requireNonNull(
+                validationSelection, "validationSelection");
+            finalTestEvaluation = Objects.requireNonNull(
+                finalTestEvaluation, "finalTestEvaluation");
+            counterexampleEvidence = Objects.requireNonNull(
+                counterexampleEvidence, "counterexampleEvidence");
             receipt = Objects.requireNonNull(receipt, "receipt");
-            if (evidenceRoots.size() != EvidenceRole.values().length
+            if (!receipt.evidenceBundleHash().equals(evidenceBundle.contentHash())
+                    || !receipt.semanticValidationHash().equals(
+                        validationSelection.contentHash())
+                    || !receipt.counterexampleSearchHash().equals(
+                        counterexampleEvidence.contentHash())
+                    || !receipt.holdoutEvaluationHash().equals(
+                        finalTestEvaluation.contentHash())
+                    || !receipt.leakageAuditHash().equals(
+                        splitManifest.contentHash())
                     || !receipt.promotionReceiptHash().equals(
                         promotion.receipt().contentHash())
                     || !receipt.promotedRuleId().equals(promotion.rule().id())
@@ -647,14 +1040,7 @@ public final class LearnedPatternRuleAuthorizationService {
                     || !receipt.applicabilitySchemaHash().equals(
                         promotion.applicabilitySchema().contentHash())) {
                 throw new IllegalArgumentException(
-                    "learned rule authorization products are inconsistent");
-            }
-            for (EvidenceRole role : EvidenceRole.values()) {
-                EvidenceRoot root = evidenceRoots.get(role);
-                if (root == null || root.role() != role) {
-                    throw new IllegalArgumentException(
-                        "learned rule authorization lacks evidence for " + role);
-                }
+                    "learned pattern authorization products are inconsistent");
             }
         }
     }
