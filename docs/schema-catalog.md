@@ -65,12 +65,22 @@ dokumentiert.
 | [`regelsuche-evolution-rewrite-program-execution-protocol-bound-checkpoint-artifact-v1`](schemas/regelsuche-evolution-rewrite-program-execution-protocol-bound-checkpoint-artifact-v1.schema.json) | Process-independent Manifest-last-Checkpoint, der nested TRAIN-State an Execution Plan und Protocol bindet |
 | [`regelsuche-evolution-rewrite-program-train-diagnostics-v1`](schemas/regelsuche-evolution-rewrite-program-train-diagnostics-v1.schema.json) | Content-addressed TRAIN-only Proposal-, Mutationstyp-, Alpha-Struktur- und Lineage-Diagnostik für versionierte Scheduler |
 | [`regelsuche-learned-pattern-rule-promotion-receipt-v1`](schemas/regelsuche-learned-pattern-rule-promotion-receipt-v1.schema.json) | Receipt der engen assumption-free Polynom-Pattern-Promotion; Evidence-Hashes sind gebundene Referenzen und noch keine unabhängig verifizierte Promotionsevidence |
+| [`regelsuche-learned-pattern-rule-authorization-bundle-v1`](schemas/regelsuche-learned-pattern-rule-authorization-bundle-v1.schema.json) | Zeit-, Genome-, Gene- und Repository-gebundener Manifestvertrag für die konkreten Qualification-Roots; enthält bewusst keinen PASS-Status |
+| [`regelsuche-learned-pattern-rule-counterexample-evidence-v1`](schemas/regelsuche-learned-pattern-rule-counterexample-evidence-v1.schema.json) | Gene-spezifische, content-addressed Counterexample-Evidence mit vollständig eingefrorenem deterministischem Replay-Budget |
+| [`regelsuche-learned-pattern-rule-authorization-receipt-v1`](schemas/regelsuche-learned-pattern-rule-authorization-receipt-v1.schema.json) | Produktionszulassungsreceipt, das native Split-/VALIDATION-/FINAL-TEST-Evidence, Counterexample-Replay und den exakten Promotion-Receipt bindet |
 
 Weitere Flagship-Verträge für Freeze, Reveal, Baselines und Work Accounting
 liegen ebenfalls im Schema-Verzeichnis und sind in
 [Flagship Freeze Execution](evolution-rewrite-program-flagship-freeze-execution.md)
-beschrieben. Die semantische Grenze des neuen Promotion-Receipts steht unter
-[Promotion gelernter Pattern-Regeln](learned-pattern-rule-promotion.md).
+beschrieben. Die mathematische Grenze des Promotion-Receipts steht unter
+[Promotion gelernter Pattern-Regeln](learned-pattern-rule-promotion.md); die
+stärkere Production-Qualification und der Stored-Receipt-Replay stehen unter
+[Learned pattern rule authorization](learned-pattern-rule-authorization.md).
+`verifyLearnedPatternAuthorizationEvidence` erzeugt dafür eine deterministische
+Java-Fixture und prüft die neuen Schemas, Content-Hashes, Split-Disjunktheit,
+VALIDATION-/FINAL-TEST-Parität, Counterexample-Budget/-Resultat und Receipt-
+Querverweise zusätzlich mit dem unabhängigen Python-Verifier
+`scripts/verify-learned-pattern-authorization.py`.
 
 ## Benchmarks, Kosten und Reproduktion
 
