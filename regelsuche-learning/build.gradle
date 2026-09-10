@@ -244,18 +244,67 @@ def verifyLearnedPatternAuthorizationEvidence = tasks.register(
     }
 }
 
+def learnedRewriteProgramAuthorizationOutput = layout.buildDirectory.dir(
+    'reports/learned-rewrite-program-authorization')
+def learnedRewriteProgramAuthorizationVerifier = rootProject.file(
+    'scripts/verify-learned-rewrite-program-authorization.py')
+def learnedRewriteProgramAuthorizationSchemas = [
+    'regelsuche-evolution-genome-v1.schema.json',
+    'regelsuche-evolution-rewrite-program-plan-v1.schema.json',
+    'regelsuche-evolution-rewrite-program-candidate-v1.schema.json',
+    'regelsuche-learned-rewrite-program-replay-evidence-v1.schema.json',
+    'regelsuche-learned-rewrite-program-authorization-receipt-v1.schema.json',
+    'regelsuche-learned-pattern-rule-authorization-receipt-v1.schema.json'
+].collect { name -> rootProject.file("docs/schemas/${name}") }
+
+def writeLearnedRewriteProgramAuthorizationEvidence = tasks.register(
+    'writeLearnedRewriteProgramAuthorizationEvidence',
+    JavaExec
+) {
+    group = 'verification'
+    description = 'Writes deterministic learned RewriteProgram authorization evidence for independent verification.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'de.regelsuche.evolution.LearnedRewriteProgramAuthorizationEvidenceFixtureWriter'
+    args learnedRewriteProgramAuthorizationOutput.get().asFile.absolutePath
+    outputs.dir learnedRewriteProgramAuthorizationOutput
+}
+
+def verifyLearnedRewriteProgramAuthorizationEvidence = tasks.register(
+    'verifyLearnedRewriteProgramAuthorizationEvidence',
+    Exec
+) {
+    group = 'verification'
+    description = 'Independently verifies learned RewriteProgram schemas, leaf bindings, replay work and receipt hashes.'
+    dependsOn rootProject.tasks.named('prepareVerificationEnvironment'),
+        writeLearnedRewriteProgramAuthorizationEvidence
+    workingDir rootProject.rootDir
+    inputs.file(learnedRewriteProgramAuthorizationVerifier)
+    inputs.files(learnedRewriteProgramAuthorizationSchemas)
+    inputs.dir(learnedRewriteProgramAuthorizationOutput)
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine verificationPython.get().absolutePath,
+            learnedRewriteProgramAuthorizationVerifier.absolutePath,
+            '--root', learnedRewriteProgramAuthorizationOutput.get().asFile.absolutePath,
+            '--schemas', independentReviewSchemasPath
+    }
+}
+
 tasks.named('check') {
     dependsOn verifyEvolutionStudyContracts,
         verifyIndependentInterestingnessReview,
         verifyRewriteProgramWorkEvidence,
-        verifyLearnedPatternAuthorizationEvidence
+        verifyLearnedPatternAuthorizationEvidence,
+        verifyLearnedRewriteProgramAuthorizationEvidence
 }
 
 rootProject.tasks.named('check') {
     dependsOn verifyEvolutionStudyContracts,
         verifyIndependentInterestingnessReview,
         verifyRewriteProgramWorkEvidence,
-        verifyLearnedPatternAuthorizationEvidence
+        verifyLearnedPatternAuthorizationEvidence,
+        verifyLearnedRewriteProgramAuthorizationEvidence
 }
 
 tasks.register('learnedSchedulingStudy', JavaExec) {
