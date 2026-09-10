@@ -116,7 +116,8 @@ public final class LearnedPatternRuleAuthorizationService {
     }
 
     /**
-     * Reconstructs and cross-verifies the complete qualification bundle.
+     * Reconstructs and cross-verifies the complete qualification bundle and
+     * creates a new authorization receipt at the supplied deterministic time.
      *
      * @param asOf explicit validity instant; no implicit wall clock participates
      */
@@ -213,6 +214,61 @@ public final class LearnedPatternRuleAuthorizationService {
             holdout,
             counterexample,
             receipt);
+    }
+
+    /**
+     * Loads a retained authorization receipt and replays every authority it
+     * references before admitting the learned rule for use.
+     *
+     * <p>The receipt is not trusted as a capability token by itself. The method
+     * reconstructs the same qualification at the original {@code authorizedAt}
+     * instant, which reloads split/VALIDATION/FINAL-TEST evidence, reruns the
+     * deterministic counterexample search and reruns exact promotion. The
+     * retained and reconstructed receipts must be identical. Only then is the
+     * retained receipt checked at the current explicit {@code asOf} instant.</p>
+     */
+    public Authorization verifyAuthorization(
+        EvolutionGenome genome,
+        String geneId,
+        String repositoryRevision,
+        EvidenceFiles evidenceFiles,
+        Path authorizationReceipt,
+        Instant asOf
+    ) throws IOException {
+        Objects.requireNonNull(genome, "genome");
+        LearnedPatternAuthorizationJson.requireText(geneId, "geneId");
+        LearnedPatternAuthorizationJson.requireRevision(
+            repositoryRevision, "repositoryRevision");
+        Objects.requireNonNull(evidenceFiles, "evidenceFiles");
+        Objects.requireNonNull(asOf, "asOf");
+
+        LearnedPatternAuthorizationReceipt retained =
+            LearnedPatternAuthorizationReceipt.fromCanonicalJson(
+                readRegularFile(
+                    authorizationReceipt,
+                    "learned pattern authorization receipt"));
+        if (!retained.genomeHash().equals(genome.contentHash())
+                || !retained.geneId().equals(geneId)
+                || !retained.repositoryRevision().equals(repositoryRevision)) {
+            throw new IllegalArgumentException(
+                "retained learned-rule authorization subject/revision mismatch");
+        }
+
+        Authorization replayed = authorize(
+            genome,
+            geneId,
+            repositoryRevision,
+            evidenceFiles,
+            retained.authorizedAt());
+        if (!retained.equals(replayed.receipt())) {
+            throw new IllegalArgumentException(
+                "retained learned-rule authorization differs from evidence replay");
+        }
+        retained.requireUsableAt(
+            asOf,
+            repositoryRevision,
+            replayed.receipt().promotedRuleHash());
+        return replayed;
     }
 
     private static void verifySplit(
