@@ -79,11 +79,14 @@ public final class EvolutionRewriteProgramCompiler {
      * Compiles the same canonical topology with an explicitly authorized rule
      * implementation for every referenced gene.
      *
-     * <p>This is the production boundary for learned programs. Raw evolutionary
-     * genome rules are intentionally not treated as authorization: callers must
-     * provide the independently promoted and proved rule for each source leaf.
-     * Extra, missing and non-equivalence-preserving rules are rejected so the
-     * executable program cannot silently gain a different authority surface.</p>
+     * <p>This is the compiler half of the production path, not an evidence
+     * authorization boundary by itself. Callers must provide independently
+     * promoted and proved rules; {@link LearnedRewriteProgramAuthorizationService}
+     * is responsible for verifying their authorization receipts, repository and
+     * time identities, applicability schemas and deterministic program replay.
+     * Extra, missing and non-equivalence-preserving rules are rejected here so
+     * the executable program cannot silently gain a different authority
+     * surface.</p>
      */
     public CompiledRewriteProgram compileAuthorized(
         EvolutionGenome genome,
