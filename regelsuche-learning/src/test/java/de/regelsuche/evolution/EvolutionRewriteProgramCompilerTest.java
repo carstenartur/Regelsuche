@@ -19,6 +19,7 @@ import de.regelsuche.transform.PatternRewriteRule;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
 import de.regelsuche.transform.Transformation;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -91,7 +92,7 @@ class EvolutionRewriteProgramCompilerTest {
     }
 
     @Test
-    void authorizedCompilationRejectsMissingExtraAndUnsafeLeaves() {
+    void authorizedCompilationRejectsMissingExtraUnsafeAndNullLeaves() {
         EvolutionGenome genome = normalizationGenome();
         EvolutionRewriteProgramPlan plan = EvolutionRewriteProgramPlan.create(
             genome,
@@ -118,6 +119,16 @@ class EvolutionRewriteProgramCompilerTest {
                 plan,
                 Map.of("add_zero", exactRule(
                     "unsafe_add", "?A+0", "?A", false))));
+
+        Map<String, RewriteRule> nullValue = new HashMap<>();
+        nullValue.put("add_zero", null);
+        assertThrows(IllegalArgumentException.class,
+            () -> compiler.compileAuthorized(genome, plan, nullValue));
+
+        Map<String, RewriteRule> nullKey = new HashMap<>();
+        nullKey.put(null, safe);
+        assertThrows(IllegalArgumentException.class,
+            () -> compiler.compileAuthorized(genome, plan, nullKey));
     }
 
     @Test
