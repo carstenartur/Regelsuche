@@ -21,6 +21,7 @@ dependencies {
     api project(':regelsuche-math-algorithms')
 
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.2'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.22.2'
 
     testImplementation libs.junit.jupiter
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -196,16 +197,65 @@ def verifyRewriteProgramWorkEvidence = tasks.register(
     }
 }
 
+def learnedPatternAuthorizationOutput = layout.buildDirectory.dir(
+    'reports/learned-pattern-authorization')
+def learnedPatternAuthorizationVerifier = rootProject.file(
+    'scripts/verify-learned-pattern-authorization.py')
+def learnedPatternAuthorizationSchemas = [
+    'regelsuche-learned-pattern-rule-authorization-bundle-v1.schema.json',
+    'regelsuche-evolution-split-manifest-v1.schema.json',
+    'evolution-validation-selection-v1.schema.json',
+    'evolution-final-test-evaluation-v1.schema.json',
+    'regelsuche-learned-pattern-rule-counterexample-evidence-v1.schema.json',
+    'regelsuche-learned-pattern-rule-authorization-receipt-v1.schema.json'
+].collect { name -> rootProject.file("docs/schemas/${name}") }
+
+def writeLearnedPatternAuthorizationEvidence = tasks.register(
+    'writeLearnedPatternAuthorizationEvidence',
+    JavaExec
+) {
+    group = 'verification'
+    description = 'Writes deterministic learned-pattern authorization evidence for independent verification.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'de.regelsuche.evolution.LearnedPatternAuthorizationEvidenceFixtureWriter'
+    args learnedPatternAuthorizationOutput.get().asFile.absolutePath
+    outputs.dir learnedPatternAuthorizationOutput
+}
+
+def verifyLearnedPatternAuthorizationEvidence = tasks.register(
+    'verifyLearnedPatternAuthorizationEvidence',
+    Exec
+) {
+    group = 'verification'
+    description = 'Independently verifies learned-pattern qualification schemas, hashes and evidence bindings.'
+    dependsOn rootProject.tasks.named('prepareVerificationEnvironment'),
+        writeLearnedPatternAuthorizationEvidence
+    workingDir rootProject.rootDir
+    inputs.file(learnedPatternAuthorizationVerifier)
+    inputs.files(learnedPatternAuthorizationSchemas)
+    inputs.dir(learnedPatternAuthorizationOutput)
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine verificationPython.get().absolutePath,
+            learnedPatternAuthorizationVerifier.absolutePath,
+            '--root', learnedPatternAuthorizationOutput.get().asFile.absolutePath,
+            '--schemas', independentReviewSchemasPath
+    }
+}
+
 tasks.named('check') {
     dependsOn verifyEvolutionStudyContracts,
         verifyIndependentInterestingnessReview,
-        verifyRewriteProgramWorkEvidence
+        verifyRewriteProgramWorkEvidence,
+        verifyLearnedPatternAuthorizationEvidence
 }
 
 rootProject.tasks.named('check') {
     dependsOn verifyEvolutionStudyContracts,
         verifyIndependentInterestingnessReview,
-        verifyRewriteProgramWorkEvidence
+        verifyRewriteProgramWorkEvidence,
+        verifyLearnedPatternAuthorizationEvidence
 }
 
 tasks.register('learnedSchedulingStudy', JavaExec) {
