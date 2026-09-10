@@ -93,6 +93,80 @@ class SharedUnifiedRulePreparationCoordinatorTest {
     }
 
     @Test
+    void sharedV2RetainsLegacyResultsButHalvesDuplicatedFallbackWork() {
+        PatternRewriteRule preparation = rule(
+            "matched_work_factor_difference_squares",
+            expandedDifferenceOfSquares(),
+            factoredDifferenceOfSquares(),
+            RewriteKind.FACTOR);
+        PatternRewriteRule first = rule(
+            "matched_work_first_principal",
+            factoredDifferenceOfSquares(),
+            expandedDifferenceOfSquares(),
+            RewriteKind.EXPAND);
+        PatternRewriteRule second = rule(
+            "matched_work_second_principal",
+            factoredDifferenceOfSquares(),
+            expandedDifferenceOfSquares(),
+            RewriteKind.EXPAND);
+        List<RewriteApplicabilitySchema> schemas = List.of(
+            RewriteApplicabilitySchema.fromPatternRule(first),
+            RewriteApplicabilitySchema.fromPatternRule(second));
+        AssumptionSignature assumptions =
+            AssumptionSignature.ofExpressions(List.of());
+        UnifiedRulePreparationCoordinator legacy =
+            new UnifiedRulePreparationCoordinator(
+                schemas,
+                List.of(preparation),
+                REVISION,
+                budget());
+        SharedUnifiedRulePreparationCoordinator shared =
+            new SharedUnifiedRulePreparationCoordinator(
+                schemas,
+                List.of(preparation),
+                REVISION,
+                budget());
+
+        var legacyEvaluation = legacy.analyze("x^2-y^2", assumptions);
+        var sharedEvaluation = shared.analyze("x^2-y^2", assumptions);
+
+        assertEquals(
+            legacyEvaluation.outcomes().stream()
+                .map(outcome -> outcome.candidate().orElseThrow()
+                    .transformedExpression())
+                .toList(),
+            sharedEvaluation.outcomes().stream()
+                .map(outcome -> outcome.candidate().orElseThrow()
+                    .transformedExpression())
+                .toList(),
+            "shared execution must not change the mathematical results");
+        assertEquals(
+            legacyEvaluation.outcomes().stream()
+                .map(outcome -> outcome.candidate().orElseThrow()
+                    .primitiveRuleIds())
+                .toList(),
+            sharedEvaluation.outcomes().stream()
+                .map(outcome -> outcome.candidate().orElseThrow()
+                    .primitiveRuleIds())
+                .toList(),
+            "shared execution must retain the same primitive proof lineage");
+        assertEquals(2,
+            legacyEvaluation.aggregateWork().expandedStates());
+        assertEquals(2,
+            legacyEvaluation.aggregateWork().generatedTransitions());
+        assertEquals(1,
+            sharedEvaluation.aggregateWork().expandedStates());
+        assertEquals(1,
+            sharedEvaluation.aggregateWork().generatedTransitions());
+        assertEquals(
+            legacyEvaluation.aggregateWork().generatedTransitions(),
+            Math.multiplyExact(
+                2,
+                sharedEvaluation.aggregateWork().generatedTransitions()),
+            "the matched two-principal case must eliminate the duplicated physical fallback transition");
+    }
+
+    @Test
     void nativeExactSpecialistStillWinsBeforeSharedFallback() {
         PatternRewriteRule principal = builtInPattern(
             PerfectSquareStructurePreparationSolver.PRINCIPAL_RULE_ID);
