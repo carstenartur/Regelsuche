@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MovePriorityPolicy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">MovePriorityPolicy.java</span></div><h1>MovePriorityPolicy.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+/** Search-only policy. It cannot change a transformation, assumptions or proof strength. */
+@FunctionalInterface
+public interface MovePriorityPolicy {
+    double score(SearchMove move, MoveState state, MoveContext context);
+<span class="fc" id="L7">    enum Stage { PRINCIPAL_HISTORY, FORCED_CHEAP, VALUABLE_LEARNED, NORMAL_PRIMITIVE, EXPLORATION, EXPENSIVE }</span>
+    default Stage stage(MoveProvider.Descriptor provider, MoveState state, MoveContext context) {
+<span class="pc bpc" id="L9" title="1 of 4 branches missed.">        return switch (provider.sourceKind()) {</span>
+<span class="fc" id="L10">            case PREPARATION, SOLVER -&gt; Stage.EXPENSIVE;</span>
+<span class="nc" id="L11">            case BRIDGE, HYPOTHESIS -&gt; Stage.EXPLORATION;</span>
+<span class="pc bpc" id="L12" title="1 of 2 branches missed.">            case LEARNED -&gt; provider.valueEvidence().confidence() &gt;= 0.75</span>
+<span class="pc bpc" id="L13" title="1 of 2 branches missed.">                &amp;&amp; provider.valueEvidence().knownDepthCompression() &gt; 0 ? Stage.VALUABLE_LEARNED : Stage.EXPLORATION;</span>
+<span class="fc" id="L14">            case PRIMITIVE, EXPERT -&gt; Stage.NORMAL_PRIMITIVE;</span>
+        };
+    }
+<span class="fc" id="L17">    default double providerScore(MoveProvider.Descriptor provider, MoveState state, MoveContext context) { return 0; }</span>
+    /** Mechanical feature work, charged once per state/picker; implementations may memoize immutable features. */
+<span class="fc" id="L19">    default long contextWork(MoveState state, MoveContext context) { return 0; }</span>
+<span class="fc" id="L20">    MovePriorityPolicy INVENTORY_ORDER = (move, state, context) -&gt; 0;</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

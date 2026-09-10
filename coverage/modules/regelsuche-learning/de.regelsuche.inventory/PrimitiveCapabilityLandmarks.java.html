@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PrimitiveCapabilityLandmarks.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.inventory</a> &gt; <span class="el_source">PrimitiveCapabilityLandmarks.java</span></div><h1>PrimitiveCapabilityLandmarks.java</h1><pre class="source lang-java linenums">package de.regelsuche.inventory;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.moves.*;
+import de.regelsuche.transform.RewriteRule;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/** Landmarks are registered executable rules, not token-name detectors or speculative solver promises. */
+public final class PrimitiveCapabilityLandmarks implements StateValue {
+    public record Registration(String capabilityId, String providerId, RewriteRule rule, double value) {
+<span class="fc" id="L16">        public Registration {</span>
+<span class="pc bpc" id="L17" title="5 of 10 branches missed.">            if (capabilityId == null || capabilityId.isBlank() || providerId == null || providerId.isBlank()</span>
+<span class="pc bpc" id="L18" title="2 of 4 branches missed.">                    || rule == null || !Double.isFinite(value) || value &lt; 0) throw new IllegalArgumentException(&quot;invalid capability registration&quot;);</span>
+<span class="fc" id="L19">        }</span>
+    }
+<span class="fc" id="L21">    private record Occurrence(Expr expression, String path) {}</span>
+    private final List&lt;Registration&gt; registrations;
+<span class="fc" id="L23">    public PrimitiveCapabilityLandmarks(List&lt;Registration&gt; registrations, List&lt;MoveProvider&gt; inventory) {</span>
+<span class="fc" id="L24">        this.registrations = List.copyOf(registrations);</span>
+<span class="fc" id="L25">        var ids = inventory.stream().map(provider -&gt; provider.descriptor().id()).collect(java.util.stream.Collectors.toSet());</span>
+<span class="fc" id="L26">        var unique = new java.util.HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        for (var registration : registrations) {</span>
+<span class="pc bpc" id="L28" title="1 of 4 branches missed.">            if (!ids.contains(registration.providerId()) || !unique.add(registration.capabilityId()))</span>
+<span class="fc" id="L29">                throw new IllegalArgumentException(&quot;capability must name one registered provider and have a unique identity&quot;);</span>
+<span class="fc" id="L30">            var provider = inventory.stream().filter(value -&gt; value.descriptor().id().equals(registration.providerId())).findFirst().orElseThrow();</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">            if (!(provider instanceof EngineMoveProvider engine)</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">                    || !(engine.engine() instanceof de.regelsuche.transform.PreparedAstRewriteTransformationEngine ast)</span>
+<span class="pc bpc" id="L33" title="2 of 4 branches missed.">                    || !ast.rules().contains(registration.rule()) || !engine.completeRelation())</span>
+<span class="nc" id="L34">                throw new IllegalArgumentException(&quot;primitive landmark requires the exact rule object in a complete AST provider&quot;);</span>
+<span class="fc" id="L35">        }</span>
+<span class="fc" id="L36">    }</span>
+    @Override public Assessment evaluate(MoveState state, MoveContext context) {
+<span class="fc" id="L38">        var root = new ExpressionParser().parseTerm(state.expression());</span>
+<span class="fc" id="L39">        var occurrences = new ArrayList&lt;Occurrence&gt;(); collect(root, &quot;root&quot;, occurrences);</span>
+<span class="fc" id="L40">        var capabilities = new TreeMap&lt;String, Capability&gt;();</span>
+<span class="fc" id="L41">        long work = occurrences.size(), primitive = 0; double value = 0;</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        for (var registration : registrations) {</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            for (var occurrence : occurrences) {</span>
+<span class="fc" id="L44">                work++;</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">                if (!registration.rule().matches(occurrence.expression())) continue;</span>
+<span class="fc" id="L46">                work++;</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">                if (!context.carries(registration.rule().assumptions(occurrence.expression()).stream()</span>
+<span class="pc" id="L48">                        .map(de.regelsuche.assumption.Assumption::expression).toList(), state)) continue;</span>
+<span class="fc" id="L49">                var rewritten = registration.rule().apply(occurrence.expression()); primitive++;</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">                if (rewritten.equals(occurrence.expression())) continue;</span>
+<span class="fc" id="L51">                capabilities.put(registration.capabilityId(), new Capability(registration.providerId(), state.expression(), occurrence.path(),</span>
+<span class="fc" id="L52">                    ExpressionFormatter.format(occurrence.expression()), ExpressionFormatter.format(rewritten)));</span>
+<span class="fc" id="L53">                value += registration.value(); break;</span>
+            }
+<span class="fc" id="L55">        }</span>
+<span class="fc" id="L56">        return new Assessment(occurrences.size(), value, work, primitive, capabilities);</span>
+    }
+    private static void collect(Expr expression, String path, List&lt;Occurrence&gt; occurrences) {
+<span class="fc" id="L59">        occurrences.add(new Occurrence(expression, path));</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L61">            collect(binary.left(), path + &quot;/left&quot;, occurrences); collect(binary.right(), path + &quot;/right&quot;, occurrences);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">            for (int i = 0; i &lt; function.arguments().size(); i++) collect(function.arguments().get(i), path + &quot;/argument-&quot; + i, occurrences);</span>
+        }
+<span class="fc" id="L65">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

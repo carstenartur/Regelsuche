@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HistoryMovePolicy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.inventory</a> &gt; <span class="el_source">HistoryMovePolicy.java</span></div><h1>HistoryMovePolicy.java</h1><pre class="source lang-java linenums">package de.regelsuche.inventory;
+
+import de.regelsuche.search.moves.*;
+
+/** An inspectable linear policy with fixed weights and immutable TRAIN tables. */
+public final class HistoryMovePolicy implements MovePriorityPolicy {
+    public record Weights(double compression, double history, double capability, double goal, double proof,
+            double branching, double failure, double verification) {
+<span class="fc" id="L9">        public static final Weights DEFAULT = new Weights(3, 4, 6, 8, 0.25, 1, 3, 0.02);</span>
+<span class="fc" id="L10">        public Weights {</span>
+<span class="fc bfc" id="L11" title="All 2 branches covered.">            for (double weight : new double[]{compression, history, capability, goal, proof, branching, failure, verification})</span>
+<span class="pc bpc" id="L12" title="1 of 4 branches missed.">                if (!Double.isFinite(weight) || weight &lt; 0) throw new IllegalArgumentException(&quot;invalid ranking weight&quot;);</span>
+<span class="fc" id="L13">        }</span>
+    }
+<span class="fc" id="L15">    public record Features(double compression, double history, double capability, double goal, double proof,</span>
+            double branching, double failure, double verification) {}
+    private final RuleHistoryMemory.Snapshot history;
+    private final Weights weights;
+    // A read-through source-feature cache, never a learning update. Recreate the policy for each run.
+<span class="fc" id="L20">    private final java.util.Map&lt;MoveState, StructuralMoveContext&gt; contexts = new java.util.HashMap&lt;&gt;();</span>
+<span class="fc" id="L21">    public HistoryMovePolicy(RuleHistoryMemory.Snapshot history, Weights weights) { this.history = history; this.weights = weights; }</span>
+<span class="nc" id="L22">    public RuleHistoryMemory.Snapshot history() { return history; }</span>
+<span class="nc" id="L23">    public Weights weights() { return weights; }</span>
+<span class="fc" id="L24">    private StructuralMoveContext context(MoveState state) { return contexts.computeIfAbsent(state, StructuralMoveContext::of); }</span>
+<span class="fc" id="L25">    @Override public long contextWork(MoveState state, MoveContext context) { return 2L * context(state).visitedNodes(); }</span>
+    public Features features(SearchMove move, MoveState state, MoveContext context) {
+<span class="fc" id="L27">        String key = context(state).key(); var family = history.family(key, move.ruleFamily());</span>
+<span class="fc" id="L28">        var continuation = history.continuation(key, state.previousRule(), move.ruleId());</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        double verification = family.applications() == 0 ? move.applicationCost() : (double) family.verificationWork() / family.applications();</span>
+<span class="fc" id="L30">        return new Features(move.valueEvidence().knownDepthCompression() * move.valueEvidence().confidence(),</span>
+<span class="fc" id="L31">            family.successValue() + continuation.successValue() + Math.log1p(family.averageWorkSaved()), move.capabilityDelta().size(),</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">            move.transformation().transformedExpression().equals(context.goal()) ? 1 : 0,</span>
+<span class="pc bpc" id="L33" title="2 of 4 branches missed.">            move.proofStrength() == SearchMove.ProofStrength.VERIFIED ? 2 : move.proofStrength() == SearchMove.ProofStrength.REPLAYABLE ? 1 : 0,</span>
+<span class="fc" id="L34">            Math.log1p(move.generationCost()) + family.duplicateRate(), family.failureRate(), verification);</span>
+    }
+    @Override public double score(SearchMove move, MoveState state, MoveContext context) {
+<span class="fc" id="L37">        var f = features(move, state, context);</span>
+<span class="fc" id="L38">        return weights.compression() * f.compression() + weights.history() * f.history() + weights.capability() * f.capability()</span>
+<span class="fc" id="L39">            + weights.goal() * f.goal() + weights.proof() * f.proof() - weights.branching() * f.branching()</span>
+<span class="fc" id="L40">            - weights.failure() * f.failure() - weights.verification() * f.verification();</span>
+    }
+    @Override public double providerScore(MoveProvider.Descriptor provider, MoveState state, MoveContext ignored) {
+<span class="fc" id="L43">        String key = context(state).key(); var family = history.family(key, provider.ruleFamily());</span>
+<span class="fc" id="L44">        return weights.compression() * provider.valueEvidence().knownDepthCompression() * provider.valueEvidence().confidence()</span>
+<span class="fc" id="L45">            + weights.history() * (family.successValue() + history.continuation(key, state.previousRule(), provider.id()).successValue())</span>
+<span class="fc" id="L46">            - weights.branching() * family.duplicateRate() - weights.failure() * family.failureRate();</span>
+    }
+    @Override public Stage stage(MoveProvider.Descriptor provider, MoveState state, MoveContext context) {
+        // Expensive/bridge lanes do not become cheap simply because they were useful before.
+<span class="fc" id="L50">        var ordinary = MovePriorityPolicy.super.stage(provider, state, context);</span>
+<span class="pc bpc" id="L51" title="1 of 4 branches missed.">        if (ordinary == Stage.EXPENSIVE || ordinary == Stage.EXPLORATION) return ordinary;</span>
+<span class="fc" id="L52">        var continuation = history.continuation(context(state).key(), state.previousRule(), provider.id());</span>
+<span class="pc bpc" id="L53" title="1 of 4 branches missed.">        return continuation.success() &gt;= 2 &amp;&amp; continuation.failure() == 0 ? Stage.PRINCIPAL_HISTORY : ordinary;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

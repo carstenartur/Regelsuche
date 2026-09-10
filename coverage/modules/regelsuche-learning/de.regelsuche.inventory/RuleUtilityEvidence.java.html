@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleUtilityEvidence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.inventory</a> &gt; <span class="el_source">RuleUtilityEvidence.java</span></div><h1>RuleUtilityEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.inventory;
+
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.json.JsonWriter;
+import java.util.List;
+import java.util.Objects;
+
+/** Persisted search-utility observations. Deserialization never issues mathematical/replay authority. */
+public record RuleUtilityEvidence(String schema, int observedPathSteps, int bestKnownPrimitiveSteps,
+        boolean boundedMinimumProved, int macroSearchDepth, long directApplicationWork, long proofReplayWork,
+        long successfulApplications, long failedApplications, long duplicateSuccessors, long deadEnds,
+        long applicabilityCount, List&lt;String&gt; capabilitiesUnlocked, long firstReachabilityGains,
+        double confidence, long evidenceCount, ReferenceScope reference) {
+    public static final String REVISION = &quot;regelsuche.rule-utility/v1&quot;;
+<span class="fc" id="L16">    public static final RuleUtilityEvidence UNKNOWN = new RuleUtilityEvidence(REVISION, 0, -1, false, 1,</span>
+<span class="fc" id="L17">        -1, -1, 0, 0, 0, 0, 0, List.of(), 0, 0, 0, null);</span>
+<span class="fc" id="L18">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L19">        .enable(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES)</span>
+<span class="fc" id="L20">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+
+    /** The minimum applies only to these concrete endpoints, inventory and declared reference budget. */
+    public record ReferenceScope(String primitiveInventoryHash, String source, String target, String relationScope,
+            String limitsJson, String assessmentHash, boolean observedReplayVerified, long referenceWork) {
+<span class="fc" id="L25">        public ReferenceScope {</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">            for (String value : new String[]{primitiveInventoryHash, source, target, relationScope, limitsJson, assessmentHash}) {</span>
+<span class="fc bfc" id="L27" title="All 4 branches covered.">                if (value == null || value.isBlank()) throw new IllegalArgumentException(&quot;reference scope must be explicit&quot;);</span>
+            }
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">            if (referenceWork &lt; 0) throw new IllegalArgumentException(&quot;negative reference work&quot;);</span>
+<span class="fc" id="L30">        }</span>
+    }
+
+<span class="fc" id="L33">    public RuleUtilityEvidence {</span>
+<span class="pc bpc" id="L34" title="13 of 26 branches missed.">        if (!REVISION.equals(schema) || observedPathSteps &lt; 0 || bestKnownPrimitiveSteps &lt; -1 || macroSearchDepth &lt; 1</span>
+                || directApplicationWork &lt; -1 || proofReplayWork &lt; -1 || successfulApplications &lt; 0 || failedApplications &lt; 0
+                || duplicateSuccessors &lt; 0 || deadEnds &lt; 0 || applicabilityCount &lt; 0 || firstReachabilityGains &lt; 0
+<span class="pc bpc" id="L37" title="3 of 6 branches missed.">                || evidenceCount &lt; 0 || !Double.isFinite(confidence) || confidence &lt; 0 || confidence &gt; 1) {</span>
+<span class="nc" id="L38">            throw new IllegalArgumentException(&quot;invalid utility observations&quot;);</span>
+        }
+<span class="pc bpc" id="L40" title="3 of 8 branches missed.">        if (bestKnownPrimitiveSteps &gt;= 0 &amp;&amp; (reference == null || !reference.observedReplayVerified()</span>
+                || bestKnownPrimitiveSteps &gt; observedPathSteps)) {
+<span class="nc" id="L42">            throw new IllegalArgumentException(&quot;a known primitive distance requires a retained reference witness&quot;);</span>
+        }
+<span class="pc bpc" id="L44" title="2 of 6 branches missed.">        if (boundedMinimumProved &amp;&amp; (bestKnownPrimitiveSteps &lt; 0 || evidenceCount == 0)) {</span>
+<span class="nc" id="L45">            throw new IllegalArgumentException(&quot;minimum cannot be proved without scoped evidence&quot;);</span>
+        }
+<span class="fc" id="L47">        capabilitiesUnlocked = Objects.requireNonNull(capabilitiesUnlocked).stream().distinct().sorted().toList();</span>
+<span class="fc" id="L48">    }</span>
+
+<span class="fc" id="L50">    public int knownDepthCompression() { return Math.max(0, bestKnownPrimitiveSteps - macroSearchDepth); }</span>
+<span class="pc bpc" id="L51" title="3 of 4 branches missed.">    public boolean hasReferenceEvidence() { return reference != null &amp;&amp; reference.observedReplayVerified(); }</span>
+
+    public String toCanonicalJson() {
+<span class="fc" id="L54">        var writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L55">        writeJson(writer);</span>
+<span class="fc" id="L56">        return writer.endObject().toString();</span>
+    }
+
+    public void writeJson(JsonWriter writer) {
+<span class="fc" id="L60">        writer.property(&quot;schema&quot;, schema).property(&quot;observedPathSteps&quot;, observedPathSteps)</span>
+<span class="fc" id="L61">            .property(&quot;bestKnownPrimitiveSteps&quot;, bestKnownPrimitiveSteps).property(&quot;boundedMinimumProved&quot;, boundedMinimumProved)</span>
+<span class="fc" id="L62">            .property(&quot;macroSearchDepth&quot;, macroSearchDepth).property(&quot;directApplicationWork&quot;, directApplicationWork)</span>
+<span class="fc" id="L63">            .property(&quot;proofReplayWork&quot;, proofReplayWork).property(&quot;successfulApplications&quot;, successfulApplications)</span>
+<span class="fc" id="L64">            .property(&quot;failedApplications&quot;, failedApplications).property(&quot;duplicateSuccessors&quot;, duplicateSuccessors)</span>
+<span class="fc" id="L65">            .property(&quot;deadEnds&quot;, deadEnds).property(&quot;applicabilityCount&quot;, applicabilityCount)</span>
+<span class="fc" id="L66">            .stringArray(&quot;capabilitiesUnlocked&quot;, capabilitiesUnlocked).property(&quot;firstReachabilityGains&quot;, firstReachabilityGains)</span>
+<span class="fc" id="L67">            .property(&quot;confidence&quot;, confidence).property(&quot;evidenceCount&quot;, evidenceCount);</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (reference == null) writer.nullProperty(&quot;reference&quot;);</span>
+<span class="fc" id="L69">        else writer.object(&quot;reference&quot;, value -&gt; value.property(&quot;primitiveInventoryHash&quot;, reference.primitiveInventoryHash())</span>
+<span class="fc" id="L70">            .property(&quot;source&quot;, reference.source()).property(&quot;target&quot;, reference.target()).property(&quot;relationScope&quot;, reference.relationScope())</span>
+<span class="fc" id="L71">            .property(&quot;limitsJson&quot;, reference.limitsJson()).property(&quot;assessmentHash&quot;, reference.assessmentHash())</span>
+<span class="fc" id="L72">            .property(&quot;observedReplayVerified&quot;, reference.observedReplayVerified()).property(&quot;referenceWork&quot;, reference.referenceWork()));</span>
+<span class="fc" id="L73">    }</span>
+
+    public static RuleUtilityEvidence fromJson(String json) {
+<span class="pc bpc" id="L76" title="3 of 6 branches missed.">        if (json == null || json.isBlank() || json.equals(&quot;null&quot;)) return UNKNOWN;</span>
+<span class="fc" id="L77">        try { return JSON.readValue(json, RuleUtilityEvidence.class); }</span>
+<span class="nc" id="L78">        catch (java.io.IOException exception) { throw new IllegalArgumentException(&quot;invalid utility evidence JSON&quot;, exception); }</span>
+    }
+
+    public static RuleUtilityEvidence fromValue(Object value) {
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (value == null) return UNKNOWN;</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (value instanceof String text) return fromJson(text);</span>
+<span class="nc" id="L84">        return JSON.convertValue(value, RuleUtilityEvidence.class);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

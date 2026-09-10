@@ -23,31 +23,41 @@ public final class DiscoveryEngineFactory {
 <span class="nc" id="L23">        return create(baseEngine, options, null);</span>
     }
 
+    /** Explicit experimental scheduling entry point; the production default awaits #953/#745 qualification. */
+    public de.regelsuche.search.moves.ProviderTransformationEngine createMoveEngine(
+        TransformationEngine baseEngine, DiscoveryOptions options, GoalAwareMacroMoveSelector macroSelector,
+        de.regelsuche.search.moves.MovePriorityPolicy policy, de.regelsuche.search.moves.MoveContext context
+    ) {
+<span class="fc" id="L31">        var inventory = create(baseEngine, options, macroSelector);</span>
+<span class="fc" id="L32">        return new de.regelsuche.search.moves.ProviderTransformationEngine(</span>
+<span class="fc" id="L33">            de.regelsuche.search.moves.MoveProviders.from(inventory), policy, context);</span>
+    }
+
     public TransformationEngine create(
         TransformationEngine baseEngine,
         DiscoveryOptions options,
         GoalAwareMacroMoveSelector macroSelector
     ) {
-<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (baseEngine == null) {</span>
-<span class="nc" id="L32">            throw new IllegalArgumentException(&quot;baseEngine is required&quot;);</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (baseEngine == null) {</span>
+<span class="nc" id="L42">            throw new IllegalArgumentException(&quot;baseEngine is required&quot;);</span>
         }
-<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        DiscoveryOptions resolved = options == null ? DiscoveryOptions.forProfile(DiscoveryProfile.PURE_REWRITE) : options;</span>
-<span class="fc" id="L35">        DiscoveryEngineOptions engineOptions = resolved.engine();</span>
-<span class="fc" id="L36">        TransformationEngine engine = baseEngine;</span>
-<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (engineOptions.enableHypothesisOperators()) {</span>
-<span class="fc" id="L38">            List&lt;HypothesisOperator&gt; operators = registry.selectOperators(resolved);</span>
-<span class="pc bpc" id="L39" title="1 of 2 branches missed.">            if (!operators.isEmpty()) {</span>
-<span class="fc" id="L40">                engine = new HypothesisTransformationEngine(</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        DiscoveryOptions resolved = options == null ? DiscoveryOptions.forProfile(DiscoveryProfile.PURE_REWRITE) : options;</span>
+<span class="fc" id="L45">        DiscoveryEngineOptions engineOptions = resolved.engine();</span>
+<span class="fc" id="L46">        TransformationEngine engine = baseEngine;</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (engineOptions.enableHypothesisOperators()) {</span>
+<span class="fc" id="L48">            List&lt;HypothesisOperator&gt; operators = registry.selectOperators(resolved);</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">            if (!operators.isEmpty()) {</span>
+<span class="fc" id="L50">                engine = new HypothesisTransformationEngine(</span>
                     engine,
                     operators,
-<span class="fc" id="L43">                    engineOptions.maxHypothesisCandidatesPerOperator() * operators.size()</span>
+<span class="fc" id="L53">                    engineOptions.maxHypothesisCandidatesPerOperator() * operators.size()</span>
                 );
             }
         }
-<span class="fc bfc" id="L47" title="All 4 branches covered.">        if (engineOptions.enableMacroReuse() &amp;&amp; macroSelector != null) {</span>
-<span class="fc" id="L48">            engine = new MacroMoveTransformationEngine(engine, macroSelector);</span>
+<span class="fc bfc" id="L57" title="All 4 branches covered.">        if (engineOptions.enableMacroReuse() &amp;&amp; macroSelector != null) {</span>
+<span class="fc" id="L58">            engine = new MacroMoveTransformationEngine(engine, macroSelector);</span>
         }
-<span class="fc" id="L50">        return engine;</span>
+<span class="fc" id="L60">        return engine;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

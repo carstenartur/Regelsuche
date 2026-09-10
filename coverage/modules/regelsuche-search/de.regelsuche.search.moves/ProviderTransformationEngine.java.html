@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProviderTransformationEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">ProviderTransformationEngine.java</span></div><h1>ProviderTransformationEngine.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.transform.MeasuredTransformationEngine;
+import de.regelsuche.transform.TransformationBatch;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/** Opt-in bridge for existing consumers; search callers can pull evidence-bearing moves directly. */
+public record ProviderTransformationEngine(List&lt;MoveProvider&gt; moveProviders, MovePriorityPolicy policy,
+                                            MoveContext context) implements MeasuredTransformationEngine, MoveProviderInventory {
+<span class="fc" id="L12">    public ProviderTransformationEngine {</span>
+<span class="fc" id="L13">        moveProviders = List.copyOf(moveProviders);</span>
+<span class="fc" id="L14">        Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L15">        Objects.requireNonNull(context, &quot;context&quot;);</span>
+<span class="fc bfc" id="L16" title="All 2 branches covered.">        if (context.phase() == MoveContext.Phase.PRODUCTION) {</span>
+<span class="fc" id="L17">            throw new IllegalArgumentException(&quot;experimental move scheduling requires separate production qualification (#745)&quot;);</span>
+        }
+<span class="fc" id="L19">    }</span>
+<span class="fc" id="L20">    public MovePicker picker(MoveState state) { return new EagerMovePicker(moveProviders, policy, state, context); }</span>
+<span class="nc" id="L21">    public MovePicker stagedPicker(MoveState state) { return new StagedMovePicker(moveProviders, policy, state, context); }</span>
+    @Override public TransformationBatch transformMeasured(String expression) {
+<span class="fc" id="L23">        var picker = picker(MoveState.root(expression));</span>
+<span class="fc" id="L24">        var steps = new ArrayList&lt;de.regelsuche.transform.Transformation&gt;();</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        for (var next = picker.next(); next.isPresent(); next = picker.next()) steps.add(next.orElseThrow().transformation());</span>
+<span class="fc" id="L26">        return new TransformationBatch(steps, picker.workMetrics());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

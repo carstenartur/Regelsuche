@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LearnedSchedulingProtocol.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">LearnedSchedulingProtocol.java</span></div><h1>LearnedSchedulingProtocol.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.search.moves.MoveSearch;
+import java.util.List;
+
+/** Frozen public held-out protocol: changes require a new revision, never post-result task/budget selection. */
+<span class="nc" id="L8">public final class LearnedSchedulingProtocol {</span>
+    public static final String REVISION = &quot;regelsuche.learned-knowledge-search/v4&quot;;
+<span class="fc" id="L10">    public static final List&lt;Long&gt; WORK_BUDGETS = List.of(256L, 512L, 1024L, 2048L, 4096L, 16384L);</span>
+<span class="fc" id="L11">    public record Case(String id, String source, String target, boolean polynomial) {}</span>
+<span class="fc" id="L12">    public record Configuration(String id, LearnedSearchProfile profile, MoveSearch.Scheduling scheduling,</span>
+            boolean utility, boolean history, boolean continuation, boolean activity, boolean landmarks) {}
+    public static List&lt;Configuration&gt; configurations() {
+<span class="fc" id="L15">        return List.of(config(&quot;BASE&quot;, LearnedSearchProfile.BASE, false, false, false, false, false, true),</span>
+<span class="fc" id="L16">            config(&quot;LEARNED_NAIVE&quot;, LearnedSearchProfile.LEARNED_NAIVE, false, false, false, false, false, true),</span>
+<span class="fc" id="L17">            config(&quot;LEARNED_RANKED&quot;, LearnedSearchProfile.LEARNED_RANKED, true, true, true, true, true, true),</span>
+<span class="fc" id="L18">            config(&quot;EXPERT&quot;, LearnedSearchProfile.EXPERT, true, false, false, false, false, true),</span>
+<span class="fc" id="L19">            config(&quot;BASE_STAGED&quot;, LearnedSearchProfile.BASE, true, false, false, false, false, true),</span>
+<span class="fc" id="L20">            config(&quot;NAIVE_STAGED&quot;, LearnedSearchProfile.LEARNED_NAIVE, true, false, false, false, false, true),</span>
+<span class="fc" id="L21">            config(&quot;NO_UTILITY&quot;, LearnedSearchProfile.LEARNED_RANKED, true, false, true, true, true, true),</span>
+<span class="fc" id="L22">            config(&quot;NO_HISTORY&quot;, LearnedSearchProfile.LEARNED_RANKED, true, true, false, false, true, true),</span>
+<span class="fc" id="L23">            config(&quot;NO_CONTINUATION&quot;, LearnedSearchProfile.LEARNED_RANKED, true, true, true, false, true, true),</span>
+<span class="fc" id="L24">            config(&quot;NO_ACTIVITY&quot;, LearnedSearchProfile.LEARNED_RANKED, true, true, true, true, false, true),</span>
+<span class="fc" id="L25">            config(&quot;NO_LANDMARKS&quot;, LearnedSearchProfile.LEARNED_RANKED, true, true, true, true, true, false));</span>
+    }
+    private static Configuration config(String id, LearnedSearchProfile profile, boolean staged, boolean utility,
+            boolean history, boolean continuation, boolean activity, boolean landmarks) {
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        return new Configuration(id, profile, staged ? MoveSearch.Scheduling.STAGED : MoveSearch.Scheduling.EAGER_CONTROL,</span>
+            utility, history, continuation, activity, landmarks);
+    }
+    public static List&lt;Case&gt; cases() {
+<span class="fc" id="L33">        return List.of(</span>
+            new Case(&quot;three-squares&quot;, &quot;((a+b)*(a-b)+b*b)+((a+c)*(a-c)+c*c)+((a+d)*(a-d)+d*d)&quot;, &quot;3*a^2&quot;, true),
+            new Case(&quot;nested-product&quot;, &quot;((u+v)*(u-v)+v*v)*(u+3)*(u+4)&quot;, &quot;u^2*(u+3)*(u+4)&quot;, true),
+            new Case(&quot;compound-shared&quot;, &quot;((p*q+r)*(p*q-r)+r*r)+((p*q+s)*(p*q-s)+s*s)&quot;, &quot;2*(p*q)^2&quot;, true),
+            new Case(&quot;weighted-two-sites&quot;, &quot;2*((x+y)*(x-y)+y*y)+4*((x+z)*(x-z)+z*z)&quot;, &quot;2*x^2+4*x^2&quot;, true),
+            new Case(&quot;two-factor-sites&quot;, &quot;(a*b+a*c)*(d*b+d*c)&quot;, &quot;(a*(b+c))*(d*(b+c))&quot;, true),
+            new Case(&quot;residual-control&quot;, &quot;((u+v)*(u-v)+v*(v+1))*(u+3)&quot;, &quot;u^2*(u+3)&quot;, true),
+            new Case(&quot;already-target&quot;, &quot;m^3+11&quot;, &quot;m^3+11&quot;, true),
+            new Case(&quot;unsupported-control&quot;, &quot;sin(u)+cos(v)&quot;, &quot;1&quot;, false));
+    }
+    public static String canonicalJson() {
+<span class="fc" id="L44">        return new JsonWriter().beginObject().property(&quot;schema&quot;, REVISION)</span>
+<span class="fc" id="L45">            .property(&quot;split&quot;, &quot;PUBLIC_HELD_OUT_FROM_TRAIN_AND_PR1_DEVELOPMENT;NOT_A_SEALED_FINAL_TEST&quot;)</span>
+<span class="fc" id="L46">            .property(&quot;parity&quot;, &quot;SAME_TARGETS_PRIMITIVES_TOTAL_WORK_AND_EXACT_PRIMITIVE_REPLAY&quot;)</span>
+<span class="fc" id="L47">            .property(&quot;freeze&quot;, &quot;TASKS_BUDGETS_WEIGHTS_AND_ABLATIONS_FIXED_BEFORE_FIRST_RUN;TEST_NEVER_UPDATES&quot;)</span>
+<span class="fc" id="L48">            .property(&quot;work&quot;, &quot;SOURCE_EVENTS_PLUS_MEASURED_PRIMITIVE_APPLICATIONS_PLUS_FRONTIER_FEATURE_PROBE_AND_EXACT_REPLAY_WORK;ATOMIC_OVERRUN_RETAINED&quot;)</span>
+<span class="fc" id="L49">            .property(&quot;primitiveDepth&quot;, 9).property(&quot;searchDepth&quot;, 9).property(&quot;states&quot;, 256).property(&quot;complexityDebt&quot;, 24)</span>
+<span class="fc" id="L50">            .property(&quot;referenceWork&quot;, 1000000).property(&quot;referenceStates&quot;, 4096).property(&quot;trainingEpochs&quot;, 5)</span>
+<span class="fc" id="L51">            .property(&quot;amortizationPopulation&quot;, &quot;UNIFORM_COMMON_SOLVED_CASES_AT_MAXIMUM_WORK_BUDGET;CANONICAL_HOT_PATH_UNITS&quot;)</span>
+<span class="fc" id="L52">            .property(&quot;trainingFeedbackWork&quot;, &quot;ACTIVITY_ENTRY_UPDATES_HISTORY_CONTEXT_NODES_AND_TABLE_UPDATES_UTILITY_OBSERVATION_INSPECTIONS&quot;)</span>
+<span class="fc" id="L53">            .stringArray(&quot;budgets&quot;, WORK_BUDGETS.stream().map(String::valueOf).toList())</span>
+<span class="fc" id="L54">            .array(&quot;configurations&quot;, array -&gt; configurations().forEach(c -&gt; array.objectValue(value -&gt; value.property(&quot;id&quot;, c.id())</span>
+<span class="fc" id="L55">                .property(&quot;profile&quot;, c.profile().name()).property(&quot;scheduling&quot;, c.scheduling().name()).property(&quot;utility&quot;, c.utility())</span>
+<span class="fc" id="L56">                .property(&quot;history&quot;, c.history()).property(&quot;continuation&quot;, c.continuation()).property(&quot;activity&quot;, c.activity()).property(&quot;landmarks&quot;, c.landmarks()))))</span>
+<span class="fc" id="L57">            .array(&quot;cases&quot;, array -&gt; cases().forEach(c -&gt; array.objectValue(value -&gt; value.property(&quot;id&quot;, c.id())</span>
+<span class="fc" id="L58">                .property(&quot;source&quot;, c.source()).property(&quot;target&quot;, c.target()).property(&quot;polynomial&quot;, c.polynomial())))).endObject().toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

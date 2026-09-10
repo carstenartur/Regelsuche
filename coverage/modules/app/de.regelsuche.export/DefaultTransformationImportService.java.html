@@ -118,81 +118,86 @@ import java.util.Objects;
 <span class="fc" id="L118">            doubleValue(values.get(&quot;averageImprovement&quot;), 0d),</span>
 <span class="fc" id="L119">            parseInstant(values.get(&quot;createdAt&quot;), Instant.EPOCH),</span>
 <span class="fc" id="L120">            stringValue(values.get(&quot;canonicalHash&quot;), &quot;&quot;),</span>
-<span class="pc bpc" id="L121" title="1 of 2 branches missed.">            values.get(&quot;lastUsedAt&quot;) == null ? null : parseInstant(values.get(&quot;lastUsedAt&quot;), null),</span>
-<span class="fc" id="L122">            intValue(values.get(&quot;usageCount&quot;), 0)</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            values.get(&quot;lastUsedAt&quot;) == null ? null : parseInstant(values.get(&quot;lastUsedAt&quot;), null),</span>
+<span class="fc" id="L122">            intValue(values.get(&quot;usageCount&quot;), 0),</span>
+<span class="fc" id="L123">            intValue(values.get(&quot;occurrenceCount&quot;), 0),</span>
+<span class="fc" id="L124">            stringList(values.get(&quot;supportingPathIds&quot;)),</span>
+<span class="fc" id="L125">            doubleValue(values.get(&quot;confidenceScore&quot;), 0d),</span>
+<span class="fc" id="L126">            stringList(values.get(&quot;assumptions&quot;)),</span>
+<span class="fc" id="L127">            de.regelsuche.inventory.RuleUtilityEvidence.fromValue(values.get(&quot;utilityEvidence&quot;))</span>
         );
     }
 
     private List&lt;Object&gt; readList(Object raw) {
-<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (raw == null) {</span>
-<span class="nc" id="L128">            return List.of();</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L133">            return List.of();</span>
         }
-<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (raw instanceof List&lt;?&gt; list) {</span>
-<span class="fc" id="L131">            return list.stream().map(o -&gt; (Object) o).toList();</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (raw instanceof List&lt;?&gt; list) {</span>
+<span class="fc" id="L136">            return list.stream().map(o -&gt; (Object) o).toList();</span>
         }
-<span class="nc" id="L133">        throw new IllegalArgumentException(&quot;Expected array, got &quot; + raw);</span>
+<span class="nc" id="L138">        throw new IllegalArgumentException(&quot;Expected array, got &quot; + raw);</span>
     }
 
     private List&lt;String&gt; stringList(Object raw) {
-<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (raw == null) {</span>
-<span class="fc" id="L138">            return List.of();</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (raw == null) {</span>
+<span class="fc" id="L143">            return List.of();</span>
         }
-<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (raw instanceof List&lt;?&gt; list) {</span>
-<span class="fc" id="L141">            return list.stream().map(String::valueOf).toList();</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        if (raw instanceof List&lt;?&gt; list) {</span>
+<span class="fc" id="L146">            return list.stream().map(String::valueOf).toList();</span>
         }
-<span class="nc" id="L143">        throw new IllegalArgumentException(&quot;Expected array of strings, got &quot; + raw);</span>
+<span class="nc" id="L148">        throw new IllegalArgumentException(&quot;Expected array of strings, got &quot; + raw);</span>
     }
 
     @SuppressWarnings(&quot;unchecked&quot;)
     private Map&lt;String, Object&gt; asMap(Object raw) {
-<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (raw == null) {</span>
-<span class="nc" id="L149">            return Map.of();</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L154">            return Map.of();</span>
         }
-<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if (raw instanceof Map&lt;?, ?&gt; map) {</span>
-<span class="fc" id="L152">            return (Map&lt;String, Object&gt;) map;</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (raw instanceof Map&lt;?, ?&gt; map) {</span>
+<span class="fc" id="L157">            return (Map&lt;String, Object&gt;) map;</span>
         }
-<span class="nc" id="L154">        throw new IllegalArgumentException(&quot;Expected object, got &quot; + raw);</span>
+<span class="nc" id="L159">        throw new IllegalArgumentException(&quot;Expected object, got &quot; + raw);</span>
     }
 
     private String stringValue(Object raw, String fallback) {
-<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        return raw == null ? fallback : String.valueOf(raw);</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        return raw == null ? fallback : String.valueOf(raw);</span>
     }
 
     private int intValue(Object raw, int fallback) {
-<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (raw == null) {</span>
-<span class="nc" id="L163">            return fallback;</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L168">            return fallback;</span>
         }
-<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (raw instanceof Number number) {</span>
-<span class="fc" id="L166">            return number.intValue();</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if (raw instanceof Number number) {</span>
+<span class="fc" id="L171">            return number.intValue();</span>
         }
-<span class="nc" id="L168">        return Integer.parseInt(String.valueOf(raw));</span>
+<span class="nc" id="L173">        return Integer.parseInt(String.valueOf(raw));</span>
     }
 
     private double doubleValue(Object raw, double fallback) {
-<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (raw == null) {</span>
-<span class="nc" id="L173">            return fallback;</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L178">            return fallback;</span>
         }
-<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        if (raw instanceof Number number) {</span>
-<span class="fc" id="L176">            return number.doubleValue();</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (raw instanceof Number number) {</span>
+<span class="fc" id="L181">            return number.doubleValue();</span>
         }
-<span class="nc" id="L178">        return Double.parseDouble(String.valueOf(raw));</span>
+<span class="nc" id="L183">        return Double.parseDouble(String.valueOf(raw));</span>
     }
 
     private boolean booleanValue(Object raw, boolean fallback) {
-<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        if (raw == null) {</span>
-<span class="nc" id="L183">            return fallback;</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L188">            return fallback;</span>
         }
-<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (raw instanceof Boolean bool) {</span>
-<span class="fc" id="L186">            return bool;</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (raw instanceof Boolean bool) {</span>
+<span class="fc" id="L191">            return bool;</span>
         }
-<span class="nc" id="L188">        return Boolean.parseBoolean(String.valueOf(raw));</span>
+<span class="nc" id="L193">        return Boolean.parseBoolean(String.valueOf(raw));</span>
     }
 
     private Instant parseInstant(Object raw, Instant fallback) {
-<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        if (raw == null) {</span>
-<span class="nc" id="L193">            return fallback;</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L198">            return fallback;</span>
         }
-<span class="fc" id="L195">        return Instant.parse(String.valueOf(raw));</span>
+<span class="fc" id="L200">        return Instant.parse(String.valueOf(raw));</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

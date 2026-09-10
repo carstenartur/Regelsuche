@@ -11,50 +11,58 @@ import java.util.Map;
  * Alpha identity minimizes over all variable permutations, not lexical renaming.
  * These identities are exclusion keys, never evidence of a new theorem.
  */
-<span class="fc" id="L14">public final class ExactPolynomialAnalysis {</span>
+public final class ExactPolynomialAnalysis {
     public static final String REVISION = &quot;regelsuche.exact-polynomial-analysis/v1&quot;;
     public static final int MAX_VARIABLES = 4;
-<span class="fc" id="L17">    private final ExactResidualPolynomialArithmetic arithmetic = new ExactResidualPolynomialArithmetic();</span>
+    private final ExactResidualPolynomialArithmetic arithmetic;
+    private final java.util.function.LongConsumer workObserver;
+<span class="fc" id="L19">    public ExactPolynomialAnalysis() { this(null); }</span>
+    /** Optional exact node/term and alpha-renaming work receipt; mathematical results are unchanged. */
+<span class="fc" id="L21">    public ExactPolynomialAnalysis(java.util.function.LongConsumer workObserver) {</span>
+<span class="fc" id="L22">        this.workObserver = workObserver;</span>
+<span class="fc" id="L23">        arithmetic = new ExactResidualPolynomialArithmetic(workObserver);</span>
+<span class="fc" id="L24">    }</span>
 
     public void requireEquivalent(String source, String candidate) {
-<span class="fc bfc" id="L20" title="All 2 branches covered.">        if (!arithmetic.parse(source).equals(arithmetic.parse(candidate))) {</span>
-<span class="fc" id="L21">            throw new IllegalArgumentException(&quot;polynomial normal forms differ&quot;);</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        if (!arithmetic.parse(source).equals(arithmetic.parse(candidate))) {</span>
+<span class="fc" id="L28">            throw new IllegalArgumentException(&quot;polynomial normal forms differ&quot;);</span>
         }
-<span class="fc" id="L23">    }</span>
+<span class="fc" id="L30">    }</span>
 
     /** Unsupported or excessive inputs throw; they never establish disjointness. */
     public String alphaIdentity(String expression) {
-<span class="fc" id="L27">        Polynomial polynomial = arithmetic.parse(expression);</span>
-<span class="fc" id="L28">        List&lt;String&gt; variables = polynomial.variables().stream().sorted().toList();</span>
-<span class="fc bfc" id="L29" title="All 2 branches covered.">        if (variables.size() &gt; MAX_VARIABLES) {</span>
-<span class="fc" id="L30">            throw new IllegalArgumentException(&quot;alpha identity supports at most four polynomial variables&quot;);</span>
+<span class="fc" id="L34">        Polynomial polynomial = arithmetic.parse(expression);</span>
+<span class="fc" id="L35">        List&lt;String&gt; variables = polynomial.variables().stream().sorted().toList();</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (variables.size() &gt; MAX_VARIABLES) {</span>
+<span class="fc" id="L37">            throw new IllegalArgumentException(&quot;alpha identity supports at most four polynomial variables&quot;);</span>
         }
-<span class="fc" id="L32">        List&lt;String&gt; alternatives = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L33">        permute(polynomial, variables, new ArrayList&lt;&gt;(), alternatives);</span>
-<span class="fc" id="L34">        return REVISION + &quot;:&quot; + alternatives.stream().min(String::compareTo).orElseThrow();</span>
+<span class="fc" id="L39">        List&lt;String&gt; alternatives = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L40">        permute(polynomial, variables, new ArrayList&lt;&gt;(), alternatives);</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        if (workObserver != null) workObserver.accept((long) alternatives.size() * polynomial.termCount());</span>
+<span class="fc" id="L42">        return REVISION + &quot;:&quot; + alternatives.stream().min(String::compareTo).orElseThrow();</span>
     }
 
     private static void permute(Polynomial polynomial, List&lt;String&gt; variables,
             List&lt;String&gt; order, List&lt;String&gt; results) {
-<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (order.size() == variables.size()) {</span>
-<span class="fc" id="L40">            Map&lt;String, String&gt; names = new HashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L41" title="All 2 branches covered.">            for (int i = 0; i &lt; order.size(); i++) names.put(order.get(i), &quot;v&quot; + i);</span>
-<span class="fc" id="L42">            Polynomial renamed = Polynomial.zero();</span>
-<span class="fc bfc" id="L43" title="All 2 branches covered.">            for (var term : polynomial.terms().entrySet()) {</span>
-<span class="fc" id="L44">                Map&lt;String, Integer&gt; powers = new HashMap&lt;&gt;();</span>
-<span class="fc" id="L45">                term.getKey().powers().forEach((name, exponent) -&gt; powers.put(names.get(name), exponent));</span>
-<span class="fc" id="L46">                renamed = renamed.addTerm(new Monomial(powers), term.getValue());</span>
-<span class="fc" id="L47">            }</span>
-<span class="fc" id="L48">            results.add(renamed.toCanonicalString());</span>
-<span class="fc" id="L49">            return;</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (order.size() == variables.size()) {</span>
+<span class="fc" id="L48">            Map&lt;String, String&gt; names = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            for (int i = 0; i &lt; order.size(); i++) names.put(order.get(i), &quot;v&quot; + i);</span>
+<span class="fc" id="L50">            Polynomial renamed = Polynomial.zero();</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">            for (var term : polynomial.terms().entrySet()) {</span>
+<span class="fc" id="L52">                Map&lt;String, Integer&gt; powers = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L53">                term.getKey().powers().forEach((name, exponent) -&gt; powers.put(names.get(name), exponent));</span>
+<span class="fc" id="L54">                renamed = renamed.addTerm(new Monomial(powers), term.getValue());</span>
+<span class="fc" id="L55">            }</span>
+<span class="fc" id="L56">            results.add(renamed.toCanonicalString());</span>
+<span class="fc" id="L57">            return;</span>
         }
-<span class="fc bfc" id="L51" title="All 2 branches covered.">        for (String variable : variables) {</span>
-<span class="fc bfc" id="L52" title="All 2 branches covered.">            if (!order.contains(variable)) {</span>
-<span class="fc" id="L53">                order.add(variable);</span>
-<span class="fc" id="L54">                permute(polynomial, variables, order, results);</span>
-<span class="fc" id="L55">                order.removeLast();</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (String variable : variables) {</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            if (!order.contains(variable)) {</span>
+<span class="fc" id="L61">                order.add(variable);</span>
+<span class="fc" id="L62">                permute(polynomial, variables, order, results);</span>
+<span class="fc" id="L63">                order.removeLast();</span>
             }
-<span class="fc" id="L57">        }</span>
-<span class="fc" id="L58">    }</span>
+<span class="fc" id="L65">        }</span>
+<span class="fc" id="L66">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

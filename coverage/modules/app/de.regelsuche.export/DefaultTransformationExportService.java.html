@@ -157,32 +157,37 @@ public class DefaultTransformationExportService implements TransformationExportS
 <span class="fc" id="L157">        writer.property(&quot;averageImprovement&quot;, rule.averageImprovement());</span>
 <span class="fc" id="L158">        writer.property(&quot;createdAt&quot;, rule.createdAt().toString());</span>
 <span class="fc" id="L159">        writer.property(&quot;canonicalHash&quot;, rule.canonicalHash());</span>
-<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        if (rule.lastUsedAt() == null) {</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (rule.lastUsedAt() == null) {</span>
 <span class="fc" id="L161">            writer.nullProperty(&quot;lastUsedAt&quot;);</span>
         } else {
-<span class="nc" id="L163">            writer.property(&quot;lastUsedAt&quot;, rule.lastUsedAt().toString());</span>
+<span class="fc" id="L163">            writer.property(&quot;lastUsedAt&quot;, rule.lastUsedAt().toString());</span>
         }
 <span class="fc" id="L165">        writer.property(&quot;usageCount&quot;, rule.usageCount());</span>
-<span class="fc" id="L166">    }</span>
+<span class="fc" id="L166">        writer.property(&quot;occurrenceCount&quot;, rule.occurrenceCount());</span>
+<span class="fc" id="L167">        writer.stringArray(&quot;supportingPathIds&quot;, rule.supportingPathIds());</span>
+<span class="fc" id="L168">        writer.property(&quot;confidenceScore&quot;, rule.confidenceScore());</span>
+<span class="fc" id="L169">        writer.stringArray(&quot;assumptions&quot;, rule.assumptions());</span>
+<span class="fc" id="L170">        writer.object(&quot;utilityEvidence&quot;, rule.utilityEvidence()::writeJson);</span>
+<span class="fc" id="L171">    }</span>
 
     private void writeCandidate(JsonWriter writer, RuleCandidate candidate) {
-<span class="fc" id="L169">        writer.property(&quot;leftPattern&quot;, candidate.leftPattern());</span>
-<span class="fc" id="L170">        writer.property(&quot;rightPattern&quot;, candidate.rightPattern());</span>
-<span class="fc" id="L171">        writer.property(&quot;examplesCount&quot;, candidate.examplesCount());</span>
-<span class="fc" id="L172">        writer.property(&quot;averageScoreImprovement&quot;, candidate.averageScoreImprovement());</span>
-<span class="fc" id="L173">        writer.property(&quot;maximumScoreImprovement&quot;, candidate.maximumScoreImprovement());</span>
-<span class="fc" id="L174">        writer.property(&quot;equivalenceVerified&quot;, candidate.equivalenceVerified());</span>
-<span class="fc" id="L175">        writer.property(&quot;generalizationPlausible&quot;, candidate.generalizationPlausible());</span>
-<span class="fc" id="L176">        writer.property(&quot;containsFreeParameters&quot;, candidate.containsFreeParameters());</span>
-<span class="fc" id="L177">        writer.stringArray(&quot;parameterRelations&quot;, candidate.parameterRelations());</span>
-<span class="fc" id="L178">        writer.property(&quot;status&quot;, candidate.status().name());</span>
-<span class="fc" id="L179">        writer.property(&quot;proofStatus&quot;, candidate.proofStatus().name());</span>
-<span class="fc" id="L180">        writer.property(&quot;canonicalHash&quot;, candidate.canonicalHash());</span>
-<span class="fc" id="L181">        writer.stringArray(&quot;supportingTransformationIds&quot;, candidate.supportingTransformationIds());</span>
-<span class="fc" id="L182">    }</span>
+<span class="fc" id="L174">        writer.property(&quot;leftPattern&quot;, candidate.leftPattern());</span>
+<span class="fc" id="L175">        writer.property(&quot;rightPattern&quot;, candidate.rightPattern());</span>
+<span class="fc" id="L176">        writer.property(&quot;examplesCount&quot;, candidate.examplesCount());</span>
+<span class="fc" id="L177">        writer.property(&quot;averageScoreImprovement&quot;, candidate.averageScoreImprovement());</span>
+<span class="fc" id="L178">        writer.property(&quot;maximumScoreImprovement&quot;, candidate.maximumScoreImprovement());</span>
+<span class="fc" id="L179">        writer.property(&quot;equivalenceVerified&quot;, candidate.equivalenceVerified());</span>
+<span class="fc" id="L180">        writer.property(&quot;generalizationPlausible&quot;, candidate.generalizationPlausible());</span>
+<span class="fc" id="L181">        writer.property(&quot;containsFreeParameters&quot;, candidate.containsFreeParameters());</span>
+<span class="fc" id="L182">        writer.stringArray(&quot;parameterRelations&quot;, candidate.parameterRelations());</span>
+<span class="fc" id="L183">        writer.property(&quot;status&quot;, candidate.status().name());</span>
+<span class="fc" id="L184">        writer.property(&quot;proofStatus&quot;, candidate.proofStatus().name());</span>
+<span class="fc" id="L185">        writer.property(&quot;canonicalHash&quot;, candidate.canonicalHash());</span>
+<span class="fc" id="L186">        writer.stringArray(&quot;supportingTransformationIds&quot;, candidate.supportingTransformationIds());</span>
+<span class="fc" id="L187">    }</span>
 
     private String escapeMermaid(String value) {
-<span class="fc" id="L185">        return value.replace(&quot;\&quot;&quot;, &quot;'&quot;);</span>
+<span class="fc" id="L190">        return value.replace(&quot;\&quot;&quot;, &quot;'&quot;);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

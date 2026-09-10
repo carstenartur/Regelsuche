@@ -35,7 +35,7 @@ import java.util.Optional;
  * path (or supporting path reconstruction references) for the graph/replay
  * layer.&lt;/p&gt;
  */
-public class MacroMoveTransformationEngine implements TransformationEngine {
+public class MacroMoveTransformationEngine implements TransformationEngine, de.regelsuche.search.moves.MoveProviderInventory {
     private final TransformationEngine baseEngine;
     private final GoalAwareMacroMoveSelector selector;
     private final String goalExpression;
@@ -119,172 +119,189 @@ public class MacroMoveTransformationEngine implements TransformationEngine {
 <span class="fc" id="L119">        return result;</span>
     }
 
+    /** Common scheduling bypasses both legacy append loops and the selector's old representation heuristic. */
+    @Override
+    public List&lt;de.regelsuche.search.moves.MoveProvider&gt; moveProviders() {
+<span class="fc" id="L125">        var providers = new ArrayList&lt;&gt;(de.regelsuche.search.moves.MoveProviders.from(baseEngine));</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (!macroMovesEnabled) return List.copyOf(providers);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        for (var rule : selector.inventoryRules()) {</span>
+<span class="fc" id="L128">            var descriptor = new de.regelsuche.search.moves.MoveProvider.Descriptor(rule.id(), &quot;inventory-macro&quot;,</span>
+                de.regelsuche.search.moves.SearchMove.SourceKind.LEARNED,
+<span class="fc" id="L130">                de.regelsuche.search.moves.SearchMove.ProofStrength.EMPIRICAL, rule.assumptions(),</span>
+<span class="fc" id="L131">                rule.moveValueEvidence(), rule.canonicalHash());</span>
+            // Supporting-path metadata alone is not a replayable primitive proof. Keep it quarantined in the new boundary.
+<span class="fc" id="L133">            providers.add(new de.regelsuche.search.moves.EngineMoveProvider(descriptor,</span>
+<span class="fc" id="L134">                expression -&gt; applyMacro(expression, rule), false));</span>
+<span class="fc" id="L135">        }</span>
+<span class="fc" id="L136">        return List.copyOf(providers);</span>
+    }
+
     public Optional&lt;MacroMoveExpansion&gt; expansionFor(String fromExpression, String toExpression, String ruleId) {
-<span class="fc" id="L123">        return Optional.ofNullable(expansionsByEdge.get(edgeKey(fromExpression, toExpression, ruleId)));</span>
+<span class="fc" id="L140">        return Optional.ofNullable(expansionsByEdge.get(edgeKey(fromExpression, toExpression, ruleId)));</span>
     }
 
     public Map&lt;String, MacroMoveStatistics&gt; statisticsByRuleId() {
-<span class="nc" id="L127">        return Map.copyOf(statisticsByRuleId);</span>
+<span class="nc" id="L144">        return Map.copyOf(statisticsByRuleId);</span>
     }
 
     private List&lt;Transformation&gt; applyMacro(String expression, ReusableRule rule) {
-<span class="fc" id="L131">        RewriteRule rewriteRule = new PatternRewriteRule(</span>
-<span class="fc" id="L132">            macroRuleId(rule),</span>
-<span class="fc" id="L133">            toPatternExpr(new RulePatternParser().parse(rule.leftPattern())),</span>
-<span class="fc" id="L134">            toPatternExpr(new RulePatternParser().parse(rule.rightPattern())),</span>
+<span class="fc" id="L148">        RewriteRule rewriteRule = new PatternRewriteRule(</span>
+<span class="fc" id="L149">            macroRuleId(rule),</span>
+<span class="fc" id="L150">            toPatternExpr(new RulePatternParser().parse(rule.leftPattern())),</span>
+<span class="fc" id="L151">            toPatternExpr(new RulePatternParser().parse(rule.rightPattern())),</span>
             RewriteKind.NORMALIZE,
             false,
-<span class="fc" id="L137">            -Math.max(1, (int) Math.round(Math.max(1.0, rule.averageImprovement()))),</span>
+<span class="fc" id="L154">            -Math.max(1, (int) Math.round(Math.max(1.0, rule.averageImprovement()))),</span>
             true
         );
-<span class="fc" id="L140">        AstRewriteTransformationEngine macroEngine = new AstRewriteTransformationEngine(List.of(rewriteRule), Integer.MAX_VALUE, 80);</span>
-<span class="fc" id="L141">        MacroMoveStatistics before = statisticsByRuleId.getOrDefault(rule.id(), MacroMoveStatistics.empty());</span>
-<span class="fc" id="L142">        List&lt;Transformation&gt; transformations = macroEngine.transform(expression);</span>
-<span class="fc" id="L143">        specialUnitStepTransformation(expression, rule).ifPresent(transformations::add);</span>
-<span class="fc" id="L144">        transformations = transformations.stream()</span>
-<span class="fc" id="L145">            .filter(transformation -&gt; applicabilityGuard.allows(expression, rule, transformation))</span>
-<span class="fc" id="L146">            .toList();</span>
-<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        int improved = (int) transformations.stream().filter(t -&gt; t.estimatedCostDelta() &lt; 0).count();</span>
-<span class="fc bfc" id="L148" title="All 2 branches covered.">        double averageReduction = transformations.isEmpty()</span>
-<span class="fc" id="L149">            ? before.averageCostReduction()</span>
-<span class="fc" id="L150">            : transformations.stream().mapToInt(t -&gt; Math.max(0, -t.estimatedCostDelta())).average().orElse(0.0);</span>
-<span class="fc" id="L151">        MacroMoveStatistics stats = new MacroMoveStatistics(</span>
-<span class="fc" id="L152">            before.timesConsidered() + 1,</span>
-<span class="fc" id="L153">            before.timesApplied() + transformations.size(),</span>
-<span class="fc" id="L154">            before.timesImprovedScore() + improved,</span>
+<span class="fc" id="L157">        AstRewriteTransformationEngine macroEngine = new AstRewriteTransformationEngine(List.of(rewriteRule), Integer.MAX_VALUE, 80);</span>
+<span class="fc" id="L158">        MacroMoveStatistics before = statisticsByRuleId.getOrDefault(rule.id(), MacroMoveStatistics.empty());</span>
+<span class="fc" id="L159">        List&lt;Transformation&gt; transformations = macroEngine.transform(expression);</span>
+<span class="fc" id="L160">        specialUnitStepTransformation(expression, rule).ifPresent(transformations::add);</span>
+<span class="fc" id="L161">        transformations = transformations.stream()</span>
+<span class="fc" id="L162">            .filter(transformation -&gt; applicabilityGuard.allows(expression, rule, transformation))</span>
+<span class="fc" id="L163">            .toList();</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        int improved = (int) transformations.stream().filter(t -&gt; t.estimatedCostDelta() &lt; 0).count();</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        double averageReduction = transformations.isEmpty()</span>
+<span class="fc" id="L166">            ? before.averageCostReduction()</span>
+<span class="fc" id="L167">            : transformations.stream().mapToInt(t -&gt; Math.max(0, -t.estimatedCostDelta())).average().orElse(0.0);</span>
+<span class="fc" id="L168">        MacroMoveStatistics stats = new MacroMoveStatistics(</span>
+<span class="fc" id="L169">            before.timesConsidered() + 1,</span>
+<span class="fc" id="L170">            before.timesApplied() + transformations.size(),</span>
+<span class="fc" id="L171">            before.timesImprovedScore() + improved,</span>
             averageReduction,
-<span class="pc bpc" id="L156" title="1 of 4 branches missed.">            goalExpression == null || goalExpression.isBlank() ? before.usefulForGoals() : List.of(goalExpression)</span>
+<span class="pc bpc" id="L173" title="1 of 4 branches missed.">            goalExpression == null || goalExpression.isBlank() ? before.usefulForGoals() : List.of(goalExpression)</span>
         );
-<span class="fc" id="L158">        statisticsByRuleId.put(rule.id(), stats);</span>
-<span class="fc bfc" id="L159" title="All 2 branches covered.">        for (Transformation transformation : transformations) {</span>
-<span class="fc" id="L160">            MacroMoveExpansion expansion = new MacroMoveExpansion(</span>
-<span class="fc" id="L161">                transformation.rule(),</span>
+<span class="fc" id="L175">        statisticsByRuleId.put(rule.id(), stats);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        for (Transformation transformation : transformations) {</span>
+<span class="fc" id="L177">            MacroMoveExpansion expansion = new MacroMoveExpansion(</span>
+<span class="fc" id="L178">                transformation.rule(),</span>
                 expression,
-<span class="fc" id="L163">                transformation.transformedExpression(),</span>
-<span class="fc" id="L164">                atomicStepsByRuleId.getOrDefault(rule.id(), List.of()),</span>
-<span class="fc" id="L165">                rule.supportingPathIds(),</span>
-<span class="fc" id="L166">                rule.assumptions(),</span>
-<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                Math.max(1.0, rule.supportingPathIds().isEmpty() ? 1.0 : rule.supportingPathIds().size()),</span>
+<span class="fc" id="L180">                transformation.transformedExpression(),</span>
+<span class="fc" id="L181">                atomicStepsByRuleId.getOrDefault(rule.id(), List.of()),</span>
+<span class="fc" id="L182">                rule.supportingPathIds(),</span>
+<span class="fc" id="L183">                rule.assumptions(),</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">                Math.max(1.0, rule.supportingPathIds().isEmpty() ? 1.0 : rule.supportingPathIds().size()),</span>
                 false,
                 stats
             );
-<span class="fc" id="L171">            expansionsByEdge.put(edgeKey(expression, transformation.transformedExpression(), transformation.rule()), expansion);</span>
-<span class="fc" id="L172">        }</span>
-<span class="fc" id="L173">        return transformations;</span>
+<span class="fc" id="L188">            expansionsByEdge.put(edgeKey(expression, transformation.transformedExpression(), transformation.rule()), expansion);</span>
+<span class="fc" id="L189">        }</span>
+<span class="fc" id="L190">        return transformations;</span>
     }
 
     private Optional&lt;Transformation&gt; specialUnitStepTransformation(String expression, ReusableRule rule) {
-<span class="fc" id="L177">        String compactPattern = rule.leftPattern().replace(&quot; &quot;, &quot;&quot;);</span>
-<span class="pc bpc" id="L178" title="1 of 4 branches missed.">        if (!compactPattern.contains(&quot;A*(A+1)&quot;) &amp;&amp; !compactPattern.contains(&quot;(A*(A+1))&quot;)) {</span>
-<span class="fc" id="L179">            return Optional.empty();</span>
+<span class="fc" id="L194">        String compactPattern = rule.leftPattern().replace(&quot; &quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L195" title="1 of 4 branches missed.">        if (!compactPattern.contains(&quot;A*(A+1)&quot;) &amp;&amp; !compactPattern.contains(&quot;(A*(A+1))&quot;)) {</span>
+<span class="fc" id="L196">            return Optional.empty();</span>
         }
         Expr parsed;
         try {
-<span class="fc" id="L183">            parsed = expressionParser.parse(new InputRequest(InputType.TERM, expression)).terms().getFirst();</span>
-<span class="nc" id="L184">        } catch (IllegalArgumentException exception) {</span>
-<span class="nc" id="L185">            return Optional.empty();</span>
-<span class="fc" id="L186">        }</span>
-<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (!(parsed instanceof BinaryExpr division)</span>
-<span class="pc bpc" id="L188" title="1 of 2 branches missed.">            || division.operator() != BinaryOperator.DIV</span>
-<span class="pc bpc" id="L189" title="1 of 2 branches missed.">            || !isOne(division.left())) {</span>
-<span class="nc" id="L190">            return Optional.empty();</span>
+<span class="fc" id="L200">            parsed = expressionParser.parse(new InputRequest(InputType.TERM, expression)).terms().getFirst();</span>
+<span class="nc" id="L201">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L202">            return Optional.empty();</span>
+<span class="fc" id="L203">        }</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">        if (!(parsed instanceof BinaryExpr division)</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">            || division.operator() != BinaryOperator.DIV</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">            || !isOne(division.left())) {</span>
+<span class="nc" id="L207">            return Optional.empty();</span>
         }
-<span class="fc" id="L192">        List&lt;Expr&gt; factors = flattenMultiplication(division.right());</span>
-<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        if (factors.size() != 2) {</span>
-<span class="nc" id="L194">            return Optional.empty();</span>
+<span class="fc" id="L209">        List&lt;Expr&gt; factors = flattenMultiplication(division.right());</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">        if (factors.size() != 2) {</span>
+<span class="nc" id="L211">            return Optional.empty();</span>
         }
-<span class="fc" id="L196">        Expr lower = factors.get(0);</span>
-<span class="fc" id="L197">        Expr upper = factors.get(1);</span>
-<span class="fc bfc" id="L198" title="All 2 branches covered.">        if (!isUnitStepPair(lower, upper)) {</span>
-<span class="fc" id="L199">            lower = factors.get(1);</span>
-<span class="fc" id="L200">            upper = factors.get(0);</span>
-<span class="pc bpc" id="L201" title="1 of 2 branches missed.">            if (!isUnitStepPair(lower, upper)) {</span>
-<span class="fc" id="L202">                return Optional.empty();</span>
+<span class="fc" id="L213">        Expr lower = factors.get(0);</span>
+<span class="fc" id="L214">        Expr upper = factors.get(1);</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        if (!isUnitStepPair(lower, upper)) {</span>
+<span class="fc" id="L216">            lower = factors.get(1);</span>
+<span class="fc" id="L217">            upper = factors.get(0);</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">            if (!isUnitStepPair(lower, upper)) {</span>
+<span class="fc" id="L219">                return Optional.empty();</span>
             }
         }
-<span class="fc" id="L205">        String transformed = &quot;1 / (&quot; + ExpressionFormatter.format(lower) + &quot;) - 1 / (&quot; + ExpressionFormatter.format(upper) + &quot;)&quot;;</span>
-<span class="fc" id="L206">        return Optional.of(new Transformation(</span>
-<span class="fc" id="L207">            macroRuleId(rule),</span>
+<span class="fc" id="L222">        String transformed = &quot;1 / (&quot; + ExpressionFormatter.format(lower) + &quot;) - 1 / (&quot; + ExpressionFormatter.format(upper) + &quot;)&quot;;</span>
+<span class="fc" id="L223">        return Optional.of(new Transformation(</span>
+<span class="fc" id="L224">            macroRuleId(rule),</span>
             transformed,
             RewriteKind.NORMALIZE,
             false,
-<span class="fc" id="L211">            -Math.max(1, (int) Math.round(Math.max(1.0, rule.averageImprovement()))),</span>
+<span class="fc" id="L228">            -Math.max(1, (int) Math.round(Math.max(1.0, rule.averageImprovement()))),</span>
             true,
-<span class="fc" id="L213">            macroRuleId(rule) + &quot;:&quot; + transformed,</span>
-<span class="fc" id="L214">            rule.assumptions()</span>
+<span class="fc" id="L230">            macroRuleId(rule) + &quot;:&quot; + transformed,</span>
+<span class="fc" id="L231">            rule.assumptions()</span>
         ));
     }
 
     private List&lt;Expr&gt; flattenMultiplication(Expr expression) {
-<span class="fc bfc" id="L219" title="All 4 branches covered.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.MUL) {</span>
-<span class="fc" id="L220">            return java.util.stream.Stream.concat(</span>
-<span class="fc" id="L221">                flattenMultiplication(binary.left()).stream(),</span>
-<span class="fc" id="L222">                flattenMultiplication(binary.right()).stream()</span>
-<span class="fc" id="L223">            ).toList();</span>
+<span class="fc bfc" id="L236" title="All 4 branches covered.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.MUL) {</span>
+<span class="fc" id="L237">            return java.util.stream.Stream.concat(</span>
+<span class="fc" id="L238">                flattenMultiplication(binary.left()).stream(),</span>
+<span class="fc" id="L239">                flattenMultiplication(binary.right()).stream()</span>
+<span class="fc" id="L240">            ).toList();</span>
         }
-<span class="fc" id="L225">        return List.of(expression);</span>
+<span class="fc" id="L242">        return List.of(expression);</span>
     }
 
     private boolean isUnitStepPair(Expr lower, Expr upper) {
-<span class="fc" id="L229">        AdditiveOffset lowerOffset = additiveOffset(lower);</span>
-<span class="fc" id="L230">        AdditiveOffset upperOffset = additiveOffset(upper);</span>
-<span class="pc bpc" id="L231" title="2 of 4 branches missed.">        return lowerOffset != null</span>
+<span class="fc" id="L246">        AdditiveOffset lowerOffset = additiveOffset(lower);</span>
+<span class="fc" id="L247">        AdditiveOffset upperOffset = additiveOffset(upper);</span>
+<span class="pc bpc" id="L248" title="2 of 4 branches missed.">        return lowerOffset != null</span>
             &amp;&amp; upperOffset != null
-<span class="pc bpc" id="L233" title="1 of 2 branches missed.">            &amp;&amp; same(lowerOffset.symbolicPart(), upperOffset.symbolicPart())</span>
-<span class="fc bfc" id="L234" title="All 2 branches covered.">            &amp;&amp; upperOffset.offset().subtract(lowerOffset.offset()).isOne();</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">            &amp;&amp; same(lowerOffset.symbolicPart(), upperOffset.symbolicPart())</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">            &amp;&amp; upperOffset.offset().subtract(lowerOffset.offset()).isOne();</span>
     }
 
     private AdditiveOffset additiveOffset(Expr expression) {
-<span class="pc bpc" id="L238" title="1 of 2 branches missed.">        if (expression instanceof NumberExpr number) {</span>
-<span class="nc" id="L239">            return new AdditiveOffset(new NumberExpr(0), number.value());</span>
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">        if (expression instanceof NumberExpr number) {</span>
+<span class="nc" id="L256">            return new AdditiveOffset(new NumberExpr(0), number.value());</span>
         }
-<span class="pc bpc" id="L241" title="1 of 4 branches missed.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.ADD) {</span>
-<span class="pc bpc" id="L242" title="1 of 2 branches missed.">            if (binary.right() instanceof NumberExpr right) {</span>
-<span class="fc" id="L243">                return new AdditiveOffset(binary.left(), right.value());</span>
+<span class="pc bpc" id="L258" title="1 of 4 branches missed.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.ADD) {</span>
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">            if (binary.right() instanceof NumberExpr right) {</span>
+<span class="fc" id="L260">                return new AdditiveOffset(binary.left(), right.value());</span>
             }
-<span class="nc bnc" id="L245" title="All 2 branches missed.">            if (binary.left() instanceof NumberExpr left) {</span>
-<span class="nc" id="L246">                return new AdditiveOffset(binary.right(), left.value());</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">            if (binary.left() instanceof NumberExpr left) {</span>
+<span class="nc" id="L263">                return new AdditiveOffset(binary.right(), left.value());</span>
             }
         }
-<span class="fc" id="L249">        return new AdditiveOffset(expression, ExactRational.ZERO);</span>
+<span class="fc" id="L266">        return new AdditiveOffset(expression, ExactRational.ZERO);</span>
     }
 
     private boolean isOne(Expr expression) {
-<span class="pc bpc" id="L253" title="2 of 4 branches missed.">        return expression instanceof NumberExpr number &amp;&amp; number.value().equalsInteger(1);</span>
+<span class="pc bpc" id="L270" title="2 of 4 branches missed.">        return expression instanceof NumberExpr number &amp;&amp; number.value().equalsInteger(1);</span>
     }
 
     private boolean same(Expr left, Expr right) {
-<span class="fc" id="L257">        return canonicalizer.stableHash(ExpressionFormatter.format(left))</span>
-<span class="fc" id="L258">            .equals(canonicalizer.stableHash(ExpressionFormatter.format(right)));</span>
+<span class="fc" id="L274">        return canonicalizer.stableHash(ExpressionFormatter.format(left))</span>
+<span class="fc" id="L275">            .equals(canonicalizer.stableHash(ExpressionFormatter.format(right)));</span>
     }
 
-<span class="fc" id="L261">    private record AdditiveOffset(Expr symbolicPart, ExactRational offset) {</span>
+<span class="fc" id="L278">    private record AdditiveOffset(Expr symbolicPart, ExactRational offset) {</span>
     }
 
     private String macroRuleId(ReusableRule rule) {
-<span class="fc bfc" id="L265" title="All 2 branches covered.">        return rule.id().startsWith(&quot;macro_&quot;) ? rule.id() : &quot;macro_&quot; + rule.id();</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">        return rule.id().startsWith(&quot;macro_&quot;) ? rule.id() : &quot;macro_&quot; + rule.id();</span>
     }
 
     private String edgeKey(String fromExpression, String toExpression, String ruleId) {
-<span class="fc" id="L269">        return fromExpression + &quot;\u0001&quot; + toExpression + &quot;\u0001&quot; + ruleId;</span>
+<span class="fc" id="L286">        return fromExpression + &quot;\u0001&quot; + toExpression + &quot;\u0001&quot; + ruleId;</span>
     }
 
     private PatternExpr toPatternExpr(RulePatternNode node) {
-<span class="fc bfc" id="L273" title="All 2 branches covered.">        if (node instanceof PatternNumber number) {</span>
-<span class="fc" id="L274">            return PatternExpr.num(number.value());</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">        if (node instanceof PatternNumber number) {</span>
+<span class="fc" id="L291">            return PatternExpr.num(number.value());</span>
         }
-<span class="fc bfc" id="L276" title="All 2 branches covered.">        if (node instanceof PatternVariable variable) {</span>
-<span class="fc" id="L277">            return PatternExpr.var(variable.name());</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        if (node instanceof PatternVariable variable) {</span>
+<span class="fc" id="L294">            return PatternExpr.var(variable.name());</span>
         }
-<span class="fc bfc" id="L279" title="All 2 branches covered.">        if (node instanceof PatternFunction function) {</span>
-<span class="fc" id="L280">            PatternExpr[] converted = new PatternExpr[function.arguments().size()];</span>
-<span class="fc bfc" id="L281" title="All 2 branches covered.">            for (int i = 0; i &lt; converted.length; i++) {</span>
-<span class="fc" id="L282">                converted[i] = toPatternExpr(function.arguments().get(i));</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">        if (node instanceof PatternFunction function) {</span>
+<span class="fc" id="L297">            PatternExpr[] converted = new PatternExpr[function.arguments().size()];</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">            for (int i = 0; i &lt; converted.length; i++) {</span>
+<span class="fc" id="L299">                converted[i] = toPatternExpr(function.arguments().get(i));</span>
             }
-<span class="fc" id="L284">            return PatternExpr.fn(function.name(), converted);</span>
+<span class="fc" id="L301">            return PatternExpr.fn(function.name(), converted);</span>
         }
-<span class="fc" id="L286">        PatternBinary binary = (PatternBinary) node;</span>
-<span class="fc" id="L287">        return PatternExpr.op(binary.op(), toPatternExpr(binary.left()), toPatternExpr(binary.right()));</span>
+<span class="fc" id="L303">        PatternBinary binary = (PatternBinary) node;</span>
+<span class="fc" id="L304">        return PatternExpr.op(binary.op(), toPatternExpr(binary.left()), toPatternExpr(binary.right()));</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StructuralMoveContext.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.inventory</a> &gt; <span class="el_source">StructuralMoveContext.java</span></div><h1>StructuralMoveContext.java</h1><pre class="source lang-java linenums">package de.regelsuche.inventory;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.moves.MoveState;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+
+/** Source structure only; unknown degree is explicit. Variable spelling is absent from the context key. */
+<span class="fc" id="L14">public record StructuralMoveContext(String rootOperator, int degree, int variables, int products, int powers,</span>
+        int repeatedSubtrees, List&lt;String&gt; assumptions, List&lt;String&gt; capabilities, int visitedNodes) {
+    public static StructuralMoveContext of(MoveState state) {
+<span class="fc" id="L17">        var root = new ExpressionParser().parse(new InputRequest(InputType.TERM, state.expression())).terms().getFirst();</span>
+<span class="fc" id="L18">        var seen = new HashMap&lt;Expr, Integer&gt;(); var variables = new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L19">        int[] counts = new int[3]; collect(root, seen, variables, counts);</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">        String operator = root instanceof BinaryExpr binary ? binary.operator().name()</span>
+<span class="pc bpc" id="L21" title="1 of 4 branches missed.">            : root instanceof FunctionExpr function ? &quot;FUNCTION:&quot; + function.name() : root instanceof VariableExpr ? &quot;VARIABLE&quot; : &quot;NUMBER&quot;;</span>
+<span class="fc" id="L22">        return new StructuralMoveContext(operator, degree(root), variables.size(), counts[1], counts[2],</span>
+<span class="fc" id="L23">            seen.values().stream().mapToInt(count -&gt; Math.max(0, count - 1)).sum(), state.assumptions(),</span>
+<span class="fc" id="L24">            state.capabilities().stream().sorted().toList(), counts[0]);</span>
+    }
+    public String key() {
+<span class="fc" id="L27">        return new JsonWriter().beginObject().property(&quot;root&quot;, rootOperator).property(&quot;degree&quot;, degree).property(&quot;variables&quot;, variables)</span>
+<span class="fc" id="L28">            .property(&quot;products&quot;, products).property(&quot;powers&quot;, powers).property(&quot;repeated&quot;, repeatedSubtrees)</span>
+<span class="fc" id="L29">            .stringArray(&quot;assumptions&quot;, assumptions).stringArray(&quot;capabilities&quot;, capabilities).endObject().toString();</span>
+    }
+    private static void collect(Expr expr, HashMap&lt;Expr, Integer&gt; seen, HashSet&lt;String&gt; variables, int[] counts) {
+<span class="fc" id="L32">        counts[0]++; seen.merge(expr, 1, Integer::sum);</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        if (expr instanceof VariableExpr variable) variables.add(variable.name());</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        else if (expr instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.MUL) counts[1]++;</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.POW) counts[2]++;</span>
+<span class="fc" id="L37">            collect(binary.left(), seen, variables, counts); collect(binary.right(), seen, variables, counts);</span>
+<span class="fc bfc" id="L38" title="All 4 branches covered.">        } else if (expr instanceof FunctionExpr function) for (var argument : function.arguments()) collect(argument, seen, variables, counts);</span>
+<span class="fc" id="L39">    }</span>
+    private static int degree(Expr expr) {
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        if (expr instanceof VariableExpr) return 1;</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (expr instanceof NumberExpr) return 0;</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (!(expr instanceof BinaryExpr binary)) return -1;</span>
+<span class="fc" id="L44">        int left = degree(binary.left()), right = degree(binary.right());</span>
+<span class="pc bpc" id="L45" title="2 of 4 branches missed.">        if (left &lt; 0 || right &lt; 0) return -1;</span>
+<span class="pc bpc" id="L46" title="1 of 4 branches missed.">        return switch (binary.operator()) {</span>
+<span class="fc" id="L47">            case ADD, SUB -&gt; Math.max(left, right);</span>
+<span class="fc" id="L48">            case MUL -&gt; Math.min(1000, left + right);</span>
+<span class="pc bpc" id="L49" title="2 of 4 branches missed.">            case POW -&gt; binary.right() instanceof NumberExpr number &amp;&amp; number.value().isInteger()</span>
+<span class="pc bpc" id="L50" title="2 of 4 branches missed.">                &amp;&amp; number.value().numerator().signum() &gt;= 0 &amp;&amp; number.value().numerator().bitLength() &lt; 10</span>
+<span class="pc" id="L51">                ? Math.min(1000, left * number.value().numerator().intValueExact()) : -1;</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">            case DIV -&gt; right == 0 ? left : -1;</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -7,6 +7,12 @@ import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.HypothesisOperator;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
+import de.regelsuche.inventory.ReusableRule;
+import de.regelsuche.search.moves.EngineMoveProvider;
+import de.regelsuche.search.moves.MoveContext;
+import de.regelsuche.search.moves.MoveProvider;
+import de.regelsuche.search.moves.MoveState;
+import de.regelsuche.search.moves.SearchMove;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -20,7 +26,7 @@ import java.util.Optional;
  * AST rewrite rule specified entirely by a left-hand pattern and a right-hand
  * template, without requiring a hand-written Java operator class.
  */
-public final class DynamicPatternOperator implements HypothesisOperator {
+public final class DynamicPatternOperator implements HypothesisOperator, MoveProvider {
 
     public static final String RULE_ID_PREFIX = &quot;dynamic_hypothesis_&quot;;
 
@@ -33,11 +39,12 @@ public final class DynamicPatternOperator implements HypothesisOperator {
     private final RulePatternNode leftPattern;
     private final RulePatternNode rightPattern;
     private final int maxCandidates;
+    private final ReusableRule reusableRule;
 
-<span class="fc" id="L37">    private final RulePatternMatcher matcher = new RulePatternMatcher();</span>
-<span class="fc" id="L38">    private final RulePatternInstantiator instantiator = new RulePatternInstantiator();</span>
-<span class="fc" id="L39">    private final ExpressionParser parser = new ExpressionParser();</span>
-<span class="fc" id="L40">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+<span class="fc" id="L44">    private final RulePatternMatcher matcher = new RulePatternMatcher();</span>
+<span class="fc" id="L45">    private final RulePatternInstantiator instantiator = new RulePatternInstantiator();</span>
+<span class="fc" id="L46">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L47">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
 
     DynamicPatternOperator(
         String ruleId,
@@ -49,121 +56,156 @@ public final class DynamicPatternOperator implements HypothesisOperator {
         RulePatternNode leftPattern,
         RulePatternNode rightPattern,
         int maxCandidates
-<span class="fc" id="L52">    ) {</span>
-<span class="pc bpc" id="L53" title="2 of 4 branches missed.">        if (ruleId == null || ruleId.isBlank()) {</span>
-<span class="nc" id="L54">            throw new IllegalArgumentException(&quot;ruleId must not be blank&quot;);</span>
+    ) {
+<span class="fc" id="L60">        this(ruleId, hypothesisId, hypothesisRevision, provenanceHash, leftPatternText, rightPatternText,</span>
+            leftPattern, rightPattern, maxCandidates, null);
+<span class="fc" id="L62">    }</span>
+
+    private DynamicPatternOperator(
+        String ruleId, String hypothesisId, String hypothesisRevision, String provenanceHash,
+        String leftPatternText, String rightPatternText, RulePatternNode leftPattern,
+        RulePatternNode rightPattern, int maxCandidates, ReusableRule reusableRule
+<span class="fc" id="L68">    ) {</span>
+<span class="pc bpc" id="L69" title="2 of 4 branches missed.">        if (ruleId == null || ruleId.isBlank()) {</span>
+<span class="nc" id="L70">            throw new IllegalArgumentException(&quot;ruleId must not be blank&quot;);</span>
         }
-<span class="pc bpc" id="L56" title="2 of 4 branches missed.">        if (hypothesisId == null || hypothesisId.isBlank()) {</span>
-<span class="nc" id="L57">            throw new IllegalArgumentException(&quot;hypothesisId must not be blank&quot;);</span>
+<span class="pc bpc" id="L72" title="2 of 4 branches missed.">        if (hypothesisId == null || hypothesisId.isBlank()) {</span>
+<span class="nc" id="L73">            throw new IllegalArgumentException(&quot;hypothesisId must not be blank&quot;);</span>
         }
-<span class="pc bpc" id="L59" title="2 of 4 branches missed.">        if (leftPattern == null || rightPattern == null) {</span>
-<span class="nc" id="L60">            throw new IllegalArgumentException(&quot;patterns must not be null&quot;);</span>
+<span class="pc bpc" id="L75" title="2 of 4 branches missed.">        if (leftPattern == null || rightPattern == null) {</span>
+<span class="nc" id="L76">            throw new IllegalArgumentException(&quot;patterns must not be null&quot;);</span>
         }
-<span class="fc" id="L62">        this.ruleId = ruleId;</span>
-<span class="fc" id="L63">        this.hypothesisId = hypothesisId;</span>
-<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        this.hypothesisRevision = hypothesisRevision == null ? &quot;&quot; : hypothesisRevision;</span>
-<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        this.provenanceHash = provenanceHash == null ? &quot;&quot; : provenanceHash;</span>
-<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        this.leftPatternText = leftPatternText == null ? &quot;&quot; : leftPatternText;</span>
-<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        this.rightPatternText = rightPatternText == null ? &quot;&quot; : rightPatternText;</span>
-<span class="fc" id="L68">        this.leftPattern = leftPattern;</span>
-<span class="fc" id="L69">        this.rightPattern = rightPattern;</span>
-<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        this.maxCandidates = maxCandidates &lt; 1 ? 1 : maxCandidates;</span>
-<span class="fc" id="L71">    }</span>
+<span class="fc" id="L78">        this.ruleId = ruleId;</span>
+<span class="fc" id="L79">        this.hypothesisId = hypothesisId;</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        this.hypothesisRevision = hypothesisRevision == null ? &quot;&quot; : hypothesisRevision;</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        this.provenanceHash = provenanceHash == null ? &quot;&quot; : provenanceHash;</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        this.leftPatternText = leftPatternText == null ? &quot;&quot; : leftPatternText;</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        this.rightPatternText = rightPatternText == null ? &quot;&quot; : rightPatternText;</span>
+<span class="fc" id="L84">        this.leftPattern = leftPattern;</span>
+<span class="fc" id="L85">        this.rightPattern = rightPattern;</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        this.maxCandidates = maxCandidates &lt; 1 ? 1 : maxCandidates;</span>
+<span class="fc" id="L87">        this.reusableRule = reusableRule;</span>
+<span class="fc" id="L88">    }</span>
+
+    DynamicPatternOperator withRuleEvidence(ReusableRule rule) {
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (!hypothesisId.equals(rule.id())</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">                || !leftPatternText.replaceAll(&quot;\\s+&quot;, &quot;&quot;).equals(rule.leftPattern().replaceAll(&quot;\\s+&quot;, &quot;&quot;))</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                || !rightPatternText.replaceAll(&quot;\\s+&quot;, &quot;&quot;).equals(rule.rightPattern().replaceAll(&quot;\\s+&quot;, &quot;&quot;))) {</span>
+<span class="fc" id="L94">            throw new IllegalArgumentException(&quot;utility evidence belongs to different compiled patterns&quot;);</span>
+        }
+<span class="fc" id="L96">        return new DynamicPatternOperator(ruleId, hypothesisId, hypothesisRevision, provenanceHash,</span>
+            leftPatternText, rightPatternText, leftPattern, rightPattern, maxCandidates, rule);
+    }
+
+<span class="fc" id="L100">    public Optional&lt;ReusableRule&gt; reusableRuleEvidence() { return Optional.ofNullable(reusableRule); }</span>
+
+    @Override public Descriptor descriptor() {
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        return new Descriptor(hypothesisId, &quot;dynamic-pattern&quot;, reusableRule == null</span>
+<span class="fc" id="L104">            ? SearchMove.SourceKind.HYPOTHESIS : SearchMove.SourceKind.LEARNED,</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            SearchMove.ProofStrength.EMPIRICAL, reusableRule == null ? List.of() : reusableRule.assumptions(),</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            reusableRule == null ? SearchMove.ValueEvidence.UNKNOWN : reusableRule.moveValueEvidence(), provenanceHash);</span>
+    }
+
+    @Override public Batch candidates(MoveState state, MoveContext context) {
+        // Compilation and usefulness do not authorize this quarantined hypothesis.
+<span class="fc" id="L111">        return new EngineMoveProvider(descriptor(), this::generateCandidates, false).candidates(state, context);</span>
+    }
 
     public String ruleId() {
-<span class="fc" id="L74">        return ruleId;</span>
+<span class="fc" id="L115">        return ruleId;</span>
     }
 
     public String hypothesisId() {
-<span class="fc" id="L78">        return hypothesisId;</span>
+<span class="fc" id="L119">        return hypothesisId;</span>
     }
 
     public String hypothesisRevision() {
-<span class="fc" id="L82">        return hypothesisRevision;</span>
+<span class="fc" id="L123">        return hypothesisRevision;</span>
     }
 
     public String provenanceHash() {
-<span class="fc" id="L86">        return provenanceHash;</span>
+<span class="fc" id="L127">        return provenanceHash;</span>
     }
 
     public String leftPatternText() {
-<span class="fc" id="L90">        return leftPatternText;</span>
+<span class="fc" id="L131">        return leftPatternText;</span>
     }
 
     public String rightPatternText() {
-<span class="fc" id="L94">        return rightPatternText;</span>
+<span class="fc" id="L135">        return rightPatternText;</span>
     }
 
     @Override
     public List&lt;Transformation&gt; generateCandidates(String expression) {
-<span class="pc bpc" id="L99" title="1 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
-<span class="fc" id="L100">            return List.of();</span>
+<span class="pc bpc" id="L140" title="1 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="fc" id="L141">            return List.of();</span>
         }
-<span class="fc" id="L102">        Optional&lt;Map&lt;String, Expr&gt;&gt; bindings = matcher.match(leftPattern, expression);</span>
-<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (bindings.isEmpty()) {</span>
-<span class="fc" id="L104">            return List.of();</span>
+<span class="fc" id="L143">        Optional&lt;Map&lt;String, Expr&gt;&gt; bindings = matcher.match(leftPattern, expression);</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (bindings.isEmpty()) {</span>
+<span class="fc" id="L145">            return List.of();</span>
         }
         Expr outputExpr;
         try {
-<span class="fc" id="L108">            outputExpr = instantiator.instantiate(rightPattern, bindings.get());</span>
-<span class="nc" id="L109">        } catch (IllegalArgumentException ignored) {</span>
-<span class="nc" id="L110">            return List.of();</span>
-<span class="fc" id="L111">        }</span>
-<span class="fc" id="L112">        String formattedOutput = ExpressionFormatter.format(outputExpr);</span>
-<span class="fc" id="L113">        String formattedInput = formatted(expression);</span>
-<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (suppressesRewrite(formattedInput, formattedOutput)) {</span>
-<span class="fc" id="L115">            return List.of();</span>
+<span class="fc" id="L149">            outputExpr = instantiator.instantiate(rightPattern, bindings.get());</span>
+<span class="nc" id="L150">        } catch (IllegalArgumentException ignored) {</span>
+<span class="nc" id="L151">            return List.of();</span>
+<span class="fc" id="L152">        }</span>
+<span class="fc" id="L153">        String formattedOutput = ExpressionFormatter.format(outputExpr);</span>
+<span class="fc" id="L154">        String formattedInput = formatted(expression);</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (suppressesRewrite(formattedInput, formattedOutput)) {</span>
+<span class="fc" id="L156">            return List.of();</span>
         }
-<span class="fc" id="L117">        String applicationKey = ruleId + &quot;:&quot; + hypothesisRevision + &quot;:&quot;</span>
-<span class="fc" id="L118">            + syntaxHash(formattedInput) + &quot;-&gt;&quot; + syntaxHash(formattedOutput);</span>
-<span class="fc" id="L119">        Transformation transformation = new Transformation(</span>
+<span class="fc" id="L158">        String applicationKey = ruleId + &quot;:&quot; + hypothesisRevision + &quot;:&quot;</span>
+<span class="fc" id="L159">            + syntaxHash(formattedInput) + &quot;-&gt;&quot; + syntaxHash(formattedOutput);</span>
+<span class="fc" id="L160">        Transformation transformation = new Transformation(</span>
             ruleId,
             formattedOutput,
             RewriteKind.NORMALIZE,
             true,
             -1,
             true,
-            applicationKey
+            applicationKey,
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            reusableRule == null ? List.of() : reusableRule.assumptions()</span>
         );
-<span class="fc" id="L128">        return List.of(transformation).stream()</span>
-<span class="fc" id="L129">            .limit(maxCandidates)</span>
-<span class="fc" id="L130">            .toList();</span>
+<span class="fc" id="L170">        return List.of(transformation).stream()</span>
+<span class="fc" id="L171">            .limit(maxCandidates)</span>
+<span class="fc" id="L172">            .toList();</span>
     }
 
     private boolean suppressesRewrite(String input, String output) {
-<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (output.equals(input)) {</span>
-<span class="nc" id="L135">            return true;</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        if (output.equals(input)) {</span>
+<span class="nc" id="L177">            return true;</span>
         }
-<span class="fc" id="L137">        String canonicalInput = canonicalizer.canonicalize(input);</span>
-<span class="fc" id="L138">        String canonicalOutput = canonicalizer.canonicalize(output);</span>
-<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (!canonicalInput.equals(canonicalOutput)) {</span>
-<span class="fc" id="L140">            return false;</span>
+<span class="fc" id="L179">        String canonicalInput = canonicalizer.canonicalize(input);</span>
+<span class="fc" id="L180">        String canonicalOutput = canonicalizer.canonicalize(output);</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (!canonicalInput.equals(canonicalOutput)) {</span>
+<span class="fc" id="L182">            return false;</span>
         }
-<span class="pc bpc" id="L142" title="1 of 4 branches missed.">        if (output.equals(canonicalInput) &amp;&amp; !input.equals(canonicalInput)) {</span>
-<span class="fc" id="L143">            return false;</span>
+<span class="pc bpc" id="L184" title="1 of 4 branches missed.">        if (output.equals(canonicalInput) &amp;&amp; !input.equals(canonicalInput)) {</span>
+<span class="fc" id="L185">            return false;</span>
         }
-<span class="fc" id="L145">        int inputNodes = canonicalizer.astNodeCount(input);</span>
-<span class="fc" id="L146">        int outputNodes = canonicalizer.astNodeCount(output);</span>
-<span class="pc bpc" id="L147" title="2 of 4 branches missed.">        boolean strictlySimpler = outputNodes &lt; inputNodes</span>
-<span class="fc bfc" id="L148" title="All 2 branches covered.">            || (outputNodes == inputNodes &amp;&amp; output.length() &lt; input.length());</span>
-<span class="fc bfc" id="L149" title="All 2 branches covered.">        return !strictlySimpler;</span>
+<span class="fc" id="L187">        int inputNodes = canonicalizer.astNodeCount(input);</span>
+<span class="fc" id="L188">        int outputNodes = canonicalizer.astNodeCount(output);</span>
+<span class="pc bpc" id="L189" title="2 of 4 branches missed.">        boolean strictlySimpler = outputNodes &lt; inputNodes</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            || (outputNodes == inputNodes &amp;&amp; output.length() &lt; input.length());</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        return !strictlySimpler;</span>
     }
 
     private String formatted(String expression) {
         try {
-<span class="fc" id="L154">            return ExpressionFormatter.format(parser.parseTerm(expression));</span>
-<span class="nc" id="L155">        } catch (IllegalArgumentException ignored) {</span>
-<span class="nc" id="L156">            return expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="fc" id="L196">            return ExpressionFormatter.format(parser.parseTerm(expression));</span>
+<span class="nc" id="L197">        } catch (IllegalArgumentException ignored) {</span>
+<span class="nc" id="L198">            return expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
         }
     }
 
     private static String syntaxHash(String expression) {
         try {
-<span class="fc" id="L162">            byte[] hash = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
-<span class="fc" id="L163">                .digest(expression.getBytes(StandardCharsets.UTF_8));</span>
-<span class="fc" id="L164">            return &quot;syntax-v1:&quot; + HexFormat.of().formatHex(hash, 0, 12);</span>
-<span class="nc" id="L165">        } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L166">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+<span class="fc" id="L204">            byte[] hash = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L205">                .digest(expression.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L206">            return &quot;syntax-v1:&quot; + HexFormat.of().formatHex(hash, 0, 12);</span>
+<span class="nc" id="L207">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L208">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
         }
     }
 }

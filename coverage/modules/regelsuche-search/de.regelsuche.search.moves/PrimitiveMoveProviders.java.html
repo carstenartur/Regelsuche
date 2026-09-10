@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PrimitiveMoveProviders.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">PrimitiveMoveProviders.java</span></div><h1>PrimitiveMoveProviders.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.transform.PreparedAstRewriteTransformationEngine;
+import de.regelsuche.transform.RewriteRule;
+import java.util.List;
+
+/** One lazy lane per primitive; no hidden growth or candidate cap in this finite AST relation. */
+public final class PrimitiveMoveProviders {
+    private PrimitiveMoveProviders() {}
+    public static List&lt;MoveProvider&gt; complete(List&lt;RewriteRule&gt; rules, String inventoryId) {
+<span class="nc" id="L11">        return List.copyOf(rules).stream().map(rule -&gt; (MoveProvider) new EngineMoveProvider(</span>
+<span class="nc" id="L12">            new MoveProvider.Descriptor(rule.id(), rule.id(), SearchMove.SourceKind.PRIMITIVE,</span>
+<span class="nc" id="L13">                SearchMove.ProofStrength.REPLAYABLE, List.of(), SearchMove.ValueEvidence.UNKNOWN, inventoryId),</span>
+<span class="nc" id="L14">            new PreparedAstRewriteTransformationEngine(List.of(rule), Integer.MAX_VALUE, Integer.MAX_VALUE), true)).toList();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

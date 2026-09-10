@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LearnedSchedulingArtifacts.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">LearnedSchedulingArtifacts.java</span></div><h1>LearnedSchedulingArtifacts.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.search.moves.*;
+import java.io.IOException;
+import java.lang.reflect.RecordComponent;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+
+/** Canonical evidence and scientific qualification are a layer above the mathematical search. */
+public final class LearnedSchedulingArtifacts {
+<span class="fc" id="L18">    private static final ObjectMapper JSON = new ObjectMapper();</span>
+    private LearnedSchedulingArtifacts() {}
+    public static String modelJson(LearnedSchedulingModel model) {
+<span class="fc" id="L21">        return json(Map.of(&quot;knowledge&quot;, model.knowledge().toCanonicalJson(), &quot;traces&quot;, model.traces(), &quot;activity&quot;, model.activity(),</span>
+<span class="fc" id="L22">            &quot;history&quot;, model.history(), &quot;weights&quot;, de.regelsuche.inventory.HistoryMovePolicy.Weights.DEFAULT,</span>
+<span class="fc" id="L23">            &quot;trainingWork&quot;, model.trainingWorkUnits(), &quot;trainingWorkComponents&quot;, model.trainingWorkComponents(), &quot;trainingWorkAccountingComplete&quot;, true,</span>
+            &quot;trainingAccountingScope&quot;, &quot;CANONICAL_HOT_PATH_EVENTS_INCLUDING_EXACT_NODES_TERMS_ALPHA_RENAMING_REFERENCE_AND_MEMORY_FEEDBACK_WORK;EXCLUDES_COMPILATION_SERIALIZATION_AND_CPU_BIT_COST&quot;));
+    }
+    public static String summaryJson(LearnedSchedulingStudy.Report report) {
+<span class="fc" id="L27">        var summary = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L28">        var paired = new TreeMap&lt;String, Map&lt;String, LearnedSchedulingStudy.Row&gt;&gt;();</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        for (var row : report.rows()) paired.computeIfAbsent(row.caseId() + &quot;:&quot; + row.budget(), ignored -&gt; new TreeMap&lt;&gt;()).put(row.configuration(), row);</span>
+<span class="fc" id="L30">        long regressions = 0, strongRegressions = 0, commonBaseWork = 0, commonRankedWork = 0, commonBaseSearch = 0, commonRankedSearch = 0;</span>
+<span class="fc" id="L31">        var gains = new ArrayList&lt;String&gt;(); var strongGains = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L32">        var frozenIds = report.model().traces().stream().map(LearnedSchedulingModel.Trace::id).collect(java.util.stream.Collectors.toSet());</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        for (var pair : paired.values()) {</span>
+<span class="fc" id="L34">            var base = pair.get(&quot;BASE&quot;); var strong = pair.get(&quot;BASE_STAGED&quot;); var ranked = pair.get(&quot;LEARNED_RANKED&quot;);</span>
+<span class="pc bpc" id="L35" title="1 of 4 branches missed.">            if (base.reached() &amp;&amp; !ranked.reached()) regressions++;</span>
+<span class="pc bpc" id="L36" title="1 of 4 branches missed.">            if (strong.reached() &amp;&amp; !ranked.reached()) strongRegressions++;</span>
+<span class="pc bpc" id="L37" title="1 of 4 branches missed.">            if (base.reached() &amp;&amp; ranked.reached()) {</span>
+<span class="fc" id="L38">                commonBaseWork += base.result().metrics().totalWork(); commonRankedWork += ranked.result().metrics().totalWork();</span>
+<span class="fc" id="L39">                commonBaseSearch += base.result().metrics().searchWork(); commonRankedSearch += ranked.result().metrics().searchWork();</span>
+            }
+<span class="fc bfc" id="L41" title="All 4 branches covered.">            if (ranked.reached() &amp;&amp; ranked.result().witness().stream().anyMatch(step -&gt; frozenIds.contains(step.move().ruleId()))) {</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">                if (!base.reached()) gains.add(ranked.id());</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">                if (!strong.reached()) strongGains.add(ranked.id());</span>
+            }
+<span class="fc" id="L45">        }</span>
+<span class="fc" id="L46">        long assumptions = report.rows().stream().filter(LearnedSchedulingStudy.Row::reached).flatMap(row -&gt; row.result().witness().stream())</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">            .filter(step -&gt; !step.move().assumptions().isEmpty()).count();</span>
+<span class="fc" id="L48">        long invalid = report.rows().stream().filter(LearnedSchedulingStudy.Row::reached).flatMap(row -&gt; row.result().witness().stream())</span>
+<span class="pc bpc" id="L49" title="2 of 4 branches missed.">            .filter(step -&gt; !step.verification().accepted() || step.verification().receipts().size() != step.move().primitiveExpansion().size()).count();</span>
+<span class="fc" id="L50">        var byBudget = budgetSummary(report);</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        boolean noninferior = byBudget.stream().allMatch(row -&gt; (long) row.get(&quot;rankedSolved&quot;) &gt;= (long) row.get(&quot;baseSolved&quot;));</span>
+<span class="fc" id="L52">        boolean reference = report.references().stream().allMatch(LearnedSchedulingStudy.Reference::inclusion);</span>
+<span class="pc bpc" id="L53" title="5 of 6 branches missed.">        boolean gain = !gains.isEmpty() || (commonBaseSearch &gt; 0 &amp;&amp; commonRankedSearch &lt;= 0.9 * commonBaseSearch);</span>
+<span class="fc" id="L54">        summary.put(&quot;schema&quot;, LearnedSchedulingProtocol.REVISION); summary.put(&quot;modelHash&quot;, SchematicProofPlan.hash(modelJson(report.model())));</span>
+<span class="fc" id="L55">        summary.put(&quot;rows&quot;, report.rows().size()); summary.put(&quot;byBudget&quot;, byBudget); summary.put(&quot;regressions&quot;, regressions);</span>
+<span class="fc" id="L56">        summary.put(&quot;regressionsAgainstStagedPrimitives&quot;, strongRegressions); summary.put(&quot;newlyReachableWitnesses&quot;, gains);</span>
+<span class="fc" id="L57">        summary.put(&quot;newlyReachableAgainstStagedPrimitives&quot;, strongGains); summary.put(&quot;commonSolvedBaseWork&quot;, commonBaseWork);</span>
+<span class="fc" id="L58">        summary.put(&quot;commonSolvedRankedWork&quot;, commonRankedWork); summary.put(&quot;commonSolvedBaseSearchWork&quot;, commonBaseSearch);</span>
+<span class="fc" id="L59">        summary.put(&quot;commonSolvedRankedSearchWork&quot;, commonRankedSearch); summary.put(&quot;correctnessRegressions&quot;, invalid);</span>
+<span class="fc" id="L60">        summary.put(&quot;assumptionRegressions&quot;, assumptions); summary.put(&quot;referenceInclusion&quot;, reference); summary.put(&quot;fastNoninferiorityAtEveryBudget&quot;, noninferior);</span>
+<span class="pc bpc" id="L61" title="7 of 14 branches missed.">        summary.put(&quot;coreLearnedWitnessDemonstrated&quot;, !gains.isEmpty()); summary.put(&quot;scientificCandidateGate&quot;, invalid == 0 &amp;&amp; assumptions == 0 &amp;&amp; reference &amp;&amp; noninferior &amp;&amp; gain &amp;&amp; !gains.isEmpty());</span>
+<span class="fc" id="L62">        summary.put(&quot;productionQualified&quot;, false); summary.put(&quot;productionBoundary&quot;, &quot;SEPARATE_AUTHORIZATION_REPLAY_AND_PRODUCTION_QUALIFICATION_REQUIRED_BY_745&quot;);</span>
+<span class="fc" id="L63">        summary.put(&quot;trainingWork&quot;, report.model().trainingWorkUnits());</span>
+<span class="fc" id="L64">        summary.putAll(amortization(report));</span>
+<span class="fc" id="L65">        return json(summary);</span>
+    }
+    private static Map&lt;String, Object&gt; amortization(LearnedSchedulingStudy.Report report) {
+<span class="fc" id="L68">        long budget = LearnedSchedulingProtocol.WORK_BUDGETS.getLast();</span>
+<span class="fc" id="L69">        var ranked = new TreeMap&lt;String, LearnedSchedulingStudy.Row&gt;();</span>
+<span class="fc bfc" id="L70" title="All 4 branches covered.">        report.rows().stream().filter(row -&gt; row.budget() == budget &amp;&amp; row.configuration().equals(&quot;LEARNED_RANKED&quot;))</span>
+<span class="fc" id="L71">            .forEach(row -&gt; ranked.put(row.caseId(), row));</span>
+<span class="fc" id="L72">        long common = 0, saved = 0;</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        for (var row : report.rows()) {</span>
+<span class="fc bfc" id="L74" title="All 6 branches covered.">            if (row.budget() != budget || !row.configuration().equals(&quot;BASE&quot;) || !row.reached()) continue;</span>
+<span class="fc" id="L75">            var other = ranked.get(row.caseId());</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            if (other.reached()) { common++; saved += row.result().metrics().totalWork() - other.result().metrics().totalWork(); }</span>
+<span class="fc" id="L77">        }</span>
+<span class="fc" id="L78">        var result = new TreeMap&lt;String, Object&gt;();</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        result.put(&quot;amortizationPoint&quot;, saved &lt;= 0 ? null : Math.floorDiv(Math.addExact(Math.multiplyExact(report.model().trainingWorkUnits(), common), saved - 1), saved));</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        result.put(&quot;amortizationStatus&quot;, saved &gt; 0 ? &quot;CANONICAL_WORK_QUERY_PAYBACK&quot; : &quot;NO_POSITIVE_COMMON_SOLVED_WORK_SAVING&quot;);</span>
+<span class="fc" id="L81">        result.put(&quot;amortizationPopulation&quot;, &quot;UNIFORM_COMMONLY_SOLVED_HELD_OUT_CASES_AT_FIXED_MAXIMUM_BUDGET;NOT_WALLTIME_OR_CPU_PAYBACK&quot;);</span>
+<span class="fc" id="L82">        result.put(&quot;amortizationCommonCases&quot;, common); result.put(&quot;amortizationPairedWorkSaved&quot;, saved); result.put(&quot;amortizationBudget&quot;, budget);</span>
+<span class="fc" id="L83">        return result;</span>
+    }
+    private static List&lt;Map&lt;String, Object&gt;&gt; budgetSummary(LearnedSchedulingStudy.Report report) {
+<span class="fc" id="L86">        var result = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (long budget : LearnedSchedulingProtocol.WORK_BUDGETS) {</span>
+<span class="fc" id="L88">            var row = new TreeMap&lt;String, Object&gt;(); row.put(&quot;budget&quot;, budget);</span>
+<span class="fc" id="L89">            row.put(&quot;baseSolved&quot;, solved(report, &quot;BASE&quot;, budget)); row.put(&quot;rankedSolved&quot;, solved(report, &quot;LEARNED_RANKED&quot;, budget));</span>
+<span class="fc" id="L90">            row.put(&quot;naiveSolved&quot;, solved(report, &quot;LEARNED_NAIVE&quot;, budget)); row.put(&quot;expertSolved&quot;, solved(report, &quot;EXPERT&quot;, budget));</span>
+<span class="fc" id="L91">            row.put(&quot;stagedPrimitiveSolved&quot;, solved(report, &quot;BASE_STAGED&quot;, budget)); result.add(row);</span>
+<span class="fc" id="L92">        }</span>
+<span class="fc" id="L93">        return result;</span>
+    }
+    private static long solved(LearnedSchedulingStudy.Report report, String configuration, long budget) {
+<span class="fc bfc" id="L96" title="All 6 branches covered.">        return report.rows().stream().filter(row -&gt; row.configuration().equals(configuration) &amp;&amp; row.budget() == budget &amp;&amp; row.reached()).count();</span>
+    }
+    public static Path write(LearnedSchedulingStudy.Report report, Path output) throws IOException {
+<span class="fc" id="L99">        var files = new TreeMap&lt;String, String&gt;(); files.put(&quot;protocol.json&quot;, report.protocol()); files.put(&quot;model.json&quot;, modelJson(report.model()));</span>
+<span class="fc" id="L100">        files.put(&quot;summary.json&quot;, summaryJson(report)); files.put(&quot;results.csv&quot;, csv(report));</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        for (var row : report.rows()) files.put(&quot;runs/&quot; + row.id() + &quot;.json&quot;, rowJson(row));</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        for (var reference : report.references()) {</span>
+<span class="fc" id="L103">            files.put(&quot;reference/&quot; + reference.caseId() + &quot;-BASE.json&quot;, resultJson(reference.base()));</span>
+<span class="fc" id="L104">            files.put(&quot;reference/&quot; + reference.caseId() + &quot;-LEARNED.json&quot;, resultJson(reference.learned()));</span>
+<span class="fc" id="L105">        }</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        for (var training : report.model().training()) files.put(&quot;train/&quot; + training.id() + &quot;.json&quot;, resultJson(training.result()));</span>
+<span class="fc" id="L107">        files.put(&quot;README.md&quot;, &quot;# Frozen learned-knowledge search\n\nAll task/budget/profile rows and their failures are retained. See protocol.json, model.json, results.csv and summary.json. Each retained witness carries its frozen rule ID, full bound primitive expansion and independent exact replay receipts. Reference files enumerate bounded closures with an impossible sentinel target. An incomplete closure is inconclusive.\n\nThis is a public reproducible held-out corpus, not a sealed final test or production qualification. Primitive-only lazy scheduling and single-feature ablations are included. TRAIN and TEST snapshots cannot mutate each other. Atomic overruns count as failures; walltime is a separate diagnostic. Supplementary legacy instrumentation meters exact node/term, alpha-renaming and bounded-reference work without changing frozen v1/v2 replays. Query amortization uses canonical hot-path work over the fixed maximum-budget common-solved population; it is not walltime or CPU payback. Compilation, serialization and coefficient bit complexity remain outside the declared search-work ledger.\n&quot;);</span>
+<span class="fc" id="L108">        var manifest = new TreeMap&lt;String, String&gt;();</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        for (var file : files.entrySet()) { var path = output.resolve(file.getKey()); Files.createDirectories(path.getParent()); Files.writeString(path, file.getValue()); manifest.put(file.getKey(), SchematicProofPlan.hash(file.getValue())); }</span>
+<span class="fc" id="L110">        Files.writeString(output.resolve(&quot;manifest.json&quot;), json(Map.of(&quot;schema&quot;, &quot;regelsuche.learned-scheduling-manifest/v1&quot;, &quot;files&quot;, manifest)));</span>
+<span class="fc" id="L111">        var wall = new StringBuilder(&quot;run,wallNanos\nTRAIN,&quot;).append(report.trainingWallNanos()).append('\n');</span>
+<span class="fc" id="L112">        report.rows().forEach(row -&gt; wall.append(row.id()).append(',').append(row.wallNanos()).append('\n'));</span>
+<span class="fc" id="L113">        Files.writeString(output.resolve(&quot;walltime-diagnostic.csv&quot;), wall.toString());</span>
+<span class="fc" id="L114">        return output.resolve(&quot;summary.json&quot;);</span>
+    }
+    private static String rowJson(LearnedSchedulingStudy.Row row) {
+<span class="fc" id="L117">        var payload = new TreeMap&lt;String, Object&gt;(); payload.put(&quot;id&quot;, row.id()); payload.put(&quot;caseId&quot;, row.caseId());</span>
+<span class="fc" id="L118">        payload.put(&quot;configuration&quot;, row.configuration()); payload.put(&quot;budget&quot;, row.budget()); payload.put(&quot;status&quot;, row.status());</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        payload.put(&quot;search&quot;, row.result() == null ? null : resultPayload(row.result())); return json(payload);</span>
+    }
+<span class="fc" id="L121">    public static String resultJson(MoveSearch.Result result) { return json(resultPayload(result)); }</span>
+    private static Map&lt;String, Object&gt; resultPayload(MoveSearch.Result result) {
+<span class="fc" id="L123">        var payload = new TreeMap&lt;String, Object&gt;(); payload.put(&quot;outcome&quot;, result.outcome()); payload.put(&quot;reached&quot;, result.reached());</span>
+<span class="fc" id="L124">        payload.put(&quot;completeBoundedRelation&quot;, result.completeBoundedRelation()); payload.put(&quot;witness&quot;, result.witness()); payload.put(&quot;events&quot;, result.events());</span>
+<span class="fc" id="L125">        payload.put(&quot;reachedStates&quot;, result.reachedStates()); payload.put(&quot;deadEndStates&quot;, result.deadEndStates()); payload.put(&quot;metrics&quot;, result.metrics());</span>
+<span class="fc" id="L126">        payload.put(&quot;totalWork&quot;, result.metrics().totalWork()); payload.put(&quot;effectiveBranchingFactor&quot;, result.metrics().effectiveBranchingFactor());</span>
+<span class="fc" id="L127">        payload.put(&quot;stateAssessments&quot;, result.stateAssessments().entrySet().stream()</span>
+<span class="fc" id="L128">            .map(entry -&gt; Map.of(&quot;state&quot;, entry.getKey(), &quot;assessment&quot;, entry.getValue())).sorted(java.util.Comparator.comparing(LearnedSchedulingArtifacts::json)).toList());</span>
+<span class="fc" id="L129">        return payload;</span>
+    }
+    private static String csv(LearnedSchedulingStudy.Report report) {
+<span class="fc" id="L132">        var csv = new StringBuilder(&quot;case,configuration,budget,status,solved,primitiveWork,searchWork,verificationWork,totalWork,exploredStates,expandedStates,generatedSuccessors,consumedSuccessors,discardedSuccessors,unconsumedSuccessors,effectiveBranchingFactor,firstHitDepth,firstHitPrimitiveDepth,duplicateRate,learnedRuleHitRate,capabilityUnlocks\n&quot;);</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (var row : report.rows()) {</span>
+<span class="fc" id="L134">            csv.append(row.caseId()).append(',').append(row.configuration()).append(',').append(row.budget()).append(',').append(row.status()).append(',').append(row.reached());</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (row.result() == null) { csv.append(&quot;,,,,,,,,,,,,,,,,\n&quot;); continue; }</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            var m = row.result().metrics(); long learned = row.result().witness().stream().filter(step -&gt; step.move().sourceKind() == SearchMove.SourceKind.LEARNED).count();</span>
+<span class="fc" id="L137">            long unlocks = row.result().witness().stream().mapToLong(step -&gt; step.move().capabilityDelta().size()).sum();</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            for (Object value : List.of(m.primitiveWork(), m.searchWork(), m.verificationWork(), m.totalWork(), m.exploredStates(), m.expandedStates(),</span>
+<span class="fc" id="L139">                    m.generatedSuccessors(), m.consumedSuccessors(), m.discardedSuccessors(), m.unconsumedSuccessors(), m.effectiveBranchingFactor(), m.firstHitDepth(),</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">                    m.firstHitPrimitiveDepth(), m.consumedSuccessors() == 0 ? 0 : (double) m.duplicates() / m.consumedSuccessors(),</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">                    row.result().witness().isEmpty() ? 0 : (double) learned / row.result().witness().size(), unlocks)) csv.append(',').append(value);</span>
+<span class="fc" id="L142">            csv.append('\n');</span>
+<span class="fc" id="L143">        }</span>
+<span class="fc" id="L144">        return csv.toString();</span>
+    }
+    public static String json(Object value) {
+<span class="fc" id="L147">        try { return JSON.writeValueAsString(normalize(value)); }</span>
+<span class="nc" id="L148">        catch (IOException | ReflectiveOperationException exception) { throw new IllegalStateException(&quot;cannot write canonical scheduling evidence&quot;, exception); }</span>
+    }
+    private static Object normalize(Object value) throws ReflectiveOperationException, IOException {
+<span class="fc bfc" id="L151" title="All 8 branches covered.">        if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean) return value;</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (value instanceof Enum&lt;?&gt; enumeration) return enumeration.name();</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (value instanceof Map&lt;?, ?&gt; map) {</span>
+<span class="fc" id="L154">            var result = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            for (var entry : map.entrySet()) result.put((String) entry.getKey(), normalize(entry.getValue())); return result;</span>
+        }
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (value instanceof Collection&lt;?&gt; collection) {</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            var result = new ArrayList&lt;Object&gt;(); for (Object element : collection) result.add(normalize(element));</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            if (value instanceof Set&lt;?&gt;) result.sort(java.util.Comparator.comparing(LearnedSchedulingArtifacts::json)); return result;</span>
+        }
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        if (value.getClass().isRecord()) {</span>
+<span class="fc" id="L162">            var result = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            for (RecordComponent component : value.getClass().getRecordComponents()) result.put(component.getName(), normalize(component.getAccessor().invoke(value)));</span>
+<span class="fc" id="L164">            return result;</span>
+        }
+<span class="nc" id="L166">        throw new IllegalArgumentException(&quot;unsupported evidence value: &quot; + value.getClass());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

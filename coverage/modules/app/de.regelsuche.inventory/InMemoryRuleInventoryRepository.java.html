@@ -106,100 +106,102 @@ import java.util.concurrent.ConcurrentHashMap;
 <span class="fc" id="L106">            builder.append(&quot;,\&quot;averageImprovement\&quot;:&quot;).append(rule.averageImprovement());</span>
 <span class="fc" id="L107">            builder.append(&quot;,\&quot;createdAt\&quot;:&quot;).append(quote(rule.createdAt().toString()));</span>
 <span class="fc" id="L108">            builder.append(&quot;,\&quot;canonicalHash\&quot;:&quot;).append(quote(rule.canonicalHash()));</span>
-<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            builder.append(&quot;,\&quot;lastUsedAt\&quot;:&quot;).append(rule.lastUsedAt() == null ? &quot;null&quot; : quote(rule.lastUsedAt().toString()));</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            builder.append(&quot;,\&quot;lastUsedAt\&quot;:&quot;).append(rule.lastUsedAt() == null ? &quot;null&quot; : quote(rule.lastUsedAt().toString()));</span>
 <span class="fc" id="L110">            builder.append(&quot;,\&quot;usageCount\&quot;:&quot;).append(rule.usageCount());</span>
 <span class="fc" id="L111">            builder.append(&quot;,\&quot;occurrenceCount\&quot;:&quot;).append(rule.occurrenceCount());</span>
 <span class="fc" id="L112">            builder.append(&quot;,\&quot;confidenceScore\&quot;:&quot;).append(rule.confidenceScore());</span>
 <span class="fc" id="L113">            builder.append(&quot;,\&quot;supportingPathIds\&quot;:&quot;).append(quoteArray(rule.supportingPathIds()));</span>
 <span class="fc" id="L114">            builder.append(&quot;,\&quot;assumptions\&quot;:&quot;).append(quoteArray(rule.assumptions()));</span>
-<span class="fc" id="L115">            builder.append(&quot;,\&quot;enabled\&quot;:&quot;).append(isEnabled(rule.id()));</span>
-<span class="fc" id="L116">            builder.append(&quot;,\&quot;tags\&quot;:&quot;).append(quoteArray(new ArrayList&lt;&gt;(tagsOf(rule.id()))));</span>
-<span class="fc" id="L117">            builder.append(&quot;}&quot;);</span>
-<span class="fc bfc" id="L118" title="All 2 branches covered.">            if (i &lt; all.size() - 1) {</span>
-<span class="fc" id="L119">                builder.append(',');</span>
+<span class="fc" id="L115">            builder.append(&quot;,\&quot;utilityEvidence\&quot;:&quot;).append(rule.utilityEvidence().toCanonicalJson());</span>
+<span class="fc" id="L116">            builder.append(&quot;,\&quot;enabled\&quot;:&quot;).append(isEnabled(rule.id()));</span>
+<span class="fc" id="L117">            builder.append(&quot;,\&quot;tags\&quot;:&quot;).append(quoteArray(new ArrayList&lt;&gt;(tagsOf(rule.id()))));</span>
+<span class="fc" id="L118">            builder.append(&quot;}&quot;);</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">            if (i &lt; all.size() - 1) {</span>
+<span class="fc" id="L120">                builder.append(',');</span>
             }
-<span class="fc" id="L121">            builder.append('\n');</span>
+<span class="fc" id="L122">            builder.append('\n');</span>
         }
-<span class="fc" id="L123">        builder.append(&quot;  ]\n}\n&quot;);</span>
-<span class="fc" id="L124">        Files.writeString(file, builder.toString(), StandardCharsets.UTF_8);</span>
-<span class="fc" id="L125">    }</span>
+<span class="fc" id="L124">        builder.append(&quot;  ]\n}\n&quot;);</span>
+<span class="fc" id="L125">        Files.writeString(file, builder.toString(), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L126">    }</span>
 
     /** Re-hydrate a repository from a file previously written by {@link #persistTo(Path)}. */
     public static InMemoryRuleInventoryRepository loadFrom(Path file) throws IOException {
-<span class="fc" id="L129">        InMemoryRuleInventoryRepository repo = new InMemoryRuleInventoryRepository();</span>
-<span class="fc" id="L130">        String content = Files.readString(file, StandardCharsets.UTF_8);</span>
-<span class="fc bfc" id="L131" title="All 2 branches covered.">        for (Map&lt;String, String&gt; raw : MiniJson.parseObjectArray(content, &quot;rules&quot;)) {</span>
-<span class="fc" id="L132">            List&lt;String&gt; relations = MiniJson.parseStringArray(raw.getOrDefault(&quot;parameterRelations&quot;, &quot;[]&quot;));</span>
-<span class="fc" id="L133">            List&lt;String&gt; tags = MiniJson.parseStringArray(raw.getOrDefault(&quot;tags&quot;, &quot;[]&quot;));</span>
-<span class="fc" id="L134">            String lastUsedAtRaw = raw.get(&quot;lastUsedAt&quot;);</span>
-<span class="pc bpc" id="L135" title="4 of 6 branches missed.">            Instant lastUsedAt = lastUsedAtRaw == null || lastUsedAtRaw.equals(&quot;null&quot;) || lastUsedAtRaw.isBlank()</span>
-<span class="fc" id="L136">                ? null</span>
-<span class="pc" id="L137">                : Instant.parse(lastUsedAtRaw);</span>
-<span class="fc" id="L138">            ReusableRule rule = new ReusableRule(</span>
-<span class="fc" id="L139">                raw.get(&quot;id&quot;),</span>
-<span class="fc" id="L140">                raw.get(&quot;leftPattern&quot;),</span>
-<span class="fc" id="L141">                raw.get(&quot;rightPattern&quot;),</span>
+<span class="fc" id="L130">        InMemoryRuleInventoryRepository repo = new InMemoryRuleInventoryRepository();</span>
+<span class="fc" id="L131">        String content = Files.readString(file, StandardCharsets.UTF_8);</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        for (Map&lt;String, String&gt; raw : MiniJson.parseObjectArray(content, &quot;rules&quot;)) {</span>
+<span class="fc" id="L133">            List&lt;String&gt; relations = MiniJson.parseStringArray(raw.getOrDefault(&quot;parameterRelations&quot;, &quot;[]&quot;));</span>
+<span class="fc" id="L134">            List&lt;String&gt; tags = MiniJson.parseStringArray(raw.getOrDefault(&quot;tags&quot;, &quot;[]&quot;));</span>
+<span class="fc" id="L135">            String lastUsedAtRaw = raw.get(&quot;lastUsedAt&quot;);</span>
+<span class="pc bpc" id="L136" title="1 of 6 branches missed.">            Instant lastUsedAt = lastUsedAtRaw == null || lastUsedAtRaw.equals(&quot;null&quot;) || lastUsedAtRaw.isBlank()</span>
+<span class="fc" id="L137">                ? null</span>
+<span class="fc" id="L138">                : Instant.parse(lastUsedAtRaw);</span>
+<span class="fc" id="L139">            ReusableRule rule = new ReusableRule(</span>
+<span class="fc" id="L140">                raw.get(&quot;id&quot;),</span>
+<span class="fc" id="L141">                raw.get(&quot;leftPattern&quot;),</span>
+<span class="fc" id="L142">                raw.get(&quot;rightPattern&quot;),</span>
                 relations,
-<span class="fc" id="L143">                CandidateProofStatus.valueOf(raw.getOrDefault(&quot;proofStatus&quot;, CandidateProofStatus.OBSERVED.name())),</span>
-<span class="fc" id="L144">                RuleStatus.valueOf(raw.getOrDefault(&quot;knownRuleStatus&quot;, RuleStatus.NEW.name())),</span>
-<span class="fc" id="L145">                Integer.parseInt(raw.getOrDefault(&quot;supportingExamples&quot;, &quot;0&quot;)),</span>
-<span class="fc" id="L146">                Double.parseDouble(raw.getOrDefault(&quot;averageImprovement&quot;, &quot;0&quot;)),</span>
-<span class="fc" id="L147">                Instant.parse(raw.getOrDefault(&quot;createdAt&quot;, Instant.EPOCH.toString())),</span>
-<span class="fc" id="L148">                raw.getOrDefault(&quot;canonicalHash&quot;, &quot;&quot;),</span>
+<span class="fc" id="L144">                CandidateProofStatus.valueOf(raw.getOrDefault(&quot;proofStatus&quot;, CandidateProofStatus.OBSERVED.name())),</span>
+<span class="fc" id="L145">                RuleStatus.valueOf(raw.getOrDefault(&quot;knownRuleStatus&quot;, RuleStatus.NEW.name())),</span>
+<span class="fc" id="L146">                Integer.parseInt(raw.getOrDefault(&quot;supportingExamples&quot;, &quot;0&quot;)),</span>
+<span class="fc" id="L147">                Double.parseDouble(raw.getOrDefault(&quot;averageImprovement&quot;, &quot;0&quot;)),</span>
+<span class="fc" id="L148">                Instant.parse(raw.getOrDefault(&quot;createdAt&quot;, Instant.EPOCH.toString())),</span>
+<span class="fc" id="L149">                raw.getOrDefault(&quot;canonicalHash&quot;, &quot;&quot;),</span>
                 lastUsedAt,
-<span class="fc" id="L150">                Integer.parseInt(raw.getOrDefault(&quot;usageCount&quot;, &quot;0&quot;)),</span>
-<span class="fc" id="L151">                Integer.parseInt(raw.getOrDefault(&quot;occurrenceCount&quot;, &quot;0&quot;)),</span>
-<span class="fc" id="L152">                MiniJson.parseStringArray(raw.getOrDefault(&quot;supportingPathIds&quot;, &quot;[]&quot;)),</span>
-<span class="fc" id="L153">                Double.parseDouble(raw.getOrDefault(&quot;confidenceScore&quot;, &quot;0&quot;)),</span>
-<span class="fc" id="L154">                MiniJson.parseStringArray(raw.getOrDefault(&quot;assumptions&quot;, &quot;[]&quot;))</span>
+<span class="fc" id="L151">                Integer.parseInt(raw.getOrDefault(&quot;usageCount&quot;, &quot;0&quot;)),</span>
+<span class="fc" id="L152">                Integer.parseInt(raw.getOrDefault(&quot;occurrenceCount&quot;, &quot;0&quot;)),</span>
+<span class="fc" id="L153">                MiniJson.parseStringArray(raw.getOrDefault(&quot;supportingPathIds&quot;, &quot;[]&quot;)),</span>
+<span class="fc" id="L154">                Double.parseDouble(raw.getOrDefault(&quot;confidenceScore&quot;, &quot;0&quot;)),</span>
+<span class="fc" id="L155">                MiniJson.parseStringArray(raw.getOrDefault(&quot;assumptions&quot;, &quot;[]&quot;)),</span>
+<span class="fc" id="L156">                RuleUtilityEvidence.fromJson(raw.get(&quot;utilityEvidence&quot;))</span>
             );
-<span class="fc" id="L156">            repo.save(rule);</span>
-<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (&quot;false&quot;.equals(raw.get(&quot;enabled&quot;))) {</span>
-<span class="fc" id="L158">                repo.setEnabled(rule.id(), false);</span>
+<span class="fc" id="L158">            repo.save(rule);</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            if (&quot;false&quot;.equals(raw.get(&quot;enabled&quot;))) {</span>
+<span class="fc" id="L160">                repo.setEnabled(rule.id(), false);</span>
             }
-<span class="fc bfc" id="L160" title="All 2 branches covered.">            for (String tag : tags) {</span>
-<span class="fc" id="L161">                repo.addTag(rule.id(), tag);</span>
-<span class="fc" id="L162">            }</span>
-<span class="fc" id="L163">        }</span>
-<span class="fc" id="L164">        return repo;</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            for (String tag : tags) {</span>
+<span class="fc" id="L163">                repo.addTag(rule.id(), tag);</span>
+<span class="fc" id="L164">            }</span>
+<span class="fc" id="L165">        }</span>
+<span class="fc" id="L166">        return repo;</span>
     }
 
     private static String quote(String value) {
-<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (value == null) {</span>
-<span class="nc" id="L169">            return &quot;null&quot;;</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L171">            return &quot;null&quot;;</span>
         }
-<span class="fc" id="L171">        StringBuilder builder = new StringBuilder(&quot;\&quot;&quot;);</span>
-<span class="fc bfc" id="L172" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
-<span class="fc" id="L173">            char c = value.charAt(i);</span>
-<span class="pc bpc" id="L174" title="5 of 6 branches missed.">            switch (c) {</span>
-<span class="nc" id="L175">                case '\\' -&gt; builder.append(&quot;\\\\&quot;);</span>
-<span class="nc" id="L176">                case '&quot;' -&gt; builder.append(&quot;\\\&quot;&quot;);</span>
-<span class="nc" id="L177">                case '\n' -&gt; builder.append(&quot;\\n&quot;);</span>
-<span class="nc" id="L178">                case '\r' -&gt; builder.append(&quot;\\r&quot;);</span>
-<span class="nc" id="L179">                case '\t' -&gt; builder.append(&quot;\\t&quot;);</span>
+<span class="fc" id="L173">        StringBuilder builder = new StringBuilder(&quot;\&quot;&quot;);</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L175">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L176" title="5 of 6 branches missed.">            switch (c) {</span>
+<span class="nc" id="L177">                case '\\' -&gt; builder.append(&quot;\\\\&quot;);</span>
+<span class="nc" id="L178">                case '&quot;' -&gt; builder.append(&quot;\\\&quot;&quot;);</span>
+<span class="nc" id="L179">                case '\n' -&gt; builder.append(&quot;\\n&quot;);</span>
+<span class="nc" id="L180">                case '\r' -&gt; builder.append(&quot;\\r&quot;);</span>
+<span class="nc" id="L181">                case '\t' -&gt; builder.append(&quot;\\t&quot;);</span>
                 default -&gt; {
-<span class="pc bpc" id="L181" title="1 of 2 branches missed.">                    if (c &lt; 0x20) {</span>
-<span class="nc" id="L182">                        builder.append(String.format(&quot;\\u%04x&quot;, (int) c));</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">                    if (c &lt; 0x20) {</span>
+<span class="nc" id="L184">                        builder.append(String.format(&quot;\\u%04x&quot;, (int) c));</span>
                     } else {
-<span class="fc" id="L184">                        builder.append(c);</span>
+<span class="fc" id="L186">                        builder.append(c);</span>
                     }
                 }
             }
         }
-<span class="fc" id="L189">        builder.append('&quot;');</span>
-<span class="fc" id="L190">        return builder.toString();</span>
+<span class="fc" id="L191">        builder.append('&quot;');</span>
+<span class="fc" id="L192">        return builder.toString();</span>
     }
 
     private static String quoteArray(List&lt;String&gt; values) {
-<span class="fc" id="L194">        StringBuilder builder = new StringBuilder(&quot;[&quot;);</span>
-<span class="fc bfc" id="L195" title="All 2 branches covered.">        for (int i = 0; i &lt; values.size(); i++) {</span>
-<span class="fc bfc" id="L196" title="All 2 branches covered.">            if (i &gt; 0) {</span>
-<span class="fc" id="L197">                builder.append(',');</span>
+<span class="fc" id="L196">        StringBuilder builder = new StringBuilder(&quot;[&quot;);</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        for (int i = 0; i &lt; values.size(); i++) {</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L199">                builder.append(',');</span>
             }
-<span class="fc" id="L199">            builder.append(quote(values.get(i)));</span>
+<span class="fc" id="L201">            builder.append(quote(values.get(i)));</span>
         }
-<span class="fc" id="L201">        builder.append(']');</span>
-<span class="fc" id="L202">        return builder.toString();</span>
+<span class="fc" id="L203">        builder.append(']');</span>
+<span class="fc" id="L204">        return builder.toString();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

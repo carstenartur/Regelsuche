@@ -36,45 +36,47 @@ import java.util.TreeSet;
 <span class="fc" id="L36">public final class TraceRewriteStrategyLearner {</span>
     public static final String REVISION = &quot;regelsuche.trace-rewrite-strategy-learner/v2&quot;;
     private static final long SHUFFLE_SEED = 0x74726163654cL;
-<span class="fc" id="L39">    private final ExactPolynomialAnalysis exact = new ExactPolynomialAnalysis();</span>
+    private long exactWork;
+    private long replayPrimitiveWork;
+<span class="fc" id="L41">    private final ExactPolynomialAnalysis exact = new ExactPolynomialAnalysis(units -&gt; exactWork = Math.addExact(exactWork, units));</span>
 
     public record Input(String id, String expression) {
-<span class="fc" id="L42">        public Input {</span>
-<span class="fc" id="L43">            id = SchematicProofPlan.requireId(id, &quot;input id&quot;);</span>
-<span class="fc" id="L44">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
-<span class="fc" id="L45">        }</span>
+<span class="fc" id="L44">        public Input {</span>
+<span class="fc" id="L45">            id = SchematicProofPlan.requireId(id, &quot;input id&quot;);</span>
+<span class="fc" id="L46">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L47">        }</span>
     }
 
     public record Limits(Budget trainingBudget, int maximumInputs, int maximumTraceSteps,
                          int maximumProgramNodes, PrimitiveTraceMinimalityVerifier.Limits minimalityLimits) {
         public Limits(Budget trainingBudget, int maximumInputs, int maximumTraceSteps, int maximumProgramNodes) {
-<span class="fc" id="L51">            this(trainingBudget, maximumInputs, maximumTraceSteps, maximumProgramNodes, PrimitiveTraceMinimalityVerifier.Limits.defaults());</span>
-<span class="fc" id="L52">        }</span>
-<span class="fc" id="L53">        public Limits {</span>
-<span class="fc" id="L54">            Objects.requireNonNull(trainingBudget, &quot;trainingBudget&quot;);</span>
-<span class="fc" id="L55">            Objects.requireNonNull(minimalityLimits, &quot;minimalityLimits&quot;);</span>
-<span class="pc bpc" id="L56" title="6 of 12 branches missed.">            if (maximumInputs &lt; 2 || maximumInputs &gt; 32 || maximumTraceSteps &lt; 2 || maximumTraceSteps &gt; 8</span>
+<span class="fc" id="L53">            this(trainingBudget, maximumInputs, maximumTraceSteps, maximumProgramNodes, PrimitiveTraceMinimalityVerifier.Limits.defaults());</span>
+<span class="fc" id="L54">        }</span>
+<span class="fc" id="L55">        public Limits {</span>
+<span class="fc" id="L56">            Objects.requireNonNull(trainingBudget, &quot;trainingBudget&quot;);</span>
+<span class="fc" id="L57">            Objects.requireNonNull(minimalityLimits, &quot;minimalityLimits&quot;);</span>
+<span class="pc bpc" id="L58" title="6 of 12 branches missed.">            if (maximumInputs &lt; 2 || maximumInputs &gt; 32 || maximumTraceSteps &lt; 2 || maximumTraceSteps &gt; 8</span>
                     || maximumProgramNodes &lt; 3 || maximumProgramNodes &gt; 128
-<span class="pc bpc" id="L58" title="1 of 2 branches missed.">                    || trainingBudget.maxPrimitiveSteps() &gt; maximumTraceSteps</span>
-<span class="pc bpc" id="L59" title="1 of 2 branches missed.">                    || trainingBudget.maxExactTheoryWorkUnits() != 0</span>
-<span class="pc bpc" id="L60" title="2 of 4 branches missed.">                    || trainingBudget.maxExploredStates() &gt; 512 || trainingBudget.maxCandidatesPerState() &gt; 128</span>
-<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                    || trainingBudget.maxWorkUnits() &gt; 1_000_000) {</span>
-<span class="nc" id="L62">                throw new IllegalArgumentException(&quot;invalid bounded trace-learning limits&quot;);</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">                    || trainingBudget.maxPrimitiveSteps() &gt; maximumTraceSteps</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                    || trainingBudget.maxExactTheoryWorkUnits() != 0</span>
+<span class="pc bpc" id="L62" title="2 of 4 branches missed.">                    || trainingBudget.maxExploredStates() &gt; 512 || trainingBudget.maxCandidatesPerState() &gt; 128</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">                    || trainingBudget.maxWorkUnits() &gt; 1_000_000) {</span>
+<span class="nc" id="L64">                throw new IllegalArgumentException(&quot;invalid bounded trace-learning limits&quot;);</span>
             }
-<span class="fc" id="L64">        }</span>
+<span class="fc" id="L66">        }</span>
     }
 
-<span class="fc" id="L67">    public enum Profile { FLAT_RULES, LEARNED_PROGRAM, SHUFFLED_PROGRAM }</span>
+<span class="fc" id="L69">    public enum Profile { FLAT_RULES, LEARNED_PROGRAM, SHUFFLED_PROGRAM }</span>
 
     /** Failed, unchanged and budget-limited training searches remain in the model. */
     public record Observation(Input input, String alphaIdentity, Result search,
                               List&lt;String&gt; geneSequence, long replayWorkUnits, int exactAuditCalls,
                               Optional&lt;PrimitiveTraceMinimalityVerifier.Assessment&gt; minimality) {
-<span class="fc" id="L73">        public Observation {</span>
-<span class="fc" id="L74">            geneSequence = List.copyOf(geneSequence);</span>
-<span class="fc" id="L75">            minimality = Objects.requireNonNull(minimality, &quot;minimality&quot;);</span>
-<span class="fc" id="L76">        }</span>
-<span class="fc" id="L77">        public String searchHash() { return SchematicProofPlan.hash(search.toCanonicalJson()); }</span>
+<span class="fc" id="L75">        public Observation {</span>
+<span class="fc" id="L76">            geneSequence = List.copyOf(geneSequence);</span>
+<span class="fc" id="L77">            minimality = Objects.requireNonNull(minimality, &quot;minimality&quot;);</span>
+<span class="fc" id="L78">        }</span>
+<span class="fc" id="L79">        public String searchHash() { return SchematicProofPlan.hash(search.toCanonicalJson()); }</span>
     }
 
     /** Privately issued after training; serialized plans alone carry no authority. */
@@ -86,324 +88,339 @@ import java.util.TreeSet;
         private final Optional&lt;EvolutionRewriteProgramPlan&gt; plan;
         private final Optional&lt;EvolutionRewriteProgramPlan&gt; shuffled;
         private final String canonicalJson;
+        private final long exactWork;
+        private final long replayPrimitiveWork;
 
         private FrozenStrategy(EvolutionGenome inventory, Limits limits, List&lt;Observation&gt; observations,
                 Set&lt;String&gt; excludedIdentities, Optional&lt;EvolutionRewriteProgramPlan&gt; plan,
-<span class="fc" id="L92">                Optional&lt;EvolutionRewriteProgramPlan&gt; shuffled) {</span>
-<span class="fc" id="L93">            this.inventory = inventory;</span>
-<span class="fc" id="L94">            this.limits = limits;</span>
-<span class="fc" id="L95">            this.observations = List.copyOf(observations);</span>
-<span class="fc" id="L96">            this.excludedIdentities = excludedIdentities.stream().sorted().toList();</span>
-<span class="fc" id="L97">            this.plan = plan;</span>
-<span class="fc" id="L98">            this.shuffled = shuffled;</span>
-<span class="fc" id="L99">            canonicalJson = render();</span>
-<span class="fc" id="L100">        }</span>
+<span class="fc" id="L96">                Optional&lt;EvolutionRewriteProgramPlan&gt; shuffled, long exactWork, long replayPrimitiveWork) {</span>
+<span class="fc" id="L97">            this.inventory = inventory;</span>
+<span class="fc" id="L98">            this.limits = limits;</span>
+<span class="fc" id="L99">            this.observations = List.copyOf(observations);</span>
+<span class="fc" id="L100">            this.excludedIdentities = excludedIdentities.stream().sorted().toList();</span>
+<span class="fc" id="L101">            this.plan = plan;</span>
+<span class="fc" id="L102">            this.shuffled = shuffled;</span>
+<span class="fc" id="L103">            this.exactWork = exactWork;</span>
+<span class="fc" id="L104">            this.replayPrimitiveWork = replayPrimitiveWork;</span>
+<span class="fc" id="L105">            canonicalJson = render();</span>
+<span class="fc" id="L106">        }</span>
 
-<span class="fc" id="L102">        public EvolutionGenome inventory() { return inventory; }</span>
-<span class="fc" id="L103">        public Limits limits() { return limits; }</span>
-<span class="fc" id="L104">        public List&lt;Observation&gt; observations() { return observations; }</span>
-<span class="fc" id="L105">        public List&lt;String&gt; excludedIdentities() { return excludedIdentities; }</span>
-<span class="fc" id="L106">        public Optional&lt;EvolutionRewriteProgramPlan&gt; plan() { return plan; }</span>
-<span class="fc" id="L107">        public Optional&lt;EvolutionRewriteProgramPlan&gt; shuffledPlan() { return shuffled; }</span>
-<span class="fc" id="L108">        public String toCanonicalJson() { return canonicalJson; }</span>
-<span class="fc" id="L109">        public String contentHash() { return SchematicProofPlan.hash(canonicalJson); }</span>
+<span class="fc" id="L108">        public EvolutionGenome inventory() { return inventory; }</span>
+<span class="fc" id="L109">        public Limits limits() { return limits; }</span>
+<span class="fc" id="L110">        public List&lt;Observation&gt; observations() { return observations; }</span>
+<span class="fc" id="L111">        public List&lt;String&gt; excludedIdentities() { return excludedIdentities; }</span>
+<span class="fc" id="L112">        public Optional&lt;EvolutionRewriteProgramPlan&gt; plan() { return plan; }</span>
+<span class="fc" id="L113">        public Optional&lt;EvolutionRewriteProgramPlan&gt; shuffledPlan() { return shuffled; }</span>
+<span class="fc" id="L114">        public String toCanonicalJson() { return canonicalJson; }</span>
+<span class="fc" id="L115">        public String contentHash() { return SchematicProofPlan.hash(canonicalJson); }</span>
         public long trainingSearchWorkUnits() {
-<span class="fc" id="L111">            return observations.stream().mapToLong(o -&gt; o.search().metrics().chargedSearchWorkUnits())</span>
-<span class="fc" id="L112">                .reduce(0L, Math::addExact);</span>
+<span class="fc" id="L117">            return observations.stream().mapToLong(o -&gt; o.search().metrics().chargedSearchWorkUnits())</span>
+<span class="fc" id="L118">                .reduce(0L, Math::addExact);</span>
+        }
+        /** Supplementary observed accounting; frozen historical JSON and mathematical identity stay unchanged. */
+<span class="fc" id="L121">        public long trainingExactWorkUnits() { return exactWork; }</span>
+<span class="fc" id="L122">        public long trainingReplayPrimitiveWorkUnits() { return replayPrimitiveWork; }</span>
+        public long trainingPrimitiveWorkUnits() {
+<span class="fc" id="L124">            return observations.stream().mapToLong(value -&gt; value.search().metrics().transformationWork().sourceCandidates()).sum();</span>
+        }
+        public long trainingReferenceSupplementaryWorkUnits() {
+<span class="fc" id="L127">            return observations.stream().mapToLong(value -&gt; value.minimality().map(PrimitiveTraceMinimalityVerifier.Assessment::supplementaryWork).orElse(0L)).sum();</span>
         }
         public long trainingReplayWorkUnits() {
-<span class="fc" id="L115">            return observations.stream().mapToLong(Observation::replayWorkUnits).reduce(0L, Math::addExact);</span>
+<span class="fc" id="L130">            return observations.stream().mapToLong(Observation::replayWorkUnits).reduce(0L, Math::addExact);</span>
         }
         public int trainingExactAuditCalls() {
-<span class="fc" id="L118">            return observations.stream().mapToInt(Observation::exactAuditCalls).sum();</span>
+<span class="fc" id="L133">            return observations.stream().mapToInt(Observation::exactAuditCalls).sum();</span>
         }
         public long trainingMinimalityWorkUnits() {
-<span class="fc" id="L121">            return observations.stream().mapToLong(o -&gt; o.minimality().map(PrimitiveTraceMinimalityVerifier.Assessment::measuredWork)</span>
-<span class="fc" id="L122">                .orElse(0L)).reduce(0L, Math::addExact);</span>
+<span class="fc" id="L136">            return observations.stream().mapToLong(o -&gt; o.minimality().map(PrimitiveTraceMinimalityVerifier.Assessment::measuredWork)</span>
+<span class="fc" id="L137">                .orElse(0L)).reduce(0L, Math::addExact);</span>
         }
 
         private String render() {
-<span class="fc" id="L126">            var json = new JsonWriter().beginObject().property(&quot;schema&quot;, REVISION)</span>
-<span class="fc" id="L127">                .property(&quot;state&quot;, &quot;TRAIN_COMPLETE_STRATEGY_FROZEN&quot;)</span>
-<span class="fc" id="L128">                .property(&quot;authority&quot;, &quot;EXPERIMENTAL_NO_PRODUCTION_PROMOTION&quot;)</span>
-<span class="fc" id="L129">                .property(&quot;inventoryHash&quot;, inventory.contentHash())</span>
-<span class="fc" id="L130">                .property(&quot;identityRevision&quot;, ExactPolynomialAnalysis.REVISION)</span>
-<span class="fc" id="L131">                .property(&quot;formation&quot;, &quot;TARGET_FREE_SCORER_SELECTED_PRIMITIVE_TRACES&quot;)</span>
-<span class="fc" id="L132">                .property(&quot;topology&quot;, &quot;OBSERVED_RULE_SEQUENCES_SHARED_PREFIX_CHOICE&quot;)</span>
-<span class="fc" id="L133">                .property(&quot;minimalityRevision&quot;, PrimitiveTraceMinimalityVerifier.REVISION)</span>
-<span class="fc" id="L134">                .property(&quot;minimalityScope&quot;, PrimitiveTraceMinimalityVerifier.SCOPE)</span>
-<span class="fc" id="L135">                .property(&quot;formationGate&quot;, &quot;SHORTEST_VERIFIED_TRACE_ONLY;SHORTEN_OR_REJECT;INCONCLUSIVE_REJECTED&quot;)</span>
-<span class="fc" id="L136">                .property(&quot;objective&quot;, &quot;EXPRESSION_SCORE_PLUS_2_PER_PRIMITIVE_PLUS_5_PER_EXPANDING_STEP&quot;)</span>
-<span class="fc" id="L137">                .property(&quot;shuffleSeed&quot;, SHUFFLE_SEED)</span>
-<span class="fc" id="L138">                .property(&quot;shufflePolicy&quot;, &quot;FIXED_SEED_FISHER_YATES;ROTATE_UNCHANGED_SEQUENCE_ONCE&quot;)</span>
-<span class="fc bfc" id="L139" title="All 2 branches covered.">                .property(&quot;orderAblationChanged&quot;, !plan.equals(shuffled))</span>
-<span class="fc" id="L140">                .property(&quot;maximumInputs&quot;, limits.maximumInputs())</span>
-<span class="fc" id="L141">                .property(&quot;maximumTraceSteps&quot;, limits.maximumTraceSteps())</span>
-<span class="fc" id="L142">                .property(&quot;maximumProgramNodes&quot;, limits.maximumProgramNodes())</span>
-<span class="fc" id="L143">                .object(&quot;trainingBudget&quot;, value -&gt; writeBudget(value, limits.trainingBudget()))</span>
-<span class="fc" id="L144">                .property(&quot;trainingSearchWorkUnits&quot;, trainingSearchWorkUnits())</span>
-<span class="fc" id="L145">                .property(&quot;trainingReplayWorkUnits&quot;, trainingReplayWorkUnits())</span>
-<span class="fc" id="L146">                .property(&quot;trainingExactAuditCalls&quot;, trainingExactAuditCalls())</span>
-<span class="fc" id="L147">                .property(&quot;trainingMinimalityWorkUnits&quot;, trainingMinimalityWorkUnits())</span>
-<span class="fc" id="L148">                .object(&quot;minimalityLimits&quot;, value -&gt; PrimitiveTraceMinimalityVerifier.writeLimits(value, limits.minimalityLimits()))</span>
-<span class="fc" id="L149">                .property(&quot;inventoryIdentityChecks&quot;, inventory.rewrites().size())</span>
-<span class="fc" id="L150">                .property(&quot;workClaim&quot;, &quot;SEARCH_MECHANICS_MINIMALITY_EVENTS_AND_AUDIT_CALLS;NOT_COMPLETE_CPU_OR_LEARNING_COST&quot;)</span>
-<span class="fc" id="L151">                .stringArray(&quot;excludedAlphaPolynomialIdentities&quot;, excludedIdentities)</span>
-<span class="fc" id="L152">                .property(&quot;plan&quot;, plan.map(EvolutionRewriteProgramPlan::toCanonicalJson).orElse(&quot;&quot;))</span>
-<span class="fc" id="L153">                .property(&quot;shuffledPlan&quot;, shuffled.map(EvolutionRewriteProgramPlan::toCanonicalJson).orElse(&quot;&quot;))</span>
-<span class="fc" id="L154">                .array(&quot;observations&quot;, values -&gt; observations.forEach(o -&gt; values.objectValue(value -&gt;</span>
-<span class="fc" id="L155">                    value.property(&quot;id&quot;, o.input().id()).property(&quot;input&quot;, o.input().expression())</span>
-<span class="fc" id="L156">                        .property(&quot;alphaIdentity&quot;, o.alphaIdentity()).property(&quot;searchHash&quot;, o.searchHash())</span>
-<span class="fc" id="L157">                        .property(&quot;status&quot;, o.search().status().name())</span>
-<span class="fc" id="L158">                        .property(&quot;selectedOutput&quot;, o.search().bestState().expression())</span>
-<span class="fc" id="L159">                        .stringArray(&quot;geneSequence&quot;, o.geneSequence())</span>
-<span class="fc" id="L160">                        .property(&quot;replayWorkUnits&quot;, o.replayWorkUnits())</span>
-<span class="fc" id="L161">                        .property(&quot;exactAuditCalls&quot;, o.exactAuditCalls())</span>
-<span class="fc" id="L162">                        .property(&quot;minimality&quot;, o.minimality().map(PrimitiveTraceMinimalityVerifier.Assessment::toCanonicalJson).orElse(&quot;&quot;)))));</span>
-<span class="fc" id="L163">            return json.endObject().toString();</span>
+<span class="fc" id="L141">            var json = new JsonWriter().beginObject().property(&quot;schema&quot;, REVISION)</span>
+<span class="fc" id="L142">                .property(&quot;state&quot;, &quot;TRAIN_COMPLETE_STRATEGY_FROZEN&quot;)</span>
+<span class="fc" id="L143">                .property(&quot;authority&quot;, &quot;EXPERIMENTAL_NO_PRODUCTION_PROMOTION&quot;)</span>
+<span class="fc" id="L144">                .property(&quot;inventoryHash&quot;, inventory.contentHash())</span>
+<span class="fc" id="L145">                .property(&quot;identityRevision&quot;, ExactPolynomialAnalysis.REVISION)</span>
+<span class="fc" id="L146">                .property(&quot;formation&quot;, &quot;TARGET_FREE_SCORER_SELECTED_PRIMITIVE_TRACES&quot;)</span>
+<span class="fc" id="L147">                .property(&quot;topology&quot;, &quot;OBSERVED_RULE_SEQUENCES_SHARED_PREFIX_CHOICE&quot;)</span>
+<span class="fc" id="L148">                .property(&quot;minimalityRevision&quot;, PrimitiveTraceMinimalityVerifier.REVISION)</span>
+<span class="fc" id="L149">                .property(&quot;minimalityScope&quot;, PrimitiveTraceMinimalityVerifier.SCOPE)</span>
+<span class="fc" id="L150">                .property(&quot;formationGate&quot;, &quot;SHORTEST_VERIFIED_TRACE_ONLY;SHORTEN_OR_REJECT;INCONCLUSIVE_REJECTED&quot;)</span>
+<span class="fc" id="L151">                .property(&quot;objective&quot;, &quot;EXPRESSION_SCORE_PLUS_2_PER_PRIMITIVE_PLUS_5_PER_EXPANDING_STEP&quot;)</span>
+<span class="fc" id="L152">                .property(&quot;shuffleSeed&quot;, SHUFFLE_SEED)</span>
+<span class="fc" id="L153">                .property(&quot;shufflePolicy&quot;, &quot;FIXED_SEED_FISHER_YATES;ROTATE_UNCHANGED_SEQUENCE_ONCE&quot;)</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">                .property(&quot;orderAblationChanged&quot;, !plan.equals(shuffled))</span>
+<span class="fc" id="L155">                .property(&quot;maximumInputs&quot;, limits.maximumInputs())</span>
+<span class="fc" id="L156">                .property(&quot;maximumTraceSteps&quot;, limits.maximumTraceSteps())</span>
+<span class="fc" id="L157">                .property(&quot;maximumProgramNodes&quot;, limits.maximumProgramNodes())</span>
+<span class="fc" id="L158">                .object(&quot;trainingBudget&quot;, value -&gt; writeBudget(value, limits.trainingBudget()))</span>
+<span class="fc" id="L159">                .property(&quot;trainingSearchWorkUnits&quot;, trainingSearchWorkUnits())</span>
+<span class="fc" id="L160">                .property(&quot;trainingReplayWorkUnits&quot;, trainingReplayWorkUnits())</span>
+<span class="fc" id="L161">                .property(&quot;trainingExactAuditCalls&quot;, trainingExactAuditCalls())</span>
+<span class="fc" id="L162">                .property(&quot;trainingMinimalityWorkUnits&quot;, trainingMinimalityWorkUnits())</span>
+<span class="fc" id="L163">                .object(&quot;minimalityLimits&quot;, value -&gt; PrimitiveTraceMinimalityVerifier.writeLimits(value, limits.minimalityLimits()))</span>
+<span class="fc" id="L164">                .property(&quot;inventoryIdentityChecks&quot;, inventory.rewrites().size())</span>
+<span class="fc" id="L165">                .property(&quot;workClaim&quot;, &quot;SEARCH_MECHANICS_MINIMALITY_EVENTS_AND_AUDIT_CALLS;NOT_COMPLETE_CPU_OR_LEARNING_COST&quot;)</span>
+<span class="fc" id="L166">                .stringArray(&quot;excludedAlphaPolynomialIdentities&quot;, excludedIdentities)</span>
+<span class="fc" id="L167">                .property(&quot;plan&quot;, plan.map(EvolutionRewriteProgramPlan::toCanonicalJson).orElse(&quot;&quot;))</span>
+<span class="fc" id="L168">                .property(&quot;shuffledPlan&quot;, shuffled.map(EvolutionRewriteProgramPlan::toCanonicalJson).orElse(&quot;&quot;))</span>
+<span class="fc" id="L169">                .array(&quot;observations&quot;, values -&gt; observations.forEach(o -&gt; values.objectValue(value -&gt;</span>
+<span class="fc" id="L170">                    value.property(&quot;id&quot;, o.input().id()).property(&quot;input&quot;, o.input().expression())</span>
+<span class="fc" id="L171">                        .property(&quot;alphaIdentity&quot;, o.alphaIdentity()).property(&quot;searchHash&quot;, o.searchHash())</span>
+<span class="fc" id="L172">                        .property(&quot;status&quot;, o.search().status().name())</span>
+<span class="fc" id="L173">                        .property(&quot;selectedOutput&quot;, o.search().bestState().expression())</span>
+<span class="fc" id="L174">                        .stringArray(&quot;geneSequence&quot;, o.geneSequence())</span>
+<span class="fc" id="L175">                        .property(&quot;replayWorkUnits&quot;, o.replayWorkUnits())</span>
+<span class="fc" id="L176">                        .property(&quot;exactAuditCalls&quot;, o.exactAuditCalls())</span>
+<span class="fc" id="L177">                        .property(&quot;minimality&quot;, o.minimality().map(PrimitiveTraceMinimalityVerifier.Assessment::toCanonicalJson).orElse(&quot;&quot;)))));</span>
+<span class="fc" id="L178">            return json.endObject().toString();</span>
         }
     }
 
-<span class="fc" id="L167">    public record Application(String strategyHash, Profile profile, String input, String alphaIdentity,</span>
+<span class="fc" id="L182">    public record Application(String strategyHash, Profile profile, String input, String alphaIdentity,</span>
                               Result search, int exactAuditCalls) {
         public String toCanonicalJson() {
-<span class="fc" id="L170">            return new JsonWriter().beginObject().property(&quot;schema&quot;, REVISION)</span>
-<span class="fc" id="L171">                .property(&quot;strategyHash&quot;, strategyHash).property(&quot;profile&quot;, profile.name())</span>
-<span class="fc" id="L172">                .property(&quot;input&quot;, input).property(&quot;alphaIdentity&quot;, alphaIdentity)</span>
-<span class="fc" id="L173">                .property(&quot;searchHash&quot;, SchematicProofPlan.hash(search.toCanonicalJson()))</span>
-<span class="fc" id="L174">                .property(&quot;output&quot;, search.bestState().expression())</span>
-<span class="fc" id="L175">                .property(&quot;status&quot;, search.status().name())</span>
-<span class="fc" id="L176">                .property(&quot;score&quot;, search.bestState().score().weightedTotal())</span>
-<span class="fc" id="L177">                .property(&quot;primitiveSteps&quot;, search.bestState().primitiveDepth())</span>
-<span class="fc" id="L178">                .property(&quot;programUsed&quot;, search.bestState().programUsed())</span>
-<span class="fc" id="L179">                .property(&quot;chargedSearchWorkUnits&quot;, search.metrics().chargedSearchWorkUnits())</span>
-<span class="fc" id="L180">                .property(&quot;exactAuditCalls&quot;, exactAuditCalls)</span>
-<span class="fc" id="L181">                .endObject().toString();</span>
+<span class="fc" id="L185">            return new JsonWriter().beginObject().property(&quot;schema&quot;, REVISION)</span>
+<span class="fc" id="L186">                .property(&quot;strategyHash&quot;, strategyHash).property(&quot;profile&quot;, profile.name())</span>
+<span class="fc" id="L187">                .property(&quot;input&quot;, input).property(&quot;alphaIdentity&quot;, alphaIdentity)</span>
+<span class="fc" id="L188">                .property(&quot;searchHash&quot;, SchematicProofPlan.hash(search.toCanonicalJson()))</span>
+<span class="fc" id="L189">                .property(&quot;output&quot;, search.bestState().expression())</span>
+<span class="fc" id="L190">                .property(&quot;status&quot;, search.status().name())</span>
+<span class="fc" id="L191">                .property(&quot;score&quot;, search.bestState().score().weightedTotal())</span>
+<span class="fc" id="L192">                .property(&quot;primitiveSteps&quot;, search.bestState().primitiveDepth())</span>
+<span class="fc" id="L193">                .property(&quot;programUsed&quot;, search.bestState().programUsed())</span>
+<span class="fc" id="L194">                .property(&quot;chargedSearchWorkUnits&quot;, search.metrics().chargedSearchWorkUnits())</span>
+<span class="fc" id="L195">                .property(&quot;exactAuditCalls&quot;, exactAuditCalls)</span>
+<span class="fc" id="L196">                .endObject().toString();</span>
         }
     }
 
     public FrozenStrategy learn(EvolutionGenome inventory, List&lt;Input&gt; inputs, Limits limits) {
-<span class="fc" id="L186">        Objects.requireNonNull(inventory, &quot;inventory&quot;);</span>
-<span class="fc" id="L187">        Objects.requireNonNull(limits, &quot;limits&quot;);</span>
-<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (inventory.trainingScope().sourceSplit() != EvolutionGenome.SourceSplit.TRAIN</span>
-<span class="pc bpc" id="L189" title="2 of 4 branches missed.">                || inventory.rewrites().size() &gt; 16 || limits.maximumProgramNodes() &gt; inventory.budget().maxProgramLength()) {</span>
-<span class="nc" id="L190">            throw new IllegalArgumentException(&quot;TRAIN inventory and compatible program bounds required&quot;);</span>
+<span class="fc" id="L201">        exactWork = 0; replayPrimitiveWork = 0;</span>
+<span class="fc" id="L202">        Objects.requireNonNull(inventory, &quot;inventory&quot;);</span>
+<span class="fc" id="L203">        Objects.requireNonNull(limits, &quot;limits&quot;);</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">        if (inventory.trainingScope().sourceSplit() != EvolutionGenome.SourceSplit.TRAIN</span>
+<span class="pc bpc" id="L205" title="2 of 4 branches missed.">                || inventory.rewrites().size() &gt; 16 || limits.maximumProgramNodes() &gt; inventory.budget().maxProgramLength()) {</span>
+<span class="nc" id="L206">            throw new IllegalArgumentException(&quot;TRAIN inventory and compatible program bounds required&quot;);</span>
         }
-<span class="fc" id="L192">        List&lt;Input&gt; ordered = List.copyOf(inputs).stream().sorted(Comparator.comparing(Input::id)).toList();</span>
-<span class="pc bpc" id="L193" title="2 of 4 branches missed.">        if (ordered.size() &lt; 2 || ordered.size() &gt; limits.maximumInputs()</span>
-<span class="pc bpc" id="L194" title="1 of 2 branches missed.">                || ordered.stream().map(Input::id).distinct().count() != ordered.size()) {</span>
-<span class="nc" id="L195">            throw new IllegalArgumentException(&quot;two or more distinct bounded TRAIN inputs required&quot;);</span>
+<span class="fc" id="L208">        List&lt;Input&gt; ordered = List.copyOf(inputs).stream().sorted(Comparator.comparing(Input::id)).toList();</span>
+<span class="pc bpc" id="L209" title="2 of 4 branches missed.">        if (ordered.size() &lt; 2 || ordered.size() &gt; limits.maximumInputs()</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                || ordered.stream().map(Input::id).distinct().count() != ordered.size()) {</span>
+<span class="nc" id="L211">            throw new IllegalArgumentException(&quot;two or more distinct bounded TRAIN inputs required&quot;);</span>
         }
-<span class="fc" id="L197">        validateRules(inventory);</span>
-<span class="fc" id="L198">        var compiled = new EvolutionGenomeCompiler().compile(inventory);</span>
-<span class="fc" id="L199">        Map&lt;String, String&gt; genes = new HashMap&lt;&gt;();</span>
-<span class="fc" id="L200">        Map&lt;String, RewriteRule&gt; rules = new HashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L201" title="All 2 branches covered.">        for (int i = 0; i &lt; compiled.rules().size(); i++) {</span>
-<span class="fc" id="L202">            RewriteRule rule = compiled.rules().get(i);</span>
-<span class="fc" id="L203">            genes.put(rule.id(), inventory.rewrites().get(i).geneId());</span>
-<span class="fc" id="L204">            rules.put(rule.id(), rule);</span>
+<span class="fc" id="L213">        validateRules(inventory);</span>
+<span class="fc" id="L214">        var compiled = new EvolutionGenomeCompiler().compile(inventory);</span>
+<span class="fc" id="L215">        Map&lt;String, String&gt; genes = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L216">        Map&lt;String, RewriteRule&gt; rules = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        for (int i = 0; i &lt; compiled.rules().size(); i++) {</span>
+<span class="fc" id="L218">            RewriteRule rule = compiled.rules().get(i);</span>
+<span class="fc" id="L219">            genes.put(rule.id(), inventory.rewrites().get(i).geneId());</span>
+<span class="fc" id="L220">            rules.put(rule.id(), rule);</span>
         }
-<span class="fc" id="L206">        Set&lt;String&gt; excluded = new TreeSet&lt;&gt;();</span>
-<span class="fc" id="L207">        Map&lt;String, String&gt; identities = new HashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L208" title="All 2 branches covered.">        for (Input input : ordered) {</span>
-<span class="fc" id="L209">            String identity = exact.alphaIdentity(input.expression());</span>
-<span class="fc bfc" id="L210" title="All 2 branches covered.">            if (!excluded.add(identity)) throw new IllegalArgumentException(&quot;semantically duplicate TRAIN input&quot;);</span>
-<span class="fc" id="L211">            identities.put(input.id(), identity);</span>
-<span class="fc" id="L212">        }</span>
-<span class="fc" id="L213">        var flat = flat(inventory);</span>
-<span class="fc" id="L214">        var minimality = new PrimitiveTraceMinimalityVerifier(inventory);</span>
-<span class="fc" id="L215">        List&lt;Observation&gt; observations = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L216" title="All 2 branches covered.">        for (Input input : ordered) {</span>
-<span class="fc" id="L217">            observations.add(observeTraining(input, identities.get(input.id()), inventory, limits, genes, rules, flat, minimality, excluded));</span>
-<span class="fc" id="L218">        }</span>
-<span class="fc" id="L219">        List&lt;List&lt;String&gt;&gt; sequences = observations.stream().map(Observation::geneSequence)</span>
-<span class="fc bfc" id="L220" title="All 2 branches covered.">            .filter(s -&gt; !s.isEmpty()).distinct().toList();</span>
-<span class="fc" id="L221">        var plan = compileTopology(inventory, sequences, limits.maximumProgramNodes());</span>
-<span class="fc" id="L222">        List&lt;List&lt;String&gt;&gt; shuffledSequences = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L223">        Random random = new Random(SHUFFLE_SEED);</span>
-<span class="fc bfc" id="L224" title="All 2 branches covered.">        for (List&lt;String&gt; sequence : sequences) {</span>
-<span class="fc" id="L225">            var shuffled = new ArrayList&lt;&gt;(sequence);</span>
-<span class="fc" id="L226">            java.util.Collections.shuffle(shuffled, random);</span>
+<span class="fc" id="L222">        Set&lt;String&gt; excluded = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L223">        Map&lt;String, String&gt; identities = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        for (Input input : ordered) {</span>
+<span class="fc" id="L225">            String identity = exact.alphaIdentity(input.expression());</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">            if (!excluded.add(identity)) throw new IllegalArgumentException(&quot;semantically duplicate TRAIN input&quot;);</span>
+<span class="fc" id="L227">            identities.put(input.id(), identity);</span>
+<span class="fc" id="L228">        }</span>
+<span class="fc" id="L229">        var flat = flat(inventory);</span>
+<span class="fc" id="L230">        var minimality = new PrimitiveTraceMinimalityVerifier(inventory);</span>
+<span class="fc" id="L231">        List&lt;Observation&gt; observations = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        for (Input input : ordered) {</span>
+<span class="fc" id="L233">            observations.add(observeTraining(input, identities.get(input.id()), inventory, limits, genes, rules, flat, minimality, excluded));</span>
+<span class="fc" id="L234">        }</span>
+<span class="fc" id="L235">        List&lt;List&lt;String&gt;&gt; sequences = observations.stream().map(Observation::geneSequence)</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">            .filter(s -&gt; !s.isEmpty()).distinct().toList();</span>
+<span class="fc" id="L237">        var plan = compileTopology(inventory, sequences, limits.maximumProgramNodes());</span>
+<span class="fc" id="L238">        List&lt;List&lt;String&gt;&gt; shuffledSequences = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L239">        Random random = new Random(SHUFFLE_SEED);</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        for (List&lt;String&gt; sequence : sequences) {</span>
+<span class="fc" id="L241">            var shuffled = new ArrayList&lt;&gt;(sequence);</span>
+<span class="fc" id="L242">            java.util.Collections.shuffle(shuffled, random);</span>
             // An unchanged random permutation is not an order ablation.
             // This fixed fallback never consults application results.
-<span class="pc bpc" id="L229" title="1 of 2 branches missed.">            if (shuffled.equals(sequence)) java.util.Collections.rotate(shuffled, 1);</span>
-<span class="fc" id="L230">            shuffledSequences.add(List.copyOf(shuffled));</span>
-<span class="fc" id="L231">        }</span>
-<span class="fc" id="L232">        return new FrozenStrategy(inventory, limits, observations, excluded, plan,</span>
-<span class="fc" id="L233">            compileTopology(inventory, shuffledSequences, limits.maximumProgramNodes()));</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">            if (shuffled.equals(sequence)) java.util.Collections.rotate(shuffled, 1);</span>
+<span class="fc" id="L246">            shuffledSequences.add(List.copyOf(shuffled));</span>
+<span class="fc" id="L247">        }</span>
+<span class="fc" id="L248">        return new FrozenStrategy(inventory, limits, observations, excluded, plan,</span>
+<span class="fc" id="L249">            compileTopology(inventory, shuffledSequences, limits.maximumProgramNodes()), exactWork, replayPrimitiveWork);</span>
     }
 
     private Observation observeTraining(Input input, String identity, EvolutionGenome inventory, Limits limits,
             Map&lt;String, String&gt; genes, Map&lt;String, RewriteRule&gt; rules, MeasuredTransformationEngine flat,
             PrimitiveTraceMinimalityVerifier verifier, Set&lt;String&gt; excluded) {
-<span class="fc" id="L239">        Result result = search(input.expression(), flat, limits.trainingBudget());</span>
-<span class="fc" id="L240">        var selected = result.bestState();</span>
-<span class="fc" id="L241">        var replay = replayTraining(inventory, selected.path().getFirst(), selected.transformations(), rules);</span>
+<span class="fc" id="L255">        Result result = search(input.expression(), flat, limits.trainingBudget());</span>
+<span class="fc" id="L256">        var selected = result.bestState();</span>
+<span class="fc" id="L257">        var replay = replayTraining(inventory, selected.path().getFirst(), selected.transformations(), rules);</span>
         // Exclude every observed value, including unsuccessfully explored alternatives.
-<span class="fc bfc" id="L243" title="All 2 branches covered.">        for (var state : result.exploredStates()) excluded.add(exact.alphaIdentity(state.expression()));</span>
-<span class="fc bfc" id="L244" title="All 2 branches covered.">        for (String state : selected.path()) excluded.add(exact.alphaIdentity(state));</span>
-<span class="fc" id="L245">        List&lt;String&gt; sequence = List.of();</span>
-<span class="fc" id="L246">        Optional&lt;PrimitiveTraceMinimalityVerifier.Assessment&gt; assessment = Optional.empty();</span>
-<span class="fc" id="L247">        int steps = selected.transformations().size();</span>
-<span class="pc bpc" id="L248" title="1 of 4 branches missed.">        if (steps &gt;= 2 &amp;&amp; steps &lt;= limits.maximumTraceSteps()</span>
-<span class="pc bpc" id="L249" title="1 of 2 branches missed.">                &amp;&amp; new ExpressionScorer().score(input.expression()).weightedTotal() &gt; selected.score().weightedTotal()) {</span>
-<span class="fc" id="L250">            var checked = verifier.assess(selected.path().getFirst(), selected.transformations(), limits.minimalityLimits());</span>
-<span class="fc" id="L251">            assessment = Optional.of(checked);</span>
-<span class="pc bpc" id="L252" title="1 of 2 branches missed.">            if (checked.status() == PrimitiveTraceMinimalityVerifier.Status.TECHNICAL_FAILURE) {</span>
-<span class="nc" id="L253">                throw new IllegalStateException(&quot;primitive minimality verification failed: &quot; + checked.toCanonicalJson());</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        for (var state : result.exploredStates()) excluded.add(exact.alphaIdentity(state.expression()));</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        for (String state : selected.path()) excluded.add(exact.alphaIdentity(state));</span>
+<span class="fc" id="L261">        List&lt;String&gt; sequence = List.of();</span>
+<span class="fc" id="L262">        Optional&lt;PrimitiveTraceMinimalityVerifier.Assessment&gt; assessment = Optional.empty();</span>
+<span class="fc" id="L263">        int steps = selected.transformations().size();</span>
+<span class="pc bpc" id="L264" title="1 of 4 branches missed.">        if (steps &gt;= 2 &amp;&amp; steps &lt;= limits.maximumTraceSteps()</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">                &amp;&amp; new ExpressionScorer().score(input.expression()).weightedTotal() &gt; selected.score().weightedTotal()) {</span>
+<span class="fc" id="L266">            var checked = verifier.assess(selected.path().getFirst(), selected.transformations(), limits.minimalityLimits());</span>
+<span class="fc" id="L267">            assessment = Optional.of(checked);</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">            if (checked.status() == PrimitiveTraceMinimalityVerifier.Status.TECHNICAL_FAILURE) {</span>
+<span class="nc" id="L269">                throw new IllegalStateException(&quot;primitive minimality verification failed: &quot; + checked.toCanonicalJson());</span>
             }
-<span class="fc bfc" id="L255" title="All 2 branches covered.">            if (checked.reusableMultistepTrace()) sequence = checked.shortestPath().stream().map(step -&gt; genes.get(step.rule())).toList();</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">            if (checked.reusableMultistepTrace()) sequence = checked.shortestPath().stream().map(step -&gt; genes.get(step.rule())).toList();</span>
         }
-<span class="fc" id="L257">        return new Observation(input, identity, result, sequence, replay.work(), replay.audits(), assessment);</span>
+<span class="fc" id="L273">        return new Observation(input, identity, result, sequence, replay.work(), replay.audits(), assessment);</span>
     }
 
-<span class="fc" id="L260">    private record TraceReplay(long work, int audits) {}</span>
+<span class="fc" id="L276">    private record TraceReplay(long work, int audits) {}</span>
 
     private TraceReplay replayTraining(EvolutionGenome inventory, String source,
             List&lt;de.regelsuche.transform.Transformation&gt; steps, Map&lt;String, RewriteRule&gt; rules) {
-<span class="fc" id="L264">        String current = source;</span>
-<span class="fc" id="L265">        long replayWork = 0;</span>
-<span class="fc" id="L266">        int audits = 0;</span>
-<span class="fc bfc" id="L267" title="All 2 branches covered.">        for (var step : steps) {</span>
-<span class="fc" id="L268">            RewriteRule rule = rules.get(step.rule());</span>
-<span class="pc bpc" id="L269" title="4 of 8 branches missed.">            if (rule == null || step.primitiveStepCount() != 1 || step.exactTheoryStepCount() != 0 || !step.assumptions().isEmpty()) {</span>
-<span class="nc" id="L270">                throw new IllegalArgumentException(&quot;training path is not a supported primitive trace&quot;);</span>
+<span class="fc" id="L280">        String current = source;</span>
+<span class="fc" id="L281">        long replayWork = 0;</span>
+<span class="fc" id="L282">        int audits = 0;</span>
+<span class="fc bfc" id="L283" title="All 2 branches covered.">        for (var step : steps) {</span>
+<span class="fc" id="L284">            RewriteRule rule = rules.get(step.rule());</span>
+<span class="pc bpc" id="L285" title="4 of 8 branches missed.">            if (rule == null || step.primitiveStepCount() != 1 || step.exactTheoryStepCount() != 0 || !step.assumptions().isEmpty()) {</span>
+<span class="nc" id="L286">                throw new IllegalArgumentException(&quot;training path is not a supported primitive trace&quot;);</span>
             }
-<span class="fc" id="L272">            var replay = MeasuredTransformationEngines.counting(new AstRewriteTransformationEngine(</span>
-<span class="fc" id="L273">                List.of(rule), inventory.budget().maxAstGrowthPerStep(), inventory.budget().maxCandidatesPerState())).transformMeasured(current);</span>
-<span class="fc" id="L274">            replayWork = Math.addExact(replayWork, replay.workMetrics().totalWorkUnits());</span>
-<span class="pc bpc" id="L275" title="1 of 2 branches missed.">            if (!replay.transformations().contains(step)) throw new IllegalArgumentException(&quot;primitive replay mismatch&quot;);</span>
-<span class="fc" id="L276">            exact.requireEquivalent(current, step.transformedExpression());</span>
-<span class="fc" id="L277">            audits++;</span>
-<span class="fc" id="L278">            current = step.transformedExpression();</span>
-<span class="fc" id="L279">        }</span>
-<span class="fc" id="L280">        return new TraceReplay(replayWork, audits);</span>
+<span class="fc" id="L288">            var replay = MeasuredTransformationEngines.counting(new AstRewriteTransformationEngine(</span>
+<span class="fc" id="L289">                List.of(rule), inventory.budget().maxAstGrowthPerStep(), inventory.budget().maxCandidatesPerState())).transformMeasured(current);</span>
+<span class="fc" id="L290">            replayWork = Math.addExact(replayWork, replay.workMetrics().totalWorkUnits());</span>
+<span class="fc" id="L291">            replayPrimitiveWork = Math.addExact(replayPrimitiveWork, replay.workMetrics().sourceCandidates());</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">            if (!replay.transformations().contains(step)) throw new IllegalArgumentException(&quot;primitive replay mismatch&quot;);</span>
+<span class="fc" id="L293">            exact.requireEquivalent(current, step.transformedExpression());</span>
+<span class="fc" id="L294">            audits++;</span>
+<span class="fc" id="L295">            current = step.transformedExpression();</span>
+<span class="fc" id="L296">        }</span>
+<span class="fc" id="L297">        return new TraceReplay(replayWork, audits);</span>
     }
 
     public Application apply(FrozenStrategy strategy, String source, Budget budget, Profile profile) {
-<span class="fc" id="L284">        Objects.requireNonNull(strategy, &quot;strategy&quot;);</span>
-<span class="fc" id="L285">        Objects.requireNonNull(profile, &quot;profile&quot;);</span>
-<span class="fc" id="L286">        Objects.requireNonNull(budget, &quot;budget&quot;);</span>
-<span class="pc bpc" id="L287" title="1 of 2 branches missed.">        if (budget.maxPrimitiveSteps() &gt; strategy.limits().maximumTraceSteps()</span>
-<span class="pc bpc" id="L288" title="2 of 4 branches missed.">                || budget.maxExactTheoryWorkUnits() != 0 || budget.maxExploredStates() &gt; 512</span>
-<span class="pc bpc" id="L289" title="2 of 4 branches missed.">                || budget.maxCandidatesPerState() &gt; 128 || budget.maxWorkUnits() &gt; 1_000_000) {</span>
-<span class="nc" id="L290">            throw new IllegalArgumentException(&quot;application exceeds supported bounded search envelope&quot;);</span>
+<span class="fc" id="L301">        Objects.requireNonNull(strategy, &quot;strategy&quot;);</span>
+<span class="fc" id="L302">        Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="fc" id="L303">        Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">        if (budget.maxPrimitiveSteps() &gt; strategy.limits().maximumTraceSteps()</span>
+<span class="pc bpc" id="L305" title="2 of 4 branches missed.">                || budget.maxExactTheoryWorkUnits() != 0 || budget.maxExploredStates() &gt; 512</span>
+<span class="pc bpc" id="L306" title="2 of 4 branches missed.">                || budget.maxCandidatesPerState() &gt; 128 || budget.maxWorkUnits() &gt; 1_000_000) {</span>
+<span class="nc" id="L307">            throw new IllegalArgumentException(&quot;application exceeds supported bounded search envelope&quot;);</span>
         }
-<span class="fc" id="L292">        String identity = exact.alphaIdentity(source);</span>
-<span class="fc bfc" id="L293" title="All 2 branches covered.">        if (strategy.excludedIdentities().contains(identity)) {</span>
-<span class="fc" id="L294">            throw new IllegalArgumentException(&quot;application overlaps an observed TRAIN polynomial up to variable renaming&quot;);</span>
+<span class="fc" id="L309">        String identity = exact.alphaIdentity(source);</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        if (strategy.excludedIdentities().contains(identity)) {</span>
+<span class="fc" id="L311">            throw new IllegalArgumentException(&quot;application overlaps an observed TRAIN polynomial up to variable renaming&quot;);</span>
         }
-<span class="fc" id="L296">        MeasuredTransformationEngine engine = flat(strategy.inventory());</span>
-<span class="fc bfc" id="L297" title="All 3 branches covered.">        Optional&lt;EvolutionRewriteProgramPlan&gt; plan = switch (profile) {</span>
-<span class="fc" id="L298">            case FLAT_RULES -&gt; Optional.empty();</span>
-<span class="fc" id="L299">            case LEARNED_PROGRAM -&gt; strategy.plan();</span>
-<span class="fc" id="L300">            case SHUFFLED_PROGRAM -&gt; strategy.shuffledPlan();</span>
+<span class="fc" id="L313">        MeasuredTransformationEngine engine = flat(strategy.inventory());</span>
+<span class="fc bfc" id="L314" title="All 3 branches covered.">        Optional&lt;EvolutionRewriteProgramPlan&gt; plan = switch (profile) {</span>
+<span class="fc" id="L315">            case FLAT_RULES -&gt; Optional.empty();</span>
+<span class="fc" id="L316">            case LEARNED_PROGRAM -&gt; strategy.plan();</span>
+<span class="fc" id="L317">            case SHUFFLED_PROGRAM -&gt; strategy.shuffledPlan();</span>
         };
-<span class="fc bfc" id="L302" title="All 2 branches covered.">        if (plan.isPresent()) {</span>
-<span class="fc" id="L303">            engine = MeasuredTransformationEngines.union(engine,</span>
-<span class="fc" id="L304">                new EvolutionRewriteProgramCompiler().compile(strategy.inventory(), plan.orElseThrow()).engine());</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">        if (plan.isPresent()) {</span>
+<span class="fc" id="L320">            engine = MeasuredTransformationEngines.union(engine,</span>
+<span class="fc" id="L321">                new EvolutionRewriteProgramCompiler().compile(strategy.inventory(), plan.orElseThrow()).engine());</span>
         }
-<span class="fc" id="L306">        Result result = search(source, engine, budget);</span>
-<span class="fc" id="L307">        int calls = audit(result.bestState().path().getFirst(), result.bestState().transformations());</span>
-<span class="fc" id="L308">        return new Application(strategy.contentHash(), profile, source, identity, result, calls);</span>
+<span class="fc" id="L323">        Result result = search(source, engine, budget);</span>
+<span class="fc" id="L324">        int calls = audit(result.bestState().path().getFirst(), result.bestState().transformations());</span>
+<span class="fc" id="L325">        return new Application(strategy.contentHash(), profile, source, identity, result, calls);</span>
     }
 
     int audit(String source, List&lt;de.regelsuche.transform.Transformation&gt; steps) {
-<span class="fc" id="L312">        int calls = 0;</span>
-<span class="fc" id="L313">        String current = source;</span>
-<span class="fc bfc" id="L314" title="All 2 branches covered.">        for (var step : steps) {</span>
-<span class="pc bpc" id="L315" title="1 of 2 branches missed.">            if (!step.assumptions().isEmpty()) throw new IllegalArgumentException(&quot;unexpected assumption in polynomial trace&quot;);</span>
-<span class="fc bfc" id="L316" title="All 2 branches covered.">            if (step.provenance() instanceof de.regelsuche.transform.TransformationProvenance.Sequence sequence) {</span>
-<span class="pc bpc" id="L317" title="1 of 2 branches missed.">                if (!sequence.sourceExpression().equals(current)) throw new IllegalArgumentException(&quot;unbound program trace&quot;);</span>
-<span class="fc" id="L318">                calls += audit(current, sequence.steps());</span>
+<span class="fc" id="L329">        int calls = 0;</span>
+<span class="fc" id="L330">        String current = source;</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">        for (var step : steps) {</span>
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">            if (!step.assumptions().isEmpty()) throw new IllegalArgumentException(&quot;unexpected assumption in polynomial trace&quot;);</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">            if (step.provenance() instanceof de.regelsuche.transform.TransformationProvenance.Sequence sequence) {</span>
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">                if (!sequence.sourceExpression().equals(current)) throw new IllegalArgumentException(&quot;unbound program trace&quot;);</span>
+<span class="fc" id="L335">                calls += audit(current, sequence.steps());</span>
             } else {
-<span class="fc" id="L320">                exact.requireEquivalent(current, step.transformedExpression());</span>
-<span class="fc" id="L321">                calls++;</span>
+<span class="fc" id="L337">                exact.requireEquivalent(current, step.transformedExpression());</span>
+<span class="fc" id="L338">                calls++;</span>
             }
-<span class="fc" id="L323">            current = step.transformedExpression();</span>
-<span class="fc" id="L324">        }</span>
-<span class="fc" id="L325">        return calls;</span>
+<span class="fc" id="L340">            current = step.transformedExpression();</span>
+<span class="fc" id="L341">        }</span>
+<span class="fc" id="L342">        return calls;</span>
     }
 
     private void validateRules(EvolutionGenome inventory) {
-<span class="fc bfc" id="L329" title="All 2 branches covered.">        for (var gene : inventory.rewrites()) {</span>
-<span class="pc bpc" id="L330" title="1 of 2 branches missed.">            if (!gene.assumptions().isEmpty()) throw new IllegalArgumentException(&quot;only unconditional polynomial rules supported&quot;);</span>
-<span class="fc" id="L331">            var left = EvolutionGenomeCompiler.parsePattern(gene.sourcePattern());</span>
-<span class="fc" id="L332">            var right = EvolutionGenomeCompiler.parsePattern(gene.targetPattern());</span>
-<span class="fc" id="L333">            rejectFixedSymbols(left);</span>
-<span class="fc" id="L334">            rejectFixedSymbols(right);</span>
-<span class="fc" id="L335">            exact.requireEquivalent(EvolutionGenome.transformPlaceholders(gene.sourcePattern(), s -&gt; &quot;slot&quot; + s.substring(1)),</span>
-<span class="fc" id="L336">                EvolutionGenome.transformPlaceholders(gene.targetPattern(), s -&gt; &quot;slot&quot; + s.substring(1)));</span>
-<span class="fc" id="L337">        }</span>
-<span class="fc" id="L338">    }</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">        for (var gene : inventory.rewrites()) {</span>
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">            if (!gene.assumptions().isEmpty()) throw new IllegalArgumentException(&quot;only unconditional polynomial rules supported&quot;);</span>
+<span class="fc" id="L348">            var left = EvolutionGenomeCompiler.parsePattern(gene.sourcePattern());</span>
+<span class="fc" id="L349">            var right = EvolutionGenomeCompiler.parsePattern(gene.targetPattern());</span>
+<span class="fc" id="L350">            rejectFixedSymbols(left);</span>
+<span class="fc" id="L351">            rejectFixedSymbols(right);</span>
+<span class="fc" id="L352">            exact.requireEquivalent(EvolutionGenome.transformPlaceholders(gene.sourcePattern(), s -&gt; &quot;slot&quot; + s.substring(1)),</span>
+<span class="fc" id="L353">                EvolutionGenome.transformPlaceholders(gene.targetPattern(), s -&gt; &quot;slot&quot; + s.substring(1)));</span>
+<span class="fc" id="L354">        }</span>
+<span class="fc" id="L355">    }</span>
 
     private static void rejectFixedSymbols(PatternExpr pattern) {
-<span class="fc bfc" id="L341" title="All 4 branches covered.">        if (pattern instanceof PatternExpr.LiteralVariable || pattern instanceof PatternExpr.Function) {</span>
-<span class="fc" id="L342">            throw new IllegalArgumentException(&quot;literal symbols and functions are outside the polynomial strategy inventory&quot;);</span>
+<span class="fc bfc" id="L358" title="All 4 branches covered.">        if (pattern instanceof PatternExpr.LiteralVariable || pattern instanceof PatternExpr.Function) {</span>
+<span class="fc" id="L359">            throw new IllegalArgumentException(&quot;literal symbols and functions are outside the polynomial strategy inventory&quot;);</span>
         }
-<span class="fc bfc" id="L344" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Operation op) {</span>
-<span class="fc" id="L345">            rejectFixedSymbols(op.left());</span>
-<span class="fc" id="L346">            rejectFixedSymbols(op.right());</span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Operation op) {</span>
+<span class="fc" id="L362">            rejectFixedSymbols(op.left());</span>
+<span class="fc" id="L363">            rejectFixedSymbols(op.right());</span>
         }
-<span class="fc" id="L348">    }</span>
+<span class="fc" id="L365">    }</span>
 
     private static MeasuredTransformationEngine flat(EvolutionGenome inventory) {
-<span class="fc" id="L351">        return MeasuredTransformationEngines.counting(new AstRewriteTransformationEngine(</span>
-<span class="fc" id="L352">            new EvolutionGenomeCompiler().compile(inventory).rules(), inventory.budget().maxAstGrowthPerStep(),</span>
-<span class="fc" id="L353">            inventory.budget().maxCandidatesPerState()));</span>
+<span class="fc" id="L368">        return MeasuredTransformationEngines.counting(new AstRewriteTransformationEngine(</span>
+<span class="fc" id="L369">            new EvolutionGenomeCompiler().compile(inventory).rules(), inventory.budget().maxAstGrowthPerStep(),</span>
+<span class="fc" id="L370">            inventory.budget().maxCandidatesPerState()));</span>
     }
 
     private static Result search(String source, MeasuredTransformationEngine engine, Budget budget) {
-<span class="fc" id="L357">        return new WorkBudgetBestFirstSearchStrategy().search(Problem.withoutTarget(source,</span>
+<span class="fc" id="L374">        return new WorkBudgetBestFirstSearchStrategy().search(Problem.withoutTarget(source,</span>
             new SearchExpansionSource.Measured(engine), new ExpressionScorer(), new ExpressionCanonicalizer(), budget));
     }
 
     private static Optional&lt;EvolutionRewriteProgramPlan&gt; compileTopology(EvolutionGenome inventory,
             List&lt;List&lt;String&gt;&gt; sequences, int maximumNodes) {
-<span class="fc bfc" id="L363" title="All 2 branches covered.">        if (sequences.isEmpty()) return Optional.empty();</span>
-<span class="fc" id="L364">        int[] ids = {0};</span>
-<span class="fc" id="L365">        var root = trie(sequences, ids);</span>
-<span class="fc" id="L366">        return Optional.of(EvolutionRewriteProgramPlan.create(inventory, root, maximumNodes, maximumNodes));</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        if (sequences.isEmpty()) return Optional.empty();</span>
+<span class="fc" id="L381">        int[] ids = {0};</span>
+<span class="fc" id="L382">        var root = trie(sequences, ids);</span>
+<span class="fc" id="L383">        return Optional.of(EvolutionRewriteProgramPlan.create(inventory, root, maximumNodes, maximumNodes));</span>
     }
 
     /** Share nonterminal prefixes; preserve terminal alternatives without inventing an identity action. */
     private static EvolutionRewriteProgramPlan.Node trie(List&lt;List&lt;String&gt;&gt; sequences, int[] ids) {
-<span class="fc" id="L371">        Map&lt;String, List&lt;List&lt;String&gt;&gt;&gt; groups = new TreeMap&lt;&gt;();</span>
-<span class="fc bfc" id="L372" title="All 2 branches covered.">        for (var sequence : sequences) {</span>
-<span class="fc" id="L373">            groups.computeIfAbsent(sequence.getFirst(), ignored -&gt; new ArrayList&lt;&gt;())</span>
-<span class="fc" id="L374">                .add(List.copyOf(sequence.subList(1, sequence.size())));</span>
-<span class="fc" id="L375">        }</span>
-<span class="fc" id="L376">        List&lt;EvolutionRewriteProgramPlan.Node&gt; branches = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L377" title="All 2 branches covered.">        for (var group : groups.entrySet()) {</span>
-<span class="fc bfc" id="L378" title="All 2 branches covered.">            if (group.getValue().stream().anyMatch(List::isEmpty)) {</span>
-<span class="fc" id="L379">                branches.add(new EvolutionRewriteProgramPlan.Source(nodeId(ids), List.of(group.getKey())));</span>
+<span class="fc" id="L388">        Map&lt;String, List&lt;List&lt;String&gt;&gt;&gt; groups = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L389" title="All 2 branches covered.">        for (var sequence : sequences) {</span>
+<span class="fc" id="L390">            groups.computeIfAbsent(sequence.getFirst(), ignored -&gt; new ArrayList&lt;&gt;())</span>
+<span class="fc" id="L391">                .add(List.copyOf(sequence.subList(1, sequence.size())));</span>
+<span class="fc" id="L392">        }</span>
+<span class="fc" id="L393">        List&lt;EvolutionRewriteProgramPlan.Node&gt; branches = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L394" title="All 2 branches covered.">        for (var group : groups.entrySet()) {</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">            if (group.getValue().stream().anyMatch(List::isEmpty)) {</span>
+<span class="fc" id="L396">                branches.add(new EvolutionRewriteProgramPlan.Source(nodeId(ids), List.of(group.getKey())));</span>
             }
-<span class="fc bfc" id="L381" title="All 2 branches covered.">            var suffixes = group.getValue().stream().filter(s -&gt; !s.isEmpty()).distinct().toList();</span>
-<span class="fc bfc" id="L382" title="All 2 branches covered.">            if (!suffixes.isEmpty()) {</span>
-<span class="fc" id="L383">                var head = new EvolutionRewriteProgramPlan.Source(nodeId(ids), List.of(group.getKey()));</span>
-<span class="fc" id="L384">                branches.add(new EvolutionRewriteProgramPlan.Sequence(nodeId(ids), List.of(head, trie(suffixes, ids))));</span>
+<span class="fc bfc" id="L398" title="All 2 branches covered.">            var suffixes = group.getValue().stream().filter(s -&gt; !s.isEmpty()).distinct().toList();</span>
+<span class="fc bfc" id="L399" title="All 2 branches covered.">            if (!suffixes.isEmpty()) {</span>
+<span class="fc" id="L400">                var head = new EvolutionRewriteProgramPlan.Source(nodeId(ids), List.of(group.getKey()));</span>
+<span class="fc" id="L401">                branches.add(new EvolutionRewriteProgramPlan.Sequence(nodeId(ids), List.of(head, trie(suffixes, ids))));</span>
             }
-<span class="fc" id="L386">        }</span>
-<span class="fc bfc" id="L387" title="All 2 branches covered.">        return branches.size() == 1 ? branches.getFirst() : new EvolutionRewriteProgramPlan.Choice(nodeId(ids), branches);</span>
+<span class="fc" id="L403">        }</span>
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        return branches.size() == 1 ? branches.getFirst() : new EvolutionRewriteProgramPlan.Choice(nodeId(ids), branches);</span>
     }
 
-<span class="fc" id="L390">    private static String nodeId(int[] ids) { return &quot;trace_node_&quot; + ids[0]++; }</span>
+<span class="fc" id="L407">    private static String nodeId(int[] ids) { return &quot;trace_node_&quot; + ids[0]++; }</span>
 
     static void writeLearningProtocol(JsonWriter json, Limits limits) {
-<span class="fc" id="L393">        json.property(&quot;revision&quot;, REVISION).property(&quot;identityRevision&quot;, ExactPolynomialAnalysis.REVISION)</span>
-<span class="fc" id="L394">            .property(&quot;shuffleSeed&quot;, SHUFFLE_SEED)</span>
-<span class="fc" id="L395">            .property(&quot;shufflePolicy&quot;, &quot;FIXED_SEED_FISHER_YATES;ROTATE_UNCHANGED_SEQUENCE_ONCE&quot;)</span>
-<span class="fc" id="L396">            .property(&quot;maximumInputs&quot;, limits.maximumInputs()).property(&quot;maximumTraceSteps&quot;, limits.maximumTraceSteps())</span>
-<span class="fc" id="L397">            .property(&quot;maximumProgramNodes&quot;, limits.maximumProgramNodes())</span>
-<span class="fc" id="L398">            .property(&quot;minimalityRevision&quot;, PrimitiveTraceMinimalityVerifier.REVISION)</span>
-<span class="fc" id="L399">            .object(&quot;minimalityLimits&quot;, value -&gt; PrimitiveTraceMinimalityVerifier.writeLimits(value, limits.minimalityLimits()))</span>
-<span class="fc" id="L400">            .object(&quot;trainingBudget&quot;, value -&gt; writeBudget(value, limits.trainingBudget()));</span>
-<span class="fc" id="L401">    }</span>
+<span class="fc" id="L410">        json.property(&quot;revision&quot;, REVISION).property(&quot;identityRevision&quot;, ExactPolynomialAnalysis.REVISION)</span>
+<span class="fc" id="L411">            .property(&quot;shuffleSeed&quot;, SHUFFLE_SEED)</span>
+<span class="fc" id="L412">            .property(&quot;shufflePolicy&quot;, &quot;FIXED_SEED_FISHER_YATES;ROTATE_UNCHANGED_SEQUENCE_ONCE&quot;)</span>
+<span class="fc" id="L413">            .property(&quot;maximumInputs&quot;, limits.maximumInputs()).property(&quot;maximumTraceSteps&quot;, limits.maximumTraceSteps())</span>
+<span class="fc" id="L414">            .property(&quot;maximumProgramNodes&quot;, limits.maximumProgramNodes())</span>
+<span class="fc" id="L415">            .property(&quot;minimalityRevision&quot;, PrimitiveTraceMinimalityVerifier.REVISION)</span>
+<span class="fc" id="L416">            .object(&quot;minimalityLimits&quot;, value -&gt; PrimitiveTraceMinimalityVerifier.writeLimits(value, limits.minimalityLimits()))</span>
+<span class="fc" id="L417">            .object(&quot;trainingBudget&quot;, value -&gt; writeBudget(value, limits.trainingBudget()));</span>
+<span class="fc" id="L418">    }</span>
 
     static void writeBudget(JsonWriter json, Budget budget) {
-<span class="fc" id="L404">        json.property(&quot;primitiveSteps&quot;, budget.maxPrimitiveSteps()).property(&quot;states&quot;, budget.maxExploredStates())</span>
-<span class="fc" id="L405">            .property(&quot;candidatesPerState&quot;, budget.maxCandidatesPerState()).property(&quot;expandingSteps&quot;, budget.maxExpandingSteps())</span>
-<span class="fc" id="L406">            .property(&quot;workUnits&quot;, budget.maxWorkUnits());</span>
-<span class="fc" id="L407">    }</span>
+<span class="fc" id="L421">        json.property(&quot;primitiveSteps&quot;, budget.maxPrimitiveSteps()).property(&quot;states&quot;, budget.maxExploredStates())</span>
+<span class="fc" id="L422">            .property(&quot;candidatesPerState&quot;, budget.maxCandidatesPerState()).property(&quot;expandingSteps&quot;, budget.maxExpandingSteps())</span>
+<span class="fc" id="L423">            .property(&quot;workUnits&quot;, budget.maxWorkUnits());</span>
+<span class="fc" id="L424">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

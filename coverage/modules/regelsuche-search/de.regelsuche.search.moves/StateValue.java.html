@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StateValue.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">StateValue.java</span></div><h1>StateValue.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import java.util.Map;
+import java.util.TreeMap;
+
+/** Costed capability inspection, separate from move ranking and mathematical admission. */
+@FunctionalInterface
+public interface StateValue {
+    Assessment evaluate(MoveState state, MoveContext context);
+    record Capability(String providerId, String sourceExpression, String subtreePath, String matchedExpression, String rewrittenExpression) {
+<span class="fc" id="L11">        public Capability {</span>
+<span class="pc bpc" id="L12" title="6 of 12 branches missed.">            if (providerId == null || providerId.isBlank() || sourceExpression == null || subtreePath == null</span>
+<span class="pc bpc" id="L13" title="1 of 2 branches missed.">                    || matchedExpression == null || rewrittenExpression == null || matchedExpression.equals(rewrittenExpression))</span>
+<span class="nc" id="L14">                throw new IllegalArgumentException(&quot;capability requires an executable non-identity witness&quot;);</span>
+<span class="fc" id="L15">        }</span>
+    }
+    record Assessment(int complexity, double value, long searchWork, long primitiveWork, Map&lt;String, Capability&gt; capabilities) {
+<span class="fc" id="L18">        public static final Assessment EMPTY = new Assessment(0, 0, 0, 0, Map.of());</span>
+<span class="fc" id="L19">        public Assessment {</span>
+<span class="pc bpc" id="L20" title="4 of 10 branches missed.">            if (complexity &lt; 0 || !Double.isFinite(value) || searchWork &lt; 0 || primitiveWork &lt; 0 || capabilities == null</span>
+<span class="pc bpc" id="L21" title="2 of 8 branches missed.">                    || capabilities.entrySet().stream().anyMatch(entry -&gt; entry.getKey() == null || entry.getKey().isBlank() || entry.getValue() == null))</span>
+<span class="fc" id="L22">                throw new IllegalArgumentException(&quot;invalid state assessment&quot;);</span>
+<span class="fc" id="L23">            capabilities = java.util.Collections.unmodifiableMap(new TreeMap&lt;&gt;(capabilities));</span>
+<span class="fc" id="L24">        }</span>
+    }
+<span class="fc" id="L26">    StateValue NONE = (state, context) -&gt; Assessment.EMPTY;</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

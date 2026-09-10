@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MoveProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">MoveProvider.java</span></div><h1>MoveProvider.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.util.List;
+import java.util.Objects;
+
+/** Candidate formation contains no global search ordering. */
+public interface MoveProvider {
+    Descriptor descriptor();
+    Batch candidates(MoveState state, MoveContext context);
+
+    record Descriptor(String id, String ruleFamily, SearchMove.SourceKind sourceKind,
+            SearchMove.ProofStrength proofStrength, List&lt;String&gt; requiredAssumptions,
+            SearchMove.ValueEvidence valueEvidence, String provenanceId) {
+<span class="fc" id="L16">        public Descriptor {</span>
+<span class="pc bpc" id="L17" title="4 of 12 branches missed.">            if (id == null || id.isBlank() || ruleFamily == null || ruleFamily.isBlank() || provenanceId == null || provenanceId.isBlank()) {</span>
+<span class="fc" id="L18">                throw new IllegalArgumentException(&quot;provider identity is required&quot;);</span>
+            }
+<span class="fc" id="L20">            Objects.requireNonNull(sourceKind, &quot;sourceKind&quot;);</span>
+<span class="fc" id="L21">            Objects.requireNonNull(proofStrength, &quot;proofStrength&quot;);</span>
+<span class="fc" id="L22">            Objects.requireNonNull(valueEvidence, &quot;valueEvidence&quot;);</span>
+<span class="fc" id="L23">            requiredAssumptions = AssumptionSignature.ofExpressions(requiredAssumptions).normalizedAssumptions();</span>
+<span class="fc" id="L24">        }</span>
+    }
+
+    /** complete is a successor-relation claim, not a mathematical proof or a claim that the goal is unreachable. */
+    record Batch(List&lt;SearchMove&gt; moves, TransformationWorkMetrics work, boolean complete) {
+<span class="fc" id="L29">        public Batch {</span>
+<span class="fc" id="L30">            moves = List.copyOf(moves); Objects.requireNonNull(work, &quot;work&quot;);</span>
+            // Legacy event-only engines still expose source work even when a macro has no endpoint.
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">            if (work.candidateWork().equals(de.regelsuche.transform.ExecutionWork.ZERO)) {</span>
+<span class="fc" id="L33">                var expansion = moves.stream().map(move -&gt; move.transformation().executionWork())</span>
+<span class="fc" id="L34">                    .reduce(de.regelsuche.transform.ExecutionWork.ZERO, de.regelsuche.transform.ExecutionWork::plus);</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">                long primitives = expansion.exactTheorySteps() == 0 ? Math.max(expansion.primitiveRewrites(), work.sourceCandidates())</span>
+<span class="pc" id="L36">                    : expansion.primitiveRewrites();</span>
+<span class="fc" id="L37">                work = work.withCandidateWork(new de.regelsuche.transform.ExecutionWork(primitives,</span>
+<span class="fc" id="L38">                    expansion.exactTheorySteps(), expansion.exactTheoryWorkUnits()));</span>
+            }
+<span class="fc" id="L40">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MoveProviders.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">MoveProviders.java</span></div><h1>MoveProviders.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.transform.HypothesisTransformationEngine;
+import de.regelsuche.transform.TransformationEngine;
+import java.util.ArrayList;
+import java.util.List;
+
+/** Unwraps the old base-plus-hypothesis boundary for the common picker. Legacy transform() remains reproducible. */
+public final class MoveProviders {
+    private MoveProviders() {}
+    public static List&lt;MoveProvider&gt; from(TransformationEngine engine) {
+<span class="fc bfc" id="L12" title="All 2 branches covered.">        if (engine instanceof MoveProviderInventory inventory) return List.copyOf(inventory.moveProviders());</span>
+<span class="fc bfc" id="L13" title="All 2 branches covered.">        if (engine instanceof HypothesisTransformationEngine hypotheses) {</span>
+<span class="fc" id="L14">            var providers = new ArrayList&lt;&gt;(from(hypotheses.baseEngine()));</span>
+<span class="fc" id="L15">            int index = 0;</span>
+<span class="fc bfc" id="L16" title="All 2 branches covered.">            for (var operator : hypotheses.operators()) {</span>
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">                if (operator instanceof MoveProvider provider) providers.add(provider);</span>
+<span class="fc" id="L18">                else providers.add(new EngineMoveProvider(new MoveProvider.Descriptor(</span>
+<span class="fc" id="L19">                    &quot;hypothesis-&quot; + index, operator.getClass().getName(), SearchMove.SourceKind.HYPOTHESIS,</span>
+<span class="fc" id="L20">                    SearchMove.ProofStrength.UNVALIDATED, List.of(), SearchMove.ValueEvidence.UNKNOWN,</span>
+<span class="fc" id="L21">                    operator.getClass().getName()), operator::generateCandidates, false));</span>
+<span class="fc" id="L22">                index++;</span>
+<span class="fc" id="L23">            }</span>
+<span class="fc" id="L24">            return List.copyOf(providers);</span>
+        }
+<span class="fc" id="L26">        return List.of(new EngineMoveProvider(new MoveProvider.Descriptor(&quot;primitive-inventory&quot;, &quot;*&quot;,</span>
+            SearchMove.SourceKind.PRIMITIVE, SearchMove.ProofStrength.REPLAYABLE,
+<span class="fc" id="L28">            List.of(), SearchMove.ValueEvidence.UNKNOWN, engine.getClass().getName()), engine, false));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

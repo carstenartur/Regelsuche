@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleActivityMemory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.inventory</a> &gt; <span class="el_source">RuleActivityMemory.java</span></div><h1>RuleActivityMemory.java</h1><pre class="source lang-java linenums">package de.regelsuche.inventory;
+
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.search.moves.MoveContext;
+import de.regelsuche.search.moves.MoveSearch;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Collection;
+import java.util.Map;
+import java.util.TreeMap;
+
+/** Search activity is a separate sidecar. No API here mutates mathematical proof status or deletes a rule. */
+public final class RuleActivityMemory {
+<span class="fc" id="L16">    public enum Tier { HOT, WARM, COLD, SHADOW }</span>
+    public record Entry(double activity, long applications, long successes, long failures, long duplicates,
+            long deadEnds, long capabilityUnlocks, long measuredWorkSaved, long lastUsedEpoch) {
+<span class="fc" id="L19">        public Entry {</span>
+<span class="pc bpc" id="L20" title="9 of 18 branches missed.">            if (!Double.isFinite(activity) || applications &lt; 0 || successes &lt; 0 || failures &lt; 0 || duplicates &lt; 0</span>
+                    || deadEnds &lt; 0 || capabilityUnlocks &lt; 0 || measuredWorkSaved &lt; 0 || lastUsedEpoch &lt; 0)
+<span class="nc" id="L22">                throw new IllegalArgumentException(&quot;invalid activity observation&quot;);</span>
+<span class="fc" id="L23">        }</span>
+        public Tier tier() {
+<span class="pc bpc" id="L25" title="2 of 6 branches missed.">            if (successes == 0 &amp;&amp; capabilityUnlocks == 0) return applications == 0 ? Tier.SHADOW : Tier.COLD;</span>
+<span class="fc bfc" id="L26" title="All 4 branches covered.">            return activity &gt;= 8 ? Tier.HOT : activity &gt;= 1 ? Tier.WARM : Tier.COLD;</span>
+        }
+<span class="fc" id="L28">        Entry decay() { return new Entry(activity * 0.95, applications, successes, failures, duplicates, deadEnds,</span>
+            capabilityUnlocks, measuredWorkSaved, lastUsedEpoch); }
+    }
+    public record Snapshot(String schema, long epoch, Map&lt;String, Entry&gt; rules) {
+<span class="fc" id="L32">        public Snapshot {</span>
+<span class="pc bpc" id="L33" title="2 of 4 branches missed.">            if (!&quot;regelsuche.rule-activity/v1&quot;.equals(schema) || epoch &lt; 0) throw new IllegalArgumentException(&quot;invalid activity snapshot&quot;);</span>
+<span class="fc" id="L34">            rules = java.util.Collections.unmodifiableMap(new TreeMap&lt;&gt;(rules));</span>
+<span class="pc bpc" id="L35" title="3 of 6 branches missed.">            if (rules.entrySet().stream().anyMatch(entry -&gt; entry.getKey().isBlank() || entry.getValue() == null</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">                    || entry.getValue().lastUsedEpoch() &gt; epoch)) throw new IllegalArgumentException(&quot;invalid activity identity/epoch&quot;);</span>
+<span class="fc" id="L37">        }</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        public Tier tier(String id) { return rules.containsKey(id) ? rules.get(id).tier() : Tier.SHADOW; }</span>
+        public void persistTo(Path path) throws IOException {
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">            if (path.toAbsolutePath().getParent() != null) Files.createDirectories(path.toAbsolutePath().getParent());</span>
+<span class="fc" id="L41">            mapper().writeValue(path.toFile(), this);</span>
+<span class="fc" id="L42">        }</span>
+<span class="fc" id="L43">        public static Snapshot load(Path path) throws IOException { return mapper().readValue(path.toFile(), Snapshot.class); }</span>
+    }
+<span class="pc" id="L45">    private final Map&lt;String, Entry&gt; rules = new TreeMap&lt;&gt;();</span>
+    private long epoch;
+    private long measuredWork;
+    /** IDs come from the caller's validated durable inventory. Their presence grants no execution authority. */
+<span class="fc" id="L49">    public RuleActivityMemory(Collection&lt;String&gt; inventoryIds) {</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        for (String id : inventoryIds) {</span>
+<span class="pc bpc" id="L51" title="3 of 6 branches missed.">            if (id == null || id.isBlank() || rules.putIfAbsent(id, new Entry(0, 0, 0, 0, 0, 0, 0, 0, 0)) != null)</span>
+<span class="nc" id="L52">                throw new IllegalArgumentException(&quot;invalid or duplicate inventory identity&quot;);</span>
+<span class="fc" id="L53">        }</span>
+<span class="fc" id="L54">    }</span>
+<span class="nc" id="L55">    public RuleActivityMemory(Snapshot snapshot) { rules.putAll(snapshot.rules()); epoch = snapshot.epoch(); }</span>
+<span class="fc" id="L56">    public Snapshot freeze() { return new Snapshot(&quot;regelsuche.rule-activity/v1&quot;, epoch, rules); }</span>
+    /** TRAIN memory-entry updates, including aging; separate from search and proof work. */
+<span class="fc" id="L58">    public long measuredWork() { return measuredWork; }</span>
+    public void age(MoveContext.Phase phase) {
+<span class="fc" id="L60">        requireTrain(phase); epoch = Math.addExact(epoch, 1); rules.replaceAll((id, entry) -&gt; entry.decay());</span>
+<span class="fc" id="L61">        measuredWork = Math.addExact(measuredWork, rules.size());</span>
+<span class="fc" id="L62">    }</span>
+    /** Only completed witness edges count as successes; budget-cut enqueues are not failures or dead ends. */
+    public void observe(MoveSearch.Result result, MoveContext.Phase phase, Map&lt;String, Long&gt; pairedWorkSavings) {
+<span class="fc" id="L65">        requireTrain(phase);</span>
+<span class="fc bfc" id="L66" title="All 4 branches covered.">        if (result == null || pairedWorkSavings == null) throw new IllegalArgumentException(&quot;feedback result and savings are required&quot;);</span>
+<span class="pc bpc" id="L67" title="3 of 6 branches missed.">        if (pairedWorkSavings.values().stream().anyMatch(value -&gt; value == null || value &lt; 0)) throw new IllegalArgumentException(&quot;negative measured saving&quot;);</span>
+<span class="fc" id="L68">        age(phase);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        for (var event : result.events()) {</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            var entry = rules.get(event.move().ruleId()); if (entry == null) continue;</span>
+<span class="fc" id="L71">            measuredWork = Math.addExact(measuredWork, 1);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            boolean duplicate = event.decision() == MoveSearch.Decision.DUPLICATE;</span>
+<span class="pc bpc" id="L73" title="2 of 4 branches missed.">            boolean failure = event.decision() == MoveSearch.Decision.PROOF_REJECTED || event.decision() == MoveSearch.Decision.ASSUMPTION_REJECTED;</span>
+<span class="pc bpc" id="L74" title="1 of 4 branches missed.">            double penalty = duplicate ? 1 : failure ? 3 + Math.log1p(event.move().applicationCost()) : 0;</span>
+<span class="fc" id="L75">            rules.put(event.move().ruleId(), new Entry(entry.activity() - penalty, entry.applications() + 1, entry.successes(),</span>
+<span class="pc bpc" id="L76" title="1 of 4 branches missed.">                entry.failures() + (failure ? 1 : 0), entry.duplicates() + (duplicate ? 1 : 0), entry.deadEnds(),</span>
+<span class="fc" id="L77">                entry.capabilityUnlocks(), entry.measuredWorkSaved(), epoch));</span>
+<span class="fc" id="L78">        }</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        for (var state : result.deadEndStates()) {</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            var entry = rules.get(state.previousRule()); if (entry == null) continue;</span>
+<span class="fc" id="L81">            measuredWork = Math.addExact(measuredWork, 1);</span>
+<span class="fc" id="L82">            rules.put(state.previousRule(), new Entry(entry.activity() - 3, entry.applications(), entry.successes(), entry.failures(),</span>
+<span class="fc" id="L83">                entry.duplicates(), entry.deadEnds() + 1, entry.capabilityUnlocks(), entry.measuredWorkSaved(), epoch));</span>
+<span class="fc" id="L84">        }</span>
+<span class="fc" id="L85">        var credited = new java.util.HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        for (var step : result.witness()) {</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            String id = step.move().ruleId(); var entry = rules.get(id); if (entry == null) continue;</span>
+<span class="fc" id="L88">            measuredWork = Math.addExact(measuredWork, 1);</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">            long saved = credited.add(id) ? pairedWorkSavings.getOrDefault(id, 0L) : 0;</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            long unlocks = step.target().capabilities().stream().filter(capability -&gt; !step.source().capabilities().contains(capability)).count();</span>
+<span class="fc" id="L91">            rules.put(id, new Entry(entry.activity() + 2 + 4 * unlocks + Math.log1p(saved), entry.applications(), entry.successes() + 1,</span>
+<span class="fc" id="L92">                entry.failures(), entry.duplicates(), entry.deadEnds(), entry.capabilityUnlocks() + unlocks,</span>
+<span class="fc" id="L93">                Math.addExact(entry.measuredWorkSaved(), saved), epoch));</span>
+<span class="fc" id="L94">        }</span>
+<span class="fc" id="L95">    }</span>
+    private static void requireTrain(MoveContext.Phase phase) {
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (phase != MoveContext.Phase.TRAIN) throw new IllegalArgumentException(&quot;activity updates require TRAIN; evaluation snapshots are frozen&quot;);</span>
+<span class="fc" id="L98">    }</span>
+    private static ObjectMapper mapper() {
+<span class="fc" id="L100">        return new ObjectMapper().enable(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES)</span>
+<span class="fc" id="L101">            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

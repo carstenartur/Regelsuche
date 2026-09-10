@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MoveState.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">MoveState.java</span></div><h1>MoveState.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import java.util.List;
+import java.util.Set;
+
+/** Source-only search position, independent of any learning implementation. */
+public record MoveState(String expression, int searchDepth, int primitiveDepth, String previousRule,
+                        List&lt;String&gt; assumptions, Set&lt;String&gt; capabilities, int complexityDebt) {
+<span class="fc" id="L10">    public MoveState {</span>
+<span class="pc bpc" id="L11" title="6 of 12 branches missed.">        if (expression == null || expression.isBlank() || previousRule == null</span>
+                || searchDepth &lt; 0 || primitiveDepth &lt; 0 || complexityDebt &lt; 0) {
+<span class="nc" id="L13">            throw new IllegalArgumentException(&quot;invalid move state&quot;);</span>
+        }
+<span class="fc" id="L15">        assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();</span>
+<span class="fc" id="L16">        capabilities = Set.copyOf(capabilities);</span>
+<span class="fc" id="L17">    }</span>
+<span class="fc" id="L18">    public static MoveState root(String expression) { return new MoveState(expression, 0, 0, &quot;&quot;, List.of(), Set.of(), 0); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
