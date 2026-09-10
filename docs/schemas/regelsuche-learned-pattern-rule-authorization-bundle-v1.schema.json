@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-learned-pattern-rule-authorization-bundle-v1.schema.json",
+  "title": "Regelsuche learned pattern rule authorization bundle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "genomeHash",
+    "geneId",
+    "repositoryRevision",
+    "issuedAt",
+    "expiresAt",
+    "splitManifestHash",
+    "validationSelectionHash",
+    "finalTestEvaluationHash",
+    "counterexampleEvidenceHash",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.learned-pattern-rule-authorization-bundle/v1"
+    },
+    "genomeHash": {"$ref": "#/$defs/sha256"},
+    "geneId": {"type": "string", "minLength": 1},
+    "repositoryRevision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "issuedAt": {"type": "string", "format": "date-time"},
+    "expiresAt": {"type": "string", "format": "date-time"},
+    "splitManifestHash": {"$ref": "#/$defs/sha256"},
+    "validationSelectionHash": {"$ref": "#/$defs/sha256"},
+    "finalTestEvaluationHash": {"$ref": "#/$defs/sha256"},
+    "counterexampleEvidenceHash": {"$ref": "#/$defs/sha256"},
+    "contentHash": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
