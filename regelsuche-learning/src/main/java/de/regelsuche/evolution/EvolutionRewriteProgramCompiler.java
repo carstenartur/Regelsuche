@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Predicate;
 
 /**
@@ -65,18 +66,62 @@ public final class EvolutionRewriteProgramCompiler {
         EvolutionGenome genome,
         EvolutionRewriteProgramPlan plan
     ) {
-        Objects.requireNonNull(genome, "genome");
-        Objects.requireNonNull(plan, "plan");
-        if (!genome.contentHash().equals(plan.genomeHash())) {
-            throw new IllegalArgumentException(
-                "program plan is bound to a different genome");
-        }
-        validateProgramBudget(genome, plan);
-
+        validateProgramIdentityAndBudget(genome, plan);
         EvolutionGenomeCompiler.CompiledProgram compiledGenome =
             genomeCompiler.compile(genome);
-        Map<String, RewriteRule> rulesByGeneId = rulesByGeneId(
-            genome, compiledGenome);
+        return compileResolved(
+            genome,
+            plan,
+            rulesByGeneId(genome, compiledGenome));
+    }
+
+    /**
+     * Compiles the same canonical topology with an explicitly authorized rule
+     * implementation for every referenced gene.
+     *
+     * <p>This is the production boundary for learned programs. Raw evolutionary
+     * genome rules are intentionally not treated as authorization: callers must
+     * provide the independently promoted and proved rule for each source leaf.
+     * Extra, missing and non-equivalence-preserving rules are rejected so the
+     * executable program cannot silently gain a different authority surface.</p>
+     */
+    public CompiledRewriteProgram compileAuthorized(
+        EvolutionGenome genome,
+        EvolutionRewriteProgramPlan plan,
+        Map<String, RewriteRule> authorizedRulesByGeneId
+    ) {
+        validateProgramIdentityAndBudget(genome, plan);
+        Objects.requireNonNull(
+            authorizedRulesByGeneId, "authorizedRulesByGeneId");
+        Map<String, RewriteRule> retained = Map.copyOf(authorizedRulesByGeneId);
+        Set<String> referenced = Set.copyOf(plan.referencedGeneIds());
+        if (!retained.keySet().equals(referenced)) {
+            throw new IllegalArgumentException(
+                "authorized rule set must equal the program's referenced genes");
+        }
+        for (Map.Entry<String, RewriteRule> entry : retained.entrySet()) {
+            String geneId = entry.getKey();
+            RewriteRule rule = Objects.requireNonNull(
+                entry.getValue(), "authorized rule for " + geneId);
+            if (genome.rewrites().stream().noneMatch(
+                    gene -> gene.geneId().equals(geneId))) {
+                throw new IllegalArgumentException(
+                    "authorized rule references unknown genome gene: " + geneId);
+            }
+            if (!rule.isEquivalencePreservingByConstruction()) {
+                throw new IllegalArgumentException(
+                    "authorized program leaf is not equivalence preserving: "
+                        + geneId);
+            }
+        }
+        return compileResolved(genome, plan, retained);
+    }
+
+    private CompiledRewriteProgram compileResolved(
+        EvolutionGenome genome,
+        EvolutionRewriteProgramPlan plan,
+        Map<String, RewriteRule> rulesByGeneId
+    ) {
         for (String geneId : plan.referencedGeneIds()) {
             if (!rulesByGeneId.containsKey(geneId)) {
                 throw new IllegalArgumentException(
@@ -100,6 +145,19 @@ public final class EvolutionRewriteProgramCompiler {
             engine,
             plan.toReadableProgram(),
             plan.referencedGeneIds());
+    }
+
+    private static void validateProgramIdentityAndBudget(
+        EvolutionGenome genome,
+        EvolutionRewriteProgramPlan plan
+    ) {
+        Objects.requireNonNull(genome, "genome");
+        Objects.requireNonNull(plan, "plan");
+        if (!genome.contentHash().equals(plan.genomeHash())) {
+            throw new IllegalArgumentException(
+                "program plan is bound to a different genome");
+        }
+        validateProgramBudget(genome, plan);
     }
 
     private static void validateProgramBudget(
