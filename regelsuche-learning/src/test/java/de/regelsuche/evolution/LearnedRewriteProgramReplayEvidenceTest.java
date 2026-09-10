@@ -1,6 +1,7 @@
 package de.regelsuche.evolution;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -39,6 +40,8 @@ class LearnedRewriteProgramReplayEvidenceTest {
                     "(x * 1) + 0")));
 
         var replayCase = evidence.cases().getFirst();
+        assertFalse(replayCase.complete(),
+            "declared pruning must remain visible as incomplete enumeration");
         assertEquals(1, replayCase.candidates().size());
         var result = replayCase.candidates().getFirst();
         assertEquals("x", result.outputExpression());
