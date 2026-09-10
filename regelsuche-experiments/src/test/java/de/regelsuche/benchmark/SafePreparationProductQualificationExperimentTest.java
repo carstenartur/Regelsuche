@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.function.Predicate;
+import de.regelsuche.benchmark.SafePreparationProductQualificationReport.CaseResult;
+import de.regelsuche.benchmark.SafePreparationProductQualificationReport.ProductDecision;
+import de.regelsuche.benchmark.SafePreparationProductQualificationReport.Report;
 import org.junit.jupiter.api.Test;
 
 class SafePreparationProductQualificationExperimentTest {
@@ -12,7 +14,7 @@ class SafePreparationProductQualificationExperimentTest {
 
     @Test
     void comparesDirectAndSafeUnderOneFrozenInformationParityBudget() {
-        var report = new SafePreparationProductQualificationExperiment()
+        Report report = new SafePreparationProductQualificationExperiment()
             .run(REVISION);
 
         assertEquals(
@@ -22,6 +24,11 @@ class SafePreparationProductQualificationExperimentTest {
             SafePreparationProductQualificationExperiment.SAFE_PROFILE_ID,
             report.safeProfileId());
         assertTrue(report.directRouteIsNoPreparationAblation());
+        assertTrue(report.verificationReplayCharged());
+        assertEquals(
+            SafePreparationProductQualificationReport
+                .SAFE_WORK_ACCOUNTING_REVISION,
+            report.safeWorkAccountingRevision());
         assertTrue(report.evidenceQualified());
         assertTrue(report.newlyReachedCases() >= 1);
         assertTrue(report.commonSolvedCases() >= 1);
@@ -33,16 +40,34 @@ class SafePreparationProductQualificationExperimentTest {
                 result.safe().visibleInventoryFingerprint())));
         assertFalse(report.productBlockers().isEmpty());
         assertEquals(
-            SafePreparationProductQualificationExperiment.ProductDecision
-                .KEEP_OPT_IN_PENDING_PRODUCT_COVERAGE,
+            ProductDecision.KEEP_OPT_IN_PENDING_PRODUCT_COVERAGE,
             report.productDecision());
     }
 
     @Test
-    void preparedCapabilityDoesNotDiscountItsPrimitiveProofWork() {
-        var report = new SafePreparationProductQualificationExperiment()
+    void chargesDeterministicVerificationReplayInsteadOfTreatingItAsFree() {
+        Report report = new SafePreparationProductQualificationExperiment()
             .run(REVISION);
-        var exact = caseById(
+
+        assertTrue(report.cases().stream().allMatch(result -> {
+            var telemetry = result.safe().safeTelemetry();
+            return telemetry.coordinatorCalls() == telemetry.verificationCalls()
+                && telemetry.analyzeMechanicalWork()
+                    == telemetry.verificationReplayMechanicalWork()
+                && telemetry.chargedCoordinatorMechanicalWork()
+                    == telemetry.analyzeMechanicalWork()
+                        + telemetry.verificationReplayMechanicalWork();
+        }));
+        assertTrue(report.cases().stream().anyMatch(result ->
+            result.safe().safeTelemetry().chargedCoordinatorMechanicalWork()
+                > 0));
+    }
+
+    @Test
+    void preparedCapabilityDoesNotDiscountItsPrimitiveProofWork() {
+        Report report = new SafePreparationProductQualificationExperiment()
+            .run(REVISION);
+        CaseResult exact = caseById(
             report,
             "perfect-square-native-exact-preparation");
 
@@ -58,9 +83,9 @@ class SafePreparationProductQualificationExperimentTest {
 
     @Test
     void guardControlCannotBecomeAQualifiedSuccessWithoutAssumptions() {
-        var report = new SafePreparationProductQualificationExperiment()
+        Report report = new SafePreparationProductQualificationExperiment()
             .run(REVISION);
-        var guard = caseById(
+        CaseResult guard = caseById(
             report,
             "telescoping-missing-guard-control");
 
@@ -76,27 +101,20 @@ class SafePreparationProductQualificationExperimentTest {
 
     @Test
     void safeProfileHasNoRegressionOnEveryCommonDirectSuccess() {
-        var report = new SafePreparationProductQualificationExperiment()
+        Report report = new SafePreparationProductQualificationExperiment()
             .run(REVISION);
 
         assertTrue(report.cases().stream()
-            .noneMatch(SafePreparationProductQualificationExperiment
-                .CaseResult::reachabilityRegression));
+            .noneMatch(CaseResult::reachabilityRegression));
         assertTrue(report.cases().stream()
-            .noneMatch(SafePreparationProductQualificationExperiment
-                .CaseResult::correctnessRegression));
+            .noneMatch(CaseResult::correctnessRegression));
         assertTrue(report.cases().stream()
-            .noneMatch(SafePreparationProductQualificationExperiment
-                .CaseResult::assumptionRegression));
+            .noneMatch(CaseResult::assumptionRegression));
         assertTrue(report.cases().stream().allMatch(result ->
             result.safe().safeTelemetry().verificationFailures() == 0));
     }
 
-    private static SafePreparationProductQualificationExperiment.CaseResult
-            caseById(
-        SafePreparationProductQualificationExperiment.Report report,
-        String id
-    ) {
+    private static CaseResult caseById(Report report, String id) {
         return report.cases().stream()
             .filter(result -> result.experimentCase().id().equals(id))
             .findFirst()
