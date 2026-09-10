@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -79,6 +80,43 @@ class LearnedRewriteProgramAuthorizationServiceTest {
 
         assertEquals(authorization.receipt(), replayed.receipt());
         assertEquals(replay, replayed.replayEvidence());
+    }
+
+    @Test
+    void rejectsStoredReceiptThatPredatesItsLeafAuthority(@TempDir Path root)
+            throws IOException {
+        LeafFixture leaf = authorizedLeaf(root.resolve("leaf"));
+        EvolutionRewriteProgramCandidate candidate = candidate(leaf.genome());
+        LearnedRewriteProgramAuthorizationService service =
+            new LearnedRewriteProgramAuthorizationService();
+        LearnedRewriteProgramReplayEvidence replay = service.evaluateReplay(
+            candidate,
+            List.of(leaf.authorization()),
+            List.of(new LearnedRewriteProgramReplayEvidence.ReplayInput(
+                "difference_squares_case",
+                "x^2-y^2")),
+            REVISION,
+            AUTHORIZED);
+
+        LearnedRewriteProgramAuthorizationReceipt impossibleHistory =
+            LearnedRewriteProgramAuthorizationReceipt.create(
+                candidate,
+                REVISION,
+                AUTHORIZED.minusSeconds(1),
+                EXPIRES,
+                replay,
+                Map.of(
+                    "difference-squares",
+                    leaf.authorization().receipt().contentHash()));
+
+        assertThrows(IllegalArgumentException.class, () ->
+            service.replayStoredAuthorization(
+                candidate,
+                List.of(leaf.authorization()),
+                replay,
+                impossibleHistory,
+                REVISION,
+                AUTHORIZED.plusSeconds(1)));
     }
 
     @Test
