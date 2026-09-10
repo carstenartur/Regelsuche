@@ -7,6 +7,7 @@ import static de.regelsuche.evolution.LearnedPatternAuthorizationJson.requireTex
 import de.regelsuche.search.program.BudgetedRewriteProgramExecution.PathBudget;
 import de.regelsuche.search.program.RewriteCandidate;
 import de.regelsuche.search.program.RewriteExecution;
+import de.regelsuche.search.program.RewriteProgramInterpreter;
 import de.regelsuche.transform.ExecutionWork;
 import de.regelsuche.transform.TransformationWorkMetrics;
 import java.util.HashSet;
@@ -76,11 +77,18 @@ public record LearnedRewriteProgramReplayEvidence(
         Objects.requireNonNull(compiled, "compiled");
         requireCompiledIdentity(candidate, compiled);
         List<ReplayInput> retainedInputs = canonicalInputs(inputs);
+        PathBudget replayBudget = new PathBudget(
+            candidate.genome().budget().maxApplicationsPerPath(),
+            0);
+        RewriteProgramInterpreter interpreter = new RewriteProgramInterpreter();
         List<ReplayCase> replayCases = retainedInputs.stream()
             .map(input -> ReplayCase.capture(
                 input.caseId(),
                 input.inputExpression(),
-                compiled.engine().execute(input.inputExpression())))
+                interpreter.executeWithWorkBudget(
+                    compiled.program(),
+                    input.inputExpression(),
+                    replayBudget)))
             .toList();
         Map<String, Object> payload = payload(
             SCHEMA,
