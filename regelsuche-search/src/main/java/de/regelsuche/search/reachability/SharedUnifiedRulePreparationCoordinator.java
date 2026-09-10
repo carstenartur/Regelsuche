@@ -5,7 +5,6 @@ import de.regelsuche.knowledge.RuleInventoryFingerprint;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
-import de.regelsuche.transform.EquivalentExpressionProvider;
 import de.regelsuche.transform.ExprMatcher;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternMatchAnalyzer;
@@ -143,14 +142,14 @@ public final class SharedUnifiedRulePreparationCoordinator {
 
         for (RewriteApplicabilitySchema schema : principalSchemas) {
             PrincipalRuntime runtime = runtimes.get(schema.ruleId());
-            PatternMatchAnalyzer.Analysis initial = analysisForEvidence(
-                schema, sourceParsed, sourceAnalysis);
-            initialAnalyses.put(schema.ruleId(), initial);
 
             Optional<Transformation> direct;
             try {
                 direct = directCandidate(schema.executor(), source, assumptions);
             } catch (RuntimeException exception) {
+                PatternMatchAnalyzer.Analysis initial = analysisForEvidence(
+                    schema, sourceParsed, sourceAnalysis);
+                initialAnalyses.put(schema.ruleId(), initial);
                 RulePreparationCoordinator.Outcome technical = technicalOutcome(
                     runtime,
                     initial,
@@ -161,6 +160,10 @@ public final class SharedUnifiedRulePreparationCoordinator {
                 nonFallbackOutcomes.add(technical);
                 continue;
             }
+
+            PatternMatchAnalyzer.Analysis initial = analysisForEvidence(
+                schema, sourceParsed, sourceAnalysis);
+            initialAnalyses.put(schema.ruleId(), initial);
 
             if (direct.isPresent()) {
                 RulePreparationCoordinator.Outcome outcome = directOutcome(
