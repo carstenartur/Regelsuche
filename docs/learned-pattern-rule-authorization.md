@@ -67,13 +67,23 @@ authorizer additionally requires its derived TRAIN scope to equal the exact
 
 `EvolutionValidationSelection` must reference that split manifest, must have
 selected the exact genome being promoted, and the selected configuration must
-remain `eligible()`.
+remain `eligible()`. Its selected case IDs and families must equal the concrete
+VALIDATION partition in the split manifest.
 
 `EvolutionFinalTestEvaluation` must continue the same split and exact validation
 selection, retain the same selected genome/configuration and satisfy
-`qualificationEligible()`. Technical failures, reachability regressions and
+`qualificationEligible()`. Its case IDs and families must equal the concrete
+FINAL TEST partition. Technical failures, reachability regressions and
 correctness failures therefore block authorization rather than being hidden by
 an aggregate PASS label.
+
+This slice verifies the **revealed** VALIDATION/FINAL-TEST artifacts used for the
+production decision. It does not claim to replace the pre-reveal custody and
+sealed-commitment protocol. That stronger custody chain currently lives in
+`EvolutionRewriteProgramHeldOutCommitment` and related rewrite-program classes.
+Generalizing that boundary without program-specific naming belongs to the next
+#745 program/replay slice rather than being silently reused under the wrong
+semantic name here.
 
 ## Deterministic counterexample evidence
 
@@ -119,9 +129,30 @@ The authorization call receives an explicit `asOf` instant. No implicit system
 clock participates in reproducible tests or qualification. An expired or
 not-yet-valid bundle fails closed.
 
-The resulting authorization receipt expires with the bundle and can later be
-checked through `AuthorizationReceipt.requireUsableAt(...)` against time,
-repository revision and promoted-rule content hash.
+The resulting `LearnedPatternAuthorizationReceipt` expires with the bundle and
+binds the exact promotion result, promoted rule content hash and applicability
+schema in addition to all verified evidence identities.
+
+## Stored receipt admission
+
+A stored authorization receipt is not treated as a bearer token. Production
+startup/admission can call `verifyAuthorization(...)`, which:
+
+1. strictly parses the retained receipt;
+2. checks its genome, gene and repository-revision subject;
+3. reconstructs the entire authorization at the receipt's original
+   `authorizedAt` instant;
+4. reloads split, VALIDATION and FINAL TEST artifacts;
+5. reruns deterministic counterexample search;
+6. reruns the exact pattern promotion proof;
+7. requires the reconstructed receipt to equal the retained receipt;
+8. finally checks that the retained authorization is still valid at the current
+   explicit `asOf` instant.
+
+Thus a valid-looking stored receipt cannot survive replacement of a bound root,
+a changed promoted-rule identity or expiration. The replay test explicitly
+replaces a VALIDATION root with another internally valid artifact after receipt
+issuance and verifies fail-closed rejection.
 
 ## Schemas
 
