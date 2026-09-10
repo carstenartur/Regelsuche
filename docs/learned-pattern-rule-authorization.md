@@ -3,10 +3,13 @@
 Issue #745 requires a production-facing boundary beyond the existing exact
 pattern promotion. `LearnedPatternRulePromoter` proves the mathematical pattern
 identity and binds caller-supplied evidence hashes, but the v1 promoter alone
-does not load those evidence artifacts.
+does not load those artifacts.
 
 `LearnedPatternRuleAuthorizationService` adds the missing fail-closed evidence
-layer without changing the mathematical proof contract.
+layer without changing the mathematical proof contract. It deliberately does
+**not** trust a generic file that merely says `PASSED`: where Regelsuche already
+has a native self-verifying artifact, that artifact is parsed and its semantic
+invariants are checked directly.
 
 ## Authorization flow
 
@@ -14,71 +17,135 @@ layer without changing the mathematical proof contract.
 EvolutionGenome + selected RewriteGene
              |
              v
-four independently produced evidence roots
-  - SEMANTIC_VALIDATION / PASSED
-  - COUNTEREXAMPLE_SEARCH / NO_COUNTEREXAMPLE_FOUND
-  - HOLDOUT_EVALUATION / PASSED
-  - LEAKAGE_AUDIT / PASSED
+EvidenceBundle
+  genome + gene + repository revision
+  issuedAt / expiresAt
+  hashes of the four concrete evidence roots
              |
-             v
-LearnedPatternRuleAuthorizationService
-  - strict JSON / duplicate-key rejection
-  - exact role set
-  - genomeHash + geneId subject binding
-  - repositoryRevision binding
-  - issuedAt / expiresAt validation at explicit asOf
-  - root content-hash verification
-             |
-             v
-LearnedPatternRulePromoter
-  - genome preflight
-  - exact polynomial pattern identity proof
-  - promoted PatternRewriteRule
-  - RewriteApplicabilitySchema
-  - promotion receipt
-             |
-             v
-learned-pattern-rule-authorization-receipt/v1
+             +-----------------------+
+             |                       |
+             v                       v
+EvolutionSplitManifest       EvolutionValidationSelection
+  TRAIN/VALIDATION/TEST       deterministic VALIDATION winner
+  disjointness/leakage        no correctness/reachability blockers
+             |                       |
+             +-----------+-----------+
+                         |
+                         v
+              EvolutionFinalTestEvaluation
+                exact selected genome/config
+                same split + validation selection
+                qualificationEligible == true
+                         |
+                         v
+              CounterexampleEvidence
+                exact gene/repository subject
+                frozen scalar/commutative budget
+                deterministic search replay
+                NO_COUNTEREXAMPLE_FOUND
+                no inferred assumptions
+                         |
+                         v
+              LearnedPatternRulePromoter
+                exact polynomial identity proof
+                         |
+                         v
+ learned-pattern-rule-authorization-receipt/v1
 ```
 
-The authorization lifetime ends at the earliest expiry of the four evidence
-roots. `AuthorizationReceipt.requireUsableAt(...)` rechecks time, repository
-revision and promoted-rule identity before later use.
+The bundle contains no success status. It only supplies identity, lifetime and
+content-addressed links. Therefore changing a status claim in the bundle cannot
+authorize anything: the domain artifacts themselves determine qualification.
 
-## Evidence-root contract
+## Leakage and held-out binding
 
-Each root uses
-`regelsuche.learned-rule-promotion-evidence-root/v1` and contains exactly:
+`EvolutionSplitManifest` is the leakage root. Its existing constructor verifies
+that TRAIN, VALIDATION and FINAL TEST are disjoint by case ID, family, exact
+signature, alpha signature, input identity and hidden-target identity. The
+authorizer additionally requires its derived TRAIN scope to equal the exact
+`EvolutionGenome.trainingScope()`.
 
-- evidence role and role-specific terminal status;
-- the exact genome content hash and gene ID;
-- the exact repository commit revision;
-- `issuedAt` and `expiresAt` UTC instants;
-- the content hash of the independently retained underlying artifact;
-- a content-addressed root hash over all semantic fields.
+`EvolutionValidationSelection` must reference that split manifest, must have
+selected the exact genome being promoted, and the selected configuration must
+remain `eligible()`.
 
-The four files must be distinct regular files. Missing files, symbolic links,
-duplicate JSON keys, unknown/missing fields, invalid hashes, wrong subjects,
-wrong revisions, wrong roles, failed terminal states, future evidence and
-expired evidence all fail closed.
+`EvolutionFinalTestEvaluation` must continue the same split and exact validation
+selection, retain the same selected genome/configuration and satisfy
+`qualificationEligible()`. Technical failures, reachability regressions and
+correctness failures therefore block authorization rather than being hidden by
+an aggregate PASS label.
 
-The schemas are:
+## Deterministic counterexample evidence
 
-- `docs/schemas/regelsuche-learned-rule-promotion-evidence-root-v1.schema.json`
-- `docs/schemas/regelsuche-learned-pattern-rule-authorization-receipt-v1.schema.json`
+There was no durable content-addressed counterexample artifact matching the
+promotion boundary, so this slice adds
+`regelsuche.learned-pattern-rule-counterexample-evidence/v1`.
+
+The authorizer converts pattern placeholders to distinct scalar variables while
+preserving literal variables, then runs the existing
+`DeterministicCounterexampleSearchService` with a frozen budget:
+
+- 64 deterministic numeric random samples;
+- boundary values enabled;
+- rational samples enabled;
+- complex samples enabled;
+- random seed `745`;
+- matrix assignments disabled;
+- no wall-clock timeout.
+
+Matrix assignments are intentionally excluded here because the v1 mathematical
+promoter proves identities in a **commutative polynomial ring**. Noncommutative
+matrix semantics belong to typed matrix/operator rule contracts, not to this
+scalar polynomial authorization lane.
+
+The retained counterexample evidence binds the canonical source/target pattern,
+the concrete replay expressions, the complete budget, terminal status,
+attempted sources, inferred assumptions, explanation and a hash over the full
+runtime result (including a counterexample or typed assumptions if present).
+Authorization reruns the service and requires the result hash and retained
+fields to match. Only `NO_COUNTEREXAMPLE_FOUND` with non-empty attempted sources,
+no concrete counterexample and no inferred/typed assumptions is accepted.
+
+## Time and repository identity
+
+`regelsuche.learned-pattern-rule-authorization-bundle/v1` binds:
+
+- exact genome content hash and gene ID;
+- exact lower-case 40-character repository commit revision;
+- explicit `issuedAt` and `expiresAt` instants;
+- the split-manifest, validation-selection, FINAL-TEST and counterexample hashes.
+
+The authorization call receives an explicit `asOf` instant. No implicit system
+clock participates in reproducible tests or qualification. An expired or
+not-yet-valid bundle fails closed.
+
+The resulting authorization receipt expires with the bundle and can later be
+checked through `AuthorizationReceipt.requireUsableAt(...)` against time,
+repository revision and promoted-rule content hash.
+
+## Schemas
+
+This slice adds:
+
+- `docs/schemas/regelsuche-learned-pattern-rule-authorization-bundle-v1.schema.json`;
+- `docs/schemas/regelsuche-learned-pattern-rule-counterexample-evidence-v1.schema.json`;
+- `docs/schemas/regelsuche-learned-pattern-rule-authorization-receipt-v1.schema.json`.
+
+Existing native evolution artifacts keep their existing schemas and codecs; no
+parallel VALIDATION or split model is introduced.
 
 ## Claim boundary
 
 This contract authorizes only the existing narrow, assumption-free, exactly
-proved learned **pattern rule** path. It does not turn empirical search success
-into mathematical authority, does not authorize conditional rules, and does not
-authorize a `RewriteProgram`.
+proved learned **pattern rule** path. Counterexample search is additional
+refutation evidence; it does not replace the exact proof.
 
-Programs have different semantics: sequence, choice, repetition, guards,
-pruning and multiple entry/exit paths must be replayed as a program. Issue #745
-therefore keeps learned-program authorization as a separate follow-up rather
-than disguising a program as one pattern rewrite.
+The contract does not authorize conditional learned rules and does not authorize
+a `RewriteProgram`. Programs have different semantics: sequence, choice,
+repetition, guards, pruning and multiple entry/exit paths must be replayed as a
+program. Issue #745 therefore keeps learned-program authorization as a separate
+follow-up rather than disguising a program as one pattern rewrite.
 
-The legacy promotion receipt remains useful as the mathematical promotion
-product. Production-facing code should use the authorization service when
-external validation/counterexample/holdout/leakage evidence is required.
+The legacy promotion receipt remains the mathematical promotion product. Code
+that needs the production qualification boundary must use the authorization
+service and its stronger receipt.
