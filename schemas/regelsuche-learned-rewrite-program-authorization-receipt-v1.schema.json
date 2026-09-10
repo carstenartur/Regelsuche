@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.de/schemas/regelsuche-learned-rewrite-program-authorization-receipt-v1.schema.json",
+  "title": "Regelsuche learned rewrite-program authorization receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "authorizerId",
+    "candidateHash",
+    "genomeHash",
+    "genomeAlphaStructuralHash",
+    "planHash",
+    "planAlphaStructuralHash",
+    "repositoryRevision",
+    "authorizedAt",
+    "validUntil",
+    "replayEvidenceHash",
+    "applicabilitySemantics",
+    "leafAuthorizationHashes",
+    "leafApplicabilitySchemaHashes",
+    "workRevisions",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {"const": "regelsuche.learned-rewrite-program-authorization-receipt/v1"},
+    "authorizerId": {"const": "regelsuche.learned-rewrite-program-authorizer/v1"},
+    "candidateHash": {"$ref": "#/$defs/hash"},
+    "genomeHash": {"$ref": "#/$defs/hash"},
+    "genomeAlphaStructuralHash": {"$ref": "#/$defs/hash"},
+    "planHash": {"$ref": "#/$defs/hash"},
+    "planAlphaStructuralHash": {"$ref": "#/$defs/hash"},
+    "repositoryRevision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "authorizedAt": {"type": "string", "format": "date-time"},
+    "validUntil": {"type": "string", "format": "date-time"},
+    "replayEvidenceHash": {"$ref": "#/$defs/hash"},
+    "applicabilitySemantics": {
+      "const": "CANONICAL_PROGRAM_RETURNS_AT_LEAST_ONE_CANDIDATE/v1"
+    },
+    "leafAuthorizationHashes": {"$ref": "#/$defs/geneHashMap"},
+    "leafApplicabilitySchemaHashes": {"$ref": "#/$defs/geneHashMap"},
+    "workRevisions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "contentHash": {"$ref": "#/$defs/hash"}
+  },
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "geneHashMap": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/hash"},
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_-]{2,127}$"
+      }
+    }
+  }
+}

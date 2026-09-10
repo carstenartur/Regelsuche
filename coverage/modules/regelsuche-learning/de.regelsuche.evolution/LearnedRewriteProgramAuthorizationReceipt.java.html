@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LearnedRewriteProgramAuthorizationReceipt.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">LearnedRewriteProgramAuthorizationReceipt.java</span></div><h1>LearnedRewriteProgramAuthorizationReceipt.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import static de.regelsuche.evolution.LearnedPatternAuthorizationJson.hash;
+import static de.regelsuche.evolution.LearnedPatternAuthorizationJson.requireHash;
+import static de.regelsuche.evolution.LearnedPatternAuthorizationJson.requireRevision;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+
+/** Content-addressed production authorization for one canonical learned program. */
+public record LearnedRewriteProgramAuthorizationReceipt(
+    String schema,
+    String authorizerId,
+    String candidateHash,
+    String genomeHash,
+    String genomeAlphaStructuralHash,
+    String planHash,
+    String planAlphaStructuralHash,
+    String repositoryRevision,
+    Instant authorizedAt,
+    Instant validUntil,
+    String replayEvidenceHash,
+    String applicabilitySemantics,
+    Map&lt;String, String&gt; leafAuthorizationHashes,
+    Map&lt;String, String&gt; leafApplicabilitySchemaHashes,
+    List&lt;String&gt; workRevisions,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.learned-rewrite-program-authorization-receipt/v1&quot;;
+    public static final String AUTHORIZER_ID =
+        &quot;regelsuche.learned-rewrite-program-authorizer/v1&quot;;
+    public static final String APPLICABILITY_SEMANTICS =
+        &quot;CANONICAL_PROGRAM_RETURNS_AT_LEAST_ONE_CANDIDATE/v1&quot;;
+
+<span class="fc" id="L39">    public LearnedRewriteProgramAuthorizationReceipt {</span>
+<span class="pc bpc" id="L40" title="2 of 4 branches missed.">        if (!SCHEMA.equals(schema) || !AUTHORIZER_ID.equals(authorizerId)) {</span>
+<span class="nc" id="L41">            throw new IllegalArgumentException(</span>
+                &quot;learned rewrite-program authorization identity is invalid&quot;);
+        }
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        for (String value : List.of(</span>
+                candidateHash,
+                genomeHash,
+                genomeAlphaStructuralHash,
+                planHash,
+                planAlphaStructuralHash,
+                replayEvidenceHash,
+                contentHash)) {
+<span class="fc" id="L52">            requireHash(value, &quot;rewrite-program authorization hash&quot;);</span>
+<span class="fc" id="L53">        }</span>
+<span class="fc" id="L54">        requireRevision(repositoryRevision, &quot;repositoryRevision&quot;);</span>
+<span class="fc" id="L55">        authorizedAt = Objects.requireNonNull(authorizedAt, &quot;authorizedAt&quot;);</span>
+<span class="fc" id="L56">        validUntil = Objects.requireNonNull(validUntil, &quot;validUntil&quot;);</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (!authorizedAt.isBefore(validUntil)) {</span>
+<span class="nc" id="L58">            throw new IllegalArgumentException(</span>
+                &quot;rewrite-program authorization must expire after authorizedAt&quot;);
+        }
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (!APPLICABILITY_SEMANTICS.equals(applicabilitySemantics)) {</span>
+<span class="nc" id="L62">            throw new IllegalArgumentException(</span>
+                &quot;unsupported learned rewrite-program applicability semantics&quot;);
+        }
+<span class="fc" id="L65">        leafAuthorizationHashes = canonicalLeafHashes(</span>
+            leafAuthorizationHashes, &quot;leafAuthorizationHashes&quot;);
+<span class="fc" id="L67">        leafApplicabilitySchemaHashes = canonicalLeafHashes(</span>
+            leafApplicabilitySchemaHashes, &quot;leafApplicabilitySchemaHashes&quot;);
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (!leafAuthorizationHashes.keySet().equals(</span>
+<span class="fc" id="L70">                leafApplicabilitySchemaHashes.keySet())) {</span>
+<span class="nc" id="L71">            throw new IllegalArgumentException(</span>
+                &quot;leaf authorization and applicability-schema subjects differ&quot;);
+        }
+<span class="fc" id="L74">        workRevisions = canonicalWorkRevisions(workRevisions);</span>
+<span class="fc" id="L75">        String expected = hash(payload(</span>
+            schema,
+            authorizerId,
+            candidateHash,
+            genomeHash,
+            genomeAlphaStructuralHash,
+            planHash,
+            planAlphaStructuralHash,
+            repositoryRevision,
+            authorizedAt,
+            validUntil,
+            replayEvidenceHash,
+            applicabilitySemantics,
+            leafAuthorizationHashes,
+            leafApplicabilitySchemaHashes,
+            workRevisions));
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L92">            throw new IllegalArgumentException(</span>
+                &quot;rewrite-program authorization receipt contentHash mismatch&quot;);
+        }
+<span class="fc" id="L95">    }</span>
+
+    static LearnedRewriteProgramAuthorizationReceipt create(
+        EvolutionRewriteProgramCandidate candidate,
+        String repositoryRevision,
+        Instant authorizedAt,
+        Instant validUntil,
+        LearnedRewriteProgramReplayEvidence replayEvidence,
+        Map&lt;String, String&gt; leafAuthorizationHashes,
+        Map&lt;String, String&gt; leafApplicabilitySchemaHashes
+    ) {
+<span class="fc" id="L106">        Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc" id="L107">        Objects.requireNonNull(replayEvidence, &quot;replayEvidence&quot;);</span>
+<span class="fc" id="L108">        replayEvidence.requireCandidate(candidate);</span>
+<span class="fc" id="L109">        Map&lt;String, String&gt; leaves = canonicalLeafHashes(</span>
+            leafAuthorizationHashes, &quot;leafAuthorizationHashes&quot;);
+<span class="fc" id="L111">        Map&lt;String, String&gt; applicability = canonicalLeafHashes(</span>
+            leafApplicabilitySchemaHashes, &quot;leafApplicabilitySchemaHashes&quot;);
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (!leaves.keySet().equals(applicability.keySet())) {</span>
+<span class="nc" id="L114">            throw new IllegalArgumentException(</span>
+                &quot;leaf authorization and applicability-schema subjects differ&quot;);
+        }
+<span class="fc" id="L117">        List&lt;String&gt; revisions = canonicalWorkRevisions(</span>
+<span class="fc" id="L118">            replayEvidence.cases().stream()</span>
+<span class="fc" id="L119">                .map(LearnedRewriteProgramReplayEvidence.ReplayCase::workRevision)</span>
+<span class="fc" id="L120">                .distinct()</span>
+<span class="fc" id="L121">                .toList());</span>
+<span class="fc" id="L122">        Map&lt;String, Object&gt; payload = payload(</span>
+            SCHEMA,
+            AUTHORIZER_ID,
+<span class="fc" id="L125">            candidate.contentHash(),</span>
+<span class="fc" id="L126">            candidate.genome().contentHash(),</span>
+<span class="fc" id="L127">            candidate.genome().alphaStructuralHash(),</span>
+<span class="fc" id="L128">            candidate.plan().contentHash(),</span>
+<span class="fc" id="L129">            candidate.plan().alphaStructuralHash(),</span>
+            repositoryRevision,
+            authorizedAt,
+            validUntil,
+<span class="fc" id="L133">            replayEvidence.contentHash(),</span>
+            APPLICABILITY_SEMANTICS,
+            leaves,
+            applicability,
+            revisions);
+<span class="fc" id="L138">        return new LearnedRewriteProgramAuthorizationReceipt(</span>
+            SCHEMA,
+            AUTHORIZER_ID,
+<span class="fc" id="L141">            candidate.contentHash(),</span>
+<span class="fc" id="L142">            candidate.genome().contentHash(),</span>
+<span class="fc" id="L143">            candidate.genome().alphaStructuralHash(),</span>
+<span class="fc" id="L144">            candidate.plan().contentHash(),</span>
+<span class="fc" id="L145">            candidate.plan().alphaStructuralHash(),</span>
+            repositoryRevision,
+            authorizedAt,
+            validUntil,
+<span class="fc" id="L149">            replayEvidence.contentHash(),</span>
+            APPLICABILITY_SEMANTICS,
+            leaves,
+            applicability,
+            revisions,
+<span class="fc" id="L154">            hash(payload));</span>
+    }
+
+    public static LearnedRewriteProgramAuthorizationReceipt fromCanonicalJson(
+        String json
+    ) {
+<span class="fc" id="L160">        return LearnedPatternAuthorizationJson.read(</span>
+            json,
+            LearnedRewriteProgramAuthorizationReceipt.class,
+            &quot;learned rewrite-program authorization receipt&quot;);
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L167">        return LearnedPatternAuthorizationJson.write(this);</span>
+    }
+
+    public void requireUsableAt(
+        Instant asOf,
+        String expectedRepositoryRevision,
+        EvolutionRewriteProgramCandidate candidate
+    ) {
+<span class="fc" id="L175">        Objects.requireNonNull(asOf, &quot;asOf&quot;);</span>
+<span class="fc" id="L176">        Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="pc bpc" id="L177" title="1 of 4 branches missed.">        if (asOf.isBefore(authorizedAt) || !asOf.isBefore(validUntil)) {</span>
+<span class="fc" id="L178">            throw new IllegalArgumentException(</span>
+                &quot;learned rewrite-program authorization is not valid at &quot; + asOf);
+        }
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (!repositoryRevision.equals(expectedRepositoryRevision)</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">                || !candidateHash.equals(candidate.contentHash())</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">                || !genomeHash.equals(candidate.genome().contentHash())</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">                || !genomeAlphaStructuralHash.equals(</span>
+<span class="fc" id="L185">                    candidate.genome().alphaStructuralHash())</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">                || !planHash.equals(candidate.plan().contentHash())</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">                || !planAlphaStructuralHash.equals(</span>
+<span class="fc" id="L188">                    candidate.plan().alphaStructuralHash())) {</span>
+<span class="fc" id="L189">            throw new IllegalArgumentException(</span>
+                &quot;learned rewrite-program authorization identity mismatch&quot;);
+        }
+<span class="fc" id="L192">    }</span>
+
+    private static Map&lt;String, String&gt; canonicalLeafHashes(
+        Map&lt;String, String&gt; values,
+        String field
+    ) {
+<span class="fc" id="L198">        Objects.requireNonNull(values, field);</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">        if (values.isEmpty()) {</span>
+<span class="nc" id="L200">            throw new IllegalArgumentException(</span>
+                &quot;rewrite-program authorization requires &quot; + field);
+        }
+<span class="fc" id="L203">        TreeMap&lt;String, String&gt; retained = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L204">        values.forEach((geneId, value) -&gt; {</span>
+<span class="fc" id="L205">            LearnedPatternAuthorizationJson.requireText(geneId, &quot;leaf geneId&quot;);</span>
+<span class="fc" id="L206">            requireHash(value, field + &quot; hash&quot;);</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">            if (retained.put(geneId, value) != null) {</span>
+<span class="nc" id="L208">                throw new IllegalArgumentException(</span>
+                    &quot;duplicate leaf subject in &quot; + field + &quot;: &quot; + geneId);
+            }
+<span class="fc" id="L211">        });</span>
+<span class="fc" id="L212">        return Map.copyOf(retained);</span>
+    }
+
+    private static List&lt;String&gt; canonicalWorkRevisions(List&lt;String&gt; values) {
+<span class="fc" id="L216">        Objects.requireNonNull(values, &quot;workRevisions&quot;);</span>
+<span class="fc" id="L217">        List&lt;String&gt; retained = values.stream()</span>
+<span class="fc" id="L218">            .map(value -&gt; LearnedPatternAuthorizationJson.requireText(</span>
+                value, &quot;workRevision&quot;))
+<span class="fc" id="L220">            .distinct()</span>
+<span class="fc" id="L221">            .sorted()</span>
+<span class="fc" id="L222">            .toList();</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">        if (retained.isEmpty()) {</span>
+<span class="nc" id="L224">            throw new IllegalArgumentException(</span>
+                &quot;rewrite-program authorization requires a work revision&quot;);
+        }
+<span class="fc" id="L227">        return retained;</span>
+    }
+
+    private static Map&lt;String, Object&gt; payload(
+        String schema,
+        String authorizerId,
+        String candidateHash,
+        String genomeHash,
+        String genomeAlphaStructuralHash,
+        String planHash,
+        String planAlphaStructuralHash,
+        String repositoryRevision,
+        Instant authorizedAt,
+        Instant validUntil,
+        String replayEvidenceHash,
+        String applicabilitySemantics,
+        Map&lt;String, String&gt; leafAuthorizationHashes,
+        Map&lt;String, String&gt; leafApplicabilitySchemaHashes,
+        List&lt;String&gt; workRevisions
+    ) {
+<span class="fc" id="L247">        Map&lt;String, Object&gt; value = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L248">        value.put(&quot;applicabilitySemantics&quot;, applicabilitySemantics);</span>
+<span class="fc" id="L249">        value.put(&quot;authorizedAt&quot;, authorizedAt);</span>
+<span class="fc" id="L250">        value.put(&quot;authorizerId&quot;, authorizerId);</span>
+<span class="fc" id="L251">        value.put(&quot;candidateHash&quot;, candidateHash);</span>
+<span class="fc" id="L252">        value.put(&quot;genomeAlphaStructuralHash&quot;, genomeAlphaStructuralHash);</span>
+<span class="fc" id="L253">        value.put(&quot;genomeHash&quot;, genomeHash);</span>
+<span class="fc" id="L254">        value.put(&quot;leafApplicabilitySchemaHashes&quot;, leafApplicabilitySchemaHashes);</span>
+<span class="fc" id="L255">        value.put(&quot;leafAuthorizationHashes&quot;, leafAuthorizationHashes);</span>
+<span class="fc" id="L256">        value.put(&quot;planAlphaStructuralHash&quot;, planAlphaStructuralHash);</span>
+<span class="fc" id="L257">        value.put(&quot;planHash&quot;, planHash);</span>
+<span class="fc" id="L258">        value.put(&quot;replayEvidenceHash&quot;, replayEvidenceHash);</span>
+<span class="fc" id="L259">        value.put(&quot;repositoryRevision&quot;, repositoryRevision);</span>
+<span class="fc" id="L260">        value.put(&quot;schema&quot;, schema);</span>
+<span class="fc" id="L261">        value.put(&quot;validUntil&quot;, validUntil);</span>
+<span class="fc" id="L262">        value.put(&quot;workRevisions&quot;, workRevisions);</span>
+<span class="fc" id="L263">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

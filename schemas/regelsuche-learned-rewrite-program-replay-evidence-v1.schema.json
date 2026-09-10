@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.de/schemas/regelsuche-learned-rewrite-program-replay-evidence-v1.schema.json",
+  "title": "Regelsuche learned rewrite-program replay evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "candidateHash",
+    "genomeHash",
+    "genomeAlphaStructuralHash",
+    "planHash",
+    "planAlphaStructuralHash",
+    "cases",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {"const": "regelsuche.learned-rewrite-program-replay-evidence/v1"},
+    "candidateHash": {"$ref": "#/$defs/hash"},
+    "genomeHash": {"$ref": "#/$defs/hash"},
+    "genomeAlphaStructuralHash": {"$ref": "#/$defs/hash"},
+    "planHash": {"$ref": "#/$defs/hash"},
+    "planAlphaStructuralHash": {"$ref": "#/$defs/hash"},
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/replayCase"}
+    },
+    "contentHash": {"$ref": "#/$defs/hash"}
+  },
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "executionWork": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primitiveRewrites", "exactTheorySteps", "exactTheoryWorkUnits"],
+      "properties": {
+        "primitiveRewrites": {"type": "integer", "minimum": 0},
+        "exactTheorySteps": {"type": "integer", "minimum": 0},
+        "exactTheoryWorkUnits": {"type": "integer", "minimum": 0}
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "originNodeId",
+        "outputExpression",
+        "ruleIds",
+        "primitiveRuleIds",
+        "assumptions",
+        "provenanceHash",
+        "executionWork",
+        "contentHash"
+      ],
+      "properties": {
+        "originNodeId": {"type": "string", "minLength": 1},
+        "outputExpression": {"type": "string", "minLength": 1},
+        "ruleIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "primitiveRuleIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "provenanceHash": {"$ref": "#/$defs/hash"},
+        "executionWork": {"$ref": "#/$defs/executionWork"},
+        "contentHash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "pathBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["present", "primitiveRewriteUnits", "exactTheoryWorkUnits"],
+      "properties": {
+        "present": {"type": "boolean"},
+        "primitiveRewriteUnits": {"type": "integer", "minimum": 0},
+        "exactTheoryWorkUnits": {"type": "integer", "minimum": 0}
+      }
+    },
+    "workMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "engineInvocations",
+        "programNodeVisits",
+        "sourceInvocations",
+        "sourceCandidates",
+        "composedCandidates",
+        "requirementEvaluations",
+        "requirementRejections",
+        "priorityCandidatesOrdered",
+        "prunedCandidates",
+        "repeatIterations",
+        "repeatEndpoints",
+        "alternativeSelections",
+        "alternativesSkipped",
+        "duplicateCandidatesDropped",
+        "candidateWork",
+        "delegatedMechanicalWorkUnits"
+      ],
+      "properties": {
+        "engineInvocations": {"type": "integer", "minimum": 0},
+        "programNodeVisits": {"type": "integer", "minimum": 0},
+        "sourceInvocations": {"type": "integer", "minimum": 0},
+        "sourceCandidates": {"type": "integer", "minimum": 0},
+        "composedCandidates": {"type": "integer", "minimum": 0},
+        "requirementEvaluations": {"type": "integer", "minimum": 0},
+        "requirementRejections": {"type": "integer", "minimum": 0},
+        "priorityCandidatesOrdered": {"type": "integer", "minimum": 0},
+        "prunedCandidates": {"type": "integer", "minimum": 0},
+        "repeatIterations": {"type": "integer", "minimum": 0},
+        "repeatEndpoints": {"type": "integer", "minimum": 0},
+        "alternativeSelections": {"type": "integer", "minimum": 0},
+        "alternativesSkipped": {"type": "integer", "minimum": 0},
+        "duplicateCandidatesDropped": {"type": "integer", "minimum": 0},
+        "candidateWork": {"$ref": "#/$defs/executionWork"},
+        "delegatedMechanicalWorkUnits": {"type": "integer", "minimum": 0}
+      }
+    },
+    "replayCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "caseId",
+        "inputExpression",
+        "candidates",
+        "complete",
+        "workRevision",
+        "workMetrics",
+        "pathBudget",
+        "contentHash"
+      ],
+      "properties": {
+        "caseId": {"type": "string", "minLength": 1},
+        "inputExpression": {"type": "string", "minLength": 1},
+        "candidates": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/candidate"}
+        },
+        "complete": {"type": "boolean"},
+        "workRevision": {"type": "string", "minLength": 1},
+        "workMetrics": {"$ref": "#/$defs/workMetrics"},
+        "pathBudget": {"$ref": "#/$defs/pathBudget"},
+        "contentHash": {"$ref": "#/$defs/hash"}
+      }
+    }
+  }
+}

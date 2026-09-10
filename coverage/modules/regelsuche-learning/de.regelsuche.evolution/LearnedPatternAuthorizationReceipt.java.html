@@ -163,7 +163,7 @@ public record LearnedPatternAuthorizationReceipt(
         String expectedPromotedRuleHash
     ) {
 <span class="fc" id="L165">        Objects.requireNonNull(asOf, &quot;asOf&quot;);</span>
-<span class="pc bpc" id="L166" title="1 of 4 branches missed.">        if (asOf.isBefore(authorizedAt) || !asOf.isBefore(validUntil)) {</span>
+<span class="fc bfc" id="L166" title="All 4 branches covered.">        if (asOf.isBefore(authorizedAt) || !asOf.isBefore(validUntil)) {</span>
 <span class="fc" id="L167">            throw new IllegalArgumentException(</span>
                 &quot;learned rule authorization is not valid at &quot; + asOf);
         }

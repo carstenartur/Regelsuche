@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Predicate;
 
 /**
@@ -34,273 +35,348 @@ public final class EvolutionRewriteProgramCompiler {
     private final AstRewriteTransformationEngines.Backend astRewriteBackend;
 
     public EvolutionRewriteProgramCompiler() {
-<span class="fc" id="L37">        this(</span>
+<span class="fc" id="L38">        this(</span>
             new EvolutionGenomeCompiler(),
-<span class="fc" id="L39">            AstRewriteTransformationEngines.productionBackend()</span>
+<span class="fc" id="L40">            AstRewriteTransformationEngines.productionBackend()</span>
         );
-<span class="fc" id="L41">    }</span>
+<span class="fc" id="L42">    }</span>
 
     public EvolutionRewriteProgramCompiler(EvolutionGenomeCompiler genomeCompiler) {
-<span class="nc" id="L44">        this(</span>
+<span class="nc" id="L45">        this(</span>
             genomeCompiler,
-<span class="nc" id="L46">            AstRewriteTransformationEngines.productionBackend()</span>
+<span class="nc" id="L47">            AstRewriteTransformationEngines.productionBackend()</span>
         );
-<span class="nc" id="L48">    }</span>
+<span class="nc" id="L49">    }</span>
 
     public EvolutionRewriteProgramCompiler(
         EvolutionGenomeCompiler genomeCompiler,
         AstRewriteTransformationEngines.Backend astRewriteBackend
-<span class="fc" id="L53">    ) {</span>
-<span class="fc" id="L54">        this.genomeCompiler = Objects.requireNonNull(</span>
+<span class="fc" id="L54">    ) {</span>
+<span class="fc" id="L55">        this.genomeCompiler = Objects.requireNonNull(</span>
             genomeCompiler,
             &quot;genomeCompiler&quot;
         );
-<span class="fc" id="L58">        this.astRewriteBackend = Objects.requireNonNull(</span>
+<span class="fc" id="L59">        this.astRewriteBackend = Objects.requireNonNull(</span>
             astRewriteBackend,
             &quot;astRewriteBackend&quot;
         );
-<span class="fc" id="L62">    }</span>
+<span class="fc" id="L63">    }</span>
 
     public CompiledRewriteProgram compile(
         EvolutionGenome genome,
         EvolutionRewriteProgramPlan plan
     ) {
-<span class="fc" id="L68">        Objects.requireNonNull(genome, &quot;genome&quot;);</span>
-<span class="fc" id="L69">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
-<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (!genome.contentHash().equals(plan.genomeHash())) {</span>
-<span class="fc" id="L71">            throw new IllegalArgumentException(</span>
-                &quot;program plan is bound to a different genome&quot;);
-        }
-<span class="fc" id="L74">        validateProgramBudget(genome, plan);</span>
+<span class="fc" id="L69">        validateProgramIdentityAndBudget(genome, plan);</span>
+<span class="fc" id="L70">        EvolutionGenomeCompiler.CompiledProgram compiledGenome =</span>
+<span class="fc" id="L71">            genomeCompiler.compile(genome);</span>
+<span class="fc" id="L72">        return compileResolved(</span>
+            genome,
+            plan,
+<span class="fc" id="L75">            rulesByGeneId(genome, compiledGenome));</span>
+    }
 
-<span class="fc" id="L76">        EvolutionGenomeCompiler.CompiledProgram compiledGenome =</span>
-<span class="fc" id="L77">            genomeCompiler.compile(genome);</span>
-<span class="fc" id="L78">        Map&lt;String, RewriteRule&gt; rulesByGeneId = rulesByGeneId(</span>
-            genome, compiledGenome);
-<span class="fc bfc" id="L80" title="All 2 branches covered.">        for (String geneId : plan.referencedGeneIds()) {</span>
-<span class="fc bfc" id="L81" title="All 2 branches covered.">            if (!rulesByGeneId.containsKey(geneId)) {</span>
-<span class="fc" id="L82">                throw new IllegalArgumentException(</span>
+    /**
+     * Compiles the same canonical topology with an explicitly authorized rule
+     * implementation for every referenced gene.
+     *
+     * &lt;p&gt;This is the compiler half of the production path, not an evidence
+     * authorization boundary by itself. Callers must provide independently
+     * promoted and proved rules; {@link LearnedRewriteProgramAuthorizationService}
+     * is responsible for verifying their authorization receipts, repository and
+     * time identities, applicability schemas and deterministic program replay.
+     * Extra, missing and non-equivalence-preserving rules are rejected here so
+     * the executable program cannot silently gain a different authority
+     * surface.&lt;/p&gt;
+     */
+    public CompiledRewriteProgram compileAuthorized(
+        EvolutionGenome genome,
+        EvolutionRewriteProgramPlan plan,
+        Map&lt;String, RewriteRule&gt; authorizedRulesByGeneId
+    ) {
+<span class="fc" id="L96">        validateProgramIdentityAndBudget(genome, plan);</span>
+<span class="fc" id="L97">        Objects.requireNonNull(</span>
+            authorizedRulesByGeneId, &quot;authorizedRulesByGeneId&quot;);
+
+<span class="fc" id="L100">        Map&lt;String, RewriteRule&gt; checkedRules = new LinkedHashMap&lt;&gt;();</span>
+        for (Map.Entry&lt;String, RewriteRule&gt; entry
+<span class="fc bfc" id="L102" title="All 2 branches covered.">                : authorizedRulesByGeneId.entrySet()) {</span>
+<span class="fc" id="L103">            String geneId = entry.getKey();</span>
+<span class="pc bpc" id="L104" title="1 of 4 branches missed.">            if (geneId == null || geneId.isBlank()) {</span>
+<span class="fc" id="L105">                throw new IllegalArgumentException(</span>
+                    &quot;authorized rule gene ID must not be blank&quot;);
+            }
+<span class="fc" id="L108">            RewriteRule rule = entry.getValue();</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            if (rule == null) {</span>
+<span class="fc" id="L110">                throw new IllegalArgumentException(</span>
+                    &quot;authorized rule must not be null for gene &quot; + geneId);
+            }
+<span class="fc" id="L113">            checkedRules.put(geneId, rule);</span>
+<span class="fc" id="L114">        }</span>
+<span class="fc" id="L115">        Map&lt;String, RewriteRule&gt; retained = Map.copyOf(checkedRules);</span>
+<span class="fc" id="L116">        Set&lt;String&gt; referenced = Set.copyOf(plan.referencedGeneIds());</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (!retained.keySet().equals(referenced)) {</span>
+<span class="fc" id="L118">            throw new IllegalArgumentException(</span>
+                &quot;authorized rule set must equal the program's referenced genes&quot;);
+        }
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (Map.Entry&lt;String, RewriteRule&gt; entry : retained.entrySet()) {</span>
+<span class="fc" id="L122">            String geneId = entry.getKey();</span>
+<span class="fc" id="L123">            RewriteRule rule = entry.getValue();</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            if (genome.rewrites().stream().noneMatch(</span>
+<span class="fc" id="L125">                    gene -&gt; gene.geneId().equals(geneId))) {</span>
+<span class="nc" id="L126">                throw new IllegalArgumentException(</span>
+                    &quot;authorized rule references unknown genome gene: &quot; + geneId);
+            }
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            if (!rule.isEquivalencePreservingByConstruction()) {</span>
+<span class="fc" id="L130">                throw new IllegalArgumentException(</span>
+                    &quot;authorized program leaf is not equivalence preserving: &quot;
+                        + geneId);
+            }
+<span class="fc" id="L134">        }</span>
+<span class="fc" id="L135">        return compileResolved(genome, plan, retained);</span>
+    }
+
+    private CompiledRewriteProgram compileResolved(
+        EvolutionGenome genome,
+        EvolutionRewriteProgramPlan plan,
+        Map&lt;String, RewriteRule&gt; rulesByGeneId
+    ) {
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        for (String geneId : plan.referencedGeneIds()) {</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            if (!rulesByGeneId.containsKey(geneId)) {</span>
+<span class="fc" id="L145">                throw new IllegalArgumentException(</span>
                     &quot;program source references unknown genome gene: &quot; + geneId);
             }
-<span class="fc" id="L85">        }</span>
+<span class="fc" id="L148">        }</span>
 
-<span class="fc" id="L87">        CompilationContext context = new CompilationContext(</span>
+<span class="fc" id="L150">        CompilationContext context = new CompilationContext(</span>
             genome,
             rulesByGeneId,
             astRewriteBackend);
-<span class="fc" id="L91">        RewriteProgram program = compileNode(plan.root(), context);</span>
-<span class="fc" id="L92">        ProgrammedTransformationEngine engine =</span>
+<span class="fc" id="L154">        RewriteProgram program = compileNode(plan.root(), context);</span>
+<span class="fc" id="L155">        ProgrammedTransformationEngine engine =</span>
             new ProgrammedTransformationEngine(program);
-<span class="fc" id="L94">        return new CompiledRewriteProgram(</span>
-<span class="fc" id="L95">            genome.contentHash(),</span>
-<span class="fc" id="L96">            genome.alphaStructuralHash(),</span>
-<span class="fc" id="L97">            plan.contentHash(),</span>
-<span class="fc" id="L98">            plan.alphaStructuralHash(),</span>
+<span class="fc" id="L157">        return new CompiledRewriteProgram(</span>
+<span class="fc" id="L158">            genome.contentHash(),</span>
+<span class="fc" id="L159">            genome.alphaStructuralHash(),</span>
+<span class="fc" id="L160">            plan.contentHash(),</span>
+<span class="fc" id="L161">            plan.alphaStructuralHash(),</span>
             program,
             engine,
-<span class="fc" id="L101">            plan.toReadableProgram(),</span>
-<span class="fc" id="L102">            plan.referencedGeneIds());</span>
+<span class="fc" id="L164">            plan.toReadableProgram(),</span>
+<span class="fc" id="L165">            plan.referencedGeneIds());</span>
     }
+
+    private static void validateProgramIdentityAndBudget(
+        EvolutionGenome genome,
+        EvolutionRewriteProgramPlan plan
+    ) {
+<span class="fc" id="L172">        Objects.requireNonNull(genome, &quot;genome&quot;);</span>
+<span class="fc" id="L173">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (!genome.contentHash().equals(plan.genomeHash())) {</span>
+<span class="fc" id="L175">            throw new IllegalArgumentException(</span>
+                &quot;program plan is bound to a different genome&quot;);
+        }
+<span class="fc" id="L178">        validateProgramBudget(genome, plan);</span>
+<span class="fc" id="L179">    }</span>
 
     private static void validateProgramBudget(
         EvolutionGenome genome,
         EvolutionRewriteProgramPlan plan
     ) {
-<span class="fc" id="L109">        EvolutionGenome.ResourceBudget budget = genome.budget();</span>
-<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (plan.maxNodes() &gt; budget.maxProgramLength()</span>
-<span class="pc bpc" id="L111" title="1 of 2 branches missed.">                || plan.nodeCount() &gt; budget.maxProgramLength()) {</span>
-<span class="nc" id="L112">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L185">        EvolutionGenome.ResourceBudget budget = genome.budget();</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        if (plan.maxNodes() &gt; budget.maxProgramLength()</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">                || plan.nodeCount() &gt; budget.maxProgramLength()) {</span>
+<span class="nc" id="L188">            throw new IllegalArgumentException(</span>
                 &quot;program topology exceeds genome maxProgramLength&quot;);
         }
-<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (plan.maxDepth() &gt; budget.maxProgramLength()</span>
-<span class="pc bpc" id="L116" title="1 of 2 branches missed.">                || plan.actualDepth() &gt; budget.maxProgramLength()) {</span>
-<span class="nc" id="L117">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        if (plan.maxDepth() &gt; budget.maxProgramLength()</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">                || plan.actualDepth() &gt; budget.maxProgramLength()) {</span>
+<span class="nc" id="L193">            throw new IllegalArgumentException(</span>
                 &quot;program topology exceeds genome depth budget&quot;);
         }
-<span class="fc" id="L120">        validateNodeBudget(plan.root(), budget);</span>
-<span class="fc" id="L121">    }</span>
+<span class="fc" id="L196">        validateNodeBudget(plan.root(), budget);</span>
+<span class="fc" id="L197">    }</span>
 
     private static void validateNodeBudget(
         Node node,
         EvolutionGenome.ResourceBudget budget
     ) {
-<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (node instanceof Repeat repeat</span>
-<span class="fc bfc" id="L128" title="All 2 branches covered.">                &amp;&amp; repeat.maxIterations() &gt; budget.maxApplicationsPerPath()) {</span>
-<span class="fc" id="L129">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (node instanceof Repeat repeat</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">                &amp;&amp; repeat.maxIterations() &gt; budget.maxApplicationsPerPath()) {</span>
+<span class="fc" id="L205">            throw new IllegalArgumentException(</span>
                 &quot;repeat exceeds genome maxApplicationsPerPath&quot;);
         }
-<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (node instanceof Prune prune</span>
-<span class="fc bfc" id="L133" title="All 2 branches covered.">                &amp;&amp; prune.maxCandidates() &gt; budget.maxCandidatesPerState()) {</span>
-<span class="fc" id="L134">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        if (node instanceof Prune prune</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">                &amp;&amp; prune.maxCandidates() &gt; budget.maxCandidatesPerState()) {</span>
+<span class="fc" id="L210">            throw new IllegalArgumentException(</span>
                 &quot;prune exceeds genome maxCandidatesPerState&quot;);
         }
-<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (node instanceof Require require</span>
-<span class="fc bfc" id="L138" title="All 2 branches covered.">                &amp;&amp; require.requirement().kind()</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        if (node instanceof Require require</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">                &amp;&amp; require.requirement().kind()</span>
                     == EvolutionRewriteProgramPlan.RequirementKind.MAX_PRIMITIVE_STEPS
-<span class="fc" id="L140">                &amp;&amp; require.requirement().threshold()</span>
-<span class="pc bpc" id="L141" title="1 of 2 branches missed.">                    &gt; budget.maxApplicationsPerPath()) {</span>
-<span class="nc" id="L142">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L216">                &amp;&amp; require.requirement().threshold()</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">                    &gt; budget.maxApplicationsPerPath()) {</span>
+<span class="nc" id="L218">            throw new IllegalArgumentException(</span>
                 &quot;primitive-step guard exceeds genome maxApplicationsPerPath&quot;);
         }
-<span class="fc bfc" id="L145" title="All 2 branches covered.">        for (Node child : children(node)) {</span>
-<span class="fc" id="L146">            validateNodeBudget(child, budget);</span>
-<span class="fc" id="L147">        }</span>
-<span class="fc" id="L148">    }</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        for (Node child : children(node)) {</span>
+<span class="fc" id="L222">            validateNodeBudget(child, budget);</span>
+<span class="fc" id="L223">        }</span>
+<span class="fc" id="L224">    }</span>
 
     private static Map&lt;String, RewriteRule&gt; rulesByGeneId(
         EvolutionGenome genome,
         EvolutionGenomeCompiler.CompiledProgram compiled
     ) {
-<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (genome.rewrites().size() != compiled.rules().size()) {</span>
-<span class="nc" id="L155">            throw new IllegalStateException(</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">        if (genome.rewrites().size() != compiled.rules().size()) {</span>
+<span class="nc" id="L231">            throw new IllegalStateException(</span>
                 &quot;compiled genome rule count does not match gene count&quot;);
         }
-<span class="fc" id="L158">        LinkedHashMap&lt;String, RewriteRule&gt; result = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L159" title="All 2 branches covered.">        for (int index = 0; index &lt; genome.rewrites().size(); index++) {</span>
-<span class="fc" id="L160">            EvolutionGenome.RewriteGene gene = genome.rewrites().get(index);</span>
-<span class="fc" id="L161">            RewriteRule rule = compiled.rules().get(index);</span>
-<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            if (!rule.id().endsWith(&quot;_&quot; + gene.geneId())) {</span>
-<span class="nc" id="L163">                throw new IllegalStateException(</span>
-<span class="nc" id="L164">                    &quot;compiled rule identity is not bound to gene &quot; + gene.geneId());</span>
+<span class="fc" id="L234">        LinkedHashMap&lt;String, RewriteRule&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        for (int index = 0; index &lt; genome.rewrites().size(); index++) {</span>
+<span class="fc" id="L236">            EvolutionGenome.RewriteGene gene = genome.rewrites().get(index);</span>
+<span class="fc" id="L237">            RewriteRule rule = compiled.rules().get(index);</span>
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">            if (!rule.id().endsWith(&quot;_&quot; + gene.geneId())) {</span>
+<span class="nc" id="L239">                throw new IllegalStateException(</span>
+<span class="nc" id="L240">                    &quot;compiled rule identity is not bound to gene &quot; + gene.geneId());</span>
             }
-<span class="fc" id="L166">            result.put(gene.geneId(), rule);</span>
+<span class="fc" id="L242">            result.put(gene.geneId(), rule);</span>
         }
-<span class="fc" id="L168">        return Map.copyOf(result);</span>
+<span class="fc" id="L244">        return Map.copyOf(result);</span>
     }
 
     private static RewriteProgram compileNode(
         Node node,
         CompilationContext context
     ) {
-<span class="fc" id="L175">        NodeMetadata metadata = NodeMetadata.named(node.nodeId());</span>
-<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (node instanceof Source source) {</span>
-<span class="fc" id="L177">            List&lt;RewriteRule&gt; rules = source.geneIds().stream()</span>
-<span class="fc" id="L178">                .map(context::rule)</span>
-<span class="fc" id="L179">                .toList();</span>
-<span class="fc" id="L180">            return new RewriteProgram.Source(</span>
+<span class="fc" id="L251">        NodeMetadata metadata = NodeMetadata.named(node.nodeId());</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        if (node instanceof Source source) {</span>
+<span class="fc" id="L253">            List&lt;RewriteRule&gt; rules = source.geneIds().stream()</span>
+<span class="fc" id="L254">                .map(context::rule)</span>
+<span class="fc" id="L255">                .toList();</span>
+<span class="fc" id="L256">            return new RewriteProgram.Source(</span>
                 metadata,
-<span class="fc" id="L182">                AstRewriteTransformationEngines.create(</span>
-<span class="fc" id="L183">                    context.astRewriteBackend(),</span>
+<span class="fc" id="L258">                AstRewriteTransformationEngines.create(</span>
+<span class="fc" id="L259">                    context.astRewriteBackend(),</span>
                     rules,
-<span class="fc" id="L185">                    context.genome().budget().maxAstGrowthPerStep(),</span>
-<span class="fc" id="L186">                    context.genome().budget().maxCandidatesPerState()));</span>
+<span class="fc" id="L261">                    context.genome().budget().maxAstGrowthPerStep(),</span>
+<span class="fc" id="L262">                    context.genome().budget().maxCandidatesPerState()));</span>
         }
-<span class="fc bfc" id="L188" title="All 2 branches covered.">        if (node instanceof Choice choice) {</span>
-<span class="fc" id="L189">            return new RewriteProgram.Choice(</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        if (node instanceof Choice choice) {</span>
+<span class="fc" id="L265">            return new RewriteProgram.Choice(</span>
                 metadata,
-<span class="fc" id="L191">                compileChildren(choice.alternatives(), context));</span>
+<span class="fc" id="L267">                compileChildren(choice.alternatives(), context));</span>
         }
-<span class="fc bfc" id="L193" title="All 2 branches covered.">        if (node instanceof FirstApplicable firstApplicable) {</span>
-<span class="fc" id="L194">            return new RewriteProgram.FirstApplicable(</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        if (node instanceof FirstApplicable firstApplicable) {</span>
+<span class="fc" id="L270">            return new RewriteProgram.FirstApplicable(</span>
                 metadata,
-<span class="fc" id="L196">                compileChildren(firstApplicable.alternatives(), context));</span>
+<span class="fc" id="L272">                compileChildren(firstApplicable.alternatives(), context));</span>
         }
-<span class="fc bfc" id="L198" title="All 2 branches covered.">        if (node instanceof Sequence sequence) {</span>
-<span class="fc" id="L199">            return new RewriteProgram.Sequence(</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        if (node instanceof Sequence sequence) {</span>
+<span class="fc" id="L275">            return new RewriteProgram.Sequence(</span>
                 metadata,
-<span class="fc" id="L201">                compileChildren(sequence.steps(), context));</span>
+<span class="fc" id="L277">                compileChildren(sequence.steps(), context));</span>
         }
-<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (node instanceof Repeat repeat) {</span>
-<span class="fc" id="L204">            return new RewriteProgram.Repeat(</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">        if (node instanceof Repeat repeat) {</span>
+<span class="fc" id="L280">            return new RewriteProgram.Repeat(</span>
                 metadata,
-<span class="fc" id="L206">                compileNode(repeat.body(), context),</span>
-<span class="fc" id="L207">                repeat.minIterations(),</span>
-<span class="fc" id="L208">                repeat.maxIterations());</span>
+<span class="fc" id="L282">                compileNode(repeat.body(), context),</span>
+<span class="fc" id="L283">                repeat.minIterations(),</span>
+<span class="fc" id="L284">                repeat.maxIterations());</span>
         }
-<span class="fc bfc" id="L210" title="All 2 branches covered.">        if (node instanceof Require require) {</span>
-<span class="fc" id="L211">            Requirement requirement = require.requirement();</span>
-<span class="fc" id="L212">            return new RewriteProgram.Require(</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">        if (node instanceof Require require) {</span>
+<span class="fc" id="L287">            Requirement requirement = require.requirement();</span>
+<span class="fc" id="L288">            return new RewriteProgram.Require(</span>
                 metadata,
-<span class="fc" id="L214">                compileNode(require.body(), context),</span>
-<span class="fc" id="L215">                requirementDescription(requirement),</span>
-<span class="fc" id="L216">                requirementPredicate(requirement));</span>
+<span class="fc" id="L290">                compileNode(require.body(), context),</span>
+<span class="fc" id="L291">                requirementDescription(requirement),</span>
+<span class="fc" id="L292">                requirementPredicate(requirement));</span>
         }
-<span class="fc bfc" id="L218" title="All 2 branches covered.">        if (node instanceof Prioritize prioritize) {</span>
-<span class="fc" id="L219">            return new RewriteProgram.Prioritize(</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">        if (node instanceof Prioritize prioritize) {</span>
+<span class="fc" id="L295">            return new RewriteProgram.Prioritize(</span>
                 metadata,
-<span class="fc" id="L221">                compileNode(prioritize.body(), context),</span>
-<span class="fc" id="L222">                priorityDescription(prioritize),</span>
-<span class="fc" id="L223">                priorityComparator(prioritize, context));</span>
+<span class="fc" id="L297">                compileNode(prioritize.body(), context),</span>
+<span class="fc" id="L298">                priorityDescription(prioritize),</span>
+<span class="fc" id="L299">                priorityComparator(prioritize, context));</span>
         }
-<span class="fc" id="L225">        Prune prune = (Prune) node;</span>
-<span class="fc" id="L226">        return new RewriteProgram.Prune(</span>
+<span class="fc" id="L301">        Prune prune = (Prune) node;</span>
+<span class="fc" id="L302">        return new RewriteProgram.Prune(</span>
             metadata,
-<span class="fc" id="L228">            compileNode(prune.body(), context),</span>
-<span class="fc" id="L229">            prune.maxCandidates(),</span>
-<span class="fc" id="L230">            prune.reason());</span>
+<span class="fc" id="L304">            compileNode(prune.body(), context),</span>
+<span class="fc" id="L305">            prune.maxCandidates(),</span>
+<span class="fc" id="L306">            prune.reason());</span>
     }
 
     private static List&lt;RewriteProgram&gt; compileChildren(
         List&lt;Node&gt; nodes,
         CompilationContext context
     ) {
-<span class="fc" id="L237">        return nodes.stream()</span>
-<span class="fc" id="L238">            .map(node -&gt; compileNode(node, context))</span>
-<span class="fc" id="L239">            .toList();</span>
+<span class="fc" id="L313">        return nodes.stream()</span>
+<span class="fc" id="L314">            .map(node -&gt; compileNode(node, context))</span>
+<span class="fc" id="L315">            .toList();</span>
     }
 
     private static Predicate&lt;RewriteCandidate&gt; requirementPredicate(
         Requirement requirement
     ) {
-<span class="pc bpc" id="L245" title="1 of 4 branches missed.">        return switch (requirement.kind()) {</span>
+<span class="pc bpc" id="L321" title="1 of 4 branches missed.">        return switch (requirement.kind()) {</span>
             case EQUIVALENCE_PRESERVING_BY_CONSTRUCTION -&gt;
-<span class="fc" id="L247">                RewritePrograms.equivalencePreserving();</span>
-<span class="pc" id="L248">            case ASSUMPTION_FREE -&gt; candidate -&gt; candidate.steps().stream()</span>
-<span class="nc" id="L249">                .allMatch(step -&gt; step.assumptions().isEmpty());</span>
-<span class="nc" id="L250">            case MAX_ESTIMATED_COST_DELTA -&gt; candidate -&gt;</span>
-<span class="nc" id="L251">                candidate.toTransformation().estimatedCostDelta()</span>
-<span class="nc bnc" id="L252" title="All 2 branches missed.">                    &lt;= requirement.threshold();</span>
-<span class="fc" id="L253">            case MAX_PRIMITIVE_STEPS -&gt; candidate -&gt;</span>
-<span class="pc bpc" id="L254" title="1 of 2 branches missed.">                candidate.steps().size() &lt;= requirement.threshold();</span>
+<span class="fc" id="L323">                RewritePrograms.equivalencePreserving();</span>
+<span class="pc" id="L324">            case ASSUMPTION_FREE -&gt; candidate -&gt; candidate.steps().stream()</span>
+<span class="nc" id="L325">                .allMatch(step -&gt; step.assumptions().isEmpty());</span>
+<span class="nc" id="L326">            case MAX_ESTIMATED_COST_DELTA -&gt; candidate -&gt;</span>
+<span class="nc" id="L327">                candidate.toTransformation().estimatedCostDelta()</span>
+<span class="nc bnc" id="L328" title="All 2 branches missed.">                    &lt;= requirement.threshold();</span>
+<span class="fc" id="L329">            case MAX_PRIMITIVE_STEPS -&gt; candidate -&gt;</span>
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">                candidate.steps().size() &lt;= requirement.threshold();</span>
         };
     }
 
     private static String requirementDescription(Requirement requirement) {
-<span class="fc" id="L259">        return requirement.kind().name() + &quot;(&quot; + requirement.threshold() + &quot;)&quot;;</span>
+<span class="fc" id="L335">        return requirement.kind().name() + &quot;(&quot; + requirement.threshold() + &quot;)&quot;;</span>
     }
 
     private static Comparator&lt;RewriteCandidate&gt; priorityComparator(
         Prioritize prioritize,
         CompilationContext context
     ) {
-<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        if (prioritize.priority().kind()</span>
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">        if (prioritize.priority().kind()</span>
                 == PriorityKind.ESTIMATED_COST_THEN_RULE) {
-<span class="fc" id="L268">            return RewritePrograms.byEstimatedCostThenRule();</span>
+<span class="fc" id="L344">            return RewritePrograms.byEstimatedCostThenRule();</span>
         }
-<span class="nc" id="L270">        List&lt;String&gt; ruleIds = prioritize.priority().preferredGeneIds().stream()</span>
-<span class="nc" id="L271">            .map(geneId -&gt; context.rule(geneId).id())</span>
-<span class="nc" id="L272">            .toList();</span>
-<span class="nc" id="L273">        return RewritePrograms.preferRuleOrder(ruleIds);</span>
+<span class="nc" id="L346">        List&lt;String&gt; ruleIds = prioritize.priority().preferredGeneIds().stream()</span>
+<span class="nc" id="L347">            .map(geneId -&gt; context.rule(geneId).id())</span>
+<span class="nc" id="L348">            .toList();</span>
+<span class="nc" id="L349">        return RewritePrograms.preferRuleOrder(ruleIds);</span>
     }
 
     private static String priorityDescription(Prioritize prioritize) {
-<span class="fc" id="L277">        return prioritize.priority().kind().name()</span>
-<span class="fc" id="L278">            + prioritize.priority().preferredGeneIds();</span>
+<span class="fc" id="L353">        return prioritize.priority().kind().name()</span>
+<span class="fc" id="L354">            + prioritize.priority().preferredGeneIds();</span>
     }
 
     private static List&lt;Node&gt; children(Node node) {
-<span class="fc bfc" id="L282" title="All 2 branches covered.">        if (node instanceof Choice choice) {</span>
-<span class="fc" id="L283">            return choice.alternatives();</span>
+<span class="fc bfc" id="L358" title="All 2 branches covered.">        if (node instanceof Choice choice) {</span>
+<span class="fc" id="L359">            return choice.alternatives();</span>
         }
-<span class="fc bfc" id="L285" title="All 2 branches covered.">        if (node instanceof FirstApplicable firstApplicable) {</span>
-<span class="fc" id="L286">            return firstApplicable.alternatives();</span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">        if (node instanceof FirstApplicable firstApplicable) {</span>
+<span class="fc" id="L362">            return firstApplicable.alternatives();</span>
         }
-<span class="fc bfc" id="L288" title="All 2 branches covered.">        if (node instanceof Sequence sequence) {</span>
-<span class="fc" id="L289">            return sequence.steps();</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        if (node instanceof Sequence sequence) {</span>
+<span class="fc" id="L365">            return sequence.steps();</span>
         }
-<span class="fc bfc" id="L291" title="All 2 branches covered.">        if (node instanceof Repeat repeat) {</span>
-<span class="fc" id="L292">            return List.of(repeat.body());</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        if (node instanceof Repeat repeat) {</span>
+<span class="fc" id="L368">            return List.of(repeat.body());</span>
         }
-<span class="fc bfc" id="L294" title="All 2 branches covered.">        if (node instanceof Require require) {</span>
-<span class="fc" id="L295">            return List.of(require.body());</span>
+<span class="fc bfc" id="L370" title="All 2 branches covered.">        if (node instanceof Require require) {</span>
+<span class="fc" id="L371">            return List.of(require.body());</span>
         }
-<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (node instanceof Prioritize prioritize) {</span>
-<span class="fc" id="L298">            return List.of(prioritize.body());</span>
+<span class="fc bfc" id="L373" title="All 2 branches covered.">        if (node instanceof Prioritize prioritize) {</span>
+<span class="fc" id="L374">            return List.of(prioritize.body());</span>
         }
-<span class="fc bfc" id="L300" title="All 2 branches covered.">        if (node instanceof Prune prune) {</span>
-<span class="fc" id="L301">            return List.of(prune.body());</span>
+<span class="fc bfc" id="L376" title="All 2 branches covered.">        if (node instanceof Prune prune) {</span>
+<span class="fc" id="L377">            return List.of(prune.body());</span>
         }
-<span class="fc" id="L303">        return List.of();</span>
+<span class="fc" id="L379">        return List.of();</span>
     }
 
     public record CompiledRewriteProgram(
@@ -313,21 +389,21 @@ public final class EvolutionRewriteProgramCompiler {
         String readableProgram,
         List&lt;String&gt; referencedGeneIds
     ) {
-<span class="fc" id="L316">        public CompiledRewriteProgram {</span>
-<span class="fc" id="L317">            EvolutionGenome.requireSha256(genomeHash, &quot;genomeHash&quot;);</span>
-<span class="fc" id="L318">            EvolutionGenome.requireSha256(</span>
+<span class="fc" id="L392">        public CompiledRewriteProgram {</span>
+<span class="fc" id="L393">            EvolutionGenome.requireSha256(genomeHash, &quot;genomeHash&quot;);</span>
+<span class="fc" id="L394">            EvolutionGenome.requireSha256(</span>
                 genomeAlphaStructuralHash, &quot;genomeAlphaStructuralHash&quot;);
-<span class="fc" id="L320">            EvolutionGenome.requireSha256(planHash, &quot;planHash&quot;);</span>
-<span class="fc" id="L321">            EvolutionGenome.requireSha256(</span>
+<span class="fc" id="L396">            EvolutionGenome.requireSha256(planHash, &quot;planHash&quot;);</span>
+<span class="fc" id="L397">            EvolutionGenome.requireSha256(</span>
                 planAlphaStructuralHash, &quot;planAlphaStructuralHash&quot;);
-<span class="fc" id="L323">            Objects.requireNonNull(program, &quot;program&quot;);</span>
-<span class="fc" id="L324">            Objects.requireNonNull(engine, &quot;engine&quot;);</span>
-<span class="pc bpc" id="L325" title="2 of 4 branches missed.">            if (readableProgram == null || readableProgram.isBlank()) {</span>
-<span class="nc" id="L326">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L399">            Objects.requireNonNull(program, &quot;program&quot;);</span>
+<span class="fc" id="L400">            Objects.requireNonNull(engine, &quot;engine&quot;);</span>
+<span class="pc bpc" id="L401" title="2 of 4 branches missed.">            if (readableProgram == null || readableProgram.isBlank()) {</span>
+<span class="nc" id="L402">                throw new IllegalArgumentException(</span>
                     &quot;readableProgram must not be blank&quot;);
             }
-<span class="fc" id="L329">            referencedGeneIds = List.copyOf(referencedGeneIds);</span>
-<span class="fc" id="L330">        }</span>
+<span class="fc" id="L405">            referencedGeneIds = List.copyOf(referencedGeneIds);</span>
+<span class="fc" id="L406">        }</span>
     }
 
     private record CompilationContext(
@@ -335,19 +411,19 @@ public final class EvolutionRewriteProgramCompiler {
         Map&lt;String, RewriteRule&gt; rulesByGeneId,
         AstRewriteTransformationEngines.Backend astRewriteBackend
     ) {
-<span class="fc" id="L338">        private CompilationContext {</span>
-<span class="fc" id="L339">            Objects.requireNonNull(genome, &quot;genome&quot;);</span>
-<span class="fc" id="L340">            rulesByGeneId = Map.copyOf(rulesByGeneId);</span>
-<span class="fc" id="L341">            Objects.requireNonNull(astRewriteBackend, &quot;astRewriteBackend&quot;);</span>
-<span class="fc" id="L342">        }</span>
+<span class="fc" id="L414">        private CompilationContext {</span>
+<span class="fc" id="L415">            Objects.requireNonNull(genome, &quot;genome&quot;);</span>
+<span class="fc" id="L416">            rulesByGeneId = Map.copyOf(rulesByGeneId);</span>
+<span class="fc" id="L417">            Objects.requireNonNull(astRewriteBackend, &quot;astRewriteBackend&quot;);</span>
+<span class="fc" id="L418">        }</span>
 
         private RewriteRule rule(String geneId) {
-<span class="fc" id="L345">            RewriteRule rule = rulesByGeneId.get(geneId);</span>
-<span class="pc bpc" id="L346" title="1 of 2 branches missed.">            if (rule == null) {</span>
-<span class="nc" id="L347">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L421">            RewriteRule rule = rulesByGeneId.get(geneId);</span>
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">            if (rule == null) {</span>
+<span class="nc" id="L423">                throw new IllegalArgumentException(</span>
                     &quot;unknown genome gene: &quot; + geneId);
             }
-<span class="fc" id="L350">            return rule;</span>
+<span class="fc" id="L426">            return rule;</span>
         }
     }
 }
