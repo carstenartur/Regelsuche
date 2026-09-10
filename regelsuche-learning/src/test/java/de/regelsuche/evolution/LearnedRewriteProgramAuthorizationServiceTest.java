@@ -1,6 +1,7 @@
 package de.regelsuche.evolution;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -50,8 +51,15 @@ class LearnedRewriteProgramAuthorizationServiceTest {
 
         assertEquals(EXPIRES, authorization.receipt().validUntil());
         assertEquals(
+            LearnedRewriteProgramAuthorizationService.APPLICABILITY_SEMANTICS,
+            authorization.receipt().applicabilitySemantics());
+        assertEquals(
             leaf.authorization().receipt().contentHash(),
             authorization.receipt().leafAuthorizationHashes()
+                .get("difference-squares"));
+        assertEquals(
+            leaf.authorization().receipt().applicabilitySchemaHash(),
+            authorization.receipt().leafApplicabilitySchemaHashes()
                 .get("difference-squares"));
         assertEquals(replay.contentHash(),
             authorization.receipt().replayEvidenceHash());
@@ -60,6 +68,8 @@ class LearnedRewriteProgramAuthorizationServiceTest {
         assertTrue(authorization.compiledProgram().engine()
             .transform("x^2-y^2").getFirst().rule()
             .startsWith("learned.promoted."));
+        assertTrue(authorization.isApplicable("x^2-y^2"));
+        assertFalse(authorization.isApplicable("x+1"));
         assertEquals(1,
             replay.cases().getFirst().candidates().getFirst()
                 .executionWork().primitiveRewrites());
@@ -107,7 +117,10 @@ class LearnedRewriteProgramAuthorizationServiceTest {
                 replay,
                 Map.of(
                     "difference-squares",
-                    leaf.authorization().receipt().contentHash()));
+                    leaf.authorization().receipt().contentHash()),
+                Map.of(
+                    "difference-squares",
+                    leaf.authorization().receipt().applicabilitySchemaHash()));
 
         assertThrows(IllegalArgumentException.class, () ->
             service.replayStoredAuthorization(
