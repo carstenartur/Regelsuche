@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-learned-pattern-rule-counterexample-evidence-v1.schema.json",
+  "title": "Regelsuche learned pattern rule counterexample evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "engineId",
+    "genomeHash",
+    "geneId",
+    "repositoryRevision",
+    "sourcePattern",
+    "targetPattern",
+    "leftExpression",
+    "rightExpression",
+    "budget",
+    "status",
+    "attemptedSources",
+    "inferredAssumptions",
+    "explanation",
+    "resultHash",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.learned-pattern-rule-counterexample-evidence/v1"
+    },
+    "engineId": {
+      "const": "regelsuche.deterministic-counterexample-search/pattern-authorization-v1"
+    },
+    "genomeHash": {"$ref": "#/$defs/sha256"},
+    "geneId": {"type": "string", "minLength": 1},
+    "repositoryRevision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sourcePattern": {"type": "string", "minLength": 1},
+    "targetPattern": {"type": "string", "minLength": 1},
+    "leftExpression": {"type": "string", "minLength": 1},
+    "rightExpression": {"type": "string", "minLength": 1},
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "numericRandomSamples",
+        "includeEdgeCases",
+        "includeMatrixAssignments",
+        "randomSeed",
+        "includeComplexAssignments",
+        "includeRationalAssignments",
+        "maxMatrixDimension",
+        "timeoutMillis"
+      ],
+      "properties": {
+        "numericRandomSamples": {"type": "integer", "minimum": 0},
+        "includeEdgeCases": {"type": "boolean"},
+        "includeMatrixAssignments": {"type": "boolean"},
+        "randomSeed": {"type": "integer"},
+        "includeComplexAssignments": {"type": "boolean"},
+        "includeRationalAssignments": {"type": "boolean"},
+        "maxMatrixDimension": {"type": "integer", "minimum": 0},
+        "timeoutMillis": {"type": "integer", "minimum": 0}
+      }
+    },
+    "status": {
+      "enum": ["NO_COUNTEREXAMPLE_FOUND", "COUNTEREXAMPLE_FOUND", "INCONCLUSIVE"]
+    },
+    "attemptedSources": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "inferredAssumptions": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "explanation": {"type": "string", "minLength": 1},
+    "resultHash": {"$ref": "#/$defs/sha256"},
+    "contentHash": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
