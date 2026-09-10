@@ -15,8 +15,12 @@ import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Require;
 import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Requirement;
 import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Sequence;
 import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Source;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.RewriteRule;
 import de.regelsuche.transform.Transformation;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class EvolutionRewriteProgramCompilerTest {
@@ -54,6 +58,66 @@ class EvolutionRewriteProgramCompilerTest {
         assertEquals(genome.contentHash(), compiled.genomeHash());
         assertTrue(compiled.readableProgram().contains("sequence"));
         assertTrue(compiled.readableProgram().contains("MAX_PRIMITIVE_STEPS"));
+    }
+
+    @Test
+    void authorizedCompilationUsesOnlyExplicitlyProvedLeafRules() {
+        EvolutionGenome genome = normalizationGenome();
+        EvolutionRewriteProgramPlan plan = EvolutionRewriteProgramPlan.create(
+            genome,
+            new Sequence(
+                "authorized_sequence",
+                List.of(
+                    new Source("authorized_mul", List.of("mul_one")),
+                    new Source("authorized_add", List.of("add_zero")))),
+            6,
+            6);
+        Map<String, RewriteRule> authorized = Map.of(
+            "mul_one", exactRule("promoted_mul", "?A*1", "?A", true),
+            "add_zero", exactRule("promoted_add", "?A+0", "?A", true));
+
+        var compiled = new EvolutionRewriteProgramCompiler()
+            .compileAuthorized(genome, plan, authorized);
+        var execution = compiled.engine().execute("(x * 1) + 0");
+        var candidate = execution.candidates().stream()
+            .filter(value -> value.outputExpression().equals("x"))
+            .findFirst()
+            .orElseThrow();
+
+        assertEquals(List.of("promoted_mul", "promoted_add"),
+            candidate.ruleIds());
+        assertEquals(2, candidate.executionWork().primitiveRewrites());
+        assertEquals(2, candidate.primitiveRuleIds().size());
+    }
+
+    @Test
+    void authorizedCompilationRejectsMissingExtraAndUnsafeLeaves() {
+        EvolutionGenome genome = normalizationGenome();
+        EvolutionRewriteProgramPlan plan = EvolutionRewriteProgramPlan.create(
+            genome,
+            new Source("only_add", List.of("add_zero")),
+            4,
+            4);
+        EvolutionRewriteProgramCompiler compiler =
+            new EvolutionRewriteProgramCompiler();
+        RewriteRule safe = exactRule("promoted_add", "?A+0", "?A", true);
+
+        assertThrows(IllegalArgumentException.class,
+            () -> compiler.compileAuthorized(genome, plan, Map.of()));
+        assertThrows(IllegalArgumentException.class,
+            () -> compiler.compileAuthorized(
+                genome,
+                plan,
+                Map.of(
+                    "add_zero", safe,
+                    "mul_one", exactRule(
+                        "promoted_mul", "?A*1", "?A", true))));
+        assertThrows(IllegalArgumentException.class,
+            () -> compiler.compileAuthorized(
+                genome,
+                plan,
+                Map.of("add_zero", exactRule(
+                    "unsafe_add", "?A+0", "?A", false))));
     }
 
     @Test
@@ -209,6 +273,22 @@ class EvolutionRewriteProgramCompilerTest {
                     Priority.preferredGeneOrder(List.of("mul_one"))),
                 4,
                 4));
+    }
+
+    private static RewriteRule exactRule(
+        String id,
+        String source,
+        String target,
+        boolean equivalencePreserving
+    ) {
+        return new PatternRewriteRule(
+            id,
+            EvolutionGenomeCompiler.parsePattern(source),
+            EvolutionGenomeCompiler.parsePattern(target),
+            RewriteKind.NORMALIZE,
+            false,
+            -1,
+            equivalencePreserving);
     }
 
     private static EvolutionGenome normalizationGenome() {
