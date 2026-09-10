@@ -67,10 +67,18 @@ authorized program. Each replay case retains:
 - normalized assumptions;
 - provenance hash;
 - primitive and exact-theory execution work;
-- completeness;
+- the interpreter's completeness flag;
 - rewrite-program work revision;
 - path-budget identity when present;
 - the full deterministic `TransformationWorkMetrics` ledger.
+
+The completeness flag is **evidence, not an authorization requirement**. A
+program containing declared `Prune` or first-applicable control flow can
+intentionally enumerate only a retained part of the underlying candidate set.
+Such a replay must preserve `complete=false`; changing it to `true` would be a
+false completeness claim. The canonical verification fixture deliberately
+contains pruning and independently checks both `complete=false` and positive
+`prunedCandidates`.
 
 This makes control-flow changes observable. Sequence and repeat work remains
 represented by the complete underlying step path; requirements, prioritization,
@@ -84,10 +92,17 @@ currently usable leaf authorizations and recreates the replay evidence from its
 bound inputs. The supplied and reconstructed canonical artifacts must be
 identical.
 
-`replayStoredAuthorization(...)` applies the same rule to a stored program
-receipt: it revalidates every leaf authorization, recompiles the program,
-replays the evidence, checks the work-revision set and requires the stored leaf
-receipt hashes and program lifetime to match the reconstructed authority.
+`replayStoredAuthorization(...)` also does not treat a stored program receipt as
+a bearer token. It first reconstructs the complete authorization at the
+receipt's original `authorizedAt` instant. That replay revalidates all leaf
+authorities, recompiles the canonical topology and regenerates the replay
+evidence. The **entire** reconstructed receipt must equal the retained receipt.
+Only after that historical reconstruction succeeds is the retained receipt
+checked for usability at the caller's current explicit `asOf` instant.
+
+This ordering is important: a self-consistent receipt that claims a program was
+authorized before one of its leaf-rule authorizations became valid is rejected,
+even if all leaves are valid at the later time when the stored receipt is read.
 
 ## Lifetime and repository binding
 
@@ -106,7 +121,8 @@ The composite program expires at the **earliest** expiry of its referenced leaf
 authorizations. It can never remain valid after one of its mathematical rule
 authorities has expired. Stored receipts also fail closed before their
 `authorizedAt` instant, at the `validUntil` boundary, after a repository revision
-change, or after candidate/plan substitution.
+change, after candidate/plan substitution, or if their claimed issuance time
+predates any referenced leaf authority.
 
 ## Canonical strategy language, not arbitrary closures
 
@@ -120,6 +136,21 @@ a production-authorized learned strategy.
 This distinction is important for replayability: the plan hash identifies the
 actual strategy grammar, while the repository revision identifies the compiler
 and interpreter implementation used to realize it.
+
+## Independent verification
+
+The deterministic fixture writes the canonical genome, program plan, candidate,
+program replay evidence, program authorization receipt and both leaf-rule
+authorization receipts. `scripts/verify-learned-rewrite-program-authorization.py`
+validates them independently of the Java object graph. It verifies schemas,
+canonical encoding and content hashes where applicable, cross-artifact
+candidate/plan/leaf bindings, authorization lifetime, work-semantics revisions,
+primitive lineage and the retained control-flow work ledger.
+
+The fixture exercises sequence, choice, repeat, requirement, prioritization and
+pruning in one program. In particular it checks that the retained successful
+program path still carries two primitive rewrites and that pruning remains
+visible as an incomplete enumeration rather than being relabelled as complete.
 
 ## Schemas
 
