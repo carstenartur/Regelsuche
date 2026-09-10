@@ -96,7 +96,23 @@ public final class EvolutionRewriteProgramCompiler {
         validateProgramIdentityAndBudget(genome, plan);
         Objects.requireNonNull(
             authorizedRulesByGeneId, "authorizedRulesByGeneId");
-        Map<String, RewriteRule> retained = Map.copyOf(authorizedRulesByGeneId);
+
+        Map<String, RewriteRule> checkedRules = new LinkedHashMap<>();
+        for (Map.Entry<String, RewriteRule> entry
+                : authorizedRulesByGeneId.entrySet()) {
+            String geneId = entry.getKey();
+            if (geneId == null || geneId.isBlank()) {
+                throw new IllegalArgumentException(
+                    "authorized rule gene ID must not be blank");
+            }
+            RewriteRule rule = entry.getValue();
+            if (rule == null) {
+                throw new IllegalArgumentException(
+                    "authorized rule must not be null for gene " + geneId);
+            }
+            checkedRules.put(geneId, rule);
+        }
+        Map<String, RewriteRule> retained = Map.copyOf(checkedRules);
         Set<String> referenced = Set.copyOf(plan.referencedGeneIds());
         if (!retained.keySet().equals(referenced)) {
             throw new IllegalArgumentException(
@@ -104,8 +120,7 @@ public final class EvolutionRewriteProgramCompiler {
         }
         for (Map.Entry<String, RewriteRule> entry : retained.entrySet()) {
             String geneId = entry.getKey();
-            RewriteRule rule = Objects.requireNonNull(
-                entry.getValue(), "authorized rule for " + geneId);
+            RewriteRule rule = entry.getValue();
             if (genome.rewrites().stream().noneMatch(
                     gene -> gene.geneId().equals(geneId))) {
                 throw new IllegalArgumentException(
