@@ -16,7 +16,9 @@
     "authorizedAt",
     "validUntil",
     "replayEvidenceHash",
+    "applicabilitySemantics",
     "leafAuthorizationHashes",
+    "leafApplicabilitySchemaHashes",
     "workRevisions",
     "contentHash"
   ],
@@ -35,12 +37,11 @@
     "authorizedAt": {"type": "string", "format": "date-time"},
     "validUntil": {"type": "string", "format": "date-time"},
     "replayEvidenceHash": {"$ref": "#/$defs/hash"},
-    "leafAuthorizationHashes": {
-      "type": "object",
-      "minProperties": 1,
-      "additionalProperties": {"$ref": "#/$defs/hash"},
-      "propertyNames": {"minLength": 1}
+    "applicabilitySemantics": {
+      "const": "CANONICAL_PROGRAM_RETURNS_AT_LEAST_ONE_CANDIDATE/v1"
     },
+    "leafAuthorizationHashes": {"$ref": "#/$defs/geneHashMap"},
+    "leafApplicabilitySchemaHashes": {"$ref": "#/$defs/geneHashMap"},
     "workRevisions": {
       "type": "array",
       "minItems": 1,
@@ -53,6 +54,15 @@
     "hash": {
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "geneHashMap": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/hash"},
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_-]{2,127}$"
+      }
     }
   }
 }
