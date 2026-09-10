@@ -18,6 +18,7 @@ final class LearnedPatternAuthorizationJson {
         .findAndRegisterModules()
         .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
         .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
         .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
         .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 
@@ -29,7 +30,13 @@ final class LearnedPatternAuthorizationJson {
             throw new IllegalArgumentException(name + " JSON must not be blank");
         }
         try {
-            return JSON.readValue(json, type);
+            T value = JSON.readValue(json, type);
+            String canonical = write(value);
+            if (!canonical.equals(json)) {
+                throw new IllegalArgumentException(
+                    name + " JSON is not in canonical encoding");
+            }
+            return value;
         } catch (JsonProcessingException exception) {
             throw new IllegalArgumentException("invalid " + name + " JSON", exception);
         }
