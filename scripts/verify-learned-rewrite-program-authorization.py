@@ -189,9 +189,15 @@ def verify_replay(replay: dict[str, Any]) -> None:
         "priorityCandidatesOrdered",
         "prunedCandidates",
         "repeatIterations",
-        "alternativeSelections",
     ):
         require_positive(metrics[field], f"workMetrics.{field}")
+    # Choice evaluates all alternatives; only FirstApplicable records a selected
+    # alternative and skipped suffix. This fixture intentionally contains Choice
+    # but no FirstApplicable, so both counters must remain zero.
+    require_equal(metrics["alternativeSelections"], 0,
+                  "choice-only fixture alternative selection count")
+    require_equal(metrics["alternativesSkipped"], 0,
+                  "choice-only fixture skipped-alternative count")
     if metrics["requirementRejections"] > metrics["requirementEvaluations"]:
         fail("requirementRejections exceeds requirementEvaluations")
     if metric_work < candidate_work:
