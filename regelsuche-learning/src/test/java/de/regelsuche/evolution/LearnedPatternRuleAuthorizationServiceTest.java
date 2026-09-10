@@ -40,6 +40,7 @@ class LearnedPatternRuleAuthorizationServiceTest {
                 AS_OF);
 
         assertTrue(authorization.promotion().proof().proved());
+        assertTrue(authorization.selectedValidationCandidate().eligible());
         assertTrue(authorization.finalTestEvaluation().qualificationEligible());
         assertEquals(
             CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND,
@@ -110,7 +111,7 @@ class LearnedPatternRuleAuthorizationServiceTest {
         var service = new LearnedPatternRuleAuthorizationService();
         var counterexample = service.evaluateCounterexamples(
             fixture.genome(), "difference-squares", REVISION);
-        var bundle = LearnedPatternRuleAuthorizationService.EvidenceBundle.create(
+        var bundle = LearnedPatternAuthorizationBundle.create(
             fixture.genome(), "difference-squares", REVISION,
             ISSUED, EXPIRES, fixture.split(), validation, holdout,
             counterexample);
@@ -138,7 +139,7 @@ class LearnedPatternRuleAuthorizationServiceTest {
         var service = new LearnedPatternRuleAuthorizationService();
         var counterexample = service.evaluateCounterexamples(
             fixture.genome(), "difference-squares", REVISION);
-        var bundle = LearnedPatternRuleAuthorizationService.EvidenceBundle.create(
+        var bundle = LearnedPatternAuthorizationBundle.create(
             fixture.genome(), "difference-squares", REVISION,
             ISSUED, EXPIRES, otherSplit, validation, holdout,
             counterexample);
@@ -155,12 +156,37 @@ class LearnedPatternRuleAuthorizationServiceTest {
     }
 
     @Test
+    void rejectsValidationCasesThatDoNotMatchTheSplit(@TempDir Path temporary)
+            throws IOException {
+        EvolutionSplitManifest split = split("case-parity");
+        EvolutionGenome genome = genome(
+            split, "?A^2-?B^2", "(?A-?B)*(?A+?B)");
+        EvolutionValidationSelection validation = validationWithCase(
+            split, genome, "other-validation", "other-family");
+        EvolutionFinalTestEvaluation holdout = holdout(split, validation, false);
+        var service = new LearnedPatternRuleAuthorizationService();
+        var counterexample = service.evaluateCounterexamples(
+            genome, "difference-squares", REVISION);
+        var bundle = LearnedPatternAuthorizationBundle.create(
+            genome, "difference-squares", REVISION,
+            ISSUED, EXPIRES, split, validation, holdout, counterexample);
+        var files = write(
+            temporary, split, validation, holdout, counterexample, bundle);
+
+        IllegalArgumentException failure = assertThrows(
+            IllegalArgumentException.class,
+            () -> service.authorize(
+                genome, "difference-squares", REVISION, files, AS_OF));
+        assertTrue(failure.getMessage().contains("VALIDATION case"));
+    }
+
+    @Test
     void rejectsFinalTestWithQualityBlockers(@TempDir Path temporary)
             throws IOException {
         Fixture fixture = fixture(temporary, REVISION, ISSUED, EXPIRES);
         EvolutionFinalTestEvaluation blocked = holdout(
             fixture.split(), fixture.validation(), true);
-        var bundle = LearnedPatternRuleAuthorizationService.EvidenceBundle.create(
+        var bundle = LearnedPatternAuthorizationBundle.create(
             fixture.genome(), "difference-squares", REVISION,
             ISSUED, EXPIRES, fixture.split(), fixture.validation(), blocked,
             fixture.counterexample());
@@ -180,7 +206,8 @@ class LearnedPatternRuleAuthorizationServiceTest {
     void rejectsCounterexampleEvidenceThatDoesNotReplay(@TempDir Path temporary)
             throws IOException {
         EvolutionSplitManifest split = split("replay");
-        EvolutionGenome genome = genome(split, "?A^2-?B^2", "(?A-?B)*(?A+?B)");
+        EvolutionGenome genome = genome(
+            split, "?A^2-?B^2", "(?A-?B)*(?A+?B)");
         CounterexampleSearchService fake = (hypothesis, budget) ->
             new CounterexampleSearchService.CounterexampleSearchResult(
                 CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND,
@@ -196,7 +223,7 @@ class LearnedPatternRuleAuthorizationServiceTest {
             genome, "difference-squares", REVISION);
         EvolutionValidationSelection validation = validation(split, genome);
         EvolutionFinalTestEvaluation holdout = holdout(split, validation, false);
-        var bundle = LearnedPatternRuleAuthorizationService.EvidenceBundle.create(
+        var bundle = LearnedPatternAuthorizationBundle.create(
             genome, "difference-squares", REVISION,
             ISSUED, EXPIRES, split, validation, holdout, counterexample);
         var files = write(
@@ -210,24 +237,34 @@ class LearnedPatternRuleAuthorizationServiceTest {
     }
 
     @Test
-    void strictBundleAndCounterexampleCodecsRejectTampering(@TempDir Path temporary)
+    void strictArtifactCodecsRejectTampering(@TempDir Path temporary)
             throws IOException {
         Fixture fixture = fixture(temporary, REVISION, ISSUED, EXPIRES);
         String bundle = fixture.bundle().toCanonicalJson().trim();
         String duplicate = bundle.substring(0, bundle.length() - 1)
             + ",\"schema\":\""
-            + LearnedPatternRuleAuthorizationService.BUNDLE_SCHEMA
+            + LearnedPatternAuthorizationBundle.SCHEMA
             + "\"}";
         assertThrows(IllegalArgumentException.class,
-            () -> LearnedPatternRuleAuthorizationService.EvidenceBundle
-                .fromCanonicalJson(duplicate));
+            () -> LearnedPatternAuthorizationBundle.fromCanonicalJson(duplicate));
 
         String counterexample = fixture.counterexample().toCanonicalJson().trim();
         String unknown = counterexample.substring(0, counterexample.length() - 1)
             + ",\"unknown\":true}";
         assertThrows(IllegalArgumentException.class,
-            () -> LearnedPatternRuleAuthorizationService.CounterexampleEvidence
-                .fromCanonicalJson(unknown));
+            () -> LearnedPatternCounterexampleEvidence.fromCanonicalJson(unknown));
+
+        String receiptJson = new LearnedPatternRuleAuthorizationService()
+            .authorize(fixture.genome(), "difference-squares", REVISION,
+                fixture.files(), AS_OF)
+            .receipt().toCanonicalJson();
+        assertEquals(
+            LearnedPatternAuthorizationReceipt.fromCanonicalJson(receiptJson)
+                .contentHash(),
+            new LearnedPatternRuleAuthorizationService()
+                .authorize(fixture.genome(), "difference-squares", REVISION,
+                    fixture.files(), AS_OF)
+                .receipt().contentHash());
 
         Files.delete(fixture.files().finalTestEvaluation());
         assertThrows(IllegalArgumentException.class,
@@ -272,7 +309,7 @@ class LearnedPatternRuleAuthorizationServiceTest {
         var service = new LearnedPatternRuleAuthorizationService();
         var counterexample = service.evaluateCounterexamples(
             genome, "difference-squares", revision);
-        var bundle = LearnedPatternRuleAuthorizationService.EvidenceBundle.create(
+        var bundle = LearnedPatternAuthorizationBundle.create(
             genome, "difference-squares", revision,
             issuedAt, expiresAt, split, validation, holdout, counterexample);
         var files = write(
@@ -341,9 +378,19 @@ class LearnedPatternRuleAuthorizationServiceTest {
         EvolutionSplitManifest split,
         EvolutionGenome genome
     ) {
+        return validationWithCase(
+            split, genome, "validation", "validation-family");
+    }
+
+    private static EvolutionValidationSelection validationWithCase(
+        EvolutionSplitManifest split,
+        EvolutionGenome genome,
+        String caseId,
+        String family
+    ) {
         EvolutionValidationCaseEvidence evidence =
             new EvolutionValidationCaseEvidence(
-                "validation", "validation-family", false, true,
+                caseId, family, false, true,
                 EvolutionCorrectnessStatus.NOT_EVALUATED,
                 EvolutionCorrectnessStatus.CONFIRMED,
                 "FRONTIER_EXHAUSTED", "TARGET_REACHED", -1, 2,
@@ -359,8 +406,8 @@ class LearnedPatternRuleAuthorizationServiceTest {
             hash("study-plan"),
             split.contentHash(),
             hash("train-population"),
-            hash("validation-suite"),
-            List.of("validation"),
+            hash("validation-suite-" + caseId),
+            List.of(caseId),
             List.of(candidate));
     }
 
@@ -414,8 +461,8 @@ class LearnedPatternRuleAuthorizationServiceTest {
         EvolutionSplitManifest split,
         EvolutionValidationSelection validation,
         EvolutionFinalTestEvaluation holdout,
-        LearnedPatternRuleAuthorizationService.CounterexampleEvidence counterexample,
-        LearnedPatternRuleAuthorizationService.EvidenceBundle bundle
+        LearnedPatternCounterexampleEvidence counterexample,
+        LearnedPatternAuthorizationBundle bundle
     ) throws IOException {
         Files.createDirectories(directory);
         Path bundleFile = directory.resolve("authorization-bundle.json");
@@ -448,8 +495,8 @@ class LearnedPatternRuleAuthorizationServiceTest {
         EvolutionGenome genome,
         EvolutionValidationSelection validation,
         EvolutionFinalTestEvaluation holdout,
-        LearnedPatternRuleAuthorizationService.CounterexampleEvidence counterexample,
-        LearnedPatternRuleAuthorizationService.EvidenceBundle bundle,
+        LearnedPatternCounterexampleEvidence counterexample,
+        LearnedPatternAuthorizationBundle bundle,
         LearnedPatternRuleAuthorizationService.EvidenceFiles files
     ) {
     }
