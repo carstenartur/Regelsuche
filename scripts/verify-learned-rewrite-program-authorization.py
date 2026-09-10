@@ -93,6 +93,11 @@ def require_positive(value: Any, message: str) -> None:
         fail(f"{message} must be a positive integer, got {value!r}")
 
 
+def require_boolean(value: Any, message: str) -> None:
+    if not isinstance(value, bool):
+        fail(f"{message} must be a boolean, got {value!r}")
+
+
 def validate_schema(document: dict[str, Any], schema_path: Path, name: str) -> None:
     schema = load(schema_path)
     validator = Draft202012Validator(schema, format_checker=FormatChecker())
@@ -154,7 +159,12 @@ def verify_replay(replay: dict[str, Any]) -> None:
     verify_self_hash(case, "program replay case")
     require_equal(case["caseId"], "composite-normalization", "replay case ID")
     require_equal(case["inputExpression"], "(x * 1) + 0", "replay input")
-    require_equal(case["complete"], True, "replay completeness")
+    require_boolean(case.get("complete"), "replay completeness marker")
+    # This fixture deliberately contains a Prune node. A faithful replay must
+    # therefore retain an incomplete enumeration instead of silently upgrading
+    # the pruned program to a completeness claim.
+    require_equal(case["complete"], False,
+                  "declared pruning must retain incomplete replay enumeration")
     require_equal(len(case["candidates"]), 1, "retained replay candidate count")
 
     candidate = case["candidates"][0]
