@@ -8,22 +8,22 @@ Automatisch generiert von `./gradlew benchmarkReport`. Jede Zeile zeigt neben de
 
 | Strategie | Ausdruck | Status | Gefunden | Erw. getroffen | Zeit (ms) | Besucht | Geprunt | e-Klassen | e-Knoten | Klassen-Scans | Knoten-Scans | Kandidaten-Skips | Matches | Cache-Hits | Cache-Misses | Sat-Iterationen | Regeln gefeuert | Sat-Sparung | Lernregel | Proof | Export |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| best-first | x + 0 | ✅ | ✓ | ✓ | 116 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| beam | x + 0 | ✅ | ✓ | ✓ | 11 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| best-first | x + 0 | ✅ | ✓ | ✓ | 103 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| beam | x + 0 | ✅ | ✓ | ✓ | 12 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
 | a-star | x + 0 | ✅ | ✓ | ✓ | 6 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| random-mc | x + 0 | ✅ | ✓ | ✓ | 8 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| mcts | x + 0 | ✅ | ✓ | ✓ | 9 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| random-mc | x + 0 | ✅ | ✓ | ✓ | 9 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| mcts | x + 0 | ✅ | ✓ | ✓ | 8 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
 | hybrid | x + 0 | ✅ | ✓ | ✓ | 9 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| best-first | x * 1 | ✅ | ✓ | ✓ | 6 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| beam | x * 1 | ✅ | ✓ | ✓ | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| a-star | x * 1 | ✅ | ✓ | ✓ | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| random-mc | x * 1 | ✅ | ✓ | ✓ | 8 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| mcts | x * 1 | ✅ | ✓ | ✓ | 7 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| hybrid | x * 1 | ✅ | ✓ | ✓ | 7 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| best-first | x * 0 | ✅ | ✓ | ✓ | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| best-first | x * 1 | ✅ | ✓ | ✓ | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| beam | x * 1 | ✅ | ✓ | ✓ | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| a-star | x * 1 | ✅ | ✓ | ✓ | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| random-mc | x * 1 | ✅ | ✓ | ✓ | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| mcts | x * 1 | ✅ | ✓ | ✓ | 6 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| hybrid | x * 1 | ✅ | ✓ | ✓ | 5 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| best-first | x * 0 | ✅ | ✓ | ✓ | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
 | beam | x * 0 | ✅ | ✓ | ✓ | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| a-star | x * 0 | ✅ | ✓ | ✓ | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| random-mc | x * 0 | ✅ | ✓ | ✓ | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| a-star | x * 0 | ✅ | ✓ | ✓ | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| random-mc | x * 0 | ✅ | ✓ | ✓ | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
 | mcts | x * 0 | ✅ | ✓ | ✓ | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
 | hybrid | x * 0 | ✅ | ✓ | ✓ | 5 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
 | best-first | a + a | ❌ | ✗ | — | 17 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | OBSERVED | ✓ |
@@ -31,35 +31,35 @@ Automatisch generiert von `./gradlew benchmarkReport`. Jede Zeile zeigt neben de
 | a-star | a + a | ❌ | ✗ | — | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | OBSERVED | ✓ |
 | random-mc | a + a | ❌ | ✗ | — | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | OBSERVED | ✓ |
 | mcts | a + a | ❌ | ✗ | — | 7 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | OBSERVED | ✓ |
-| hybrid | a + a | ❌ | ✗ | — | 8 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | OBSERVED | ✓ |
+| hybrid | a + a | ❌ | ✗ | — | 9 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | OBSERVED | ✓ |
 
 ## polynomial-simplification
 
 | Strategie | Ausdruck | Status | Gefunden | Erw. getroffen | Zeit (ms) | Besucht | Geprunt | e-Klassen | e-Knoten | Klassen-Scans | Knoten-Scans | Kandidaten-Skips | Matches | Cache-Hits | Cache-Misses | Sat-Iterationen | Regeln gefeuert | Sat-Sparung | Lernregel | Proof | Export |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| best-first | (x + 1)*(x + 1) | ✅ | ✓ | — | 174 | 22 | 82 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| beam | (x + 1)*(x + 1) | ✅ | ✓ | — | 62 | 21 | 46 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| a-star | (x + 1)*(x + 1) | ✅ | ✓ | — | 67 | 21 | 76 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| random-mc | (x + 1)*(x + 1) | ✅ | ✓ | — | 58 | 25 | 64 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| mcts | (x + 1)*(x + 1) | ✅ | ✓ | — | 1423 | 1500 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| hybrid | (x + 1)*(x + 1) | ✅ | ✓ | — | 34 | 43 | 128 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| best-first | x*x + x*x | ✅ | ✓ | — | 5 | 9 | 21 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| beam | x*x + x*x | ✅ | ✓ | — | 3 | 9 | 21 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| best-first | (x + 1)*(x + 1) | ✅ | ✓ | — | 186 | 22 | 82 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| beam | (x + 1)*(x + 1) | ✅ | ✓ | — | 65 | 21 | 46 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| a-star | (x + 1)*(x + 1) | ✅ | ✓ | — | 108 | 21 | 76 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| random-mc | (x + 1)*(x + 1) | ✅ | ✓ | — | 75 | 25 | 64 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| mcts | (x + 1)*(x + 1) | ✅ | ✓ | — | 1589 | 1500 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| hybrid | (x + 1)*(x + 1) | ✅ | ✓ | — | 36 | 43 | 128 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| best-first | x*x + x*x | ✅ | ✓ | — | 6 | 9 | 21 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| beam | x*x + x*x | ✅ | ✓ | — | 4 | 9 | 21 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
 | a-star | x*x + x*x | ✅ | ✓ | — | 5 | 9 | 21 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
 | random-mc | x*x + x*x | ✅ | ✓ | — | 4 | 9 | 25 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| mcts | x*x + x*x | ✅ | ✓ | — | 94 | 170 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| hybrid | x*x + x*x | ✅ | ✓ | — | 7 | 18 | 42 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| best-first | (x + 2)*(x + 3) | ✅ | ✓ | — | 43 | 42 | 127 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| mcts | x*x + x*x | ✅ | ✓ | — | 96 | 170 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| hybrid | x*x + x*x | ✅ | ✓ | — | 8 | 18 | 42 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| best-first | (x + 2)*(x + 3) | ✅ | ✓ | — | 45 | 42 | 127 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
 | beam | (x + 2)*(x + 3) | ✅ | ✓ | — | 14 | 17 | 26 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
 | a-star | (x + 2)*(x + 3) | ✅ | ✓ | — | 39 | 42 | 127 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| random-mc | (x + 2)*(x + 3) | ✅ | ✓ | — | 28 | 37 | 93 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| mcts | (x + 2)*(x + 3) | ✅ | ✓ | — | 900 | 1500 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| hybrid | (x + 2)*(x + 3) | ✅ | ✓ | — | 34 | 59 | 153 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| best-first | (x + a)^2 | ✅ | ✓ | — | 26 | 26 | 106 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| beam | (x + a)^2 | ✅ | ✓ | — | 8 | 15 | 35 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| a-star | (x + a)^2 | ✅ | ✓ | — | 18 | 26 | 106 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| random-mc | (x + a)^2 | ✅ | ✓ | — | 16 | 25 | 95 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| mcts | (x + a)^2 | ✅ | ✓ | — | 473 | 1176 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| random-mc | (x + 2)*(x + 3) | ✅ | ✓ | — | 25 | 37 | 93 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| mcts | (x + 2)*(x + 3) | ✅ | ✓ | — | 1109 | 1500 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| hybrid | (x + 2)*(x + 3) | ✅ | ✓ | — | 44 | 59 | 153 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| best-first | (x + a)^2 | ✅ | ✓ | — | 32 | 26 | 106 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| beam | (x + a)^2 | ✅ | ✓ | — | 11 | 15 | 35 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| a-star | (x + a)^2 | ✅ | ✓ | — | 24 | 26 | 106 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| random-mc | (x + a)^2 | ✅ | ✓ | — | 14 | 25 | 95 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| mcts | (x + a)^2 | ✅ | ✓ | — | 440 | 1181 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
 | hybrid | (x + a)^2 | ✅ | ✓ | — | 17 | 41 | 141 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
 
 ## rational-simplification
@@ -89,18 +89,18 @@ Automatisch generiert von `./gradlew benchmarkReport`. Jede Zeile zeigt neben de
 
 | Strategie | Ausdruck | Status | Gefunden | Erw. getroffen | Zeit (ms) | Besucht | Geprunt | e-Klassen | e-Knoten | Klassen-Scans | Knoten-Scans | Kandidaten-Skips | Matches | Cache-Hits | Cache-Misses | Sat-Iterationen | Regeln gefeuert | Sat-Sparung | Lernregel | Proof | Export |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| best-first | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 702 | 663 | 2232 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| beam | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 13 | 20 | 55 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| a-star | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 404 | 664 | 2241 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| random-mc | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 326 | 619 | 2059 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| mcts | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 1702 | 3000 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
-| hybrid | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 425 | 683 | 2287 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| best-first | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 558 | 663 | 2232 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| beam | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 14 | 20 | 55 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| a-star | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 445 | 664 | 2241 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| random-mc | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 370 | 619 | 2059 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| mcts | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 1784 | 3000 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
+| hybrid | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 460 | 683 | 2287 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | VALIDATED_BY_EXAMPLES | ✓ |
 
 ## equations
 
 | Strategie | Ausdruck | Status | Gefunden | Erw. getroffen | Zeit (ms) | Besucht | Geprunt | e-Klassen | e-Knoten | Klassen-Scans | Knoten-Scans | Kandidaten-Skips | Matches | Cache-Hits | Cache-Misses | Sat-Iterationen | Regeln gefeuert | Sat-Sparung | Lernregel | Proof | Export |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| math-domain | x + 3 = 7 | ✅ | ✓ | — | 8 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | SYMBOLICALLY_VERIFIED | ✓ |
+| math-domain | x + 3 = 7 | ✅ | ✓ | — | 9 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00 | – | SYMBOLICALLY_VERIFIED | ✓ |
 
 ## inequalities
 

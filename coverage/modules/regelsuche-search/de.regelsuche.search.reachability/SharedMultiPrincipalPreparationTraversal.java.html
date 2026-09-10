@@ -1,0 +1,731 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SharedMultiPrincipalPreparationTraversal.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.reachability</a> &gt; <span class="el_source">SharedMultiPrincipalPreparationTraversal.java</span></div><h1>SharedMultiPrincipalPreparationTraversal.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.reachability;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.transform.PatternMatchAnalyzer;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * One bounded physical preparation traversal shared by several principals.
+ *
+ * &lt;p&gt;The traversal deliberately stops before guard authorization and concrete
+ * principal replay. Those remain separate authority decisions. What is shared
+ * here is principal-independent work: state identity, preparation expansion,
+ * AST metadata, deduplication and the bounded traversal budget. Pattern analysis
+ * stays keyed by the complete pattern/recognition contract through
+ * {@link SharedPreparationTraversal}, so two principal IDs never imply shared
+ * semantics merely because their names are related.&lt;/p&gt;
+ */
+final class SharedMultiPrincipalPreparationTraversal {
+    static final String REVISION =
+        &quot;regelsuche.shared-multi-principal-preparation-traversal/v1&quot;;
+
+    private final List&lt;RewriteApplicabilitySchema&gt; principals;
+    private final PatternTargetedLocalBridgeSearch.Budget budget;
+    private final SharedPreparationTraversal shared;
+
+    SharedMultiPrincipalPreparationTraversal(
+        List&lt;RewriteApplicabilitySchema&gt; principalSchemas,
+        List&lt;? extends RewriteRule&gt; preparationRules,
+        PatternTargetedLocalBridgeSearch.Budget budget
+<span class="fc" id="L42">    ) {</span>
+<span class="fc" id="L43">        this.principals = validatePrincipals(principalSchemas);</span>
+<span class="fc" id="L44">        validateNoPrincipalInPreparation(this.principals, preparationRules);</span>
+<span class="fc" id="L45">        this.budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L46">        this.shared = new SharedPreparationTraversal(preparationRules, budget);</span>
+<span class="fc" id="L47">    }</span>
+
+    Evaluation analyze(
+        String sourceExpression,
+        AssumptionSignature initialAssumptions
+    ) {
+<span class="fc" id="L53">        AssumptionSignature sourceAssumptions = normalized(initialAssumptions);</span>
+<span class="fc" id="L54">        SharedPreparationTraversal.ParsedExpression source =</span>
+<span class="fc" id="L55">            shared.parse(sourceExpression);</span>
+<span class="fc" id="L56">        Map&lt;String, PrincipalState&gt; principalStates = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        for (RewriteApplicabilitySchema principal : principals) {</span>
+<span class="fc" id="L58">            PatternMatchAnalyzer.Analysis initial = analyze(principal, source);</span>
+<span class="fc" id="L59">            principalStates.put(</span>
+<span class="fc" id="L60">                principal.ruleId(),</span>
+                new PrincipalState(principal, initial));
+<span class="fc" id="L62">        }</span>
+
+<span class="fc" id="L64">        ArrayDeque&lt;State&gt; frontier = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L65">        Map&lt;String, State&gt; states = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L66">        State root = new State(</span>
+            source,
+            sourceAssumptions,
+            0,
+            0,
+            null,
+            null);
+<span class="fc" id="L73">        states.put(root.key(), root);</span>
+<span class="fc" id="L74">        frontier.add(root);</span>
+
+<span class="fc" id="L76">        WorkCounter work = new WorkCounter();</span>
+<span class="fc" id="L77">        work.maxFrontierSize = 1;</span>
+<span class="fc" id="L78">        resolveMatches(root, principalStates, work);</span>
+
+<span class="fc bfc" id="L80" title="All 4 branches covered.">        while (!frontier.isEmpty() &amp;&amp; !allResolved(principalStates)) {</span>
+<span class="fc" id="L81">            int depth = frontier.getFirst().depth();</span>
+<span class="fc" id="L82">            List&lt;State&gt; layer = removeLayer(frontier, depth);</span>
+<span class="fc" id="L83">            List&lt;Candidate&gt; candidates = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            for (State current : layer) {</span>
+<span class="fc" id="L85">                expand(current, principalStates, candidates, work);</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">                if (work.reachedLimits.contains(&quot;GENERATED_TRANSITIONS&quot;)) {</span>
+<span class="nc" id="L87">                    break;</span>
+                }
+<span class="fc" id="L89">            }</span>
+<span class="fc" id="L90">            candidates.sort(candidateOrder(principalStates));</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            for (Candidate candidate : candidates) {</span>
+<span class="fc" id="L92">                State retained = retain(candidate, states, frontier, work);</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                if (retained == null) {</span>
+<span class="nc" id="L94">                    continue;</span>
+                }
+<span class="fc" id="L96">                resolveMatches(retained, principalStates, work);</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">                if (allResolved(principalStates)) {</span>
+<span class="fc" id="L98">                    break;</span>
+                }
+<span class="fc" id="L100">            }</span>
+<span class="fc" id="L101">            work.maxFrontierSize = Math.max(</span>
+                work.maxFrontierSize,
+<span class="fc" id="L103">                frontier.size());</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">            if (work.reachedLimits.contains(&quot;GENERATED_TRANSITIONS&quot;)</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">                    || work.reachedLimits.contains(&quot;VISITED_STATES&quot;)) {</span>
+<span class="nc" id="L106">                break;</span>
+            }
+<span class="fc" id="L108">        }</span>
+
+<span class="fc" id="L110">        List&lt;PrincipalOutcome&gt; outcomes = principals.stream()</span>
+<span class="fc" id="L111">            .map(principal -&gt; outcome(</span>
+<span class="fc" id="L112">                principalStates.get(principal.ruleId()), work.reachedLimits))</span>
+<span class="fc" id="L113">            .toList();</span>
+<span class="fc" id="L114">        return new Evaluation(</span>
+            REVISION,
+<span class="fc" id="L116">            source.expression(),</span>
+            sourceAssumptions,
+            outcomes,
+<span class="fc" id="L119">            work.finish(states.size(), shared.work()));</span>
+    }
+
+    private void expand(
+        State current,
+        Map&lt;String, PrincipalState&gt; principalStates,
+        List&lt;Candidate&gt; candidates,
+        WorkCounter work
+    ) {
+<span class="fc" id="L128">        SharedPreparationTraversal.Expansion expansion =</span>
+<span class="fc" id="L129">            shared.expand(current.expression().expression());</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (current.depth() &gt;= budget.maxDepth()) {</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">            if (!expansion.transitions().isEmpty()) {</span>
+<span class="nc" id="L132">                work.reachedLimits.add(&quot;DEPTH&quot;);</span>
+            }
+<span class="nc" id="L134">            return;</span>
+        }
+<span class="fc" id="L136">        work.expandedStates++;</span>
+<span class="fc" id="L137">        List&lt;Candidate&gt; local = new ArrayList&lt;&gt;();</span>
+        for (SharedPreparationTraversal.Transition transition
+<span class="fc bfc" id="L139" title="All 2 branches covered.">                : expansion.transitions()) {</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">            if (work.generatedTransitions &gt;= budget.maxGeneratedTransitions()) {</span>
+<span class="nc" id="L141">                work.reachedLimits.add(&quot;GENERATED_TRANSITIONS&quot;);</span>
+<span class="nc" id="L142">                break;</span>
+            }
+<span class="fc" id="L144">            work.generatedTransitions++;</span>
+<span class="fc" id="L145">            Candidate candidate = candidate(</span>
+                current,
+                transition,
+                principalStates,
+                work);
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">            if (candidate != null) {</span>
+<span class="fc" id="L151">                local.add(candidate);</span>
+            }
+<span class="fc" id="L153">        }</span>
+<span class="fc" id="L154">        local.sort(candidateOrder(principalStates));</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (local.size() &gt; budget.maxSuccessorsPerState()) {</span>
+<span class="nc" id="L156">            work.reachedLimits.add(&quot;SUCCESSORS_PER_STATE&quot;);</span>
+<span class="nc" id="L157">            local = local.subList(0, budget.maxSuccessorsPerState());</span>
+        }
+<span class="fc" id="L159">        candidates.addAll(local);</span>
+<span class="fc" id="L160">    }</span>
+
+    private Candidate candidate(
+        State parent,
+        SharedPreparationTraversal.Transition transition,
+        Map&lt;String, PrincipalState&gt; principalStates,
+        WorkCounter work
+    ) {
+<span class="fc" id="L168">        Transformation transformation = transition.transformation();</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        if (!transformation.equivalencePreservingByConstruction()) {</span>
+<span class="nc" id="L170">            work.reachedLimits.add(&quot;UNSAFE_PREPARATION_OUTPUT&quot;);</span>
+<span class="nc" id="L171">            return null;</span>
+        }
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (principals.stream().anyMatch(value -&gt;</span>
+<span class="fc" id="L174">                value.ruleId().equals(transformation.rule()))) {</span>
+<span class="nc" id="L175">            work.reachedLimits.add(&quot;PRINCIPAL_PRESENT_IN_PREPARATION_OUTPUT&quot;);</span>
+<span class="nc" id="L176">            return null;</span>
+        }
+<span class="fc" id="L178">        int primitiveWork = parent.primitivePathWork()</span>
+<span class="fc" id="L179">            + transformation.primitiveStepCount();</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (primitiveWork &gt; budget.maxPrimitiveSteps()) {</span>
+<span class="nc" id="L181">            work.reachedLimits.add(&quot;PRIMITIVE_STEPS&quot;);</span>
+<span class="nc" id="L182">            return null;</span>
+        }
+<span class="fc" id="L184">        SharedPreparationTraversal.ParsedExpression target = transition.target();</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (target.expressionNodes() &gt; budget.maxExpressionNodes()) {</span>
+<span class="nc" id="L186">            work.reachedLimits.add(&quot;EXPRESSION_NODES&quot;);</span>
+<span class="nc" id="L187">            return null;</span>
+        }
+<span class="fc" id="L189">        AssumptionSignature assumptions = AssumptionSignature.merge(</span>
+<span class="fc" id="L190">            parent.assumptions(),</span>
+<span class="fc" id="L191">            AssumptionSignature.ofExpressions(transformation.assumptions()));</span>
+<span class="fc" id="L192">        Map&lt;String, PatternMatchAnalyzer.Analysis&gt; analyses =</span>
+<span class="fc" id="L193">            analysesForUnresolved(target, principalStates, work);</span>
+<span class="fc" id="L194">        return new Candidate(</span>
+            parent,
+            transformation,
+            target,
+            assumptions,
+<span class="fc" id="L199">            parent.depth() + 1,</span>
+            primitiveWork,
+<span class="fc" id="L201">            target.expressionNodes() - parent.expression().expressionNodes(),</span>
+            analyses);
+    }
+
+    private Map&lt;String, PatternMatchAnalyzer.Analysis&gt; analysesForUnresolved(
+        SharedPreparationTraversal.ParsedExpression expression,
+        Map&lt;String, PrincipalState&gt; principalStates,
+        WorkCounter work
+    ) {
+<span class="fc" id="L210">        Map&lt;String, PatternMatchAnalyzer.Analysis&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        for (PrincipalState state : principalStates.values()) {</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">            if (state.terminal != null) {</span>
+<span class="nc" id="L213">                continue;</span>
+            }
+<span class="fc" id="L215">            PatternMatchAnalyzer.Analysis analysis = analyze(</span>
+                state.principal,
+                expression);
+<span class="fc" id="L218">            work.principalAnalysisRequests++;</span>
+<span class="fc" id="L219">            recordAnalysisLimit(analysis, work);</span>
+<span class="fc" id="L220">            result.put(state.principal.ruleId(), analysis);</span>
+<span class="fc" id="L221">        }</span>
+<span class="fc" id="L222">        return Map.copyOf(result);</span>
+    }
+
+    private PatternMatchAnalyzer.Analysis analyze(
+        RewriteApplicabilitySchema principal,
+        SharedPreparationTraversal.ParsedExpression expression
+    ) {
+<span class="fc" id="L229">        return shared.analyze(</span>
+<span class="fc" id="L230">            principal.pattern(),</span>
+<span class="fc" id="L231">            principal.recognitionProfile(),</span>
+            expression);
+    }
+
+    private void resolveMatches(
+        State state,
+        Map&lt;String, PrincipalState&gt; principalStates,
+        WorkCounter work
+    ) {
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        for (PrincipalState principal : principalStates.values()) {</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">            if (principal.terminal != null) {</span>
+<span class="nc" id="L242">                continue;</span>
+            }
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">            PatternMatchAnalyzer.Analysis analysis = state == null</span>
+<span class="nc" id="L245">                ? null</span>
+<span class="fc" id="L246">                : analyze(principal.principal, state.expression());</span>
+<span class="fc" id="L247">            work.principalAnalysisRequests++;</span>
+<span class="fc" id="L248">            recordAnalysisLimit(analysis, work);</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">            if (analysis.matched()) {</span>
+<span class="fc" id="L250">                principal.terminal = new Terminal(</span>
+                    state,
+                    analysis,
+<span class="fc" id="L253">                    path(state));</span>
+            }
+<span class="fc" id="L255">        }</span>
+<span class="fc" id="L256">    }</span>
+
+    private static void recordAnalysisLimit(
+        PatternMatchAnalyzer.Analysis analysis,
+        WorkCounter work
+    ) {
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        if (analysis.inconclusive()) {</span>
+<span class="nc" id="L263">            work.reachedLimits.add(&quot;MATCH_ANALYSIS&quot;);</span>
+        }
+<span class="fc" id="L265">    }</span>
+
+    private State retain(
+        Candidate candidate,
+        Map&lt;String, State&gt; states,
+        ArrayDeque&lt;State&gt; frontier,
+        WorkCounter work
+    ) {
+<span class="fc" id="L273">        String key = stateKey(candidate.expression(), candidate.assumptions());</span>
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">        if (states.containsKey(key)) {</span>
+<span class="nc" id="L275">            work.duplicateTransitions++;</span>
+<span class="nc" id="L276">            return null;</span>
+        }
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">        if (states.size() &gt;= budget.maxVisitedStates()) {</span>
+<span class="nc" id="L279">            work.reachedLimits.add(&quot;VISITED_STATES&quot;);</span>
+<span class="nc" id="L280">            return null;</span>
+        }
+<span class="fc" id="L282">        PatternTargetedLocalBridgeSearch.Step step =</span>
+            new PatternTargetedLocalBridgeSearch.Step(
+<span class="fc" id="L284">                candidate.parent().expression().expression(),</span>
+<span class="fc" id="L285">                candidate.expression().expression(),</span>
+<span class="fc" id="L286">                candidate.transformation().rule(),</span>
+<span class="fc" id="L287">                candidate.transformation().assumptions(),</span>
+<span class="fc" id="L288">                candidate.transformation().applicationKey(),</span>
+<span class="fc" id="L289">                candidate.transformation().primitiveRuleIds());</span>
+<span class="fc" id="L290">        State retained = new State(</span>
+<span class="fc" id="L291">            candidate.expression(),</span>
+<span class="fc" id="L292">            candidate.assumptions(),</span>
+<span class="fc" id="L293">            candidate.depth(),</span>
+<span class="fc" id="L294">            candidate.primitivePathWork(),</span>
+<span class="fc" id="L295">            candidate.parent(),</span>
+            step);
+<span class="fc" id="L297">        states.put(key, retained);</span>
+<span class="fc" id="L298">        frontier.addLast(retained);</span>
+<span class="fc" id="L299">        work.retainedTransitions++;</span>
+<span class="fc" id="L300">        return retained;</span>
+    }
+
+    private Comparator&lt;Candidate&gt; candidateOrder(
+        Map&lt;String, PrincipalState&gt; principalStates
+    ) {
+<span class="fc" id="L306">        return Comparator</span>
+<span class="fc" id="L307">            .comparingInt((Candidate value) -&gt;</span>
+<span class="fc" id="L308">                -matchedPrincipalCount(value, principalStates))</span>
+<span class="fc" id="L309">            .thenComparingInt(value -&gt;</span>
+<span class="fc" id="L310">                -bestMatchedPatternNodes(value, principalStates))</span>
+<span class="fc" id="L311">            .thenComparingInt(value -&gt;</span>
+<span class="fc" id="L312">                -bestBindingCount(value, principalStates))</span>
+<span class="fc" id="L313">            .thenComparingInt(value -&gt;</span>
+<span class="fc" id="L314">                minimumResidualCount(value, principalStates))</span>
+<span class="fc" id="L315">            .thenComparingInt(value -&gt;</span>
+<span class="fc" id="L316">                minimumResidualLowerBound(value, principalStates))</span>
+<span class="fc" id="L317">            .thenComparingInt(Candidate::astGrowth)</span>
+<span class="fc" id="L318">            .thenComparingInt(Candidate::primitivePathWork)</span>
+<span class="fc" id="L319">            .thenComparing(value -&gt; value.expression().structuralFingerprint())</span>
+<span class="fc" id="L320">            .thenComparing(value -&gt; value.transformation().rule())</span>
+<span class="fc" id="L321">            .thenComparing(value -&gt; value.transformation().applicationKey());</span>
+    }
+
+    private static int matchedPrincipalCount(
+        Candidate candidate,
+        Map&lt;String, PrincipalState&gt; principals
+    ) {
+<span class="fc" id="L328">        return activeAnalyses(candidate, principals).stream()</span>
+<span class="fc" id="L329">            .map(Map.Entry::getValue)</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">            .mapToInt(value -&gt; value.matched() ? 1 : 0)</span>
+<span class="fc" id="L331">            .sum();</span>
+    }
+
+    private static int bestMatchedPatternNodes(
+        Candidate candidate,
+        Map&lt;String, PrincipalState&gt; principals
+    ) {
+<span class="fc" id="L338">        return activeAnalyses(candidate, principals).stream()</span>
+<span class="fc" id="L339">            .map(Map.Entry::getValue)</span>
+<span class="fc" id="L340">            .mapToInt(PatternMatchAnalyzer.Analysis::matchedPatternNodes)</span>
+<span class="fc" id="L341">            .max()</span>
+<span class="fc" id="L342">            .orElse(0);</span>
+    }
+
+    private static int bestBindingCount(
+        Candidate candidate,
+        Map&lt;String, PrincipalState&gt; principals
+    ) {
+<span class="fc" id="L349">        return activeAnalyses(candidate, principals).stream()</span>
+<span class="fc" id="L350">            .map(Map.Entry::getValue)</span>
+<span class="fc" id="L351">            .mapToInt(value -&gt; value.bindings().size())</span>
+<span class="fc" id="L352">            .max()</span>
+<span class="fc" id="L353">            .orElse(0);</span>
+    }
+
+    private static int minimumResidualCount(
+        Candidate candidate,
+        Map&lt;String, PrincipalState&gt; principals
+    ) {
+<span class="fc" id="L360">        return activeAnalyses(candidate, principals).stream()</span>
+<span class="fc" id="L361">            .map(Map.Entry::getValue)</span>
+<span class="fc" id="L362">            .mapToInt(value -&gt; value.residualObligations().size())</span>
+<span class="fc" id="L363">            .min()</span>
+<span class="fc" id="L364">            .orElse(Integer.MAX_VALUE);</span>
+    }
+
+    private static int minimumResidualLowerBound(
+        Candidate candidate,
+        Map&lt;String, PrincipalState&gt; principals
+    ) {
+<span class="fc" id="L371">        return activeAnalyses(candidate, principals).stream()</span>
+<span class="fc" id="L372">            .map(Map.Entry::getValue)</span>
+<span class="fc" id="L373">            .mapToInt(SharedMultiPrincipalPreparationTraversal::residualLowerBound)</span>
+<span class="fc" id="L374">            .min()</span>
+<span class="fc" id="L375">            .orElse(Integer.MAX_VALUE);</span>
+    }
+
+    private static List&lt;Map.Entry&lt;String, PatternMatchAnalyzer.Analysis&gt;&gt;
+            activeAnalyses(
+                Candidate candidate,
+                Map&lt;String, PrincipalState&gt; principals
+            ) {
+<span class="fc" id="L383">        return candidate.analyses().entrySet().stream()</span>
+<span class="fc" id="L384">            .filter(entry -&gt; {</span>
+<span class="fc" id="L385">                PrincipalState state = principals.get(entry.getKey());</span>
+<span class="pc bpc" id="L386" title="2 of 4 branches missed.">                return state != null &amp;&amp; state.terminal == null;</span>
+            })
+<span class="fc" id="L388">            .toList();</span>
+    }
+
+    private static int residualLowerBound(
+        PatternMatchAnalyzer.Analysis analysis
+    ) {
+<span class="fc" id="L394">        return analysis.residualObligations().stream()</span>
+<span class="pc bpc" id="L395" title="3 of 4 branches missed.">            .mapToInt(value -&gt; switch (value.kind()) {</span>
+<span class="nc" id="L396">                case LITERAL_MISMATCH -&gt; 1;</span>
+<span class="nc" id="L397">                case BINDING_CONFLICT -&gt; 2;</span>
+<span class="nc" id="L398">                case SHAPE_MISMATCH -&gt; 3;</span>
+<span class="fc" id="L399">                case FUNCTION_SHAPE_MISMATCH -&gt; 4;</span>
+            })
+<span class="fc" id="L401">            .sum();</span>
+    }
+
+    private static List&lt;PatternTargetedLocalBridgeSearch.Step&gt; path(State terminal) {
+<span class="fc" id="L405">        ArrayDeque&lt;PatternTargetedLocalBridgeSearch.Step&gt; reversed =</span>
+            new ArrayDeque&lt;&gt;();
+<span class="fc" id="L407">        State current = terminal;</span>
+<span class="fc bfc" id="L408" title="All 2 branches covered.">        while (current.parent() != null) {</span>
+<span class="fc" id="L409">            reversed.addFirst(current.incomingStep());</span>
+<span class="fc" id="L410">            current = current.parent();</span>
+        }
+<span class="fc" id="L412">        return List.copyOf(reversed);</span>
+    }
+
+    private static List&lt;State&gt; removeLayer(
+        ArrayDeque&lt;State&gt; frontier,
+        int depth
+    ) {
+<span class="fc" id="L419">        List&lt;State&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L420" title="1 of 4 branches missed.">        while (!frontier.isEmpty() &amp;&amp; frontier.getFirst().depth() == depth) {</span>
+<span class="fc" id="L421">            result.add(frontier.removeFirst());</span>
+        }
+<span class="fc" id="L423">        return result;</span>
+    }
+
+    private static boolean allResolved(Map&lt;String, PrincipalState&gt; states) {
+<span class="fc bfc" id="L427" title="All 2 branches covered.">        return states.values().stream().allMatch(value -&gt; value.terminal != null);</span>
+    }
+
+    private static PrincipalOutcome outcome(
+        PrincipalState state,
+        Set&lt;String&gt; reachedLimits
+    ) {
+<span class="fc bfc" id="L434" title="All 2 branches covered.">        if (state.terminal != null) {</span>
+<span class="fc" id="L435">            Terminal terminal = state.terminal;</span>
+<span class="fc" id="L436">            return new PrincipalOutcome(</span>
+<span class="fc" id="L437">                state.principal.ruleId(),</span>
+<span class="fc" id="L438">                state.principal.contentHash(),</span>
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">                terminal.path().isEmpty()</span>
+<span class="nc" id="L440">                    ? Status.MATCHED_AT_SOURCE</span>
+<span class="fc" id="L441">                    : Status.PREPARED_MATCH,</span>
+<span class="fc" id="L442">                PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(</span>
+                    state.initial),
+<span class="fc" id="L444">                PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(</span>
+<span class="fc" id="L445">                    terminal.analysis()),</span>
+<span class="fc" id="L446">                terminal.state().expression().expression(),</span>
+<span class="fc" id="L447">                terminal.state().assumptions(),</span>
+<span class="fc" id="L448">                terminal.path());</span>
+        }
+<span class="pc bpc" id="L450" title="1 of 2 branches missed.">        Status status = reachedLimits.isEmpty()</span>
+<span class="fc" id="L451">            ? Status.NO_MATCH_IN_COMPLETE_FROZEN_CLOSURE</span>
+<span class="pc" id="L452">            : Status.BUDGET_INCONCLUSIVE;</span>
+<span class="fc" id="L453">        return new PrincipalOutcome(</span>
+<span class="fc" id="L454">            state.principal.ruleId(),</span>
+<span class="fc" id="L455">            state.principal.contentHash(),</span>
+            status,
+<span class="fc" id="L457">            PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(state.initial),</span>
+<span class="fc" id="L458">            PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(state.initial),</span>
+            &quot;&quot;,
+<span class="fc" id="L460">            AssumptionSignature.ofExpressions(List.of()),</span>
+<span class="fc" id="L461">            List.of());</span>
+    }
+
+    private static List&lt;RewriteApplicabilitySchema&gt; validatePrincipals(
+        List&lt;RewriteApplicabilitySchema&gt; supplied
+    ) {
+<span class="fc" id="L467">        Objects.requireNonNull(supplied, &quot;principalSchemas&quot;);</span>
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">        if (supplied.isEmpty()) {</span>
+<span class="nc" id="L469">            throw new IllegalArgumentException(</span>
+                &quot;at least one principal schema is required&quot;);
+        }
+<span class="fc" id="L472">        Map&lt;String, RewriteApplicabilitySchema&gt; byId = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L473" title="All 2 branches covered.">        for (RewriteApplicabilitySchema schema : supplied) {</span>
+<span class="fc" id="L474">            RewriteApplicabilitySchema checked = Objects.requireNonNull(</span>
+                schema, &quot;principal schema&quot;);
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">            if (!checked.executor().isEquivalencePreservingByConstruction()) {</span>
+<span class="nc" id="L477">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L478">                    &quot;principal must preserve equivalence: &quot; + checked.ruleId());</span>
+            }
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">            if (byId.put(checked.ruleId(), checked) != null) {</span>
+<span class="nc" id="L481">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L482">                    &quot;duplicate principal rule ID: &quot; + checked.ruleId());</span>
+            }
+<span class="fc" id="L484">        }</span>
+<span class="fc" id="L485">        return byId.values().stream()</span>
+<span class="fc" id="L486">            .sorted(Comparator</span>
+<span class="fc" id="L487">                .comparing(RewriteApplicabilitySchema::ruleId)</span>
+<span class="fc" id="L488">                .thenComparing(RewriteApplicabilitySchema::schemaId))</span>
+<span class="fc" id="L489">            .toList();</span>
+    }
+
+    private static void validateNoPrincipalInPreparation(
+        List&lt;RewriteApplicabilitySchema&gt; principals,
+        List&lt;? extends RewriteRule&gt; preparationRules
+    ) {
+<span class="fc" id="L496">        Objects.requireNonNull(preparationRules, &quot;preparationRules&quot;);</span>
+<span class="fc" id="L497">        Set&lt;String&gt; principalIds = principals.stream()</span>
+<span class="fc" id="L498">            .map(RewriteApplicabilitySchema::ruleId)</span>
+<span class="fc" id="L499">            .collect(java.util.stream.Collectors.toSet());</span>
+<span class="fc bfc" id="L500" title="All 2 branches covered.">        for (RewriteRule rule : preparationRules) {</span>
+<span class="fc" id="L501">            RewriteRule checked = Objects.requireNonNull(</span>
+                rule, &quot;preparation rule&quot;);
+<span class="pc bpc" id="L503" title="1 of 2 branches missed.">            if (principalIds.contains(checked.id())) {</span>
+<span class="nc" id="L504">                throw new IllegalArgumentException(</span>
+                    &quot;principal rule must not be in preparation inventory: &quot;
+<span class="nc" id="L506">                        + checked.id());</span>
+            }
+<span class="fc" id="L508">        }</span>
+<span class="fc" id="L509">    }</span>
+
+    private static AssumptionSignature normalized(AssumptionSignature value) {
+<span class="fc" id="L512">        AssumptionSignature checked = Objects.requireNonNull(</span>
+            value, &quot;initialAssumptions&quot;);
+<span class="fc" id="L514">        return AssumptionSignature.ofExpressions(</span>
+<span class="fc" id="L515">            checked.normalizedAssumptions());</span>
+    }
+
+    private static String stateKey(
+        SharedPreparationTraversal.ParsedExpression expression,
+        AssumptionSignature assumptions
+    ) {
+<span class="fc" id="L522">        return expression.structuralFingerprint() + &quot;\u0000&quot;</span>
+<span class="fc" id="L523">            + assumptions.fingerprint();</span>
+    }
+
+<span class="fc" id="L526">    enum Status {</span>
+<span class="fc" id="L527">        MATCHED_AT_SOURCE,</span>
+<span class="fc" id="L528">        PREPARED_MATCH,</span>
+<span class="fc" id="L529">        NO_MATCH_IN_COMPLETE_FROZEN_CLOSURE,</span>
+<span class="fc" id="L530">        BUDGET_INCONCLUSIVE</span>
+    }
+
+    record PrincipalOutcome(
+        String ruleId,
+        String applicabilitySchemaHash,
+        Status status,
+        PatternTargetedLocalBridgeSearch.AnalysisSnapshot initialAnalysis,
+        PatternTargetedLocalBridgeSearch.AnalysisSnapshot terminalAnalysis,
+        String terminalExpression,
+        AssumptionSignature terminalAssumptions,
+        List&lt;PatternTargetedLocalBridgeSearch.Step&gt; preparationSteps
+    ) {
+<span class="fc" id="L543">        PrincipalOutcome {</span>
+<span class="pc bpc" id="L544" title="3 of 6 branches missed.">            if (ruleId == null || ruleId.isBlank()</span>
+                    || applicabilitySchemaHash == null
+<span class="pc bpc" id="L546" title="1 of 2 branches missed.">                    || !applicabilitySchemaHash.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L547">                throw new IllegalArgumentException(</span>
+                    &quot;principal outcome identity is invalid&quot;);
+            }
+<span class="fc" id="L550">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L551">            initialAnalysis = Objects.requireNonNull(</span>
+                initialAnalysis, &quot;initialAnalysis&quot;);
+<span class="fc" id="L553">            terminalAnalysis = Objects.requireNonNull(</span>
+                terminalAnalysis, &quot;terminalAnalysis&quot;);
+<span class="pc bpc" id="L555" title="1 of 2 branches missed.">            terminalExpression = terminalExpression == null</span>
+<span class="nc" id="L556">                ? &quot;&quot;</span>
+<span class="fc" id="L557">                : terminalExpression;</span>
+<span class="fc" id="L558">            terminalAssumptions = Objects.requireNonNull(</span>
+                terminalAssumptions, &quot;terminalAssumptions&quot;);
+<span class="fc" id="L560">            preparationSteps = List.copyOf(Objects.requireNonNull(</span>
+                preparationSteps, &quot;preparationSteps&quot;));
+<span class="pc bpc" id="L562" title="1 of 4 branches missed.">            boolean positive = status == Status.MATCHED_AT_SOURCE</span>
+                || status == Status.PREPARED_MATCH;
+<span class="pc bpc" id="L564" title="1 of 4 branches missed.">            if (positive != !terminalExpression.isBlank()) {</span>
+<span class="nc" id="L565">                throw new IllegalArgumentException(</span>
+                    &quot;only matched principals retain a terminal expression&quot;);
+            }
+<span class="fc bfc" id="L568" title="All 2 branches covered.">            if ((status == Status.PREPARED_MATCH)</span>
+<span class="pc bpc" id="L569" title="1 of 4 branches missed.">                    != !preparationSteps.isEmpty()) {</span>
+<span class="nc" id="L570">                throw new IllegalArgumentException(</span>
+                    &quot;only prepared matches retain preparation steps&quot;);
+            }
+<span class="fc" id="L573">        }</span>
+
+        boolean matched() {
+<span class="nc bnc" id="L576" title="All 4 branches missed.">            return status == Status.MATCHED_AT_SOURCE</span>
+                || status == Status.PREPARED_MATCH;
+        }
+    }
+
+    record Evaluation(
+        String revision,
+        String sourceExpression,
+        AssumptionSignature sourceAssumptions,
+        List&lt;PrincipalOutcome&gt; outcomes,
+        Work work
+    ) {
+<span class="fc" id="L588">        Evaluation {</span>
+<span class="pc bpc" id="L589" title="2 of 4 branches missed.">            if (!REVISION.equals(revision)</span>
+                    || sourceExpression == null
+<span class="pc bpc" id="L591" title="1 of 2 branches missed.">                    || sourceExpression.isBlank()) {</span>
+<span class="nc" id="L592">                throw new IllegalArgumentException(</span>
+                    &quot;shared traversal evaluation identity is invalid&quot;);
+            }
+<span class="fc" id="L595">            sourceAssumptions = normalized(sourceAssumptions);</span>
+<span class="fc" id="L596">            outcomes = List.copyOf(Objects.requireNonNull(outcomes, &quot;outcomes&quot;));</span>
+<span class="pc bpc" id="L597" title="1 of 2 branches missed.">            if (outcomes.isEmpty()) {</span>
+<span class="nc" id="L598">                throw new IllegalArgumentException(</span>
+                    &quot;shared traversal requires principal outcomes&quot;);
+            }
+<span class="fc" id="L601">            work = Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L602">        }</span>
+
+        Optional&lt;PrincipalOutcome&gt; outcome(String ruleId) {
+<span class="fc" id="L605">            return outcomes.stream()</span>
+<span class="fc" id="L606">                .filter(value -&gt; value.ruleId().equals(ruleId))</span>
+<span class="fc" id="L607">                .findFirst();</span>
+        }
+    }
+
+    record Work(
+        int expandedStates,
+        int generatedTransitions,
+        int discoveredStates,
+        int retainedTransitions,
+        int duplicateTransitions,
+        long principalAnalysisRequests,
+        int maxFrontierSize,
+        Set&lt;String&gt; reachedLimits,
+        SharedPreparationTraversal.Work physicalWork
+    ) {
+<span class="fc" id="L622">        Work {</span>
+<span class="pc bpc" id="L623" title="8 of 16 branches missed.">            if (expandedStates &lt; 0</span>
+                    || generatedTransitions &lt; 0
+                    || discoveredStates &lt; 1
+                    || retainedTransitions &lt; 0
+                    || duplicateTransitions &lt; 0
+                    || principalAnalysisRequests &lt; 0
+                    || maxFrontierSize &lt; 1
+                    || discoveredStates != retainedTransitions + 1) {
+<span class="nc" id="L631">                throw new IllegalArgumentException(</span>
+                    &quot;shared multi-principal work ledger is invalid&quot;);
+            }
+<span class="fc" id="L634">            reachedLimits = Set.copyOf(Objects.requireNonNull(</span>
+                reachedLimits, &quot;reachedLimits&quot;));
+<span class="fc" id="L636">            physicalWork = Objects.requireNonNull(physicalWork, &quot;physicalWork&quot;);</span>
+<span class="fc" id="L637">        }</span>
+    }
+
+    private static final class PrincipalState {
+        private final RewriteApplicabilitySchema principal;
+        private final PatternMatchAnalyzer.Analysis initial;
+        private Terminal terminal;
+
+        private PrincipalState(
+            RewriteApplicabilitySchema principal,
+            PatternMatchAnalyzer.Analysis initial
+<span class="fc" id="L648">        ) {</span>
+<span class="fc" id="L649">            this.principal = principal;</span>
+<span class="fc" id="L650">            this.initial = initial;</span>
+<span class="fc" id="L651">        }</span>
+    }
+
+<span class="fc" id="L654">    private record Terminal(</span>
+        State state,
+        PatternMatchAnalyzer.Analysis analysis,
+        List&lt;PatternTargetedLocalBridgeSearch.Step&gt; path
+    ) {
+    }
+
+    private record State(
+        SharedPreparationTraversal.ParsedExpression expression,
+        AssumptionSignature assumptions,
+        int depth,
+        int primitivePathWork,
+        State parent,
+        PatternTargetedLocalBridgeSearch.Step incomingStep
+    ) {
+<span class="fc" id="L669">        private State {</span>
+<span class="fc" id="L670">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L671">            Objects.requireNonNull(assumptions, &quot;assumptions&quot;);</span>
+<span class="pc bpc" id="L672" title="2 of 4 branches missed.">            if (depth &lt; 0 || primitivePathWork &lt; 0) {</span>
+<span class="nc" id="L673">                throw new IllegalArgumentException(&quot;state counters are invalid&quot;);</span>
+            }
+<span class="pc bpc" id="L675" title="1 of 6 branches missed.">            if ((parent == null) != (incomingStep == null)) {</span>
+<span class="nc" id="L676">                throw new IllegalArgumentException(</span>
+                    &quot;state parent and incoming step must appear together&quot;);
+            }
+<span class="fc" id="L679">        }</span>
+
+        String key() {
+<span class="fc" id="L682">            return stateKey(expression, assumptions);</span>
+        }
+    }
+
+    private record Candidate(
+        State parent,
+        Transformation transformation,
+        SharedPreparationTraversal.ParsedExpression expression,
+        AssumptionSignature assumptions,
+        int depth,
+        int primitivePathWork,
+        int astGrowth,
+        Map&lt;String, PatternMatchAnalyzer.Analysis&gt; analyses
+    ) {
+<span class="fc" id="L696">        private Candidate {</span>
+<span class="fc" id="L697">            Objects.requireNonNull(parent, &quot;parent&quot;);</span>
+<span class="fc" id="L698">            Objects.requireNonNull(transformation, &quot;transformation&quot;);</span>
+<span class="fc" id="L699">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L700">            Objects.requireNonNull(assumptions, &quot;assumptions&quot;);</span>
+<span class="fc" id="L701">            analyses = Map.copyOf(Objects.requireNonNull(analyses, &quot;analyses&quot;));</span>
+<span class="fc" id="L702">        }</span>
+    }
+
+<span class="fc" id="L705">    private static final class WorkCounter {</span>
+        private int expandedStates;
+        private int generatedTransitions;
+        private int retainedTransitions;
+        private int duplicateTransitions;
+        private long principalAnalysisRequests;
+        private int maxFrontierSize;
+<span class="fc" id="L712">        private final Set&lt;String&gt; reachedLimits = new LinkedHashSet&lt;&gt;();</span>
+
+        private Work finish(
+            int discoveredStates,
+            SharedPreparationTraversal.Work physicalWork
+        ) {
+<span class="fc" id="L718">            return new Work(</span>
+                expandedStates,
+                generatedTransitions,
+                discoveredStates,
+                retainedTransitions,
+                duplicateTransitions,
+                principalAnalysisRequests,
+                maxFrontierSize,
+                reachedLimits,
+                physicalWork);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

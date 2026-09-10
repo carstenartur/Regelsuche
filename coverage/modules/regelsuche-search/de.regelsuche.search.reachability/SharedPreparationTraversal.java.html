@@ -1,0 +1,429 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SharedPreparationTraversal.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.reachability</a> &gt; <span class="el_source">SharedPreparationTraversal.java</span></div><h1>SharedPreparationTraversal.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.reachability;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.knowledge.RuleInventoryFingerprint;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.EquivalentExpressionProvider;
+import de.regelsuche.transform.ExprMatcher;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternMatchAnalyzer;
+import de.regelsuche.transform.RecognitionProfile;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Per-evaluation physical cache shared by several logical local-bridge searches.
+ *
+ * &lt;p&gt;Principal searches keep their own frontier, ranking and logical budget
+ * accounting. This object only deduplicates work whose semantics are independent
+ * of the principal: preparation-engine expansion, parsing/structural
+ * fingerprinting of produced expressions and pattern analysis when two
+ * principals use the exact same pattern/recognition contract.&lt;/p&gt;
+ *
+ * &lt;p&gt;The cache is intentionally short lived. A coordinator creates one instance
+ * for one source evaluation, so no work or result can leak between independent
+ * requests or repository/configuration identities.&lt;/p&gt;
+ */
+public final class SharedPreparationTraversal {
+    public static final String REVISION =
+        &quot;regelsuche.shared-preparation-traversal/v1&quot;;
+
+    private final List&lt;RewriteRule&gt; preparationRules;
+    private final PatternTargetedLocalBridgeSearch.Budget budget;
+    private final String preparationInventoryFingerprint;
+    private final AstRewriteTransformationEngine preparationEngine;
+<span class="fc" id="L53">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L54">    private final PatternMatchAnalyzer analyzer = new PatternMatchAnalyzer();</span>
+<span class="fc" id="L55">    private final Map&lt;String, ParsedExpression&gt; parsedExpressions =</span>
+        new LinkedHashMap&lt;&gt;();
+<span class="fc" id="L57">    private final Map&lt;String, Expansion&gt; expansions = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L58">    private final Map&lt;AnalysisKey, PatternMatchAnalyzer.Analysis&gt; analyses =</span>
+        new LinkedHashMap&lt;&gt;();
+
+    private long expansionRequests;
+    private long expansionCacheHits;
+    private long generatedTransformations;
+    private long parseRequests;
+    private long parseCacheHits;
+    private long analysisRequests;
+    private long analysisCacheHits;
+
+    public SharedPreparationTraversal(
+        List&lt;? extends RewriteRule&gt; preparationRules,
+        PatternTargetedLocalBridgeSearch.Budget budget
+<span class="fc" id="L72">    ) {</span>
+<span class="fc" id="L73">        this.preparationRules = validatePreparationRules(preparationRules);</span>
+<span class="fc" id="L74">        this.budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L75">        this.preparationInventoryFingerprint =</span>
+<span class="fc" id="L76">            RuleInventoryFingerprint.contentHash(this.preparationRules);</span>
+<span class="fc" id="L77">        this.preparationEngine = new AstRewriteTransformationEngine(</span>
+            this.preparationRules,
+            Integer.MAX_VALUE,
+<span class="fc" id="L80">            engineCandidateObservationLimit(this.budget));</span>
+<span class="fc" id="L81">    }</span>
+
+    public String preparationInventoryFingerprint() {
+<span class="nc" id="L84">        return preparationInventoryFingerprint;</span>
+    }
+
+    public PatternTargetedLocalBridgeSearch.Budget budget() {
+<span class="nc" id="L88">        return budget;</span>
+    }
+
+    /** Returns one immutable physical expansion, computing it at most once. */
+    public synchronized Expansion expand(String sourceExpression) {
+<span class="fc" id="L93">        String source = parse(sourceExpression).expression();</span>
+<span class="fc" id="L94">        expansionRequests++;</span>
+<span class="fc" id="L95">        Expansion retained = expansions.get(source);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (retained != null) {</span>
+<span class="fc" id="L97">            expansionCacheHits++;</span>
+<span class="fc" id="L98">            return retained;</span>
+        }
+<span class="fc" id="L100">        List&lt;Transformation&gt; generated = Objects.requireNonNull(</span>
+<span class="fc" id="L101">            preparationEngine.transform(source),</span>
+            &quot;preparation engine result&quot;);
+<span class="fc" id="L103">        generatedTransformations = add(</span>
+<span class="fc" id="L104">            generatedTransformations, generated.size());</span>
+<span class="fc" id="L105">        List&lt;Transition&gt; transitions = new ArrayList&lt;&gt;(generated.size());</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        for (Transformation transformation : generated) {</span>
+<span class="fc" id="L107">            Transformation checked = Objects.requireNonNull(</span>
+                transformation, &quot;preparation transformation&quot;);
+<span class="fc" id="L109">            ParsedExpression target = parse(checked.transformedExpression());</span>
+<span class="fc" id="L110">            transitions.add(new Transition(checked, target));</span>
+<span class="fc" id="L111">        }</span>
+<span class="fc" id="L112">        Expansion result = new Expansion(source, transitions);</span>
+<span class="fc" id="L113">        expansions.put(source, result);</span>
+<span class="fc" id="L114">        return result;</span>
+    }
+
+    /**
+     * Returns a parsed/fingerprinted immutable expression. Equal normalized
+     * expression text is parsed exactly once in one shared traversal.
+     */
+    public synchronized ParsedExpression parse(String expression) {
+<span class="pc bpc" id="L122" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L123">            throw new IllegalArgumentException(&quot;expression must not be blank&quot;);</span>
+        }
+<span class="fc" id="L125">        parseRequests++;</span>
+<span class="fc" id="L126">        ParsedExpression byInput = parsedExpressions.get(expression);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (byInput != null) {</span>
+<span class="fc" id="L128">            parseCacheHits++;</span>
+<span class="fc" id="L129">            return byInput;</span>
+        }
+        Expr ast;
+        try {
+<span class="fc" id="L133">            ast = parser.parseTerm(expression);</span>
+<span class="nc" id="L134">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L135">            throw new IllegalArgumentException(</span>
+                &quot;expression is not a supported term&quot;, exception);
+<span class="fc" id="L137">        }</span>
+<span class="fc" id="L138">        String normalized = ExpressionFormatter.format(ast);</span>
+<span class="fc" id="L139">        ParsedExpression canonical = parsedExpressions.get(normalized);</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (canonical != null) {</span>
+<span class="nc" id="L141">            parseCacheHits++;</span>
+<span class="nc" id="L142">            parsedExpressions.put(expression, canonical);</span>
+<span class="nc" id="L143">            return canonical;</span>
+        }
+<span class="fc" id="L145">        ParsedExpression parsed = new ParsedExpression(</span>
+            normalized,
+            ast,
+<span class="fc" id="L148">            structuralFingerprint(ast),</span>
+<span class="fc" id="L149">            expressionNodes(ast));</span>
+<span class="fc" id="L150">        parsedExpressions.put(normalized, parsed);</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (!normalized.equals(expression)) {</span>
+<span class="fc" id="L152">            parsedExpressions.put(expression, parsed);</span>
+        }
+<span class="fc" id="L154">        return parsed;</span>
+    }
+
+    /**
+     * Shares match analysis only when pattern, recognition profile and matcher
+     * limits are structurally identical. Different principals never share a
+     * result merely because their rule IDs look related.
+     */
+    public synchronized PatternMatchAnalyzer.Analysis analyze(
+        PatternExpr pattern,
+        RecognitionProfile recognitionProfile,
+        ParsedExpression expression
+    ) {
+<span class="fc" id="L167">        Objects.requireNonNull(pattern, &quot;pattern&quot;);</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        RecognitionProfile profile = recognitionProfile == null</span>
+<span class="nc" id="L169">            ? RecognitionProfile.exact()</span>
+<span class="fc" id="L170">            : recognitionProfile;</span>
+<span class="fc" id="L171">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L172">        analysisRequests++;</span>
+<span class="fc" id="L173">        AnalysisKey key = new AnalysisKey(</span>
+            pattern,
+            profile,
+<span class="fc" id="L176">            expression.structuralFingerprint(),</span>
+<span class="fc" id="L177">            budget.maxMatchResults(),</span>
+<span class="fc" id="L178">            budget.maxMatchSteps(),</span>
+<span class="fc" id="L179">            budget.maxPatternBranches());</span>
+<span class="fc" id="L180">        PatternMatchAnalyzer.Analysis retained = analyses.get(key);</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (retained != null) {</span>
+<span class="fc" id="L182">            analysisCacheHits++;</span>
+<span class="fc" id="L183">            return retained;</span>
+        }
+<span class="fc" id="L185">        PatternMatchAnalyzer.Analysis result = analyzer.analyze(</span>
+            pattern,
+<span class="fc" id="L187">            expression.ast(),</span>
+            profile,
+            new ExprMatcher.MatchOptions(
+<span class="fc" id="L190">                EquivalentExpressionProvider.identity(),</span>
+<span class="fc" id="L191">                budget.maxMatchResults(),</span>
+<span class="fc" id="L192">                budget.maxMatchSteps(),</span>
+<span class="fc" id="L193">                budget.maxPatternBranches()));</span>
+<span class="fc" id="L194">        analyses.put(key, result);</span>
+<span class="fc" id="L195">        return result;</span>
+    }
+
+    public synchronized Work work() {
+<span class="fc" id="L199">        return new Work(</span>
+            expansionRequests,
+<span class="fc" id="L201">            expansions.size(),</span>
+            expansionCacheHits,
+            generatedTransformations,
+            parseRequests,
+<span class="fc" id="L205">            canonicalParsedExpressionCount(),</span>
+            parseCacheHits,
+            analysisRequests,
+<span class="fc" id="L208">            analyses.size(),</span>
+            analysisCacheHits);
+    }
+
+    private int canonicalParsedExpressionCount() {
+<span class="fc" id="L213">        return Math.toIntExact(parsedExpressions.values().stream()</span>
+<span class="fc" id="L214">            .map(ParsedExpression::structuralFingerprint)</span>
+<span class="fc" id="L215">            .distinct()</span>
+<span class="fc" id="L216">            .count());</span>
+    }
+
+    private static int engineCandidateObservationLimit(
+        PatternTargetedLocalBridgeSearch.Budget budget
+    ) {
+<span class="fc" id="L222">        int tighterLimit = Math.min(</span>
+<span class="fc" id="L223">            budget.maxSuccessorsPerState(),</span>
+<span class="fc" id="L224">            budget.maxGeneratedTransitions());</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        if (tighterLimit == Integer.MAX_VALUE) {</span>
+<span class="nc" id="L226">            return Integer.MAX_VALUE;</span>
+        }
+<span class="fc" id="L228">        return Math.max(1, tighterLimit + 1);</span>
+    }
+
+    private static List&lt;RewriteRule&gt; validatePreparationRules(
+        List&lt;? extends RewriteRule&gt; supplied
+    ) {
+<span class="fc" id="L234">        Objects.requireNonNull(supplied, &quot;preparationRules&quot;);</span>
+<span class="fc" id="L235">        List&lt;RewriteRule&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L236">        Set&lt;String&gt; ids = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        for (RewriteRule rule : supplied) {</span>
+<span class="fc" id="L238">            RewriteRule checked = Objects.requireNonNull(</span>
+                rule, &quot;preparation rule&quot;);
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            if (!checked.isEquivalencePreservingByConstruction()) {</span>
+<span class="fc" id="L241">                throw new IllegalArgumentException(</span>
+                    &quot;preparation rules must preserve equivalence: &quot;
+<span class="fc" id="L243">                        + checked.id());</span>
+            }
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">            if (!ids.add(checked.id())) {</span>
+<span class="nc" id="L246">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L247">                    &quot;duplicate preparation rule ID: &quot; + checked.id());</span>
+            }
+<span class="fc" id="L249">            result.add(checked);</span>
+<span class="fc" id="L250">        }</span>
+<span class="fc" id="L251">        return List.copyOf(result);</span>
+    }
+
+    private static int expressionNodes(Expr expression) {
+<span class="fc" id="L255">        int count = 0;</span>
+<span class="fc" id="L256">        ArrayDeque&lt;Expr&gt; pending = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L257">        pending.push(expression);</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L259">            Expr current = pending.pop();</span>
+<span class="fc" id="L260">            count++;</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">            if (current instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L262">                pending.push(binary.right());</span>
+<span class="fc" id="L263">                pending.push(binary.left());</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">            } else if (current instanceof FunctionExpr function) {</span>
+<span class="fc" id="L265">                for (int index = function.arguments().size() - 1;</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">                        index &gt;= 0; index--) {</span>
+<span class="fc" id="L267">                    pending.push(function.arguments().get(index));</span>
+                }
+            }
+<span class="fc" id="L270">        }</span>
+<span class="fc" id="L271">        return count;</span>
+    }
+
+    private static String structuralFingerprint(Expr expression) {
+<span class="fc" id="L275">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L276">        appendExpression(descriptor, expression);</span>
+<span class="fc" id="L277">        return sha256(descriptor.toString());</span>
+    }
+
+    private static void appendExpression(
+        StringBuilder target,
+        Expr expression
+    ) {
+<span class="fc bfc" id="L284" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L285">            append(target, &quot;number&quot;);</span>
+<span class="fc" id="L286">            append(target, number.value().canonicalText());</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        } else if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L288">            append(target, &quot;variable&quot;);</span>
+<span class="fc" id="L289">            append(target, variable.name());</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">        } else if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L291">            append(target, &quot;binary&quot;);</span>
+<span class="fc" id="L292">            append(target, binary.operator().name());</span>
+<span class="fc" id="L293">            appendExpression(target, binary.left());</span>
+<span class="fc" id="L294">            appendExpression(target, binary.right());</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L296">            append(target, &quot;function&quot;);</span>
+<span class="fc" id="L297">            append(target, function.name());</span>
+<span class="fc" id="L298">            function.arguments().forEach(value -&gt;</span>
+<span class="fc" id="L299">                appendExpression(target, value));</span>
+        } else {
+<span class="nc" id="L301">            throw new IllegalArgumentException(</span>
+                &quot;unsupported expression type: &quot;
+<span class="nc" id="L303">                    + expression.getClass().getName());</span>
+        }
+<span class="fc" id="L305">    }</span>
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L308">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L309">    }</span>
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L313">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L314">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L315">                    .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L316">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L317">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static long add(long left, long right) {
+        try {
+<span class="fc" id="L323">            return Math.addExact(left, right);</span>
+<span class="nc" id="L324">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L325">            return Long.MAX_VALUE;</span>
+        }
+    }
+
+    public record ParsedExpression(
+        String expression,
+        Expr ast,
+        String structuralFingerprint,
+        int expressionNodes
+    ) {
+<span class="fc" id="L335">        public ParsedExpression {</span>
+<span class="pc bpc" id="L336" title="4 of 8 branches missed.">            if (expression == null || expression.isBlank()</span>
+                    || ast == null
+                    || structuralFingerprint == null
+<span class="pc bpc" id="L339" title="2 of 4 branches missed.">                    || !structuralFingerprint.matches(&quot;sha256:[0-9a-f]{64}&quot;)</span>
+                    || expressionNodes &lt; 1) {
+<span class="nc" id="L341">                throw new IllegalArgumentException(</span>
+                    &quot;parsed expression metadata is invalid&quot;);
+            }
+<span class="fc" id="L344">        }</span>
+    }
+
+    public record Transition(
+        Transformation transformation,
+        ParsedExpression target
+    ) {
+<span class="fc" id="L351">        public Transition {</span>
+<span class="fc" id="L352">            transformation = Objects.requireNonNull(</span>
+                transformation, &quot;transformation&quot;);
+<span class="fc" id="L354">            target = Objects.requireNonNull(target, &quot;target&quot;);</span>
+<span class="fc" id="L355">        }</span>
+    }
+
+    public record Expansion(
+        String sourceExpression,
+        List&lt;Transition&gt; transitions
+    ) {
+<span class="fc" id="L362">        public Expansion {</span>
+<span class="pc bpc" id="L363" title="2 of 4 branches missed.">            if (sourceExpression == null || sourceExpression.isBlank()) {</span>
+<span class="nc" id="L364">                throw new IllegalArgumentException(</span>
+                    &quot;sourceExpression must not be blank&quot;);
+            }
+<span class="fc" id="L367">            transitions = List.copyOf(Objects.requireNonNull(</span>
+                transitions, &quot;transitions&quot;));
+<span class="fc" id="L369">        }</span>
+    }
+
+    /** Physical work, counted once even when several principals reuse it. */
+    public record Work(
+        long expansionRequests,
+        long uniqueExpansions,
+        long expansionCacheHits,
+        long generatedTransformations,
+        long parseRequests,
+        long uniqueParsedExpressions,
+        long parseCacheHits,
+        long analysisRequests,
+        long uniqueAnalyses,
+        long analysisCacheHits
+    ) {
+<span class="fc" id="L385">        public Work {</span>
+<span class="pc bpc" id="L386" title="13 of 26 branches missed.">            if (expansionRequests &lt; 0</span>
+                    || uniqueExpansions &lt; 0
+                    || expansionCacheHits &lt; 0
+                    || generatedTransformations &lt; 0
+                    || parseRequests &lt; 0
+                    || uniqueParsedExpressions &lt; 0
+                    || parseCacheHits &lt; 0
+                    || analysisRequests &lt; 0
+                    || uniqueAnalyses &lt; 0
+                    || analysisCacheHits &lt; 0
+                    || expansionRequests != uniqueExpansions + expansionCacheHits
+                    || analysisRequests != uniqueAnalyses + analysisCacheHits
+                    || parseCacheHits &gt; parseRequests) {
+<span class="nc" id="L399">                throw new IllegalArgumentException(</span>
+                    &quot;shared traversal work ledger is inconsistent&quot;);
+            }
+<span class="fc" id="L402">        }</span>
+
+        public long avoidedExpansionInvocations() {
+<span class="fc" id="L405">            return expansionCacheHits;</span>
+        }
+
+        public long avoidedPatternAnalyses() {
+<span class="fc" id="L409">            return analysisCacheHits;</span>
+        }
+    }
+
+    private record AnalysisKey(
+        PatternExpr pattern,
+        RecognitionProfile recognitionProfile,
+        String structuralFingerprint,
+        int maxMatchResults,
+        int maxMatchSteps,
+        int maxPatternBranches
+    ) {
+<span class="fc" id="L421">        private AnalysisKey {</span>
+<span class="fc" id="L422">            Objects.requireNonNull(pattern, &quot;pattern&quot;);</span>
+<span class="fc" id="L423">            Objects.requireNonNull(recognitionProfile, &quot;recognitionProfile&quot;);</span>
+<span class="fc" id="L424">            Objects.requireNonNull(</span>
+                structuralFingerprint, &quot;structuralFingerprint&quot;);
+<span class="fc" id="L426">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

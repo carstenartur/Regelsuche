@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SharedPreparationGuardFacts.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.reachability</a> &gt; <span class="el_source">SharedPreparationGuardFacts.java</span></div><h1>SharedPreparationGuardFacts.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.reachability;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.PatternMatchAnalyzer;
+import de.regelsuche.transform.RequiredAssumptionTemplate;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+
+/** Per-evaluation cache for semantically identical applicability guard facts. */
+<span class="fc" id="L20">final class SharedPreparationGuardFacts {</span>
+    static final String REVISION =
+        &quot;regelsuche.shared-preparation-guard-facts/v1&quot;;
+
+<span class="fc" id="L24">    private final Map&lt;Key, Fact&gt; facts = new LinkedHashMap&lt;&gt;();</span>
+    private long requests;
+    private long cacheHits;
+
+    synchronized Fact evaluate(
+        RewriteApplicabilitySchema schema,
+        PatternMatchAnalyzer.Analysis analysis,
+        AssumptionSignature available
+    ) {
+<span class="fc" id="L33">        Objects.requireNonNull(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L34">        Objects.requireNonNull(analysis, &quot;analysis&quot;);</span>
+<span class="fc" id="L35">        AssumptionSignature assumptions = normalized(available);</span>
+<span class="fc" id="L36">        Map&lt;String, String&gt; formattedBindings = formattedBindings(analysis);</span>
+<span class="fc" id="L37">        requests++;</span>
+<span class="fc" id="L38">        Key key = key(</span>
+<span class="fc" id="L39">            schema.requiredAssumptions(),</span>
+<span class="fc" id="L40">            analysis.status(),</span>
+            formattedBindings,
+            assumptions);
+<span class="fc" id="L43">        Fact retained = facts.get(key);</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (retained != null) {</span>
+<span class="fc" id="L45">            cacheHits++;</span>
+<span class="fc" id="L46">            return retained;</span>
+        }
+<span class="fc" id="L48">        Fact result = compute(</span>
+<span class="fc" id="L49">            schema.requiredAssumptions(),</span>
+<span class="fc" id="L50">            analysis.matched(),</span>
+<span class="fc" id="L51">            analysis.bindings(),</span>
+            assumptions);
+<span class="fc" id="L53">        facts.put(key, result);</span>
+<span class="fc" id="L54">        return result;</span>
+    }
+
+    /**
+     * Reuses the same semantic guard cache from a retained match-analysis
+     * snapshot. Binding expressions are parsed only on a cache miss, so a
+     * shared traversal can discard heavyweight analysis internals without
+     * forcing every principal to recompute its guards.
+     */
+    synchronized Fact evaluateSnapshot(
+        RewriteApplicabilitySchema schema,
+        PatternTargetedLocalBridgeSearch.AnalysisSnapshot analysis,
+        AssumptionSignature available
+    ) {
+<span class="fc" id="L68">        Objects.requireNonNull(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L69">        Objects.requireNonNull(analysis, &quot;analysis&quot;);</span>
+<span class="fc" id="L70">        AssumptionSignature assumptions = normalized(available);</span>
+<span class="fc" id="L71">        Map&lt;String, String&gt; formattedBindings = new TreeMap&lt;&gt;(</span>
+<span class="fc" id="L72">            analysis.bindings());</span>
+<span class="fc" id="L73">        requests++;</span>
+<span class="fc" id="L74">        Key key = key(</span>
+<span class="fc" id="L75">            schema.requiredAssumptions(),</span>
+<span class="fc" id="L76">            analysis.status(),</span>
+            formattedBindings,
+            assumptions);
+<span class="fc" id="L79">        Fact retained = facts.get(key);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (retained != null) {</span>
+<span class="fc" id="L81">            cacheHits++;</span>
+<span class="fc" id="L82">            return retained;</span>
+        }
+<span class="fc" id="L84">        Fact result = compute(</span>
+<span class="fc" id="L85">            schema.requiredAssumptions(),</span>
+<span class="fc" id="L86">            matched(analysis.status()),</span>
+<span class="fc" id="L87">            parseBindings(formattedBindings),</span>
+            assumptions);
+<span class="fc" id="L89">        facts.put(key, result);</span>
+<span class="fc" id="L90">        return result;</span>
+    }
+
+    synchronized Work work() {
+<span class="fc" id="L94">        return new Work(requests, facts.size(), cacheHits);</span>
+    }
+
+    private static Fact compute(
+        List&lt;RequiredAssumptionTemplate&gt; templates,
+        boolean matched,
+        Map&lt;String, Expr&gt; bindings,
+        AssumptionSignature available
+    ) {
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (templates.isEmpty()) {</span>
+<span class="fc" id="L104">            return Fact.satisfied(&quot;NO_REQUIRED_ASSUMPTIONS&quot;);</span>
+        }
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (!matched) {</span>
+<span class="nc" id="L107">            return Fact.unknown(</span>
+                &quot;REQUIRED_ASSUMPTION_BINDINGS_UNAVAILABLE&quot;);
+        }
+        try {
+<span class="fc" id="L111">            Set&lt;String&gt; known = Set.copyOf(available.normalizedAssumptions());</span>
+<span class="fc" id="L112">            List&lt;String&gt; required = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            for (RequiredAssumptionTemplate template : templates) {</span>
+<span class="fc" id="L114">                Assumption assumption = template.instantiate(bindings);</span>
+<span class="fc" id="L115">                String normalized = AssumptionSignature.normalizeExpression(</span>
+<span class="fc" id="L116">                    assumption.expression());</span>
+<span class="fc" id="L117">                required.add(normalized);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">                if (!known.contains(normalized)) {</span>
+<span class="fc" id="L119">                    return new Fact(</span>
+                        Status.UNKNOWN,
+                        &quot;REQUIRED_ASSUMPTION_UNKNOWN&quot;,
+                        required);
+                }
+<span class="fc" id="L124">            }</span>
+<span class="fc" id="L125">            return new Fact(</span>
+                Status.SATISFIED,
+                &quot;REQUIRED_ASSUMPTIONS_SATISFIED&quot;,
+                required);
+<span class="nc" id="L129">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L130">            return Fact.invalid(</span>
+                &quot;REQUIRED_ASSUMPTION_TEMPLATE_INVALID&quot;);
+        }
+    }
+
+    private static Key key(
+        List&lt;RequiredAssumptionTemplate&gt; templates,
+        PatternMatchAnalyzer.Status status,
+        Map&lt;String, String&gt; bindings,
+        AssumptionSignature available
+    ) {
+<span class="fc" id="L141">        List&lt;String&gt; templateHashes = templates.stream()</span>
+<span class="fc" id="L142">            .map(RequiredAssumptionTemplate::contentHash)</span>
+<span class="fc" id="L143">            .toList();</span>
+<span class="fc" id="L144">        return new Key(</span>
+            templateHashes,
+            status,
+<span class="fc" id="L147">            Map.copyOf(new TreeMap&lt;&gt;(bindings)),</span>
+<span class="fc" id="L148">            available.fingerprint());</span>
+    }
+
+    private static Map&lt;String, String&gt; formattedBindings(
+        PatternMatchAnalyzer.Analysis analysis
+    ) {
+<span class="fc" id="L154">        Map&lt;String, String&gt; bindings = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L155">        analysis.bindings().forEach((name, expression) -&gt;</span>
+<span class="fc" id="L156">            bindings.put(name, ExpressionFormatter.format(expression)));</span>
+<span class="fc" id="L157">        return Map.copyOf(bindings);</span>
+    }
+
+    private static Map&lt;String, Expr&gt; parseBindings(
+        Map&lt;String, String&gt; bindings
+    ) {
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        if (bindings.isEmpty()) {</span>
+<span class="nc" id="L164">            return Map.of();</span>
+        }
+<span class="fc" id="L166">        ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L167">        Map&lt;String, Expr&gt; result = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L168">        bindings.forEach((name, expression) -&gt;</span>
+<span class="fc" id="L169">            result.put(name, parser.parseTerm(expression)));</span>
+<span class="fc" id="L170">        return Map.copyOf(result);</span>
+    }
+
+    private static boolean matched(PatternMatchAnalyzer.Status status) {
+<span class="pc bpc" id="L174" title="3 of 4 branches missed.">        return status == PatternMatchAnalyzer.Status.EXACT_MATCH</span>
+            || status == PatternMatchAnalyzer.Status.MATCH_MODULO_THEORY;
+    }
+
+    private static AssumptionSignature normalized(AssumptionSignature value) {
+<span class="fc" id="L179">        AssumptionSignature checked = Objects.requireNonNull(</span>
+            value, &quot;availableAssumptions&quot;);
+<span class="fc" id="L181">        return AssumptionSignature.ofExpressions(</span>
+<span class="fc" id="L182">            checked.normalizedAssumptions());</span>
+    }
+
+<span class="fc" id="L185">    enum Status {</span>
+<span class="fc" id="L186">        SATISFIED,</span>
+<span class="fc" id="L187">        UNKNOWN,</span>
+<span class="fc" id="L188">        INVALID</span>
+    }
+
+    record Fact(
+        Status status,
+        String detailCode,
+        List&lt;String&gt; requiredAssumptions
+    ) {
+<span class="fc" id="L196">        Fact {</span>
+<span class="fc" id="L197">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L198" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L199">                throw new IllegalArgumentException(</span>
+                    &quot;guard fact detailCode must not be blank&quot;);
+            }
+<span class="fc" id="L202">            requiredAssumptions = List.copyOf(Objects.requireNonNull(</span>
+                requiredAssumptions, &quot;requiredAssumptions&quot;));
+<span class="fc" id="L204">        }</span>
+
+        static Fact satisfied(String detailCode) {
+<span class="fc" id="L207">            return new Fact(Status.SATISFIED, detailCode, List.of());</span>
+        }
+
+        static Fact unknown(String detailCode) {
+<span class="nc" id="L211">            return new Fact(Status.UNKNOWN, detailCode, List.of());</span>
+        }
+
+        static Fact invalid(String detailCode) {
+<span class="nc" id="L215">            return new Fact(Status.INVALID, detailCode, List.of());</span>
+        }
+
+        boolean satisfied() {
+<span class="fc bfc" id="L219" title="All 2 branches covered.">            return status == Status.SATISFIED;</span>
+        }
+    }
+
+    record Work(long requests, long uniqueFacts, long cacheHits) {
+<span class="fc" id="L224">        Work {</span>
+<span class="pc bpc" id="L225" title="4 of 8 branches missed.">            if (requests &lt; 0 || uniqueFacts &lt; 0 || cacheHits &lt; 0</span>
+                    || requests != uniqueFacts + cacheHits) {
+<span class="nc" id="L227">                throw new IllegalArgumentException(</span>
+                    &quot;shared guard-fact work ledger is inconsistent&quot;);
+            }
+<span class="fc" id="L230">        }</span>
+    }
+
+    private record Key(
+        List&lt;String&gt; templateHashes,
+        PatternMatchAnalyzer.Status analysisStatus,
+        Map&lt;String, String&gt; bindings,
+        String assumptionFingerprint
+    ) {
+<span class="fc" id="L239">        private Key {</span>
+<span class="fc" id="L240">            templateHashes = List.copyOf(Objects.requireNonNull(</span>
+                templateHashes, &quot;templateHashes&quot;));
+<span class="fc" id="L242">            analysisStatus = Objects.requireNonNull(</span>
+                analysisStatus, &quot;analysisStatus&quot;);
+<span class="fc" id="L244">            bindings = Map.copyOf(Objects.requireNonNull(bindings, &quot;bindings&quot;));</span>
+<span class="fc" id="L245">            assumptionFingerprint = Objects.requireNonNull(</span>
+                assumptionFingerprint, &quot;assumptionFingerprint&quot;);
+<span class="fc" id="L247">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

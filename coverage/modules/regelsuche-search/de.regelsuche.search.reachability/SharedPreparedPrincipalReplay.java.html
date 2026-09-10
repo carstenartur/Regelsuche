@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SharedPreparedPrincipalReplay.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.reachability</a> &gt; <span class="el_source">SharedPreparedPrincipalReplay.java</span></div><h1>SharedPreparedPrincipalReplay.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.reachability;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.knowledge.RuleInventoryFingerprint;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * Converts one shared preparation result into one independently replayed
+ * principal outcome.
+ *
+ * &lt;p&gt;The shared traversal is only a search optimization. Authorization stays
+ * principal-local: terminal guards are checked from the retained match
+ * snapshot and the concrete principal executor is replayed at the terminal
+ * expression. A positive outcome retains the complete preparation plus
+ * principal primitive lineage and a content-addressed certificate bound to the
+ * repository revision, schema, preparation inventory, budget and shared work
+ * identity.&lt;/p&gt;
+ */
+final class SharedPreparedPrincipalReplay {
+    static final String CERTIFICATE_SCHEMA =
+        &quot;regelsuche.unified-shared-preparation-certificate/v1&quot;;
+
+    private final String repositoryRevision;
+    private final String preparationInventoryFingerprint;
+    private final PatternTargetedLocalBridgeSearch.Budget budget;
+    private final SharedPreparationGuardFacts guardFacts;
+
+    SharedPreparedPrincipalReplay(
+        List&lt;? extends RewriteRule&gt; preparationRules,
+        String repositoryRevision,
+        PatternTargetedLocalBridgeSearch.Budget budget,
+        SharedPreparationGuardFacts guardFacts
+<span class="fc" id="L45">    ) {</span>
+<span class="fc" id="L46">        Objects.requireNonNull(preparationRules, &quot;preparationRules&quot;);</span>
+<span class="fc" id="L47">        this.preparationInventoryFingerprint =</span>
+<span class="fc" id="L48">            RuleInventoryFingerprint.contentHash(preparationRules);</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (repositoryRevision == null</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">                || !repositoryRevision.matches(&quot;[0-9a-f]{40}&quot;)) {</span>
+<span class="nc" id="L51">            throw new IllegalArgumentException(</span>
+                &quot;repositoryRevision must be a lowercase commit SHA&quot;);
+        }
+<span class="fc" id="L54">        this.repositoryRevision = repositoryRevision;</span>
+<span class="fc" id="L55">        this.budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L56">        this.guardFacts = Objects.requireNonNull(guardFacts, &quot;guardFacts&quot;);</span>
+<span class="fc" id="L57">    }</span>
+
+    RulePreparationCoordinator.Outcome replay(
+        RewriteApplicabilitySchema schema,
+        SharedMultiPrincipalPreparationTraversal.Evaluation sharedEvaluation,
+        SharedMultiPrincipalPreparationTraversal.PrincipalOutcome sharedOutcome
+    ) {
+<span class="fc" id="L64">        Objects.requireNonNull(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L65">        Objects.requireNonNull(sharedEvaluation, &quot;sharedEvaluation&quot;);</span>
+<span class="fc" id="L66">        Objects.requireNonNull(sharedOutcome, &quot;sharedOutcome&quot;);</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (!schema.ruleId().equals(sharedOutcome.ruleId())</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                || !schema.contentHash().equals(</span>
+<span class="fc" id="L69">                    sharedOutcome.applicabilitySchemaHash())) {</span>
+<span class="nc" id="L70">            throw new IllegalArgumentException(</span>
+                &quot;shared principal outcome does not match applicability schema&quot;);
+        }
+
+<span class="fc" id="L74">        PatternTargetedLocalBridgeSearch.Work sharedWork =</span>
+<span class="fc" id="L75">            legacyWork(sharedEvaluation.work());</span>
+<span class="fc" id="L76">        Set&lt;String&gt; limits = sharedEvaluation.work().reachedLimits();</span>
+<span class="pc bpc" id="L77" title="3 of 4 branches missed.">        return switch (sharedOutcome.status()) {</span>
+<span class="fc" id="L78">            case PREPARED_MATCH -&gt; prepared(</span>
+                schema,
+                sharedEvaluation,
+                sharedOutcome,
+                sharedWork,
+                limits);
+<span class="nc" id="L84">            case MATCHED_AT_SOURCE -&gt; negative(</span>
+                schema,
+                sharedOutcome,
+                PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE,
+                sharedWork,
+                limits,
+                &quot;UNIFIED_SCHEMA_MATCH_WITHOUT_DIRECT_REPLAY&quot;);
+<span class="nc" id="L91">            case NO_MATCH_IN_COMPLETE_FROZEN_CLOSURE -&gt; negative(</span>
+                schema,
+                sharedOutcome,
+                PatternTargetedLocalBridgeSearch.Status
+                    .NO_BRIDGE_IN_COMPLETE_FROZEN_CLOSURE,
+                sharedWork,
+                limits,
+                &quot;SHARED_FROZEN_CLOSURE_EXHAUSTED&quot;);
+<span class="nc" id="L99">            case BUDGET_INCONCLUSIVE -&gt; negative(</span>
+                schema,
+                sharedOutcome,
+                PatternTargetedLocalBridgeSearch.Status.BUDGET_INCONCLUSIVE,
+                sharedWork,
+                limits,
+                &quot;SHARED_BRIDGE_BUDGET_INCONCLUSIVE&quot;);
+        };
+    }
+
+    private RulePreparationCoordinator.Outcome prepared(
+        RewriteApplicabilitySchema schema,
+        SharedMultiPrincipalPreparationTraversal.Evaluation sharedEvaluation,
+        SharedMultiPrincipalPreparationTraversal.PrincipalOutcome sharedOutcome,
+        PatternTargetedLocalBridgeSearch.Work sharedWork,
+        Set&lt;String&gt; limits
+    ) {
+        SharedPreparationGuardFacts.Fact guards;
+        try {
+<span class="fc" id="L118">            guards = guardFacts.evaluateSnapshot(</span>
+                schema,
+<span class="fc" id="L120">                sharedOutcome.terminalAnalysis(),</span>
+<span class="fc" id="L121">                sharedOutcome.terminalAssumptions());</span>
+<span class="nc" id="L122">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L123">            return negative(</span>
+                schema,
+                sharedOutcome,
+                PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE,
+                sharedWork,
+                limits,
+                &quot;UNIFIED_SHARED_GUARD_REPLAY_TECHNICAL_FAILURE&quot;);
+<span class="fc" id="L130">        }</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (!guards.satisfied()) {</span>
+            PatternTargetedLocalBridgeSearch.Status status =
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">                guards.status() == SharedPreparationGuardFacts.Status.INVALID</span>
+<span class="nc" id="L134">                    ? PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE</span>
+<span class="fc" id="L135">                    : PatternTargetedLocalBridgeSearch.Status.UNSUPPORTED;</span>
+<span class="fc" id="L136">            return negative(</span>
+                schema,
+                sharedOutcome,
+                status,
+                sharedWork,
+                limits,
+<span class="fc" id="L142">                guards.detailCode());</span>
+        }
+
+        Optional&lt;Transformation&gt; replay;
+        try {
+<span class="fc" id="L147">            replay = concreteReplay(</span>
+<span class="fc" id="L148">                schema.executor(),</span>
+<span class="fc" id="L149">                sharedOutcome.terminalExpression());</span>
+<span class="nc" id="L150">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L151">            return negative(</span>
+                schema,
+                sharedOutcome,
+                PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE,
+                sharedWork,
+                limits,
+                &quot;UNIFIED_SHARED_PRINCIPAL_REPLAY_TECHNICAL_FAILURE&quot;);
+<span class="fc" id="L158">        }</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        if (replay.isEmpty()) {</span>
+<span class="nc" id="L160">            return negative(</span>
+                schema,
+                sharedOutcome,
+                PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE,
+                sharedWork,
+                limits,
+                &quot;UNIFIED_SHARED_PRINCIPAL_REPLAY_FAILED&quot;);
+        }
+
+<span class="fc" id="L169">        Transformation principal = replay.orElseThrow();</span>
+<span class="fc" id="L170">        AssumptionSignature resultAssumptions = AssumptionSignature.merge(</span>
+<span class="fc" id="L171">            sharedOutcome.terminalAssumptions(),</span>
+<span class="fc" id="L172">            AssumptionSignature.ofExpressions(principal.assumptions()));</span>
+<span class="fc" id="L173">        List&lt;String&gt; primitiveRuleIds = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L174">        sharedOutcome.preparationSteps().forEach(step -&gt;</span>
+<span class="fc" id="L175">            primitiveRuleIds.addAll(step.primitiveRuleIds()));</span>
+<span class="fc" id="L176">        primitiveRuleIds.addAll(principal.primitiveRuleIds());</span>
+<span class="fc" id="L177">        List&lt;String&gt; retainedPrimitiveRuleIds = List.copyOf(primitiveRuleIds);</span>
+<span class="fc" id="L178">        String certificateHash = certificateHash(</span>
+            schema,
+            sharedEvaluation,
+            sharedOutcome,
+            principal,
+            resultAssumptions,
+            retainedPrimitiveRuleIds,
+            sharedWork);
+<span class="fc" id="L186">        Transformation candidate = new Transformation(</span>
+<span class="fc" id="L187">            schema.executor().id(),</span>
+<span class="fc" id="L188">            principal.transformedExpression(),</span>
+<span class="fc" id="L189">            schema.executor().kind(),</span>
+<span class="fc" id="L190">            schema.executor().mayIncreaseComplexity(),</span>
+<span class="fc" id="L191">            schema.executor().estimatedCostDelta(),</span>
+<span class="fc" id="L192">            schema.executor().isEquivalencePreservingByConstruction(),</span>
+            &quot;unified-shared-preparation:&quot; + certificateHash,
+<span class="fc" id="L194">            resultAssumptions.normalizedAssumptions(),</span>
+<span class="fc" id="L195">            principal.packId(),</span>
+<span class="fc" id="L196">            principal.license(),</span>
+            retainedPrimitiveRuleIds);
+
+<span class="fc" id="L199">        return new RulePreparationCoordinator.Outcome(</span>
+<span class="fc" id="L200">            schema.ruleId(),</span>
+<span class="fc" id="L201">            schema.contentHash(),</span>
+            PatternTargetedLocalBridgeSearch.Status.PREPARED,
+<span class="fc" id="L203">            Optional.of(candidate),</span>
+            true,
+<span class="fc" id="L205">            sharedOutcome.initialAnalysis(),</span>
+            sharedWork,
+            limits,
+            &quot;UNIFIED_SHARED_PREPARATION_REPLAYED&quot;,
+            certificateHash);
+    }
+
+    private static RulePreparationCoordinator.Outcome negative(
+        RewriteApplicabilitySchema schema,
+        SharedMultiPrincipalPreparationTraversal.PrincipalOutcome sharedOutcome,
+        PatternTargetedLocalBridgeSearch.Status status,
+        PatternTargetedLocalBridgeSearch.Work work,
+        Set&lt;String&gt; limits,
+        String detailCode
+    ) {
+<span class="fc" id="L220">        return new RulePreparationCoordinator.Outcome(</span>
+<span class="fc" id="L221">            schema.ruleId(),</span>
+<span class="fc" id="L222">            schema.contentHash(),</span>
+            status,
+<span class="fc" id="L224">            Optional.empty(),</span>
+            false,
+<span class="fc" id="L226">            sharedOutcome.initialAnalysis(),</span>
+            work,
+            limits,
+            detailCode,
+            &quot;&quot;);
+    }
+
+    private static Optional&lt;Transformation&gt; concreteReplay(
+        RewriteRule executor,
+        String terminalExpression
+    ) {
+<span class="fc" id="L237">        return new AstRewriteTransformationEngine(</span>
+<span class="fc" id="L238">                List.of(executor),</span>
+                Integer.MAX_VALUE,
+                1)
+<span class="fc" id="L241">            .transform(terminalExpression)</span>
+<span class="fc" id="L242">            .stream()</span>
+<span class="fc" id="L243">            .filter(value -&gt; executor.id().equals(value.rule()))</span>
+<span class="fc" id="L244">            .findFirst();</span>
+    }
+
+    private String certificateHash(
+        RewriteApplicabilitySchema schema,
+        SharedMultiPrincipalPreparationTraversal.Evaluation sharedEvaluation,
+        SharedMultiPrincipalPreparationTraversal.PrincipalOutcome sharedOutcome,
+        Transformation principal,
+        AssumptionSignature resultAssumptions,
+        List&lt;String&gt; primitiveRuleIds,
+        PatternTargetedLocalBridgeSearch.Work sharedWork
+    ) {
+<span class="fc" id="L256">        StringBuilder value = new StringBuilder();</span>
+<span class="fc" id="L257">        append(value, CERTIFICATE_SCHEMA);</span>
+<span class="fc" id="L258">        append(value, SharedMultiPrincipalPreparationTraversal.REVISION);</span>
+<span class="fc" id="L259">        append(value, SharedPreparationTraversal.REVISION);</span>
+<span class="fc" id="L260">        append(value, SharedPreparationGuardFacts.REVISION);</span>
+<span class="fc" id="L261">        append(value, repositoryRevision);</span>
+<span class="fc" id="L262">        append(value, preparationInventoryFingerprint);</span>
+<span class="fc" id="L263">        append(value, schema.contentHash());</span>
+<span class="fc" id="L264">        append(value, budget.identity());</span>
+<span class="fc" id="L265">        append(value, sharedEvaluation.sourceExpression());</span>
+<span class="fc" id="L266">        append(value, sharedEvaluation.sourceAssumptions().fingerprint());</span>
+<span class="fc" id="L267">        append(value, sharedOutcome.initialAnalysis().descriptor());</span>
+<span class="fc" id="L268">        append(value, sharedOutcome.terminalExpression());</span>
+<span class="fc" id="L269">        append(value, sharedOutcome.terminalAssumptions().fingerprint());</span>
+<span class="fc" id="L270">        append(value, sharedOutcome.terminalAnalysis().descriptor());</span>
+<span class="fc" id="L271">        sharedOutcome.preparationSteps().forEach(step -&gt;</span>
+<span class="fc" id="L272">            append(value, step.descriptor()));</span>
+<span class="fc" id="L273">        append(value, principal.rule());</span>
+<span class="fc" id="L274">        append(value, principal.transformedExpression());</span>
+<span class="fc" id="L275">        append(value, principal.applicationKey());</span>
+<span class="fc" id="L276">        append(value, String.join(&quot;\u0000&quot;, principal.assumptions()));</span>
+<span class="fc" id="L277">        append(value, String.join(&quot;\u0000&quot;, principal.primitiveRuleIds()));</span>
+<span class="fc" id="L278">        append(value, resultAssumptions.fingerprint());</span>
+<span class="fc" id="L279">        append(value, String.join(&quot;\u0000&quot;, primitiveRuleIds));</span>
+<span class="fc" id="L280">        append(value, sharedWork.descriptor());</span>
+<span class="fc" id="L281">        return sha256(value.toString());</span>
+    }
+
+    static PatternTargetedLocalBridgeSearch.Work legacyWork(
+        SharedMultiPrincipalPreparationTraversal.Work work
+    ) {
+<span class="fc" id="L287">        Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L288">        return new PatternTargetedLocalBridgeSearch.Work(</span>
+<span class="fc" id="L289">            work.expandedStates(),</span>
+<span class="fc" id="L290">            work.generatedTransitions(),</span>
+<span class="fc" id="L291">            work.discoveredStates(),</span>
+<span class="fc" id="L292">            work.retainedTransitions(),</span>
+<span class="fc" id="L293">            work.duplicateTransitions(),</span>
+<span class="fc" id="L294">            Math.toIntExact(work.principalAnalysisRequests()),</span>
+<span class="fc" id="L295">            work.maxFrontierSize());</span>
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L299">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L300">    }</span>
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L304">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L305">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L306">                    .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L307">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L308">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
