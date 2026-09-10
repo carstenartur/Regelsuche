@@ -68,19 +68,33 @@ dokumentiert.
 | [`regelsuche-learned-pattern-rule-authorization-bundle-v1`](schemas/regelsuche-learned-pattern-rule-authorization-bundle-v1.schema.json) | Zeit-, Genome-, Gene- und Repository-gebundener Manifestvertrag für die konkreten Qualification-Roots; enthält bewusst keinen PASS-Status |
 | [`regelsuche-learned-pattern-rule-counterexample-evidence-v1`](schemas/regelsuche-learned-pattern-rule-counterexample-evidence-v1.schema.json) | Gene-spezifische, content-addressed Counterexample-Evidence mit vollständig eingefrorenem deterministischem Replay-Budget |
 | [`regelsuche-learned-pattern-rule-authorization-receipt-v1`](schemas/regelsuche-learned-pattern-rule-authorization-receipt-v1.schema.json) | Produktionszulassungsreceipt, das native Split-/VALIDATION-/FINAL-TEST-Evidence, Counterexample-Replay und den exakten Promotion-Receipt bindet |
+| [`regelsuche-learned-rewrite-program-replay-evidence-v1`](schemas/regelsuche-learned-rewrite-program-replay-evidence-v1.schema.json) | Kandidaten- und plan-gebundene Programmausführung mit geordneten Ergebnissen, vollständiger primitiver Lineage und Interpreter-Work-Ledger |
+| [`regelsuche-learned-rewrite-program-authorization-receipt-v1`](schemas/regelsuche-learned-rewrite-program-authorization-receipt-v1.schema.json) | Produktionszulassung eines kanonischen `RewriteProgram`, gebunden an unabhängig autorisierte Leaf-Regeln, deterministischen Replay und Work-Semantik |
 
 Weitere Flagship-Verträge für Freeze, Reveal, Baselines und Work Accounting
 liegen ebenfalls im Schema-Verzeichnis und sind in
 [Flagship Freeze Execution](evolution-rewrite-program-flagship-freeze-execution.md)
 beschrieben. Die mathematische Grenze des Promotion-Receipts steht unter
 [Promotion gelernter Pattern-Regeln](learned-pattern-rule-promotion.md); die
-stärkere Production-Qualification und der Stored-Receipt-Replay stehen unter
+stärkere Production-Qualification und der Stored-Receipt-Replay einer einzelnen
+Pattern-Regel stehen unter
 [Learned pattern rule authorization](learned-pattern-rule-authorization.md).
-`verifyLearnedPatternAuthorizationEvidence` erzeugt dafür eine deterministische
-Java-Fixture und prüft die neuen Schemas, Content-Hashes, Split-Disjunktheit,
-VALIDATION-/FINAL-TEST-Parität, Counterexample-Budget/-Resultat und Receipt-
-Querverweise zusätzlich mit dem unabhängigen Python-Verifier
+Zusammengesetzte Strategien haben eine eigene Grenze unter
+[Learned RewriteProgram authorization](learned-rewrite-program-authorization.md):
+Die Programmtopologie bleibt explizit und jede Source muss eine unabhängig
+autorisierte Leaf-Regel verwenden.
+
+`verifyLearnedPatternAuthorizationEvidence` erzeugt für einzelne Pattern-Regeln
+eine deterministische Java-Fixture und prüft Schemas, Content-Hashes,
+Split-Disjunktheit, VALIDATION-/FINAL-TEST-Parität, Counterexample-Budget und
+Receipt-Querverweise mit dem unabhängigen Python-Verifier
 `scripts/verify-learned-pattern-authorization.py`.
+`verifyLearnedRewriteProgramAuthorizationEvidence` erzeugt zusätzlich ein
+zusammengesetztes Programm mit Sequence, Choice, Repeat, Guard, Priorisierung
+und Pruning. Der unabhängige Verifier
+`scripts/verify-learned-rewrite-program-authorization.py` prüft dessen
+Genome-/Plan-/Candidate-Bindungen, Leaf-Receipts, kanonische Content-Hashes,
+Ablaufgrenze, primitive Lineage und mechanisches Work-Ledger.
 
 ## Benchmarks, Kosten und Reproduktion
 
