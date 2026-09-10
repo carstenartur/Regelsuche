@@ -23,7 +23,9 @@ public record LearnedRewriteProgramAuthorizationReceipt(
     Instant authorizedAt,
     Instant validUntil,
     String replayEvidenceHash,
+    String applicabilitySemantics,
     Map<String, String> leafAuthorizationHashes,
+    Map<String, String> leafApplicabilitySchemaHashes,
     List<String> workRevisions,
     String contentHash
 ) {
@@ -31,6 +33,8 @@ public record LearnedRewriteProgramAuthorizationReceipt(
         "regelsuche.learned-rewrite-program-authorization-receipt/v1";
     public static final String AUTHORIZER_ID =
         "regelsuche.learned-rewrite-program-authorizer/v1";
+    public static final String APPLICABILITY_SEMANTICS =
+        "CANONICAL_PROGRAM_RETURNS_AT_LEAST_ONE_CANDIDATE/v1";
 
     public LearnedRewriteProgramAuthorizationReceipt {
         if (!SCHEMA.equals(schema) || !AUTHORIZER_ID.equals(authorizerId)) {
@@ -54,7 +58,19 @@ public record LearnedRewriteProgramAuthorizationReceipt(
             throw new IllegalArgumentException(
                 "rewrite-program authorization must expire after authorizedAt");
         }
-        leafAuthorizationHashes = canonicalLeafHashes(leafAuthorizationHashes);
+        if (!APPLICABILITY_SEMANTICS.equals(applicabilitySemantics)) {
+            throw new IllegalArgumentException(
+                "unsupported learned rewrite-program applicability semantics");
+        }
+        leafAuthorizationHashes = canonicalLeafHashes(
+            leafAuthorizationHashes, "leafAuthorizationHashes");
+        leafApplicabilitySchemaHashes = canonicalLeafHashes(
+            leafApplicabilitySchemaHashes, "leafApplicabilitySchemaHashes");
+        if (!leafAuthorizationHashes.keySet().equals(
+                leafApplicabilitySchemaHashes.keySet())) {
+            throw new IllegalArgumentException(
+                "leaf authorization and applicability-schema subjects differ");
+        }
         workRevisions = canonicalWorkRevisions(workRevisions);
         String expected = hash(payload(
             schema,
@@ -68,7 +84,9 @@ public record LearnedRewriteProgramAuthorizationReceipt(
             authorizedAt,
             validUntil,
             replayEvidenceHash,
+            applicabilitySemantics,
             leafAuthorizationHashes,
+            leafApplicabilitySchemaHashes,
             workRevisions));
         if (!expected.equals(contentHash)) {
             throw new IllegalArgumentException(
@@ -82,12 +100,20 @@ public record LearnedRewriteProgramAuthorizationReceipt(
         Instant authorizedAt,
         Instant validUntil,
         LearnedRewriteProgramReplayEvidence replayEvidence,
-        Map<String, String> leafAuthorizationHashes
+        Map<String, String> leafAuthorizationHashes,
+        Map<String, String> leafApplicabilitySchemaHashes
     ) {
         Objects.requireNonNull(candidate, "candidate");
         Objects.requireNonNull(replayEvidence, "replayEvidence");
         replayEvidence.requireCandidate(candidate);
-        Map<String, String> leaves = canonicalLeafHashes(leafAuthorizationHashes);
+        Map<String, String> leaves = canonicalLeafHashes(
+            leafAuthorizationHashes, "leafAuthorizationHashes");
+        Map<String, String> applicability = canonicalLeafHashes(
+            leafApplicabilitySchemaHashes, "leafApplicabilitySchemaHashes");
+        if (!leaves.keySet().equals(applicability.keySet())) {
+            throw new IllegalArgumentException(
+                "leaf authorization and applicability-schema subjects differ");
+        }
         List<String> revisions = canonicalWorkRevisions(
             replayEvidence.cases().stream()
                 .map(LearnedRewriteProgramReplayEvidence.ReplayCase::workRevision)
@@ -105,7 +131,9 @@ public record LearnedRewriteProgramAuthorizationReceipt(
             authorizedAt,
             validUntil,
             replayEvidence.contentHash(),
+            APPLICABILITY_SEMANTICS,
             leaves,
+            applicability,
             revisions);
         return new LearnedRewriteProgramAuthorizationReceipt(
             SCHEMA,
@@ -119,7 +147,9 @@ public record LearnedRewriteProgramAuthorizationReceipt(
             authorizedAt,
             validUntil,
             replayEvidence.contentHash(),
+            APPLICABILITY_SEMANTICS,
             leaves,
+            applicability,
             revisions,
             hash(payload));
     }
@@ -162,20 +192,21 @@ public record LearnedRewriteProgramAuthorizationReceipt(
     }
 
     private static Map<String, String> canonicalLeafHashes(
-        Map<String, String> values
+        Map<String, String> values,
+        String field
     ) {
-        Objects.requireNonNull(values, "leafAuthorizationHashes");
+        Objects.requireNonNull(values, field);
         if (values.isEmpty()) {
             throw new IllegalArgumentException(
-                "rewrite-program authorization requires leaf authorizations");
+                "rewrite-program authorization requires " + field);
         }
         TreeMap<String, String> retained = new TreeMap<>();
         values.forEach((geneId, value) -> {
             LearnedPatternAuthorizationJson.requireText(geneId, "leaf geneId");
-            requireHash(value, "leaf authorization hash");
+            requireHash(value, field + " hash");
             if (retained.put(geneId, value) != null) {
                 throw new IllegalArgumentException(
-                    "duplicate leaf authorization for " + geneId);
+                    "duplicate leaf subject in " + field + ": " + geneId);
             }
         });
         return Map.copyOf(retained);
@@ -208,15 +239,19 @@ public record LearnedRewriteProgramAuthorizationReceipt(
         Instant authorizedAt,
         Instant validUntil,
         String replayEvidenceHash,
+        String applicabilitySemantics,
         Map<String, String> leafAuthorizationHashes,
+        Map<String, String> leafApplicabilitySchemaHashes,
         List<String> workRevisions
     ) {
         Map<String, Object> value = new TreeMap<>();
+        value.put("applicabilitySemantics", applicabilitySemantics);
         value.put("authorizedAt", authorizedAt);
         value.put("authorizerId", authorizerId);
         value.put("candidateHash", candidateHash);
         value.put("genomeAlphaStructuralHash", genomeAlphaStructuralHash);
         value.put("genomeHash", genomeHash);
+        value.put("leafApplicabilitySchemaHashes", leafApplicabilitySchemaHashes);
         value.put("leafAuthorizationHashes", leafAuthorizationHashes);
         value.put("planAlphaStructuralHash", planAlphaStructuralHash);
         value.put("planHash", planHash);
