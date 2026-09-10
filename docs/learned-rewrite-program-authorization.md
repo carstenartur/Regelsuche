@@ -54,6 +54,30 @@ inside the already reconstructed learned-pattern authorizations introduced by
 #964. A program therefore cannot turn an unqualified raw genome gene into an
 authorized production rule merely by referencing it from a successful strategy.
 
+## Program-level applicability
+
+A composite strategy does not have one honest source pattern. Its applicability
+depends on the canonical control-flow topology and on the applicability of the
+leaf rules encountered along that topology. #965 therefore deliberately does
+**not** synthesize a `RewriteApplicabilitySchema` for the whole program.
+
+The authorization receipt instead binds three things:
+
+1. the exact `EvolutionRewriteProgramPlan` content/alpha identity, which includes
+   sequence, choice, first-applicable, repeat, requirements, prioritization and
+   pruning;
+2. the `RewriteApplicabilitySchema` content hash of every authorized leaf rule,
+   keyed by the same gene ID as its leaf authorization receipt;
+3. the versioned program-level semantics
+   `CANONICAL_PROGRAM_RETURNS_AT_LEAST_ONE_CANDIDATE/v1`.
+
+Under that contract a program is applicable to an expression exactly when
+executing the authorized canonical program leaves at least one candidate.
+`Authorization.isApplicable(...)` implements that definition directly. This is
+an exact executable contract, not a promise that applicability can always be
+predicted cheaply. A later staged search layer may add conservative prefilters
+without changing what “applicable” means.
+
 ## Deterministic program replay
 
 `LearnedRewriteProgramReplayEvidence` binds the exact candidate, genome and plan
@@ -113,7 +137,9 @@ The program receipt binds:
 - exact plan content and alpha-structural hashes;
 - exact lower-case 40-character repository revision;
 - deterministic replay-evidence hash;
+- versioned program-level applicability semantics;
 - a gene-ID-to-leaf-authorization-receipt-hash map;
+- the matching gene-ID-to-leaf-applicability-schema-hash map;
 - all replay work-semantics revisions;
 - explicit authorization and expiry instants.
 
@@ -144,8 +170,9 @@ program replay evidence, program authorization receipt and both leaf-rule
 authorization receipts. `scripts/verify-learned-rewrite-program-authorization.py`
 validates them independently of the Java object graph. It verifies schemas,
 canonical encoding and content hashes where applicable, cross-artifact
-candidate/plan/leaf bindings, authorization lifetime, work-semantics revisions,
-primitive lineage and the retained control-flow work ledger.
+candidate/plan/leaf bindings, leaf applicability-schema bindings,
+authorization lifetime, work-semantics revisions, primitive lineage and the
+retained control-flow work ledger.
 
 The fixture exercises sequence, choice, repeat, requirement, prioritization and
 pruning in one program. In particular it checks that the retained successful
@@ -165,10 +192,10 @@ non-canonical encodings fail closed.
 
 ## Claim boundary
 
-Program authorization is a safety, identity and replay contract. It does **not**
-show that the learned program is faster or more successful than a primitive
-baseline. Product-default selection and matched-work performance qualification
-remain separate #745 tasks.
+Program authorization is a safety, identity, applicability and replay contract.
+It does **not** show that the learned program is faster or more successful than
+a primitive baseline. Product-default selection and matched-work performance
+qualification remain separate #745 tasks.
 
 Likewise, retained primitive-path length is evidence about the path actually
 executed, not proof that no shorter path exists. A later utility/minimality layer
