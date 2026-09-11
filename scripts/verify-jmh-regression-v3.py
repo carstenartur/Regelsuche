@@ -17,6 +17,9 @@ DECISION_POLICY_SCHEMA = "regelsuche.quality.jmh-regression-decision-policy/v3"
 REPORT_SCHEMA = "regelsuche.quality.jmh-regression-report/v3"
 DECISION_STATISTIC = "max(0, currentScore - currentScoreError)"
 FAILURE_CONDITION = "decisionScore > maximumAllowedScore"
+INCONCLUSIVE_CONDITION = (
+    "currentScore > maximumAllowedScore && decisionScore <= maximumAllowedScore"
+)
 BOUNDARY_POLICY = "inclusive-pass"
 LOW_PRECISION_DIAGNOSTIC = "currentScoreError >= currentScore"
 FAMILIES = {"CORE", "REWRITE_PROGRAM", "END_TO_END_SEARCH"}
@@ -82,6 +85,8 @@ def load_decision_policy(path: Path) -> dict[str, Any]:
         fail("unsupported decision statistic")
     if policy.get("failureCondition") != FAILURE_CONDITION:
         fail("unsupported failure condition")
+    if policy.get("inconclusiveCondition") != INCONCLUSIVE_CONDITION:
+        fail("unsupported inconclusive condition")
     if policy.get("boundaryPolicy") != BOUNDARY_POLICY:
         fail("unsupported boundary policy")
     if policy.get("lowPrecisionDiagnostic") != LOW_PRECISION_DIAGNOSTIC:
@@ -203,6 +208,7 @@ def main() -> int:
     missing = sorted(set(policy_by_name) - set(current_by_name))
     unexpected = sorted(set(current_by_name) - set(policy_by_name))
     violations: list[str] = []
+    inconclusive: list[str] = []
     if missing:
         violations.append("missing benchmarks: " + ", ".join(missing))
     if unexpected:
@@ -210,6 +216,7 @@ def main() -> int:
 
     rows: list[dict[str, Any]] = []
     low_precision_benchmarks: list[str] = []
+    inconclusive_benchmarks: list[str] = []
     expected_jdk = integer(execution.get("jdkMajor"), "execution.jdkMajor")
     for name in sorted(set(policy_by_name) & set(current_by_name)):
         expected = policy_by_name[name]
@@ -223,6 +230,7 @@ def main() -> int:
         )
         unit = primary.get("scoreUnit")
         row_violations: list[str] = []
+        row_inconclusive: list[str] = []
 
         checks = (
             ("JMH version", entry.get("jmhVersion"), execution.get("jmhVersion")),
@@ -256,6 +264,7 @@ def main() -> int:
             )
 
         maximum = float(expected["maximumAllowedScore"])
+        tolerance = max(1e-12, maximum * 1e-12)
         decision_score = max(0.0, score - score_error)
         precision_status = "LOW_PRECISION" if score_error >= score else "MEASURED"
         if precision_status == "LOW_PRECISION":
@@ -266,14 +275,30 @@ def main() -> int:
         decision_regression_percent = 100.0 * (
             decision_score / float(expected["baselineScore"]) - 1.0
         )
-        if decision_score > maximum + max(1e-12, maximum * 1e-12):
+        if decision_score > maximum + tolerance:
             row_violations.append(
                 f"decision score {decision_score:.9f} {unit} "
                 f"(score {score:.9f} - scoreError {score_error:.9f}) "
                 f"exceeds {maximum:.9f} {unit}"
             )
+        elif score > maximum + tolerance:
+            message = (
+                f"point estimate {score:.9f} {unit} exceeds {maximum:.9f} {unit}, "
+                f"but decision score {decision_score:.9f} {unit} does not; "
+                "measurement is inconclusive and requires fresh evidence"
+            )
+            row_inconclusive.append(message)
+            inconclusive.append(f"{name}: {message}")
+            inconclusive_benchmarks.append(name)
 
         violations.extend(f"{name}: {item}" for item in row_violations)
+        row_status = (
+            "FAILED"
+            if row_violations
+            else "INCONCLUSIVE"
+            if row_inconclusive
+            else "PASSED"
+        )
         rows.append(
             {
                 "benchmark": name,
@@ -288,11 +313,15 @@ def main() -> int:
                 "rawRegressionPercent": round(raw_regression_percent, 6),
                 "decisionRegressionPercent": round(decision_regression_percent, 6),
                 "precisionStatus": precision_status,
-                "status": "PASSED" if not row_violations else "FAILED",
+                "status": row_status,
                 "violations": row_violations,
+                "inconclusiveReasons": row_inconclusive,
             }
         )
 
+    report_status = (
+        "FAILED" if violations else "INCONCLUSIVE" if inconclusive else "PASSED"
+    )
     report = {
         "schema": REPORT_SCHEMA,
         "decisionPolicy": str(args.decision_policy),
@@ -305,16 +334,20 @@ def main() -> int:
         "claimBoundary": decision_policy.get("claimBoundary"),
         "decisionStatistic": DECISION_STATISTIC,
         "failureCondition": FAILURE_CONDITION,
+        "inconclusiveCondition": INCONCLUSIVE_CONDITION,
         "boundaryPolicy": BOUNDARY_POLICY,
         "lowPrecisionDiagnostic": LOW_PRECISION_DIAGNOSTIC,
-        "status": "PASSED" if not violations else "FAILED",
+        "status": report_status,
         "benchmarkCount": len(rows),
         "lowPrecisionCount": len(low_precision_benchmarks),
         "lowPrecisionBenchmarks": low_precision_benchmarks,
+        "inconclusiveCount": len(inconclusive_benchmarks),
+        "inconclusiveBenchmarks": inconclusive_benchmarks,
         "missingBenchmarks": missing,
         "unexpectedBenchmarks": unexpected,
         "benchmarks": rows,
         "violations": violations,
+        "inconclusiveReasons": inconclusive,
     }
     args.json_output.parent.mkdir(parents=True, exist_ok=True)
     args.markdown_output.parent.mkdir(parents=True, exist_ok=True)
@@ -333,9 +366,11 @@ def main() -> int:
         "",
         f"Decision statistic: `{DECISION_STATISTIC}`.",
         f" Failure condition: `{FAILURE_CONDITION}`; the exact boundary passes.",
+        f" Inconclusive condition: `{INCONCLUSIVE_CONDITION}`; inconclusive evidence fails closed.",
         f" Low precision diagnostic: `{LOW_PRECISION_DIAGNOSTIC}`.",
         "",
         f"Low-precision measurements: **{len(low_precision_benchmarks)}**.",
+        f"Inconclusive measurements: **{len(inconclusive_benchmarks)}**.",
         "",
         "| Benchmark | Unit | Baseline | Current ± error | Decision | Maximum | Raw change | Precision | Status |",
         "| --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- |",
@@ -349,6 +384,9 @@ def main() -> int:
             f"{row['rawRegressionPercent']:+.2f}% | {row['precisionStatus']} | "
             f"{row['status']} |"
         )
+    if inconclusive:
+        lines.extend(["", "## Inconclusive measurements", ""])
+        lines.extend(f"- {item}" for item in inconclusive)
     if violations:
         lines.extend(["", "## Violations", ""])
         lines.extend(f"- {item}" for item in violations)
@@ -357,10 +395,15 @@ def main() -> int:
     print(f"jmhRegressionStatus={report['status']}")
     print(f"jmhRegressionBenchmarks={len(rows)}")
     print(f"jmhRegressionLowPrecision={len(low_precision_benchmarks)}")
+    print(f"jmhRegressionInconclusive={len(inconclusive_benchmarks)}")
     print(f"jmhRegressionReport={args.json_output}")
+    if inconclusive:
+        for reason in inconclusive:
+            print(f"jmhRegressionInconclusiveReason={reason}", file=sys.stderr)
     if violations:
         for violation in violations:
             print(f"jmhRegressionViolation={violation}", file=sys.stderr)
+    if inconclusive or violations:
         return 1
     return 0
 
