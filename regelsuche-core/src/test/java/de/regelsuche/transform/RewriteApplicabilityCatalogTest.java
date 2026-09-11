@@ -22,7 +22,6 @@ class RewriteApplicabilityCatalogTest {
     @Test
     void neverInfersSchemaFromAlgorithmicRuleMetadata() {
         RewriteRule rule = new NoSchemaRule("log_product_split");
-
         RewriteApplicabilityCatalog.Entry entry =
             RewriteApplicabilityCatalog.inspect(rule);
 
@@ -37,11 +36,9 @@ class RewriteApplicabilityCatalogTest {
     @Test
     void explicitProviderMustBindTheExactExecutorObject() {
         BadProviderRule rule = new BadProviderRule();
-
         IllegalArgumentException error = assertThrows(
             IllegalArgumentException.class,
             () -> RewriteApplicabilityCatalog.inspect(rule));
-
         assertTrue(error.getMessage().contains("exact executor object"));
     }
 
@@ -60,11 +57,13 @@ class RewriteApplicabilityCatalogTest {
         coverage.forEach(entry -> byId.put(entry.rule().id(), entry));
 
         assertTrue(byId.get("trig_tan_to_sin_over_cos").safeProfileEligible());
-        assertTrue(byId.get("calculus_exp_of_log").safeProfileEligible());
+        assertTrue(byId.get("calculus_exp_of_ln").safeProfileEligible());
         assertTrue(byId.get("log_product_split").safeProfileEligible());
         assertTrue(byId.get("radical_sqrt_of_product").safeProfileEligible());
         assertTrue(byId.get("rational_multiply_fractions").safeProfileEligible());
         assertTrue(byId.get("rational_divide_by_fraction").safeProfileEligible());
+        assertFalse(byId.containsKey("calculus_exp_of_log"));
+        assertFalse(byId.containsKey("calculus_log_of_exp"));
 
         assertEquals(
             RewriteApplicabilityCatalog.Status
@@ -89,9 +88,9 @@ class RewriteApplicabilityCatalogTest {
             RuleDomainRegistry.LOGARITHMIC,
             RuleDomainRegistry.RADICAL,
             RuleDomainRegistry.CALCULUS_BASIC));
-        Map<String, String> examples = explicitAlgorithmicExamples();
 
-        for (Map.Entry<String, String> example : examples.entrySet()) {
+        for (Map.Entry<String, String> example
+                : explicitAlgorithmicExamples().entrySet()) {
             RewriteRule rule = rules.stream()
                 .filter(candidate -> candidate.id().equals(example.getKey()))
                 .findFirst()
@@ -123,9 +122,7 @@ class RewriteApplicabilityCatalogTest {
     private static Map<String, String> explicitAlgorithmicExamples() {
         Map<String, String> values = new LinkedHashMap<>();
         values.put("trig_tan_to_sin_over_cos", "tan(x)");
-        values.put("calculus_exp_of_log", "exp(log(x))");
         values.put("calculus_exp_of_ln", "exp(ln(x))");
-        values.put("calculus_log_of_exp", "log(exp(x))");
         values.put("calculus_ln_of_exp", "ln(exp(x))");
         values.put("calculus_exp_of_zero", "exp(0)");
         values.put("log_product_split", "log(x*y)");
