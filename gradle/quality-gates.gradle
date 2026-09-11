@@ -126,7 +126,6 @@ def verifySupplyChainInventory = tasks.register('verifySupplyChainInventory', Ex
     workingDir qualityRepositoryRoot
     inputs.file qualityRepositoryRoot.file('config/quality/supply-chain-policy.json')
     inputs.file qualityRepositoryRoot.file('scripts/verify-supply-chain-evidence.py')
-    inputs.file qualityRepositoryRoot.file('scripts/test-supply-chain-evidence.py')
     inputs.file supplyChainBom
     outputs.file supplyChainReportDirectory.file('dependency-inventory.json')
     outputs.file supplyChainReportDirectory.file('supply-chain-evidence.json')
