@@ -2,6 +2,7 @@
   "schema": "regelsuche.public-api/v1",
   "discoveryApiVersion": "1",
   "pluginApiVersion": "1",
+  "extensionApiVersion": "2",
   "coreCompatibility": "1.0.0",
   "javaRelease": 25,
   "bom": "de.regelsuche:regelsuche-bom",
@@ -12,9 +13,17 @@
     "regelsuche-validation",
     "regelsuche-discovery",
     "regelsuche-discovery-sdk",
-    "regelsuche-plugin-api"
+    "regelsuche-plugin-api",
+    "regelsuche-extension-api",
+    "regelsuche-extension-runtime"
   ],
   "stablePackages": [
+    "de.regelsuche.api",
+    "de.regelsuche.sdk.discovery",
+    "de.regelsuche.extension",
+    "de.regelsuche.extension.runtime"
+  ],
+  "baselineCompatibilityPackages": [
     "de.regelsuche.api",
     "de.regelsuche.sdk.discovery"
   ],
