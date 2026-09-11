@@ -9,6 +9,10 @@ import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RecognitionProfile;
+import de.regelsuche.transform.RequiredAssumptionTemplate;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
+import de.regelsuche.transform.RewriteApplicabilitySchemaProvider;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
 import java.util.List;
@@ -102,7 +106,8 @@ public final class TrigonometricRules {
     /**
      * {@code tan(A) -> sin(A) / cos(A)} with the assumption {@code cos(A) != 0}.
      */
-    static final class TanToSinOverCosRule implements RewriteRule {
+    static final class TanToSinOverCosRule
+            implements RewriteRule, RewriteApplicabilitySchemaProvider {
         @Override
         public String id() {
             return "trig_tan_to_sin_over_cos";
@@ -161,6 +166,18 @@ public final class TrigonometricRules {
             // bridge parses function calls via `toSmtExpr`, the Lean bridge
             // emits the expression text — both targets render this correctly.
             return List.of(Assumption.nonZero("cos(" + ExpressionFormatter.format(argument) + ")"));
+        }
+
+        @Override
+        public RewriteApplicabilitySchema applicabilitySchema() {
+            PatternExpr argument = PatternExpr.var("A");
+            return new RewriteApplicabilitySchema(
+                "algorithmic-source/v1:" + id(),
+                this,
+                PatternExpr.fn("tan", argument),
+                RecognitionProfile.exact(),
+                List.of(RequiredAssumptionTemplate.nonZero(
+                    PatternExpr.fn("cos", argument))));
         }
     }
 
