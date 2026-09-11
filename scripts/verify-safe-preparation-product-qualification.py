@@ -67,6 +67,13 @@ def assert_route(route: dict[str, Any], expected_profile: str, inventory: str) -
         fail(f"route profile mismatch: {route['profileId']} != {expected_profile}")
     if route["visibleInventoryFingerprint"] != inventory:
         fail("route visible inventory differs from frozen report inventory")
+    if route["technicalFailure"]:
+        if route["searchStatus"] != "TECHNICAL_FAILURE":
+            fail("technical failure route does not retain TECHNICAL_FAILURE status")
+        if route["syntacticallyReached"] or route["semanticReached"]:
+            fail("technical failure route claims target reachability")
+        if route["edgeDepth"] != -1 or route["primitiveDepth"] != 0:
+            fail("technical failure route retains a non-empty path depth")
     if route["semanticReached"]:
         if not route["syntacticallyReached"]:
             fail("semantic success without syntactic target reachability")
@@ -109,8 +116,10 @@ def recompute_case(case: dict[str, Any], inventory: str) -> tuple[bool, bool, bo
     assert_route(safe, EXPECTED_SAFE, inventory)
     assert_telemetry(case)
 
+    technical_failure = bool(direct["technicalFailure"] or safe["technicalFailure"])
     expectations = (
-        direct["semanticReached"] == case["expectDirectSemanticReachability"]
+        not technical_failure
+        and direct["semanticReached"] == case["expectDirectSemanticReachability"]
         and safe["semanticReached"] == case["expectSafeSemanticReachability"]
     )
     reachability_regression = direct["semanticReached"] and not safe["semanticReached"]
@@ -124,7 +133,11 @@ def recompute_case(case: dict[str, Any], inventory: str) -> tuple[bool, bool, bo
         and safe["semanticReached"]
         and direct["effectiveAssumptions"] != safe["effectiveAssumptions"]
     )
-    newly_reached = not direct["semanticReached"] and safe["semanticReached"]
+    newly_reached = (
+        not technical_failure
+        and not direct["semanticReached"]
+        and safe["semanticReached"]
+    )
 
     expected_flags = {
         "expectationsSatisfied": expectations,
@@ -198,7 +211,11 @@ def verify(report: dict[str, Any]) -> None:
         and not any(flag[2] for flag in flags)
         and not any(flag[3] for flag in flags)
         and newly_reached >= 1
-        and all(not case["safe"]["technicalFailure"] for case in cases)
+        and all(
+            not case["direct"]["technicalFailure"]
+            and not case["safe"]["technicalFailure"]
+            for case in cases
+        )
     )
     if report["evidenceQualified"] != recomputed_qualified:
         fail("evidenceQualified differs from independently recomputed decision")
@@ -227,6 +244,8 @@ def verify(report: dict[str, Any]) -> None:
         fail("missing guard negative-control case")
     if not guard["direct"]["syntacticallyReached"] or guard["direct"]["semanticReached"]:
         fail("DIRECT guard control no longer distinguishes syntactic from semantic reachability")
+    if guard["direct"]["missingAssumptions"] != guard["requiredAssumptions"]:
+        fail("DIRECT guard control does not retain the exact missing assumptions")
     if guard["safe"]["semanticReached"]:
         fail("SAFE admitted the missing-guard control")
 
