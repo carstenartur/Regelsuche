@@ -80,10 +80,13 @@ public final class RationalRules {
                     || !(division.right() instanceof BinaryExpr denominator) || denominator.operator() != BinaryOperator.MUL) {
                 return null;
             }
-            if (numerator.left().equals(denominator.left()) && !isZero(denominator.right())) {
+            if (isZero(denominator.left()) || isZero(denominator.right())) {
+                return null;
+            }
+            if (numerator.left().equals(denominator.left())) {
                 return new Cancellable(numerator.left(), numerator.right(), denominator.right());
             }
-            if (numerator.right().equals(denominator.right()) && !isZero(denominator.left())) {
+            if (numerator.right().equals(denominator.right())) {
                 return new Cancellable(numerator.right(), numerator.left(), denominator.left());
             }
             return null;
