@@ -46,12 +46,6 @@ public final class RewriteApplicabilityCatalog {
                 Status.OUTSIDE_SAFE_PROFILE_NOT_EQUIVALENCE_PRESERVING,
                 "RULE_NOT_EQUIVALENCE_PRESERVING");
         }
-        if (checked instanceof PatternRewriteRule patternRule) {
-            return Entry.eligible(
-                checked,
-                Status.DECLARATIVE_PATTERN_SCHEMA,
-                RewriteApplicabilitySchema.fromPatternRule(patternRule));
-        }
         if (checked instanceof RewriteApplicabilitySchemaProvider provider) {
             RewriteApplicabilitySchema schema = Objects.requireNonNull(
                 provider.applicabilitySchema(),
@@ -71,6 +65,18 @@ public final class RewriteApplicabilityCatalog {
                 Status.EXPLICIT_ALGORITHMIC_SCHEMA,
                 schema);
         }
+        if (checked instanceof PatternRewriteRule patternRule) {
+            if (checked.mayEmitAssumptions()) {
+                return Entry.excluded(
+                    checked,
+                    Status.OUTSIDE_SAFE_PROFILE_UNDECLARED_ASSUMPTIONS,
+                    "PATTERN_RULE_ASSUMPTIONS_REQUIRE_EXPLICIT_SCHEMA");
+            }
+            return Entry.eligible(
+                checked,
+                Status.DECLARATIVE_PATTERN_SCHEMA,
+                RewriteApplicabilitySchema.fromPatternRule(patternRule));
+        }
         return Entry.excluded(
             checked,
             Status.OUTSIDE_SAFE_PROFILE_NO_EXPLICIT_SCHEMA,
@@ -81,6 +87,7 @@ public final class RewriteApplicabilityCatalog {
         DECLARATIVE_PATTERN_SCHEMA,
         EXPLICIT_ALGORITHMIC_SCHEMA,
         OUTSIDE_SAFE_PROFILE_NO_EXPLICIT_SCHEMA,
+        OUTSIDE_SAFE_PROFILE_UNDECLARED_ASSUMPTIONS,
         OUTSIDE_SAFE_PROFILE_NOT_EQUIVALENCE_PRESERVING
     }
 
