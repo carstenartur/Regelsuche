@@ -138,7 +138,8 @@ class MathRenderingVisualTest {
     private void openDemo(String demoId) {
         page.locator(".demo-button[data-demo='" + demoId + "']").click();
         page.waitForFunction(
-            "() => document.querySelector('#demoSummary')"
+            "() => window.__regelsucheDemoReady === true"
+                + " && document.querySelector('#demoSummary')"
                 + " && document.querySelector('#demoSummary').innerHTML.length > 50",
             null,
             new Page.WaitForFunctionOptions().setTimeout(60_000));
@@ -209,18 +210,33 @@ class MathRenderingVisualTest {
     }
 
     private void openInteractiveGraph() {
+        // A successful demo starts one graph refresh itself. Drain that request
+        // before starting the visual-test-owned reload, otherwise the older
+        // async request can replace the canvas after this test has begun
+        // waiting on the newer request.
+        page.waitForFunction(
+            "() => window.__regelsucheGraphRendered === true",
+            null,
+            new Page.WaitForFunctionOptions().setTimeout(15_000));
         page.locator(".tab[data-tab='graph']").click();
+        page.waitForSelector("#tab-graph.active",
+            new Page.WaitForSelectorOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(5_000));
+        page.evaluate("() => {"
+            + " window.__regelsucheVisualOverlayStability = null;"
+            + " window.__regelsucheGraphRendered = false;"
+            + "}");
         page.locator("#graphInteractive").check();
         page.locator("#reloadGraph").click();
-        page.waitForSelector("#graphCanvas",
-            new Page.WaitForSelectorOptions()
-                .setState(WaitForSelectorState.VISIBLE)
-                .setTimeout(15_000));
+        page.waitForFunction(
+            "() => window.__regelsucheGraphRendered === true"
+                + " && document.querySelectorAll("
+                + "'#graphCanvas .graph-overlay-layer .graph-node-math .katex'"
+                + ").length > 0",
+            null,
+            new Page.WaitForFunctionOptions().setTimeout(15_000));
         assertTrue(page.locator("#graphCanvas").isVisible());
-        page.waitForSelector(".graph-overlay-layer .graph-node-math .katex",
-            new Page.WaitForSelectorOptions()
-                .setState(WaitForSelectorState.VISIBLE)
-                .setTimeout(15_000));
         waitForGraphOverlayToSettle();
     }
 
