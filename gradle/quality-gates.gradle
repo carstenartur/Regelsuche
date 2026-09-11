@@ -56,36 +56,38 @@ def verifyContainerImagePolicy = tasks.register('verifyContainerImagePolicy') {
 
 def testJmhRegressionVerifier = tasks.register('testJmhRegressionVerifier', Exec) {
     group = 'verification'
-    description = 'Characterizes the JMH regression verifier with positive and fail-closed synthetic cases.'
+    description = 'Characterizes the versioned JMH v3 decision authority with positive and fail-closed synthetic cases.'
     dependsOn 'prepareVerificationEnvironment'
     workingDir qualityRepositoryRoot
-    inputs.file qualityRepositoryRoot.file('scripts/verify-jmh-regression-v2.py')
-    inputs.file qualityRepositoryRoot.file('scripts/test-verify-jmh-regression-v2.py')
+    inputs.file qualityRepositoryRoot.file('scripts/verify-jmh-regression-v3.py')
+    inputs.file qualityRepositoryRoot.file('scripts/test-verify-jmh-regression-v3.py')
     outputs.upToDateWhen { false }
     doFirst {
         commandLine qualityVerificationPython.get().absolutePath,
-            'scripts/test-verify-jmh-regression-v2.py',
-            '--verifier', qualityRepositoryRoot.file('scripts/verify-jmh-regression-v2.py').asFile.absolutePath
+            'scripts/test-verify-jmh-regression-v3.py',
+            '--verifier', qualityRepositoryRoot.file('scripts/verify-jmh-regression-v3.py').asFile.absolutePath
     }
 }
 
 def verifyJmhRegression = tasks.register('verifyJmhRegression', Exec) {
     group = 'verification'
-    description = 'Fails on missing, undeclared, contract-drifted or materially slower JMH benchmarks.'
+    description = 'Fails on missing, undeclared, contract-drifted or materially slower JMH benchmarks under the v3 uncertainty-aware decision authority.'
     dependsOn 'prepareVerificationEnvironment', ':app:jmh', testJmhRegressionVerifier
     mustRunAfter ':app:jmh'
     workingDir qualityRepositoryRoot
     inputs.file qualityRepositoryRoot.file('config/quality/jmh-regression-policy-v2.json')
-    inputs.file qualityRepositoryRoot.file('scripts/verify-jmh-regression-v2.py')
+    inputs.file qualityRepositoryRoot.file('config/quality/jmh-regression-decision-policy-v3.json')
+    inputs.file qualityRepositoryRoot.file('scripts/verify-jmh-regression-v3.py')
     inputs.file qualityRepositoryRoot.file('app/build/reports/jmh/result.json')
     outputs.file layout.buildDirectory.file('reports/quality/jmh-regression-report.json')
     outputs.file layout.buildDirectory.file('reports/quality/jmh-regression-report.md')
     outputs.upToDateWhen { false }
     doFirst {
         commandLine qualityVerificationPython.get().absolutePath,
-            'scripts/verify-jmh-regression-v2.py',
+            'scripts/verify-jmh-regression-v3.py',
             '--result', qualityRepositoryRoot.file('app/build/reports/jmh/result.json').asFile.absolutePath,
-            '--policy', qualityRepositoryRoot.file('config/quality/jmh-regression-policy-v2.json').asFile.absolutePath,
+            '--threshold-policy', qualityRepositoryRoot.file('config/quality/jmh-regression-policy-v2.json').asFile.absolutePath,
+            '--decision-policy', qualityRepositoryRoot.file('config/quality/jmh-regression-decision-policy-v3.json').asFile.absolutePath,
             '--json-output', qualityRepositoryRoot.file('build/reports/quality/jmh-regression-report.json').asFile.absolutePath,
             '--markdown-output', qualityRepositoryRoot.file('build/reports/quality/jmh-regression-report.md').asFile.absolutePath
     }
@@ -124,6 +126,7 @@ def verifySupplyChainInventory = tasks.register('verifySupplyChainInventory', Ex
     workingDir qualityRepositoryRoot
     inputs.file qualityRepositoryRoot.file('config/quality/supply-chain-policy.json')
     inputs.file qualityRepositoryRoot.file('scripts/verify-supply-chain-evidence.py')
+    inputs.file qualityRepositoryRoot.file('scripts/test-supply-chain-evidence.py')
     inputs.file supplyChainBom
     outputs.file supplyChainReportDirectory.file('dependency-inventory.json')
     outputs.file supplyChainReportDirectory.file('supply-chain-evidence.json')
