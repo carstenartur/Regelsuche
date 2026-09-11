@@ -13,37 +13,20 @@ import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
 import java.util.List;
 
-/**
- * Curated calculus / exponential rewrite rules.
- *
- * <p>Currently focused on the exponential/logarithm interplay; derivative
- * and integral operators are reserved for a follow-up once the AST grows
- * dedicated operator nodes.</p>
- */
+/** Basic real exponential/natural-logarithm rewrite rules. */
 public final class CalculusBasicRules {
     private CalculusBasicRules() {
     }
 
     public static List<RewriteRule> rules() {
-        return List.of(
-            new ExpOfLogRule("log"),
-            new ExpOfLogRule("ln"),
-            new LogOfExpRule("log"),
-            new LogOfExpRule("ln"),
-            new ExpOfZeroRule());
+        return List.of(new ExpOfLnRule(), new LnOfExpRule(), new ExpOfZeroRule());
     }
 
-    /** {@code exp(log(x)) -> x} with {@code x > 0}. */
-    static final class ExpOfLogRule implements RewriteApplicabilitySchemaProvider {
-        private final String logName;
-
-        ExpOfLogRule(String logName) {
-            this.logName = logName;
-        }
-
+    /** {@code exp(ln(x)) -> x} with {@code x > 0}. */
+    static final class ExpOfLnRule implements RewriteApplicabilitySchemaProvider {
         @Override
         public String id() {
-            return "calculus_exp_of_" + logName;
+            return "calculus_exp_of_ln";
         }
 
         @Override
@@ -97,36 +80,28 @@ public final class CalculusBasicRules {
         public RewriteApplicabilitySchema applicabilitySchema() {
             PatternExpr value = PatternExpr.var("X");
             return exactSource(
-                PatternExpr.fn("exp", PatternExpr.fn(logName, value)),
+                PatternExpr.fn("exp", PatternExpr.fn("ln", value)),
                 RequiredAssumptionTemplate.positive(value));
         }
 
-        private Expr inner(Expr subtree) {
+        private static Expr inner(Expr subtree) {
             if (!(subtree instanceof FunctionExpr exp)
                     || !"exp".equals(exp.name())
-                    || exp.arguments().size() != 1) {
+                    || exp.arguments().size() != 1
+                    || !(exp.arguments().getFirst() instanceof FunctionExpr ln)
+                    || !"ln".equals(ln.name())
+                    || ln.arguments().size() != 1) {
                 return null;
             }
-            if (exp.arguments().getFirst() instanceof FunctionExpr log
-                    && log.name().equals(logName)
-                    && log.arguments().size() == 1) {
-                return log.arguments().getFirst();
-            }
-            return null;
+            return ln.arguments().getFirst();
         }
     }
 
-    /** {@code log(exp(x)) -> x} — unconditional. */
-    static final class LogOfExpRule implements RewriteApplicabilitySchemaProvider {
-        private final String logName;
-
-        LogOfExpRule(String logName) {
-            this.logName = logName;
-        }
-
+    /** {@code ln(exp(x)) -> x} for every real {@code x}. */
+    static final class LnOfExpRule implements RewriteApplicabilitySchemaProvider {
         @Override
         public String id() {
-            return "calculus_" + logName + "_of_exp";
+            return "calculus_ln_of_exp";
         }
 
         @Override
@@ -166,22 +141,20 @@ public final class CalculusBasicRules {
         @Override
         public RewriteApplicabilitySchema applicabilitySchema() {
             PatternExpr value = PatternExpr.var("X");
-            return exactSource(
-                PatternExpr.fn(logName, PatternExpr.fn("exp", value)));
+            return exactSource(PatternExpr.fn(
+                "ln", PatternExpr.fn("exp", value)));
         }
 
-        private Expr inner(Expr subtree) {
-            if (!(subtree instanceof FunctionExpr log)
-                    || !log.name().equals(logName)
-                    || log.arguments().size() != 1) {
+        private static Expr inner(Expr subtree) {
+            if (!(subtree instanceof FunctionExpr ln)
+                    || !"ln".equals(ln.name())
+                    || ln.arguments().size() != 1
+                    || !(ln.arguments().getFirst() instanceof FunctionExpr exp)
+                    || !"exp".equals(exp.name())
+                    || exp.arguments().size() != 1) {
                 return null;
             }
-            if (log.arguments().getFirst() instanceof FunctionExpr exp
-                    && "exp".equals(exp.name())
-                    && exp.arguments().size() == 1) {
-                return exp.arguments().getFirst();
-            }
-            return null;
+            return exp.arguments().getFirst();
         }
     }
 
