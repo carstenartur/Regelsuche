@@ -97,6 +97,19 @@ class DomainRulesTest {
     }
 
     @Test
+    void rationalCancellationRejectsExplicitZeroDenominatorFactors() {
+        RewriteRule rule = findRule(
+            RationalRules.rules(), "rational_cancel_common_factor");
+        assertNotNull(rule);
+        Expr rightZero = parse("(a*0)/(a*0)");
+        Expr leftZero = parse("(0*a)/(0*a)");
+        assertFalse(rule.matches(rightZero));
+        assertFalse(rule.matches(leftZero));
+        assertThrows(IllegalArgumentException.class, () -> rule.apply(rightZero));
+        assertThrows(IllegalArgumentException.class, () -> rule.apply(leftZero));
+    }
+
+    @Test
     void expOfLnRequiresPositiveArgument() {
         Expr expr = parse("exp(ln(x))");
         RewriteRule rule = findRule(CalculusBasicRules.rules(), "calculus_exp_of_ln");
@@ -150,12 +163,20 @@ class DomainRulesTest {
             RewriteApplicabilitySchema.coverageOf(new GuardedPatternSubclass());
         assertFalse(entry.safeProfileEligible());
         assertEquals(
-            RewriteApplicabilitySchema.CoverageStatus
-                .OUTSIDE_SAFE_PROFILE_UNDECLARED_ASSUMPTIONS,
+            RewriteApplicabilitySchema.CoverageStatus.OUTSIDE_SAFE_PROFILE_NO_EXPLICIT_SCHEMA,
             entry.status());
+        assertEquals("NO_EXPLICIT_APPLICABILITY_SCHEMA", entry.exclusionReason());
+    }
+
+    @Test
+    void customPatternSubclassWithoutAssumptionsStillRequiresExplicitSchema() {
+        RewriteApplicabilitySchema.CoverageEntry entry =
+            RewriteApplicabilitySchema.coverageOf(new SemanticOverridePatternSubclass());
+        assertFalse(entry.safeProfileEligible());
         assertEquals(
-            "PATTERN_RULE_ASSUMPTIONS_REQUIRE_EXPLICIT_SCHEMA",
-            entry.exclusionReason());
+            RewriteApplicabilitySchema.CoverageStatus.OUTSIDE_SAFE_PROFILE_NO_EXPLICIT_SCHEMA,
+            entry.status());
+        assertEquals("NO_EXPLICIT_APPLICABILITY_SCHEMA", entry.exclusionReason());
     }
 
     @Test
@@ -286,6 +307,22 @@ class DomainRulesTest {
         @Override
         public List<Assumption> assumptions(Expr subtree) {
             return List.of(Assumption.positive("B"));
+        }
+    }
+
+    private static final class SemanticOverridePatternSubclass extends PatternRewriteRule {
+        SemanticOverridePatternSubclass() {
+            super("semantic_override_without_schema",
+                PatternExpr.op(BinaryOperator.ADD, PatternExpr.var("A"), PatternExpr.num(0)),
+                PatternExpr.var("A"), RewriteKind.SIMPLIFY, false, -1, true);
+        }
+        @Override
+        public boolean matches(Expr subtree) {
+            return false;
+        }
+        @Override
+        public Expr apply(Expr subtree) {
+            throw new IllegalArgumentException("Rule does not match subtree");
         }
     }
 }
