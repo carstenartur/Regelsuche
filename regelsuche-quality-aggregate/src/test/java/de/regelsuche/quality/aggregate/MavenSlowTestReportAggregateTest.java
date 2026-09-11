@@ -31,11 +31,13 @@ class MavenSlowTestReportAggregateTest {
             System.getProperty(FULL_PROPERTY, "false")
         );
 
-        assertEquals(fullProfile ? 23 : 22, modules.size());
+        assertEquals(fullProfile ? 25 : 24, modules.size());
         assertTrue(modules.contains("regelsuche-quality"));
         assertTrue(modules.contains("maven-build-contract"));
         assertTrue(modules.contains("regelsuche-discovery-sdk"));
         assertTrue(modules.contains("regelsuche-plugin-api"));
+        assertTrue(modules.contains("regelsuche-extension-api"));
+        assertTrue(modules.contains("regelsuche-extension-runtime"));
         assertTrue(modules.contains("app"));
         assertEquals(
             fullProfile,
