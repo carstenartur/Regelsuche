@@ -6,7 +6,6 @@ import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.transform.PatternExpr;
-import de.regelsuche.transform.RecognitionProfile;
 import de.regelsuche.transform.RequiredAssumptionTemplate;
 import de.regelsuche.transform.RewriteApplicabilitySchema;
 import de.regelsuche.transform.RewriteApplicabilitySchemaProvider;
@@ -31,13 +30,11 @@ public final class CalculusBasicRules {
             new ExpOfLogRule("ln"),
             new LogOfExpRule("log"),
             new LogOfExpRule("ln"),
-            new ExpOfZeroRule()
-        );
+            new ExpOfZeroRule());
     }
 
     /** {@code exp(log(x)) -> x} with {@code x > 0}. */
-    static final class ExpOfLogRule
-            implements RewriteRule, RewriteApplicabilitySchemaProvider {
+    static final class ExpOfLogRule implements RewriteApplicabilitySchemaProvider {
         private final String logName;
 
         ExpOfLogRule(String logName) {
@@ -91,40 +88,36 @@ public final class CalculusBasicRules {
         @Override
         public List<Assumption> assumptions(Expr subtree) {
             Expr inner = inner(subtree);
-            if (inner == null) {
-                return List.of();
-            }
-            return List.of(Assumption.positive(ExpressionFormatter.format(inner)));
+            return inner == null
+                ? List.of()
+                : List.of(Assumption.positive(ExpressionFormatter.format(inner)));
         }
 
         @Override
         public RewriteApplicabilitySchema applicabilitySchema() {
             PatternExpr value = PatternExpr.var("X");
-            return new RewriteApplicabilitySchema(
-                "algorithmic-source/v1:" + id(),
-                this,
+            return exactSource(
                 PatternExpr.fn("exp", PatternExpr.fn(logName, value)),
-                RecognitionProfile.exact(),
-                List.of(RequiredAssumptionTemplate.positive(value)));
+                RequiredAssumptionTemplate.positive(value));
         }
 
         private Expr inner(Expr subtree) {
-            if (!(subtree instanceof FunctionExpr exp) || !"exp".equals(exp.name())
-                || exp.arguments().size() != 1) {
+            if (!(subtree instanceof FunctionExpr exp)
+                    || !"exp".equals(exp.name())
+                    || exp.arguments().size() != 1) {
                 return null;
             }
-            if (exp.arguments().get(0) instanceof FunctionExpr log
-                && log.name().equals(logName)
-                && log.arguments().size() == 1) {
-                return log.arguments().get(0);
+            if (exp.arguments().getFirst() instanceof FunctionExpr log
+                    && log.name().equals(logName)
+                    && log.arguments().size() == 1) {
+                return log.arguments().getFirst();
             }
             return null;
         }
     }
 
     /** {@code log(exp(x)) -> x} — unconditional. */
-    static final class LogOfExpRule
-            implements RewriteRule, RewriteApplicabilitySchemaProvider {
+    static final class LogOfExpRule implements RewriteApplicabilitySchemaProvider {
         private final String logName;
 
         LogOfExpRule(String logName) {
@@ -173,31 +166,27 @@ public final class CalculusBasicRules {
         @Override
         public RewriteApplicabilitySchema applicabilitySchema() {
             PatternExpr value = PatternExpr.var("X");
-            return new RewriteApplicabilitySchema(
-                "algorithmic-source/v1:" + id(),
-                this,
-                PatternExpr.fn(logName, PatternExpr.fn("exp", value)),
-                RecognitionProfile.exact(),
-                List.of());
+            return exactSource(
+                PatternExpr.fn(logName, PatternExpr.fn("exp", value)));
         }
 
         private Expr inner(Expr subtree) {
-            if (!(subtree instanceof FunctionExpr log) || !log.name().equals(logName)
-                || log.arguments().size() != 1) {
+            if (!(subtree instanceof FunctionExpr log)
+                    || !log.name().equals(logName)
+                    || log.arguments().size() != 1) {
                 return null;
             }
-            if (log.arguments().get(0) instanceof FunctionExpr exp
-                && "exp".equals(exp.name())
-                && exp.arguments().size() == 1) {
-                return exp.arguments().get(0);
+            if (log.arguments().getFirst() instanceof FunctionExpr exp
+                    && "exp".equals(exp.name())
+                    && exp.arguments().size() == 1) {
+                return exp.arguments().getFirst();
             }
             return null;
         }
     }
 
     /** {@code exp(0) -> 1}. */
-    static final class ExpOfZeroRule
-            implements RewriteRule, RewriteApplicabilitySchemaProvider {
+    static final class ExpOfZeroRule implements RewriteApplicabilitySchemaProvider {
         @Override
         public String id() {
             return "calculus_exp_of_zero";
@@ -228,7 +217,8 @@ public final class CalculusBasicRules {
             return subtree instanceof FunctionExpr fn
                 && "exp".equals(fn.name())
                 && fn.arguments().size() == 1
-                && fn.arguments().get(0) instanceof NumberExpr n && n.value().equalsInteger(0);
+                && fn.arguments().getFirst() instanceof NumberExpr n
+                && n.value().equalsInteger(0);
         }
 
         @Override
@@ -241,12 +231,7 @@ public final class CalculusBasicRules {
 
         @Override
         public RewriteApplicabilitySchema applicabilitySchema() {
-            return new RewriteApplicabilitySchema(
-                "algorithmic-source/v1:" + id(),
-                this,
-                PatternExpr.fn("exp", PatternExpr.num(0)),
-                RecognitionProfile.exact(),
-                List.of());
+            return exactSource(PatternExpr.fn("exp", PatternExpr.num(0)));
         }
     }
 }
