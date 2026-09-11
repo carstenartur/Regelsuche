@@ -92,7 +92,7 @@ class SafePreparationProductQualificationExperimentTest {
         assertTrue(guard.direct().syntacticallyReached());
         assertFalse(guard.direct().semanticReached());
         assertEquals(
-            java.util.List.of("n + 1 != 0", "n != 0"),
+            guard.experimentCase().requiredAssumptions(),
             guard.direct().missingAssumptions());
         assertFalse(guard.safe().semanticReached());
         assertTrue(report.directSyntacticButSemanticallyRejectedCases() >= 1);
