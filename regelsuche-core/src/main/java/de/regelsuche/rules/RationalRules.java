@@ -5,6 +5,11 @@ import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.RecognitionProfile;
+import de.regelsuche.transform.RequiredAssumptionTemplate;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
+import de.regelsuche.transform.RewriteApplicabilitySchemaProvider;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
 import java.util.ArrayList;
@@ -49,6 +54,13 @@ public final class RationalRules {
      * both sides. Refuses to apply when the divisor would become a literal
      * zero. The retained assumptions include both the cancelled factor
      * {@code A != 0} and the remaining denominator {@code C != 0}.
+     *
+     * <p>This rule deliberately does not expose one preparation schema yet:
+     * its executor supports two structurally distinct cancellation
+     * orientations, while the current applicability contract has one source
+     * pattern per principal. Direct execution remains available; prepared
+     * execution stays outside the safe profile until a complete disjunctive
+     * contract exists.</p>
      */
     public static final class CancelCommonFactorRule implements RewriteRule {
         @Override
@@ -160,7 +172,8 @@ public final class RationalRules {
      * {@code (A/B) * (C/D) -> (A*C)/(B*D)}. Refuses when {@code B} or
      * {@code D} are explicit zero literals.
      */
-    public static final class MultiplyFractionsRule implements RewriteRule {
+    public static final class MultiplyFractionsRule
+            implements RewriteRule, RewriteApplicabilitySchemaProvider {
         @Override
         public String id() {
             return "rational_multiply_fractions";
@@ -210,6 +223,24 @@ public final class RationalRules {
         }
 
         @Override
+        public RewriteApplicabilitySchema applicabilitySchema() {
+            PatternExpr a = PatternExpr.var("A");
+            PatternExpr b = PatternExpr.var("B");
+            PatternExpr c = PatternExpr.var("C");
+            PatternExpr d = PatternExpr.var("D");
+            return new RewriteApplicabilitySchema(
+                "algorithmic-source/v1:" + id(),
+                this,
+                PatternExpr.op(BinaryOperator.MUL,
+                    PatternExpr.op(BinaryOperator.DIV, a, b),
+                    PatternExpr.op(BinaryOperator.DIV, c, d)),
+                RecognitionProfile.exact(),
+                List.of(
+                    RequiredAssumptionTemplate.nonZero(b),
+                    RequiredAssumptionTemplate.nonZero(d)));
+        }
+
+        @Override
         public Expr apply(Expr subtree) {
             Pair pair = parts(subtree);
             if (pair == null) {
@@ -248,7 +279,8 @@ public final class RationalRules {
      * {@code A / (B/C) -> (A*C)/B}. Refuses when {@code C} would be a literal
      * zero.
      */
-    public static final class DivideByFractionRule implements RewriteRule {
+    public static final class DivideByFractionRule
+            implements RewriteRule, RewriteApplicabilitySchemaProvider {
         @Override
         public String id() {
             return "rational_divide_by_fraction";
@@ -295,6 +327,23 @@ public final class RationalRules {
                     de.regelsuche.parse.ExpressionFormatter.format(parts.b)),
                 de.regelsuche.assumption.Assumption.nonZero(
                     de.regelsuche.parse.ExpressionFormatter.format(parts.c)));
+        }
+
+        @Override
+        public RewriteApplicabilitySchema applicabilitySchema() {
+            PatternExpr a = PatternExpr.var("A");
+            PatternExpr b = PatternExpr.var("B");
+            PatternExpr c = PatternExpr.var("C");
+            return new RewriteApplicabilitySchema(
+                "algorithmic-source/v1:" + id(),
+                this,
+                PatternExpr.op(BinaryOperator.DIV,
+                    a,
+                    PatternExpr.op(BinaryOperator.DIV, b, c)),
+                RecognitionProfile.exact(),
+                List.of(
+                    RequiredAssumptionTemplate.nonZero(b),
+                    RequiredAssumptionTemplate.nonZero(c)));
         }
 
         @Override
