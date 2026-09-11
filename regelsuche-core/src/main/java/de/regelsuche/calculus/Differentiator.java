@@ -25,7 +25,8 @@ import java.util.Objects;
  *       chain-rule generalisation {@code d/dx u^n = n*u^(n-1) * u'},</li>
  *   <li>standard functions with chain rule:
  *       {@code sin(u) -> cos(u)*u'}, {@code cos(u) -> -sin(u)*u'},
- *       {@code exp(u) -> exp(u)*u'}, {@code log(u) -> u'/u}.</li>
+ *       {@code exp(u) -> exp(u)*u'}, {@code ln(u) -> u'/u},
+ *       {@code log(u) -> u'/(u*ln(10))} for base-10 {@code log}.</li>
  * </ul>
  *
  * <p>The output AST is not simplified beyond a tiny constant-folding pass
@@ -84,7 +85,12 @@ public final class Differentiator {
                     new FunctionExpr("sin", u)
                 );
                 case "exp" -> new FunctionExpr("exp", u);
-                case "log", "ln" -> new BinaryExpr(new NumberExpr(1), BinaryOperator.DIV, u);
+                case "ln" -> reciprocal(u);
+                case "log" -> reciprocal(new BinaryExpr(
+                    u,
+                    BinaryOperator.MUL,
+                    new FunctionExpr("ln", new NumberExpr(10))
+                ));
                 default -> null;
             };
             if (outer != null) {
@@ -93,6 +99,10 @@ public final class Differentiator {
         }
         throw new UnsupportedOperationException(
             "Differentiator has no rule for " + expr.getClass().getSimpleName() + ": " + expr);
+    }
+
+    private static Expr reciprocal(Expr expression) {
+        return new BinaryExpr(new NumberExpr(1), BinaryOperator.DIV, expression);
     }
 
     private Expr powerRule(Expr base, Expr exponent, Expr baseDerivative, String variable) {
