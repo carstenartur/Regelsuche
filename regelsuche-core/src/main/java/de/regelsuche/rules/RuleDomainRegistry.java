@@ -1,6 +1,8 @@
 package de.regelsuche.rules;
 
 import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.RewriteApplicabilityCatalog;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
 import de.regelsuche.transform.RewriteRule;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -79,6 +81,25 @@ public final class RuleDomainRegistry {
             }
         }
         return rules;
+    }
+
+    /**
+     * Returns the complete explicit preparation-eligibility decision for the
+     * selected domains. A rule without a declarative pattern or an explicit
+     * {@code RewriteApplicabilitySchemaProvider} remains visible here as an
+     * exclusion; no schema is inferred from metadata or examples.
+     */
+    public List<RewriteApplicabilityCatalog.Entry> applicabilityCoverageFor(
+        List<String> domainNames
+    ) {
+        return RewriteApplicabilityCatalog.inspect(rulesFor(domainNames));
+    }
+
+    /** Returns only explicitly safe preparation principal schemas. */
+    public List<RewriteApplicabilitySchema> applicabilitySchemasFor(
+        List<String> domainNames
+    ) {
+        return RewriteApplicabilityCatalog.safeSchemas(rulesFor(domainNames));
     }
 
     private record SimpleRuleDomain(String name, String description, List<RewriteRule> rules) implements RuleDomain {
