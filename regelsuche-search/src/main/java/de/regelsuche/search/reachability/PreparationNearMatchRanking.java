@@ -1,6 +1,7 @@
 package de.regelsuche.search.reachability;
 
 import de.regelsuche.transform.PatternMatchAnalyzer;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -30,6 +31,43 @@ public final class PreparationNearMatchRanking {
             value.bindings().size(),
             value.residualObligations().size(),
             residualLowerBound(value));
+    }
+
+    /**
+     * Preserves the historical multi-principal aggregation exactly while
+     * centralizing the same structural signals and residual weights used by
+     * {@link #rank(PatternMatchAnalyzer.Analysis)}.
+     */
+    public static AggregateRank aggregate(
+        List<PatternMatchAnalyzer.Analysis> analyses
+    ) {
+        List<PatternMatchAnalyzer.Analysis> values = List.copyOf(
+            Objects.requireNonNull(analyses, "analyses"));
+        int matchedCount = values.stream()
+            .mapToInt(value -> value.matched() ? 1 : 0)
+            .sum();
+        int bestMatchedPatternNodes = values.stream()
+            .mapToInt(value -> rank(value).matchedPatternNodes())
+            .max()
+            .orElse(0);
+        int bestBindingCount = values.stream()
+            .mapToInt(value -> rank(value).bindingCount())
+            .max()
+            .orElse(0);
+        int minimumResidualCount = values.stream()
+            .mapToInt(value -> rank(value).residualCount())
+            .min()
+            .orElse(Integer.MAX_VALUE);
+        int minimumResidualLowerBound = values.stream()
+            .mapToInt(value -> rank(value).residualLowerBound())
+            .min()
+            .orElse(Integer.MAX_VALUE);
+        return new AggregateRank(
+            matchedCount,
+            bestMatchedPatternNodes,
+            bestBindingCount,
+            minimumResidualCount,
+            minimumResidualLowerBound);
     }
 
     public static int residualLowerBound(
@@ -92,6 +130,58 @@ public final class PreparationNearMatchRanking {
             return Integer.compare(
                 residualLowerBound,
                 other.residualLowerBound);
+        }
+    }
+
+    /** Historical multi-principal structural prefix; smaller ranks first. */
+    public record AggregateRank(
+        int matchedPrincipalCount,
+        int bestMatchedPatternNodes,
+        int bestBindingCount,
+        int minimumResidualCount,
+        int minimumResidualLowerBound
+    ) implements Comparable<AggregateRank> {
+        public AggregateRank {
+            if (matchedPrincipalCount < 0
+                    || bestMatchedPatternNodes < 0
+                    || bestBindingCount < 0
+                    || minimumResidualCount < 0
+                    || minimumResidualLowerBound < 0) {
+                throw new IllegalArgumentException(
+                    "aggregate near-match rank counters must be non-negative");
+            }
+        }
+
+        @Override
+        public int compareTo(AggregateRank other) {
+            Objects.requireNonNull(other, "other");
+            int comparison = Integer.compare(
+                other.matchedPrincipalCount,
+                matchedPrincipalCount);
+            if (comparison != 0) {
+                return comparison;
+            }
+            comparison = Integer.compare(
+                other.bestMatchedPatternNodes,
+                bestMatchedPatternNodes);
+            if (comparison != 0) {
+                return comparison;
+            }
+            comparison = Integer.compare(
+                other.bestBindingCount,
+                bestBindingCount);
+            if (comparison != 0) {
+                return comparison;
+            }
+            comparison = Integer.compare(
+                minimumResidualCount,
+                other.minimumResidualCount);
+            if (comparison != 0) {
+                return comparison;
+            }
+            return Integer.compare(
+                minimumResidualLowerBound,
+                other.minimumResidualLowerBound);
         }
     }
 }
