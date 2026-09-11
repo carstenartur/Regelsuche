@@ -5,42 +5,28 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.RequiredAssumptionTemplate;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.RewriteRule.RewriteApplicabilitySchemaProvider;
 import java.util.List;
 
-/**
- * Curated calculus / exponential rewrite rules.
- *
- * <p>Currently focused on the exponential/logarithm interplay; derivative
- * and integral operators are reserved for a follow-up once the AST grows
- * dedicated operator nodes.</p>
- */
+/** Basic real exponential/natural-logarithm rewrite rules. */
 public final class CalculusBasicRules {
     private CalculusBasicRules() {
     }
 
     public static List<RewriteRule> rules() {
-        return List.of(
-            new ExpOfLogRule("log"),
-            new ExpOfLogRule("ln"),
-            new LogOfExpRule("log"),
-            new LogOfExpRule("ln"),
-            new ExpOfZeroRule()
-        );
+        return List.of(new ExpOfLnRule(), new LnOfExpRule(), new ExpOfZeroRule());
     }
 
-    /** {@code exp(log(x)) -> x} with {@code x > 0}. */
-    static final class ExpOfLogRule implements RewriteRule {
-        private final String logName;
-
-        ExpOfLogRule(String logName) {
-            this.logName = logName;
-        }
-
+    /** {@code exp(ln(x)) -> x} with {@code x > 0}. */
+    static final class ExpOfLnRule implements RewriteApplicabilitySchemaProvider {
         @Override
         public String id() {
-            return "calculus_exp_of_" + logName;
+            return "calculus_exp_of_ln";
         }
 
         @Override
@@ -85,37 +71,37 @@ public final class CalculusBasicRules {
         @Override
         public List<Assumption> assumptions(Expr subtree) {
             Expr inner = inner(subtree);
-            if (inner == null) {
-                return List.of();
-            }
-            return List.of(Assumption.positive(ExpressionFormatter.format(inner)));
-        }
-
-        private Expr inner(Expr subtree) {
-            if (!(subtree instanceof FunctionExpr exp) || !"exp".equals(exp.name())
-                || exp.arguments().size() != 1) {
-                return null;
-            }
-            if (exp.arguments().get(0) instanceof FunctionExpr log
-                && log.name().equals(logName)
-                && log.arguments().size() == 1) {
-                return log.arguments().get(0);
-            }
-            return null;
-        }
-    }
-
-    /** {@code log(exp(x)) -> x} — unconditional. */
-    static final class LogOfExpRule implements RewriteRule {
-        private final String logName;
-
-        LogOfExpRule(String logName) {
-            this.logName = logName;
+            return inner == null
+                ? List.of()
+                : List.of(Assumption.positive(ExpressionFormatter.format(inner)));
         }
 
         @Override
+        public RewriteApplicabilitySchema applicabilitySchema() {
+            PatternExpr value = PatternExpr.var("X");
+            return exactSource(
+                PatternExpr.fn("exp", PatternExpr.fn("ln", value)),
+                RequiredAssumptionTemplate.positive(value));
+        }
+
+        private static Expr inner(Expr subtree) {
+            if (!(subtree instanceof FunctionExpr exp)
+                    || !"exp".equals(exp.name())
+                    || exp.arguments().size() != 1
+                    || !(exp.arguments().getFirst() instanceof FunctionExpr ln)
+                    || !"ln".equals(ln.name())
+                    || ln.arguments().size() != 1) {
+                return null;
+            }
+            return ln.arguments().getFirst();
+        }
+    }
+
+    /** {@code ln(exp(x)) -> x} for every real {@code x}. */
+    static final class LnOfExpRule implements RewriteApplicabilitySchemaProvider {
+        @Override
         public String id() {
-            return "calculus_" + logName + "_of_exp";
+            return "calculus_ln_of_exp";
         }
 
         @Override
@@ -152,22 +138,28 @@ public final class CalculusBasicRules {
             return inner;
         }
 
-        private Expr inner(Expr subtree) {
-            if (!(subtree instanceof FunctionExpr log) || !log.name().equals(logName)
-                || log.arguments().size() != 1) {
+        @Override
+        public RewriteApplicabilitySchema applicabilitySchema() {
+            PatternExpr value = PatternExpr.var("X");
+            return exactSource(PatternExpr.fn(
+                "ln", PatternExpr.fn("exp", value)));
+        }
+
+        private static Expr inner(Expr subtree) {
+            if (!(subtree instanceof FunctionExpr ln)
+                    || !"ln".equals(ln.name())
+                    || ln.arguments().size() != 1
+                    || !(ln.arguments().getFirst() instanceof FunctionExpr exp)
+                    || !"exp".equals(exp.name())
+                    || exp.arguments().size() != 1) {
                 return null;
             }
-            if (log.arguments().get(0) instanceof FunctionExpr exp
-                && "exp".equals(exp.name())
-                && exp.arguments().size() == 1) {
-                return exp.arguments().get(0);
-            }
-            return null;
+            return exp.arguments().getFirst();
         }
     }
 
     /** {@code exp(0) -> 1}. */
-    static final class ExpOfZeroRule implements RewriteRule {
+    static final class ExpOfZeroRule implements RewriteApplicabilitySchemaProvider {
         @Override
         public String id() {
             return "calculus_exp_of_zero";
@@ -198,7 +190,8 @@ public final class CalculusBasicRules {
             return subtree instanceof FunctionExpr fn
                 && "exp".equals(fn.name())
                 && fn.arguments().size() == 1
-                && fn.arguments().get(0) instanceof NumberExpr n && n.value().equalsInteger(0);
+                && fn.arguments().getFirst() instanceof NumberExpr n
+                && n.value().equalsInteger(0);
         }
 
         @Override
@@ -207,6 +200,11 @@ public final class CalculusBasicRules {
                 throw new IllegalArgumentException("Rule does not match subtree");
             }
             return new NumberExpr(1);
+        }
+
+        @Override
+        public RewriteApplicabilitySchema applicabilitySchema() {
+            return exactSource(PatternExpr.fn("exp", PatternExpr.num(0)));
         }
     }
 }
