@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.benchmark.SafePreparationProductQualificationReport.CaseResult;
 import de.regelsuche.benchmark.SafePreparationProductQualificationReport.ProductDecision;
 import de.regelsuche.benchmark.SafePreparationProductQualificationReport.Report;
+import de.regelsuche.benchmark.SafePreparationProductQualificationReport.RouteOutcome;
+import de.regelsuche.benchmark.SafePreparationProductQualificationReport.SafeTelemetry;
 import org.junit.jupiter.api.Test;
 
 class SafePreparationProductQualificationExperimentTest {
@@ -97,6 +99,61 @@ class SafePreparationProductQualificationExperimentTest {
         assertFalse(guard.safe().semanticReached());
         assertTrue(report.directSyntacticButSemanticallyRejectedCases() >= 1);
         assertEquals(0, report.safeSyntacticButSemanticallyRejectedCases());
+    }
+
+    @Test
+    void technicalFailureOnEitherMatchedRouteCannotQualifyOrCreateAGain() {
+        Report report = new SafePreparationProductQualificationExperiment()
+            .run(REVISION);
+        CaseResult exact = caseById(
+            report,
+            "perfect-square-native-exact-preparation");
+        RouteOutcome failedDirect = RouteOutcome.technicalFailure(
+            exact.direct().profileId(),
+            exact.direct().visibleInventoryFingerprint(),
+            exact.direct().configuredBudget(),
+            "synthetic direct-route failure",
+            SafeTelemetry.none());
+        CaseResult failedPair = new CaseResult(
+            exact.experimentCase(),
+            failedDirect,
+            exact.safe(),
+            true,
+            false,
+            false,
+            false,
+            true);
+
+        assertFalse(failedPair.expectationsSatisfied());
+        assertFalse(failedPair.newlyReachedBySafe());
+
+        Report failedReport = new Report(
+            report.schema(),
+            report.configurationId(),
+            report.repositoryRevision(),
+            report.directProfileId(),
+            report.safeProfileId(),
+            report.safeWorkAccountingRevision(),
+            report.verificationReplayCharged(),
+            report.visibleInventoryFingerprint(),
+            report.principalInventoryFingerprint(),
+            report.preparationInventoryFingerprint(),
+            report.exactRegistryFingerprint(),
+            report.preparationBudget(),
+            report.searchBudget(),
+            report.directRouteIsNoPreparationAblation(),
+            report.cases().stream()
+                .map(result -> result == exact ? failedPair : result)
+                .toList(),
+            report.productBlockers());
+
+        assertFalse(failedReport.evidenceQualified());
+        assertEquals(
+            ProductDecision.KEEP_OPT_IN_SAFETY_FAILURE,
+            failedReport.productDecision());
+        assertEquals(
+            report.newlyReachedCases() - 1,
+            failedReport.newlyReachedCases());
     }
 
     @Test
