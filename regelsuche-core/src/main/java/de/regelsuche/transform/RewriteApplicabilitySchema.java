@@ -136,7 +136,8 @@ public record RewriteApplicabilitySchema(
                 checked, CoverageStatus.EXPLICIT_CUSTOM_SCHEMA, schema);
         }
 
-        if (checked instanceof PatternRewriteRule patternRule) {
+        if (checked.getClass() == PatternRewriteRule.class) {
+            PatternRewriteRule patternRule = (PatternRewriteRule) checked;
             if (checked.mayEmitAssumptions()) {
                 return CoverageEntry.excluded(
                     checked,
