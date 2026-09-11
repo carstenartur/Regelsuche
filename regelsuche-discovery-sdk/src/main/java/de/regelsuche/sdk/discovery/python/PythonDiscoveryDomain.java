@@ -19,8 +19,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 
@@ -32,6 +34,7 @@ import java.util.function.Function;
 public final class PythonDiscoveryDomain<C, K> {
     public static final String PROTOCOL = "regelsuche.python-domain/v1";
     public static final String BRIDGE_RESOURCE = "/de/regelsuche/sdk/discovery/python/bridge.py";
+    private static final String NO_HOST_PRECHECK = "none";
 
     /** The implementation binds the actual trusted program and enforces the timeout. */
     public interface Transport {
@@ -75,6 +78,48 @@ public final class PythonDiscoveryDomain<C, K> {
         public String bindingSha256() { return sha256(canonical()); }
     }
 
+    /**
+     * Optional trusted host shortcut executed before the Python counterexample callback.
+     *
+     * <p>{@link Optional#empty()} means that this precheck does not apply and the
+     * unchanged Python search receives the full attempt budget. A present result
+     * is terminal for that candidate and is validated against the same host witness
+     * checker before it can refute a candidate. The stable precheck id is included
+     * automatically in the effective Python-domain binding. Changing semantics
+     * under an unchanged id is therefore forbidden; use a new id and, when the
+     * mathematical domain itself changes, a new revision/configuration.</p>
+     */
+    public static final class HostCounterexamplePrecheck<C> {
+        private final String id;
+        private final BiFunction<C, Integer, Optional<CounterexampleResult>> search;
+        private final boolean absent;
+
+        public HostCounterexamplePrecheck(
+                String id,
+                BiFunction<C, Integer, Optional<CounterexampleResult>> search
+        ) {
+            this(id, search, false);
+            require(!NO_HOST_PRECHECK.equals(id), "reserved host precheck id");
+        }
+
+        private HostCounterexamplePrecheck(
+                String id,
+                BiFunction<C, Integer, Optional<CounterexampleResult>> search,
+                boolean absent
+        ) {
+            require(id != null && id.matches("[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}"), "host precheck id");
+            this.id = id;
+            this.search = Objects.requireNonNull(search, "host precheck search");
+            this.absent = absent;
+        }
+
+        public String id() { return id; }
+
+        public Optional<CounterexampleResult> apply(C candidate, int attemptBudget) {
+            return Objects.requireNonNull(search.apply(candidate, attemptBudget), "host precheck returned null");
+        }
+    }
+
     public enum Failure { PROTOCOL, TRANSPORT, LIMIT, REUSED }
     public static final class CallbackFailure extends IllegalStateException {
         private static final long serialVersionUID = 1L;
@@ -97,6 +142,7 @@ public final class PythonDiscoveryDomain<C, K> {
     private final Function<String, C> decodeCandidate;
     private final Function<C, String> encodeCandidate;
     private final BiPredicate<C, String> checkWitness;
+    private final HostCounterexamplePrecheck<C> hostPrecheck;
     private final DiscoveryDomain<String, C, K> domain;
     private final AtomicBoolean started = new AtomicBoolean();
     private final Map<String, Integer> counts = new TreeMap<>();
@@ -115,16 +161,32 @@ public final class PythonDiscoveryDomain<C, K> {
             BiPredicate<C, String> checkWitness, Function<C, Evaluation<K>> evaluator,
             String certificateKind, Function<K, String> certificateCanonical,
             Function<K, String> certificateRendering) {
+        this(definition, transport, decodeCandidate, encodeCandidate, checkWitness,
+                new HostCounterexamplePrecheck<>(
+                        NO_HOST_PRECHECK, (candidate, budget) -> Optional.empty(), true),
+                evaluator, certificateKind, certificateCanonical, certificateRendering);
+    }
+
+    /**
+     * Variant with an exact trusted-host precheck before guest counterexample search.
+     * Existing callers use the overload above and retain byte-for-byte behavior.
+     */
+    public PythonDiscoveryDomain(Definition definition, Transport transport,
+            Function<String, C> decodeCandidate, Function<C, String> encodeCandidate,
+            BiPredicate<C, String> checkWitness, HostCounterexamplePrecheck<C> hostPrecheck,
+            Function<C, Evaluation<K>> evaluator, String certificateKind,
+            Function<K, String> certificateCanonical, Function<K, String> certificateRendering) {
         this.definition = Objects.requireNonNull(definition);
         this.transport = Objects.requireNonNull(transport);
         this.decodeCandidate = Objects.requireNonNull(decodeCandidate);
         this.encodeCandidate = Objects.requireNonNull(encodeCandidate);
         this.checkWitness = Objects.requireNonNull(checkWitness);
+        this.hostPrecheck = Objects.requireNonNull(hostPrecheck);
         Objects.requireNonNull(evaluator);
         Objects.requireNonNull(certificateCanonical);
         Objects.requireNonNull(certificateRendering);
         require(definition.programSha256.equals(transport.programSha256()), "transport program binding mismatch");
-        binding = definition.bindingSha256();
+        binding = effectiveBinding(definition, hostPrecheck);
         domain = DiscoveryDomainBuilder.<String, C, K>domain(definition.domainId, definition.revision)
                 .generator(seed -> {
                     if (!started.compareAndSet(false, true)) throw failure(Failure.REUSED, "initial");
@@ -179,6 +241,13 @@ public final class PythonDiscoveryDomain<C, K> {
         }
     }
 
+    private static String effectiveBinding(Definition definition, HostCounterexamplePrecheck<?> precheck) {
+        if (precheck.absent) return definition.bindingSha256();
+        return sha256(canonical(Map.of(
+                "definitionBinding", definition.bindingSha256(),
+                "hostPrecheckId", precheck.id())));
+    }
+
     private String payload(Object value) { return text(value, definition.limits.maxPayloadBytes, false); }
     private String bound(String role, String material) {
         bytes(material, definition.limits.maxMessageBytes);
@@ -208,6 +277,10 @@ public final class PythonDiscoveryDomain<C, K> {
     private CounterexampleResult counterexamples(C candidate, Integer budget) {
         require(budget >= 0, "negative counterexample budget");
         if (budget == 0) return CounterexampleResult.inconclusive(0, "no counterexample budget", Map.of());
+
+        Optional<CounterexampleResult> hostResult = hostPrecheck.apply(candidate, budget);
+        if (hostResult.isPresent()) return validateHostPrecheck(candidate, budget, hostResult.orElseThrow());
+
         Map<String, Object> reply = call("counterexamples", Map.of("candidate", payload(encodeCandidate.apply(candidate)), "budget", budget));
         fields(reply, "status", "attempts", "witness");
         CounterexampleStatus status = CounterexampleStatus.valueOf(text(reply.get("status"), 32, false));
@@ -219,8 +292,29 @@ public final class PythonDiscoveryDomain<C, K> {
             require(attempts > 0 && !witness.isBlank(), "missing attempted counterexample");
             if (!checkWitness.test(candidate, witness)) throw failure(Failure.PROTOCOL, "unverified-counterexample");
         }
-        return new CounterexampleResult(status, attempts, witness,
-                Map.of("pythonBinding", binding, "witnessCheckedByHost", Boolean.toString(status == CounterexampleStatus.FOUND)));
+        Map<String, String> metrics = hostPrecheck.absent
+                ? Map.of("pythonBinding", binding,
+                        "witnessCheckedByHost", Boolean.toString(status == CounterexampleStatus.FOUND))
+                : Map.of("hostPrecheck", hostPrecheck.id(),
+                        "pythonBinding", binding,
+                        "witnessCheckedByHost", Boolean.toString(status == CounterexampleStatus.FOUND));
+        return new CounterexampleResult(status, attempts, witness, metrics);
+    }
+
+    private CounterexampleResult validateHostPrecheck(C candidate, int budget, CounterexampleResult result) {
+        require(result.attempts() <= budget, "host precheck exceeded counterexample budget");
+        CounterexampleStatus status = result.status();
+        if (status == CounterexampleStatus.NONE_FOUND) require(result.witness().isEmpty(), "unexpected host precheck witness");
+        if (status == CounterexampleStatus.UNSUPPORTED) require(result.attempts() == 0, "unsupported host precheck attempt count");
+        if (status == CounterexampleStatus.FOUND) {
+            require(result.attempts() > 0 && !result.witness().isBlank(), "missing host precheck counterexample");
+            require(checkWitness.test(candidate, result.witness()), "unverified host precheck counterexample");
+        }
+        Map<String, String> metrics = new TreeMap<>(result.metrics());
+        metrics.put("hostPrecheck", hostPrecheck.id());
+        metrics.put("pythonBinding", binding);
+        metrics.put("witnessCheckedByHost", Boolean.toString(status == CounterexampleStatus.FOUND));
+        return new CounterexampleResult(status, result.attempts(), result.witness(), metrics);
     }
 
     private synchronized Map<String, Object> call(String operation, Map<String, Object> arguments) {
