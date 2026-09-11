@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.PatternExpr;
@@ -18,6 +19,9 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class SharedPreparationTraversalTest {
+    private static final String REVISION =
+        "0123456789abcdef0123456789abcdef01234567";
+
     @Test
     void normalizesAndExpandsOnePhysicalStateOnlyOnce() {
         SharedPreparationTraversal traversal = traversal();
@@ -128,6 +132,70 @@ class SharedPreparationTraversalTest {
             lowerResidualCost, lowerResidualCost, higherResidualCost, higherResidualCost), repeated);
     }
 
+    @Test
+    void singlePrincipalProductionOrderingFollowsVersionedRank() {
+        PatternExpr principalPattern = PatternExpr.fn(
+            "goal", PatternExpr.var("A"), PatternExpr.num(0));
+        PatternRewriteRule principal = new PatternRewriteRule(
+            "rank_principal",
+            principalPattern,
+            PatternExpr.var("A"),
+            RewriteKind.SIMPLIFY,
+            false,
+            -1,
+            true);
+        PatternRewriteRule toward = new PatternRewriteRule(
+            "rank_toward",
+            PatternExpr.fn("src", PatternExpr.var("A")),
+            PatternExpr.fn("goal", PatternExpr.var("A"), PatternExpr.num(1)),
+            RewriteKind.NORMALIZE,
+            false,
+            0,
+            true);
+        PatternRewriteRule worse = new PatternRewriteRule(
+            "rank_worse",
+            PatternExpr.fn("src", PatternExpr.var("A")),
+            PatternExpr.fn("other", PatternExpr.var("A")),
+            RewriteKind.NORMALIZE,
+            false,
+            0,
+            true);
+        PatternRewriteRule finish = new PatternRewriteRule(
+            "rank_finish",
+            PatternExpr.fn("goal", PatternExpr.var("A"), PatternExpr.num(1)),
+            PatternExpr.fn("goal", PatternExpr.var("A"), PatternExpr.num(0)),
+            RewriteKind.NORMALIZE,
+            false,
+            0,
+            true);
+
+        PatternMatchAnalyzer analyzer = new PatternMatchAnalyzer();
+        ExpressionParser parser = new ExpressionParser();
+        var towardAnalysis = analyzer.analyze(
+            principalPattern,
+            parser.parseTerm("goal(x,1)"),
+            RecognitionProfile.exact());
+        var worseAnalysis = analyzer.analyze(
+            principalPattern,
+            parser.parseTerm("other(x)"),
+            RecognitionProfile.exact());
+        assertTrue(PreparationNearMatchRanking.rank(towardAnalysis)
+            .compareTo(PreparationNearMatchRanking.rank(worseAnalysis)) < 0);
+
+        var attempt = new PatternTargetedLocalBridgeSearch(
+            principal,
+            List.of(toward, worse, finish),
+            REVISION,
+            rankingBudget()).analyze(
+                "src(x)",
+                AssumptionSignature.ofExpressions(List.of()));
+
+        assertEquals(PatternTargetedLocalBridgeSearch.Status.PREPARED, attempt.status());
+        var steps = attempt.bridge().orElseThrow().preparationSteps();
+        assertEquals(List.of("rank_toward", "rank_finish"),
+            steps.stream().map(PatternTargetedLocalBridgeSearch.Step::ruleId).toList());
+    }
+
     private static SharedPreparationTraversal traversal() {
         PatternRewriteRule removeZero = new PatternRewriteRule(
             "shared_remove_zero",
@@ -139,5 +207,10 @@ class SharedPreparationTraversalTest {
     private static PatternTargetedLocalBridgeSearch.Budget budget() {
         return new PatternTargetedLocalBridgeSearch.Budget(
             3, 128, 1_024, 8, 160, 128, 32, 5_000, 2_500);
+    }
+
+    private static PatternTargetedLocalBridgeSearch.Budget rankingBudget() {
+        return new PatternTargetedLocalBridgeSearch.Budget(
+            2, 8, 16, 4, 64, 1, 32, 500, 250);
     }
 }
