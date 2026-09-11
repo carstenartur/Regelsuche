@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -16,6 +18,7 @@ REPORT_SCHEMA = "regelsuche.quality.jmh-regression-report/v3"
 DECISION_STATISTIC = "max(0, currentScore - currentScoreError)"
 FAILURE_CONDITION = "decisionScore > maximumAllowedScore"
 BOUNDARY_POLICY = "inclusive-pass"
+LOW_PRECISION_DIAGNOSTIC = "currentScoreError >= currentScore"
 FAMILIES = {"CORE", "REWRITE_PROGRAM", "END_TO_END_SEARCH"}
 
 
@@ -28,6 +31,15 @@ def load_json(path: Path, label: str) -> Any:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         fail(f"cannot read {label} {path}: {error}")
+
+
+def git_blob_sha1(path: Path) -> str:
+    try:
+        data = path.read_bytes()
+    except OSError as error:
+        fail(f"cannot read threshold policy bytes {path}: {error}")
+    header = f"blob {len(data)}\0".encode("ascii")
+    return hashlib.sha1(header + data).hexdigest()
 
 
 def finite_positive(value: Any, label: str) -> float:
@@ -63,12 +75,17 @@ def load_decision_policy(path: Path) -> dict[str, Any]:
         fail("decision policy thresholdPolicyPath must be a non-empty string")
     if policy.get("thresholdPolicySchema") != THRESHOLD_POLICY_SCHEMA:
         fail("decision policy thresholdPolicySchema differs from frozen v2 threshold schema")
+    threshold_blob = policy.get("thresholdPolicyGitBlobSha1")
+    if not isinstance(threshold_blob, str) or re.fullmatch(r"[0-9a-f]{40}", threshold_blob) is None:
+        fail("decision policy thresholdPolicyGitBlobSha1 must be a lowercase Git blob SHA-1")
     if policy.get("decisionStatistic") != DECISION_STATISTIC:
         fail("unsupported decision statistic")
     if policy.get("failureCondition") != FAILURE_CONDITION:
         fail("unsupported failure condition")
     if policy.get("boundaryPolicy") != BOUNDARY_POLICY:
         fail("unsupported boundary policy")
+    if policy.get("lowPrecisionDiagnostic") != LOW_PRECISION_DIAGNOSTIC:
+        fail("unsupported low precision diagnostic")
     claim_boundary = policy.get("claimBoundary")
     if not isinstance(claim_boundary, str) or not claim_boundary.strip():
         fail("decision policy claimBoundary must be a non-empty string")
@@ -82,8 +99,33 @@ def load_threshold_policy(path: Path) -> dict[str, Any]:
     return policy
 
 
+def bind_threshold_policy(
+    repository_root: Path,
+    supplied_path: Path,
+    decision_policy: dict[str, Any],
+) -> str:
+    root = repository_root.resolve()
+    supplied = supplied_path.resolve()
+    declared = (root / decision_policy["thresholdPolicyPath"]).resolve()
+    try:
+        declared.relative_to(root)
+    except ValueError:
+        fail("decision policy thresholdPolicyPath escapes repository root")
+    if supplied != declared:
+        fail(f"threshold policy path differs: expected {declared}, found {supplied}")
+    actual_blob = git_blob_sha1(supplied)
+    expected_blob = decision_policy["thresholdPolicyGitBlobSha1"]
+    if actual_blob != expected_blob:
+        fail(
+            "threshold policy content differs: "
+            f"expected Git blob {expected_blob}, found {actual_blob}"
+        )
+    return actual_blob
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--repository-root", required=True, type=Path)
     parser.add_argument("--result", required=True, type=Path)
     parser.add_argument("--threshold-policy", required=True, type=Path)
     parser.add_argument("--decision-policy", required=True, type=Path)
@@ -92,6 +134,11 @@ def main() -> int:
     args = parser.parse_args()
 
     decision_policy = load_decision_policy(args.decision_policy)
+    threshold_blob = bind_threshold_policy(
+        args.repository_root,
+        args.threshold_policy,
+        decision_policy,
+    )
     threshold_policy = load_threshold_policy(args.threshold_policy)
     execution = threshold_policy.get("execution")
     configured = threshold_policy.get("benchmarks")
@@ -162,6 +209,7 @@ def main() -> int:
         violations.append("undeclared benchmarks: " + ", ".join(unexpected))
 
     rows: list[dict[str, Any]] = []
+    low_precision_benchmarks: list[str] = []
     expected_jdk = integer(execution.get("jdkMajor"), "execution.jdkMajor")
     for name in sorted(set(policy_by_name) & set(current_by_name)):
         expected = policy_by_name[name]
@@ -209,6 +257,9 @@ def main() -> int:
 
         maximum = float(expected["maximumAllowedScore"])
         decision_score = max(0.0, score - score_error)
+        precision_status = "LOW_PRECISION" if score_error >= score else "MEASURED"
+        if precision_status == "LOW_PRECISION":
+            low_precision_benchmarks.append(name)
         raw_regression_percent = 100.0 * (
             score / float(expected["baselineScore"]) - 1.0
         )
@@ -236,6 +287,7 @@ def main() -> int:
                 "maximumAllowedScore": maximum,
                 "rawRegressionPercent": round(raw_regression_percent, 6),
                 "decisionRegressionPercent": round(decision_regression_percent, 6),
+                "precisionStatus": precision_status,
                 "status": "PASSED" if not row_violations else "FAILED",
                 "violations": row_violations,
             }
@@ -247,14 +299,18 @@ def main() -> int:
         "decisionPolicySchema": DECISION_POLICY_SCHEMA,
         "thresholdPolicy": str(args.threshold_policy),
         "thresholdPolicySchema": THRESHOLD_POLICY_SCHEMA,
+        "thresholdPolicyGitBlobSha1": threshold_blob,
         "baselineRevision": threshold_policy.get("baselineRevision"),
         "baselineArtifactDigest": threshold_policy.get("baselineArtifactDigest"),
         "claimBoundary": decision_policy.get("claimBoundary"),
         "decisionStatistic": DECISION_STATISTIC,
         "failureCondition": FAILURE_CONDITION,
         "boundaryPolicy": BOUNDARY_POLICY,
+        "lowPrecisionDiagnostic": LOW_PRECISION_DIAGNOSTIC,
         "status": "PASSED" if not violations else "FAILED",
         "benchmarkCount": len(rows),
+        "lowPrecisionCount": len(low_precision_benchmarks),
+        "lowPrecisionBenchmarks": low_precision_benchmarks,
         "missingBenchmarks": missing,
         "unexpectedBenchmarks": unexpected,
         "benchmarks": rows,
@@ -273,13 +329,16 @@ def main() -> int:
         "",
         str(decision_policy.get("claimBoundary", "")),
         "",
-        "The frozen v2 benchmark inventory and finite thresholds remain unchanged.",
+        "The frozen v2 benchmark inventory and finite thresholds remain unchanged and content-bound.",
         "",
         f"Decision statistic: `{DECISION_STATISTIC}`.",
         f" Failure condition: `{FAILURE_CONDITION}`; the exact boundary passes.",
+        f" Low precision diagnostic: `{LOW_PRECISION_DIAGNOSTIC}`.",
         "",
-        "| Benchmark | Unit | Baseline | Current ± error | Decision | Maximum | Raw change | Status |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |",
+        f"Low-precision measurements: **{len(low_precision_benchmarks)}**.",
+        "",
+        "| Benchmark | Unit | Baseline | Current ± error | Decision | Maximum | Raw change | Precision | Status |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- |",
     ]
     for row in rows:
         lines.append(
@@ -287,7 +346,8 @@ def main() -> int:
             f"{row['baselineScore']:.6f} | "
             f"{row['currentScore']:.6f} ± {row['currentScoreError']:.6f} | "
             f"{row['decisionScore']:.6f} | {row['maximumAllowedScore']:.6f} | "
-            f"{row['rawRegressionPercent']:+.2f}% | {row['status']} |"
+            f"{row['rawRegressionPercent']:+.2f}% | {row['precisionStatus']} | "
+            f"{row['status']} |"
         )
     if violations:
         lines.extend(["", "## Violations", ""])
@@ -296,6 +356,7 @@ def main() -> int:
 
     print(f"jmhRegressionStatus={report['status']}")
     print(f"jmhRegressionBenchmarks={len(rows)}")
+    print(f"jmhRegressionLowPrecision={len(low_precision_benchmarks)}")
     print(f"jmhRegressionReport={args.json_output}")
     if violations:
         for violation in violations:
