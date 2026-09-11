@@ -21,10 +21,7 @@ public interface RewriteRule {
 
     Expr apply(Expr subtree);
 
-    /**
-     * @return symbolic side conditions the rule introduces when fired on the
-     *         given subtree. Default: none (the rule is unconditional).
-     */
+    /** Symbolic side conditions introduced by this concrete application. */
     default List<Assumption> assumptions(Expr subtree) {
         return List.of();
     }
@@ -35,30 +32,41 @@ public interface RewriteRule {
     }
 
     /**
-     * Explicit opt-in contract for algorithmic/custom schema-directed
-     * preparation. No caller may infer this contract from rule metadata.
+     * Explicit opt-in contract for custom schema-directed preparation. No
+     * caller may infer this contract from IDs, classes, examples or benchmarks.
      */
     default Optional<RewriteApplicabilitySchema> explicitApplicabilitySchema() {
         return Optional.empty();
     }
 
-    /**
-     * Builds the standard exact source-pattern contract for this exact rule
-     * object. Intended for {@link #explicitApplicabilitySchema()} overrides.
-     */
-    default RewriteApplicabilitySchema exactApplicabilitySchema(
-        PatternExpr pattern,
-        RequiredAssumptionTemplate... requiredAssumptions
-    ) {
-        return new RewriteApplicabilitySchema(
-            "algorithmic-source/v1:" + id(),
-            this,
-            pattern,
-            RecognitionProfile.exact(),
-            List.of(requiredAssumptions));
-    }
-
     default RuleDescriptor descriptor() {
         return RuleDescriptor.core(id(), List.of());
+    }
+
+    /**
+     * Capability implemented by algorithmic/custom rules whose complete source
+     * applicability and guard contract is explicitly reviewable.
+     */
+    interface RewriteApplicabilitySchemaProvider extends RewriteRule {
+        RewriteApplicabilitySchema applicabilitySchema();
+
+        @Override
+        default Optional<RewriteApplicabilitySchema>
+                explicitApplicabilitySchema() {
+            return Optional.of(applicabilitySchema());
+        }
+
+        /** Builds the standard exact source-pattern contract for this rule. */
+        default RewriteApplicabilitySchema exactSource(
+            PatternExpr pattern,
+            RequiredAssumptionTemplate... requiredAssumptions
+        ) {
+            return new RewriteApplicabilitySchema(
+                "algorithmic-source/v1:" + id(),
+                this,
+                pattern,
+                RecognitionProfile.exact(),
+                List.of(requiredAssumptions));
+        }
     }
 }
