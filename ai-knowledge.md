@@ -5,12 +5,17 @@ the `carstenartur/ai-knowledge-extractor` GitHub Packages repository. The
 consumer version is pinned once in `gradle.properties`:
 
 ```properties
-aiKnowledgeExtractorVersion=0.1.9
+aiKnowledgeExtractorVersion=0.1.10
 ```
 
-Version 0.1.9 prunes generated `build/` and `target/` subtrees before repository
-inventory traversal. This keeps parallel verification deterministic while
-preserving the complete analysis of checkout-owned source and documentation.
+Version 0.1.10 retains the generated-`build/` and `target/` inventory pruning
+introduced in 0.1.9 and fixes the context-debt trend contract. The absolute
+quality gate always checks the current measured, normalized `aiContextDebt`
+against `maxCognitiveDebt`. Separately, the debt trend gate compares normalized
+`aiContextDebt` only when the baseline and current snapshot declare the same
+context-debt model. The former `aiCognitiveDebt` value remains available as a
+legacy diagnostic; it is no longer allowed to fail a normalized context-debt
+trend merely because the two metrics move differently.
 
 Regelsuche never consumes a snapshot implicitly. Updating the released
 dependency requires one explicit version change followed by the normal
@@ -88,28 +93,10 @@ unresolved capability references and drift from the measured context-footprint
 contract. A missing `methodFacts` section remains an explicit warning rather
 than a build failure.
 
-The generated files are written to:
-
-```text
-build/ai-knowledge/
-```
-
-Important artifacts include:
-
-```text
-index.json
-modules.json
-classes.json
-tests.json
-docs.json
-capabilities.json
-dependencies.json
-claims.json
-evidence.json
-complexity.json
-review-context.md
-context-packs/index.json
-```
+The generated files are written to `build/ai-knowledge/`. Important artifacts
+include `index.json`, `modules.json`, `classes.json`, `tests.json`, `docs.json`,
+`capabilities.json`, `dependencies.json`, `claims.json`, `evidence.json`,
+`complexity.json`, `review-context.md` and `context-packs/index.json`.
 
 ## Individual extractor tasks
 
@@ -159,27 +146,54 @@ command above, or without package credentials by selecting the explicit local
 composite build. Authentication changes how Gradle resolves the plugin; it does
 not change which tasks, assertions or artifact contracts are executed.
 
-## Baseline for learned-rule scheduling
+## Context-debt trend baseline
 
-PRs 1–6 were measured against independently green main
-`b0fc59be75d61e5005a924d853780225651eb334` after #951/#952. Its complete
-[CI run 34372553674](https://github.com/carstenartur/Regelsuche/actions/runs/34372553674)
-passed all authorities; the original baseline came from artifact `10113524705`
-(ZIP SHA-256 `4a61caa5d905a54d4031dc3bfef8d32caa01d55758a5a9623005678ac8856635`).
+The committed `ai-knowledge/complexity-baseline.json` is not chosen from the
+branch under test. For the 0.1.10 migration it is derived from independently
+green Regelsuche `main` commit
+`f19ee628fca26bd00950195a38eb940de9293ebc`, CI run `34581736197`, retained
+`repository-verification` artifact `10192975764`.
 
-For the subsequent stacked PRs, the baseline advances to the independently
-fully green preceding PR #959 commit
-`fcdd944e6be39b314fb95ab59f5c3cc78c45188d`.
-[CI run 34382028949](https://github.com/carstenartur/Regelsuche/actions/runs/34382028949)
+That accepted source revision measured:
+
+- `estimatedContextTokens = 557650`
+- `conceptRadius = 85`
+- `dependencyRadius = 254`
+- legacy diagnostic `aiCognitiveDebt = 625.5676470588235`
+- normalized `aiContextDebt = 17.11`
+- `contextDebtModelVersion = context-footprint-v3`
+
+The normalized value comes from the schema-v3 context footprint in the retained
+artifact (`normalizedContextDebt = 17.11`). Version 0.1.10 writes the model id
+into trend snapshots, so `maxCognitiveDebtIncrease` compares normalized debt
+when baseline and current model versions match. If the current snapshot is
+normalized but the baseline model is missing or different, only that debt trend
+is reported as non-comparable and skipped; the absolute normalized debt gate and
+all other configured gates remain active. For compatibility callers that do not
+expose a normalized current context-debt model, the extractor retains the legacy
+`aiCognitiveDebt` trend path rather than silently treating it as normalized debt.
+
+The policy limits are deliberately unchanged by this migration: the context-debt
+increase allowance remains 10 units, the context-token allowance remains 15000,
+the concept-radius allowance remains 3, and the method-hotspot rules remain in
+force. This is a metric-correctness migration, not a relaxation made to pass a
+particular pull request.
+
+## Historical baseline provenance
+
+The learned-rule scheduling work was originally measured against independently
+green `main` `b0fc59be75d61e5005a924d853780225651eb334` after #951/#952. CI run
+`34372553674` passed all authorities; its retained baseline artifact was
+`10113524705` (ZIP SHA-256
+`4a61caa5d905a54d4031dc3bfef8d32caa01d55758a5a9623005678ac8856635`).
+
+For the subsequent stacked PRs, the baseline advanced to independently green
+PR #959 commit `fcdd944e6be39b314fb95ab59f5c3cc78c45188d`. CI run `34382028949`
 passed Gradle, Maven/product/Docker, isolated JMH, isolated SymPy and aggregate
-ciCheck before this baseline change. The committed values are copied unchanged
-from `current` in `build/ai-knowledge/trend.json`, artifact `10117201394`
-(ZIP SHA-256 `2754c79aab3b10eb564da5c73211bc6de10c9084687765c493bc95c9980a1864`).
+`ciCheck`; the retained artifact was `10117201394` (ZIP SHA-256
+`2754c79aab3b10eb564da5c73211bc6de10c9084687765c493bc95c9980a1864`).
 
-This preserves the incremental quality check for the eight dependent PRs:
-the predecessor passed against the original main baseline, and the new steps
-are measured against that verified predecessor. No metric from a failing
-landmark/evaluation head is used. The 10-unit cognitive-debt, 15000-token,
-concept-radius and method-hotspot limits are unchanged. No hotspot exception
-is added. The `public-java-sdk` capability continues to link its public entry
-points, contract tests and tutorials.
+Those historical measurements remain useful provenance, but the active
+context-debt trend baseline is now the independently green `f19ee628...` snapshot
+above because it is the last accepted `main` state before adopting the corrected
+normalized trend semantics.
