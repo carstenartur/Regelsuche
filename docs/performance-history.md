@@ -29,6 +29,12 @@ The Gradle adapter writes the same Java-rendered evidence below `build/reports/q
 
 Every table and chart uses **milliseconds per operation (`ms/op`)**. Lower values and lower points are always faster/better. JMH `scoreError` is retained as an error bar.
 
+### Active regression decision authority
+
+The active checkout-owned `verifyJmhRegression` task uses the versioned v3 decision authority in `scripts/verify-jmh-regression-v3.py` and `config/quality/jmh-regression-decision-policy-v3.json`. It deliberately reuses the frozen benchmark inventory and finite family thresholds from `config/quality/jmh-regression-policy-v2.json` without changing them.
+
+For average-time measurements, v3 computes `max(0, currentScore - currentScoreError)` and fails only when that decision score is strictly greater than the configured `maximumAllowedScore`; equality passes. This restores the uncertainty-aware decision rule already used by the earlier benchmark contract while keeping the historical v2 verifier and its reports unchanged and reproducible at their original revisions. The rule is a finite shared-runner ratchet, not a claim of cross-hardware absolute performance or statistical significance beyond the recorded JMH uncertainty.
+
 The writer recreates the dedicated chart directory before every run, so removed benchmarks cannot leave stale SVG evidence behind. It also validates all chart filenames before writing and fails closed if two benchmark identities would normalize to the same filename.
 
 ## Retained evidence contract
