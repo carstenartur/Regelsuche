@@ -461,10 +461,10 @@ public final class PatternTargetedLocalBridgeSearch {
                 }
 <span class="fc" id="L462">            }</span>
 <span class="fc" id="L463">            local.sort(CANDIDATE_ORDER);</span>
-<span class="pc bpc" id="L464" title="1 of 2 branches missed.">            if (local.size() &gt; budget.maxSuccessorsPerState()) {</span>
-<span class="nc" id="L465">                limits.add(&quot;SUCCESSORS_PER_STATE&quot;);</span>
-<span class="nc" id="L466">                local = local.subList(</span>
-<span class="nc" id="L467">                    0, budget.maxSuccessorsPerState());</span>
+<span class="fc bfc" id="L464" title="All 2 branches covered.">            if (local.size() &gt; budget.maxSuccessorsPerState()) {</span>
+<span class="fc" id="L465">                limits.add(&quot;SUCCESSORS_PER_STATE&quot;);</span>
+<span class="fc" id="L466">                local = local.subList(</span>
+<span class="fc" id="L467">                    0, budget.maxSuccessorsPerState());</span>
             }
 <span class="fc" id="L469">            candidates.addAll(local);</span>
 <span class="fc" id="L470">        }</span>

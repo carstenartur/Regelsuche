@@ -201,11 +201,11 @@ public sealed interface PatternExpr extends ExprTemplate
 
         @Override
         public Expr instantiate(Map&lt;String, Expr&gt; bindings) {
-<span class="nc" id="L204">            List&lt;Expr&gt; args = new ArrayList&lt;&gt;(arguments.size());</span>
-<span class="nc bnc" id="L205" title="All 2 branches missed.">            for (PatternExpr argument : arguments) {</span>
-<span class="nc" id="L206">                args.add(argument.instantiate(bindings));</span>
-<span class="nc" id="L207">            }</span>
-<span class="nc" id="L208">            return new FunctionExpr(name, args);</span>
+<span class="fc" id="L204">            List&lt;Expr&gt; args = new ArrayList&lt;&gt;(arguments.size());</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">            for (PatternExpr argument : arguments) {</span>
+<span class="fc" id="L206">                args.add(argument.instantiate(bindings));</span>
+<span class="fc" id="L207">            }</span>
+<span class="fc" id="L208">            return new FunctionExpr(name, args);</span>
         }
     }
 }

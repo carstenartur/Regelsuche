@@ -2,9 +2,11 @@
 
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.knowledge.RuleInventoryFingerprint;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /** Explicit applicability contract for one concrete rewrite executor. */
@@ -15,24 +17,23 @@ public record RewriteApplicabilitySchema(
     RecognitionProfile recognitionProfile,
     List&lt;RequiredAssumptionTemplate&gt; requiredAssumptions
 ) {
-<span class="fc" id="L18">    public RewriteApplicabilitySchema {</span>
-<span class="pc bpc" id="L19" title="1 of 4 branches missed.">        if (schemaId == null || schemaId.isBlank()) {</span>
-<span class="fc" id="L20">            throw new IllegalArgumentException(</span>
-                &quot;schemaId must not be blank&quot;);
+<span class="fc" id="L20">    public RewriteApplicabilitySchema {</span>
+<span class="pc bpc" id="L21" title="1 of 4 branches missed.">        if (schemaId == null || schemaId.isBlank()) {</span>
+<span class="fc" id="L22">            throw new IllegalArgumentException(&quot;schemaId must not be blank&quot;);</span>
         }
-<span class="fc" id="L23">        schemaId = schemaId.trim();</span>
-<span class="fc" id="L24">        executor = Objects.requireNonNull(executor, &quot;executor&quot;);</span>
-<span class="fc" id="L25">        pattern = Objects.requireNonNull(pattern, &quot;pattern&quot;);</span>
-<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        recognitionProfile = recognitionProfile == null</span>
-<span class="nc" id="L27">            ? RecognitionProfile.exact()</span>
-<span class="fc" id="L28">            : recognitionProfile;</span>
-<span class="fc" id="L29">        requiredAssumptions = List.copyOf(Objects.requireNonNull(</span>
+<span class="fc" id="L24">        schemaId = schemaId.trim();</span>
+<span class="fc" id="L25">        executor = Objects.requireNonNull(executor, &quot;executor&quot;);</span>
+<span class="fc" id="L26">        pattern = Objects.requireNonNull(pattern, &quot;pattern&quot;);</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        recognitionProfile = recognitionProfile == null</span>
+<span class="nc" id="L28">            ? RecognitionProfile.exact()</span>
+<span class="fc" id="L29">            : recognitionProfile;</span>
+<span class="fc" id="L30">        requiredAssumptions = List.copyOf(Objects.requireNonNull(</span>
             requiredAssumptions, &quot;requiredAssumptions&quot;));
-<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (requiredAssumptions.stream().anyMatch(Objects::isNull)) {</span>
-<span class="nc" id="L32">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if (requiredAssumptions.stream().anyMatch(Objects::isNull)) {</span>
+<span class="nc" id="L33">            throw new IllegalArgumentException(</span>
                 &quot;requiredAssumptions must not contain null&quot;);
         }
-<span class="fc" id="L35">    }</span>
+<span class="fc" id="L36">    }</span>
 
     public RewriteApplicabilitySchema(
         String schemaId,
@@ -40,23 +41,24 @@ public record RewriteApplicabilitySchema(
         PatternExpr pattern,
         RecognitionProfile recognitionProfile
     ) {
-<span class="fc" id="L43">        this(schemaId, executor, pattern, recognitionProfile, List.of());</span>
-<span class="fc" id="L44">    }</span>
+<span class="fc" id="L44">        this(schemaId, executor, pattern, recognitionProfile, List.of());</span>
+<span class="fc" id="L45">    }</span>
 
+    /** Creates the source-pattern contract of an ordinary declarative rule. */
     public static RewriteApplicabilitySchema fromPatternRule(
         PatternRewriteRule rule
     ) {
-<span class="fc" id="L49">        PatternRewriteRule checked = Objects.requireNonNull(rule, &quot;rule&quot;);</span>
-<span class="fc" id="L50">        List&lt;RequiredAssumptionTemplate&gt; requiredAssumptions =</span>
-<span class="fc" id="L51">            inferNonZeroDenominatorAssumptions(checked);</span>
-<span class="fc bfc" id="L52" title="All 2 branches covered.">        String schemaRevision = requiredAssumptions.isEmpty()</span>
-<span class="fc" id="L53">            ? &quot;pattern-rule-source/v1:&quot;</span>
-<span class="fc" id="L54">            : &quot;pattern-rule-source-with-inferred-denominators/v1:&quot;;</span>
-<span class="fc" id="L55">        return new RewriteApplicabilitySchema(</span>
-<span class="fc" id="L56">            schemaRevision + checked.id(),</span>
+<span class="fc" id="L51">        PatternRewriteRule checked = Objects.requireNonNull(rule, &quot;rule&quot;);</span>
+<span class="fc" id="L52">        List&lt;RequiredAssumptionTemplate&gt; requiredAssumptions =</span>
+<span class="fc" id="L53">            inferNonZeroDenominatorAssumptions(checked);</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        String schemaRevision = requiredAssumptions.isEmpty()</span>
+<span class="fc" id="L55">            ? &quot;pattern-rule-source/v1:&quot;</span>
+<span class="fc" id="L56">            : &quot;pattern-rule-source-with-inferred-denominators/v1:&quot;;</span>
+<span class="fc" id="L57">        return new RewriteApplicabilitySchema(</span>
+<span class="fc" id="L58">            schemaRevision + checked.id(),</span>
             checked,
-<span class="fc" id="L58">            checked.source(),</span>
-<span class="fc" id="L59">            checked.recognitionProfile(),</span>
+<span class="fc" id="L60">            checked.source(),</span>
+<span class="fc" id="L61">            checked.recognitionProfile(),</span>
             requiredAssumptions);
     }
 
@@ -64,21 +66,102 @@ public record RewriteApplicabilitySchema(
         PatternRewriteRule rule,
         List&lt;RequiredAssumptionTemplate&gt; requiredAssumptions
     ) {
-<span class="nc" id="L67">        PatternRewriteRule checked = Objects.requireNonNull(rule, &quot;rule&quot;);</span>
-<span class="nc" id="L68">        return new RewriteApplicabilitySchema(</span>
-<span class="nc" id="L69">            &quot;pattern-rule-source-with-conditions/v1:&quot; + checked.id(),</span>
+<span class="nc" id="L69">        PatternRewriteRule checked = Objects.requireNonNull(rule, &quot;rule&quot;);</span>
+<span class="nc" id="L70">        return new RewriteApplicabilitySchema(</span>
+<span class="nc" id="L71">            &quot;pattern-rule-source-with-conditions/v1:&quot; + checked.id(),</span>
             checked,
-<span class="nc" id="L71">            checked.source(),</span>
-<span class="nc" id="L72">            checked.recognitionProfile(),</span>
+<span class="nc" id="L73">            checked.source(),</span>
+<span class="nc" id="L74">            checked.recognitionProfile(),</span>
             requiredAssumptions);
     }
 
+    /**
+     * Returns a complete fail-closed preparation eligibility decision for each
+     * supplied rule. Rule IDs, classes, examples and benchmarks are never used
+     * to synthesize applicability contracts.
+     */
+    public static List&lt;CoverageEntry&gt; coverage(
+        List&lt;? extends RewriteRule&gt; rules
+    ) {
+<span class="fc" id="L86">        Objects.requireNonNull(rules, &quot;rules&quot;);</span>
+<span class="fc" id="L87">        List&lt;CoverageEntry&gt; result = new ArrayList&lt;&gt;(rules.size());</span>
+<span class="fc" id="L88">        Set&lt;String&gt; ids = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        for (RewriteRule supplied : rules) {</span>
+<span class="fc" id="L90">            RewriteRule rule = Objects.requireNonNull(supplied, &quot;rule&quot;);</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            if (!ids.add(rule.id())) {</span>
+<span class="nc" id="L92">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L93">                    &quot;duplicate rule ID in applicability inventory: &quot; + rule.id());</span>
+            }
+<span class="fc" id="L95">            result.add(coverageOf(rule));</span>
+<span class="fc" id="L96">        }</span>
+<span class="fc" id="L97">        return List.copyOf(result);</span>
+    }
+
+    /** Returns only rules that carry a complete explicit safe schema. */
+    public static List&lt;RewriteApplicabilitySchema&gt; safeSchemas(
+        List&lt;? extends RewriteRule&gt; rules
+    ) {
+<span class="nc" id="L104">        return coverage(rules).stream()</span>
+<span class="nc" id="L105">            .filter(CoverageEntry::safeProfileEligible)</span>
+<span class="nc" id="L106">            .map(CoverageEntry::schema)</span>
+<span class="nc" id="L107">            .toList();</span>
+    }
+
+    /** Evaluates one rule against the safe preparation boundary. */
+    public static CoverageEntry coverageOf(RewriteRule rule) {
+<span class="fc" id="L112">        RewriteRule checked = Objects.requireNonNull(rule, &quot;rule&quot;);</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (!checked.isEquivalencePreservingByConstruction()) {</span>
+<span class="nc" id="L114">            return CoverageEntry.excluded(</span>
+                checked,
+                CoverageStatus.OUTSIDE_SAFE_PROFILE_NOT_EQUIVALENCE_PRESERVING,
+                &quot;RULE_NOT_EQUIVALENCE_PRESERVING&quot;);
+        }
+
+<span class="fc" id="L120">        Optional&lt;RewriteApplicabilitySchema&gt; explicit = Objects.requireNonNull(</span>
+<span class="fc" id="L121">            checked.explicitApplicabilitySchema(),</span>
+            &quot;explicitApplicabilitySchema&quot;);
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (explicit.isPresent()) {</span>
+<span class="fc" id="L124">            RewriteApplicabilitySchema schema = explicit.orElseThrow();</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            if (schema.executor() != checked) {</span>
+<span class="fc" id="L126">                throw new IllegalArgumentException(</span>
+                    &quot;explicit applicability schema must retain the exact executor object: &quot;
+<span class="fc" id="L128">                        + checked.id());</span>
+            }
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">            if (!schema.ruleId().equals(checked.id())) {</span>
+<span class="nc" id="L131">                throw new IllegalArgumentException(</span>
+                    &quot;explicit applicability schema rule ID mismatch: &quot;
+<span class="nc" id="L133">                        + checked.id());</span>
+            }
+<span class="fc" id="L135">            return CoverageEntry.eligible(</span>
+                checked, CoverageStatus.EXPLICIT_CUSTOM_SCHEMA, schema);
+        }
+
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (checked.getClass() == PatternRewriteRule.class) {</span>
+<span class="fc" id="L140">            PatternRewriteRule patternRule = (PatternRewriteRule) checked;</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">            if (checked.mayEmitAssumptions()) {</span>
+<span class="nc" id="L142">                return CoverageEntry.excluded(</span>
+                    checked,
+                    CoverageStatus.OUTSIDE_SAFE_PROFILE_UNDECLARED_ASSUMPTIONS,
+                    &quot;PATTERN_RULE_ASSUMPTIONS_REQUIRE_EXPLICIT_SCHEMA&quot;);
+            }
+<span class="fc" id="L147">            return CoverageEntry.eligible(</span>
+                checked,
+                CoverageStatus.DECLARATIVE_PATTERN_SCHEMA,
+<span class="fc" id="L150">                fromPatternRule(patternRule));</span>
+        }
+
+<span class="fc" id="L153">        return CoverageEntry.excluded(</span>
+            checked,
+            CoverageStatus.OUTSIDE_SAFE_PROFILE_NO_EXPLICIT_SCHEMA,
+            &quot;NO_EXPLICIT_APPLICABILITY_SCHEMA&quot;);
+    }
+
     public String ruleId() {
-<span class="fc" id="L77">        return executor.id();</span>
+<span class="fc" id="L160">        return executor.id();</span>
     }
 
     public String contentHash() {
-<span class="fc" id="L81">        return RuleInventoryFingerprint.applicabilitySchemaContentHash(</span>
+<span class="fc" id="L164">        return RuleInventoryFingerprint.applicabilitySchemaContentHash(</span>
             schemaId,
             executor,
             pattern,
@@ -86,59 +169,108 @@ public record RewriteApplicabilitySchema(
             requiredAssumptions);
     }
 
+    /** Preparation eligibility status retained for positive and negative rules. */
+<span class="fc" id="L173">    public enum CoverageStatus {</span>
+<span class="fc" id="L174">        DECLARATIVE_PATTERN_SCHEMA,</span>
+<span class="fc" id="L175">        EXPLICIT_CUSTOM_SCHEMA,</span>
+<span class="fc" id="L176">        OUTSIDE_SAFE_PROFILE_NO_EXPLICIT_SCHEMA,</span>
+<span class="fc" id="L177">        OUTSIDE_SAFE_PROFILE_UNDECLARED_ASSUMPTIONS,</span>
+<span class="fc" id="L178">        OUTSIDE_SAFE_PROFILE_NOT_EQUIVALENCE_PRESERVING</span>
+    }
+
+    /** One retained safe-profile coverage decision. */
+    public record CoverageEntry(
+        RewriteRule rule,
+        CoverageStatus status,
+        RewriteApplicabilitySchema schema,
+        String exclusionReason
+    ) {
+<span class="fc" id="L188">        public CoverageEntry {</span>
+<span class="fc" id="L189">            rule = Objects.requireNonNull(rule, &quot;rule&quot;);</span>
+<span class="fc" id="L190">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">            exclusionReason = exclusionReason == null ? &quot;&quot; : exclusionReason;</span>
+<span class="fc bfc" id="L192" title="All 4 branches covered.">            boolean eligible = status == CoverageStatus.DECLARATIVE_PATTERN_SCHEMA</span>
+                || status == CoverageStatus.EXPLICIT_CUSTOM_SCHEMA;
+<span class="pc bpc" id="L194" title="1 of 4 branches missed.">            if (eligible != (schema != null)</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">                    || eligible != exclusionReason.isEmpty()) {</span>
+<span class="nc" id="L196">                throw new IllegalArgumentException(</span>
+                    &quot;applicability coverage entry is inconsistent&quot;);
+            }
+<span class="fc" id="L199">        }</span>
+
+        public boolean safeProfileEligible() {
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            return schema != null;</span>
+        }
+
+        private static CoverageEntry eligible(
+            RewriteRule rule,
+            CoverageStatus status,
+            RewriteApplicabilitySchema schema
+        ) {
+<span class="fc" id="L210">            return new CoverageEntry(rule, status, schema, &quot;&quot;);</span>
+        }
+
+        private static CoverageEntry excluded(
+            RewriteRule rule,
+            CoverageStatus status,
+            String reason
+        ) {
+<span class="fc" id="L218">            return new CoverageEntry(rule, status, null, reason);</span>
+        }
+    }
+
     private static List&lt;RequiredAssumptionTemplate&gt;
             inferNonZeroDenominatorAssumptions(PatternRewriteRule rule) {
-<span class="fc" id="L91">        Set&lt;PatternExpr&gt; denominators = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L92">        collectDenominators(rule.source(), denominators);</span>
-<span class="fc" id="L93">        collectDenominators(rule.target(), denominators);</span>
-<span class="fc" id="L94">        return denominators.stream()</span>
-<span class="fc" id="L95">            .map(RequiredAssumptionTemplate::nonZero)</span>
-<span class="fc" id="L96">            .toList();</span>
+<span class="fc" id="L224">        Set&lt;PatternExpr&gt; denominators = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L225">        collectDenominators(rule.source(), denominators);</span>
+<span class="fc" id="L226">        collectDenominators(rule.target(), denominators);</span>
+<span class="fc" id="L227">        return denominators.stream()</span>
+<span class="fc" id="L228">            .map(RequiredAssumptionTemplate::nonZero)</span>
+<span class="fc" id="L229">            .toList();</span>
     }
 
     private static void collectDenominators(
         PatternExpr expression,
         Set&lt;PatternExpr&gt; denominators
     ) {
-<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (expression instanceof PatternExpr.Operation operation) {</span>
-<span class="fc bfc" id="L104" title="All 2 branches covered.">            if (operation.operator() == BinaryOperator.DIV) {</span>
-<span class="fc" id="L105">                collectNonZeroFactors(operation.right(), denominators);</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        if (expression instanceof PatternExpr.Operation operation) {</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">            if (operation.operator() == BinaryOperator.DIV) {</span>
+<span class="fc" id="L238">                collectNonZeroFactors(operation.right(), denominators);</span>
             }
-<span class="fc" id="L107">            collectDenominators(operation.left(), denominators);</span>
-<span class="fc" id="L108">            collectDenominators(operation.right(), denominators);</span>
-<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        } else if (expression instanceof PatternExpr.Function function) {</span>
-<span class="nc" id="L110">            function.arguments().forEach(argument -&gt;</span>
-<span class="nc" id="L111">                collectDenominators(argument, denominators));</span>
+<span class="fc" id="L240">            collectDenominators(operation.left(), denominators);</span>
+<span class="fc" id="L241">            collectDenominators(operation.right(), denominators);</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        } else if (expression instanceof PatternExpr.Function function) {</span>
+<span class="fc" id="L243">            function.arguments().forEach(argument -&gt;</span>
+<span class="fc" id="L244">                collectDenominators(argument, denominators));</span>
         }
-<span class="fc" id="L113">    }</span>
+<span class="fc" id="L246">    }</span>
 
     private static void collectNonZeroFactors(
         PatternExpr expression,
         Set&lt;PatternExpr&gt; denominators
     ) {
-<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (expression instanceof PatternExpr.LiteralNumber number) {</span>
-<span class="pc bpc" id="L120" title="1 of 2 branches missed.">            if (number.value().equalsInteger(0)) {</span>
-<span class="fc" id="L121">                throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        if (expression instanceof PatternExpr.LiteralNumber number) {</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">            if (number.value().equalsInteger(0)) {</span>
+<span class="fc" id="L254">                throw new IllegalArgumentException(</span>
                     &quot;applicability schema contains division by zero&quot;);
             }
-<span class="nc" id="L124">            return;</span>
+<span class="fc" id="L257">            return;</span>
         }
-<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (expression instanceof PatternExpr.Operation operation</span>
-<span class="fc bfc" id="L127" title="All 2 branches covered.">                &amp;&amp; operation.operator() == BinaryOperator.MUL) {</span>
-<span class="fc" id="L128">            collectNonZeroFactors(operation.left(), denominators);</span>
-<span class="fc" id="L129">            collectNonZeroFactors(operation.right(), denominators);</span>
-<span class="fc" id="L130">            return;</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        if (expression instanceof PatternExpr.Operation operation</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">                &amp;&amp; operation.operator() == BinaryOperator.MUL) {</span>
+<span class="fc" id="L261">            collectNonZeroFactors(operation.left(), denominators);</span>
+<span class="fc" id="L262">            collectNonZeroFactors(operation.right(), denominators);</span>
+<span class="fc" id="L263">            return;</span>
         }
-<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (expression instanceof PatternExpr.Operation operation</span>
-<span class="pc bpc" id="L133" title="1 of 2 branches missed.">                &amp;&amp; operation.operator() == BinaryOperator.POW</span>
-<span class="nc bnc" id="L134" title="All 2 branches missed.">                &amp;&amp; operation.right()</span>
-<span class="nc" id="L135">                    instanceof PatternExpr.LiteralNumber exponent</span>
-<span class="nc bnc" id="L136" title="All 2 branches missed.">                &amp;&amp; exponent.value().signum() &gt; 0</span>
-<span class="nc bnc" id="L137" title="All 2 branches missed.">                &amp;&amp; exponent.value().isInteger()) {</span>
-<span class="nc" id="L138">            collectNonZeroFactors(operation.left(), denominators);</span>
-<span class="nc" id="L139">            return;</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        if (expression instanceof PatternExpr.Operation operation</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">                &amp;&amp; operation.operator() == BinaryOperator.POW</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">                &amp;&amp; operation.right() instanceof PatternExpr.LiteralNumber exponent</span>
+<span class="nc bnc" id="L268" title="All 2 branches missed.">                &amp;&amp; exponent.value().signum() &gt; 0</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">                &amp;&amp; exponent.value().isInteger()) {</span>
+<span class="nc" id="L270">            collectNonZeroFactors(operation.left(), denominators);</span>
+<span class="nc" id="L271">            return;</span>
         }
-<span class="fc" id="L141">        denominators.add(expression);</span>
-<span class="fc" id="L142">    }</span>
+<span class="fc" id="L273">        denominators.add(expression);</span>
+<span class="fc" id="L274">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

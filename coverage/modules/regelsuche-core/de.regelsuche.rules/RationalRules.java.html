@@ -1,333 +1,209 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RationalRules.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.rules</a> &gt; <span class="el_source">RationalRules.java</span></div><h1>RationalRules.java</h1><pre class="source lang-java linenums">package de.regelsuche.rules;
 
+import de.regelsuche.assumption.Assumption;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.RequiredAssumptionTemplate;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.RewriteRule.RewriteApplicabilitySchemaProvider;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-/**
- * Curated rational-expression rewrite rules.
- *
- * &lt;p&gt;Only atomic, structurally local rules are exposed; no full common
- * denominator algorithm is offered as a single rule. Division by an explicit
- * zero literal is filtered out at match time to satisfy &quot;Division durch 0
- * verhindern&quot;.&lt;/p&gt;
- */
+/** Curated atomic rewrite rules for rational expressions. */
 public final class RationalRules {
-<span class="fc" id="L23">    private static final Set&lt;String&gt; CORE_IDS = Set.of(</span>
-        &quot;ast_divide_one&quot;,
-        &quot;ast_multiply_one_right&quot;,
-        &quot;ast_multiply_one_left&quot;,
-        &quot;ast_multiply_zero_right&quot;,
-        &quot;ast_multiply_zero_left&quot;
-    );
+<span class="fc" id="L22">    private static final Set&lt;String&gt; CORE_IDS = Set.of(</span>
+        &quot;ast_divide_one&quot;, &quot;ast_multiply_one_right&quot;, &quot;ast_multiply_one_left&quot;,
+        &quot;ast_multiply_zero_right&quot;, &quot;ast_multiply_zero_left&quot;);
 
     private RationalRules() {
     }
 
     public static List&lt;RewriteRule&gt; rules() {
-<span class="fc" id="L35">        List&lt;RewriteRule&gt; result = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L36" title="All 2 branches covered.">        for (RewriteRule rule : AstRewriteTransformationEngine.defaultRules()) {</span>
-<span class="fc bfc" id="L37" title="All 2 branches covered.">            if (CORE_IDS.contains(rule.id())) {</span>
-<span class="fc" id="L38">                result.add(rule);</span>
-            }
-<span class="fc" id="L40">        }</span>
-<span class="fc" id="L41">        result.add(new CancelCommonFactorRule());</span>
-<span class="fc" id="L42">        result.add(new MultiplyFractionsRule());</span>
-<span class="fc" id="L43">        result.add(new DivideByFractionRule());</span>
-<span class="fc" id="L44">        return List.copyOf(result);</span>
+<span class="fc" id="L30">        List&lt;RewriteRule&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        for (RewriteRule rule : AstRewriteTransformationEngine.defaultRules()) {</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">            if (CORE_IDS.contains(rule.id())) result.add(rule);</span>
+<span class="fc" id="L33">        }</span>
+<span class="fc" id="L34">        result.add(new CancelCommonFactorRule());</span>
+<span class="fc" id="L35">        result.add(new MultiplyFractionsRule());</span>
+<span class="fc" id="L36">        result.add(new DivideByFractionRule());</span>
+<span class="fc" id="L37">        return List.copyOf(result);</span>
     }
 
     /**
-     * {@code (A*B)/(A*C) -&gt; B/C} when {@code A} is structurally identical on
-     * both sides. Refuses to apply when the divisor would become a literal
-     * zero. The retained assumptions include both the cancelled factor
-     * {@code A != 0} and the remaining denominator {@code C != 0}.
+     * {@code (A*B)/(A*C) -&gt; B/C}. Two source orientations are supported by the
+     * executor, so this stays outside one-pattern schema-directed preparation.
      */
-<span class="fc" id="L53">    public static final class CancelCommonFactorRule implements RewriteRule {</span>
+<span class="fc" id="L44">    public static final class CancelCommonFactorRule implements RewriteRule {</span>
         @Override
-        public String id() {
-<span class="fc" id="L56">            return &quot;rational_cancel_common_factor&quot;;</span>
-        }
-
+<span class="fc" id="L46">        public String id() { return &quot;rational_cancel_common_factor&quot;; }</span>
         @Override
-        public RewriteKind kind() {
-<span class="fc" id="L61">            return RewriteKind.SIMPLIFY;</span>
-        }
-
+<span class="fc" id="L48">        public RewriteKind kind() { return RewriteKind.SIMPLIFY; }</span>
         @Override
-        public boolean mayIncreaseComplexity() {
-<span class="fc" id="L66">            return false;</span>
-        }
-
+<span class="fc" id="L50">        public boolean mayIncreaseComplexity() { return false; }</span>
         @Override
-        public int estimatedCostDelta() {
-<span class="fc" id="L71">            return -3;</span>
-        }
-
+<span class="fc" id="L52">        public int estimatedCostDelta() { return -3; }</span>
         @Override
-        public boolean isEquivalencePreservingByConstruction() {
-<span class="fc" id="L76">            return true;</span>
-        }
-
+<span class="fc" id="L54">        public boolean isEquivalencePreservingByConstruction() { return true; }</span>
         @Override
-        public boolean mayEmitAssumptions() {
-<span class="nc" id="L81">            return true;</span>
-        }
-
+<span class="nc" id="L56">        public boolean mayEmitAssumptions() { return true; }</span>
         @Override
-        public java.util.List&lt;de.regelsuche.assumption.Assumption&gt; assumptions(Expr subtree) {
-<span class="fc" id="L86">            Cancellable terms = extract(subtree);</span>
-<span class="pc bpc" id="L87" title="1 of 2 branches missed.">            if (terms == null) {</span>
-<span class="nc" id="L88">                return java.util.List.of();</span>
-            }
-<span class="fc" id="L90">            String cancelledFactor = de.regelsuche.parse.ExpressionFormatter.format(</span>
-<span class="fc" id="L91">                terms.cancelledFactor());</span>
-<span class="fc" id="L92">            String remainingDenominator = de.regelsuche.parse.ExpressionFormatter.format(</span>
-<span class="fc" id="L93">                terms.remainingDenominator());</span>
-<span class="fc" id="L94">            de.regelsuche.assumption.Assumption cancelledFactorNonZero =</span>
-<span class="fc" id="L95">                de.regelsuche.assumption.Assumption.nonZero(cancelledFactor);</span>
-<span class="fc bfc" id="L96" title="All 2 branches covered.">            if (cancelledFactor.equals(remainingDenominator)) {</span>
-<span class="fc" id="L97">                return java.util.List.of(cancelledFactorNonZero);</span>
-            }
-<span class="fc" id="L99">            return java.util.List.of(</span>
-                cancelledFactorNonZero,
-<span class="fc" id="L101">                de.regelsuche.assumption.Assumption.nonZero(remainingDenominator));</span>
+        public List&lt;Assumption&gt; assumptions(Expr subtree) {
+<span class="fc" id="L59">            Cancellable terms = extract(subtree);</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">            if (terms == null) return List.of();</span>
+<span class="fc" id="L61">            String cancelled = ExpressionFormatter.format(terms.cancelledFactor());</span>
+<span class="fc" id="L62">            String denominator = ExpressionFormatter.format(terms.remainingDenominator());</span>
+<span class="fc" id="L63">            Assumption cancelledNonZero = Assumption.nonZero(cancelled);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            return cancelled.equals(denominator)</span>
+<span class="fc" id="L65">                ? List.of(cancelledNonZero)</span>
+<span class="fc" id="L66">                : List.of(cancelledNonZero, Assumption.nonZero(denominator));</span>
         }
-
         @Override
-        public boolean matches(Expr subtree) {
-<span class="fc bfc" id="L106" title="All 2 branches covered.">            return extract(subtree) != null;</span>
-        }
-
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        public boolean matches(Expr subtree) { return extract(subtree) != null; }</span>
         @Override
         public Expr apply(Expr subtree) {
-<span class="fc" id="L111">            Cancellable terms = extract(subtree);</span>
-<span class="pc bpc" id="L112" title="1 of 2 branches missed.">            if (terms == null) {</span>
-<span class="nc" id="L113">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
-            }
-<span class="fc" id="L115">            return new BinaryExpr(terms.remainingNumerator(), BinaryOperator.DIV, terms.remainingDenominator());</span>
+<span class="fc" id="L72">            Cancellable terms = extract(subtree);</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            if (terms == null) throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+<span class="fc" id="L74">            return new BinaryExpr(terms.remainingNumerator(), BinaryOperator.DIV,</span>
+<span class="fc" id="L75">                terms.remainingDenominator());</span>
         }
-
         private Cancellable extract(Expr subtree) {
-<span class="fc bfc" id="L119" title="All 4 branches covered.">            if (!(subtree instanceof BinaryExpr division) || division.operator() != BinaryOperator.DIV) {</span>
-<span class="fc" id="L120">                return null;</span>
+<span class="fc bfc" id="L78" title="All 4 branches covered.">            if (!(subtree instanceof BinaryExpr division) || division.operator() != BinaryOperator.DIV</span>
+<span class="pc bpc" id="L79" title="2 of 4 branches missed.">                    || !(division.left() instanceof BinaryExpr numerator) || numerator.operator() != BinaryOperator.MUL</span>
+<span class="pc bpc" id="L80" title="2 of 4 branches missed.">                    || !(division.right() instanceof BinaryExpr denominator) || denominator.operator() != BinaryOperator.MUL) {</span>
+<span class="fc" id="L81">                return null;</span>
             }
-<span class="pc bpc" id="L122" title="1 of 2 branches missed.">            if (!(division.left() instanceof BinaryExpr numerator)</span>
-<span class="pc bpc" id="L123" title="1 of 2 branches missed.">                || numerator.operator() != BinaryOperator.MUL) {</span>
-<span class="nc" id="L124">                return null;</span>
+<span class="fc bfc" id="L83" title="All 4 branches covered.">            if (isZero(denominator.left()) || isZero(denominator.right())) {</span>
+<span class="fc" id="L84">                return null;</span>
             }
-<span class="pc bpc" id="L126" title="1 of 2 branches missed.">            if (!(division.right() instanceof BinaryExpr denominator)</span>
-<span class="pc bpc" id="L127" title="1 of 2 branches missed.">                || denominator.operator() != BinaryOperator.MUL) {</span>
-<span class="nc" id="L128">                return null;</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">            if (numerator.left().equals(denominator.left())) {</span>
+<span class="fc" id="L87">                return new Cancellable(numerator.left(), numerator.right(), denominator.right());</span>
             }
-<span class="fc bfc" id="L130" title="All 2 branches covered.">            if (numerator.left().equals(denominator.left())) {</span>
-<span class="fc bfc" id="L131" title="All 2 branches covered.">                if (isZero(denominator.right())) {</span>
-<span class="fc" id="L132">                    return null;</span>
-                }
-<span class="fc" id="L134">                return new Cancellable(</span>
-<span class="fc" id="L135">                    numerator.left(), numerator.right(), denominator.right());</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">            if (numerator.right().equals(denominator.right())) {</span>
+<span class="nc" id="L90">                return new Cancellable(numerator.right(), numerator.left(), denominator.left());</span>
             }
-<span class="pc bpc" id="L137" title="1 of 2 branches missed.">            if (numerator.right().equals(denominator.right())) {</span>
-<span class="nc bnc" id="L138" title="All 2 branches missed.">                if (isZero(denominator.left())) {</span>
-<span class="nc" id="L139">                    return null;</span>
-                }
-<span class="nc" id="L141">                return new Cancellable(</span>
-<span class="nc" id="L142">                    numerator.right(), numerator.left(), denominator.left());</span>
-            }
-<span class="fc" id="L144">            return null;</span>
+<span class="fc" id="L92">            return null;</span>
         }
-
-        private boolean isZero(Expr expr) {
-<span class="pc bpc" id="L148" title="1 of 4 branches missed.">            return expr instanceof NumberExpr number &amp;&amp; number.value().equalsInteger(0);</span>
+        private static boolean isZero(Expr expr) {
+<span class="pc bpc" id="L95" title="1 of 4 branches missed.">            return expr instanceof NumberExpr number &amp;&amp; number.value().equalsInteger(0);</span>
         }
-
-<span class="fc" id="L151">        private record Cancellable(</span>
-            Expr cancelledFactor,
-            Expr remainingNumerator,
-            Expr remainingDenominator
-        ) {
-        }
+<span class="fc" id="L97">        private record Cancellable(Expr cancelledFactor, Expr remainingNumerator, Expr remainingDenominator) {}</span>
     }
 
-    /**
-     * {@code (A/B) * (C/D) -&gt; (A*C)/(B*D)}. Refuses when {@code B} or
-     * {@code D} are explicit zero literals.
-     */
-<span class="fc" id="L163">    public static final class MultiplyFractionsRule implements RewriteRule {</span>
+    /** {@code (A/B)*(C/D) -&gt; (A*C)/(B*D)} with non-zero denominators. */
+<span class="fc" id="L101">    public static final class MultiplyFractionsRule implements RewriteApplicabilitySchemaProvider {</span>
         @Override
-        public String id() {
-<span class="fc" id="L166">            return &quot;rational_multiply_fractions&quot;;</span>
-        }
-
+<span class="fc" id="L103">        public String id() { return &quot;rational_multiply_fractions&quot;; }</span>
         @Override
-        public RewriteKind kind() {
-<span class="nc" id="L171">            return RewriteKind.NORMALIZE;</span>
-        }
-
+<span class="nc" id="L105">        public RewriteKind kind() { return RewriteKind.NORMALIZE; }</span>
         @Override
-        public boolean mayIncreaseComplexity() {
-<span class="nc" id="L176">            return false;</span>
-        }
-
+<span class="nc" id="L107">        public boolean mayIncreaseComplexity() { return false; }</span>
         @Override
-        public int estimatedCostDelta() {
-<span class="nc" id="L181">            return -1;</span>
-        }
-
+<span class="nc" id="L109">        public int estimatedCostDelta() { return -1; }</span>
         @Override
-        public boolean isEquivalencePreservingByConstruction() {
-<span class="nc" id="L186">            return true;</span>
-        }
-
+<span class="fc" id="L111">        public boolean isEquivalencePreservingByConstruction() { return true; }</span>
         @Override
-        public boolean matches(Expr subtree) {
-<span class="pc bpc" id="L191" title="1 of 2 branches missed.">            return parts(subtree) != null;</span>
-        }
-
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        public boolean matches(Expr subtree) { return parts(subtree) != null; }</span>
         @Override
-        public boolean mayEmitAssumptions() {
-<span class="nc" id="L196">            return true;</span>
-        }
-
+<span class="nc" id="L115">        public boolean mayEmitAssumptions() { return true; }</span>
         @Override
-        public java.util.List&lt;de.regelsuche.assumption.Assumption&gt; assumptions(Expr subtree) {
-<span class="nc" id="L201">            Pair pair = parts(subtree);</span>
-<span class="nc bnc" id="L202" title="All 2 branches missed.">            if (pair == null) {</span>
-<span class="nc" id="L203">                return java.util.List.of();</span>
-            }
-<span class="nc" id="L205">            return java.util.List.of(</span>
-<span class="nc" id="L206">                de.regelsuche.assumption.Assumption.nonZero(</span>
-<span class="nc" id="L207">                    de.regelsuche.parse.ExpressionFormatter.format(pair.leftDenominator)),</span>
-<span class="nc" id="L208">                de.regelsuche.assumption.Assumption.nonZero(</span>
-<span class="nc" id="L209">                    de.regelsuche.parse.ExpressionFormatter.format(pair.rightDenominator)));</span>
+        public List&lt;Assumption&gt; assumptions(Expr subtree) {
+<span class="fc" id="L118">            Pair pair = parts(subtree);</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">            return pair == null ? List.of() : List.of(</span>
+<span class="fc" id="L120">                Assumption.nonZero(ExpressionFormatter.format(pair.leftDenominator())),</span>
+<span class="fc" id="L121">                Assumption.nonZero(ExpressionFormatter.format(pair.rightDenominator())));</span>
         }
-
+        @Override
+        public RewriteApplicabilitySchema applicabilitySchema() {
+<span class="fc" id="L125">            PatternExpr a = PatternExpr.var(&quot;A&quot;);</span>
+<span class="fc" id="L126">            PatternExpr b = PatternExpr.var(&quot;B&quot;);</span>
+<span class="fc" id="L127">            PatternExpr c = PatternExpr.var(&quot;C&quot;);</span>
+<span class="fc" id="L128">            PatternExpr d = PatternExpr.var(&quot;D&quot;);</span>
+<span class="fc" id="L129">            return exactSource(</span>
+<span class="fc" id="L130">                PatternExpr.op(BinaryOperator.MUL,</span>
+<span class="fc" id="L131">                    PatternExpr.op(BinaryOperator.DIV, a, b),</span>
+<span class="fc" id="L132">                    PatternExpr.op(BinaryOperator.DIV, c, d)),</span>
+<span class="fc" id="L133">                RequiredAssumptionTemplate.nonZero(b),</span>
+<span class="fc" id="L134">                RequiredAssumptionTemplate.nonZero(d));</span>
+        }
         @Override
         public Expr apply(Expr subtree) {
-<span class="fc" id="L214">            Pair pair = parts(subtree);</span>
-<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            if (pair == null) {</span>
-<span class="nc" id="L216">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
-            }
-<span class="fc" id="L218">            Expr numerator = new BinaryExpr(pair.leftNumerator, BinaryOperator.MUL, pair.rightNumerator);</span>
-<span class="fc" id="L219">            Expr denominator = new BinaryExpr(pair.leftDenominator, BinaryOperator.MUL, pair.rightDenominator);</span>
-<span class="fc" id="L220">            return new BinaryExpr(numerator, BinaryOperator.DIV, denominator);</span>
-        }
-
-        private Pair parts(Expr subtree) {
-<span class="pc bpc" id="L224" title="2 of 4 branches missed.">            if (!(subtree instanceof BinaryExpr product) || product.operator() != BinaryOperator.MUL) {</span>
-<span class="nc" id="L225">                return null;</span>
-            }
-<span class="pc bpc" id="L227" title="2 of 4 branches missed.">            if (!(product.left() instanceof BinaryExpr left) || left.operator() != BinaryOperator.DIV) {</span>
-<span class="nc" id="L228">                return null;</span>
-            }
-<span class="pc bpc" id="L230" title="2 of 4 branches missed.">            if (!(product.right() instanceof BinaryExpr right) || right.operator() != BinaryOperator.DIV) {</span>
-<span class="nc" id="L231">                return null;</span>
-            }
-<span class="pc bpc" id="L233" title="2 of 4 branches missed.">            if (isExplicitZero(left.right()) || isExplicitZero(right.right())) {</span>
-<span class="nc" id="L234">                return null;</span>
-            }
-<span class="fc" id="L236">            return new Pair(left.left(), left.right(), right.left(), right.right());</span>
-        }
-
-        private boolean isExplicitZero(Expr expr) {
-<span class="pc bpc" id="L240" title="3 of 4 branches missed.">            return expr instanceof NumberExpr number &amp;&amp; number.value().equalsInteger(0);</span>
-        }
-
-<span class="fc" id="L243">        private record Pair(Expr leftNumerator, Expr leftDenominator, Expr rightNumerator, Expr rightDenominator) {</span>
-        }
-    }
-
-    /**
-     * {@code A / (B/C) -&gt; (A*C)/B}. Refuses when {@code C} would be a literal
-     * zero.
-     */
-<span class="fc" id="L251">    public static final class DivideByFractionRule implements RewriteRule {</span>
-        @Override
-        public String id() {
-<span class="fc" id="L254">            return &quot;rational_divide_by_fraction&quot;;</span>
-        }
-
-        @Override
-        public RewriteKind kind() {
-<span class="nc" id="L259">            return RewriteKind.NORMALIZE;</span>
-        }
-
-        @Override
-        public boolean mayIncreaseComplexity() {
-<span class="nc" id="L264">            return false;</span>
-        }
-
-        @Override
-        public int estimatedCostDelta() {
-<span class="nc" id="L269">            return 0;</span>
-        }
-
-        @Override
-        public boolean isEquivalencePreservingByConstruction() {
-<span class="nc" id="L274">            return true;</span>
-        }
-
-        @Override
-        public boolean matches(Expr subtree) {
-<span class="pc bpc" id="L279" title="1 of 2 branches missed.">            return extract(subtree) != null;</span>
-        }
-
-        @Override
-        public boolean mayEmitAssumptions() {
-<span class="nc" id="L284">            return true;</span>
-        }
-
-        @Override
-        public java.util.List&lt;de.regelsuche.assumption.Assumption&gt; assumptions(Expr subtree) {
-<span class="fc" id="L289">            Parts parts = extract(subtree);</span>
-<span class="pc bpc" id="L290" title="1 of 2 branches missed.">            if (parts == null) {</span>
-<span class="nc" id="L291">                return java.util.List.of();</span>
-            }
-<span class="fc" id="L293">            return java.util.List.of(</span>
-<span class="fc" id="L294">                de.regelsuche.assumption.Assumption.nonZero(</span>
-<span class="fc" id="L295">                    de.regelsuche.parse.ExpressionFormatter.format(parts.b)),</span>
-<span class="fc" id="L296">                de.regelsuche.assumption.Assumption.nonZero(</span>
-<span class="fc" id="L297">                    de.regelsuche.parse.ExpressionFormatter.format(parts.c)));</span>
-        }
-
-        @Override
-        public Expr apply(Expr subtree) {
-<span class="fc" id="L302">            Parts parts = extract(subtree);</span>
-<span class="pc bpc" id="L303" title="1 of 2 branches missed.">            if (parts == null) {</span>
-<span class="nc" id="L304">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
-            }
-<span class="fc" id="L306">            return new BinaryExpr(</span>
-                new BinaryExpr(parts.a, BinaryOperator.MUL, parts.c),
+<span class="fc" id="L138">            Pair pair = parts(subtree);</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">            if (pair == null) throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+<span class="fc" id="L140">            return new BinaryExpr(</span>
+<span class="fc" id="L141">                new BinaryExpr(pair.leftNumerator(), BinaryOperator.MUL, pair.rightNumerator()),</span>
                 BinaryOperator.DIV,
-                parts.b
-            );
+<span class="fc" id="L143">                new BinaryExpr(pair.leftDenominator(), BinaryOperator.MUL, pair.rightDenominator()));</span>
         }
+        private Pair parts(Expr subtree) {
+<span class="pc bpc" id="L146" title="2 of 4 branches missed.">            if (!(subtree instanceof BinaryExpr product) || product.operator() != BinaryOperator.MUL</span>
+<span class="pc bpc" id="L147" title="2 of 4 branches missed.">                    || !(product.left() instanceof BinaryExpr left) || left.operator() != BinaryOperator.DIV</span>
+<span class="pc bpc" id="L148" title="2 of 4 branches missed.">                    || !(product.right() instanceof BinaryExpr right) || right.operator() != BinaryOperator.DIV</span>
+<span class="pc bpc" id="L149" title="2 of 4 branches missed.">                    || isExplicitZero(left.right()) || isExplicitZero(right.right())) return null;</span>
+<span class="fc" id="L150">            return new Pair(left.left(), left.right(), right.left(), right.right());</span>
+        }
+<span class="fc" id="L152">        private record Pair(Expr leftNumerator, Expr leftDenominator, Expr rightNumerator, Expr rightDenominator) {}</span>
+    }
 
+    /** {@code A/(B/C) -&gt; (A*C)/B} with {@code B != 0, C != 0}. */
+<span class="fc" id="L156">    public static final class DivideByFractionRule implements RewriteApplicabilitySchemaProvider {</span>
+        @Override
+<span class="fc" id="L158">        public String id() { return &quot;rational_divide_by_fraction&quot;; }</span>
+        @Override
+<span class="nc" id="L160">        public RewriteKind kind() { return RewriteKind.NORMALIZE; }</span>
+        @Override
+<span class="nc" id="L162">        public boolean mayIncreaseComplexity() { return false; }</span>
+        @Override
+<span class="nc" id="L164">        public int estimatedCostDelta() { return 0; }</span>
+        @Override
+<span class="fc" id="L166">        public boolean isEquivalencePreservingByConstruction() { return true; }</span>
+        @Override
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        public boolean matches(Expr subtree) { return extract(subtree) != null; }</span>
+        @Override
+<span class="nc" id="L170">        public boolean mayEmitAssumptions() { return true; }</span>
+        @Override
+        public List&lt;Assumption&gt; assumptions(Expr subtree) {
+<span class="fc" id="L173">            Parts parts = extract(subtree);</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            return parts == null ? List.of() : List.of(</span>
+<span class="fc" id="L175">                Assumption.nonZero(ExpressionFormatter.format(parts.b())),</span>
+<span class="fc" id="L176">                Assumption.nonZero(ExpressionFormatter.format(parts.c())));</span>
+        }
+        @Override
+        public RewriteApplicabilitySchema applicabilitySchema() {
+<span class="fc" id="L180">            PatternExpr a = PatternExpr.var(&quot;A&quot;);</span>
+<span class="fc" id="L181">            PatternExpr b = PatternExpr.var(&quot;B&quot;);</span>
+<span class="fc" id="L182">            PatternExpr c = PatternExpr.var(&quot;C&quot;);</span>
+<span class="fc" id="L183">            return exactSource(</span>
+<span class="fc" id="L184">                PatternExpr.op(BinaryOperator.DIV, a,</span>
+<span class="fc" id="L185">                    PatternExpr.op(BinaryOperator.DIV, b, c)),</span>
+<span class="fc" id="L186">                RequiredAssumptionTemplate.nonZero(b),</span>
+<span class="fc" id="L187">                RequiredAssumptionTemplate.nonZero(c));</span>
+        }
+        @Override
+        public Expr apply(Expr subtree) {
+<span class="fc" id="L191">            Parts parts = extract(subtree);</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            if (parts == null) throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+<span class="fc" id="L193">            return new BinaryExpr(new BinaryExpr(parts.a(), BinaryOperator.MUL, parts.c()),</span>
+<span class="fc" id="L194">                BinaryOperator.DIV, parts.b());</span>
+        }
         private Parts extract(Expr subtree) {
-<span class="pc bpc" id="L314" title="2 of 4 branches missed.">            if (!(subtree instanceof BinaryExpr outer) || outer.operator() != BinaryOperator.DIV) {</span>
-<span class="nc" id="L315">                return null;</span>
-            }
-<span class="pc bpc" id="L317" title="2 of 4 branches missed.">            if (!(outer.right() instanceof BinaryExpr inner) || inner.operator() != BinaryOperator.DIV) {</span>
-<span class="nc" id="L318">                return null;</span>
-            }
-<span class="pc bpc" id="L320" title="3 of 4 branches missed.">            if (inner.right() instanceof NumberExpr n &amp;&amp; n.value().equalsInteger(0)) {</span>
-<span class="nc" id="L321">                return null;</span>
-            }
-<span class="pc bpc" id="L323" title="3 of 4 branches missed.">            if (inner.left() instanceof NumberExpr leftNumber &amp;&amp; leftNumber.value().equalsInteger(0)) {</span>
-<span class="nc" id="L324">                return null;</span>
-            }
-<span class="fc" id="L326">            return new Parts(outer.left(), inner.left(), inner.right());</span>
+<span class="pc bpc" id="L197" title="2 of 4 branches missed.">            if (!(subtree instanceof BinaryExpr outer) || outer.operator() != BinaryOperator.DIV</span>
+<span class="pc bpc" id="L198" title="2 of 4 branches missed.">                    || !(outer.right() instanceof BinaryExpr inner) || inner.operator() != BinaryOperator.DIV</span>
+<span class="pc bpc" id="L199" title="2 of 4 branches missed.">                    || isExplicitZero(inner.right()) || isExplicitZero(inner.left())) return null;</span>
+<span class="fc" id="L200">            return new Parts(outer.left(), inner.left(), inner.right());</span>
         }
+<span class="fc" id="L202">        private record Parts(Expr a, Expr b, Expr c) {}</span>
+    }
 
-<span class="fc" id="L329">        private record Parts(Expr a, Expr b, Expr c) {</span>
-        }
+    private static boolean isExplicitZero(Expr expr) {
+<span class="pc bpc" id="L206" title="3 of 4 branches missed.">        return expr instanceof NumberExpr number &amp;&amp; number.value().equalsInteger(0);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

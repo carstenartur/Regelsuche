@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PreparationNearMatchRanking.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.reachability</a> &gt; <span class="el_source">PreparationNearMatchRanking.java</span></div><h1>PreparationNearMatchRanking.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.reachability;
+
+import de.regelsuche.transform.PatternMatchAnalyzer;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Versioned characterization of the structural near-match ordering used by
+ * bounded schema-directed preparation.
+ *
+ * &lt;p&gt;The rank is deliberately target-free. It depends only on the retained
+ * applicability analysis: a complete match wins, then more matched pattern
+ * nodes, then more retained bindings, then fewer residual obligations, then a
+ * deterministic lower-bound cost over the residual kinds. Search-specific
+ * tie-breakers such as AST growth, primitive path work and structural identity
+ * remain outside this applicability rank.&lt;/p&gt;
+ */
+public final class PreparationNearMatchRanking {
+    public static final String REVISION =
+        &quot;regelsuche.preparation-near-match-ranking/v1&quot;;
+
+    private PreparationNearMatchRanking() {
+    }
+
+    public static Rank rank(PatternMatchAnalyzer.Analysis analysis) {
+<span class="fc" id="L26">        PatternMatchAnalyzer.Analysis value = Objects.requireNonNull(</span>
+            analysis, &quot;analysis&quot;);
+<span class="fc" id="L28">        return new Rank(</span>
+<span class="fc" id="L29">            value.matched(),</span>
+<span class="fc" id="L30">            value.matchedPatternNodes(),</span>
+<span class="fc" id="L31">            value.bindings().size(),</span>
+<span class="fc" id="L32">            value.residualObligations().size(),</span>
+<span class="fc" id="L33">            residualLowerBound(value));</span>
+    }
+
+    /**
+     * Preserves the historical multi-principal aggregation exactly while
+     * centralizing the same structural signals and residual weights used by
+     * {@link #rank(PatternMatchAnalyzer.Analysis)}.
+     */
+    public static AggregateRank aggregate(
+        List&lt;PatternMatchAnalyzer.Analysis&gt; analyses
+    ) {
+<span class="fc" id="L44">        List&lt;PatternMatchAnalyzer.Analysis&gt; values = List.copyOf(</span>
+<span class="fc" id="L45">            Objects.requireNonNull(analyses, &quot;analyses&quot;));</span>
+<span class="fc" id="L46">        int matchedCount = values.stream()</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">            .mapToInt(value -&gt; value.matched() ? 1 : 0)</span>
+<span class="fc" id="L48">            .sum();</span>
+<span class="fc" id="L49">        int bestMatchedPatternNodes = values.stream()</span>
+<span class="fc" id="L50">            .mapToInt(value -&gt; rank(value).matchedPatternNodes())</span>
+<span class="fc" id="L51">            .max()</span>
+<span class="fc" id="L52">            .orElse(0);</span>
+<span class="fc" id="L53">        int bestBindingCount = values.stream()</span>
+<span class="fc" id="L54">            .mapToInt(value -&gt; rank(value).bindingCount())</span>
+<span class="fc" id="L55">            .max()</span>
+<span class="fc" id="L56">            .orElse(0);</span>
+<span class="fc" id="L57">        int minimumResidualCount = values.stream()</span>
+<span class="fc" id="L58">            .mapToInt(value -&gt; rank(value).residualCount())</span>
+<span class="fc" id="L59">            .min()</span>
+<span class="fc" id="L60">            .orElse(Integer.MAX_VALUE);</span>
+<span class="fc" id="L61">        int minimumResidualLowerBound = values.stream()</span>
+<span class="fc" id="L62">            .mapToInt(value -&gt; rank(value).residualLowerBound())</span>
+<span class="fc" id="L63">            .min()</span>
+<span class="fc" id="L64">            .orElse(Integer.MAX_VALUE);</span>
+<span class="fc" id="L65">        return new AggregateRank(</span>
+            matchedCount,
+            bestMatchedPatternNodes,
+            bestBindingCount,
+            minimumResidualCount,
+            minimumResidualLowerBound);
+    }
+
+    public static int residualLowerBound(
+        PatternMatchAnalyzer.Analysis analysis
+    ) {
+<span class="fc" id="L76">        Objects.requireNonNull(analysis, &quot;analysis&quot;);</span>
+<span class="fc" id="L77">        return analysis.residualObligations().stream()</span>
+<span class="fc" id="L78">            .mapToInt(obligation -&gt; residualCost(obligation.kind()))</span>
+<span class="fc" id="L79">            .sum();</span>
+    }
+
+    public static int residualCost(PatternMatchAnalyzer.ResidualKind kind) {
+<span class="fc bfc" id="L83" title="All 4 branches covered.">        return switch (Objects.requireNonNull(kind, &quot;kind&quot;)) {</span>
+<span class="fc" id="L84">            case LITERAL_MISMATCH -&gt; 1;</span>
+<span class="fc" id="L85">            case BINDING_CONFLICT -&gt; 2;</span>
+<span class="fc" id="L86">            case SHAPE_MISMATCH -&gt; 3;</span>
+<span class="fc" id="L87">            case FUNCTION_SHAPE_MISMATCH -&gt; 4;</span>
+        };
+    }
+
+    /** Smaller values according to {@link #compareTo(Rank)} rank first. */
+    public record Rank(
+        boolean matched,
+        int matchedPatternNodes,
+        int bindingCount,
+        int residualCount,
+        int residualLowerBound
+    ) implements Comparable&lt;Rank&gt; {
+<span class="fc" id="L99">        public Rank {</span>
+<span class="pc bpc" id="L100" title="4 of 8 branches missed.">            if (matchedPatternNodes &lt; 0 || bindingCount &lt; 0</span>
+                    || residualCount &lt; 0 || residualLowerBound &lt; 0) {
+<span class="nc" id="L102">                throw new IllegalArgumentException(</span>
+                    &quot;near-match rank counters must be non-negative&quot;);
+            }
+<span class="fc" id="L105">        }</span>
+
+        @Override
+        public int compareTo(Rank other) {
+<span class="fc" id="L109">            Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc" id="L110">            int comparison = Integer.compare(</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                matched ? 0 : 1,</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">                other.matched ? 0 : 1);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            if (comparison != 0) {</span>
+<span class="fc" id="L114">                return comparison;</span>
+            }
+<span class="fc" id="L116">            comparison = Integer.compare(</span>
+                other.matchedPatternNodes,
+                matchedPatternNodes);
+<span class="fc bfc" id="L119" title="All 2 branches covered.">            if (comparison != 0) {</span>
+<span class="fc" id="L120">                return comparison;</span>
+            }
+<span class="fc" id="L122">            comparison = Integer.compare(other.bindingCount, bindingCount);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (comparison != 0) {</span>
+<span class="fc" id="L124">                return comparison;</span>
+            }
+<span class="fc" id="L126">            comparison = Integer.compare(residualCount, other.residualCount);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            if (comparison != 0) {</span>
+<span class="fc" id="L128">                return comparison;</span>
+            }
+<span class="fc" id="L130">            return Integer.compare(</span>
+                residualLowerBound,
+                other.residualLowerBound);
+        }
+    }
+
+    /** Historical multi-principal structural prefix; smaller ranks first. */
+    public record AggregateRank(
+        int matchedPrincipalCount,
+        int bestMatchedPatternNodes,
+        int bestBindingCount,
+        int minimumResidualCount,
+        int minimumResidualLowerBound
+    ) implements Comparable&lt;AggregateRank&gt; {
+<span class="fc" id="L144">        public AggregateRank {</span>
+<span class="pc bpc" id="L145" title="5 of 10 branches missed.">            if (matchedPrincipalCount &lt; 0</span>
+                    || bestMatchedPatternNodes &lt; 0
+                    || bestBindingCount &lt; 0
+                    || minimumResidualCount &lt; 0
+                    || minimumResidualLowerBound &lt; 0) {
+<span class="nc" id="L150">                throw new IllegalArgumentException(</span>
+                    &quot;aggregate near-match rank counters must be non-negative&quot;);
+            }
+<span class="fc" id="L153">        }</span>
+
+        @Override
+        public int compareTo(AggregateRank other) {
+<span class="fc" id="L157">            Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="fc" id="L158">            int comparison = Integer.compare(</span>
+                other.matchedPrincipalCount,
+                matchedPrincipalCount);
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">            if (comparison != 0) {</span>
+<span class="nc" id="L162">                return comparison;</span>
+            }
+<span class="fc" id="L164">            comparison = Integer.compare(</span>
+                other.bestMatchedPatternNodes,
+                bestMatchedPatternNodes);
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">            if (comparison != 0) {</span>
+<span class="fc" id="L168">                return comparison;</span>
+            }
+<span class="nc" id="L170">            comparison = Integer.compare(</span>
+                other.bestBindingCount,
+                bestBindingCount);
+<span class="nc bnc" id="L173" title="All 2 branches missed.">            if (comparison != 0) {</span>
+<span class="nc" id="L174">                return comparison;</span>
+            }
+<span class="nc" id="L176">            comparison = Integer.compare(</span>
+                minimumResidualCount,
+                other.minimumResidualCount);
+<span class="nc bnc" id="L179" title="All 2 branches missed.">            if (comparison != 0) {</span>
+<span class="nc" id="L180">                return comparison;</span>
+            }
+<span class="nc" id="L182">            return Integer.compare(</span>
+                minimumResidualLowerBound,
+                other.minimumResidualLowerBound);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

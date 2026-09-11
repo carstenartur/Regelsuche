@@ -1,6 +1,6 @@
 # Sicherer Regelvorbereitungskoordinator
 
-**Implementierungsstand: 10. September 2026**
+**Implementierungsstand: 11. September 2026**
 
 Die Vorbereitungsschicht ersetzt die binäre Grenze
 `matches -> apply or discard` durch einen begrenzten, nachprüfbaren Ablauf. Sie
@@ -15,66 +15,129 @@ Der historische `UnifiedRulePreparationCoordinator` behält die Identität
 lokalen Fallback für jedes Principal-Schema separat aus. Diese Semantik bleibt
 unverändert, damit vorhandene Evidence reproduzierbar bleibt.
 
-`SharedUnifiedRulePreparationCoordinator` führt den neuen Vertrag
-`regelsuche.unified-safe-rule-preparation-coordinator/v2` ein. Die mathematischen
-Autoritäten ändern sich dabei nicht. v2 teilt ausschließlich physische Arbeit,
-die unabhängig von der Principal-Identität ist, und behält für jeden Principal
-ein eigenes Outcome, eigene Guards, konkreten Replay und ein eigenes
-Zertifikat.
-
-Die gestufte Reihenfolge von v2 ist:
+`SharedUnifiedRulePreparationCoordinator` trägt den Vertrag
+`regelsuche.unified-safe-rule-preparation-coordinator/v2`. v2 teilt physische
+Arbeit, die unabhängig von der Principal-Identität ist, und behält für jeden
+Principal Outcome, Guards, konkreten Replay und Zertifikat getrennt.
 
 ```text
 konkreter Executor: direkter Replay-Versuch
   -> typisierte Guard-Prüfung für einen direkten Treffer
   -> theory-aware Source-Pattern-Analyse
   -> registrierter nativer Exact-Spezialist
-  -> alle noch ungelösten Principals
-       in eine gemeinsame bounded Preparation-Frontier
+  -> gemeinsame bounded Preparation-Frontier für ungelöste Principals
   -> terminale Guards pro Principal
   -> konkreter Principal-Replay pro Principal
   -> content-addressed Zertifikat pro Principal
   -> retained Outcome oder fail-closed Status
 ```
 
-Die konkrete Regel wird **vor** dem Applicability-Schema ausgeführt. Ein zu
-enges oder veraltetes Schema darf daher eine direkt mögliche algorithmische
-Regel nicht blockieren. Das Schema lenkt nur Vorbereitung und Guard-Bindung; es
-ist keine zweite Ausführung der Regel.
+Das Schema lenkt Vorbereitung und Guard-Bindung; es ersetzt niemals den
+konkreten Executor.
 
-v2 ist in diesem Stand eine explizite Authority und noch keine stille
-Umstellung des allgemeinen Workbench-/CLI-Defaults. Eine Produktumschaltung
-benötigt weiterhin eine eigene Auswahl- und Qualifikationsentscheidung.
+## Product-Qualification
 
-## Applicability-Schema
+PR #967 vergleicht `DIRECT_V1` und `SAFE_PREPARATION_V2` mit demselben sichtbaren
+Regelinventar, denselben Annahmen und denselben Primitive-, Candidate-, State-
+und Total-Work-Budgets. Der gehärtete Head
+`51db948fb32d80b2a7fd6936481f71fe968afce0` bestand Gradle, Maven/Product/Docker,
+SymPy, JMH und den abschließenden checkout-owned `ciCheck`; integriert wurde er
+als `58b328293e402a78ba28ec5001a241811d1e7133`.
 
-`RewriteApplicabilitySchema` trennt:
+Die bounded Evidence ist grün, die Produktentscheidung bleibt
+`KEEP_OPT_IN_PENDING_PRODUCT_COVERAGE`. Technische Ausfälle auf beiden
+Vergleichsseiten werden fail-closed behandelt; ein technischer Fehler von
+`DIRECT_V1` darf insbesondere nicht als zusätzliche SAFE-Reachability zählen.
 
-```text
-Schema-ID
-Applicability-Pattern
-RecognitionProfile
-RequiredAssumptionTemplate-Liste
-konkreter RewriteRule-Executor
-```
+## Explizite Applicability-Schemas und Coverage
 
-Das Schema enthält bewusst kein erfundenes Zielpattern. Ein positiver Kandidat
-wird nur durch den konkreten Executor erzeugt. Schema, Executor, Guard-
-Templates, Metadaten und Repository-Revision fließen in die retained
-Identitäten ein.
+`RewriteApplicabilitySchema` trennt Schema-ID, Applicability-Pattern,
+`RecognitionProfile`, typisierte `RequiredAssumptionTemplate`s und den konkreten
+`RewriteRule`-Executor. Ein positives Schema erzeugt selbst kein Ergebnis; der
+konkrete Executor bleibt die fachliche Autorität.
 
-Deklarative `PatternRewriteRule`s können ihr vorhandenes Quellpattern direkt
-verwenden. Algorithmische Java-Regeln benötigen ein ausdrücklich deklariertes
-Applicability-Schema. Nennerfaktoren deklarativer Regeln werden im derzeit
-unterstützten Fragment als typisierte Nichtnull-Voraussetzungen gebunden.
+Die Safe-Preparation-Coverage ist bewusst fail-closed:
 
-## Vorbereitende Ausführungsschichten
+- ausschließlich die exakte deklarative `PatternRewriteRule`-Klasse darf ihr
+  Quellpattern als impliziten Vertrag verwenden;
+- jede `PatternRewriteRule`-Subklasse sowie andere custom/algorithmische Regeln
+  benötigen einen expliziten Vertrag über die in `RewriteRule` eingebettete
+  Capability `RewriteApplicabilitySchemaProvider`;
+- der Provider ist selbst die konkrete Regel; sein Schema muss dasselbe
+  Executor-Objekt und dieselbe Regel-ID binden;
+- aus Regel-ID, Java-Klasse, Beispiel, Benchmark oder beobachtetem Lauf wird
+  niemals ein Schema abgeleitet;
+- Regeln mit unvollständiger Domain-/Guard-Semantik bleiben als negative
+  Coverage-Entscheidung sichtbar.
 
-### 1. Native exakte Spezialsolver
+Die Coverage-Entscheidung liegt zentral in
+`RewriteApplicabilitySchema.coverage(...)` / `coverageOf(...)`;
+`RuleDomainRegistry.applicabilityCoverageFor(...)` liefert positive und negative
+Entscheidungen, `applicabilitySchemasFor(...)` nur explizit zugelassene
+Principals.
 
-`SafePreparationEngineRegistry` versieht die vorhandene zertifikatstragende
-Engine-Kette mit einer gemeinsamen, content-addressed Registry. Die Reihenfolge
-und die jeweils zulässige native Hauptregel sind explizit:
+Explizit abgedeckt sind derzeit unter anderem:
+
+| Domain | Algorithmische Regeln | Guards |
+| --- | --- | --- |
+| Trigonometrie | `trig_tan_to_sin_over_cos` | `cos(A) != 0` |
+| Analysis | `calculus_exp_of_ln` | `X > 0` |
+| Analysis | `calculus_ln_of_exp`, `calculus_exp_of_zero` | keine |
+| Logarithmen | Produkt-/Quotientenregeln für `log` und `ln` | Argumente `> 0` |
+| Logarithmen | Potenzregel für `log` und `ln` | Basis `> 0` |
+| Wurzeln | `sqrt(A*B)` | `A >= 0`, `B >= 0` |
+| Rationale Ausdrücke | Bruchmultiplikation | Nenner `!= 0` |
+| Rationale Ausdrücke | Division durch Bruch | innerer Zähler/Nenner `!= 0` |
+
+`rational_cancel_common_factor` bleibt absichtlich außerhalb der
+schema-directed Preparation: Der Executor akzeptiert zwei strukturell
+verschiedene Orientierungen, während der heutige Principal-Vertrag genau ein
+Quellpattern trägt. Explizite Nullfaktoren im Nenner werden vor jeder
+Orientierungswahl fail-closed abgelehnt. Ebenso bleiben whole-sum-/numeric-shape-
+Regeln wie `polynomial_collect_like_terms` außerhalb, solange ihre vollständige
+Anwendbarkeit nicht ehrlich durch den Patternvertrag ausdrückbar ist.
+
+### Korrektur der Logarithmus-Semantik
+
+Die Qualifikation hat einen älteren fachlichen Fehler offengelegt. In der
+numerischen Regelsuche-Semantik ist `log` der Zehnerlogarithmus und `ln` der
+natürliche Logarithmus. Die früher vorhandenen Regeln
+`exp(log(x)) -> x` und `log(exp(x)) -> x` waren damit falsch. Sie wurden
+entfernt, nicht in SAFE übernommen. Gültig bleiben `exp(ln(x)) -> x` mit
+`x > 0` und `ln(exp(x)) -> x`. Regressionstests halten diese Trennung fest.
+
+## Deterministisches Near-Match-Ranking
+
+Die strukturbezogene Reihenfolge ist unter
+`regelsuche.preparation-near-match-ranking/v1` charakterisiert. Für ein
+Principal gilt lexikographisch:
+
+1. vollständiger Match vor Near-Match;
+2. mehr gematchte Pattern-Knoten;
+3. mehr gebundene Variablen;
+4. weniger Residual-Obligations;
+5. kleinere Residual-Untergrenze.
+
+| Residual | Kostenuntergrenze |
+| --- | ---: |
+| `LITERAL_MISMATCH` | 1 |
+| `BINDING_CONFLICT` | 2 |
+| `SHAPE_MISMATCH` | 3 |
+| `FUNCTION_SHAPE_MISMATCH` | 4 |
+
+Das sind deterministische strukturelle Ranking-Einheiten, keine CPU-Zeit und
+keine Behauptung, dass genau so viele Primitive-Schritte zum Match genügen.
+AST-Wachstum, Primitive-Path-Work und stabile strukturelle Tie-Breaker bleiben
+separate Suchkriterien. Die Multi-Principal-Traversal aggregiert dieselben
+Fortschrittssignale über ungelöste Principals, ohne Principal-Identitäten
+zusammenzuführen. Charakterisierungstests binden sowohl die Single- als auch die
+Multi-Principal-Produktionsordnung an den versionierten Rank, ohne die bereits
+qualifizierte v1/v2-Semantik rückwirkend umzudeuten.
+
+## Native exakte Spezialsolver
+
+`SafePreparationEngineRegistry` bindet die vorhandene zertifikatstragende
+Engine-Kette content-addressed:
 
 | Stage | Spezialist | Native Hauptregel |
 | --- | --- | --- |
@@ -85,87 +148,35 @@ und die jeweils zulässige native Hauptregel sind explizit:
 | Exakte Quadratexposition | `PerfectSquareStructurePreparationSolver` | `ast_square_difference_factor` |
 | Gemeinsamer Nenner | `RationalCommonDenominatorPreparationSolver` | `hypothesis_rational_normalization` |
 
-Die Registry bindet Stage-Reihenfolge, Solver-IDs, Engine-Klassen, native
-Principal-IDs und das geordnete sichtbare Regelinventar. Sie ersetzt die
-Spezialsolver nicht: deren eigene Certificates, konkreter Principal-Replay,
-Annahmen und primitive Lineage bleiben die mathematische Autorität.
+Stage-Reihenfolge, Solver-IDs, Engine-Klassen, native Principal-IDs und sichtbares
+Regelinventar sind Teil der Identität. Certificates, Annahmen und primitive
+Lineage der Spezialsolver bleiben die mathematische Autorität.
 
-Ein ähnlich aussehendes Pattern erhält nicht automatisch die Autorität eines
-nativen Spezialsolvers. Beispielsweise wird die importierte Regel
-`sympy.poly.factor.diff_squares` nicht als nativer
-`ast_square_difference_factor`-Fall ausgegeben. Für solche Regeln bleibt der
-allgemeine Bridge-Pfad zuständig.
+## Gemeinsamer Multi-Principal-Fallback
 
-### 2. Gemeinsamer Multi-Principal-Bridge-Fallback in v2
+`SharedMultiPrincipalPreparationTraversal` ersetzt N voneinander unabhängige
+bounded Fallback-Sessions durch eine gemeinsame physische Preparation-Frontier.
+Geteilt werden normalisiertes Parsing, strukturelle Fingerprints,
+vertragsidentische Pattern-Analysen, Expansionen, Visited-State-Deduplication und
+das bounded Traversal-Budget. Principal-Identität, terminale Analyse, Guards,
+Replay, Lineage und Zertifikat bleiben getrennt.
 
-`SharedMultiPrincipalPreparationTraversal` ersetzt für v2 die N voneinander
-unabhängigen bounded Fallback-Sessions durch eine gemeinsame physische
-Preparation-Frontier. Sie teilt:
+`SharedPreparationGuardFacts` teilt Guard-Fakten nur bei identischen
+Template-Hashes, Matcher-Bindings, Matchstatus und Annahmensignatur.
 
-- normalisiertes Parsing und strukturelle Fingerprints;
-- Pattern-Analyse nur bei identischem Pattern-, Recognition- und Matcher-Budget-Vertrag;
-- Expansionen des eingefrorenen Preparation-Inventars;
-- ein gemeinsames Visited-State-Set und Deduplication;
-- das bounded Traversal-Budget;
-- deterministische Kandidatenordnung über den besten sichtbaren Fortschritt der
-  noch ungelösten Principals.
+## Work Accounting
 
-Nicht geteilt werden Principal-Identität und fachliche Autorisierung. Für jedes
-Principal-Schema bleiben getrennt erhalten:
+Gemeinsame Fallback-Arbeit wird im Aggregate genau einmal gezählt. Direct- und
+Exact-Arbeit bleibt principal-lokal. `SharedExecutionWork` weist zusätzlich
+Source-Analyse, physische Fallback-Arbeit, Limits und Guard-Cache-Arbeit aus.
 
-- initiale und terminale Matchanalyse;
-- Terminalexpression und Annahmen;
-- konkreter Vorbereitungspfad;
-- Guard-Entscheidung;
-- konkreter Principal-Replay;
-- komplette primitive Lineage;
-- eigenes content-addressed Zertifikat.
+Für zwei vollständig überlappende Difference-of-Squares-Principals reduziert v2
+die physische Fallback-Arbeit von zwei expandierten States/zwei generierten
+Transitions auf einen State/eine Transition, während zwei Principal-Outcomes und
+zwei Zertifikate erhalten bleiben. Das ist eine Work-Charakterisierung, kein
+allgemeiner Wall-Clock-Speedup-Claim.
 
-Ein erfolgreicher gemeinsamer Pfad ist damit kein kostenloser Makroschritt. Die
-Vorbereitungsregeln und der anschließende Principal-Schritt bleiben als primitive
-Regel-IDs erhalten.
-
-`SharedPreparationGuardFacts` teilt Guard-Fakten nur, wenn Template-Hashes,
-Matcher-Bindings, Matchstatus und Annahmensignatur identisch sind. Gleiche
-Principal-Namen oder ähnliche Java-Klassen reichen nicht aus. Unterschiedliche
-Guard-Arten wie `NON_ZERO` und `POSITIVE` erhalten getrennte Fakten.
-
-## Work Accounting: logisch referenzieren, physisch einmal zählen
-
-Jedes v2-Fallback-Outcome referenziert den Work-Kontext der gemeinsamen
-Traversal. Würde man diese Outcome-Work-Werte einfach über alle Principals
-summieren, würde dieselbe physische Arbeit wieder N-mal gezählt. Deshalb hat v2
-einen eigenen Aggregate-Vertrag:
-
-- Direct- und Exact-Arbeit wird wie bisher pro tatsächlich ausgeführtem
-  Principal gezählt;
-- die gemeinsame bounded Fallback-Arbeit wird im `aggregateWork` **genau einmal**
-  addiert;
-- `SharedExecutionWork` weist zusätzlich Cache-/Physical-Work aus, darunter
-  Source-Analyse, Fallback-Expansionen, erreichte Limits und Guard-Cache-Treffer.
-
-Ein deterministischer Zwei-Principal-Charakterisierungstest macht den Unterschied
-explizit. Beide Coordinator-Versionen erhalten dieselben zwei Principals,
-dasselbe Preparation-Inventar, denselben Ausdruck und dasselbe Budget. Beide
-liefern dieselben Ergebnisexpressionen und dieselbe primitive Lineage. Für den
-gemeinsam benötigten Difference-of-Squares-Vorbereitungsschritt gilt jedoch:
-
-| Messgröße | v1: zwei unabhängige Fallbacks | v2: gemeinsame Frontier |
-| --- | ---: | ---: |
-| Principal-Outcomes | 2 | 2 |
-| expandierte Fallback-States | 2 | 1 |
-| generierte Fallback-Transitions | 2 | 1 |
-| unterschiedliche Principal-Zertifikate | 2 | 2 |
-
-Das ist eine gezielte Work-Charakterisierung für vollständig überlappende
-Vorbereitungsarbeit, **kein** allgemeiner Laufzeit- oder Speedup-Claim. Bei
-Principals mit wenig gemeinsamer Struktur kann die Einsparung entsprechend
-kleiner sein.
-
-## Guards und Annahmen
-
-Eine syntaktische Übereinstimmung autorisiert keine bedingte Identität. Für
-typisierte Voraussetzungen gilt:
+## Guards, Replay und Fail-closed-Verhalten
 
 ```text
 keine Voraussetzung     -> autorisiert
@@ -175,109 +186,64 @@ Binding inconclusive    -> kein Kandidat
 Template ungültig       -> technischer Fehler
 ```
 
-Der allgemeine Bridge-Pfad kann Guards nach der vorbereiteten
-Terminalexpression instanziieren und gegen Ausgangs- plus
-Vorbereitungsannahmen prüfen. v2 kann dafür die bereits retained terminale
-`AnalysisSnapshot` verwenden, statt die vollständige Patternanalyse für die
-Guard-Phase erneut auszuführen.
-
-Die nativen Exact-Spezialisten besitzen eigene Annahmen- und
-Zertifikatsverträge. Der Unified Coordinator verwendet den Exact-Pfad derzeit
-nur für deren ausdrücklich native Hauptregeln ohne zusätzliche
-`RequiredAssumptionTemplate`s. Eine spätere Erweiterung kann terminale
-Matcher-Bindungen aus Exact-Spezialisten exponieren; bis dahin bleiben guarded
-fremde Principal-Schemata im allgemeinen Fallback-Pfad.
-
-## Fail-closed Verhalten
-
-Die Ausführung interpretiert technische Exceptions nicht als gewöhnlichen
-Nichttreffer. Sie werden als retained `TECHNICAL_FAILURE` mit einem
-stadienspezifischen Detailcode ausgegeben. Nicht äquivalenzbewahrende
+Der allgemeine Bridge-Pfad instanziiert Guards an der vorbereiteten
+Terminalexpression und prüft sie gegen Ausgangs- plus Vorbereitungsannahmen.
+Technische Exceptions werden als `TECHNICAL_FAILURE` retained und nicht als
+gewöhnliche Nichttreffer interpretiert. Nicht äquivalenzbewahrende
 Vorbereitungsregeln, doppelte IDs und nicht reviewfähige Principals werden vor
 der Ausführung abgelehnt.
 
-Direct-, Exact- und Fallback-Konfigurationen bleiben getrennt identifizierbar.
-`verify(...)` berechnet die vollständige Evaluation mit frischen per-Evaluation
-Caches erneut. Die v2-Shared-Zertifikate binden zusätzlich die
-Repository-Revision, das Principal-Schema, Preparation-Inventar, Budget,
-Source-/Terminalanalyse, Annahmen, Vorbereitungspfad, konkreten Principal-Replay,
-primitive Lineage und den geteilten Work-Kontext.
+`verify(...)` berechnet die Evaluation mit frischen per-Evaluation-Caches erneut.
+Zertifikate binden Repository-Revision, Principal-Schema,
+Preparation-Inventar, Budget, Source-/Terminalanalyse, Annahmen,
+Vorbereitungspfad, konkreten Principal-Replay, primitive Lineage und Work-
+Kontext.
 
-## SymPy-Amplifikationsmatrix
+## Typisierte Repräsentationskandidaten
 
-Das retained v1-Experiment verwendet drei unveränderte importierte Regeln:
-
-```text
-sympy.trig.pythagorean
-sympy.poly.factor.diff_squares
-sympy.rational.partial_fraction.telescoping
-```
-
-Elf deklarierte Fälle umfassen vier direkte Anwendungen, vier zusätzliche
-lokal vorbereitete Anwendungen und drei konklusive Near-Misses. Das gemeinsame
-lokale Vorbereitungsinventar enthält nur `ast_cancel_division_factor`.
-Rationale Fälle behalten ihre Nichtnullbedingungen ausdrücklich.
-
-Reproduktion:
-
-```bash
-./gradlew :regelsuche-experiments:symPyRuleAmplification
-```
-
-Die Matrix belegt eine begrenzte Verstärkung deklarierter Anwendbarkeit. Sie
-belegt keine allgemeine Überlegenheit, Vollständigkeit oder bessere Laufzeit
-gegenüber SymPy. Die historische Experimentidentität wird durch v2 nicht
-rückwirkend verändert.
+Die in #746 / PR #946 gelieferte `RepresentationPreparation` ist bereits der
+typisierte Entry-Point für Gleichungssystem-, Matrix- und Operator-Kandidaten.
+Sie akzeptiert nur ausdrücklich erlaubte `RepresentationBridge.Relation`s,
+verifiziert die Formation unabhängig, führt anschließend den konkreten
+typisierten Downstream-Principal mit dem Restbudget aus und akzeptiert nur nach
+dessen eigener Verifikation. `UnifiedRulePreparationCoordinator` stellt diesen
+Pfad über `prepareRepresentation(...)` bereit. Solution-set-, Linear-map-,
+Basis-, Spektral- und Model-Interpretation-Relationen werden dabei nicht in
+skalare Ausdrucksgleichheit umgedeutet.
 
 ## Gelernte Regeln und Programme
 
-Eine exakt promovierte gelernte Pattern-Regel kann dasselbe
-`RewriteApplicabilitySchema` und den Bridge-Fallback verwenden. Der
-charakterisierte Promotionspfad zeigt dies für eine gelernte
-Differenz-von-Quadraten-Regel nach einem exakten Polynomidentitätsnachweis.
+Exakt autorisierte gelernte Pattern-Regeln können denselben Applicability- und
+Preparation-Pfad verwenden. Rohe `CompiledGenomeRule`-Objekte bleiben nicht
+äquivalenzbewahrend und werden abgelehnt. Gelernte `RewriteProgram`s besitzen
+seit #965 einen eigenen programmbasierten Authorization-/Replay-Vertrag;
+Sequence, Choice, Repeat, Guards, Priorisierung und Pruning werden nicht als
+scheinbar atomare Pattern-Regel maskiert.
 
-Rohe `CompiledGenomeRule`-Objekte bleiben dagegen
-`isEquivalencePreservingByConstruction() == false` und werden abgelehnt.
+## Noch offene Produktintegration
 
-Gelernte `RewriteProgram`s besitzen seit #965 einen separaten
-programmbasierten Authorization-/Replay-Vertrag. Sie werden nicht als eine
-scheinbar atomare Pattern-Regel maskiert; Sequence, Choice, FirstApplicable,
-Repeat, Guards, Priorisierung und Pruning bleiben Bestandteil ihrer kanonischen
-Programmtopologie und Work-Evidence.
+Nach #967 und der Applicability-Coverage bleiben insbesondere:
 
-Details stehen unter
-[Promotion exakt bewiesener gelernter Pattern-Regeln](learned-pattern-rule-promotion.md)
-und [Authorization gelernter RewritePrograms](learned-rewrite-program-authorization.md).
+- occurrence-lokale Guard-Bindungen für verschachtelte guarded Principals; diese
+  werden in #971 als neue versionierte SAFE-Authority qualifiziert, ohne die
+  historische V2-Evidence umzudeuten;
+- ein gemeinsamer qualifizierter Workbench-/CLI-Runtime-Adapter für diese neue
+  Authority (#972);
+- abschließende clean-checkout/pinned-container Reproduktion und synchronisierte
+  Produktdokumentation vor einer erneuten Default-Entscheidung.
 
-## Gegenwärtige Grenzen
-
-Der v2 Shared Coordinator ist implementiert und charakterisiert, aber noch nicht
-als allgemeiner Workbench-/CLI-Standard ausgewählt. Weiter offen sind:
-
-- eine mögliche zusätzliche Cross-Stage-Wiederverwendung desselben physischen
-  Caches zwischen Source-Analyse und Fallback-Root; v2 teilt die Arbeit bereits
-  zwischen allen Principals innerhalb der jeweiligen Stufe;
-- terminale Matcher-Bindungen für guarded native Exact-Spezialisten;
-- direkte Teilnahme typisierter Repräsentationsbrücken für Gleichungssysteme,
-  Matrizen und Operatoren;
-- eine matched-work Produktqualifikation von `SAFE_PREPARATION_V1` bzw. einer
-  späteren v2-Produktpolicy gegenüber `DIRECT_V1`.
-
-Historische Läufe behalten ihre ursprünglichen Engine- und Inventaridentitäten.
-Der v2-Vertrag deutet bestehende Evidence nicht rückwirkend um.
+Historische Läufe behalten ihre ursprünglichen Engine- und
+Inventaridentitäten.
 
 ## Prüfung aus dem Checkout
 
 ```bash
 ./gradlew :regelsuche-core:test \
-  --tests de.regelsuche.transform.SafePreparationEngineRegistryTest
+  --tests de.regelsuche.rules.DomainRulesTest
 
 ./gradlew :regelsuche-search:test \
-  --tests de.regelsuche.search.reachability.UnifiedRulePreparationCoordinatorTest \
   --tests de.regelsuche.search.reachability.SharedPreparationTraversalTest \
   --tests de.regelsuche.search.reachability.SharedMultiPrincipalPreparationTraversalTest \
-  --tests de.regelsuche.search.reachability.SharedPreparationGuardFactsTest \
-  --tests de.regelsuche.search.reachability.SharedPreparedPrincipalReplayTest \
   --tests de.regelsuche.search.reachability.SharedUnifiedRulePreparationCoordinatorTest
 
 ./gradlew --no-configuration-cache ciCheck

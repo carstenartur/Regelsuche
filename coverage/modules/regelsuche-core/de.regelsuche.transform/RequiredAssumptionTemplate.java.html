@@ -35,25 +35,25 @@ public record RequiredAssumptionTemplate(
     public static RequiredAssumptionTemplate positive(
         PatternExpr expressionPattern
     ) {
-<span class="nc" id="L38">        return new RequiredAssumptionTemplate(</span>
+<span class="fc" id="L38">        return new RequiredAssumptionTemplate(</span>
             Assumption.Kind.POSITIVE, expressionPattern);
     }
 
     public static RequiredAssumptionTemplate nonNegative(
         PatternExpr expressionPattern
     ) {
-<span class="nc" id="L45">        return new RequiredAssumptionTemplate(</span>
+<span class="fc" id="L45">        return new RequiredAssumptionTemplate(</span>
             Assumption.Kind.NON_NEGATIVE, expressionPattern);
     }
 
     public Assumption instantiate(Map&lt;String, Expr&gt; bindings) {
-<span class="nc" id="L50">        String expression = ExpressionFormatter.format(</span>
-<span class="nc" id="L51">            expressionPattern.instantiate(</span>
-<span class="nc" id="L52">                Objects.requireNonNull(bindings, &quot;bindings&quot;)));</span>
-<span class="nc bnc" id="L53" title="All 9 branches missed.">        return switch (kind) {</span>
-<span class="nc" id="L54">            case NON_ZERO -&gt; Assumption.nonZero(expression);</span>
-<span class="nc" id="L55">            case POSITIVE -&gt; Assumption.positive(expression);</span>
-<span class="nc" id="L56">            case NON_NEGATIVE -&gt; Assumption.nonNegative(expression);</span>
+<span class="fc" id="L50">        String expression = ExpressionFormatter.format(</span>
+<span class="fc" id="L51">            expressionPattern.instantiate(</span>
+<span class="fc" id="L52">                Objects.requireNonNull(bindings, &quot;bindings&quot;)));</span>
+<span class="pc bpc" id="L53" title="6 of 9 branches missed.">        return switch (kind) {</span>
+<span class="fc" id="L54">            case NON_ZERO -&gt; Assumption.nonZero(expression);</span>
+<span class="fc" id="L55">            case POSITIVE -&gt; Assumption.positive(expression);</span>
+<span class="fc" id="L56">            case NON_NEGATIVE -&gt; Assumption.nonNegative(expression);</span>
 <span class="nc" id="L57">            case INTEGER -&gt; Assumption.integer(expression);</span>
 <span class="nc" id="L58">            case NATURAL -&gt; Assumption.natural(expression);</span>
 <span class="nc" id="L59">            case INVERTIBLE -&gt; Assumption.invertible(expression);</span>
