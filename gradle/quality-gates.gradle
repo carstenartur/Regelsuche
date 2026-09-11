@@ -85,6 +85,7 @@ def verifyJmhRegression = tasks.register('verifyJmhRegression', Exec) {
     doFirst {
         commandLine qualityVerificationPython.get().absolutePath,
             'scripts/verify-jmh-regression-v3.py',
+            '--repository-root', qualityRepositoryRoot.asFile.absolutePath,
             '--result', qualityRepositoryRoot.file('app/build/reports/jmh/result.json').asFile.absolutePath,
             '--threshold-policy', qualityRepositoryRoot.file('config/quality/jmh-regression-policy-v2.json').asFile.absolutePath,
             '--decision-policy', qualityRepositoryRoot.file('config/quality/jmh-regression-decision-policy-v3.json').asFile.absolutePath,
