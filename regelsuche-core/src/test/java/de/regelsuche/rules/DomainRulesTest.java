@@ -3,6 +3,7 @@ package de.regelsuche.rules;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.assumption.Assumption;
@@ -34,7 +35,6 @@ class DomainRulesTest {
         assertTrue(rule.matches(expr));
         Expr rewritten = rule.apply(expr);
         assertEquals("1", ExpressionFormatter.format(rewritten));
-        // Pythagoras is unconditional.
         assertTrue(rule.assumptions(expr).isEmpty());
     }
 
@@ -62,13 +62,15 @@ class DomainRulesTest {
         assertEquals("log(a) + log(b)", ExpressionFormatter.format(rewritten));
         List<Assumption> assumptions = rule.assumptions(expr);
         assertEquals(2, assumptions.size());
-        assertTrue(assumptions.stream().allMatch(a -> a.kind() == Assumption.Kind.POSITIVE));
+        assertTrue(assumptions.stream().allMatch(
+            assumption -> assumption.kind() == Assumption.Kind.POSITIVE));
     }
 
     @Test
     void radicalSqrtOfSquareGivesAbs() {
         Expr expr = parse("sqrt(a^2)");
-        RewriteRule rule = findRule(RadicalRules.rules(), "radical_sqrt_of_square_to_abs");
+        RewriteRule rule = findRule(
+            RadicalRules.rules(), "radical_sqrt_of_square_to_abs");
         assertNotNull(rule);
         assertTrue(rule.matches(expr));
         Expr rewritten = rule.apply(expr);
@@ -79,17 +81,20 @@ class DomainRulesTest {
     @Test
     void radicalSqrtOfProductRequiresNonNegativity() {
         Expr expr = parse("sqrt(a*b)");
-        RewriteRule rule = findRule(RadicalRules.rules(), "radical_sqrt_of_product");
+        RewriteRule rule = findRule(
+            RadicalRules.rules(), "radical_sqrt_of_product");
         assertNotNull(rule);
         assertTrue(rule.matches(expr));
         assertEquals(2, rule.assumptions(expr).size());
-        assertTrue(rule.assumptions(expr).stream().allMatch(a -> a.kind() == Assumption.Kind.NON_NEGATIVE));
+        assertTrue(rule.assumptions(expr).stream().allMatch(
+            assumption -> assumption.kind() == Assumption.Kind.NON_NEGATIVE));
     }
 
     @Test
-    void expOfLogRequiresPositiveArgument() {
-        Expr expr = parse("exp(log(x))");
-        RewriteRule rule = findRule(CalculusBasicRules.rules(), "calculus_exp_of_log");
+    void expOfLnRequiresPositiveArgument() {
+        Expr expr = parse("exp(ln(x))");
+        RewriteRule rule = findRule(
+            CalculusBasicRules.rules(), "calculus_exp_of_ln");
         assertNotNull(rule);
         assertTrue(rule.matches(expr));
         assertEquals("x", ExpressionFormatter.format(rule.apply(expr)));
@@ -99,13 +104,21 @@ class DomainRulesTest {
     }
 
     @Test
+    void baseTenLogIsNotTreatedAsInverseOfExp() {
+        List<RewriteRule> rules = CalculusBasicRules.rules();
+        assertNull(findRule(rules, "calculus_exp_of_log"));
+        assertNull(findRule(rules, "calculus_log_of_exp"));
+        assertFalse(rules.stream().anyMatch(rule -> rule.matches(parse("exp(log(x))"))));
+        assertFalse(rules.stream().anyMatch(rule -> rule.matches(parse("log(exp(x))"))));
+    }
+
+    @Test
     void domainRegistryExposesAllNewDomains() {
         RuleDomainRegistry registry = new RuleDomainRegistry();
         assertTrue(registry.get(RuleDomainRegistry.TRIGONOMETRIC).isPresent());
         assertTrue(registry.get(RuleDomainRegistry.LOGARITHMIC).isPresent());
         assertTrue(registry.get(RuleDomainRegistry.RADICAL).isPresent());
         assertTrue(registry.get(RuleDomainRegistry.CALCULUS_BASIC).isPresent());
-        // Unknown domain stays absent.
         assertFalse(registry.get("nonexistent").isPresent());
     }
 }
