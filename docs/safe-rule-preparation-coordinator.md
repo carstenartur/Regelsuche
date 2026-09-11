@@ -58,15 +58,13 @@ konkrete Executor bleibt die fachliche Autorität.
 
 Die Safe-Preparation-Coverage ist bewusst fail-closed:
 
-- eine äquivalenzbewahrende gewöhnliche `PatternRewriteRule` ohne separat
-  emittierte Annahmen darf ihr deklaratives Quellpattern verwenden;
-- custom/algorithmische Regeln deklarieren ihren Vertrag über die in
-  `RewriteRule` eingebettete Capability
-  `RewriteApplicabilitySchemaProvider`;
+- ausschließlich die exakte deklarative `PatternRewriteRule`-Klasse darf ihr
+  Quellpattern als impliziten Vertrag verwenden;
+- jede `PatternRewriteRule`-Subklasse sowie andere custom/algorithmische Regeln
+  benötigen einen expliziten Vertrag über die in `RewriteRule` eingebettete
+  Capability `RewriteApplicabilitySchemaProvider`;
 - der Provider ist selbst die konkrete Regel; sein Schema muss dasselbe
   Executor-Objekt und dieselbe Regel-ID binden;
-- eine `PatternRewriteRule`-Subklasse mit eigenen Annahmen bleibt ohne
-  expliziten Vertrag außerhalb des Safe-Profils;
 - aus Regel-ID, Java-Klasse, Beispiel, Benchmark oder beobachtetem Lauf wird
   niemals ein Schema abgeleitet;
 - Regeln mit unvollständiger Domain-/Guard-Semantik bleiben als negative
@@ -94,8 +92,9 @@ Explizit abgedeckt sind derzeit unter anderem:
 `rational_cancel_common_factor` bleibt absichtlich außerhalb der
 schema-directed Preparation: Der Executor akzeptiert zwei strukturell
 verschiedene Orientierungen, während der heutige Principal-Vertrag genau ein
-Quellpattern trägt. Ebenso bleiben whole-sum-/numeric-shape-Regeln wie
-`polynomial_collect_like_terms` außerhalb, solange ihre vollständige
+Quellpattern trägt. Explizite Nullfaktoren im Nenner werden vor jeder
+Orientierungswahl fail-closed abgelehnt. Ebenso bleiben whole-sum-/numeric-shape-
+Regeln wie `polynomial_collect_like_terms` außerhalb, solange ihre vollständige
 Anwendbarkeit nicht ehrlich durch den Patternvertrag ausdrückbar ist.
 
 ### Korrektur der Logarithmus-Semantik
@@ -131,7 +130,9 @@ keine Behauptung, dass genau so viele Primitive-Schritte zum Match genügen.
 AST-Wachstum, Primitive-Path-Work und stabile strukturelle Tie-Breaker bleiben
 separate Suchkriterien. Die Multi-Principal-Traversal aggregiert dieselben
 Fortschrittssignale über ungelöste Principals, ohne Principal-Identitäten
-zusammenzuführen.
+zusammenzuführen. Charakterisierungstests binden sowohl die Single- als auch die
+Multi-Principal-Produktionsordnung an den versionierten Rank, ohne die bereits
+qualifizierte v1/v2-Semantik rückwirkend umzudeuten.
 
 ## Native exakte Spezialsolver
 
@@ -198,6 +199,18 @@ Preparation-Inventar, Budget, Source-/Terminalanalyse, Annahmen,
 Vorbereitungspfad, konkreten Principal-Replay, primitive Lineage und Work-
 Kontext.
 
+## Typisierte Repräsentationskandidaten
+
+Die in #746 / PR #946 gelieferte `RepresentationPreparation` ist bereits der
+typisierte Entry-Point für Gleichungssystem-, Matrix- und Operator-Kandidaten.
+Sie akzeptiert nur ausdrücklich erlaubte `RepresentationBridge.Relation`s,
+verifiziert die Formation unabhängig, führt anschließend den konkreten
+typisierten Downstream-Principal mit dem Restbudget aus und akzeptiert nur nach
+dessen eigener Verifikation. `UnifiedRulePreparationCoordinator` stellt diesen
+Pfad über `prepareRepresentation(...)` bereit. Solution-set-, Linear-map-,
+Basis-, Spektral- und Model-Interpretation-Relationen werden dabei nicht in
+skalare Ausdrucksgleichheit umgedeutet.
+
 ## Gelernte Regeln und Programme
 
 Exakt autorisierte gelernte Pattern-Regeln können denselben Applicability- und
@@ -211,12 +224,13 @@ scheinbar atomare Pattern-Regel maskiert.
 
 Nach #967 und der Applicability-Coverage bleiben insbesondere:
 
-- terminale Matcher-Bindungen für guarded native Exact-Spezialisten;
-- typisierte Repräsentationskandidaten für Gleichungssysteme, Matrizen und
-  Operatoren ohne Reduktion auf skalare Ausdrucksgleichheit;
-- ein qualifizierter Workbench-/CLI-Runtime-Adapter;
+- occurrence-lokale Guard-Bindungen für verschachtelte guarded Principals; diese
+  werden in #971 als neue versionierte SAFE-Authority qualifiziert, ohne die
+  historische V2-Evidence umzudeuten;
+- ein gemeinsamer qualifizierter Workbench-/CLI-Runtime-Adapter für diese neue
+  Authority (#972);
 - abschließende clean-checkout/pinned-container Reproduktion und synchronisierte
-  Produktdokumentation vor einer Default-Umschaltung.
+  Produktdokumentation vor einer erneuten Default-Entscheidung.
 
 Historische Läufe behalten ihre ursprünglichen Engine- und
 Inventaridentitäten.
@@ -229,6 +243,7 @@ Inventaridentitäten.
 
 ./gradlew :regelsuche-search:test \
   --tests de.regelsuche.search.reachability.SharedPreparationTraversalTest \
+  --tests de.regelsuche.search.reachability.SharedMultiPrincipalPreparationTraversalTest \
   --tests de.regelsuche.search.reachability.SharedUnifiedRulePreparationCoordinatorTest
 
 ./gradlew --no-configuration-cache ciCheck
