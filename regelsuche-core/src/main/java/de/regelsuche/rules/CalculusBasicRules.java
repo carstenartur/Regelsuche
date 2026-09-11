@@ -8,9 +8,9 @@ import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.RequiredAssumptionTemplate;
 import de.regelsuche.transform.RewriteApplicabilitySchema;
-import de.regelsuche.transform.RewriteApplicabilitySchemaProvider;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.RewriteRule.RewriteApplicabilitySchemaProvider;
 import java.util.List;
 
 /** Basic real exponential/natural-logarithm rewrite rules. */
