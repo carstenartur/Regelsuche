@@ -9,9 +9,9 @@ import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.RequiredAssumptionTemplate;
 import de.regelsuche.transform.RewriteApplicabilitySchema;
-import de.regelsuche.transform.RewriteApplicabilitySchemaProvider;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.RewriteRule.RewriteApplicabilitySchemaProvider;
 import java.util.List;
 
 /** Curated logarithm rewrite rules with explicit domain assumptions. */
@@ -40,51 +40,29 @@ public final class LogarithmicRules {
         }
 
         @Override
-        public String id() {
-            return name + "_product_split";
-        }
-
+        public String id() { return name + "_product_split"; }
         @Override
-        public RewriteKind kind() {
-            return RewriteKind.EXPAND;
-        }
-
+        public RewriteKind kind() { return RewriteKind.EXPAND; }
         @Override
-        public boolean mayIncreaseComplexity() {
-            return true;
-        }
-
+        public boolean mayIncreaseComplexity() { return true; }
         @Override
-        public int estimatedCostDelta() {
-            return 3;
-        }
-
+        public int estimatedCostDelta() { return 3; }
         @Override
-        public boolean isEquivalencePreservingByConstruction() {
-            return true;
-        }
-
+        public boolean isEquivalencePreservingByConstruction() { return true; }
         @Override
-        public boolean matches(Expr subtree) {
-            return extract(subtree) != null;
-        }
+        public boolean matches(Expr subtree) { return extract(subtree) != null; }
 
         @Override
         public Expr apply(Expr subtree) {
             BinaryExpr product = extract(subtree);
-            if (product == null) {
-                throw new IllegalArgumentException("Rule does not match subtree");
-            }
+            if (product == null) throw new IllegalArgumentException("Rule does not match subtree");
             return new BinaryExpr(
-                new FunctionExpr(name, product.left()),
-                BinaryOperator.ADD,
+                new FunctionExpr(name, product.left()), BinaryOperator.ADD,
                 new FunctionExpr(name, product.right()));
         }
 
         @Override
-        public boolean mayEmitAssumptions() {
-            return true;
-        }
+        public boolean mayEmitAssumptions() { return true; }
 
         @Override
         public List<Assumption> assumptions(Expr subtree) {
@@ -99,8 +77,7 @@ public final class LogarithmicRules {
             PatternExpr left = PatternExpr.var("A");
             PatternExpr right = PatternExpr.var("B");
             return exactSource(
-                PatternExpr.fn(name,
-                    PatternExpr.op(BinaryOperator.MUL, left, right)),
+                PatternExpr.fn(name, PatternExpr.op(BinaryOperator.MUL, left, right)),
                 RequiredAssumptionTemplate.positive(left),
                 RequiredAssumptionTemplate.positive(right));
         }
@@ -108,70 +85,40 @@ public final class LogarithmicRules {
         private BinaryExpr extract(Expr subtree) {
             if (!(subtree instanceof FunctionExpr function)
                     || !function.name().equals(name)
-                    || function.arguments().size() != 1) {
-                return null;
-            }
+                    || function.arguments().size() != 1) return null;
             return function.arguments().getFirst() instanceof BinaryExpr inner
-                    && inner.operator() == BinaryOperator.MUL
-                ? inner
-                : null;
+                    && inner.operator() == BinaryOperator.MUL ? inner : null;
         }
     }
 
     /** {@code log(a/b) -> log(a) - log(b)} with {@code a > 0, b > 0}. */
     static final class LogQuotientRule implements RewriteApplicabilitySchemaProvider {
         private final String name;
-
-        LogQuotientRule(String name) {
-            this.name = name;
-        }
-
+        LogQuotientRule(String name) { this.name = name; }
         @Override
-        public String id() {
-            return name + "_quotient_split";
-        }
-
+        public String id() { return name + "_quotient_split"; }
         @Override
-        public RewriteKind kind() {
-            return RewriteKind.EXPAND;
-        }
-
+        public RewriteKind kind() { return RewriteKind.EXPAND; }
         @Override
-        public boolean mayIncreaseComplexity() {
-            return true;
-        }
-
+        public boolean mayIncreaseComplexity() { return true; }
         @Override
-        public int estimatedCostDelta() {
-            return 3;
-        }
-
+        public int estimatedCostDelta() { return 3; }
         @Override
-        public boolean isEquivalencePreservingByConstruction() {
-            return true;
-        }
-
+        public boolean isEquivalencePreservingByConstruction() { return true; }
         @Override
-        public boolean matches(Expr subtree) {
-            return extract(subtree) != null;
-        }
+        public boolean matches(Expr subtree) { return extract(subtree) != null; }
 
         @Override
         public Expr apply(Expr subtree) {
             BinaryExpr quotient = extract(subtree);
-            if (quotient == null) {
-                throw new IllegalArgumentException("Rule does not match subtree");
-            }
+            if (quotient == null) throw new IllegalArgumentException("Rule does not match subtree");
             return new BinaryExpr(
-                new FunctionExpr(name, quotient.left()),
-                BinaryOperator.SUB,
+                new FunctionExpr(name, quotient.left()), BinaryOperator.SUB,
                 new FunctionExpr(name, quotient.right()));
         }
 
         @Override
-        public boolean mayEmitAssumptions() {
-            return true;
-        }
+        public boolean mayEmitAssumptions() { return true; }
 
         @Override
         public List<Assumption> assumptions(Expr subtree) {
@@ -186,8 +133,7 @@ public final class LogarithmicRules {
             PatternExpr numerator = PatternExpr.var("A");
             PatternExpr denominator = PatternExpr.var("B");
             return exactSource(
-                PatternExpr.fn(name,
-                    PatternExpr.op(BinaryOperator.DIV, numerator, denominator)),
+                PatternExpr.fn(name, PatternExpr.op(BinaryOperator.DIV, numerator, denominator)),
                 RequiredAssumptionTemplate.positive(numerator),
                 RequiredAssumptionTemplate.positive(denominator));
         }
@@ -195,152 +141,90 @@ public final class LogarithmicRules {
         private BinaryExpr extract(Expr subtree) {
             if (!(subtree instanceof FunctionExpr function)
                     || !function.name().equals(name)
-                    || function.arguments().size() != 1) {
-                return null;
-            }
+                    || function.arguments().size() != 1) return null;
             return function.arguments().getFirst() instanceof BinaryExpr inner
-                    && inner.operator() == BinaryOperator.DIV
-                ? inner
-                : null;
+                    && inner.operator() == BinaryOperator.DIV ? inner : null;
         }
     }
 
     /** {@code log(a^k) -> k*log(a)} with {@code a > 0}. */
     static final class LogPowerRule implements RewriteApplicabilitySchemaProvider {
         private final String name;
-
-        LogPowerRule(String name) {
-            this.name = name;
-        }
-
+        LogPowerRule(String name) { this.name = name; }
         @Override
-        public String id() {
-            return name + "_power_to_factor";
-        }
-
+        public String id() { return name + "_power_to_factor"; }
         @Override
-        public RewriteKind kind() {
-            return RewriteKind.NORMALIZE;
-        }
-
+        public RewriteKind kind() { return RewriteKind.NORMALIZE; }
         @Override
-        public boolean mayIncreaseComplexity() {
-            return false;
-        }
-
+        public boolean mayIncreaseComplexity() { return false; }
         @Override
-        public int estimatedCostDelta() {
-            return -1;
-        }
-
+        public int estimatedCostDelta() { return -1; }
         @Override
-        public boolean isEquivalencePreservingByConstruction() {
-            return true;
-        }
-
+        public boolean isEquivalencePreservingByConstruction() { return true; }
         @Override
-        public boolean matches(Expr subtree) {
-            return extract(subtree) != null;
-        }
+        public boolean matches(Expr subtree) { return extract(subtree) != null; }
 
         @Override
         public Expr apply(Expr subtree) {
             BinaryExpr power = extract(subtree);
-            if (power == null) {
-                throw new IllegalArgumentException("Rule does not match subtree");
-            }
-            return new BinaryExpr(
-                power.right(),
-                BinaryOperator.MUL,
+            if (power == null) throw new IllegalArgumentException("Rule does not match subtree");
+            return new BinaryExpr(power.right(), BinaryOperator.MUL,
                 new FunctionExpr(name, power.left()));
         }
 
         @Override
-        public boolean mayEmitAssumptions() {
-            return true;
-        }
+        public boolean mayEmitAssumptions() { return true; }
 
         @Override
         public List<Assumption> assumptions(Expr subtree) {
             BinaryExpr power = extract(subtree);
-            return power == null
-                ? List.of()
-                : List.of(Assumption.positive(
-                    ExpressionFormatter.format(power.left())));
+            return power == null ? List.of() : List.of(
+                Assumption.positive(ExpressionFormatter.format(power.left())));
         }
 
         @Override
         public RewriteApplicabilitySchema applicabilitySchema() {
             PatternExpr base = PatternExpr.var("A");
             return exactSource(
-                PatternExpr.fn(name, PatternExpr.op(
-                    BinaryOperator.POW, base, PatternExpr.var("K"))),
+                PatternExpr.fn(name, PatternExpr.op(BinaryOperator.POW, base, PatternExpr.var("K"))),
                 RequiredAssumptionTemplate.positive(base));
         }
 
         private BinaryExpr extract(Expr subtree) {
             if (!(subtree instanceof FunctionExpr function)
                     || !function.name().equals(name)
-                    || function.arguments().size() != 1) {
-                return null;
-            }
+                    || function.arguments().size() != 1) return null;
             return function.arguments().getFirst() instanceof BinaryExpr inner
-                    && inner.operator() == BinaryOperator.POW
-                ? inner
-                : null;
+                    && inner.operator() == BinaryOperator.POW ? inner : null;
         }
     }
 
     /** {@code log(1) -> 0}. */
     static final class LogOfOneRule implements RewriteApplicabilitySchemaProvider {
         private final String name;
-
-        LogOfOneRule(String name) {
-            this.name = name;
-        }
-
+        LogOfOneRule(String name) { this.name = name; }
         @Override
-        public String id() {
-            return name + "_of_one_is_zero";
-        }
-
+        public String id() { return name + "_of_one_is_zero"; }
         @Override
-        public RewriteKind kind() {
-            return RewriteKind.SIMPLIFY;
-        }
-
+        public RewriteKind kind() { return RewriteKind.SIMPLIFY; }
         @Override
-        public boolean mayIncreaseComplexity() {
-            return false;
-        }
-
+        public boolean mayIncreaseComplexity() { return false; }
         @Override
-        public int estimatedCostDelta() {
-            return -2;
-        }
-
+        public int estimatedCostDelta() { return -2; }
         @Override
-        public boolean isEquivalencePreservingByConstruction() {
-            return true;
-        }
-
+        public boolean isEquivalencePreservingByConstruction() { return true; }
         @Override
         public boolean matches(Expr subtree) {
             return subtree instanceof FunctionExpr fn
-                && fn.name().equals(name)
-                && fn.arguments().size() == 1
+                && fn.name().equals(name) && fn.arguments().size() == 1
                 && fn.arguments().getFirst() instanceof de.regelsuche.ast.NumberExpr n
                 && n.value().equalsInteger(1);
         }
-
         @Override
         public Expr apply(Expr subtree) {
-            if (!matches(subtree)) {
-                throw new IllegalArgumentException("Rule does not match subtree");
-            }
+            if (!matches(subtree)) throw new IllegalArgumentException("Rule does not match subtree");
             return new de.regelsuche.ast.NumberExpr(0);
         }
-
         @Override
         public RewriteApplicabilitySchema applicabilitySchema() {
             return exactSource(PatternExpr.fn(name, PatternExpr.num(1)));
