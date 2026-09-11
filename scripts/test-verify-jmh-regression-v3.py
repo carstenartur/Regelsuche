@@ -88,7 +88,8 @@ def execute(
     root: Path,
     label: str,
     result: list[dict[str, Any]],
-    expected: int,
+    expected_exit: int,
+    expected_status: str | None = None,
 ) -> dict[str, Any]:
     result_path = root / f"{label}-result.json"
     json_output = root / f"{label}-report.json"
@@ -109,10 +110,13 @@ def execute(
             return_code = error.code if isinstance(error.code, int) else 1
     finally:
         sys.argv = previous
-    if return_code != expected:
-        raise SystemExit(f"{label}: expected exit {expected}, found {return_code}")
+    if return_code != expected_exit:
+        raise SystemExit(
+            f"{label}: expected exit {expected_exit}, found {return_code}"
+        )
     report = json.loads(json_output.read_text(encoding="utf-8"))
-    expected_status = "PASSED" if expected == 0 else "FAILED"
+    if expected_status is None:
+        expected_status = "PASSED" if expected_exit == 0 else "FAILED"
     if report.get("status") != expected_status:
         raise SystemExit(
             f"{label}: expected status {expected_status}, found {report.get('status')}"
@@ -194,6 +198,12 @@ def assert_precision(report: dict[str, Any], expected: str, label: str) -> None:
         raise SystemExit(f"{label}: expected precision {expected}, found {actual}")
 
 
+def assert_row_status(report: dict[str, Any], expected: str, label: str) -> None:
+    actual = only_row(report, label).get("status")
+    if actual != expected:
+        raise SystemExit(f"{label}: expected row status {expected}, found {actual}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--verifier", required=True, type=Path)
@@ -236,6 +246,10 @@ def main() -> None:
             "thresholdPolicyGitBlobSha1": git_blob_sha1(threshold_path),
             "decisionStatistic": "max(0, currentScore - currentScoreError)",
             "failureCondition": "decisionScore > maximumAllowedScore",
+            "inconclusiveCondition": (
+                "currentScore > maximumAllowedScore && "
+                "decisionScore <= maximumAllowedScore"
+            ),
             "boundaryPolicy": "inclusive-pass",
             "lowPrecisionDiagnostic": "currentScoreError >= currentScore",
             "claimBoundary": "synthetic uncertainty-aware decision authority",
@@ -245,27 +259,33 @@ def main() -> None:
         ordinary_pass = execute(verifier, root, "pass", [benchmark()], 0)
         assert_decision_score(ordinary_pass, 0.9, "pass")
         assert_precision(ordinary_pass, "MEASURED", "pass")
+        assert_row_status(ordinary_pass, "PASSED", "pass")
         if ordinary_pass.get("lowPrecisionCount") != 0:
             raise SystemExit("pass: unexpected low-precision measurement")
 
-        uncertainty_pass = execute(
+        uncertainty_below_threshold = execute(
             verifier,
             root,
-            "uncertainty-pass",
-            [benchmark(score=1.6, score_error=0.2)],
+            "uncertainty-below-threshold",
+            [benchmark(score=1.4, score_error=0.2)],
             0,
         )
-        assert_decision_score(uncertainty_pass, 1.4, "uncertainty-pass")
-        assert_precision(uncertainty_pass, "MEASURED", "uncertainty-pass")
+        assert_decision_score(
+            uncertainty_below_threshold, 1.2, "uncertainty-below-threshold"
+        )
+        assert_row_status(
+            uncertainty_below_threshold, "PASSED", "uncertainty-below-threshold"
+        )
 
         boundary_pass = execute(
             verifier,
             root,
             "boundary-pass",
-            [benchmark(score=1.6, score_error=0.1)],
+            [benchmark(score=1.5, score_error=0.0)],
             0,
         )
         assert_decision_score(boundary_pass, 1.5, "boundary-pass")
+        assert_row_status(boundary_pass, "PASSED", "boundary-pass")
 
         clamped_pass = execute(
             verifier,
@@ -276,8 +296,31 @@ def main() -> None:
         )
         assert_decision_score(clamped_pass, 0.0, "clamped-pass")
         assert_precision(clamped_pass, "LOW_PRECISION", "clamped-pass")
+        assert_row_status(clamped_pass, "PASSED", "clamped-pass")
         if clamped_pass.get("lowPrecisionBenchmarks") != ["example.Benchmark.work"]:
             raise SystemExit("clamped-pass: low-precision evidence was not retained")
+
+        overlap_inconclusive = execute(
+            verifier,
+            root,
+            "overlap-inconclusive",
+            [benchmark(score=1.6, score_error=0.2)],
+            1,
+            "INCONCLUSIVE",
+        )
+        assert_decision_score(overlap_inconclusive, 1.4, "overlap-inconclusive")
+        assert_precision(overlap_inconclusive, "MEASURED", "overlap-inconclusive")
+        assert_row_status(overlap_inconclusive, "INCONCLUSIVE", "overlap-inconclusive")
+        if overlap_inconclusive.get("inconclusiveBenchmarks") != [
+            "example.Benchmark.work"
+        ]:
+            raise SystemExit(
+                "overlap-inconclusive: inconclusive benchmark evidence was not retained"
+            )
+        if overlap_inconclusive.get("violations"):
+            raise SystemExit(
+                "overlap-inconclusive: uncertainty overlap was misclassified as a violation"
+            )
 
         execute(verifier, root, "missing", [], 1)
         execute(
@@ -288,19 +331,23 @@ def main() -> None:
             1,
         )
         execute(verifier, root, "wrong-unit", [benchmark(unit="ms/op")], 1)
-        execute(
+        regression = execute(
             verifier,
             root,
             "regression",
             [benchmark(score=1.7, score_error=0.1)],
             1,
         )
-        execute(
+        assert_row_status(regression, "FAILED", "regression")
+        zero_error_regression = execute(
             verifier,
             root,
             "zero-error-regression",
             [benchmark(score=1.6, score_error=0.0)],
             1,
+        )
+        assert_row_status(
+            zero_error_regression, "FAILED", "zero-error-regression"
         )
 
         missing_family = copy.deepcopy(threshold_policy)
@@ -336,6 +383,17 @@ def main() -> None:
             "unsupported decision statistic",
         )
 
+        wrong_inconclusive = copy.deepcopy(decision_policy)
+        wrong_inconclusive["inconclusiveCondition"] = "currentScore > maximumAllowedScore"
+        execute_policy_failure(
+            verifier,
+            root,
+            "wrong-inconclusive-condition",
+            threshold_policy,
+            wrong_inconclusive,
+            "unsupported inconclusive condition",
+        )
+
         wrong_threshold_schema = copy.deepcopy(decision_policy)
         wrong_threshold_schema["thresholdPolicySchema"] = "regelsuche.quality.jmh-regression-policy/v1"
         execute_policy_failure(
@@ -367,7 +425,10 @@ def main() -> None:
             threshold_blob_override="0" * 40,
         )
 
-    print("JMH regression verifier v3 characterization passed: 4 positive, 11 negative")
+    print(
+        "JMH regression verifier v3 characterization passed: "
+        "4 passes, 1 inconclusive fail-closed case, 12 rejection cases"
+    )
 
 
 if __name__ == "__main__":
