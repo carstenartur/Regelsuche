@@ -9,12 +9,13 @@ aiKnowledgeExtractorVersion=0.1.10
 ```
 
 Version 0.1.10 retains the generated-`build/` and `target/` inventory pruning
-introduced in 0.1.9 and fixes the context-debt trend contract. The absolute gate
-and the trend gate now use the measured, normalized `aiContextDebt` whenever the
-baseline and current snapshot declare the same context-debt model. The former
-`aiCognitiveDebt` value remains available as a legacy diagnostic; it is no
-longer allowed to fail a normalized context-debt trend merely because the two
-metrics move differently.
+introduced in 0.1.9 and fixes the context-debt trend contract. The absolute
+quality gate always checks the current measured, normalized `aiContextDebt`
+against `maxCognitiveDebt`. Separately, the debt trend gate compares normalized
+`aiContextDebt` only when the baseline and current snapshot declare the same
+context-debt model. The former `aiCognitiveDebt` value remains available as a
+legacy diagnostic; it is no longer allowed to fail a normalized context-debt
+trend merely because the two metrics move differently.
 
 Regelsuche never consumes a snapshot implicitly. Updating the released
 dependency requires one explicit version change followed by the normal
@@ -165,9 +166,12 @@ That accepted source revision measured:
 The normalized value comes from the schema-v3 context footprint in the retained
 artifact (`normalizedContextDebt = 17.11`). Version 0.1.10 writes the model id
 into trend snapshots, so `maxCognitiveDebtIncrease` compares normalized debt
-only when baseline and current model versions match. A missing or different
-model version is reported as non-comparable instead of silently comparing the
-legacy formula with the normalized one.
+when baseline and current model versions match. If the current snapshot is
+normalized but the baseline model is missing or different, only that debt trend
+is reported as non-comparable and skipped; the absolute normalized debt gate and
+all other configured gates remain active. For compatibility callers that do not
+expose a normalized current context-debt model, the extractor retains the legacy
+`aiCognitiveDebt` trend path rather than silently treating it as normalized debt.
 
 The policy limits are deliberately unchanged by this migration: the context-debt
 increase allowance remains 10 units, the context-token allowance remains 15000,
