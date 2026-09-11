@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Characterize the JMH v2 verifier with two passes and six fail-closed cases."""
+"""Characterize the JMH v2 verifier, including its uncertainty-aware decision rule."""
 
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ def benchmark(
     name: str = "example.Benchmark.work",
     score: float = 1.0,
     unit: str = "us/op",
+    score_error: float = 0.1,
 ) -> dict:
     return {
         "jmhVersion": "1.36",
@@ -36,7 +37,7 @@ def benchmark(
         "measurementIterations": 3,
         "primaryMetric": {
             "score": score,
-            "scoreError": 0.1,
+            "scoreError": score_error,
             "scoreUnit": unit,
         },
         "secondaryMetrics": {},
@@ -81,7 +82,7 @@ def execute(
     result: list[dict],
     expected: int,
     legacy_options: bool = False,
-) -> None:
+) -> dict[str, Any]:
     result_path = root / f"{label}-result.json"
     json_output = root / f"{label}-report.json"
     write(result_path, result)
@@ -102,6 +103,7 @@ def execute(
         raise SystemExit(
             f"{label}: expected status {expected_status}, found {report.get('status')}"
         )
+    return report
 
 
 def execute_policy_failure(
@@ -129,6 +131,15 @@ def execute_policy_failure(
             raise SystemExit(f"{label}: malformed policy was accepted")
     finally:
         sys.argv = previous
+
+
+def assert_decision_score(report: dict[str, Any], expected: float, label: str) -> None:
+    rows = report.get("benchmarks")
+    if not isinstance(rows, list) or len(rows) != 1:
+        raise SystemExit(f"{label}: expected one benchmark row")
+    actual = rows[0].get("decisionScore")
+    if not isinstance(actual, (int, float)) or abs(float(actual) - expected) > 1e-12:
+        raise SystemExit(f"{label}: expected decisionScore {expected}, found {actual}")
 
 
 def main() -> None:
@@ -173,6 +184,25 @@ def main() -> None:
             0,
             legacy_options=True,
         )
+
+        uncertainty_pass = execute(
+            verifier,
+            root,
+            "uncertainty-pass",
+            [benchmark(score=1.6, score_error=0.2)],
+            0,
+        )
+        assert_decision_score(uncertainty_pass, 1.4, "uncertainty-pass")
+
+        boundary_pass = execute(
+            verifier,
+            root,
+            "boundary-pass",
+            [benchmark(score=1.6, score_error=0.1)],
+            0,
+        )
+        assert_decision_score(boundary_pass, 1.5, "boundary-pass")
+
         execute(verifier, root, "missing", [], 1)
         execute(
             verifier,
@@ -182,7 +212,20 @@ def main() -> None:
             1,
         )
         execute(verifier, root, "wrong-unit", [benchmark(unit="ms/op")], 1)
-        execute(verifier, root, "regression", [benchmark(score=1.6)], 1)
+        execute(
+            verifier,
+            root,
+            "regression",
+            [benchmark(score=1.7, score_error=0.1)],
+            1,
+        )
+        execute(
+            verifier,
+            root,
+            "zero-error-regression",
+            [benchmark(score=1.6, score_error=0.0)],
+            1,
+        )
 
         missing_family = copy.deepcopy(policy)
         del missing_family["benchmarks"][0]["family"]
@@ -202,7 +245,7 @@ def main() -> None:
             missing_error,
             "baselineScoreError must be numeric",
         )
-    print("JMH regression verifier characterization passed: 2 positive, 6 negative")
+    print("JMH regression verifier characterization passed: 4 positive, 7 negative")
 
 
 if __name__ == "__main__":
