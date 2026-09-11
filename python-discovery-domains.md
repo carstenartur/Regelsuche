@@ -88,6 +88,32 @@ request hash. Different programs/configurations therefore have different
 identities even when an opaque state is the same. This binds declared program
 identity; it is not cryptographic attestation of an arbitrary Transport.
 
+### Trusted host counterexample prechecks
+
+A domain may pass `HostCounterexamplePrecheck<C>` to the extended constructor.
+It runs after canonical candidate decoding and before the Python
+`counterexamples` callback, and is only for exact, independently checkable
+host-side obstructions.
+
+The contract is narrow:
+
+- `Optional.empty()` delegates to Python with the unchanged attempt budget;
+- a present result is terminal for that candidate, and `FOUND` must pass the
+  normal host witness checker;
+- reported attempts may not exceed the supplied budget, and zero budget invokes
+  no counterexample work;
+- the stable precheck id and metrics enter candidate-attempt evidence, and the
+  id enters the effective Python-domain binding so different prechecks cannot
+  share state, candidate, or certificate identities;
+- `none` is reserved for the adapter's internal no-precheck object; the legacy
+  constructor uses it and retains its previous Definition binding and behavior.
+
+The precheck is trusted semantics, not a learned or probabilistic pruning
+channel. Change its id when its obstruction or claim changes, and revise the
+domain revision/configuration when the mathematical domain changes. The Python
+program digest does not attest Java code; binding the id prevents accidental
+identity reuse, not dishonest reuse of the same id.
+
 ## Wire and resource contract
 
 The versioned `regelsuche.python-domain/v1` protocol uses sorted compact JSON,

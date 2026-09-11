@@ -19,8 +19,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 
@@ -32,6 +34,7 @@ import java.util.function.Function;
 public final class PythonDiscoveryDomain&lt;C, K&gt; {
     public static final String PROTOCOL = &quot;regelsuche.python-domain/v1&quot;;
     public static final String BRIDGE_RESOURCE = &quot;/de/regelsuche/sdk/discovery/python/bridge.py&quot;;
+    private static final String NO_HOST_PRECHECK = &quot;none&quot;;
 
     /** The implementation binds the actual trusted program and enforces the timeout. */
     public interface Transport {
@@ -42,54 +45,96 @@ public final class PythonDiscoveryDomain&lt;C, K&gt; {
     /** Logical protocol limits; these are not an isolated guest heap guarantee. */
     public record Limits(int maxMessageBytes, int maxPayloadBytes, int maxItems,
                          int maxCalls, int callbackMillis, int campaignMillis) {
-<span class="fc" id="L45">        public Limits {</span>
-<span class="pc bpc" id="L46" title="2 of 4 branches missed.">            require(maxMessageBytes &gt;= 1024 &amp;&amp; maxMessageBytes &lt;= 1_000_000, &quot;message byte limit&quot;);</span>
-<span class="pc bpc" id="L47" title="2 of 4 branches missed.">            require(maxPayloadBytes &gt;= 1 &amp;&amp; maxPayloadBytes &lt;= Math.min(65_536, maxMessageBytes), &quot;payload byte limit&quot;);</span>
-<span class="pc bpc" id="L48" title="2 of 4 branches missed.">            require(maxItems &gt;= 1 &amp;&amp; maxItems &lt;= 1024, &quot;item limit&quot;);</span>
-<span class="pc bpc" id="L49" title="2 of 4 branches missed.">            require(maxCalls &gt;= 1 &amp;&amp; maxCalls &lt;= 100_000, &quot;callback count limit&quot;);</span>
-<span class="pc bpc" id="L50" title="2 of 4 branches missed.">            require(callbackMillis &gt;= 1 &amp;&amp; callbackMillis &lt;= 120_000, &quot;callback deadline&quot;);</span>
-<span class="pc bpc" id="L51" title="2 of 4 branches missed.">            require(campaignMillis &gt;= callbackMillis &amp;&amp; campaignMillis &lt;= 120_000, &quot;campaign deadline&quot;);</span>
-<span class="fc" id="L52">        }</span>
-<span class="fc" id="L53">        public static Limits small() { return new Limits(262_144, 16_384, 128, 4096, 30_000, 120_000); }</span>
+<span class="fc" id="L48">        public Limits {</span>
+<span class="pc bpc" id="L49" title="2 of 4 branches missed.">            require(maxMessageBytes &gt;= 1024 &amp;&amp; maxMessageBytes &lt;= 1_000_000, &quot;message byte limit&quot;);</span>
+<span class="pc bpc" id="L50" title="2 of 4 branches missed.">            require(maxPayloadBytes &gt;= 1 &amp;&amp; maxPayloadBytes &lt;= Math.min(65_536, maxMessageBytes), &quot;payload byte limit&quot;);</span>
+<span class="pc bpc" id="L51" title="2 of 4 branches missed.">            require(maxItems &gt;= 1 &amp;&amp; maxItems &lt;= 1024, &quot;item limit&quot;);</span>
+<span class="pc bpc" id="L52" title="2 of 4 branches missed.">            require(maxCalls &gt;= 1 &amp;&amp; maxCalls &lt;= 100_000, &quot;callback count limit&quot;);</span>
+<span class="pc bpc" id="L53" title="2 of 4 branches missed.">            require(callbackMillis &gt;= 1 &amp;&amp; callbackMillis &lt;= 120_000, &quot;callback deadline&quot;);</span>
+<span class="pc bpc" id="L54" title="2 of 4 branches missed.">            require(campaignMillis &gt;= callbackMillis &amp;&amp; campaignMillis &lt;= 120_000, &quot;campaign deadline&quot;);</span>
+<span class="fc" id="L55">        }</span>
+<span class="fc" id="L56">        public static Limits small() { return new Limits(262_144, 16_384, 128, 4096, 30_000, 120_000); }</span>
         Map&lt;String, Object&gt; material() {
-<span class="fc" id="L55">            return Map.of(&quot;maxMessageBytes&quot;, maxMessageBytes, &quot;maxPayloadBytes&quot;, maxPayloadBytes,</span>
-<span class="fc" id="L56">                    &quot;maxItems&quot;, maxItems, &quot;maxCalls&quot;, maxCalls, &quot;callbackMillis&quot;, callbackMillis,</span>
-<span class="fc" id="L57">                    &quot;campaignMillis&quot;, campaignMillis);</span>
+<span class="fc" id="L58">            return Map.of(&quot;maxMessageBytes&quot;, maxMessageBytes, &quot;maxPayloadBytes&quot;, maxPayloadBytes,</span>
+<span class="fc" id="L59">                    &quot;maxItems&quot;, maxItems, &quot;maxCalls&quot;, maxCalls, &quot;callbackMillis&quot;, callbackMillis,</span>
+<span class="fc" id="L60">                    &quot;campaignMillis&quot;, campaignMillis);</span>
         }
     }
 
     public record Definition(String domainId, String revision, String programSha256,
                              String configuration, Limits limits) {
-<span class="fc" id="L63">        public Definition {</span>
-<span class="fc" id="L64">            Objects.requireNonNull(limits);</span>
-<span class="pc bpc" id="L65" title="2 of 4 branches missed.">            require(domainId != null &amp;&amp; domainId.matches(&quot;[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}&quot;), &quot;domain id&quot;);</span>
-<span class="pc bpc" id="L66" title="2 of 4 branches missed.">            require(revision != null &amp;&amp; revision.matches(&quot;[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}&quot;), &quot;revision&quot;);</span>
-<span class="pc bpc" id="L67" title="1 of 4 branches missed.">            require(programSha256 != null &amp;&amp; programSha256.matches(&quot;[0-9a-f]{64}&quot;), &quot;program digest&quot;);</span>
-<span class="fc" id="L68">            text(configuration, limits.maxPayloadBytes, true);</span>
-<span class="fc" id="L69">        }</span>
+<span class="fc" id="L66">        public Definition {</span>
+<span class="fc" id="L67">            Objects.requireNonNull(limits);</span>
+<span class="pc bpc" id="L68" title="2 of 4 branches missed.">            require(domainId != null &amp;&amp; domainId.matches(&quot;[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}&quot;), &quot;domain id&quot;);</span>
+<span class="pc bpc" id="L69" title="2 of 4 branches missed.">            require(revision != null &amp;&amp; revision.matches(&quot;[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}&quot;), &quot;revision&quot;);</span>
+<span class="pc bpc" id="L70" title="1 of 4 branches missed.">            require(programSha256 != null &amp;&amp; programSha256.matches(&quot;[0-9a-f]{64}&quot;), &quot;program digest&quot;);</span>
+<span class="fc" id="L71">            text(configuration, limits.maxPayloadBytes, true);</span>
+<span class="fc" id="L72">        }</span>
         public String canonical() {
-<span class="fc" id="L71">            return PythonDomainWire.canonical(Map.of(&quot;protocol&quot;, PROTOCOL, &quot;domainId&quot;, domainId,</span>
+<span class="fc" id="L74">            return PythonDomainWire.canonical(Map.of(&quot;protocol&quot;, PROTOCOL, &quot;domainId&quot;, domainId,</span>
                     &quot;revision&quot;, revision, &quot;programSha256&quot;, programSha256,
-<span class="fc" id="L73">                    &quot;configuration&quot;, configuration, &quot;limits&quot;, limits.material()));</span>
+<span class="fc" id="L76">                    &quot;configuration&quot;, configuration, &quot;limits&quot;, limits.material()));</span>
         }
-<span class="fc" id="L75">        public String bindingSha256() { return sha256(canonical()); }</span>
+<span class="fc" id="L78">        public String bindingSha256() { return sha256(canonical()); }</span>
     }
 
-<span class="fc" id="L78">    public enum Failure { PROTOCOL, TRANSPORT, LIMIT, REUSED }</span>
+    /**
+     * Optional trusted host shortcut executed before the Python counterexample callback.
+     *
+     * &lt;p&gt;{@link Optional#empty()} means that this precheck does not apply and the
+     * unchanged Python search receives the full attempt budget. A present result
+     * is terminal for that candidate and is validated against the same host witness
+     * checker before it can refute a candidate. The stable precheck id is included
+     * automatically in the effective Python-domain binding. Changing semantics
+     * under an unchanged id is therefore forbidden; use a new id and, when the
+     * mathematical domain itself changes, a new revision/configuration.&lt;/p&gt;
+     */
+    public static final class HostCounterexamplePrecheck&lt;C&gt; {
+        private final String id;
+        private final BiFunction&lt;C, Integer, Optional&lt;CounterexampleResult&gt;&gt; search;
+        private final boolean absent;
+
+        public HostCounterexamplePrecheck(
+                String id,
+                BiFunction&lt;C, Integer, Optional&lt;CounterexampleResult&gt;&gt; search
+        ) {
+<span class="fc" id="L101">            this(id, search, false);</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            require(!NO_HOST_PRECHECK.equals(id), &quot;reserved host precheck id&quot;);</span>
+<span class="fc" id="L103">        }</span>
+
+        private HostCounterexamplePrecheck(
+                String id,
+                BiFunction&lt;C, Integer, Optional&lt;CounterexampleResult&gt;&gt; search,
+                boolean absent
+<span class="fc" id="L109">        ) {</span>
+<span class="pc bpc" id="L110" title="2 of 4 branches missed.">            require(id != null &amp;&amp; id.matches(&quot;[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}&quot;), &quot;host precheck id&quot;);</span>
+<span class="fc" id="L111">            this.id = id;</span>
+<span class="fc" id="L112">            this.search = Objects.requireNonNull(search, &quot;host precheck search&quot;);</span>
+<span class="fc" id="L113">            this.absent = absent;</span>
+<span class="fc" id="L114">        }</span>
+
+<span class="fc" id="L116">        public String id() { return id; }</span>
+
+        public Optional&lt;CounterexampleResult&gt; apply(C candidate, int attemptBudget) {
+<span class="fc" id="L119">            return Objects.requireNonNull(search.apply(candidate, attemptBudget), &quot;host precheck returned null&quot;);</span>
+        }
+    }
+
+<span class="fc" id="L123">    public enum Failure { PROTOCOL, TRANSPORT, LIMIT, REUSED }</span>
     public static final class CallbackFailure extends IllegalStateException {
         private static final long serialVersionUID = 1L;
         private final Failure failure;
         private CallbackFailure(Failure failure, String operation) {
-<span class="fc" id="L83">            super(&quot;Python domain callback &quot; + failure + &quot;: &quot; + operation);</span>
-<span class="fc" id="L84">            this.failure = failure;</span>
-<span class="fc" id="L85">        }</span>
-<span class="fc" id="L86">        public Failure failure() { return failure; }</span>
+<span class="fc" id="L128">            super(&quot;Python domain callback &quot; + failure + &quot;: &quot; + operation);</span>
+<span class="fc" id="L129">            this.failure = failure;</span>
+<span class="fc" id="L130">        }</span>
+<span class="fc" id="L131">        public Failure failure() { return failure; }</span>
     }
 
     /** Observed boundary traffic only, not a replay of work inside Python. */
     public record Metrics(int calls, long requestBytes, long responseBytes,
                           Map&lt;String, Integer&gt; callsByOperation, String transcriptSha256) {
-<span class="fc" id="L92">        public Metrics { callsByOperation = Map.copyOf(callsByOperation); }</span>
+<span class="fc" id="L137">        public Metrics { callsByOperation = Map.copyOf(callsByOperation); }</span>
     }
 
     private final Definition definition;
@@ -97,13 +142,14 @@ public final class PythonDiscoveryDomain&lt;C, K&gt; {
     private final Function&lt;String, C&gt; decodeCandidate;
     private final Function&lt;C, String&gt; encodeCandidate;
     private final BiPredicate&lt;C, String&gt; checkWitness;
+    private final HostCounterexamplePrecheck&lt;C&gt; hostPrecheck;
     private final DiscoveryDomain&lt;String, C, K&gt; domain;
-<span class="fc" id="L101">    private final AtomicBoolean started = new AtomicBoolean();</span>
-<span class="fc" id="L102">    private final Map&lt;String, Integer&gt; counts = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L147">    private final AtomicBoolean started = new AtomicBoolean();</span>
+<span class="fc" id="L148">    private final Map&lt;String, Integer&gt; counts = new TreeMap&lt;&gt;();</span>
     private final String binding;
     private long deadline, requestBytes, responseBytes;
     private int calls;
-<span class="fc" id="L106">    private String transcript = sha256(PROTOCOL);</span>
+<span class="fc" id="L152">    private String transcript = sha256(PROTOCOL);</span>
 
     /**
      * The host evaluator and witness checker are mandatory and must be independent
@@ -114,144 +160,192 @@ public final class PythonDiscoveryDomain&lt;C, K&gt; {
             Function&lt;String, C&gt; decodeCandidate, Function&lt;C, String&gt; encodeCandidate,
             BiPredicate&lt;C, String&gt; checkWitness, Function&lt;C, Evaluation&lt;K&gt;&gt; evaluator,
             String certificateKind, Function&lt;K, String&gt; certificateCanonical,
-<span class="fc" id="L117">            Function&lt;K, String&gt; certificateRendering) {</span>
-<span class="fc" id="L118">        this.definition = Objects.requireNonNull(definition);</span>
-<span class="fc" id="L119">        this.transport = Objects.requireNonNull(transport);</span>
-<span class="fc" id="L120">        this.decodeCandidate = Objects.requireNonNull(decodeCandidate);</span>
-<span class="fc" id="L121">        this.encodeCandidate = Objects.requireNonNull(encodeCandidate);</span>
-<span class="fc" id="L122">        this.checkWitness = Objects.requireNonNull(checkWitness);</span>
-<span class="fc" id="L123">        Objects.requireNonNull(evaluator);</span>
-<span class="fc" id="L124">        Objects.requireNonNull(certificateCanonical);</span>
-<span class="fc" id="L125">        Objects.requireNonNull(certificateRendering);</span>
-<span class="fc" id="L126">        require(definition.programSha256.equals(transport.programSha256()), &quot;transport program binding mismatch&quot;);</span>
-<span class="fc" id="L127">        binding = definition.bindingSha256();</span>
-<span class="fc" id="L128">        domain = DiscoveryDomainBuilder.&lt;String, C, K&gt;domain(definition.domainId, definition.revision)</span>
-<span class="fc" id="L129">                .generator(seed -&gt; {</span>
-<span class="fc bfc" id="L130" title="All 2 branches covered.">                    if (!started.compareAndSet(false, true)) throw failure(Failure.REUSED, &quot;initial&quot;);</span>
-<span class="fc" id="L131">                    deadline = System.nanoTime() + Duration.ofMillis(definition.limits.campaignMillis).toNanos();</span>
-<span class="fc" id="L132">                    Map&lt;String, Object&gt; reply = call(&quot;initial&quot;, Map.of(&quot;seed&quot;, payload(seed.payload())));</span>
-<span class="fc" id="L133">                    fields(reply, &quot;states&quot;);</span>
-<span class="fc" id="L134">                    List&lt;String&gt; states = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L135" title="All 2 branches covered.">                    for (Object value : list(reply.get(&quot;states&quot;), definition.limits.maxItems)) states.add(payload(value));</span>
-<span class="fc" id="L136">                    return List.copyOf(states);</span>
-                })
-<span class="fc" id="L138">                .stateCodec(state -&gt; bound(&quot;state&quot;, payload(state)))</span>
-<span class="fc" id="L139">                .invariant(&quot;python-proposal-filter&quot;, state -&gt; {</span>
-<span class="fc" id="L140">                    Map&lt;String, Object&gt; reply = call(&quot;invariant&quot;, Map.of(&quot;state&quot;, payload(state)));</span>
-<span class="fc" id="L141">                    fields(reply, &quot;accepted&quot;, &quot;blockers&quot;);</span>
-<span class="fc" id="L142">                    List&lt;String&gt; blockers = new ArrayList&lt;&gt;();</span>
-<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                    for (Object value : list(reply.get(&quot;blockers&quot;), definition.limits.maxItems)) blockers.add(payload(value));</span>
-<span class="fc" id="L144">                    return new InvariantResult(bool(reply.get(&quot;accepted&quot;)), blockers);</span>
-                })
-<span class="fc" id="L146">                .operator(&quot;python-successors&quot;, this::successors)</span>
-<span class="fc" id="L147">                .objective(state -&gt; {</span>
-<span class="fc" id="L148">                    Map&lt;String, Object&gt; reply = call(&quot;objective&quot;, Map.of(&quot;state&quot;, payload(state)));</span>
-<span class="fc" id="L149">                    fields(reply, &quot;score&quot;, &quot;candidateReady&quot;);</span>
-<span class="fc" id="L150">                    return new ObjectiveAssessment(integer(reply.get(&quot;score&quot;), Integer.MIN_VALUE, Integer.MAX_VALUE),</span>
-<span class="fc" id="L151">                            bool(reply.get(&quot;candidateReady&quot;)), Map.of(&quot;pythonBinding&quot;, binding));</span>
-                })
-<span class="fc" id="L153">                .candidate(context -&gt; {</span>
-<span class="fc" id="L154">                    Map&lt;String, Object&gt; reply = call(&quot;candidate&quot;, Map.of(&quot;state&quot;, payload(context.currentState())));</span>
-<span class="fc" id="L155">                    fields(reply, &quot;candidate&quot;);</span>
-<span class="fc" id="L156">                    String wire = payload(reply.get(&quot;candidate&quot;));</span>
-<span class="fc" id="L157">                    C candidate = Objects.requireNonNull(decodeCandidate.apply(wire));</span>
-<span class="fc" id="L158">                    require(wire.equals(payload(encodeCandidate.apply(candidate))), &quot;candidate wire round trip&quot;);</span>
-<span class="fc" id="L159">                    return candidate;</span>
-<span class="fc" id="L160">                }, candidate -&gt; bound(&quot;candidate&quot;, payload(encodeCandidate.apply(candidate))))</span>
-<span class="fc" id="L161">                .counterexamples(this::counterexamples)</span>
-<span class="fc" id="L162">                .evaluator(candidate -&gt; Objects.requireNonNull(evaluator.apply(candidate), &quot;host evaluation&quot;))</span>
-<span class="fc" id="L163">                .certificate(certificateKind,</span>
-<span class="fc" id="L164">                        certificate -&gt; bound(&quot;certificate&quot;, certificateCanonical.apply(certificate)), certificateRendering)</span>
-<span class="fc" id="L165">                .build();</span>
-<span class="fc" id="L166">    }</span>
+            Function&lt;K, String&gt; certificateRendering) {
+<span class="fc" id="L164">        this(definition, transport, decodeCandidate, encodeCandidate, checkWitness,</span>
+                new HostCounterexamplePrecheck&lt;&gt;(
+<span class="fc" id="L166">                        NO_HOST_PRECHECK, (candidate, budget) -&gt; Optional.empty(), true),</span>
+                evaluator, certificateKind, certificateCanonical, certificateRendering);
+<span class="fc" id="L168">    }</span>
 
-<span class="fc" id="L168">    public Definition definition() { return definition; }</span>
-<span class="fc" id="L169">    public DiscoveryDomain&lt;String, C, K&gt; domain() { return domain; }</span>
-<span class="fc" id="L170">    public synchronized Metrics metrics() { return new Metrics(calls, requestBytes, responseBytes, counts, transcript); }</span>
+    /**
+     * Variant with an exact trusted-host precheck before guest counterexample search.
+     * Existing callers use the overload above and retain byte-for-byte behavior.
+     */
+    public PythonDiscoveryDomain(Definition definition, Transport transport,
+            Function&lt;String, C&gt; decodeCandidate, Function&lt;C, String&gt; encodeCandidate,
+            BiPredicate&lt;C, String&gt; checkWitness, HostCounterexamplePrecheck&lt;C&gt; hostPrecheck,
+            Function&lt;C, Evaluation&lt;K&gt;&gt; evaluator, String certificateKind,
+<span class="fc" id="L178">            Function&lt;K, String&gt; certificateCanonical, Function&lt;K, String&gt; certificateRendering) {</span>
+<span class="fc" id="L179">        this.definition = Objects.requireNonNull(definition);</span>
+<span class="fc" id="L180">        this.transport = Objects.requireNonNull(transport);</span>
+<span class="fc" id="L181">        this.decodeCandidate = Objects.requireNonNull(decodeCandidate);</span>
+<span class="fc" id="L182">        this.encodeCandidate = Objects.requireNonNull(encodeCandidate);</span>
+<span class="fc" id="L183">        this.checkWitness = Objects.requireNonNull(checkWitness);</span>
+<span class="fc" id="L184">        this.hostPrecheck = Objects.requireNonNull(hostPrecheck);</span>
+<span class="fc" id="L185">        Objects.requireNonNull(evaluator);</span>
+<span class="fc" id="L186">        Objects.requireNonNull(certificateCanonical);</span>
+<span class="fc" id="L187">        Objects.requireNonNull(certificateRendering);</span>
+<span class="fc" id="L188">        require(definition.programSha256.equals(transport.programSha256()), &quot;transport program binding mismatch&quot;);</span>
+<span class="fc" id="L189">        binding = effectiveBinding(definition, hostPrecheck);</span>
+<span class="fc" id="L190">        domain = DiscoveryDomainBuilder.&lt;String, C, K&gt;domain(definition.domainId, definition.revision)</span>
+<span class="fc" id="L191">                .generator(seed -&gt; {</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">                    if (!started.compareAndSet(false, true)) throw failure(Failure.REUSED, &quot;initial&quot;);</span>
+<span class="fc" id="L193">                    deadline = System.nanoTime() + Duration.ofMillis(definition.limits.campaignMillis).toNanos();</span>
+<span class="fc" id="L194">                    Map&lt;String, Object&gt; reply = call(&quot;initial&quot;, Map.of(&quot;seed&quot;, payload(seed.payload())));</span>
+<span class="fc" id="L195">                    fields(reply, &quot;states&quot;);</span>
+<span class="fc" id="L196">                    List&lt;String&gt; states = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">                    for (Object value : list(reply.get(&quot;states&quot;), definition.limits.maxItems)) states.add(payload(value));</span>
+<span class="fc" id="L198">                    return List.copyOf(states);</span>
+                })
+<span class="fc" id="L200">                .stateCodec(state -&gt; bound(&quot;state&quot;, payload(state)))</span>
+<span class="fc" id="L201">                .invariant(&quot;python-proposal-filter&quot;, state -&gt; {</span>
+<span class="fc" id="L202">                    Map&lt;String, Object&gt; reply = call(&quot;invariant&quot;, Map.of(&quot;state&quot;, payload(state)));</span>
+<span class="fc" id="L203">                    fields(reply, &quot;accepted&quot;, &quot;blockers&quot;);</span>
+<span class="fc" id="L204">                    List&lt;String&gt; blockers = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">                    for (Object value : list(reply.get(&quot;blockers&quot;), definition.limits.maxItems)) blockers.add(payload(value));</span>
+<span class="fc" id="L206">                    return new InvariantResult(bool(reply.get(&quot;accepted&quot;)), blockers);</span>
+                })
+<span class="fc" id="L208">                .operator(&quot;python-successors&quot;, this::successors)</span>
+<span class="fc" id="L209">                .objective(state -&gt; {</span>
+<span class="fc" id="L210">                    Map&lt;String, Object&gt; reply = call(&quot;objective&quot;, Map.of(&quot;state&quot;, payload(state)));</span>
+<span class="fc" id="L211">                    fields(reply, &quot;score&quot;, &quot;candidateReady&quot;);</span>
+<span class="fc" id="L212">                    return new ObjectiveAssessment(integer(reply.get(&quot;score&quot;), Integer.MIN_VALUE, Integer.MAX_VALUE),</span>
+<span class="fc" id="L213">                            bool(reply.get(&quot;candidateReady&quot;)), Map.of(&quot;pythonBinding&quot;, binding));</span>
+                })
+<span class="fc" id="L215">                .candidate(context -&gt; {</span>
+<span class="fc" id="L216">                    Map&lt;String, Object&gt; reply = call(&quot;candidate&quot;, Map.of(&quot;state&quot;, payload(context.currentState())));</span>
+<span class="fc" id="L217">                    fields(reply, &quot;candidate&quot;);</span>
+<span class="fc" id="L218">                    String wire = payload(reply.get(&quot;candidate&quot;));</span>
+<span class="fc" id="L219">                    C candidate = Objects.requireNonNull(decodeCandidate.apply(wire));</span>
+<span class="fc" id="L220">                    require(wire.equals(payload(encodeCandidate.apply(candidate))), &quot;candidate wire round trip&quot;);</span>
+<span class="fc" id="L221">                    return candidate;</span>
+<span class="fc" id="L222">                }, candidate -&gt; bound(&quot;candidate&quot;, payload(encodeCandidate.apply(candidate))))</span>
+<span class="fc" id="L223">                .counterexamples(this::counterexamples)</span>
+<span class="fc" id="L224">                .evaluator(candidate -&gt; Objects.requireNonNull(evaluator.apply(candidate), &quot;host evaluation&quot;))</span>
+<span class="fc" id="L225">                .certificate(certificateKind,</span>
+<span class="fc" id="L226">                        certificate -&gt; bound(&quot;certificate&quot;, certificateCanonical.apply(certificate)), certificateRendering)</span>
+<span class="fc" id="L227">                .build();</span>
+<span class="fc" id="L228">    }</span>
+
+<span class="fc" id="L230">    public Definition definition() { return definition; }</span>
+<span class="fc" id="L231">    public DiscoveryDomain&lt;String, C, K&gt; domain() { return domain; }</span>
+<span class="fc" id="L232">    public synchronized Metrics metrics() { return new Metrics(calls, requestBytes, responseBytes, counts, transcript); }</span>
 
     /** Package the bridge once; concrete interpreters remain optional and caller-owned. */
     public static String bridgeSource() throws IOException {
-<span class="fc" id="L174">        try (InputStream input = PythonDiscoveryDomain.class.getResourceAsStream(BRIDGE_RESOURCE)) {</span>
-<span class="pc bpc" id="L175" title="1 of 2 branches missed.">            if (input == null) throw new IOException(&quot;missing Python discovery bridge resource&quot;);</span>
-<span class="fc" id="L176">            byte[] bytes = input.readNBytes(65_537);</span>
-<span class="pc bpc" id="L177" title="1 of 2 branches missed.">            if (bytes.length &gt; 65_536) throw new IOException(&quot;Python discovery bridge exceeds resource limit&quot;);</span>
-<span class="fc" id="L178">            return new String(bytes, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L236">        try (InputStream input = PythonDiscoveryDomain.class.getResourceAsStream(BRIDGE_RESOURCE)) {</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">            if (input == null) throw new IOException(&quot;missing Python discovery bridge resource&quot;);</span>
+<span class="fc" id="L238">            byte[] bytes = input.readNBytes(65_537);</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">            if (bytes.length &gt; 65_536) throw new IOException(&quot;Python discovery bridge exceeds resource limit&quot;);</span>
+<span class="fc" id="L240">            return new String(bytes, StandardCharsets.UTF_8);</span>
         }
     }
 
-<span class="fc" id="L182">    private String payload(Object value) { return text(value, definition.limits.maxPayloadBytes, false); }</span>
+    private static String effectiveBinding(Definition definition, HostCounterexamplePrecheck&lt;?&gt; precheck) {
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        if (precheck.absent) return definition.bindingSha256();</span>
+<span class="fc" id="L246">        return sha256(canonical(Map.of(</span>
+<span class="fc" id="L247">                &quot;definitionBinding&quot;, definition.bindingSha256(),</span>
+<span class="fc" id="L248">                &quot;hostPrecheckId&quot;, precheck.id())));</span>
+    }
+
+<span class="fc" id="L251">    private String payload(Object value) { return text(value, definition.limits.maxPayloadBytes, false); }</span>
     private String bound(String role, String material) {
-<span class="fc" id="L184">        bytes(material, definition.limits.maxMessageBytes);</span>
-<span class="fc" id="L185">        String wrapped = canonical(Map.of(&quot;binding&quot;, binding, &quot;definition&quot;, definition.canonical(), &quot;role&quot;, role, &quot;payload&quot;, material));</span>
-<span class="fc" id="L186">        bytes(wrapped, definition.limits.maxMessageBytes);</span>
-<span class="fc" id="L187">        return wrapped;</span>
+<span class="fc" id="L253">        bytes(material, definition.limits.maxMessageBytes);</span>
+<span class="fc" id="L254">        String wrapped = canonical(Map.of(&quot;binding&quot;, binding, &quot;definition&quot;, definition.canonical(), &quot;role&quot;, role, &quot;payload&quot;, material));</span>
+<span class="fc" id="L255">        bytes(wrapped, definition.limits.maxMessageBytes);</span>
+<span class="fc" id="L256">        return wrapped;</span>
     }
 
     private List&lt;Successor&lt;String&gt;&gt; successors(String state) {
-<span class="fc" id="L191">        Map&lt;String, Object&gt; reply = call(&quot;successors&quot;, Map.of(&quot;state&quot;, payload(state)));</span>
-<span class="fc" id="L192">        fields(reply, &quot;successors&quot;);</span>
-<span class="fc" id="L193">        List&lt;Successor&lt;String&gt;&gt; successors = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L194">        HashSet&lt;String&gt; actions = new HashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L195" title="All 2 branches covered.">        for (Object item : list(reply.get(&quot;successors&quot;), definition.limits.maxItems)) {</span>
-<span class="fc" id="L196">            Map&lt;String, Object&gt; value = object(item);</span>
-<span class="fc" id="L197">            fields(value, &quot;action&quot;, &quot;state&quot;, &quot;cost&quot;);</span>
-<span class="fc" id="L198">            String action = text(value.get(&quot;action&quot;), 128, false);</span>
-<span class="fc" id="L199">            require(actions.add(action), &quot;duplicate successor action&quot;);</span>
+<span class="fc" id="L260">        Map&lt;String, Object&gt; reply = call(&quot;successors&quot;, Map.of(&quot;state&quot;, payload(state)));</span>
+<span class="fc" id="L261">        fields(reply, &quot;successors&quot;);</span>
+<span class="fc" id="L262">        List&lt;Successor&lt;String&gt;&gt; successors = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L263">        HashSet&lt;String&gt; actions = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        for (Object item : list(reply.get(&quot;successors&quot;), definition.limits.maxItems)) {</span>
+<span class="fc" id="L265">            Map&lt;String, Object&gt; value = object(item);</span>
+<span class="fc" id="L266">            fields(value, &quot;action&quot;, &quot;state&quot;, &quot;cost&quot;);</span>
+<span class="fc" id="L267">            String action = text(value.get(&quot;action&quot;), 128, false);</span>
+<span class="fc" id="L268">            require(actions.add(action), &quot;duplicate successor action&quot;);</span>
             // Python may guide the search, but cannot certify a preserving rewrite.
-<span class="fc" id="L201">            successors.add(new Successor&lt;&gt;(action, payload(value.get(&quot;state&quot;)),</span>
-<span class="fc" id="L202">                    integer(value.get(&quot;cost&quot;), -1_000_000, 1_000_000), false,</span>
-<span class="fc" id="L203">                    List.of(&quot;PYTHON_SEARCH_PROPOSAL_NOT_A_PROOF&quot;), Map.of(&quot;pythonBinding&quot;, binding)));</span>
-<span class="fc" id="L204">        }</span>
-<span class="fc" id="L205">        return List.copyOf(successors);</span>
+<span class="fc" id="L270">            successors.add(new Successor&lt;&gt;(action, payload(value.get(&quot;state&quot;)),</span>
+<span class="fc" id="L271">                    integer(value.get(&quot;cost&quot;), -1_000_000, 1_000_000), false,</span>
+<span class="fc" id="L272">                    List.of(&quot;PYTHON_SEARCH_PROPOSAL_NOT_A_PROOF&quot;), Map.of(&quot;pythonBinding&quot;, binding)));</span>
+<span class="fc" id="L273">        }</span>
+<span class="fc" id="L274">        return List.copyOf(successors);</span>
     }
 
     private CounterexampleResult counterexamples(C candidate, Integer budget) {
-<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        require(budget &gt;= 0, &quot;negative counterexample budget&quot;);</span>
-<span class="fc bfc" id="L210" title="All 2 branches covered.">        if (budget == 0) return CounterexampleResult.inconclusive(0, &quot;no counterexample budget&quot;, Map.of());</span>
-<span class="fc" id="L211">        Map&lt;String, Object&gt; reply = call(&quot;counterexamples&quot;, Map.of(&quot;candidate&quot;, payload(encodeCandidate.apply(candidate)), &quot;budget&quot;, budget));</span>
-<span class="fc" id="L212">        fields(reply, &quot;status&quot;, &quot;attempts&quot;, &quot;witness&quot;);</span>
-<span class="fc" id="L213">        CounterexampleStatus status = CounterexampleStatus.valueOf(text(reply.get(&quot;status&quot;), 32, false));</span>
-<span class="fc" id="L214">        int attempts = integer(reply.get(&quot;attempts&quot;), 0, budget);</span>
-<span class="fc" id="L215">        String witness = text(reply.get(&quot;witness&quot;), definition.limits.maxPayloadBytes, true);</span>
-<span class="fc bfc" id="L216" title="All 2 branches covered.">        if (status == CounterexampleStatus.NONE_FOUND) require(witness.isEmpty(), &quot;unexpected witness&quot;);</span>
-<span class="pc bpc" id="L217" title="3 of 4 branches missed.">        if (status == CounterexampleStatus.UNSUPPORTED) require(attempts == 0, &quot;unsupported attempt count&quot;);</span>
-<span class="fc bfc" id="L218" title="All 2 branches covered.">        if (status == CounterexampleStatus.FOUND) {</span>
-<span class="pc bpc" id="L219" title="2 of 4 branches missed.">            require(attempts &gt; 0 &amp;&amp; !witness.isBlank(), &quot;missing attempted counterexample&quot;);</span>
-<span class="fc bfc" id="L220" title="All 2 branches covered.">            if (!checkWitness.test(candidate, witness)) throw failure(Failure.PROTOCOL, &quot;unverified-counterexample&quot;);</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">        require(budget &gt;= 0, &quot;negative counterexample budget&quot;);</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">        if (budget == 0) return CounterexampleResult.inconclusive(0, &quot;no counterexample budget&quot;, Map.of());</span>
+
+<span class="fc" id="L281">        Optional&lt;CounterexampleResult&gt; hostResult = hostPrecheck.apply(candidate, budget);</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">        if (hostResult.isPresent()) return validateHostPrecheck(candidate, budget, hostResult.orElseThrow());</span>
+
+<span class="fc" id="L284">        Map&lt;String, Object&gt; reply = call(&quot;counterexamples&quot;, Map.of(&quot;candidate&quot;, payload(encodeCandidate.apply(candidate)), &quot;budget&quot;, budget));</span>
+<span class="fc" id="L285">        fields(reply, &quot;status&quot;, &quot;attempts&quot;, &quot;witness&quot;);</span>
+<span class="fc" id="L286">        CounterexampleStatus status = CounterexampleStatus.valueOf(text(reply.get(&quot;status&quot;), 32, false));</span>
+<span class="fc" id="L287">        int attempts = integer(reply.get(&quot;attempts&quot;), 0, budget);</span>
+<span class="fc" id="L288">        String witness = text(reply.get(&quot;witness&quot;), definition.limits.maxPayloadBytes, true);</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        if (status == CounterexampleStatus.NONE_FOUND) require(witness.isEmpty(), &quot;unexpected witness&quot;);</span>
+<span class="pc bpc" id="L290" title="3 of 4 branches missed.">        if (status == CounterexampleStatus.UNSUPPORTED) require(attempts == 0, &quot;unsupported attempt count&quot;);</span>
+<span class="fc bfc" id="L291" title="All 2 branches covered.">        if (status == CounterexampleStatus.FOUND) {</span>
+<span class="pc bpc" id="L292" title="2 of 4 branches missed.">            require(attempts &gt; 0 &amp;&amp; !witness.isBlank(), &quot;missing attempted counterexample&quot;);</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">            if (!checkWitness.test(candidate, witness)) throw failure(Failure.PROTOCOL, &quot;unverified-counterexample&quot;);</span>
         }
-<span class="fc bfc" id="L222" title="All 2 branches covered.">        return new CounterexampleResult(status, attempts, witness,</span>
-<span class="fc" id="L223">                Map.of(&quot;pythonBinding&quot;, binding, &quot;witnessCheckedByHost&quot;, Boolean.toString(status == CounterexampleStatus.FOUND)));</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">        Map&lt;String, String&gt; metrics = hostPrecheck.absent</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">                ? Map.of(&quot;pythonBinding&quot;, binding,</span>
+<span class="fc" id="L297">                        &quot;witnessCheckedByHost&quot;, Boolean.toString(status == CounterexampleStatus.FOUND))</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">                : Map.of(&quot;hostPrecheck&quot;, hostPrecheck.id(),</span>
+                        &quot;pythonBinding&quot;, binding,
+<span class="fc" id="L300">                        &quot;witnessCheckedByHost&quot;, Boolean.toString(status == CounterexampleStatus.FOUND));</span>
+<span class="fc" id="L301">        return new CounterexampleResult(status, attempts, witness, metrics);</span>
+    }
+
+    private CounterexampleResult validateHostPrecheck(C candidate, int budget, CounterexampleResult result) {
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        require(result.attempts() &lt;= budget, &quot;host precheck exceeded counterexample budget&quot;);</span>
+<span class="fc" id="L306">        CounterexampleStatus status = result.status();</span>
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">        if (status == CounterexampleStatus.NONE_FOUND) require(result.witness().isEmpty(), &quot;unexpected host precheck witness&quot;);</span>
+<span class="pc bpc" id="L308" title="3 of 4 branches missed.">        if (status == CounterexampleStatus.UNSUPPORTED) require(result.attempts() == 0, &quot;unsupported host precheck attempt count&quot;);</span>
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">        if (status == CounterexampleStatus.FOUND) {</span>
+<span class="pc bpc" id="L310" title="2 of 4 branches missed.">            require(result.attempts() &gt; 0 &amp;&amp; !result.witness().isBlank(), &quot;missing host precheck counterexample&quot;);</span>
+<span class="fc" id="L311">            require(checkWitness.test(candidate, result.witness()), &quot;unverified host precheck counterexample&quot;);</span>
+        }
+<span class="fc" id="L313">        Map&lt;String, String&gt; metrics = new TreeMap&lt;&gt;(result.metrics());</span>
+<span class="fc" id="L314">        metrics.put(&quot;hostPrecheck&quot;, hostPrecheck.id());</span>
+<span class="fc" id="L315">        metrics.put(&quot;pythonBinding&quot;, binding);</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">        metrics.put(&quot;witnessCheckedByHost&quot;, Boolean.toString(status == CounterexampleStatus.FOUND));</span>
+<span class="fc" id="L317">        return new CounterexampleResult(status, result.attempts(), result.witness(), metrics);</span>
     }
 
     private synchronized Map&lt;String, Object&gt; call(String operation, Map&lt;String, Object&gt; arguments) {
-<span class="fc" id="L227">        require(started.get(), &quot;start a campaign before invoking callbacks&quot;);</span>
-<span class="pc bpc" id="L228" title="1 of 4 branches missed.">        if (calls &gt;= definition.limits.maxCalls || deadline - System.nanoTime() &lt;= 0)</span>
-<span class="fc" id="L229">            throw failure(Failure.LIMIT, operation);</span>
-<span class="fc" id="L230">        String request = canonical(Map.of(&quot;protocol&quot;, PROTOCOL, &quot;binding&quot;, binding,</span>
+<span class="fc" id="L321">        require(started.get(), &quot;start a campaign before invoking callbacks&quot;);</span>
+<span class="pc bpc" id="L322" title="1 of 4 branches missed.">        if (calls &gt;= definition.limits.maxCalls || deadline - System.nanoTime() &lt;= 0)</span>
+<span class="fc" id="L323">            throw failure(Failure.LIMIT, operation);</span>
+<span class="fc" id="L324">        String request = canonical(Map.of(&quot;protocol&quot;, PROTOCOL, &quot;binding&quot;, binding,</span>
                 &quot;operation&quot;, operation, &quot;configuration&quot;, definition.configuration, &quot;arguments&quot;, arguments));
-<span class="fc" id="L232">        int sent = bytes(request, definition.limits.maxMessageBytes);</span>
-<span class="fc" id="L233">        String requestHash = sha256(request);</span>
-<span class="fc" id="L234">        long remaining = Math.min(Duration.ofMillis(definition.limits.callbackMillis).toNanos(), deadline - System.nanoTime());</span>
-<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (remaining &lt;= 0) throw failure(Failure.LIMIT, operation);</span>
-<span class="fc" id="L236">        calls++;</span>
-<span class="fc" id="L237">        counts.merge(operation, 1, Integer::sum);</span>
-<span class="fc" id="L238">        requestBytes += sent;</span>
-<span class="fc" id="L239">        long callbackDeadline = System.nanoTime() + remaining;</span>
+<span class="fc" id="L326">        int sent = bytes(request, definition.limits.maxMessageBytes);</span>
+<span class="fc" id="L327">        String requestHash = sha256(request);</span>
+<span class="fc" id="L328">        long remaining = Math.min(Duration.ofMillis(definition.limits.callbackMillis).toNanos(), deadline - System.nanoTime());</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">        if (remaining &lt;= 0) throw failure(Failure.LIMIT, operation);</span>
+<span class="fc" id="L330">        calls++;</span>
+<span class="fc" id="L331">        counts.merge(operation, 1, Integer::sum);</span>
+<span class="fc" id="L332">        requestBytes += sent;</span>
+<span class="fc" id="L333">        long callbackDeadline = System.nanoTime() + remaining;</span>
         String response;
-<span class="fc" id="L241">        try { response = transport.invoke(request, Duration.ofNanos(remaining)); }</span>
-<span class="fc" id="L242">        catch (RuntimeException ex) { throw failure(Failure.TRANSPORT, operation); }</span>
-<span class="pc bpc" id="L243" title="1 of 2 branches missed.">        if (callbackDeadline - System.nanoTime() &lt;= 0) throw failure(Failure.LIMIT, operation);</span>
+<span class="fc" id="L335">        try { response = transport.invoke(request, Duration.ofNanos(remaining)); }</span>
+<span class="fc" id="L336">        catch (RuntimeException ex) { throw failure(Failure.TRANSPORT, operation); }</span>
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">        if (callbackDeadline - System.nanoTime() &lt;= 0) throw failure(Failure.LIMIT, operation);</span>
         try {
-<span class="fc" id="L245">            responseBytes += bytes(response, definition.limits.maxMessageBytes);</span>
-<span class="fc" id="L246">            Map&lt;String, Object&gt; reply = read(response, definition.limits.maxMessageBytes);</span>
-<span class="fc" id="L247">            fields(reply, &quot;protocol&quot;, &quot;binding&quot;, &quot;operation&quot;, &quot;requestSha256&quot;, &quot;result&quot;);</span>
-<span class="fc bfc" id="L248" title="All 4 branches covered.">            require(PROTOCOL.equals(reply.get(&quot;protocol&quot;)) &amp;&amp; binding.equals(reply.get(&quot;binding&quot;))</span>
-<span class="fc bfc" id="L249" title="All 4 branches covered.">                    &amp;&amp; operation.equals(reply.get(&quot;operation&quot;)) &amp;&amp; requestHash.equals(reply.get(&quot;requestSha256&quot;)), &quot;callback response binding&quot;);</span>
-<span class="fc" id="L250">            transcript = sha256(transcript + &quot;\n&quot; + operation + &quot;\n&quot; + requestHash + &quot;\n&quot; + sha256(response));</span>
-<span class="fc" id="L251">            return object(reply.get(&quot;result&quot;));</span>
-<span class="fc" id="L252">        } catch (RuntimeException ex) { throw failure(Failure.PROTOCOL, operation); }</span>
+<span class="fc" id="L339">            responseBytes += bytes(response, definition.limits.maxMessageBytes);</span>
+<span class="fc" id="L340">            Map&lt;String, Object&gt; reply = read(response, definition.limits.maxMessageBytes);</span>
+<span class="fc" id="L341">            fields(reply, &quot;protocol&quot;, &quot;binding&quot;, &quot;operation&quot;, &quot;requestSha256&quot;, &quot;result&quot;);</span>
+<span class="fc bfc" id="L342" title="All 4 branches covered.">            require(PROTOCOL.equals(reply.get(&quot;protocol&quot;)) &amp;&amp; binding.equals(reply.get(&quot;binding&quot;))</span>
+<span class="fc bfc" id="L343" title="All 4 branches covered.">                    &amp;&amp; operation.equals(reply.get(&quot;operation&quot;)) &amp;&amp; requestHash.equals(reply.get(&quot;requestSha256&quot;)), &quot;callback response binding&quot;);</span>
+<span class="fc" id="L344">            transcript = sha256(transcript + &quot;\n&quot; + operation + &quot;\n&quot; + requestHash + &quot;\n&quot; + sha256(response));</span>
+<span class="fc" id="L345">            return object(reply.get(&quot;result&quot;));</span>
+<span class="fc" id="L346">        } catch (RuntimeException ex) { throw failure(Failure.PROTOCOL, operation); }</span>
     }
 
-<span class="fc" id="L255">    private static CallbackFailure failure(Failure kind, String operation) { return new CallbackFailure(kind, operation); }</span>
+<span class="fc" id="L349">    private static CallbackFailure failure(Failure kind, String operation) { return new CallbackFailure(kind, operation); }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
