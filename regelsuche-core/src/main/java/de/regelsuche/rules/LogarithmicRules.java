@@ -6,6 +6,11 @@ import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.RecognitionProfile;
+import de.regelsuche.transform.RequiredAssumptionTemplate;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
+import de.regelsuche.transform.RewriteApplicabilitySchemaProvider;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
 import java.util.List;
@@ -39,7 +44,8 @@ public final class LogarithmicRules {
     }
 
     /** {@code log(a*b) -> log(a) + log(b)} with {@code a > 0} and {@code b > 0}. */
-    static final class LogProductRule implements RewriteRule {
+    static final class LogProductRule
+            implements RewriteRule, RewriteApplicabilitySchemaProvider {
         private final String name;
 
         LogProductRule(String name) {
@@ -106,6 +112,21 @@ public final class LogarithmicRules {
             );
         }
 
+        @Override
+        public RewriteApplicabilitySchema applicabilitySchema() {
+            PatternExpr left = PatternExpr.var("A");
+            PatternExpr right = PatternExpr.var("B");
+            return new RewriteApplicabilitySchema(
+                "algorithmic-source/v1:" + id(),
+                this,
+                PatternExpr.fn(name,
+                    PatternExpr.op(BinaryOperator.MUL, left, right)),
+                RecognitionProfile.exact(),
+                List.of(
+                    RequiredAssumptionTemplate.positive(left),
+                    RequiredAssumptionTemplate.positive(right)));
+        }
+
         private BinaryExpr extract(Expr subtree) {
             if (!(subtree instanceof FunctionExpr functionExpr) || !functionExpr.name().equals(name)) {
                 return null;
@@ -122,7 +143,8 @@ public final class LogarithmicRules {
     }
 
     /** {@code log(a/b) -> log(a) - log(b)} with {@code a > 0} and {@code b > 0}. */
-    static final class LogQuotientRule implements RewriteRule {
+    static final class LogQuotientRule
+            implements RewriteRule, RewriteApplicabilitySchemaProvider {
         private final String name;
 
         LogQuotientRule(String name) {
@@ -189,6 +211,21 @@ public final class LogarithmicRules {
             );
         }
 
+        @Override
+        public RewriteApplicabilitySchema applicabilitySchema() {
+            PatternExpr numerator = PatternExpr.var("A");
+            PatternExpr denominator = PatternExpr.var("B");
+            return new RewriteApplicabilitySchema(
+                "algorithmic-source/v1:" + id(),
+                this,
+                PatternExpr.fn(name,
+                    PatternExpr.op(BinaryOperator.DIV, numerator, denominator)),
+                RecognitionProfile.exact(),
+                List.of(
+                    RequiredAssumptionTemplate.positive(numerator),
+                    RequiredAssumptionTemplate.positive(denominator)));
+        }
+
         private BinaryExpr extract(Expr subtree) {
             if (!(subtree instanceof FunctionExpr functionExpr) || !functionExpr.name().equals(name)) {
                 return null;
@@ -205,7 +242,8 @@ public final class LogarithmicRules {
     }
 
     /** {@code log(a^k) -> k*log(a)} with {@code a > 0}. */
-    static final class LogPowerRule implements RewriteRule {
+    static final class LogPowerRule
+            implements RewriteRule, RewriteApplicabilitySchemaProvider {
         private final String name;
 
         LogPowerRule(String name) {
@@ -269,6 +307,19 @@ public final class LogarithmicRules {
             return List.of(Assumption.positive(ExpressionFormatter.format(power.left())));
         }
 
+        @Override
+        public RewriteApplicabilitySchema applicabilitySchema() {
+            PatternExpr base = PatternExpr.var("A");
+            PatternExpr exponent = PatternExpr.var("K");
+            return new RewriteApplicabilitySchema(
+                "algorithmic-source/v1:" + id(),
+                this,
+                PatternExpr.fn(name,
+                    PatternExpr.op(BinaryOperator.POW, base, exponent)),
+                RecognitionProfile.exact(),
+                List.of(RequiredAssumptionTemplate.positive(base)));
+        }
+
         private BinaryExpr extract(Expr subtree) {
             if (!(subtree instanceof FunctionExpr functionExpr) || !functionExpr.name().equals(name)) {
                 return null;
@@ -285,7 +336,8 @@ public final class LogarithmicRules {
     }
 
     /** {@code log(1) -> 0}. */
-    static final class LogOfOneRule implements RewriteRule {
+    static final class LogOfOneRule
+            implements RewriteRule, RewriteApplicabilitySchemaProvider {
         private final String name;
 
         LogOfOneRule(String name) {
@@ -332,6 +384,16 @@ public final class LogarithmicRules {
                 throw new IllegalArgumentException("Rule does not match subtree");
             }
             return new de.regelsuche.ast.NumberExpr(0);
+        }
+
+        @Override
+        public RewriteApplicabilitySchema applicabilitySchema() {
+            return new RewriteApplicabilitySchema(
+                "algorithmic-source/v1:" + id(),
+                this,
+                PatternExpr.fn(name, PatternExpr.num(1)),
+                RecognitionProfile.exact(),
+                List.of());
         }
     }
 }
