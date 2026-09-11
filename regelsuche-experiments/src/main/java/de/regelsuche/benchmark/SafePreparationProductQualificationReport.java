@@ -193,10 +193,18 @@ public final class SafePreparationProductQualificationReport {
                 throw new IllegalArgumentException(
                     "paired routes must use the same visible inventory");
             }
+            boolean technicalFailure = direct.technicalFailurePresent()
+                || safe.technicalFailurePresent();
+            if (technicalFailure) {
+                expectationsSatisfied = false;
+                newlyReachedBySafe = false;
+            }
             if (reachabilityRegression
                     != (direct.semanticReached() && !safe.semanticReached())
                     || newlyReachedBySafe
-                        != (!direct.semanticReached() && safe.semanticReached())) {
+                        != (!technicalFailure
+                            && !direct.semanticReached()
+                            && safe.semanticReached())) {
                 throw new IllegalArgumentException(
                     "case comparison flags are inconsistent");
             }
@@ -258,7 +266,8 @@ public final class SafePreparationProductQualificationReport {
                 && cases.stream().noneMatch(CaseResult::correctnessRegression)
                 && cases.stream().noneMatch(CaseResult::assumptionRegression)
                 && cases.stream().noneMatch(result ->
-                    result.safe().technicalFailurePresent())
+                    result.direct().technicalFailurePresent()
+                        || result.safe().technicalFailurePresent())
                 && cases.stream().allMatch(result ->
                     result.safe().safeTelemetry().verificationFailures() == 0)
                 && cases.stream().allMatch(result ->
