@@ -7,6 +7,11 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.RecognitionProfile;
+import de.regelsuche.transform.RequiredAssumptionTemplate;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
+import de.regelsuche.transform.RewriteApplicabilitySchemaProvider;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
 import java.util.List;
@@ -35,7 +40,8 @@ public final class RadicalRules {
     }
 
     /** {@code sqrt(a^2) -> abs(a)} — unconditional. */
-    static final class SqrtOfSquareRule implements RewriteRule {
+    static final class SqrtOfSquareRule
+            implements RewriteRule, RewriteApplicabilitySchemaProvider {
         @Override
         public String id() {
             return "radical_sqrt_of_square_to_abs";
@@ -75,6 +81,18 @@ public final class RadicalRules {
             return new FunctionExpr("abs", base);
         }
 
+        @Override
+        public RewriteApplicabilitySchema applicabilitySchema() {
+            PatternExpr base = PatternExpr.var("A");
+            return new RewriteApplicabilitySchema(
+                "algorithmic-source/v1:" + id(),
+                this,
+                PatternExpr.fn("sqrt",
+                    PatternExpr.op(BinaryOperator.POW, base, PatternExpr.num(2))),
+                RecognitionProfile.exact(),
+                List.of());
+        }
+
         private Expr extract(Expr subtree) {
             if (!(subtree instanceof FunctionExpr functionExpr)
                 || !"sqrt".equals(functionExpr.name())
@@ -92,7 +110,8 @@ public final class RadicalRules {
     }
 
     /** {@code sqrt(a*b) -> sqrt(a)*sqrt(b)} with {@code a >= 0, b >= 0}. */
-    static final class SqrtOfProductRule implements RewriteRule {
+    static final class SqrtOfProductRule
+            implements RewriteRule, RewriteApplicabilitySchemaProvider {
         @Override
         public String id() {
             return "radical_sqrt_of_product";
@@ -153,6 +172,21 @@ public final class RadicalRules {
             );
         }
 
+        @Override
+        public RewriteApplicabilitySchema applicabilitySchema() {
+            PatternExpr left = PatternExpr.var("A");
+            PatternExpr right = PatternExpr.var("B");
+            return new RewriteApplicabilitySchema(
+                "algorithmic-source/v1:" + id(),
+                this,
+                PatternExpr.fn("sqrt",
+                    PatternExpr.op(BinaryOperator.MUL, left, right)),
+                RecognitionProfile.exact(),
+                List.of(
+                    RequiredAssumptionTemplate.nonNegative(left),
+                    RequiredAssumptionTemplate.nonNegative(right)));
+        }
+
         private BinaryExpr extract(Expr subtree) {
             if (!(subtree instanceof FunctionExpr functionExpr)
                 || !"sqrt".equals(functionExpr.name())
@@ -168,7 +202,8 @@ public final class RadicalRules {
     }
 
     /** {@code sqrt(0) -> 0}. */
-    static final class SqrtOfZeroRule implements RewriteRule {
+    static final class SqrtOfZeroRule
+            implements RewriteRule, RewriteApplicabilitySchemaProvider {
         @Override
         public String id() {
             return "radical_sqrt_of_zero";
@@ -209,10 +244,21 @@ public final class RadicalRules {
             }
             return new NumberExpr(0);
         }
+
+        @Override
+        public RewriteApplicabilitySchema applicabilitySchema() {
+            return new RewriteApplicabilitySchema(
+                "algorithmic-source/v1:" + id(),
+                this,
+                PatternExpr.fn("sqrt", PatternExpr.num(0)),
+                RecognitionProfile.exact(),
+                List.of());
+        }
     }
 
     /** {@code sqrt(1) -> 1}. */
-    static final class SqrtOfOneRule implements RewriteRule {
+    static final class SqrtOfOneRule
+            implements RewriteRule, RewriteApplicabilitySchemaProvider {
         @Override
         public String id() {
             return "radical_sqrt_of_one";
@@ -252,6 +298,16 @@ public final class RadicalRules {
                 throw new IllegalArgumentException("Rule does not match subtree");
             }
             return new NumberExpr(1);
+        }
+
+        @Override
+        public RewriteApplicabilitySchema applicabilitySchema() {
+            return new RewriteApplicabilitySchema(
+                "algorithmic-source/v1:" + id(),
+                this,
+                PatternExpr.fn("sqrt", PatternExpr.num(1)),
+                RecognitionProfile.exact(),
+                List.of());
         }
     }
 }
