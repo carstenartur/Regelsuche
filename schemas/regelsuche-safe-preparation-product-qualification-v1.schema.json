@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.dev/schemas/regelsuche-safe-preparation-product-qualification-v1.schema.json",
+  "title": "Regelsuche safe preparation product qualification v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "configurationId",
+    "repositoryRevision",
+    "directProfileId",
+    "safeProfileId",
+    "safeWorkAccountingRevision",
+    "verificationReplayCharged",
+    "visibleInventoryFingerprint",
+    "principalInventoryFingerprint",
+    "preparationInventoryFingerprint",
+    "exactRegistryFingerprint",
+    "directRouteIsNoPreparationAblation",
+    "searchBudget",
+    "preparationBudgetIdentity",
+    "evidenceQualified",
+    "productDecision",
+    "newlyReachedCases",
+    "commonSolvedCases",
+    "commonDirectWork",
+    "commonSafeWork",
+    "directSyntacticButSemanticallyRejectedCases",
+    "safeSyntacticButSemanticallyRejectedCases",
+    "productBlockers",
+    "cases"
+  ],
+  "properties": {
+    "schema": {"const": "regelsuche.safe-preparation-product-qualification/v1"},
+    "configurationId": {"const": "direct-v1-vs-safe-preparation-v2-matched-work-v1"},
+    "repositoryRevision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "directProfileId": {"const": "DIRECT_V1"},
+    "safeProfileId": {"const": "SAFE_PREPARATION_V2"},
+    "safeWorkAccountingRevision": {"const": "regelsuche.safe-preparation-work/analyze-plus-verify/v1"},
+    "verificationReplayCharged": {"const": true},
+    "visibleInventoryFingerprint": {"$ref": "#/$defs/hash"},
+    "principalInventoryFingerprint": {"$ref": "#/$defs/hash"},
+    "preparationInventoryFingerprint": {"$ref": "#/$defs/hash"},
+    "exactRegistryFingerprint": {"$ref": "#/$defs/hash"},
+    "directRouteIsNoPreparationAblation": {"const": true},
+    "searchBudget": {"$ref": "#/$defs/searchBudget"},
+    "preparationBudgetIdentity": {"type": "string", "minLength": 1},
+    "evidenceQualified": {"type": "boolean"},
+    "productDecision": {
+      "enum": [
+        "SELECT_SAFE_PREPARATION_V2",
+        "KEEP_OPT_IN_SAFETY_FAILURE",
+        "KEEP_OPT_IN_PENDING_PRODUCT_COVERAGE"
+      ]
+    },
+    "newlyReachedCases": {"type": "integer", "minimum": 0},
+    "commonSolvedCases": {"type": "integer", "minimum": 0},
+    "commonDirectWork": {"type": "integer", "minimum": 0},
+    "commonSafeWork": {"type": "integer", "minimum": 0},
+    "directSyntacticButSemanticallyRejectedCases": {"type": "integer", "minimum": 0},
+    "safeSyntacticButSemanticallyRejectedCases": {"type": "integer", "minimum": 0},
+    "productBlockers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/case"}
+    }
+  },
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "strings": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "searchBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxPrimitiveSteps",
+        "maxExactTheoryWorkUnits",
+        "maxExploredStates",
+        "maxCandidatesPerState",
+        "maxExpandingSteps",
+        "maxWorkUnits"
+      ],
+      "properties": {
+        "maxPrimitiveSteps": {"type": "integer", "minimum": 0},
+        "maxExactTheoryWorkUnits": {"type": "integer", "minimum": 0},
+        "maxExploredStates": {"type": "integer", "minimum": 0},
+        "maxCandidatesPerState": {"type": "integer", "minimum": 0},
+        "maxExpandingSteps": {"type": "integer", "minimum": 0},
+        "maxWorkUnits": {"type": "integer", "minimum": 0}
+      }
+    },
+    "telemetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "coordinatorCalls",
+        "verificationCalls",
+        "verificationFailures",
+        "directPrincipalCandidates",
+        "preparedPrincipalCandidates",
+        "analyzeMechanicalWork",
+        "verificationReplayMechanicalWork",
+        "chargedCoordinatorMechanicalWork",
+        "fallbackExecutions",
+        "fallbackGeneratedTransitions",
+        "fallbackUniqueExpansions"
+      ],
+      "properties": {
+        "coordinatorCalls": {"type": "integer", "minimum": 0},
+        "verificationCalls": {"type": "integer", "minimum": 0},
+        "verificationFailures": {"type": "integer", "minimum": 0},
+        "directPrincipalCandidates": {"type": "integer", "minimum": 0},
+        "preparedPrincipalCandidates": {"type": "integer", "minimum": 0},
+        "analyzeMechanicalWork": {"type": "integer", "minimum": 0},
+        "verificationReplayMechanicalWork": {"type": "integer", "minimum": 0},
+        "chargedCoordinatorMechanicalWork": {"type": "integer", "minimum": 0},
+        "fallbackExecutions": {"type": "integer", "minimum": 0},
+        "fallbackGeneratedTransitions": {"type": "integer", "minimum": 0},
+        "fallbackUniqueExpansions": {"type": "integer", "minimum": 0}
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profileId",
+        "visibleInventoryFingerprint",
+        "searchStatus",
+        "syntacticallyReached",
+        "semanticReached",
+        "constructionSafe",
+        "effectiveAssumptions",
+        "missingAssumptions",
+        "edgeDepth",
+        "primitiveDepth",
+        "appliedRuleIds",
+        "primitiveRuleIds",
+        "exploredStates",
+        "generatedCandidates",
+        "chargedTotalWork",
+        "technicalFailure",
+        "safeTelemetry"
+      ],
+      "properties": {
+        "profileId": {"enum": ["DIRECT_V1", "SAFE_PREPARATION_V2"]},
+        "visibleInventoryFingerprint": {"$ref": "#/$defs/hash"},
+        "searchStatus": {"type": "string", "minLength": 1},
+        "syntacticallyReached": {"type": "boolean"},
+        "semanticReached": {"type": "boolean"},
+        "constructionSafe": {"type": "boolean"},
+        "effectiveAssumptions": {"$ref": "#/$defs/strings"},
+        "missingAssumptions": {"$ref": "#/$defs/strings"},
+        "edgeDepth": {"type": "integer", "minimum": -1},
+        "primitiveDepth": {"type": "integer", "minimum": 0},
+        "appliedRuleIds": {"$ref": "#/$defs/strings"},
+        "primitiveRuleIds": {"$ref": "#/$defs/strings"},
+        "exploredStates": {"type": "integer", "minimum": 0},
+        "generatedCandidates": {"type": "integer", "minimum": 0},
+        "chargedTotalWork": {"type": "integer", "minimum": 0},
+        "technicalFailure": {"type": "string"},
+        "safeTelemetry": {"$ref": "#/$defs/telemetry"}
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "family",
+        "sourceExpression",
+        "targetExpression",
+        "sourceAssumptions",
+        "requiredAssumptions",
+        "expectDirectSemanticReachability",
+        "expectSafeSemanticReachability",
+        "expectationsSatisfied",
+        "reachabilityRegression",
+        "correctnessRegression",
+        "assumptionRegression",
+        "newlyReachedBySafe",
+        "direct",
+        "safe"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+        "family": {"type": "string", "minLength": 1},
+        "sourceExpression": {"type": "string", "minLength": 1},
+        "targetExpression": {"type": "string", "minLength": 1},
+        "sourceAssumptions": {"$ref": "#/$defs/strings"},
+        "requiredAssumptions": {"$ref": "#/$defs/strings"},
+        "expectDirectSemanticReachability": {"type": "boolean"},
+        "expectSafeSemanticReachability": {"type": "boolean"},
+        "expectationsSatisfied": {"type": "boolean"},
+        "reachabilityRegression": {"type": "boolean"},
+        "correctnessRegression": {"type": "boolean"},
+        "assumptionRegression": {"type": "boolean"},
+        "newlyReachedBySafe": {"type": "boolean"},
+        "direct": {"$ref": "#/$defs/route"},
+        "safe": {"$ref": "#/$defs/route"}
+      }
+    }
+  }
+}

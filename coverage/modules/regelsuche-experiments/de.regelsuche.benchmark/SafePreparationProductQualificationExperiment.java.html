@@ -1,0 +1,627 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SafePreparationProductQualificationExperiment.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">SafePreparationProductQualificationExperiment.java</span></div><h1>SafePreparationProductQualificationExperiment.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.benchmark.SafePreparationProductQualificationReport.CaseResult;
+import de.regelsuche.benchmark.SafePreparationProductQualificationReport.ExperimentCase;
+import de.regelsuche.benchmark.SafePreparationProductQualificationReport.Report;
+import de.regelsuche.benchmark.SafePreparationProductQualificationReport.RouteOutcome;
+import de.regelsuche.benchmark.SafePreparationProductQualificationReport.SafeTelemetry;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.knowledge.KnowledgePackRegistry;
+import de.regelsuche.knowledge.RuleInventoryFingerprint;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.reachability.PatternTargetedLocalBridgeSearch;
+import de.regelsuche.search.reachability.RulePreparationCoordinator;
+import de.regelsuche.search.reachability.SharedUnifiedRulePreparationCoordinator;
+import de.regelsuche.search.strategy.SearchExpansionSource;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Budget;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Problem;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Result;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.State;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.MeasuredTransformationEngine;
+import de.regelsuche.transform.MeasuredTransformationEngines;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.PerfectSquareStructurePreparationSolver;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationBatch;
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
+/**
+ * Frozen information-parity qualification for #745 section A.
+ *
+ * &lt;p&gt;DIRECT_V1 is the no-preparation ablation. SAFE_PREPARATION_V2 sees the
+ * same concrete rule inventory and receives the same outer search budgets but
+ * may additionally invoke the explicit shared preparation authority. Every
+ * prepared search edge retains its full primitive lineage. The SAFE route also
+ * pays for the deterministic full recomputation performed by
+ * {@link SharedUnifiedRulePreparationCoordinator#verify}.&lt;/p&gt;
+ */
+<span class="fc" id="L56">public final class SafePreparationProductQualificationExperiment {</span>
+    public static final String SCHEMA =
+        SafePreparationProductQualificationReport.SCHEMA;
+    public static final String CONFIGURATION_ID =
+        SafePreparationProductQualificationReport.CONFIGURATION_ID;
+    public static final String DIRECT_PROFILE_ID =
+        SafePreparationProductQualificationReport.DIRECT_PROFILE_ID;
+    public static final String SAFE_PROFILE_ID =
+        SafePreparationProductQualificationReport.SAFE_PROFILE_ID;
+
+    private static final String PYTHAGOREAN_RULE_ID =
+        &quot;sympy.trig.pythagorean&quot;;
+    private static final String DIFFERENCE_OF_SQUARES_RULE_ID =
+        &quot;sympy.poly.factor.diff_squares&quot;;
+    private static final String TELESCOPING_RULE_ID =
+        &quot;sympy.rational.partial_fraction.telescoping&quot;;
+    private static final String CANCELLATION_RULE_ID =
+        &quot;ast_cancel_division_factor&quot;;
+    private static final int SOURCE_CANDIDATE_LIMIT = 32;
+
+    private static final PatternTargetedLocalBridgeSearch.Budget
+<span class="fc" id="L77">        PREPARATION_BUDGET = new PatternTargetedLocalBridgeSearch.Budget(</span>
+            3, 128, 1_024, 8, 160, 128,
+            32, 5_000, 2_500);
+<span class="fc" id="L80">    private static final Budget SEARCH_BUDGET =</span>
+<span class="fc" id="L81">        Budget.primitive(4, 96, 32, 4, 200_000);</span>
+
+<span class="fc" id="L83">    private static final List&lt;String&gt; PRODUCT_BLOCKERS = List.of(</span>
+        &quot;APPLICABILITY_SCHEMA_COVERAGE_INCOMPLETE&quot;,
+        &quot;TYPED_REPRESENTATION_PREPARATION_OUTSIDE_PROFILE&quot;,
+        &quot;OCCURRENCE_LOCAL_GUARD_BINDINGS_NOT_PRODUCT_QUALIFIED&quot;,
+        &quot;WORKBENCH_CLI_RUNTIME_ADAPTER_NOT_PRODUCT_QUALIFIED&quot;);
+
+<span class="fc" id="L89">    private final ExpressionParser parser = new ExpressionParser();</span>
+
+    public static void main(String[] args) throws IOException {
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        if (args.length != 2) {</span>
+<span class="nc" id="L93">            throw new IllegalArgumentException(</span>
+                &quot;expected repository revision and output directory&quot;);
+        }
+<span class="nc" id="L96">        Report report = new SafePreparationProductQualificationExperiment()</span>
+<span class="nc" id="L97">            .run(args[0]);</span>
+<span class="nc" id="L98">        report.write(Path.of(args[1]));</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        if (!report.evidenceQualified()) {</span>
+<span class="nc" id="L100">            throw new IllegalStateException(</span>
+                &quot;safe-preparation matched-work evidence did not satisfy its frozen contract&quot;);
+        }
+<span class="nc" id="L103">    }</span>
+
+    public Report run(String repositoryRevision) {
+<span class="fc" id="L106">        SafePreparationProductQualificationReport.requireRevision(</span>
+            repositoryRevision);
+<span class="fc" id="L108">        List&lt;PatternRewriteRule&gt; principals = principals();</span>
+<span class="fc" id="L109">        List&lt;RewriteApplicabilitySchema&gt; schemas = principals.stream()</span>
+<span class="fc" id="L110">            .map(RewriteApplicabilitySchema::fromPatternRule)</span>
+<span class="fc" id="L111">            .toList();</span>
+<span class="fc" id="L112">        List&lt;RewriteRule&gt; preparationRules = cancellationRules();</span>
+<span class="fc" id="L113">        List&lt;RewriteRule&gt; visibleRules = visibleRules(</span>
+            principals, preparationRules);
+<span class="fc" id="L115">        String visibleInventory = RuleInventoryFingerprint.contentHash(</span>
+            visibleRules);
+<span class="fc" id="L117">        SharedUnifiedRulePreparationCoordinator identity =</span>
+            new SharedUnifiedRulePreparationCoordinator(
+                schemas,
+                preparationRules,
+                repositoryRevision,
+                PREPARATION_BUDGET);
+
+<span class="fc" id="L124">        List&lt;CaseResult&gt; results = cases().stream()</span>
+<span class="fc" id="L125">            .map(experimentCase -&gt; evaluateCase(</span>
+                experimentCase,
+                schemas,
+                preparationRules,
+                visibleRules,
+                repositoryRevision,
+                visibleInventory))
+<span class="fc" id="L132">            .toList();</span>
+
+<span class="fc" id="L134">        return new Report(</span>
+            SCHEMA,
+            CONFIGURATION_ID,
+            repositoryRevision,
+            DIRECT_PROFILE_ID,
+            SAFE_PROFILE_ID,
+            SafePreparationProductQualificationReport
+                .SAFE_WORK_ACCOUNTING_REVISION,
+            true,
+            visibleInventory,
+<span class="fc" id="L144">            identity.principalInventoryFingerprint(),</span>
+<span class="fc" id="L145">            identity.preparationInventoryFingerprint(),</span>
+<span class="fc" id="L146">            identity.exactRegistryFingerprint(),</span>
+            PREPARATION_BUDGET,
+            SEARCH_BUDGET,
+            true,
+            results,
+            PRODUCT_BLOCKERS);
+    }
+
+    private CaseResult evaluateCase(
+        ExperimentCase experimentCase,
+        List&lt;RewriteApplicabilitySchema&gt; schemas,
+        List&lt;RewriteRule&gt; preparationRules,
+        List&lt;RewriteRule&gt; visibleRules,
+        String repositoryRevision,
+        String visibleInventory
+    ) {
+<span class="fc" id="L162">        String source = normalize(experimentCase.sourceExpression());</span>
+<span class="fc" id="L163">        String target = normalize(experimentCase.targetExpression());</span>
+
+<span class="fc" id="L165">        MeasuredTransformationEngine direct =</span>
+<span class="fc" id="L166">            MeasuredTransformationEngines.counting(</span>
+                new AstRewriteTransformationEngine(
+                    visibleRules,
+                    Integer.MAX_VALUE,
+                    SOURCE_CANDIDATE_LIMIT));
+        RouteOutcome directOutcome;
+        try {
+<span class="fc" id="L173">            directOutcome = route(</span>
+                DIRECT_PROFILE_ID,
+                experimentCase,
+<span class="fc" id="L176">                search(direct, source, target),</span>
+<span class="fc" id="L177">                SafeTelemetry.none(),</span>
+                visibleInventory);
+<span class="nc" id="L179">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L180">            directOutcome = RouteOutcome.technicalFailure(</span>
+                DIRECT_PROFILE_ID,
+                visibleInventory,
+                SEARCH_BUDGET,
+<span class="nc" id="L184">                stableFailure(exception),</span>
+<span class="nc" id="L185">                SafeTelemetry.none());</span>
+<span class="fc" id="L186">        }</span>
+
+<span class="fc" id="L188">        SafePreparationMeasuredEngine safe =</span>
+            new SafePreparationMeasuredEngine(
+                schemas,
+                preparationRules,
+                repositoryRevision,
+<span class="fc" id="L193">                experimentCase.sourceAssumptions());</span>
+        RouteOutcome safeOutcome;
+        try {
+<span class="fc" id="L196">            Result safeResult = search(safe, source, target);</span>
+<span class="fc" id="L197">            safeOutcome = route(</span>
+                SAFE_PROFILE_ID,
+                experimentCase,
+                safeResult,
+<span class="fc" id="L201">                safe.telemetry(),</span>
+                visibleInventory);
+<span class="nc" id="L203">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L204">            safeOutcome = RouteOutcome.technicalFailure(</span>
+                SAFE_PROFILE_ID,
+                visibleInventory,
+                SEARCH_BUDGET,
+<span class="nc" id="L208">                stableFailure(exception),</span>
+<span class="nc" id="L209">                safe.telemetry());</span>
+<span class="fc" id="L210">        }</span>
+
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        boolean reachabilityRegression = directOutcome.semanticReached()</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">            &amp;&amp; !safeOutcome.semanticReached();</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        boolean correctnessRegression = safeOutcome.syntacticallyReached()</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            &amp;&amp; !safeOutcome.semanticReached()</span>
+<span class="pc bnc" id="L216" title="All 2 branches missed.">            &amp;&amp; directOutcome.semanticReached();</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        boolean assumptionRegression = directOutcome.semanticReached()</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">            &amp;&amp; safeOutcome.semanticReached()</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">            &amp;&amp; !safeOutcome.effectiveAssumptions().equals(</span>
+<span class="fc" id="L220">                directOutcome.effectiveAssumptions());</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        boolean newlyReached = !directOutcome.semanticReached()</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">            &amp;&amp; safeOutcome.semanticReached();</span>
+<span class="fc" id="L223">        boolean expectationsSatisfied =</span>
+<span class="fc" id="L224">            directOutcome.semanticReached()</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">                == experimentCase.expectDirectSemanticReachability()</span>
+<span class="fc" id="L226">            &amp;&amp; safeOutcome.semanticReached()</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">                == experimentCase.expectSafeSemanticReachability();</span>
+
+<span class="fc" id="L229">        return new CaseResult(</span>
+            experimentCase,
+            directOutcome,
+            safeOutcome,
+            expectationsSatisfied,
+            reachabilityRegression,
+            correctnessRegression,
+            assumptionRegression,
+            newlyReached);
+    }
+
+    private Result search(
+        MeasuredTransformationEngine engine,
+        String source,
+        String target
+    ) {
+<span class="fc" id="L245">        return new WorkBudgetBestFirstSearchStrategy().search(</span>
+            new Problem(
+                source,
+                target,
+                new SearchExpansionSource.Measured(engine),
+                new ExpressionScorer(),
+                new ExpressionCanonicalizer(),
+                SEARCH_BUDGET));
+    }
+
+    private RouteOutcome route(
+        String profileId,
+        ExperimentCase experimentCase,
+        Result result,
+        SafeTelemetry telemetry,
+        String visibleInventory
+    ) {
+<span class="fc" id="L262">        PathAudit audit = audit(experimentCase, result);</span>
+<span class="fc" id="L263">        State reached = result.reachedState();</span>
+<span class="fc" id="L264">        return new RouteOutcome(</span>
+            profileId,
+            visibleInventory,
+<span class="fc" id="L267">            result.status().name(),</span>
+<span class="fc" id="L268">            result.reached(),</span>
+<span class="fc" id="L269">            audit.confirmed(),</span>
+<span class="fc" id="L270">            audit.constructionSafe(),</span>
+<span class="fc" id="L271">            audit.effectiveAssumptions(),</span>
+<span class="fc" id="L272">            audit.missingAssumptions(),</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">            reached == null ? -1 : reached.edgeDepth(),</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">            reached == null ? 0 : reached.primitiveDepth(),</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">            reached == null ? List.of() : reached.appliedRuleIds(),</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">            reached == null ? List.of() : reached.primitiveRuleIds(),</span>
+<span class="fc" id="L277">            result.metrics().exploredStates(),</span>
+<span class="fc" id="L278">            result.metrics().generatedTransformations(),</span>
+<span class="fc" id="L279">            result.metrics().chargedSearchWorkUnits(),</span>
+            SEARCH_BUDGET,
+            &quot;&quot;,
+            telemetry);
+    }
+
+    private PathAudit audit(
+        ExperimentCase experimentCase,
+        Result result
+    ) {
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        if (!result.reached()) {</span>
+<span class="fc" id="L290">            return new PathAudit(false, true, List.of(), List.of());</span>
+        }
+<span class="fc" id="L292">        State reached = result.reachedState();</span>
+<span class="fc" id="L293">        boolean constructionSafe = reached.transformations().stream()</span>
+<span class="fc" id="L294">            .allMatch(Transformation::equivalencePreservingByConstruction);</span>
+<span class="fc" id="L295">        AssumptionSignature effective = AssumptionSignature.merge(</span>
+<span class="fc" id="L296">            AssumptionSignature.ofExpressions(</span>
+<span class="fc" id="L297">                experimentCase.sourceAssumptions()),</span>
+<span class="fc" id="L298">            AssumptionSignature.ofExpressions(reached.assumptions()));</span>
+<span class="fc" id="L299">        Set&lt;String&gt; required = new LinkedHashSet&lt;&gt;(</span>
+<span class="fc" id="L300">            AssumptionSignature.ofExpressions(</span>
+<span class="fc" id="L301">                experimentCase.requiredAssumptions())</span>
+<span class="fc" id="L302">                .normalizedAssumptions());</span>
+<span class="fc" id="L303">        Set&lt;String&gt; missing = new TreeSet&lt;&gt;(required);</span>
+<span class="fc" id="L304">        missing.removeAll(effective.normalizedAssumptions());</span>
+<span class="pc bpc" id="L305" title="1 of 4 branches missed.">        boolean confirmed = constructionSafe &amp;&amp; missing.isEmpty();</span>
+<span class="fc" id="L306">        return new PathAudit(</span>
+            confirmed,
+            constructionSafe,
+<span class="fc" id="L309">            effective.normalizedAssumptions(),</span>
+<span class="fc" id="L310">            List.copyOf(missing));</span>
+    }
+
+    private List&lt;PatternRewriteRule&gt; principals() {
+<span class="fc" id="L314">        return List.of(</span>
+<span class="fc" id="L315">            imported(&quot;sympy-trigonometry&quot;, PYTHAGOREAN_RULE_ID),</span>
+<span class="fc" id="L316">            imported(&quot;sympy-polynomial&quot;, DIFFERENCE_OF_SQUARES_RULE_ID),</span>
+<span class="fc" id="L317">            imported(&quot;sympy-rational&quot;, TELESCOPING_RULE_ID),</span>
+<span class="fc" id="L318">            builtInPattern(</span>
+                PerfectSquareStructurePreparationSolver.PRINCIPAL_RULE_ID));
+    }
+
+    private PatternRewriteRule imported(String packId, String ruleId) {
+<span class="fc" id="L323">        return new KnowledgePackRegistry().allPacks().stream()</span>
+<span class="fc" id="L324">            .filter(pack -&gt; packId.equals(pack.packId()))</span>
+<span class="fc" id="L325">            .flatMap(pack -&gt; pack.rules().stream())</span>
+<span class="fc" id="L326">            .filter(rule -&gt; ruleId.equals(rule.id()))</span>
+<span class="fc" id="L327">            .findFirst()</span>
+<span class="pc" id="L328">            .orElseThrow(() -&gt; new IllegalStateException(</span>
+                &quot;missing imported rule: &quot; + ruleId));
+    }
+
+    private static PatternRewriteRule builtInPattern(String ruleId) {
+<span class="fc" id="L333">        RewriteRule rule = AstRewriteTransformationEngine.allBuiltInRules()</span>
+<span class="fc" id="L334">            .stream()</span>
+<span class="fc" id="L335">            .filter(candidate -&gt; ruleId.equals(candidate.id()))</span>
+<span class="fc" id="L336">            .findFirst()</span>
+<span class="pc" id="L337">            .orElseThrow(() -&gt; new IllegalStateException(</span>
+                &quot;missing built-in rule: &quot; + ruleId));
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">        if (!(rule instanceof PatternRewriteRule pattern)) {</span>
+<span class="nc" id="L340">            throw new IllegalStateException(</span>
+                &quot;principal is not an explicitly schema-capable pattern rule: &quot;
+                    + ruleId);
+        }
+<span class="fc" id="L344">        return pattern;</span>
+    }
+
+    private static List&lt;RewriteRule&gt; cancellationRules() {
+        List&lt;RewriteRule&gt; rules = AstRewriteTransformationEngine
+<span class="fc" id="L349">            .allBuiltInRules().stream()</span>
+<span class="fc" id="L350">            .filter(rule -&gt; CANCELLATION_RULE_ID.equals(rule.id()))</span>
+<span class="fc" id="L351">            .toList();</span>
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">        if (rules.size() != 1) {</span>
+<span class="nc" id="L353">            throw new IllegalStateException(</span>
+                &quot;expected exactly one cancellation preparation rule&quot;);
+        }
+<span class="fc" id="L356">        return rules;</span>
+    }
+
+    private static List&lt;RewriteRule&gt; visibleRules(
+        List&lt;PatternRewriteRule&gt; principals,
+        List&lt;RewriteRule&gt; preparationRules
+    ) {
+<span class="fc" id="L363">        List&lt;RewriteRule&gt; result = new ArrayList&lt;&gt;(principals);</span>
+<span class="fc" id="L364">        result.addAll(preparationRules);</span>
+<span class="fc" id="L365">        return List.copyOf(result);</span>
+    }
+
+    private String normalize(String expression) {
+<span class="fc" id="L369">        return ExpressionFormatter.format(parser.parseTerm(expression));</span>
+    }
+
+    public static List&lt;ExperimentCase&gt; cases() {
+<span class="fc" id="L373">        return List.of(</span>
+<span class="fc" id="L374">            c(&quot;pythagorean-direct-canonical&quot;, &quot;trigonometry&quot;,</span>
+                &quot;sin(x)^2 + cos(x)^2&quot;, &quot;1&quot;,
+<span class="fc" id="L376">                List.of(), List.of(), true, true),</span>
+<span class="fc" id="L377">            c(&quot;pythagorean-direct-ac-reordered&quot;, &quot;trigonometry&quot;,</span>
+                &quot;cos(x)^2 + sin(x)^2&quot;, &quot;1&quot;,
+<span class="fc" id="L379">                List.of(), List.of(), true, true),</span>
+<span class="fc" id="L380">            c(&quot;pythagorean-one-hidden-cancellation&quot;, &quot;trigonometry&quot;,</span>
+                &quot;((sin(x) * a) / a)^2 + cos(x)^2&quot;, &quot;1&quot;,
+<span class="fc" id="L382">                List.of(), List.of(&quot;a != 0&quot;), true, true),</span>
+<span class="fc" id="L383">            c(&quot;pythagorean-two-hidden-cancellations&quot;, &quot;trigonometry&quot;,</span>
+                &quot;((sin(x) * a) / a)^2 + ((cos(x) * b) / b)^2&quot;, &quot;1&quot;,
+<span class="fc" id="L385">                List.of(), List.of(&quot;a != 0&quot;, &quot;b != 0&quot;), true, true),</span>
+<span class="fc" id="L386">            c(&quot;pythagorean-different-argument-near-miss&quot;,</span>
+                &quot;trigonometry-negative&quot;,
+                &quot;((sin(x) * a) / a)^2 + ((cos(y) * b) / b)^2&quot;, &quot;1&quot;,
+<span class="fc" id="L389">                List.of(), List.of(), false, false),</span>
+<span class="fc" id="L390">            c(&quot;difference-squares-direct&quot;, &quot;polynomial&quot;,</span>
+                &quot;x^2 - y^2&quot;, &quot;(x - y) * (x + y)&quot;,
+<span class="fc" id="L392">                List.of(), List.of(), true, true),</span>
+<span class="fc" id="L393">            c(&quot;difference-squares-two-hidden-cancellations&quot;, &quot;polynomial&quot;,</span>
+                &quot;((x^2 * a) / a) - ((y^2 * b) / b)&quot;,
+                &quot;(x - y) * (x + y)&quot;,
+<span class="fc" id="L396">                List.of(), List.of(&quot;a != 0&quot;, &quot;b != 0&quot;), true, true),</span>
+<span class="fc" id="L397">            c(&quot;difference-squares-sum-near-miss&quot;, &quot;polynomial-negative&quot;,</span>
+                &quot;x^2 + y^2&quot;, &quot;(x - y) * (x + y)&quot;,
+<span class="fc" id="L399">                List.of(), List.of(), false, false),</span>
+<span class="fc" id="L400">            c(&quot;telescoping-direct&quot;, &quot;rational&quot;,</span>
+                &quot;1 / (n * (n + 1))&quot;, &quot;1 / n - 1 / (n + 1)&quot;,
+<span class="fc" id="L402">                List.of(&quot;n != 0&quot;, &quot;n + 1 != 0&quot;),</span>
+<span class="fc" id="L403">                List.of(&quot;n != 0&quot;, &quot;n + 1 != 0&quot;), true, true),</span>
+<span class="fc" id="L404">            c(&quot;telescoping-two-hidden-cancellations&quot;, &quot;rational&quot;,</span>
+                &quot;1 / (((n * a) / a) * (((n + 1) * b) / b))&quot;,
+                &quot;1 / n - 1 / (n + 1)&quot;,
+<span class="fc" id="L407">                List.of(&quot;n != 0&quot;, &quot;n + 1 != 0&quot;),</span>
+<span class="fc" id="L408">                List.of(&quot;a != 0&quot;, &quot;b != 0&quot;, &quot;n != 0&quot;, &quot;n + 1 != 0&quot;),</span>
+                true, true),
+<span class="fc" id="L410">            c(&quot;telescoping-step-two-near-miss&quot;, &quot;rational-negative&quot;,</span>
+                &quot;1 / (n * (n + 2))&quot;, &quot;1 / n - 1 / (n + 1)&quot;,
+<span class="fc" id="L412">                List.of(&quot;n != 0&quot;, &quot;n + 2 != 0&quot;), List.of(), false, false),</span>
+<span class="fc" id="L413">            c(&quot;telescoping-missing-guard-control&quot;, &quot;guard-negative&quot;,</span>
+                &quot;1 / (n * (n + 1))&quot;, &quot;1 / n - 1 / (n + 1)&quot;,
+<span class="fc" id="L415">                List.of(), List.of(&quot;n != 0&quot;, &quot;n + 1 != 0&quot;), false, false),</span>
+<span class="fc" id="L416">            c(&quot;perfect-square-native-exact-preparation&quot;,</span>
+                &quot;polynomial-exact-preparation&quot;,
+                &quot;4 * x^4 * y^2 - 9 * z^2&quot;,
+                &quot;(2 * x^2 * y - 3 * z) * (2 * x^2 * y + 3 * z)&quot;,
+<span class="fc" id="L420">                List.of(), List.of(), false, true));</span>
+    }
+
+    private static ExperimentCase c(
+        String id,
+        String family,
+        String source,
+        String target,
+        List&lt;String&gt; sourceAssumptions,
+        List&lt;String&gt; requiredAssumptions,
+        boolean direct,
+        boolean safe
+    ) {
+<span class="fc" id="L433">        return new ExperimentCase(</span>
+            id,
+            family,
+            source,
+            target,
+<span class="fc" id="L438">            AssumptionSignature.ofExpressions(sourceAssumptions)</span>
+<span class="fc" id="L439">                .normalizedAssumptions(),</span>
+<span class="fc" id="L440">            AssumptionSignature.ofExpressions(requiredAssumptions)</span>
+<span class="fc" id="L441">                .normalizedAssumptions(),</span>
+            direct,
+            safe);
+    }
+
+    /**
+     * Experiment-only search adapter. General cancellation stays visible as an
+     * ordinary search move; principal outputs come only through the guarded v2
+     * coordinator, so the SAFE route cannot bypass its applicability schemas.
+     */
+    private static final class SafePreparationMeasuredEngine
+            implements MeasuredTransformationEngine {
+<span class="fc" id="L453">        private static final Comparator&lt;Transformation&gt; ORDER = Comparator</span>
+<span class="fc" id="L454">            .comparing(Transformation::rule)</span>
+<span class="fc" id="L455">            .thenComparing(Transformation::transformedExpression)</span>
+<span class="fc" id="L456">            .thenComparing(Transformation::applicationKey);</span>
+
+        private final SharedUnifiedRulePreparationCoordinator coordinator;
+        private final MeasuredTransformationEngine supportEngine;
+        private final AssumptionSignature sourceAssumptions;
+        private long coordinatorCalls;
+        private long verificationCalls;
+        private long verificationFailures;
+        private long directPrincipalCandidates;
+        private long preparedPrincipalCandidates;
+        private long analyzeMechanicalWork;
+        private long verificationReplayMechanicalWork;
+        private long chargedCoordinatorMechanicalWork;
+        private long fallbackExecutions;
+        private long fallbackGeneratedTransitions;
+        private long fallbackUniqueExpansions;
+
+        private SafePreparationMeasuredEngine(
+            List&lt;RewriteApplicabilitySchema&gt; schemas,
+            List&lt;RewriteRule&gt; preparationRules,
+            String repositoryRevision,
+            List&lt;String&gt; sourceAssumptions
+<span class="fc" id="L478">        ) {</span>
+<span class="fc" id="L479">            this.coordinator = new SharedUnifiedRulePreparationCoordinator(</span>
+                schemas,
+                preparationRules,
+                repositoryRevision,
+                PREPARATION_BUDGET);
+<span class="fc" id="L484">            this.supportEngine = MeasuredTransformationEngines.counting(</span>
+                new AstRewriteTransformationEngine(
+                    preparationRules,
+                    Integer.MAX_VALUE,
+                    SOURCE_CANDIDATE_LIMIT));
+<span class="fc" id="L489">            this.sourceAssumptions = AssumptionSignature.ofExpressions(</span>
+                sourceAssumptions);
+<span class="fc" id="L491">        }</span>
+
+        @Override
+        public TransformationBatch transformMeasured(String expression) {
+<span class="fc" id="L495">            TransformationBatch support = supportEngine.transformMeasured(</span>
+                expression);
+<span class="fc" id="L497">            SharedUnifiedRulePreparationCoordinator.Evaluation evaluation =</span>
+<span class="fc" id="L498">                coordinator.analyze(expression, sourceAssumptions);</span>
+<span class="fc" id="L499">            coordinatorCalls++;</span>
+<span class="fc" id="L500">            long analyzeWork = coordinatorMechanicalWork(evaluation);</span>
+<span class="fc" id="L501">            analyzeMechanicalWork = add(analyzeMechanicalWork, analyzeWork);</span>
+
+<span class="fc" id="L503">            verificationCalls++;</span>
+<span class="fc" id="L504">            var verification = coordinator.verify(evaluation);</span>
+            // verify(Evaluation) performs exactly one fresh analyze(...) and
+            // equality check. The deterministic recomputation therefore pays
+            // the same measured coordinator work again.
+<span class="fc" id="L508">            long replayWork = analyzeWork;</span>
+<span class="fc" id="L509">            verificationReplayMechanicalWork = add(</span>
+                verificationReplayMechanicalWork, replayWork);
+<span class="fc" id="L511">            long delegated = add(analyzeWork, replayWork);</span>
+<span class="fc" id="L512">            chargedCoordinatorMechanicalWork = add(</span>
+                chargedCoordinatorMechanicalWork, delegated);
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">            if (!verification.valid()) {</span>
+<span class="nc" id="L515">                verificationFailures++;</span>
+<span class="nc" id="L516">                throw new IllegalStateException(</span>
+                    &quot;shared safe-preparation evaluation did not replay: &quot;
+<span class="nc" id="L518">                        + verification.detailCode());</span>
+            }
+
+<span class="fc" id="L521">            List&lt;Transformation&gt; principal = evaluation.outcomes().stream()</span>
+<span class="fc" id="L522">                .filter(RulePreparationCoordinator.Outcome::positive)</span>
+<span class="fc" id="L523">                .flatMap(outcome -&gt; outcome.candidate().stream())</span>
+<span class="fc" id="L524">                .toList();</span>
+<span class="fc" id="L525">            directPrincipalCandidates += evaluation.outcomes().stream()</span>
+<span class="fc" id="L526">                .filter(RulePreparationCoordinator.Outcome::direct)</span>
+<span class="fc" id="L527">                .count();</span>
+<span class="fc" id="L528">            preparedPrincipalCandidates += evaluation.outcomes().stream()</span>
+<span class="fc" id="L529">                .filter(RulePreparationCoordinator.Outcome::prepared)</span>
+<span class="fc" id="L530">                .count();</span>
+
+<span class="fc" id="L532">            var shared = evaluation.sharedExecutionWork();</span>
+<span class="pc bpc" id="L533" title="1 of 2 branches missed.">            if (shared.fallbackExecuted()) {</span>
+<span class="fc" id="L534">                fallbackExecutions++;</span>
+            }
+<span class="fc" id="L536">            fallbackGeneratedTransitions = add(</span>
+                fallbackGeneratedTransitions,
+<span class="fc" id="L538">                shared.fallbackWork().generatedTransitions());</span>
+<span class="fc" id="L539">            fallbackUniqueExpansions = add(</span>
+                fallbackUniqueExpansions,
+<span class="fc" id="L541">                shared.fallbackPhysicalWork().uniqueExpansions());</span>
+
+<span class="fc" id="L543">            List&lt;Transformation&gt; combined = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L544">                support.transformations());</span>
+<span class="fc" id="L545">            combined.addAll(principal);</span>
+<span class="fc" id="L546">            combined.sort(ORDER);</span>
+<span class="fc" id="L547">            Map&lt;String, Transformation&gt; distinct = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L548" title="All 2 branches covered.">            for (Transformation transformation : combined) {</span>
+<span class="fc" id="L549">                distinct.putIfAbsent(key(transformation), transformation);</span>
+<span class="fc" id="L550">            }</span>
+<span class="fc" id="L551">            long duplicates = combined.size() - distinct.size();</span>
+<span class="fc" id="L552">            TransformationWorkMetrics principalWork =</span>
+<span class="fc" id="L553">                TransformationWorkMetrics.flatEngine(principal.size())</span>
+<span class="fc" id="L554">                    .withDelegatedMechanicalWork(delegated)</span>
+<span class="fc" id="L555">                    .withDuplicateCandidatesDropped(duplicates);</span>
+<span class="fc" id="L556">            return new TransformationBatch(</span>
+<span class="fc" id="L557">                List.copyOf(distinct.values()),</span>
+<span class="fc" id="L558">                support.workMetrics().plus(principalWork));</span>
+        }
+
+        private SafeTelemetry telemetry() {
+<span class="fc" id="L562">            return new SafeTelemetry(</span>
+                coordinatorCalls,
+                verificationCalls,
+                verificationFailures,
+                directPrincipalCandidates,
+                preparedPrincipalCandidates,
+                analyzeMechanicalWork,
+                verificationReplayMechanicalWork,
+                chargedCoordinatorMechanicalWork,
+                fallbackExecutions,
+                fallbackGeneratedTransitions,
+                fallbackUniqueExpansions);
+        }
+
+        private static long coordinatorMechanicalWork(
+            SharedUnifiedRulePreparationCoordinator.Evaluation evaluation
+        ) {
+<span class="fc" id="L579">            var shared = evaluation.sharedExecutionWork();</span>
+<span class="fc" id="L580">            var source = shared.sourceAnalysisWork();</span>
+<span class="fc" id="L581">            var aggregate = evaluation.aggregateWork();</span>
+<span class="fc" id="L582">            long total = 0;</span>
+<span class="fc" id="L583">            total = add(total, source.uniqueParsedExpressions());</span>
+<span class="fc" id="L584">            total = add(total, source.uniqueAnalyses());</span>
+<span class="fc" id="L585">            total = add(total, aggregate.expandedStates());</span>
+<span class="fc" id="L586">            total = add(total, aggregate.generatedTransitions());</span>
+<span class="fc" id="L587">            total = add(total, aggregate.discoveredStates());</span>
+<span class="fc" id="L588">            total = add(total, aggregate.retainedTransitions());</span>
+<span class="fc" id="L589">            total = add(total, aggregate.duplicateTransitions());</span>
+<span class="fc" id="L590">            total = add(total, aggregate.analyzedCandidates());</span>
+<span class="fc" id="L591">            return add(total, shared.guardRequests());</span>
+        }
+
+        private static String key(Transformation transformation) {
+<span class="fc" id="L595">            return transformation.rule() + &quot;\u0000&quot;</span>
+<span class="fc" id="L596">                + transformation.transformedExpression() + &quot;\u0000&quot;</span>
+<span class="fc" id="L597">                + transformation.applicationKey() + &quot;\u0000&quot;</span>
+<span class="fc" id="L598">                + transformation.primitiveRuleIds();</span>
+        }
+    }
+
+    private record PathAudit(
+        boolean confirmed,
+        boolean constructionSafe,
+        List&lt;String&gt; effectiveAssumptions,
+        List&lt;String&gt; missingAssumptions
+    ) {
+<span class="fc" id="L608">        private PathAudit {</span>
+<span class="fc" id="L609">            effectiveAssumptions = List.copyOf(effectiveAssumptions);</span>
+<span class="fc" id="L610">            missingAssumptions = List.copyOf(missingAssumptions);</span>
+<span class="fc" id="L611">        }</span>
+    }
+
+    private static long add(long left, long right) {
+<span class="fc" id="L615">        return SafePreparationProductQualificationReport.saturatedAdd(</span>
+            left, right);
+    }
+
+    private static String stableFailure(Throwable failure) {
+<span class="nc" id="L620">        String message = failure.getMessage();</span>
+<span class="nc" id="L621">        return failure.getClass().getSimpleName()</span>
+<span class="nc bnc" id="L622" title="All 4 branches missed.">            + (message == null || message.isBlank()</span>
+<span class="nc" id="L623">                ? &quot;&quot;</span>
+<span class="nc" id="L624">                : &quot;:&quot; + message.replaceAll(&quot;\\s+&quot;, &quot; &quot;).trim());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

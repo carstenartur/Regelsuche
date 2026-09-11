@@ -1,0 +1,549 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SafePreparationProductQualificationReport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">SafePreparationProductQualificationReport.java</span></div><h1>SafePreparationProductQualificationReport.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.search.reachability.PatternTargetedLocalBridgeSearch;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Budget;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Objects;
+
+/** Immutable evidence model and deterministic writer for #745 section A. */
+public final class SafePreparationProductQualificationReport {
+    public static final String SCHEMA =
+        &quot;regelsuche.safe-preparation-product-qualification/v1&quot;;
+    public static final String CONFIGURATION_ID =
+        &quot;direct-v1-vs-safe-preparation-v2-matched-work-v1&quot;;
+    public static final String DIRECT_PROFILE_ID = &quot;DIRECT_V1&quot;;
+    public static final String SAFE_PROFILE_ID = &quot;SAFE_PREPARATION_V2&quot;;
+    public static final String SAFE_WORK_ACCOUNTING_REVISION =
+        &quot;regelsuche.safe-preparation-work/analyze-plus-verify/v1&quot;;
+
+    private SafePreparationProductQualificationReport() {
+    }
+
+<span class="fc" id="L26">    public enum ProductDecision {</span>
+<span class="fc" id="L27">        SELECT_SAFE_PREPARATION_V2,</span>
+<span class="fc" id="L28">        KEEP_OPT_IN_SAFETY_FAILURE,</span>
+<span class="fc" id="L29">        KEEP_OPT_IN_PENDING_PRODUCT_COVERAGE</span>
+    }
+
+    public record ExperimentCase(
+        String id,
+        String family,
+        String sourceExpression,
+        String targetExpression,
+        List&lt;String&gt; sourceAssumptions,
+        List&lt;String&gt; requiredAssumptions,
+        boolean expectDirectSemanticReachability,
+        boolean expectSafeSemanticReachability
+    ) {
+<span class="fc" id="L42">        public ExperimentCase {</span>
+<span class="fc" id="L43">            id = requiredText(id, &quot;id&quot;);</span>
+<span class="fc" id="L44">            family = requiredText(family, &quot;family&quot;);</span>
+<span class="fc" id="L45">            sourceExpression = requiredText(sourceExpression, &quot;sourceExpression&quot;);</span>
+<span class="fc" id="L46">            targetExpression = requiredText(targetExpression, &quot;targetExpression&quot;);</span>
+<span class="fc" id="L47">            sourceAssumptions = immutableStrings(sourceAssumptions, &quot;sourceAssumptions&quot;);</span>
+<span class="fc" id="L48">            requiredAssumptions = immutableStrings(requiredAssumptions, &quot;requiredAssumptions&quot;);</span>
+<span class="fc" id="L49">        }</span>
+    }
+
+    public record SafeTelemetry(
+        long coordinatorCalls,
+        long verificationCalls,
+        long verificationFailures,
+        long directPrincipalCandidates,
+        long preparedPrincipalCandidates,
+        long analyzeMechanicalWork,
+        long verificationReplayMechanicalWork,
+        long chargedCoordinatorMechanicalWork,
+        long fallbackExecutions,
+        long fallbackGeneratedTransitions,
+        long fallbackUniqueExpansions
+    ) {
+<span class="fc" id="L65">        public SafeTelemetry {</span>
+<span class="pc bpc" id="L66" title="13 of 26 branches missed.">            if (coordinatorCalls &lt; 0 || verificationCalls &lt; 0</span>
+                    || verificationFailures &lt; 0
+                    || directPrincipalCandidates &lt; 0
+                    || preparedPrincipalCandidates &lt; 0
+                    || analyzeMechanicalWork &lt; 0
+                    || verificationReplayMechanicalWork &lt; 0
+                    || chargedCoordinatorMechanicalWork &lt; 0
+                    || fallbackExecutions &lt; 0
+                    || fallbackGeneratedTransitions &lt; 0
+                    || fallbackUniqueExpansions &lt; 0
+                    || verificationFailures &gt; verificationCalls
+                    || verificationCalls != coordinatorCalls
+                    || chargedCoordinatorMechanicalWork
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                        != saturatedAdd(analyzeMechanicalWork,</span>
+                            verificationReplayMechanicalWork)) {
+<span class="nc" id="L81">                throw new IllegalArgumentException(</span>
+                    &quot;safe preparation telemetry is inconsistent&quot;);
+            }
+<span class="fc" id="L84">        }</span>
+
+        public static SafeTelemetry none() {
+<span class="fc" id="L87">            return new SafeTelemetry(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);</span>
+        }
+    }
+
+    public record RouteOutcome(
+        String profileId,
+        String visibleInventoryFingerprint,
+        String searchStatus,
+        boolean syntacticallyReached,
+        boolean semanticReached,
+        boolean constructionSafe,
+        List&lt;String&gt; effectiveAssumptions,
+        List&lt;String&gt; missingAssumptions,
+        int edgeDepth,
+        int primitiveDepth,
+        List&lt;String&gt; appliedRuleIds,
+        List&lt;String&gt; primitiveRuleIds,
+        long exploredStates,
+        long generatedCandidates,
+        long chargedTotalWork,
+        Budget configuredBudget,
+        String technicalFailure,
+        SafeTelemetry safeTelemetry
+    ) {
+<span class="fc" id="L111">        public RouteOutcome {</span>
+<span class="fc" id="L112">            profileId = requiredText(profileId, &quot;profileId&quot;);</span>
+<span class="fc" id="L113">            visibleInventoryFingerprint = requiredHash(</span>
+                visibleInventoryFingerprint, &quot;visibleInventoryFingerprint&quot;);
+<span class="fc" id="L115">            searchStatus = requiredText(searchStatus, &quot;searchStatus&quot;);</span>
+<span class="fc" id="L116">            effectiveAssumptions = immutableStrings(</span>
+                effectiveAssumptions, &quot;effectiveAssumptions&quot;);
+<span class="fc" id="L118">            missingAssumptions = immutableStrings(</span>
+                missingAssumptions, &quot;missingAssumptions&quot;);
+<span class="fc" id="L120">            appliedRuleIds = immutableStrings(appliedRuleIds, &quot;appliedRuleIds&quot;);</span>
+<span class="fc" id="L121">            primitiveRuleIds = immutableStrings(</span>
+                primitiveRuleIds, &quot;primitiveRuleIds&quot;);
+<span class="fc" id="L123">            configuredBudget = Objects.requireNonNull(configuredBudget, &quot;configuredBudget&quot;);</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            technicalFailure = technicalFailure == null ? &quot;&quot; : technicalFailure;</span>
+<span class="fc" id="L125">            safeTelemetry = Objects.requireNonNull(safeTelemetry, &quot;safeTelemetry&quot;);</span>
+<span class="pc bpc" id="L126" title="7 of 20 branches missed.">            if (edgeDepth &lt; -1 || primitiveDepth &lt; 0</span>
+                    || exploredStates &lt; 0 || generatedCandidates &lt; 0
+                    || chargedTotalWork &lt; 0
+                    || semanticReached &amp;&amp; !syntacticallyReached
+                    || semanticReached &amp;&amp; !constructionSafe
+<span class="pc bpc" id="L131" title="3 of 12 branches missed.">                    || semanticReached &amp;&amp; !missingAssumptions.isEmpty()</span>
+                    || syntacticallyReached &amp;&amp; edgeDepth &lt; 0
+                    || !syntacticallyReached &amp;&amp; edgeDepth != -1
+                    || syntacticallyReached
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">                        &amp;&amp; primitiveDepth != primitiveRuleIds.size()) {</span>
+<span class="nc" id="L136">                throw new IllegalArgumentException(&quot;route outcome is inconsistent&quot;);</span>
+            }
+<span class="fc" id="L138">        }</span>
+
+        public static RouteOutcome technicalFailure(
+            String profileId,
+            String visibleInventoryFingerprint,
+            Budget budget,
+            String failure,
+            SafeTelemetry telemetry
+        ) {
+<span class="fc" id="L147">            return new RouteOutcome(</span>
+                profileId,
+                visibleInventoryFingerprint,
+                &quot;TECHNICAL_FAILURE&quot;,
+                false,
+                false,
+                false,
+<span class="fc" id="L154">                List.of(),</span>
+<span class="fc" id="L155">                List.of(),</span>
+                -1,
+                0,
+<span class="fc" id="L158">                List.of(),</span>
+<span class="fc" id="L159">                List.of(),</span>
+                0,
+                0,
+                0,
+                budget,
+<span class="fc" id="L164">                requiredText(failure, &quot;failure&quot;),</span>
+                telemetry);
+        }
+
+        public boolean technicalFailurePresent() {
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            return !technicalFailure.isEmpty();</span>
+        }
+    }
+
+    public record CaseResult(
+        ExperimentCase experimentCase,
+        RouteOutcome direct,
+        RouteOutcome safe,
+        boolean expectationsSatisfied,
+        boolean reachabilityRegression,
+        boolean correctnessRegression,
+        boolean assumptionRegression,
+        boolean newlyReachedBySafe
+    ) {
+<span class="fc" id="L183">        public CaseResult {</span>
+<span class="fc" id="L184">            experimentCase = Objects.requireNonNull(experimentCase, &quot;experimentCase&quot;);</span>
+<span class="fc" id="L185">            direct = Objects.requireNonNull(direct, &quot;direct&quot;);</span>
+<span class="fc" id="L186">            safe = Objects.requireNonNull(safe, &quot;safe&quot;);</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">            if (!direct.configuredBudget().equals(safe.configuredBudget())) {</span>
+<span class="nc" id="L188">                throw new IllegalArgumentException(</span>
+                    &quot;paired routes must use the same search budget&quot;);
+            }
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">            if (!direct.visibleInventoryFingerprint().equals(</span>
+<span class="fc" id="L192">                    safe.visibleInventoryFingerprint())) {</span>
+<span class="nc" id="L193">                throw new IllegalArgumentException(</span>
+                    &quot;paired routes must use the same visible inventory&quot;);
+            }
+<span class="fc bfc" id="L196" title="All 2 branches covered.">            boolean technicalFailure = direct.technicalFailurePresent()</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">                || safe.technicalFailurePresent();</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            if (technicalFailure) {</span>
+<span class="fc" id="L199">                expectationsSatisfied = false;</span>
+<span class="fc" id="L200">                newlyReachedBySafe = false;</span>
+            }
+<span class="fc" id="L202">            if (reachabilityRegression</span>
+<span class="pc bpc" id="L203" title="2 of 8 branches missed.">                    != (direct.semanticReached() &amp;&amp; !safe.semanticReached())</span>
+                    || newlyReachedBySafe
+                        != (!technicalFailure
+<span class="fc bfc" id="L206" title="All 2 branches covered.">                            &amp;&amp; !direct.semanticReached()</span>
+<span class="pc bpc" id="L207" title="1 of 4 branches missed.">                            &amp;&amp; safe.semanticReached())) {</span>
+<span class="nc" id="L208">                throw new IllegalArgumentException(</span>
+                    &quot;case comparison flags are inconsistent&quot;);
+            }
+<span class="fc" id="L211">        }</span>
+    }
+
+    public record Report(
+        String schema,
+        String configurationId,
+        String repositoryRevision,
+        String directProfileId,
+        String safeProfileId,
+        String safeWorkAccountingRevision,
+        boolean verificationReplayCharged,
+        String visibleInventoryFingerprint,
+        String principalInventoryFingerprint,
+        String preparationInventoryFingerprint,
+        String exactRegistryFingerprint,
+        PatternTargetedLocalBridgeSearch.Budget preparationBudget,
+        Budget searchBudget,
+        boolean directRouteIsNoPreparationAblation,
+        List&lt;CaseResult&gt; cases,
+        List&lt;String&gt; productBlockers
+    ) {
+<span class="fc" id="L232">        public Report {</span>
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">                    || !CONFIGURATION_ID.equals(configurationId)</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">                    || !DIRECT_PROFILE_ID.equals(directProfileId)</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">                    || !SAFE_PROFILE_ID.equals(safeProfileId)</span>
+<span class="pc bpc" id="L237" title="3 of 6 branches missed.">                    || !SAFE_WORK_ACCOUNTING_REVISION.equals(</span>
+                        safeWorkAccountingRevision)
+                    || !verificationReplayCharged
+                    || !directRouteIsNoPreparationAblation) {
+<span class="nc" id="L241">                throw new IllegalArgumentException(</span>
+                    &quot;qualification identity or accounting revision is invalid&quot;);
+            }
+<span class="fc" id="L244">            requireRevision(repositoryRevision);</span>
+<span class="fc" id="L245">            visibleInventoryFingerprint = requiredHash(</span>
+                visibleInventoryFingerprint, &quot;visibleInventoryFingerprint&quot;);
+<span class="fc" id="L247">            principalInventoryFingerprint = requiredHash(</span>
+                principalInventoryFingerprint, &quot;principalInventoryFingerprint&quot;);
+<span class="fc" id="L249">            preparationInventoryFingerprint = requiredHash(</span>
+                preparationInventoryFingerprint, &quot;preparationInventoryFingerprint&quot;);
+<span class="fc" id="L251">            exactRegistryFingerprint = requiredHash(</span>
+                exactRegistryFingerprint, &quot;exactRegistryFingerprint&quot;);
+<span class="fc" id="L253">            preparationBudget = Objects.requireNonNull(</span>
+                preparationBudget, &quot;preparationBudget&quot;);
+<span class="fc" id="L255">            searchBudget = Objects.requireNonNull(searchBudget, &quot;searchBudget&quot;);</span>
+<span class="fc" id="L256">            cases = List.copyOf(Objects.requireNonNull(cases, &quot;cases&quot;));</span>
+<span class="fc" id="L257">            productBlockers = immutableStrings(productBlockers, &quot;productBlockers&quot;);</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            if (cases.isEmpty()) {</span>
+<span class="nc" id="L259">                throw new IllegalArgumentException(&quot;qualification case matrix must not be empty&quot;);</span>
+            }
+<span class="fc" id="L261">        }</span>
+
+        public boolean evidenceQualified() {
+<span class="fc bfc" id="L264" title="All 2 branches covered.">            return cases.stream().allMatch(CaseResult::expectationsSatisfied)</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">                &amp;&amp; cases.stream().noneMatch(CaseResult::reachabilityRegression)</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">                &amp;&amp; cases.stream().noneMatch(CaseResult::correctnessRegression)</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">                &amp;&amp; cases.stream().noneMatch(CaseResult::assumptionRegression)</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">                &amp;&amp; cases.stream().noneMatch(result -&gt;</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">                    result.direct().technicalFailurePresent()</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">                        || result.safe().technicalFailurePresent())</span>
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">                &amp;&amp; cases.stream().allMatch(result -&gt;</span>
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">                    result.safe().safeTelemetry().verificationFailures() == 0)</span>
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">                &amp;&amp; cases.stream().allMatch(result -&gt;</span>
+<span class="fc" id="L274">                    result.safe().safeTelemetry().verificationCalls()</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">                        == result.safe().safeTelemetry().coordinatorCalls())</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">                &amp;&amp; newlyReachedCases() &gt;= 1;</span>
+        }
+
+        public long newlyReachedCases() {
+<span class="fc" id="L280">            return cases.stream().filter(CaseResult::newlyReachedBySafe).count();</span>
+        }
+
+        public long commonSolvedCases() {
+<span class="fc" id="L284">            return cases.stream()</span>
+<span class="fc" id="L285">                .filter(result -&gt; result.direct().semanticReached())</span>
+<span class="fc" id="L286">                .filter(result -&gt; result.safe().semanticReached())</span>
+<span class="fc" id="L287">                .count();</span>
+        }
+
+        public long directSyntacticButSemanticallyRejectedCases() {
+<span class="fc" id="L291">            return cases.stream()</span>
+<span class="fc" id="L292">                .filter(result -&gt; result.direct().syntacticallyReached())</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">                .filter(result -&gt; !result.direct().semanticReached())</span>
+<span class="fc" id="L294">                .count();</span>
+        }
+
+        public long safeSyntacticButSemanticallyRejectedCases() {
+<span class="fc" id="L298">            return cases.stream()</span>
+<span class="fc" id="L299">                .filter(result -&gt; result.safe().syntacticallyReached())</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">                .filter(result -&gt; !result.safe().semanticReached())</span>
+<span class="fc" id="L301">                .count();</span>
+        }
+
+        public long commonDirectWork() {
+<span class="nc" id="L305">            return commonWork(true);</span>
+        }
+
+        public long commonSafeWork() {
+<span class="nc" id="L309">            return commonWork(false);</span>
+        }
+
+        private long commonWork(boolean directRoute) {
+<span class="nc" id="L313">            long total = 0;</span>
+<span class="nc bnc" id="L314" title="All 2 branches missed.">            for (CaseResult result : cases) {</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">                if (result.direct().semanticReached()</span>
+<span class="nc bnc" id="L316" title="All 2 branches missed.">                        &amp;&amp; result.safe().semanticReached()) {</span>
+<span class="nc" id="L317">                    total = saturatedAdd(total,</span>
+<span class="nc bnc" id="L318" title="All 2 branches missed.">                        directRoute</span>
+<span class="nc" id="L319">                            ? result.direct().chargedTotalWork()</span>
+<span class="nc" id="L320">                            : result.safe().chargedTotalWork());</span>
+                }
+<span class="nc" id="L322">            }</span>
+<span class="nc" id="L323">            return total;</span>
+        }
+
+        public ProductDecision productDecision() {
+<span class="fc bfc" id="L327" title="All 2 branches covered.">            if (!evidenceQualified()) {</span>
+<span class="fc" id="L328">                return ProductDecision.KEEP_OPT_IN_SAFETY_FAILURE;</span>
+            }
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">            return productBlockers.isEmpty()</span>
+<span class="nc" id="L331">                ? ProductDecision.SELECT_SAFE_PREPARATION_V2</span>
+<span class="fc" id="L332">                : ProductDecision.KEEP_OPT_IN_PENDING_PRODUCT_COVERAGE;</span>
+        }
+
+        public void write(Path outputDirectory) throws IOException {
+<span class="nc" id="L336">            Objects.requireNonNull(outputDirectory, &quot;outputDirectory&quot;);</span>
+<span class="nc" id="L337">            Files.createDirectories(outputDirectory);</span>
+<span class="nc" id="L338">            Files.writeString(outputDirectory.resolve(&quot;qualification.json&quot;),</span>
+<span class="nc" id="L339">                toJson(), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L340">            Files.writeString(outputDirectory.resolve(&quot;qualification.md&quot;),</span>
+<span class="nc" id="L341">                toMarkdown(), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L342">        }</span>
+
+        public String toJson() {
+<span class="nc" id="L345">            StringBuilder json = new StringBuilder();</span>
+<span class="nc" id="L346">            json.append(&quot;{\n&quot;)</span>
+<span class="nc" id="L347">                .append(&quot;  \&quot;schema\&quot;: \&quot;&quot;).append(escape(schema)).append(&quot;\&quot;,\n&quot;)</span>
+<span class="nc" id="L348">                .append(&quot;  \&quot;configurationId\&quot;: \&quot;&quot;).append(escape(configurationId)).append(&quot;\&quot;,\n&quot;)</span>
+<span class="nc" id="L349">                .append(&quot;  \&quot;repositoryRevision\&quot;: \&quot;&quot;).append(repositoryRevision).append(&quot;\&quot;,\n&quot;)</span>
+<span class="nc" id="L350">                .append(&quot;  \&quot;directProfileId\&quot;: \&quot;&quot;).append(directProfileId).append(&quot;\&quot;,\n&quot;)</span>
+<span class="nc" id="L351">                .append(&quot;  \&quot;safeProfileId\&quot;: \&quot;&quot;).append(safeProfileId).append(&quot;\&quot;,\n&quot;)</span>
+<span class="nc" id="L352">                .append(&quot;  \&quot;safeWorkAccountingRevision\&quot;: \&quot;&quot;).append(safeWorkAccountingRevision).append(&quot;\&quot;,\n&quot;)</span>
+<span class="nc" id="L353">                .append(&quot;  \&quot;verificationReplayCharged\&quot;: &quot;).append(verificationReplayCharged).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L354">                .append(&quot;  \&quot;visibleInventoryFingerprint\&quot;: \&quot;&quot;).append(visibleInventoryFingerprint).append(&quot;\&quot;,\n&quot;)</span>
+<span class="nc" id="L355">                .append(&quot;  \&quot;principalInventoryFingerprint\&quot;: \&quot;&quot;).append(principalInventoryFingerprint).append(&quot;\&quot;,\n&quot;)</span>
+<span class="nc" id="L356">                .append(&quot;  \&quot;preparationInventoryFingerprint\&quot;: \&quot;&quot;).append(preparationInventoryFingerprint).append(&quot;\&quot;,\n&quot;)</span>
+<span class="nc" id="L357">                .append(&quot;  \&quot;exactRegistryFingerprint\&quot;: \&quot;&quot;).append(exactRegistryFingerprint).append(&quot;\&quot;,\n&quot;)</span>
+<span class="nc" id="L358">                .append(&quot;  \&quot;directRouteIsNoPreparationAblation\&quot;: &quot;).append(directRouteIsNoPreparationAblation).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L359">                .append(&quot;  \&quot;searchBudget\&quot;: &quot;).append(searchBudgetJson(searchBudget)).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L360">                .append(&quot;  \&quot;preparationBudgetIdentity\&quot;: \&quot;&quot;).append(preparationBudget.identity()).append(&quot;\&quot;,\n&quot;)</span>
+<span class="nc" id="L361">                .append(&quot;  \&quot;evidenceQualified\&quot;: &quot;).append(evidenceQualified()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L362">                .append(&quot;  \&quot;productDecision\&quot;: \&quot;&quot;).append(productDecision()).append(&quot;\&quot;,\n&quot;)</span>
+<span class="nc" id="L363">                .append(&quot;  \&quot;newlyReachedCases\&quot;: &quot;).append(newlyReachedCases()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L364">                .append(&quot;  \&quot;commonSolvedCases\&quot;: &quot;).append(commonSolvedCases()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L365">                .append(&quot;  \&quot;commonDirectWork\&quot;: &quot;).append(commonDirectWork()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L366">                .append(&quot;  \&quot;commonSafeWork\&quot;: &quot;).append(commonSafeWork()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L367">                .append(&quot;  \&quot;directSyntacticButSemanticallyRejectedCases\&quot;: &quot;).append(directSyntacticButSemanticallyRejectedCases()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L368">                .append(&quot;  \&quot;safeSyntacticButSemanticallyRejectedCases\&quot;: &quot;).append(safeSyntacticButSemanticallyRejectedCases()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L369">                .append(&quot;  \&quot;productBlockers\&quot;: &quot;).append(stringArray(productBlockers)).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L370">                .append(&quot;  \&quot;cases\&quot;: [\n&quot;);</span>
+<span class="nc bnc" id="L371" title="All 2 branches missed.">            for (int index = 0; index &lt; cases.size(); index++) {</span>
+<span class="nc bnc" id="L372" title="All 2 branches missed.">                if (index &gt; 0) {</span>
+<span class="nc" id="L373">                    json.append(&quot;,\n&quot;);</span>
+                }
+<span class="nc" id="L375">                appendCaseJson(json, cases.get(index));</span>
+            }
+<span class="nc" id="L377">            return json.append(&quot;\n  ]\n}\n&quot;).toString();</span>
+        }
+
+        public String toMarkdown() {
+<span class="nc" id="L381">            StringBuilder out = new StringBuilder();</span>
+<span class="nc" id="L382">            out.append(&quot;# Safe preparation product qualification\n\n&quot;)</span>
+<span class="nc" id="L383">                .append(&quot;Configuration: `&quot;).append(configurationId).append(&quot;`  \n&quot;)</span>
+<span class="nc" id="L384">                .append(&quot;Repository revision: `&quot;).append(repositoryRevision).append(&quot;`  \n&quot;)</span>
+<span class="nc" id="L385">                .append(&quot;Matched search budget: `&quot;).append(searchBudget).append(&quot;`  \n&quot;)</span>
+<span class="nc" id="L386">                .append(&quot;SAFE work accounting: `&quot;).append(safeWorkAccountingRevision).append(&quot;`  \n&quot;)</span>
+<span class="nc" id="L387">                .append(&quot;Verification replay charged: **&quot;).append(verificationReplayCharged).append(&quot;**  \n&quot;)</span>
+<span class="nc" id="L388">                .append(&quot;Evidence qualified: **&quot;).append(evidenceQualified()).append(&quot;**  \n&quot;)</span>
+<span class="nc" id="L389">                .append(&quot;Product decision: **&quot;).append(productDecision()).append(&quot;**\n\n&quot;)</span>
+<span class="nc" id="L390">                .append(&quot;DIRECT is the explicit no-preparation ablation. Both routes see the same declared concrete rule inventory and search budget. SAFE alone receives the versioned preparation authority; composed candidates retain their complete primitive lineage. SAFE also pays the deterministic coordinator verification replay rather than treating verification as free.\n\n&quot;)</span>
+<span class="nc" id="L391">                .append(&quot;| Case | DIRECT semantic | SAFE semantic | DIRECT primitives | SAFE primitives | DIRECT work | SAFE work | New by SAFE |\n&quot;)</span>
+<span class="nc" id="L392">                .append(&quot;|---|---:|---:|---:|---:|---:|---:|---:|\n&quot;);</span>
+<span class="nc bnc" id="L393" title="All 2 branches missed.">            for (CaseResult result : cases) {</span>
+<span class="nc" id="L394">                out.append(&quot;| &quot;).append(result.experimentCase().id())</span>
+<span class="nc" id="L395">                    .append(&quot; | &quot;).append(result.direct().semanticReached())</span>
+<span class="nc" id="L396">                    .append(&quot; | &quot;).append(result.safe().semanticReached())</span>
+<span class="nc" id="L397">                    .append(&quot; | &quot;).append(result.direct().primitiveDepth())</span>
+<span class="nc" id="L398">                    .append(&quot; | &quot;).append(result.safe().primitiveDepth())</span>
+<span class="nc" id="L399">                    .append(&quot; | &quot;).append(result.direct().chargedTotalWork())</span>
+<span class="nc" id="L400">                    .append(&quot; | &quot;).append(result.safe().chargedTotalWork())</span>
+<span class="nc" id="L401">                    .append(&quot; | &quot;).append(result.newlyReachedBySafe())</span>
+<span class="nc" id="L402">                    .append(&quot; |\n&quot;);</span>
+<span class="nc" id="L403">            }</span>
+<span class="nc" id="L404">            out.append(&quot;\nCommon solved cases: `&quot;).append(commonSolvedCases())</span>
+<span class="nc" id="L405">                .append(&quot;`; DIRECT work: `&quot;).append(commonDirectWork())</span>
+<span class="nc" id="L406">                .append(&quot;`; SAFE work: `&quot;).append(commonSafeWork()).append(&quot;`.  \n&quot;)</span>
+<span class="nc" id="L407">                .append(&quot;New semantic reachability under the matched budget: `&quot;)</span>
+<span class="nc" id="L408">                .append(newlyReachedCases()).append(&quot;` case(s).\n\n&quot;)</span>
+<span class="nc" id="L409">                .append(&quot;## Product-default decision\n\n&quot;);</span>
+<span class="nc bnc" id="L410" title="All 2 branches missed.">            if (productBlockers.isEmpty()) {</span>
+<span class="nc" id="L411">                out.append(&quot;No retained product blockers remain in this frozen qualification.\n&quot;);</span>
+            } else {
+<span class="nc" id="L413">                out.append(&quot;The bounded evidence can be green while the profile remains opt-in. Retained blockers:\n\n&quot;);</span>
+<span class="nc bnc" id="L414" title="All 2 branches missed.">                for (String blocker : productBlockers) {</span>
+<span class="nc" id="L415">                    out.append(&quot;- `&quot;).append(blocker).append(&quot;`\n&quot;);</span>
+<span class="nc" id="L416">                }</span>
+            }
+<span class="nc" id="L418">            out.append(&quot;\n## Claim boundary\n\n&quot;)</span>
+<span class="nc" id="L419">                .append(&quot;This is a frozen matched-budget comparison for the retained case matrix. It does not establish wall-clock or asymptotic superiority, universal preparation coverage, global rewrite completeness, or safety for algorithmic/typed principals without an explicit applicability contract.\n&quot;);</span>
+<span class="nc" id="L420">            return out.toString();</span>
+        }
+
+        private static void appendCaseJson(StringBuilder json, CaseResult result) {
+<span class="nc" id="L424">            ExperimentCase c = result.experimentCase();</span>
+<span class="nc" id="L425">            json.append(&quot;    {\n&quot;)</span>
+<span class="nc" id="L426">                .append(&quot;      \&quot;id\&quot;: \&quot;&quot;).append(escape(c.id())).append(&quot;\&quot;,\n&quot;)</span>
+<span class="nc" id="L427">                .append(&quot;      \&quot;family\&quot;: \&quot;&quot;).append(escape(c.family())).append(&quot;\&quot;,\n&quot;)</span>
+<span class="nc" id="L428">                .append(&quot;      \&quot;sourceExpression\&quot;: \&quot;&quot;).append(escape(c.sourceExpression())).append(&quot;\&quot;,\n&quot;)</span>
+<span class="nc" id="L429">                .append(&quot;      \&quot;targetExpression\&quot;: \&quot;&quot;).append(escape(c.targetExpression())).append(&quot;\&quot;,\n&quot;)</span>
+<span class="nc" id="L430">                .append(&quot;      \&quot;sourceAssumptions\&quot;: &quot;).append(stringArray(c.sourceAssumptions())).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L431">                .append(&quot;      \&quot;requiredAssumptions\&quot;: &quot;).append(stringArray(c.requiredAssumptions())).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L432">                .append(&quot;      \&quot;expectDirectSemanticReachability\&quot;: &quot;).append(c.expectDirectSemanticReachability()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L433">                .append(&quot;      \&quot;expectSafeSemanticReachability\&quot;: &quot;).append(c.expectSafeSemanticReachability()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L434">                .append(&quot;      \&quot;expectationsSatisfied\&quot;: &quot;).append(result.expectationsSatisfied()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L435">                .append(&quot;      \&quot;reachabilityRegression\&quot;: &quot;).append(result.reachabilityRegression()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L436">                .append(&quot;      \&quot;correctnessRegression\&quot;: &quot;).append(result.correctnessRegression()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L437">                .append(&quot;      \&quot;assumptionRegression\&quot;: &quot;).append(result.assumptionRegression()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L438">                .append(&quot;      \&quot;newlyReachedBySafe\&quot;: &quot;).append(result.newlyReachedBySafe()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L439">                .append(&quot;      \&quot;direct\&quot;: &quot;);</span>
+<span class="nc" id="L440">            appendRouteJson(json, result.direct(), 6);</span>
+<span class="nc" id="L441">            json.append(&quot;,\n      \&quot;safe\&quot;: &quot;);</span>
+<span class="nc" id="L442">            appendRouteJson(json, result.safe(), 6);</span>
+<span class="nc" id="L443">            json.append(&quot;\n    }&quot;);</span>
+<span class="nc" id="L444">        }</span>
+
+        private static void appendRouteJson(StringBuilder json, RouteOutcome route, int indent) {
+<span class="nc" id="L447">            String p = &quot; &quot;.repeat(indent);</span>
+<span class="nc" id="L448">            json.append(&quot;{\n&quot;)</span>
+<span class="nc" id="L449">                .append(p).append(&quot;  \&quot;profileId\&quot;: \&quot;&quot;).append(route.profileId()).append(&quot;\&quot;,\n&quot;)</span>
+<span class="nc" id="L450">                .append(p).append(&quot;  \&quot;visibleInventoryFingerprint\&quot;: \&quot;&quot;).append(route.visibleInventoryFingerprint()).append(&quot;\&quot;,\n&quot;)</span>
+<span class="nc" id="L451">                .append(p).append(&quot;  \&quot;searchStatus\&quot;: \&quot;&quot;).append(escape(route.searchStatus())).append(&quot;\&quot;,\n&quot;)</span>
+<span class="nc" id="L452">                .append(p).append(&quot;  \&quot;syntacticallyReached\&quot;: &quot;).append(route.syntacticallyReached()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L453">                .append(p).append(&quot;  \&quot;semanticReached\&quot;: &quot;).append(route.semanticReached()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L454">                .append(p).append(&quot;  \&quot;constructionSafe\&quot;: &quot;).append(route.constructionSafe()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L455">                .append(p).append(&quot;  \&quot;effectiveAssumptions\&quot;: &quot;).append(stringArray(route.effectiveAssumptions())).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L456">                .append(p).append(&quot;  \&quot;missingAssumptions\&quot;: &quot;).append(stringArray(route.missingAssumptions())).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L457">                .append(p).append(&quot;  \&quot;edgeDepth\&quot;: &quot;).append(route.edgeDepth()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L458">                .append(p).append(&quot;  \&quot;primitiveDepth\&quot;: &quot;).append(route.primitiveDepth()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L459">                .append(p).append(&quot;  \&quot;appliedRuleIds\&quot;: &quot;).append(stringArray(route.appliedRuleIds())).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L460">                .append(p).append(&quot;  \&quot;primitiveRuleIds\&quot;: &quot;).append(stringArray(route.primitiveRuleIds())).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L461">                .append(p).append(&quot;  \&quot;exploredStates\&quot;: &quot;).append(route.exploredStates()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L462">                .append(p).append(&quot;  \&quot;generatedCandidates\&quot;: &quot;).append(route.generatedCandidates()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L463">                .append(p).append(&quot;  \&quot;chargedTotalWork\&quot;: &quot;).append(route.chargedTotalWork()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L464">                .append(p).append(&quot;  \&quot;technicalFailure\&quot;: \&quot;&quot;).append(escape(route.technicalFailure())).append(&quot;\&quot;,\n&quot;)</span>
+<span class="nc" id="L465">                .append(p).append(&quot;  \&quot;safeTelemetry\&quot;: &quot;);</span>
+<span class="nc" id="L466">            appendTelemetryJson(json, route.safeTelemetry(), indent + 2);</span>
+<span class="nc" id="L467">            json.append(&quot;\n&quot;).append(p).append(&quot;}&quot;);</span>
+<span class="nc" id="L468">        }</span>
+
+        private static void appendTelemetryJson(StringBuilder json, SafeTelemetry value, int indent) {
+<span class="nc" id="L471">            String p = &quot; &quot;.repeat(indent);</span>
+<span class="nc" id="L472">            json.append(&quot;{\n&quot;)</span>
+<span class="nc" id="L473">                .append(p).append(&quot;  \&quot;coordinatorCalls\&quot;: &quot;).append(value.coordinatorCalls()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L474">                .append(p).append(&quot;  \&quot;verificationCalls\&quot;: &quot;).append(value.verificationCalls()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L475">                .append(p).append(&quot;  \&quot;verificationFailures\&quot;: &quot;).append(value.verificationFailures()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L476">                .append(p).append(&quot;  \&quot;directPrincipalCandidates\&quot;: &quot;).append(value.directPrincipalCandidates()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L477">                .append(p).append(&quot;  \&quot;preparedPrincipalCandidates\&quot;: &quot;).append(value.preparedPrincipalCandidates()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L478">                .append(p).append(&quot;  \&quot;analyzeMechanicalWork\&quot;: &quot;).append(value.analyzeMechanicalWork()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L479">                .append(p).append(&quot;  \&quot;verificationReplayMechanicalWork\&quot;: &quot;).append(value.verificationReplayMechanicalWork()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L480">                .append(p).append(&quot;  \&quot;chargedCoordinatorMechanicalWork\&quot;: &quot;).append(value.chargedCoordinatorMechanicalWork()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L481">                .append(p).append(&quot;  \&quot;fallbackExecutions\&quot;: &quot;).append(value.fallbackExecutions()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L482">                .append(p).append(&quot;  \&quot;fallbackGeneratedTransitions\&quot;: &quot;).append(value.fallbackGeneratedTransitions()).append(&quot;,\n&quot;)</span>
+<span class="nc" id="L483">                .append(p).append(&quot;  \&quot;fallbackUniqueExpansions\&quot;: &quot;).append(value.fallbackUniqueExpansions()).append(&quot;\n&quot;)</span>
+<span class="nc" id="L484">                .append(p).append(&quot;}&quot;);</span>
+<span class="nc" id="L485">        }</span>
+    }
+
+    static String searchBudgetJson(Budget budget) {
+<span class="nc" id="L489">        return &quot;{&quot;</span>
+<span class="nc" id="L490">            + &quot;\&quot;maxPrimitiveSteps\&quot;:&quot; + budget.maxPrimitiveSteps() + &quot;,&quot;</span>
+<span class="nc" id="L491">            + &quot;\&quot;maxExactTheoryWorkUnits\&quot;:&quot; + budget.maxExactTheoryWorkUnits() + &quot;,&quot;</span>
+<span class="nc" id="L492">            + &quot;\&quot;maxExploredStates\&quot;:&quot; + budget.maxExploredStates() + &quot;,&quot;</span>
+<span class="nc" id="L493">            + &quot;\&quot;maxCandidatesPerState\&quot;:&quot; + budget.maxCandidatesPerState() + &quot;,&quot;</span>
+<span class="nc" id="L494">            + &quot;\&quot;maxExpandingSteps\&quot;:&quot; + budget.maxExpandingSteps() + &quot;,&quot;</span>
+<span class="nc" id="L495">            + &quot;\&quot;maxWorkUnits\&quot;:&quot; + budget.maxWorkUnits()</span>
+            + &quot;}&quot;;
+    }
+
+    static String stringArray(List&lt;String&gt; values) {
+<span class="nc" id="L500">        return values.stream()</span>
+<span class="nc" id="L501">            .map(value -&gt; &quot;\&quot;&quot; + escape(value) + &quot;\&quot;&quot;)</span>
+<span class="nc" id="L502">            .collect(java.util.stream.Collectors.joining(&quot;, &quot;, &quot;[&quot;, &quot;]&quot;));</span>
+    }
+
+    static String escape(String value) {
+<span class="nc" id="L506">        return value.replace(&quot;\\&quot;, &quot;\\\\&quot;)</span>
+<span class="nc" id="L507">            .replace(&quot;\&quot;&quot;, &quot;\\\&quot;&quot;)</span>
+<span class="nc" id="L508">            .replace(&quot;\n&quot;, &quot;\\n&quot;)</span>
+<span class="nc" id="L509">            .replace(&quot;\r&quot;, &quot;\\r&quot;);</span>
+    }
+
+    static String requiredText(String value, String name) {
+<span class="pc bpc" id="L513" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L514">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L516">        return value.trim();</span>
+    }
+
+    static String requiredHash(String value, String name) {
+<span class="pc bpc" id="L520" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L521">            throw new IllegalArgumentException(name + &quot; must be a SHA-256 identity&quot;);</span>
+        }
+<span class="fc" id="L523">        return value;</span>
+    }
+
+    static void requireRevision(String value) {
+<span class="pc bpc" id="L527" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;[0-9a-f]{40}&quot;)) {</span>
+<span class="nc" id="L528">            throw new IllegalArgumentException(</span>
+                &quot;repositoryRevision must be a lowercase commit SHA&quot;);
+        }
+<span class="fc" id="L531">    }</span>
+
+    static long saturatedAdd(long left, long right) {
+        try {
+<span class="fc" id="L535">            return Math.addExact(left, right);</span>
+<span class="nc" id="L536">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L537">            return Long.MAX_VALUE;</span>
+        }
+    }
+
+    private static List&lt;String&gt; immutableStrings(List&lt;String&gt; values, String name) {
+<span class="fc" id="L542">        Objects.requireNonNull(values, name);</span>
+<span class="pc bpc" id="L543" title="3 of 6 branches missed.">        if (values.stream().anyMatch(value -&gt; value == null || value.isBlank())) {</span>
+<span class="nc" id="L544">            throw new IllegalArgumentException(name + &quot; must not contain blank values&quot;);</span>
+        }
+<span class="fc" id="L546">        return List.copyOf(values);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
