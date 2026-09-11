@@ -11,14 +11,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/**
- * Registry of available {@link RuleDomain rule domains}.
- *
- * <p>The {@code core} domain is always available and corresponds to
- * {@link AstRewriteTransformationEngine#defaultRules()}. Additional domains
- * (polynomial, rational, ...) are filtered/extended subsets sharing the same
- * atomic rule contract.</p>
- */
+/** Registry of available {@link RuleDomain rule domains}. */
 public final class RuleDomainRegistry {
     public static final String CORE = "core";
     public static final String POLYNOMIAL = "polynomial";
@@ -33,17 +26,23 @@ public final class RuleDomainRegistry {
     public RuleDomainRegistry() {
         register(new SimpleRuleDomain(CORE, "Atomare Grundregeln",
             AstRewriteTransformationEngine.defaultRules()));
-        register(new SimpleRuleDomain(POLYNOMIAL, "Polynomregeln (Ausmultiplizieren, Sammeln, Potenzen, Normalform)",
+        register(new SimpleRuleDomain(POLYNOMIAL,
+            "Polynomregeln (Ausmultiplizieren, Sammeln, Potenzen, Normalform)",
             PolynomialRules.rules()));
-        register(new SimpleRuleDomain(RATIONAL, "Bruchregeln (Kürzen, gemeinsamer Nenner, Multiplikation, Division)",
+        register(new SimpleRuleDomain(RATIONAL,
+            "Bruchregeln (Kürzen, gemeinsamer Nenner, Multiplikation, Division)",
             RationalRules.rules()));
-        register(new SimpleRuleDomain(TRIGONOMETRIC, "Trigonometrische Identitäten (Pythagoras, Doppelwinkel)",
+        register(new SimpleRuleDomain(TRIGONOMETRIC,
+            "Trigonometrische Identitäten (Pythagoras, Doppelwinkel)",
             TrigonometricRules.rules()));
-        register(new SimpleRuleDomain(LOGARITHMIC, "Logarithmische Identitäten mit Positivitäts-Assumptions",
+        register(new SimpleRuleDomain(LOGARITHMIC,
+            "Logarithmische Identitäten mit Positivitäts-Assumptions",
             LogarithmicRules.rules()));
-        register(new SimpleRuleDomain(RADICAL, "Wurzelregeln (sqrt(a^2)=abs(a), Produkt-/Quotientenregel)",
+        register(new SimpleRuleDomain(RADICAL,
+            "Wurzelregeln (sqrt(a^2)=abs(a), Produkt-/Quotientenregel)",
             RadicalRules.rules()));
-        register(new SimpleRuleDomain(CALCULUS_BASIC, "Basis Analysis (exp/log-Inversion)",
+        register(new SimpleRuleDomain(CALCULUS_BASIC,
+            "Basis Analysis (exp/ln-Inversion)",
             CalculusBasicRules.rules()));
     }
 
@@ -61,11 +60,7 @@ public final class RuleDomainRegistry {
         return List.copyOf(domains.values());
     }
 
-    /**
-     * @return concatenated rule list of all selected domain names; unknown
-     *         names are silently ignored. Duplicate rule IDs across domains are
-     *         deduplicated.
-     */
+    /** Returns the deduplicated rules of all known selected domains. */
     public List<RewriteRule> rulesFor(List<String> domainNames) {
         List<RewriteRule> rules = new ArrayList<>();
         java.util.Set<String> seen = new java.util.HashSet<>();
@@ -83,12 +78,7 @@ public final class RuleDomainRegistry {
         return rules;
     }
 
-    /**
-     * Returns the complete explicit preparation-eligibility decision for the
-     * selected domains. A rule without a declarative pattern or an explicit
-     * {@code RewriteApplicabilitySchemaProvider} remains visible here as an
-     * exclusion; no schema is inferred from metadata or examples.
-     */
+    /** Returns positive and negative safe-preparation eligibility decisions. */
     public List<RewriteApplicabilityCatalog.Entry> applicabilityCoverageFor(
         List<String> domainNames
     ) {
@@ -102,7 +92,11 @@ public final class RuleDomainRegistry {
         return RewriteApplicabilityCatalog.safeSchemas(rulesFor(domainNames));
     }
 
-    private record SimpleRuleDomain(String name, String description, List<RewriteRule> rules) implements RuleDomain {
+    private record SimpleRuleDomain(
+        String name,
+        String description,
+        List<RewriteRule> rules
+    ) implements RuleDomain {
         private SimpleRuleDomain {
             rules = List.copyOf(rules);
         }
