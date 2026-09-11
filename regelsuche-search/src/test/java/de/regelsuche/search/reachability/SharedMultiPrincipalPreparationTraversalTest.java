@@ -5,8 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternMatchAnalyzer;
 import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RecognitionProfile;
 import de.regelsuche.transform.RewriteApplicabilitySchema;
 import de.regelsuche.transform.RewriteKind;
 import java.util.List;
@@ -135,6 +138,62 @@ class SharedMultiPrincipalPreparationTraversalTest {
             evaluation.work().physicalWork().uniqueExpansions());
     }
 
+    @Test
+    void multiPrincipalProductionOrderingFollowsVersionedAggregateRank() {
+        PatternExpr principalPattern = PatternExpr.fn(
+            "goal", PatternExpr.var("A"), PatternExpr.num(0));
+        PatternRewriteRule principal = rule(
+            "multi_rank_principal",
+            principalPattern,
+            PatternExpr.var("A"),
+            RewriteKind.SIMPLIFY);
+        PatternRewriteRule toward = rule(
+            "multi_rank_toward",
+            PatternExpr.fn("src", PatternExpr.var("A")),
+            PatternExpr.fn("goal", PatternExpr.var("A"), PatternExpr.num(1)),
+            RewriteKind.NORMALIZE);
+        PatternRewriteRule worse = rule(
+            "multi_rank_worse",
+            PatternExpr.fn("src", PatternExpr.var("A")),
+            PatternExpr.fn("other", PatternExpr.var("A")),
+            RewriteKind.NORMALIZE);
+        PatternRewriteRule finish = rule(
+            "multi_rank_finish",
+            PatternExpr.fn("goal", PatternExpr.var("A"), PatternExpr.num(1)),
+            PatternExpr.fn("goal", PatternExpr.var("A"), PatternExpr.num(0)),
+            RewriteKind.NORMALIZE);
+
+        PatternMatchAnalyzer analyzer = new PatternMatchAnalyzer();
+        ExpressionParser parser = new ExpressionParser();
+        var towardAnalysis = analyzer.analyze(
+            principalPattern,
+            parser.parseTerm("goal(x,1)"),
+            RecognitionProfile.exact());
+        var worseAnalysis = analyzer.analyze(
+            principalPattern,
+            parser.parseTerm("other(x)"),
+            RecognitionProfile.exact());
+        assertTrue(PreparationNearMatchRanking.aggregate(List.of(towardAnalysis))
+            .compareTo(PreparationNearMatchRanking.aggregate(List.of(worseAnalysis))) < 0);
+
+        var traversal = new SharedMultiPrincipalPreparationTraversal(
+            List.of(RewriteApplicabilitySchema.fromPatternRule(principal)),
+            List.of(toward, worse, finish),
+            rankingBudget());
+        var evaluation = traversal.analyze(
+            "src(x)",
+            AssumptionSignature.ofExpressions(List.of()));
+        var outcome = evaluation.outcome(principal.id()).orElseThrow();
+
+        assertEquals(
+            SharedMultiPrincipalPreparationTraversal.Status.PREPARED_MATCH,
+            outcome.status());
+        assertEquals(List.of("multi_rank_toward", "multi_rank_finish"),
+            outcome.preparationSteps().stream()
+                .map(PatternTargetedLocalBridgeSearch.Step::ruleId)
+                .toList());
+    }
+
     private static PatternRewriteRule rule(
         String id,
         PatternExpr source,
@@ -189,5 +248,18 @@ class SharedMultiPrincipalPreparationTraversalTest {
             32,
             5_000,
             2_500);
+    }
+
+    private static PatternTargetedLocalBridgeSearch.Budget rankingBudget() {
+        return new PatternTargetedLocalBridgeSearch.Budget(
+            2,
+            8,
+            16,
+            4,
+            64,
+            1,
+            32,
+            500,
+            250);
     }
 }
