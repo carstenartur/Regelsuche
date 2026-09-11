@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import importlib.util
 import json
 import sys
@@ -16,7 +17,13 @@ sys.dont_write_bytecode = True
 
 
 def write(path: Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def git_blob_sha1(path: Path) -> str:
+    data = path.read_bytes()
+    return hashlib.sha1(f"blob {len(data)}\0".encode("ascii") + data).hexdigest()
 
 
 def benchmark(
@@ -51,19 +58,28 @@ def load_verifier(path: Path):
     return module
 
 
-def arguments(root: Path, label: str, threshold_policy: Path, decision_policy: Path) -> list[str]:
+def arguments(
+    repository_root: Path,
+    result_path: Path,
+    threshold_policy: Path,
+    decision_policy: Path,
+    json_output: Path,
+    markdown_output: Path,
+) -> list[str]:
     return [
         "verify-jmh-regression-v3.py",
+        "--repository-root",
+        str(repository_root),
         "--result",
-        str(root / f"{label}-result.json"),
+        str(result_path),
         "--threshold-policy",
         str(threshold_policy),
         "--decision-policy",
         str(decision_policy),
         "--json-output",
-        str(root / f"{label}-report.json"),
+        str(json_output),
         "--markdown-output",
-        str(root / f"{label}-report.md"),
+        str(markdown_output),
     ]
 
 
@@ -80,9 +96,11 @@ def execute(
     previous = sys.argv
     sys.argv = arguments(
         root,
-        label,
+        result_path,
         root / "threshold-policy.json",
         root / "decision-policy.json",
+        json_output,
+        root / f"{label}-report.md",
     )
     try:
         try:
@@ -111,14 +129,37 @@ def execute_policy_failure(
     threshold_policy: dict[str, Any],
     decision_policy: dict[str, Any],
     expected_message: str,
+    *,
+    threshold_path_override: str | None = None,
+    threshold_blob_override: str | None = None,
 ) -> None:
-    threshold_path = root / f"{label}-threshold-policy.json"
-    decision_path = root / f"{label}-decision-policy.json"
+    case_root = root / label
+    case_root.mkdir(parents=True, exist_ok=True)
+    threshold_path = case_root / "threshold-policy.json"
+    decision_path = case_root / "decision-policy.json"
+    result_path = case_root / "result.json"
+    json_output = case_root / "report.json"
     write(threshold_path, threshold_policy)
-    write(decision_path, decision_policy)
-    write(root / f"{label}-result.json", [benchmark()])
+    bound_decision = copy.deepcopy(decision_policy)
+    bound_decision["thresholdPolicyPath"] = (
+        threshold_path_override if threshold_path_override is not None else "threshold-policy.json"
+    )
+    bound_decision["thresholdPolicyGitBlobSha1"] = (
+        threshold_blob_override
+        if threshold_blob_override is not None
+        else git_blob_sha1(threshold_path)
+    )
+    write(decision_path, bound_decision)
+    write(result_path, [benchmark()])
     previous = sys.argv
-    sys.argv = arguments(root, label, threshold_path, decision_path)
+    sys.argv = arguments(
+        case_root,
+        result_path,
+        threshold_path,
+        decision_path,
+        json_output,
+        case_root / "report.md",
+    )
     try:
         try:
             verifier.main()
@@ -134,13 +175,23 @@ def execute_policy_failure(
         sys.argv = previous
 
 
-def assert_decision_score(report: dict[str, Any], expected: float, label: str) -> None:
+def only_row(report: dict[str, Any], label: str) -> dict[str, Any]:
     rows = report.get("benchmarks")
-    if not isinstance(rows, list) or len(rows) != 1:
+    if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], dict):
         raise SystemExit(f"{label}: expected one benchmark row")
-    actual = rows[0].get("decisionScore")
+    return rows[0]
+
+
+def assert_decision_score(report: dict[str, Any], expected: float, label: str) -> None:
+    actual = only_row(report, label).get("decisionScore")
     if not isinstance(actual, (int, float)) or abs(float(actual) - expected) > 1e-12:
         raise SystemExit(f"{label}: expected decisionScore {expected}, found {actual}")
+
+
+def assert_precision(report: dict[str, Any], expected: str, label: str) -> None:
+    actual = only_row(report, label).get("precisionStatus")
+    if actual != expected:
+        raise SystemExit(f"{label}: expected precision {expected}, found {actual}")
 
 
 def main() -> None:
@@ -176,20 +227,26 @@ def main() -> None:
                 }
             ],
         }
+        threshold_path = root / "threshold-policy.json"
+        write(threshold_path, threshold_policy)
         decision_policy = {
             "schema": "regelsuche.quality.jmh-regression-decision-policy/v3",
-            "thresholdPolicyPath": "config/quality/jmh-regression-policy-v2.json",
+            "thresholdPolicyPath": "threshold-policy.json",
             "thresholdPolicySchema": "regelsuche.quality.jmh-regression-policy/v2",
+            "thresholdPolicyGitBlobSha1": git_blob_sha1(threshold_path),
             "decisionStatistic": "max(0, currentScore - currentScoreError)",
             "failureCondition": "decisionScore > maximumAllowedScore",
             "boundaryPolicy": "inclusive-pass",
+            "lowPrecisionDiagnostic": "currentScoreError >= currentScore",
             "claimBoundary": "synthetic uncertainty-aware decision authority",
         }
-        write(root / "threshold-policy.json", threshold_policy)
         write(root / "decision-policy.json", decision_policy)
 
         ordinary_pass = execute(verifier, root, "pass", [benchmark()], 0)
         assert_decision_score(ordinary_pass, 0.9, "pass")
+        assert_precision(ordinary_pass, "MEASURED", "pass")
+        if ordinary_pass.get("lowPrecisionCount") != 0:
+            raise SystemExit("pass: unexpected low-precision measurement")
 
         uncertainty_pass = execute(
             verifier,
@@ -199,6 +256,7 @@ def main() -> None:
             0,
         )
         assert_decision_score(uncertainty_pass, 1.4, "uncertainty-pass")
+        assert_precision(uncertainty_pass, "MEASURED", "uncertainty-pass")
 
         boundary_pass = execute(
             verifier,
@@ -217,6 +275,9 @@ def main() -> None:
             0,
         )
         assert_decision_score(clamped_pass, 0.0, "clamped-pass")
+        assert_precision(clamped_pass, "LOW_PRECISION", "clamped-pass")
+        if clamped_pass.get("lowPrecisionBenchmarks") != ["example.Benchmark.work"]:
+            raise SystemExit("clamped-pass: low-precision evidence was not retained")
 
         execute(verifier, root, "missing", [], 1)
         execute(
@@ -286,7 +347,27 @@ def main() -> None:
             "thresholdPolicySchema differs",
         )
 
-    print("JMH regression verifier v3 characterization passed: 4 positive, 9 negative")
+        execute_policy_failure(
+            verifier,
+            root,
+            "wrong-threshold-path",
+            threshold_policy,
+            decision_policy,
+            "threshold policy path differs",
+            threshold_path_override="other-threshold-policy.json",
+        )
+
+        execute_policy_failure(
+            verifier,
+            root,
+            "wrong-threshold-content",
+            threshold_policy,
+            decision_policy,
+            "threshold policy content differs",
+            threshold_blob_override="0" * 40,
+        )
+
+    print("JMH regression verifier v3 characterization passed: 4 positive, 11 negative")
 
 
 if __name__ == "__main__":
