@@ -1,7 +1,6 @@
 package de.regelsuche.rules;
 
 import de.regelsuche.transform.AstRewriteTransformationEngine;
-import de.regelsuche.transform.RewriteApplicabilityCatalog;
 import de.regelsuche.transform.RewriteApplicabilitySchema;
 import de.regelsuche.transform.RewriteRule;
 import java.util.ArrayList;
@@ -66,30 +65,25 @@ public final class RuleDomainRegistry {
         java.util.Set<String> seen = new java.util.HashSet<>();
         for (String name : domainNames) {
             RuleDomain domain = domains.get(name);
-            if (domain == null) {
-                continue;
-            }
+            if (domain == null) continue;
             for (RewriteRule rule : domain.rules()) {
-                if (seen.add(rule.id())) {
-                    rules.add(rule);
-                }
+                if (seen.add(rule.id())) rules.add(rule);
             }
         }
         return rules;
     }
 
     /** Returns positive and negative safe-preparation eligibility decisions. */
-    public List<RewriteApplicabilityCatalog.Entry> applicabilityCoverageFor(
-        List<String> domainNames
-    ) {
-        return RewriteApplicabilityCatalog.inspect(rulesFor(domainNames));
+    public List<RewriteApplicabilitySchema.CoverageEntry>
+            applicabilityCoverageFor(List<String> domainNames) {
+        return RewriteApplicabilitySchema.coverage(rulesFor(domainNames));
     }
 
     /** Returns only explicitly safe preparation principal schemas. */
     public List<RewriteApplicabilitySchema> applicabilitySchemasFor(
         List<String> domainNames
     ) {
-        return RewriteApplicabilityCatalog.safeSchemas(rulesFor(domainNames));
+        return RewriteApplicabilitySchema.safeSchemas(rulesFor(domainNames));
     }
 
     private record SimpleRuleDomain(
