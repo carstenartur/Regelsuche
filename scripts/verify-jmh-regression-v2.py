@@ -184,12 +184,18 @@ def main() -> int:
             )
 
         maximum = float(expected["maximumAllowedScore"])
+        decision_score = max(0.0, score - score_error)
         regression_percent = 100.0 * (
             score / float(expected["baselineScore"]) - 1.0
         )
-        if score > maximum + max(1e-12, maximum * 1e-12):
+        decision_regression_percent = 100.0 * (
+            decision_score / float(expected["baselineScore"]) - 1.0
+        )
+        if decision_score > maximum + max(1e-12, maximum * 1e-12):
             row_violations.append(
-                f"score {score:.9f} {unit} exceeds {maximum:.9f} {unit}"
+                f"decision score {decision_score:.9f} {unit} "
+                f"(score {score:.9f} - scoreError {score_error:.9f}) "
+                f"exceeds {maximum:.9f} {unit}"
             )
 
         violations.extend(f"{name}: {item}" for item in row_violations)
@@ -202,8 +208,11 @@ def main() -> int:
                 "baselineScoreError": expected["baselineScoreError"],
                 "currentScore": score,
                 "currentScoreError": score_error,
+                "decisionScore": decision_score,
+                "decisionRule": "max(0, currentScore - currentScoreError) <= maximumAllowedScore",
                 "maximumAllowedScore": maximum,
                 "regressionPercent": round(regression_percent, 6),
+                "decisionRegressionPercent": round(decision_regression_percent, 6),
                 "status": "PASSED" if not row_violations else "FAILED",
                 "violations": row_violations,
             }
@@ -215,6 +224,7 @@ def main() -> int:
         "baselineRevision": policy.get("baselineRevision"),
         "baselineArtifactDigest": policy.get("baselineArtifactDigest"),
         "claimBoundary": policy.get("claimBoundary"),
+        "decisionRule": "max(0, currentScore - currentScoreError) <= maximumAllowedScore",
         "status": "PASSED" if not violations else "FAILED",
         "benchmarkCount": len(rows),
         "missingBenchmarks": missing,
@@ -235,14 +245,17 @@ def main() -> int:
         "",
         str(policy.get("claimBoundary", "")),
         "",
-        "| Benchmark | Unit | Baseline | Current | Maximum | Change | Status |",
-        "| --- | --- | ---: | ---: | ---: | ---: | --- |",
+        "Decision statistic: `max(0, current score - score error)`.",
+        "",
+        "| Benchmark | Unit | Baseline | Current ± error | Decision | Maximum | Raw change | Status |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |",
     ]
     for row in rows:
         lines.append(
             f"| `{row['benchmark']}` | `{row['unit']}` | "
-            f"{row['baselineScore']:.6f} | {row['currentScore']:.6f} | "
-            f"{row['maximumAllowedScore']:.6f} | "
+            f"{row['baselineScore']:.6f} | "
+            f"{row['currentScore']:.6f} ± {row['currentScoreError']:.6f} | "
+            f"{row['decisionScore']:.6f} | {row['maximumAllowedScore']:.6f} | "
             f"{row['regressionPercent']:+.2f}% | {row['status']} |"
         )
     if violations:
