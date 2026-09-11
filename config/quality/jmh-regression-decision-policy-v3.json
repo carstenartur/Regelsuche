@@ -1,0 +1,9 @@
+{
+  "schema": "regelsuche.quality.jmh-regression-decision-policy/v3",
+  "thresholdPolicyPath": "config/quality/jmh-regression-policy-v2.json",
+  "thresholdPolicySchema": "regelsuche.quality.jmh-regression-policy/v2",
+  "decisionStatistic": "max(0, currentScore - currentScoreError)",
+  "failureCondition": "decisionScore > maximumAllowedScore",
+  "boundaryPolicy": "inclusive-pass",
+  "claimBoundary": "Shared-runner average-time ratchet. The v3 decision authority preserves the frozen v2 benchmark inventory and finite family thresholds, but treats a material regression as established only when the JMH point estimate minus its reported scoreError remains above the configured maximum. It does not establish cross-hardware absolute performance or statistical significance beyond the recorded JMH uncertainty."
+}
