@@ -3,6 +3,7 @@ package de.regelsuche.sdk.discovery.python;
 import static de.regelsuche.sdk.discovery.python.PythonDomainWire.*;
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.regelsuche.discovery.domain.DiscoveryDomain.CounterexampleResult;
 import de.regelsuche.discovery.domain.DiscoveryDomain.DiscoverySeed;
 import de.regelsuche.discovery.domain.DiscoveryDomain.Evaluation;
 import de.regelsuche.sdk.discovery.DiscoveryBudgets;
@@ -11,6 +12,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Function;
@@ -28,6 +30,7 @@ class PythonDiscoveryDomainTest {
         Function<Map<String, Object>, Map<String, Object>> change = Function.identity();
         Function<String, String> raw = Function.identity();
         final List<String> operations = new ArrayList<>();
+        final List<Integer> counterexampleBudgets = new ArrayList<>();
         boolean skipWitness;
         public String programSha256() { return HASH; }
         public String invoke(String request, Duration timeout) {
@@ -45,8 +48,11 @@ class PythonDiscoveryDomainTest {
                 case "successors" -> Map.of("successors", state >= 2 ? List.of()
                         : List.of(Map.of("action", "next", "state", Integer.toString(state + 1), "cost", 1)));
                 case "candidate" -> Map.of("candidate", args.get("state"));
-                case "counterexamples" -> Map.of("status", "1".equals(args.get("candidate")) && !skipWitness ? "FOUND" : "NONE_FOUND",
-                        "attempts", 1, "witness", "1".equals(args.get("candidate")) && !skipWitness ? "1!=2" : "");
+                case "counterexamples" -> {
+                    counterexampleBudgets.add(integer(args.get("budget"), 0, Integer.MAX_VALUE));
+                    yield Map.of("status", "1".equals(args.get("candidate")) && !skipWitness ? "FOUND" : "NONE_FOUND",
+                            "attempts", 1, "witness", "1".equals(args.get("candidate")) && !skipWitness ? "1!=2" : "");
+                }
                 default -> throw new IllegalStateException(op);
             };
             return raw.apply(canonical(change.apply(new TreeMap<>(Map.of("protocol", PythonDiscoveryDomain.PROTOCOL,
@@ -63,6 +69,19 @@ class PythonDiscoveryDomainTest {
                 transport, decode, encode, (candidate, witness) -> candidate == 1 && witness.equals("1!=2"),
                 candidate -> candidate == 2 ? Evaluation.confirmed("checked-2", "independent finite control", Map.of())
                         : Evaluation.refuted("host rejects candidate", Map.of()), "FINITE_CONTROL", Function.identity(), Function.identity());
+    }
+    private static PythonDiscoveryDomain<Integer, String> adapter(FakeTransport transport,
+            PythonDiscoveryDomain.HostCounterexamplePrecheck<Integer> precheck) {
+        return adapter(new PythonDiscoveryDomain.Definition("python-control", "v2-host-precheck", HASH,
+                "control;hostPrecheck=" + precheck.id(), LIMITS), transport, precheck);
+    }
+    private static PythonDiscoveryDomain<Integer, String> adapter(PythonDiscoveryDomain.Definition definition,
+            FakeTransport transport, PythonDiscoveryDomain.HostCounterexamplePrecheck<Integer> precheck) {
+        return new PythonDiscoveryDomain<>(definition, transport, Integer::parseInt, Object::toString,
+                (candidate, witness) -> candidate == 1 && witness.equals("1!=2"), precheck,
+                candidate -> candidate == 2 ? Evaluation.confirmed("checked-2", "independent finite control", Map.of())
+                        : Evaluation.refuted("host rejects candidate", Map.of()),
+                "FINITE_CONTROL", Function.identity(), Function.identity());
     }
     private static void start(PythonDiscoveryDomain<?, ?> adapter) { adapter.domain().generator().generate(SEED); }
 
@@ -183,6 +202,86 @@ class PythonDiscoveryDomainTest {
                 .seed("seed", SEED.payload(), "unit-test").budget(DiscoveryBudgets.tiny()).run();
         assertFalse(run.isConfirmed()); assertTrue(run.selectedCertificate().isEmpty());
     }
+
+    @Test void trustedPrecheckRejectsBeforeGuestCounterexampleCallback() {
+        var transport = new FakeTransport();
+        var precheck = new PythonDiscoveryDomain.HostCounterexamplePrecheck<Integer>(
+                "exact-periodicity-no-go-v1",
+                (candidate, budget) -> candidate == 1
+                        ? Optional.of(CounterexampleResult.found(
+                                1, "1!=2", Map.of("proof", "constructive-collision")))
+                        : Optional.empty());
+        var adapter = adapter(transport, precheck);
+        var run = RegelsucheDiscovery.forDomain(adapter.domain()).campaign("host-precheck-control")
+                .seed("seed", SEED.payload(), "host-precheck-test").budget(DiscoveryBudgets.small()).run();
+        assertTrue(run.isConfirmed(), run::canonicalEvidence);
+        assertEquals(2, run.selectedCandidate().orElseThrow());
+        assertEquals(1L, transport.operations.stream().filter("counterexamples"::equals).count(),
+                "candidate 1 must be rejected without a Python counterexample callback");
+        assertTrue(run.canonicalEvidence().contains("exact-periodicity-no-go-v1"));
+        assertTrue(run.canonicalEvidence().contains("constructive-collision"));
+    }
+    @Test void nonApplicablePrecheckDelegatesToGuestWithUnchangedBudget() {
+        var transport = new FakeTransport();
+        int[] precheckBudget = {-1};
+        var adapter = adapter(transport, new PythonDiscoveryDomain.HostCounterexamplePrecheck<>(
+                "non-applicable-control-v1", (candidate, budget) -> {
+                    precheckBudget[0] = budget;
+                    return Optional.empty();
+                }));
+        start(adapter);
+
+        var result = adapter.domain().counterexampleGenerator().search(2, 7);
+
+        assertEquals(7, precheckBudget[0]);
+        assertEquals(List.of(7), transport.counterexampleBudgets);
+        assertEquals("non-applicable-control-v1", result.metrics().get("hostPrecheck"));
+    }
+    @Test void precheckIdentityIsAutomaticallyBoundWhileLegacyNoPrecheckBindingStaysStable() {
+        var definition = new PythonDiscoveryDomain.Definition(
+                "python-control", "binding-control", HASH, "same-configuration", LIMITS);
+        var legacyTransport = new FakeTransport();
+        var legacy = new PythonDiscoveryDomain<Integer, String>(definition, legacyTransport,
+                Integer::parseInt, Object::toString, (candidate, witness) -> false,
+                candidate -> Evaluation.refuted("control", Map.of()),
+                "FINITE_CONTROL", Function.identity(), Function.identity());
+        var first = adapter(definition, new FakeTransport(), new PythonDiscoveryDomain.HostCounterexamplePrecheck<>(
+                "precheck-a-v1", (candidate, budget) -> Optional.empty()));
+        var second = adapter(definition, new FakeTransport(), new PythonDiscoveryDomain.HostCounterexamplePrecheck<>(
+                "precheck-b-v1", (candidate, budget) -> Optional.empty()));
+        assertTrue(legacy.domain().stateCodec().canonicalForm("state").contains(definition.bindingSha256()));
+        assertNotEquals(legacy.domain().stateCodec().canonicalForm("state"),
+                first.domain().stateCodec().canonicalForm("state"));
+        assertNotEquals(first.domain().stateCodec().canonicalForm("state"),
+                second.domain().stateCodec().canonicalForm("state"));
+        start(legacy);
+        assertFalse(legacy.domain().counterexampleGenerator().search(2, 7).metrics().containsKey("hostPrecheck"));
+        assertEquals(List.of(7), legacyTransport.counterexampleBudgets);
+        assertThrows(IllegalArgumentException.class, () -> new PythonDiscoveryDomain.HostCounterexamplePrecheck<Integer>(
+                "none", (candidate, budget) -> Optional.empty()));
+    }
+    @Test void hostPrecheckWitnessStillRequiresIndependentWitnessChecker() {
+        var transport = new FakeTransport();
+        var adapter = adapter(transport, new PythonDiscoveryDomain.HostCounterexamplePrecheck<>(
+                "bad-witness-control-v1",
+                (candidate, budget) -> Optional.of(CounterexampleResult.found(1, "fabricated", Map.of()))));
+        start(adapter);
+        assertThrows(IllegalArgumentException.class,
+                () -> adapter.domain().counterexampleGenerator().search(1, 2));
+        assertFalse(transport.operations.contains("counterexamples"),
+                "an invalid host precheck must fail before invoking the guest");
+    }
+    @Test void hostPrecheckCannotOverspendTheSuppliedAttemptBudget() {
+        var transport = new FakeTransport();
+        var adapter = adapter(transport, new PythonDiscoveryDomain.HostCounterexamplePrecheck<>(
+                "overspend-control-v1",
+                (candidate, budget) -> Optional.of(CounterexampleResult.inconclusive(3, "too much work", Map.of()))));
+        start(adapter);
+        assertThrows(IllegalArgumentException.class,
+                () -> adapter.domain().counterexampleGenerator().search(1, 2));
+        assertFalse(transport.operations.contains("counterexamples"));
+    }
+
     @Test void packagedBridgeIsIncludedWithoutAnInterpreterDependency() throws Exception {
         String source = PythonDiscoveryDomain.bridgeSource();
         assertTrue(source.contains("def regelsuche_bind_domain"));
