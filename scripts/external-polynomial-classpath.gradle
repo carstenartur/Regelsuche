@@ -1,0 +1,12 @@
+// Opt-in pilot build adapter; does not modify any existing check or historical authority.
+gradle.projectsEvaluated {
+    def learning = gradle.rootProject.project(':regelsuche-learning')
+    learning.tasks.register('externalPolynomialClasspath') {
+        dependsOn learning.tasks.named('classes')
+        def destination = learning.layout.buildDirectory.file('external-polynomial-classpath.txt')
+        outputs.file(destination)
+        doLast {
+            destination.get().asFile.text = learning.sourceSets.main.runtimeClasspath.asPath
+        }
+    }
+}
