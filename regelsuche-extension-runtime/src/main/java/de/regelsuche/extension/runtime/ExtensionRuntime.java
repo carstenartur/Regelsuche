@@ -49,6 +49,7 @@ public final class ExtensionRuntime implements AutoCloseable {
         "META-INF/services/" + RegelsuchePlugin.class.getName();
 
     private Snapshot active;
+    private final List<ExternalResources> retiredResources = new ArrayList<>();
     private boolean closed;
 
     private ExtensionRuntime(Snapshot active) {
@@ -60,7 +61,14 @@ public final class ExtensionRuntime implements AutoCloseable {
         return new ExtensionRuntime(build(Objects.requireNonNull(config, "config")));
     }
 
-    /** Returns the current immutable catalog snapshot. */
+    /**
+     * Returns the current immutable catalog snapshot.
+     *
+     * <p>Previously returned snapshots keep their external classes and resources
+     * available across successful reloads until this runtime is closed. Callers
+     * must finish using all implementations before closing the owning runtime.
+     * Metadata can be retained independently after close.</p>
+     */
     public synchronized ExtensionCatalog catalog() {
         ensureOpen();
         return active.catalog();
@@ -69,7 +77,12 @@ public final class ExtensionRuntime implements AutoCloseable {
     /**
      * Builds a complete candidate snapshot and swaps atomically only on success.
      *
-     * <p>A failed candidate leaves the previous catalog and resources active.</p>
+     * <p>A failed candidate leaves the previous catalog and resources active.
+     * Successful reloads retain published external generations until {@link #close()},
+     * because callers may still be executing an older snapshot. Rejected candidate
+     * resources are released immediately. Retention grows with successful external
+     * reloads; use a runtime scoped to the host's unit of work rather than an
+     * indefinitely reloaded runtime when that bound matters.</p>
      */
     public synchronized CatalogReloadResult reload(ExtensionRuntimeConfig config) {
         ensureOpen();
@@ -77,8 +90,10 @@ public final class ExtensionRuntime implements AutoCloseable {
         try {
             Snapshot candidate = build(Objects.requireNonNull(config, "config"));
             Snapshot previous = active;
+            if (previous.externalResources() != null) {
+                retiredResources.add(previous.externalResources());
+            }
             active = candidate;
-            previous.close();
             return new CatalogReloadResult(
                 true, previousHash, active.catalog().contentHash(), "");
         } catch (RuntimeException failure) {
@@ -90,11 +105,16 @@ public final class ExtensionRuntime implements AutoCloseable {
         }
     }
 
+    /** Releases the current and all retired published external generations. */
     @Override
     public synchronized void close() {
         if (!closed) {
             closed = true;
             active.close();
+            for (ExternalResources resources : retiredResources) {
+                resources.close();
+            }
+            retiredResources.clear();
         }
     }
 
