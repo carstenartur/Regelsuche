@@ -6,6 +6,7 @@ later remain governed public API, but are validated as current artifacts rather
 than being compared to classes that did not exist in that baseline.
 """
 import argparse
+from collections import Counter
 import json
 import os
 import re
@@ -66,7 +67,11 @@ def validate_extension_revision(policy, jars):
     contents = []
     for jar in jars:
         with zipfile.ZipFile(jar) as archive:
-            contents.append((Path(jar), set(archive.namelist())))
+            entries = archive.namelist()
+            duplicates = sorted(name for name, count in Counter(entries).items() if count > 1)
+            if duplicates:
+                raise RuntimeError(f'duplicate ZIP entries in API artifact {jar}: {duplicates}')
+            contents.append((Path(jar), set(entries)))
     for module, required in REQUIRED_EXTENSION_CLASSES_BY_MODULE.items():
         owned = [(jar, entries) for jar, entries in contents
                  if re.fullmatch(re.escape(module) + r'-[0-9][A-Za-z0-9.+_-]*\.jar', jar.name)

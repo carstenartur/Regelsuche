@@ -91,6 +91,41 @@ class ExtensionVerificationBoundariesTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 api.validate_extension_revision(POLICY, [sources, jars[1]])
 
+    def test_duplicate_zip_entries_for_every_public_type_are_rejected(self):
+        payloads = (b'entry-presence fixture; not executable bytecode', b'different entry')
+        for module, entries in CLASSES.items():
+            for entry in sorted(entries):
+                for payload in payloads:
+                    with self.subTest(entry=entry, payload=payload), tempfile.TemporaryDirectory() as temporary:
+                        jars = self.jars(temporary, CLASSES)
+                        owner = next(jar for jar in jars if jar.name.startswith(module + '-'))
+                        with zipfile.ZipFile(owner, 'a') as archive:
+                            with self.assertWarnsRegex(UserWarning, 'Duplicate name'):
+                                archive.writestr(entry, payload)
+                        with self.assertRaisesRegex(RuntimeError, 'duplicate ZIP entries'):
+                            api.validate_extension_revision(POLICY, jars)
+
+    def test_duplicate_zip_metadata_is_rejected(self):
+        for module in CLASSES:
+            with self.subTest(module=module), tempfile.TemporaryDirectory() as temporary:
+                jars = self.jars(temporary, CLASSES)
+                owner = next(jar for jar in jars if jar.name.startswith(module + '-'))
+                with zipfile.ZipFile(owner, 'a') as archive:
+                    archive.writestr('META-INF/MANIFEST.MF', b'Manifest-Version: 1.0\n')
+                    with self.assertWarnsRegex(UserWarning, 'Duplicate name'):
+                        archive.writestr('META-INF/MANIFEST.MF', b'Manifest-Version: 1.0\n')
+                with self.assertRaisesRegex(RuntimeError, 'duplicate ZIP entries'):
+                    api.validate_extension_revision(POLICY, jars)
+
+    def test_unique_directory_and_metadata_entries_are_accepted(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            jars = self.jars(temporary, CLASSES)
+            for jar in jars:
+                with zipfile.ZipFile(jar, 'a') as archive:
+                    archive.writestr('META-INF/', b'')
+                    archive.writestr('META-INF/MANIFEST.MF', b'Manifest-Version: 1.0\n')
+            api.validate_extension_revision(POLICY, jars)
+
     def test_exact_catalog_hash_token_is_required(self):
         malformed = ('', 'a' * 63, 'a' * 65, 'A' * 64, 'g' * 64, 'a' * 64 + '!',
                      'a' * 32 + ' ' + 'a' * 32)
