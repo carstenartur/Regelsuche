@@ -1,6 +1,7 @@
 package de.regelsuche.calculus;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.ast.Expr;
@@ -36,5 +37,28 @@ class CalculusDerivativeRulesTest {
         String result = ExpressionFormatter.format(rule.apply(diff));
         assertTrue(result.contains("diff(x, x)") && result.contains("diff(1, x)"),
             "sum rule should split into two diff terms, got: " + result);
+    }
+
+    @Test
+    void baseTenLogRuleRetainsChangeOfBaseFactor() {
+        Expr logDiff = CalculusDerivativeRules.derivative(
+            parser.parseTerm("log(x)"), "x");
+        Expr lnDiff = CalculusDerivativeRules.derivative(
+            parser.parseTerm("ln(x)"), "x");
+        RewriteRule logRule = CalculusDerivativeRules.rules().stream()
+            .filter(r -> "calculus_diff_of_log".equals(r.id()))
+            .findFirst()
+            .orElseThrow();
+        RewriteRule lnRule = CalculusDerivativeRules.rules().stream()
+            .filter(r -> "calculus_diff_of_ln".equals(r.id()))
+            .findFirst()
+            .orElseThrow();
+
+        assertTrue(logRule.matches(logDiff));
+        assertTrue(lnRule.matches(lnDiff));
+        assertEquals("1 / (x * ln(10))",
+            ExpressionFormatter.format(logRule.apply(logDiff)));
+        assertEquals("1 / x", ExpressionFormatter.format(lnRule.apply(lnDiff)));
+        assertNotEquals(logRule.apply(logDiff), lnRule.apply(lnDiff));
     }
 }

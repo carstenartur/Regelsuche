@@ -13,8 +13,8 @@ public record PluginDependency(
     public PluginDependency {
         pluginId = ExtensionIdentifiers.identifier(pluginId, "pluginId")
             .toLowerCase(Locale.ROOT);
-        versionConstraint = versionConstraint == null || versionConstraint.isBlank()
-            ? "any"
-            : versionConstraint.trim();
+        // Only an absent declaration defaults to any. Preserve supplied text so
+        // the runtime's strict constraint parser can reject malformed input.
+        versionConstraint = versionConstraint == null ? "any" : versionConstraint;
     }
 }
