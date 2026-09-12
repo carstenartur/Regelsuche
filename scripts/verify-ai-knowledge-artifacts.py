@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,10 @@ REQUIRED_FILES = (
 
 EXPECTED_CONTEXT_FOOTPRINT_METHOD = (
     "line-weighted-prioritized-capability-selector-working-set-proxy"
+)
+CAPABILITY_COVERAGE_CONTRACT = (
+    Path(__file__).resolve().parents[1]
+    / "config/ai-knowledge-capability-coverage.json"
 )
 
 
@@ -56,6 +61,93 @@ def finite_number(value: Any) -> bool:
         and not isinstance(value, bool)
         and math.isfinite(float(value))
     )
+
+
+def verify_capability_coverage(
+    root: Path, documents: dict[str, Any], errors: list[str]
+) -> None:
+    """Check semantic membership independently of selector resolution counts."""
+    try:
+        contract = load_unique_json(CAPABILITY_COVERAGE_CONTRACT)
+    except ValueError as error:
+        errors.append(str(error))
+        return
+    if not isinstance(contract, dict) or contract.get("schema") != (
+        "regelsuche.ai-knowledge-capability-coverage/v1"
+    ):
+        errors.append("invalid AI knowledge capability coverage contract")
+        return
+
+    def indexed(document: Any, field: str, label: str) -> dict[str, Any]:
+        rows = document.get(field) if isinstance(document, dict) else None
+        if not isinstance(rows, list) or not rows:
+            errors.append(f"{label}: expected nonempty {field} array")
+            return {}
+        result: dict[str, Any] = {}
+        for row in rows:
+            identity = row.get("id") if isinstance(row, dict) else None
+            if not isinstance(identity, str) or not re.fullmatch(r"[a-z][a-z0-9-]*", identity):
+                errors.append(f"{label}: invalid capability identity {identity!r}")
+            elif identity in result:
+                errors.append(f"{label}: duplicate capability {identity}")
+            else:
+                result[identity] = row
+        return result
+
+    required = indexed(contract, "capabilities", "coverage contract")
+    capabilities = indexed(documents.get("capabilities.json"), "capabilities", "capabilities.json")
+    packs = indexed(documents.get("context-packs/index.json"), "contextPacks", "context-pack index")
+
+    def names(document: Any, field: str, name: str) -> set[str]:
+        rows = document.get(field) if isinstance(document, dict) else None
+        if not isinstance(rows, list):
+            errors.append(f"{field} inventory must contain an array")
+            return set()
+        return {row[name] for row in rows
+                if isinstance(row, dict) and isinstance(row.get(name), str)}
+
+    extracted_types = names(documents.get("classes.json"), "classes", "class")
+    extracted_tests = names(documents.get("tests.json"), "tests", "testClass")
+    for identity, boundary in required.items():
+        capability = capabilities.get(identity, {})
+        entry = packs.get(identity, {})
+        expected_file = f"context-packs/{identity}.json"
+        if entry.get("file") != expected_file:
+            errors.append(f"CONTEXT_IDENTITY_INVALID: {identity}: expected {expected_file}")
+            continue
+        try:
+            pack = load_unique_json(root / expected_file)
+        except ValueError as error:
+            errors.append(str(error))
+            continue
+        if not isinstance(pack, dict) or pack.get("id") != identity:
+            errors.append(f"CONTEXT_IDENTITY_INVALID: {identity}")
+            continue
+        for required_field, matched_field, pack_field, extracted in (
+            ("requiredTypes", "matchedTypes", "types", extracted_types),
+            ("requiredTests", "matchedTests", "tests", extracted_tests),
+        ):
+            expected = boundary.get(required_field)
+            if (not isinstance(expected, list) or not expected
+                    or any(not isinstance(name, str) or not name for name in expected)
+                    or len(set(expected)) != len(expected)):
+                errors.append(f"coverage contract: invalid {identity}.{required_field}")
+                continue
+            matched = capability.get(matched_field)
+            context = pack.get(pack_field)
+            if not isinstance(matched, list):
+                errors.append(f"{identity}.{matched_field} must be an array")
+                matched = []
+            if not isinstance(context, list):
+                errors.append(f"{identity} context {pack_field} must be an array")
+                context = []
+            for name in expected:
+                if name not in extracted:
+                    errors.append(f"BOUNDARY_NOT_EXTRACTED: {identity}: {name}")
+                if name not in matched:
+                    errors.append(f"CAPABILITY_MEMBERSHIP_MISSING: {identity}: {name}")
+                if name not in context:
+                    errors.append(f"CONTEXT_MEMBERSHIP_MISSING: {identity}: {name}")
 
 
 def verify(root: Path) -> tuple[list[str], list[str]]:
@@ -200,6 +292,7 @@ def verify(root: Path) -> tuple[list[str], list[str]]:
         if not isinstance(context_packs, list) or not context_packs:
             errors.append("context-packs/index.json contains no context packs")
 
+    verify_capability_coverage(root, documents, errors)
     return errors, warnings
 
 
@@ -223,7 +316,7 @@ def main() -> int:
 
     print(
         "AI knowledge artifacts passed required-file, evidence and "
-        "schema-v3 capability-context checks."
+        "schema-v3 and semantic capability-coverage checks."
     )
     return 0
 

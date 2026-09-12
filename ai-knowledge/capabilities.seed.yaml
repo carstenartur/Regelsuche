@@ -9,6 +9,7 @@
     - de.regelsuche.search.estimate
     - de.regelsuche.search.index
     - de.regelsuche.search.memory
+    - de.regelsuche.search.reachability
     - de.regelsuche.search.strategy
     - de.regelsuche.scoring
     - de.regelsuche.scoring.cost
@@ -28,12 +29,16 @@
     - '*Strategy*Test'
     - '*Move*Test'
     - '*RuleIndex*Test'
+    - '*Preparation*Test'
+    - '*PreparedPrincipalReplay*Test'
   docPatterns:
     - docs/search-strategies.md
     - docs/search-intelligence.md
     - docs/search-intelligence-roadmap.md
     - docs/search-space-analytics.md
     - docs/rewrite-rules.md
+    - docs/safe-rule-preparation-coordinator.md
+    - docs/safe-preparation-v3-work.md
   evidenceTypes:
     - discovery-evidence
   jmhPatterns:

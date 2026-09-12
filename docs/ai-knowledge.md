@@ -21,6 +21,15 @@ Regelsuche never consumes a snapshot implicitly. Updating the released
 dependency requires one explicit version change followed by the normal
 AI-Knowledge and repository verification lifecycles.
 
+Semantic capability coverage is checked separately from numeric selector
+resolution. The repository-owned
+`config/ai-knowledge-capability-coverage.json` requires both preparation
+coordinators, the current concrete replay boundary and their regression tests
+to exist in the extracted inventory, the `rewrite-search` capability and its
+actual context pack. Nonempty output and zero unresolved references do not
+satisfy this contract. See [coverage and controlled comparison](ai-context-coverage.md)
+for the negative controls, measurement identities and interpretation limits.
+
 ## Released package mode
 
 AI Knowledge is optional so an ordinary Regelsuche checkout does not need
