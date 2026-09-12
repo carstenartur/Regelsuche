@@ -44,6 +44,10 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
     public static final String OCCURRENCE_BINDING_REVISION =
         "regelsuche.direct-occurrence-guard-binding/v1";
 
+    /** Versioned logical work units; not wall time or CPU instructions. */
+    public static final String OCCURRENCE_WORK_REVISION =
+        "regelsuche.occurrence-preparation-work/v2";
+
     private final List<RewriteApplicabilitySchema> principalSchemas;
     private final Map<String, String> admittedSchemaHashes;
     private final List<RewriteRule> preparationRules;
@@ -122,6 +126,7 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
             new ArrayList<>();
         List<RewriteApplicabilitySchema> unresolved = new ArrayList<>();
 
+        DirectTraversalWork traversalWork = new DirectTraversalWork();
         long directRuleExecutions = 0;
         long directCandidates = 0;
         long occurrenceCandidates = 0;
@@ -130,7 +135,7 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
         for (RewriteApplicabilitySchema schema : principalSchemas) {
             directRuleExecutions++;
             DirectResolution direct = resolveDirect(
-                schema, root, source, assumptions, guardFacts);
+                schema, root, source, assumptions, guardFacts, traversalWork);
             occurrenceCandidates = Math.addExact(
                 occurrenceCandidates, direct.occurrenceCandidates());
             occurrenceAnalyses = Math.addExact(
@@ -146,6 +151,9 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
             direct.evidence().ifPresent(occurrenceEvidence::add);
         }
 
+        // V2 setup is repeated for this subset. Charge its input-sized construction
+        // separately instead of silently treating it as precomputed/free work.
+        long delegateSetupUnits = delegateSetupUnits(unresolved.size(), preparationRules.size());
         Optional<SharedUnifiedRulePreparationCoordinator.Evaluation> delegated =
             unresolved.isEmpty()
                 ? Optional.empty()
@@ -175,7 +183,11 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
             occurrenceAnalyses,
             guardWork.requests(),
             guardWork.uniqueFacts(),
-            guardWork.cacheHits());
+            guardWork.cacheHits(),
+            traversalWork.matchAttempts,
+            traversalWork.applyAttempts,
+            traversalWork.assumptionRequests,
+            delegateSetupUnits);
 
         return new Evaluation(
             COORDINATOR_ID,
@@ -235,12 +247,13 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
         Expr root,
         String source,
         AssumptionSignature assumptions,
-        SharedPreparationGuardFacts guardFacts
+        SharedPreparationGuardFacts guardFacts,
+        DirectTraversalWork traversalWork
     ) {
         final List<Occurrence> occurrences;
         try {
             verifyAdmittedSchemaHash(schema);
-            occurrences = directOccurrences(schema.executor(), root, "$")
+            occurrences = directOccurrences(schema.executor(), root, "$", traversalWork)
                 .stream()
                 .filter(occurrence -> !ExpressionFormatter.format(
                     occurrence.transformedRoot()).equals(source))
@@ -400,12 +413,18 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
     private List<Occurrence> directOccurrences(
         RewriteRule rule,
         Expr subtree,
-        String path
+        String path,
+        DirectTraversalWork work
     ) {
         List<Occurrence> result = new ArrayList<>();
+        // Count before invocation: failed matches, no-op rewrites and exceptions
+        // consume work too, even when no candidate/evidence can be retained.
+        work.matchAttempts = Math.addExact(work.matchAttempts, 1);
         if (rule.matches(subtree)) {
+            work.applyAttempts = Math.addExact(work.applyAttempts, 1);
             Expr rewritten = rule.apply(subtree);
             if (!rewritten.equals(subtree)) {
+                work.assumptionRequests = Math.addExact(work.assumptionRequests, 1);
                 List<Assumption> emitted = rule.assumptions(subtree);
                 result.add(new Occurrence(
                     path,
@@ -418,14 +437,14 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
 
         if (subtree instanceof BinaryExpr binary) {
             for (Occurrence child : directOccurrences(
-                    rule, binary.left(), path + "L")) {
+                    rule, binary.left(), path + "L", work)) {
                 result.add(child.withTransformedRoot(new BinaryExpr(
                     child.transformedRoot(),
                     binary.operator(),
                     binary.right())));
             }
             for (Occurrence child : directOccurrences(
-                    rule, binary.right(), path + "R")) {
+                    rule, binary.right(), path + "R", work)) {
                 result.add(child.withTransformedRoot(new BinaryExpr(
                     binary.left(),
                     binary.operator(),
@@ -437,7 +456,7 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
                 for (Occurrence child : directOccurrences(
                         rule,
                         arguments.get(index),
-                        path + "A" + index)) {
+                        path + "A" + index, work)) {
                     List<Expr> replaced = new ArrayList<>(arguments);
                     replaced.set(index, child.transformedRoot());
                     result.add(child.withTransformedRoot(new FunctionExpr(
@@ -446,6 +465,29 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
             }
         }
         return result;
+    }
+
+    private static final class DirectTraversalWork {
+        private long matchAttempts;
+        private long applyAttempts;
+        private long assumptionRequests;
+    }
+
+    /**
+     * Logical setup quanta for R unresolved principals and P preparation rules:
+     * one construction, R+P inventory slots and R*(P+1) visible-rule slots.
+     * A slot includes V2's nested validation/indexing of that input; this is an
+     * input-sized composite unit, not a claim to count every internal operation.
+     * The zero-principal path constructs no delegate and incurs zero setup.
+     */
+    private static long delegateSetupUnits(int principals, int preparationRules) {
+        if (principals == 0) {
+            return 0;
+        }
+        long inventorySlots = Math.addExact((long) principals, preparationRules);
+        long visibleRuleSlots = Math.multiplyExact((long) principals,
+            Math.addExact((long) preparationRules, 1));
+        return Math.addExact(1, Math.addExact(inventorySlots, visibleRuleSlots));
     }
 
     private Transformation directCandidate(
@@ -671,6 +713,13 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
         }
     }
 
+    /**
+     * Additional V3 analyze work, separate from delegated V2 execution and verify.
+     * Dispatches, retained candidates, analyses and guard requests retain their
+     * original units. Every visited node adds one match attempt; every apply and
+     * concrete-assumption call adds one unit, including no-ops and failed calls.
+     * Delegate setup uses the input-sized composite quanta documented above.
+     */
     public record OccurrenceWork(
         long directRuleExecutions,
         long directCandidates,
@@ -678,13 +727,21 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
         long occurrenceAnalyses,
         long guardRequests,
         long uniqueGuardFacts,
-        long guardCacheHits
+        long guardCacheHits,
+        long directMatchAttempts,
+        long directApplyAttempts,
+        long directAssumptionRequests,
+        long delegateSetupUnits
     ) {
         public OccurrenceWork {
             if (directRuleExecutions < 0 || directCandidates < 0
                     || occurrenceCandidates < 0 || occurrenceAnalyses < 0
                     || guardRequests < 0 || uniqueGuardFacts < 0
                     || guardCacheHits < 0
+                    || directMatchAttempts < 0 || directApplyAttempts < 0
+                    || directAssumptionRequests < 0 || delegateSetupUnits < 0
+                    || directApplyAttempts > directMatchAttempts
+                    || directAssumptionRequests > directApplyAttempts
                     || directCandidates > directRuleExecutions
                     || guardRequests != uniqueGuardFacts + guardCacheHits) {
                 throw new IllegalArgumentException(
@@ -692,10 +749,18 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
             }
         }
 
+        public String revision() {
+            return OCCURRENCE_WORK_REVISION;
+        }
+
         public long chargedUnits() {
-            return Math.addExact(
+            long retainedWork = Math.addExact(
                 Math.addExact(directRuleExecutions, occurrenceCandidates),
                 Math.addExact(occurrenceAnalyses, guardRequests));
+            long traversalWork = Math.addExact(directMatchAttempts,
+                Math.addExact(directApplyAttempts, directAssumptionRequests));
+            return Math.addExact(retainedWork,
+                Math.addExact(traversalWork, delegateSetupUnits));
         }
     }
 
