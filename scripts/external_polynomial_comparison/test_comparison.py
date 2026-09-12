@@ -2,9 +2,12 @@
 import copy
 import importlib
 import json
+import os
 import pathlib
+import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 try:
     from external_polynomial_comparison import polynomial as p
@@ -107,6 +110,33 @@ class SupervisorContractTest(unittest.TestCase):
         self.assertEqual('DEADLINE_EXCEEDED', result['verdict'])
         self.assertFalse(result['valid'])
 
+    def test_internal_work_overrun_is_diagnostic_and_never_an_eligible_success(self):
+        runner = self.runner()
+        protocol = {'cases':[{'id':'fixture'}], 'profiles':['LEARNED_RANKED','BASE'], 'repetitions':1}
+        rows = []
+        for profile, within_budget in [('LEARNED_RANKED', False), ('BASE', True)]:
+            response = {'status':'CANDIDATE','profile':profile,'output':'x',
+                        'internalWorkWithinBudget':within_budget}
+            rows.append({'case':'fixture','profile':profile,'repetition':0,'source':'x+0',
+                         'response':response,'requestWallNanos':10,
+                         'judgment':runner.judge('x+0', response, 10, 10**9)})
+        overrun = rows[0]
+        self.assertEqual('INTERNAL_WORK_BUDGET_EXCEEDED', overrun['judgment']['verdict'])
+        self.assertFalse(overrun['judgment']['valid'])
+        self.assertFalse(overrun['judgment']['improved'])
+        self.assertFalse(overrun['judgment']['substantialImprovement'])
+        self.assertEqual('x', overrun['response']['output'])
+        summary = runner.summarize(protocol, rows)['LEARNED_RANKED']
+        self.assertEqual(1, summary['internalWorkOverruns'])
+        self.assertEqual(0, summary['valid'])
+        self.assertEqual(0, summary['improved'])
+        self.assertIsNone(summary['medianValidEndToEndNanos'])
+        self.assertEqual({'COMPARATOR_ONLY':1}, runner.paired_comparisons(protocol, rows)['BASE']['counts'])
+        runner.verify_row(overrun, 10**9)
+        forged = copy.deepcopy(overrun)
+        forged['judgment'].update(valid=True, improved=True, substantialImprovement=True, verdict='IMPROVED')
+        self.assertRaises(ValueError, runner.verify_row, forged, 10**9)
+
     def test_duplicate_or_missing_matrix_rows_cannot_verify(self):
         runner = self.runner()
         protocol = {'cases':[{'id':'a'}], 'profiles':['BASE'], 'repetitions':2}
@@ -127,6 +157,50 @@ class SupervisorContractTest(unittest.TestCase):
             self.assertEqual('BLOCKED_WORKER_UNAVAILABLE', worker.request({'op':'run'}, .05)[0]['status'])
             worker.close()
 
+    def test_worker_exit_before_request_retains_error_and_closes_streams(self):
+        runner = self.runner()
+        with tempfile.TemporaryDirectory() as folder:
+            worker = runner.Session([sys.executable, '-u', '-c',
+                'print(\'{"status":"READY"}\',flush=True)'], pathlib.Path(folder)/'stderr.txt', 2)
+            worker.process.wait(timeout=2)
+            try:
+                response, elapsed = worker.request({'op':'run'}, 2)
+                self.assertEqual('ERROR', response['status'])
+                self.assertTrue(response['error'])
+                self.assertGreater(elapsed, 0)
+                self.assertEqual('BLOCKED_WORKER_UNAVAILABLE', worker.request({'op':'run'}, 2)[0]['status'])
+                for stream in (worker.process.stdin, worker.process.stdout, worker.stderr):
+                    self.assertTrue(stream.closed)
+            finally:
+                worker.close()
+
+    @unittest.skipUnless(os.name == 'posix', 'Process-group race is POSIX-specific')
+    def test_worker_exit_during_cleanup_preserves_timeout_and_error_rows(self):
+        runner = self.runner()
+        killpg = os.killpg
+        for status, behavior in [('TIMEOUT', 'time.sleep(30)'),
+                                 ('ERROR', 'print("malformed-json",flush=True);time.sleep(30)')]:
+            with self.subTest(status=status), tempfile.TemporaryDirectory() as folder:
+                worker = runner.Session([sys.executable, '-u', '-c',
+                    'import time;print(\'{"status":"READY"}\',flush=True);input();'+behavior],
+                    pathlib.Path(folder)/'stderr.txt', 2)
+                def exit_before_signal(pid, sig):
+                    # Reap the real process between poll() and the actual signal,
+                    # deterministically exposing the otherwise intermittent race.
+                    killpg(pid, sig)
+                    worker.process.wait()
+                    killpg(pid, sig)
+                try:
+                    with patch.object(runner.os, 'killpg', side_effect=exit_before_signal):
+                        response, elapsed = worker.request({'op':'run'}, .05 if status == 'TIMEOUT' else 2)
+                    self.assertEqual(status, response['status'])
+                    self.assertGreater(elapsed, 0)
+                    self.assertEqual('BLOCKED_WORKER_UNAVAILABLE', worker.request({'op':'run'}, .05)[0]['status'])
+                    self.assertTrue(worker.stderr.closed)
+                    self.assertTrue(worker.process.stdout.closed)
+                finally:
+                    worker.close()
+
 class EvidenceIntegrityTest(unittest.TestCase):
     def test_paired_comparison_keeps_losses_failures_and_unsupported(self):
         from external_polynomial_comparison import run
@@ -137,11 +211,14 @@ class EvidenceIntegrityTest(unittest.TestCase):
             for profile, cost in [('LEARNED_RANKED', a), ('BASE', b)]:
                 rows.append({'case': str(index), 'profile': profile, 'repetition': 0,
                     'response': {'status': 'SHARED_FRAGMENT_UNSUPPORTED' if index == 4 else 'CANDIDATE' if cost is not None else 'TIMEOUT'},
-                    'judgment': {'valid': cost is not None, 'outputCost': cost, 'endToEndNanos': 20}})
+                    'judgment': {'valid': cost is not None, 'outputCost': cost,
+                                 'endToEndNanos': 10 if profile == 'LEARNED_RANKED' else 20}})
         result = run.paired_comparisons(protocol, rows)['BASE']
         self.assertEqual(5, len(result['pairs']))
         self.assertEqual({'BETTER': 1, 'WORSE': 1, 'TIE': 1, 'COMPARATOR_ONLY': 1, 'SHARED_UNSUPPORTED': 1}, result['counts'])
-        self.assertEqual(1, len(result['equalQualityCostRatios']))
+        self.assertEqual([0.5], result.get('equalQualityTimeRatios'))
+        self.assertEqual(0.5, result['medianEqualQualityTimeRatio'])
+        self.assertEqual(0.5, result['pairs'][2]['equalQualityTimeRatio'])
 
     def test_forged_source_cost_and_unsupported_outcome_are_rejected(self):
         from external_polynomial_comparison import run
@@ -153,12 +230,28 @@ class EvidenceIntegrityTest(unittest.TestCase):
     def test_retained_time_sum_cannot_be_rehashed_into_success(self):
         from external_polynomial_comparison import run
         self.assertTrue(hasattr(run, 'verify_row'), 'Retained row verifier is not implemented')
-        response = {'status':'CANDIDATE','output':'x','inputCost':1,'outputCost':0}
-        row = {'source':'x+0','response':response,'requestWallNanos':123,
+        response = {'status':'CANDIDATE','profile':'BASE','output':'x','inputCost':1,'outputCost':0}
+        row = {'source':'x+0','profile':'BASE','response':response,'requestWallNanos':123,
                'judgment':run.judge('x+0', response, 123, 10**9)}
         run.verify_row(row, 10**9)
         row['judgment']['endToEndNanos'] = 0
         self.assertRaises(ValueError, run.verify_row, row, 10**9)
+
+    def test_retained_candidate_is_bound_to_the_requested_profile(self):
+        from external_polynomial_comparison import run
+        response = {'status':'CANDIDATE','profile':'BASE','output':'x','inputCost':1,'outputCost':0}
+        row = {'source':'x+0','profile':'BASE','response':response,'requestWallNanos':123,
+               'judgment':run.judge('x+0', response, 123, 10**9)}
+        run.verify_row(row, 10**9)
+        for replacement in ('LEARNED_RANKED', None):
+            with self.subTest(profile=replacement):
+                forged = copy.deepcopy(row)
+                if replacement is None:
+                    del forged['response']['profile']
+                else:
+                    forged['response']['profile'] = replacement
+                with self.assertRaisesRegex(ValueError, 'profile mismatch'):
+                    run.verify_row(forged, 10**9)
 
 if __name__ == '__main__':
     unittest.main()

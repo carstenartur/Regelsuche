@@ -101,7 +101,12 @@ PYTHONPATH=scripts build/external-polynomial-venv/bin/python \
 ```
 
 An existing result directory is never overwritten. Use a new directory for another
-run. The dedicated workflow retains raw rows, metadata, setup/TRAIN/warmup evidence,
-stderr, a complete matrix summary and a manifest. It supplements rather than replaces
-full Java 25 Gradle, Maven/product/Docker, SymPy, JMH and checkout-owned ciCheck.
+run. The isolated `External polynomial comparison` job in the existing CI workflow
+retains raw rows, metadata, setup/TRAIN/warmup evidence, stderr, a complete matrix
+summary and a manifest. It runs on every CI pull request, main push and manual run,
+so changes to core parsing, math algorithms and all build/dependency inputs rerun
+the pilot. `gradle/run-external-polynomial-comparison.sh` owns its complete local
+execution, and the aggregate CI check requires its success alongside the existing
+Java 25 Gradle, Maven/product/Docker, SymPy and JMH checks. The dedicated showcase
+branch-creation authority keeps its existing scope.
 A passing harness test is not an executed benchmark or a demonstrated competitive win.

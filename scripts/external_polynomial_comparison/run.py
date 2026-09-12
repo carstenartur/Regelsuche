@@ -102,15 +102,23 @@ class Session:
     def close(self):
         self.failed = True
         if self.process.poll() is None:
-            if os.name == 'posix':
-                os.killpg(self.process.pid, signal.SIGKILL)
-            else:
-                self.process.kill()
+            try:
+                if os.name == 'posix':
+                    os.killpg(self.process.pid, signal.SIGKILL)
+                else:
+                    self.process.kill()
+            except ProcessLookupError:
+                # The worker may exit after poll(); still reap it and close pipes.
+                pass
         self.process.wait()
-        for stream in (self.process.stdin, self.process.stdout):
+        for stream in (self.process.stdin, self.process.stdout, self.stderr):
             if stream is not None:
-                stream.close()
-        self.stderr.close()
+                try:
+                    stream.close()
+                except OSError:
+                    # Closing stdin can retry a failed flush after the worker exits.
+                    # Cleanup must preserve the request failure and close every pipe.
+                    pass
 
 
 def judge(source: str, response: dict, request_nanos: int, limit_nanos: int) -> dict:
@@ -123,7 +131,9 @@ def judge(source: str, response: dict, request_nanos: int, limit_nanos: int) -> 
             result['verdict'] = 'COVERAGE_CONTRACT_MISMATCH'
         except Unsupported:
             pass
-    if response.get('status') == 'CANDIDATE':
+    if response.get('status') == 'CANDIDATE' and response.get('internalWorkWithinBudget') is False:
+        result['verdict'] = 'INTERNAL_WORK_BUDGET_EXCEEDED'
+    elif response.get('status') == 'CANDIDATE':
         try:
             output = response['output']
             before, after = operation_cost(source), operation_cost(output)
@@ -180,7 +190,7 @@ def summarize(protocol: dict, rows: list[dict]) -> dict:
 
 
 def paired_comparisons(protocol: dict, rows: list[dict]) -> dict:
-    """Report every paired outcome; costs are compared only at equal output quality."""
+    """Report every paired outcome; times are compared only at equal output cost."""
     indexed = {(row['case'], row['profile'], row['repetition']): row for row in rows}
     result = {}
     for comparator in protocol['profiles']:
@@ -206,13 +216,16 @@ def paired_comparisons(protocol: dict, rows: list[dict]) -> dict:
                     'rankedCost': ja.get('outputCost'), 'comparatorCost': jb.get('outputCost'),
                     'rankedEndToEndNanos': ja['endToEndNanos'], 'comparatorEndToEndNanos': jb['endToEndNanos'],
                     'equalQualityTimeRatio': ratio})
-        result[comparator] = {'counts': counts, 'pairs': pairs, 'equalQualityCostRatios': ratios,
+        result[comparator] = {'counts': counts, 'pairs': pairs, 'equalQualityTimeRatios': ratios,
             'medianEqualQualityTimeRatio': statistics.median(ratios) if ratios else None}
     return result
 
 
 def verify_row(row: dict, limit_nanos: int) -> None:
     """Recompute mathematical eligibility and check the retained timing partition."""
+    if row['response'].get('status') == 'CANDIDATE' and (
+            not row.get('profile') or row['response'].get('profile') != row['profile']):
+        raise ValueError('retained worker profile mismatch')
     retained = row['judgment']
     for value in (row['requestWallNanos'], retained['verificationWallNanos'], retained['endToEndNanos']):
         if type(value) is not int or value < 0:
@@ -300,10 +313,10 @@ def execute(protocol_path: Path, classpath_path: Path, output: Path) -> dict:
     report = ['# External polynomial pilot', '', '**Public pilot, not a sealed final test or general superiority claim.**', '',
         f'Protocol `{PROTOCOL_HASH}`; source `{revision}`.', '',
         'Counts include three repetitions, not additional independent mathematical tasks.', '',
-        '| Profile | Equivalent within deadline | Improved | At least 20% shorter | Worse | Unsupported | Timeouts | Errors |',
-        '|---|---:|---:|---:|---:|---:|---:|---:|']
+        '| Profile | Eligible equivalent | Improved | At least 20% shorter | Worse | Unsupported | Timeouts | Work overruns | Errors |',
+        '|---|---:|---:|---:|---:|---:|---:|---:|---:|']
     for profile, row in summary.items():
-        report.append('| '+profile+' | '+' | '.join(str(row[key]) for key in ('valid','improved','substantialImprovement','worse','unsupported','timeouts','errors'))+' |')
+        report.append('| '+profile+' | '+' | '.join(str(row[key]) for key in ('valid','improved','substantialImprovement','worse','unsupported','timeouts','internalWorkOverruns','errors'))+' |')
     report += ['', '## Paired output quality: LEARNED_RANKED versus each comparator', '',
         '| Comparator | Better | Tie | Worse | Ranked only | Comparator only | Neither valid | Shared unsupported |',
         '|---|---:|---:|---:|---:|---:|---:|---:|']
@@ -312,6 +325,7 @@ def execute(protocol_path: Path, classpath_path: Path, output: Path) -> dict:
             ('BETTER','TIE','WORSE','RANKED_ONLY','COMPARATOR_ONLY','NEITHER_VALID','SHARED_UNSUPPORTED'))+' |')
     report += ['', 'Setup, TRAIN, warmups, all candidates, per-query native CPU/wall time, complete request time,',
                'common verification time, primitive replay and internal logical-work overruns are retained in JSON.',
+               'Eligible outputs respect the common deadline and the worker\'s declared internal work budget; overrun incumbents remain diagnostics.',
                'The Java setup trains the shared experimental model once. No zero-cost learning or product-default qualification is implied.',
                'Internal work units are not comparable with SymPy instructions. Walltime is diagnostic, not a CI speed threshold.',
                'All supported failures stay in the matrix; no amortization or lifetime win is inferred from selected successes.']
