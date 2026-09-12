@@ -11,6 +11,8 @@ dependencies { constraints {
     api "de.regelsuche:regelsuche-discovery:${project.version}"
     api "de.regelsuche:regelsuche-discovery-sdk:${project.version}"
     api "de.regelsuche:regelsuche-plugin-api:${project.version}"
+    api "de.regelsuche:regelsuche-extension-api:${project.version}"
+    api "de.regelsuche:regelsuche-extension-runtime:${project.version}"
  } }
 publishing {
     publications { mavenJava(MavenPublication) { from components.javaPlatform } }

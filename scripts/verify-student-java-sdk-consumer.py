@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -21,6 +22,13 @@ SDK_MODULES = (
     "regelsuche-validation",
     "regelsuche-discovery",
     "regelsuche-discovery-sdk",
+    "regelsuche-extension-api",
+    "regelsuche-extension-runtime",
+)
+SOURCE_DOC_MODULES = (
+    "regelsuche-discovery-sdk",
+    "regelsuche-extension-api",
+    "regelsuche-extension-runtime",
 )
 FORBIDDEN_RUNTIME_MARKERS = (
     "regelsuche-app",
@@ -129,12 +137,13 @@ def artifact_files(repository: Path, version: str) -> dict[str, Path]:
             lambda path: not path.name.endswith(("-sources.jar", "-javadoc.jar")),
         )
         artifacts[f"{module}:pom"] = one_artifact(directory, f"{module}-*.pom")
-    sdk = base / "regelsuche-discovery-sdk" / version
-    for classifier in ("sources", "javadoc"):
-        artifacts[f"regelsuche-discovery-sdk:{classifier}"] = one_artifact(
-            sdk,
-            f"regelsuche-discovery-sdk-*-{classifier}.jar",
-        )
+    for module in SOURCE_DOC_MODULES:
+        directory = base / module / version
+        for classifier in ("sources", "javadoc"):
+            artifacts[f"{module}:{classifier}"] = one_artifact(
+                directory,
+                f"{module}-*-{classifier}.jar",
+            )
     return artifacts
 
 
@@ -186,6 +195,11 @@ def require_output(execution: str, expected: tuple[str, ...], label: str) -> Non
     missing = [value for value in expected if value not in execution]
     if missing:
         raise RuntimeError(f"{label} output is incomplete: {missing}")
+    if label == "extension-runtime-java25":
+        identities = [token.removeprefix("catalog=") for token in execution.split()
+                      if token.startswith("catalog=")]
+        if len(identities) != 1 or re.fullmatch(r"sha256:[0-9a-f]{64}", identities[0]) is None:
+            raise RuntimeError(f"{label} output has an invalid or ambiguous catalog hash")
 
 
 def verify_generated_project_shape(starter: Path) -> dict:
@@ -345,6 +359,7 @@ def main() -> int:
         ("finite-difference-domain-java25", ("outcome=CONFIRMED", "sdk.provider.artifactSha256")),
         ("solver-adapter-java25", ("outcome=CONFIRMED", "outcome=REFUTED", "sdk.provider.artifactSha256")),
         ("number-theory-plan-java25", ("provider=primachsenraum-number-theory-provider", "bases=[2, 3]", "2047", "falsePrimes=0", "falseCompositeDecisions=0")),
+        ("extension-runtime-java25", ("extension=hello", "origin=greeting-plugin", "catalog=sha256:")),
     ):
         if name == "number-theory-plan-java25":
             verify_pinned_consumer(root / "examples/external-consumers" / name)
@@ -409,6 +424,7 @@ def main() -> int:
         "- ServiceLoader provider: `example-geometric-sequence-provider`\n"
         "- Confirmed candidate: `multiplier=2`\n"
         "- Negative paths: `REFUTED`, `BUDGET_EXHAUSTED`\n"
+        "- Generic extension runtime consumer: `extension-runtime-java25`\n"
         f"- Generated project: `{GENERATED_PROJECT}`\n"
         f"- Generated package: `{GENERATED_PACKAGE}`\n"
         f"- Generated provider: `{GENERATED_PROVIDER}`\n"
