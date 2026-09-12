@@ -29,6 +29,20 @@ The Gradle adapter writes the same Java-rendered evidence below `build/reports/q
 
 Every table and chart uses **milliseconds per operation (`ms/op`)**. Lower values and lower points are always faster/better. JMH `scoreError` is retained as an error bar.
 
+### Active regression decision authority
+
+The active checkout-owned `verifyJmhRegression` task uses the versioned v3 decision authority in `scripts/verify-jmh-regression-v3.py` and `config/quality/jmh-regression-decision-policy-v3.json`. It deliberately reuses the frozen benchmark inventory and finite family thresholds from `config/quality/jmh-regression-policy-v2.json` without changing them. The v3 policy binds that exact threshold file by repository-relative path, schema and Git blob identity; both policy files are LF-normalized so the content identity remains stable across supported checkouts.
+
+For average-time measurements, v3 records `decisionScore = max(0, currentScore - currentScoreError)` but does not turn uncertainty overlap into a passing result. The outcome is deliberately three-way and fail-closed:
+
+- **PASSED** when the point estimate `currentScore` is at or below `maximumAllowedScore`;
+- **INCONCLUSIVE** when the point estimate is above the maximum but `decisionScore` is at or below it, meaning the reported uncertainty overlaps the ratchet boundary; this exits non-zero and requires fresh evidence rather than claiming either a regression or a pass;
+- **FAILED** when `decisionScore` is strictly above the maximum, so even the uncertainty-adjusted lower bound exceeds the ratchet. Exact equality at the declared boundary passes.
+
+This keeps the historical v2 verifier and its reports unchanged and reproducible at their original revisions while avoiding both failure modes exposed by noisy shared-runner measurements: a small over-threshold point estimate is no longer mislabeled as a demonstrated regression merely because uncertainty was ignored, but a very wide error bar also cannot make an over-threshold result green.
+
+Measurement precision remains visible independently of the gate outcome. When `currentScoreError >= currentScore`, v3 retains the benchmark as `LOW_PRECISION` in JSON and Markdown evidence. A low-precision row whose point estimate remains below the ratchet can still pass the regression gate, but it is **not** evidence that performance is proven unchanged. If its point estimate exceeds the ratchet it is at least `INCONCLUSIVE`, and therefore fails closed. The rule remains a finite shared-runner ratchet and does not establish cross-hardware absolute performance or statistical significance beyond the recorded JMH uncertainty.
+
 The writer recreates the dedicated chart directory before every run, so removed benchmarks cannot leave stale SVG evidence behind. It also validates all chart filenames before writing and fails closed if two benchmark identities would normalize to the same filename.
 
 ## Retained evidence contract

@@ -4,6 +4,10 @@
 # Linux start script should use lf
 /gradlew        text eol=lf
 
+# Frozen/versioned quality policy bytes are content-addressed and must stay LF-normalized
+/config/quality/jmh-regression-policy-v2.json text eol=lf
+/config/quality/jmh-regression-decision-policy-v3.json text eol=lf
+
 # Frozen polynomial study resources are byte-bound and must stay LF-normalized
 /regelsuche-experiments/src/main/resources/de/regelsuche/benchmark/polynomial/*.json text eol=lf
 
