@@ -1,19 +1,19 @@
 package de.regelsuche.calculus;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
-import de.regelsuche.ast.NumberExpr;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 class DifferentiatorTest {
 
@@ -27,28 +27,43 @@ class DifferentiatorTest {
 
     @Test
     void derivativePowerRuleWorks() {
-        // d/dx x^3 -> 3 * x^2
         Expr derivative = differentiator.differentiate(parse("x^3"), "x");
         assertEquals("3 * x ^ 2", ExpressionFormatter.format(derivative));
     }
 
     @Test
     void sumProductAndStandardFunctionsAreSupported() {
-        // d/dx (x^2 + sin(x)) -> 2*x + cos(x)
         Expr derivative = differentiator.differentiate(parse("x^2 + sin(x)"), "x");
         assertEquals("2 * x + cos(x)", ExpressionFormatter.format(derivative));
 
-        // d/dx exp(x) -> exp(x)
         Expr exp = differentiator.differentiate(parse("exp(x)"), "x");
         assertEquals("exp(x)", ExpressionFormatter.format(exp));
 
-        // d/dx log(x) -> 1/x
-        Expr log = differentiator.differentiate(parse("log(x)"), "x");
-        assertEquals("1 / x", ExpressionFormatter.format(log));
+        Expr ln = differentiator.differentiate(parse("ln(x)"), "x");
+        assertEquals(parse("1 / x"), ln);
 
-        // Product rule: d/dx (x * sin(x)) -> sin(x) + x*cos(x)
         Expr product = differentiator.differentiate(parse("x * sin(x)"), "x");
         assertEquals("sin(x) + x * cos(x)", ExpressionFormatter.format(product));
+    }
+
+    @Test
+    void baseTenLogDerivativeRetainsItsChangeOfBaseFactor() {
+        Expr derivative = differentiator.differentiate(parse("log(x)"), "x");
+
+        assertEquals(parse("1 / (x * ln(10))"), derivative);
+        assertNotEquals(
+            differentiator.differentiate(parse("ln(x)"), "x"),
+            derivative);
+    }
+
+    @Test
+    void baseTenLogChainRuleRetainsItsChangeOfBaseFactor() {
+        Expr derivative = differentiator.differentiate(
+            parse("log(x^2 + 1)"), "x");
+
+        assertEquals(
+            parse("(1 / ((x^2 + 1) * ln(10))) * (2 * x)"),
+            derivative);
     }
 
     @Test

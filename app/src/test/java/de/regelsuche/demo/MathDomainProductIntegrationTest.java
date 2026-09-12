@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.api.searchgraph.SearchExpression;
 import de.regelsuche.benchmark.BenchmarkScenarioResult;
 import de.regelsuche.benchmark.BenchmarkSuite;
+import de.regelsuche.calculus.CalculusDerivativeRules;
 import de.regelsuche.discovery.TransformationStep;
 import de.regelsuche.export.MatrixLatexRenderer;
 import de.regelsuche.export.SearchAnalysisReportService;
@@ -20,7 +21,9 @@ import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.MacroRuleMiner;
+import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -177,6 +180,23 @@ class MathDomainProductIntegrationTest {
             .anyMatch(e -> e.transformationRule() != null
                 && e.transformationRule().startsWith("calculus_"));
         assertTrue(derivativeEdge, "graph store must contain a derivative-rule edge");
+    }
+
+    @Test
+    void baseTenLogDerivativeIsCorrectInWorkbenchRewritePath() {
+        ExpressionParser p = new ExpressionParser();
+        String original = ExpressionFormatter.format(
+            CalculusDerivativeRules.derivative(p.parseTerm("log(x)"), "x"));
+        AstRewriteTransformationEngine engine = new AstRewriteTransformationEngine(
+            CalculusDerivativeRules.rules());
+
+        var logDerivative = engine.transform(original).stream()
+            .filter(t -> "calculus_diff_of_log".equals(t.rule()))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException(
+                "Workbench derivative rule inventory did not rewrite " + original));
+
+        assertEquals("1 / (x * ln(10))", logDerivative.transformedExpression());
     }
 
     /* ----- 4. Matrix export contains bmatrix LaTeX ----- */

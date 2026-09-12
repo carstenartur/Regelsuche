@@ -45,6 +45,7 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
         "regelsuche.direct-occurrence-guard-binding/v1";
 
     private final List<RewriteApplicabilitySchema> principalSchemas;
+    private final Map<String, String> admittedSchemaHashes;
     private final List<RewriteRule> preparationRules;
     private final String repositoryRevision;
     private final PatternTargetedLocalBridgeSearch.Budget bridgeBudget;
@@ -69,6 +70,11 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
                 repositoryRevision,
                 bridgeBudget);
         this.principalSchemas = validated.principalSchemas();
+        // Failure diagnostics must not call the failed executor's descriptor again.
+        Map<String, String> hashes = new LinkedHashMap<>();
+        this.principalSchemas.forEach(schema ->
+            hashes.put(schema.ruleId(), schema.contentHash()));
+        this.admittedSchemaHashes = Map.copyOf(hashes);
         this.preparationRules = List.copyOf(Objects.requireNonNull(
             preparationRules, "preparationRules"));
         this.repositoryRevision = requireRevision(repositoryRevision);
@@ -226,7 +232,8 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
     ) {
         final List<Occurrence> occurrences;
         try {
-            occurrences = directOccurrences(schema.executor(), root, "$" )
+            verifyAdmittedSchemaHash(schema);
+            occurrences = directOccurrences(schema.executor(), root, "$")
                 .stream()
                 .filter(occurrence -> !ExpressionFormatter.format(
                     occurrence.transformedRoot()).equals(source))
@@ -256,7 +263,11 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
 
         SharedPreparationGuardFacts.Fact guards;
         try {
-            guards = guardFacts.evaluate(schema, analysis, assumptions);
+            // An empty guard list cannot turn an inconclusive match into success.
+            guards = analysis.matched()
+                ? guardFacts.evaluate(schema, analysis, assumptions)
+                : SharedPreparationGuardFacts.Fact.unknown(
+                    "REQUIRED_ASSUMPTION_BINDINGS_UNAVAILABLE");
         } catch (RuntimeException exception) {
             return DirectResolution.technical(
                 technicalOutcome(
@@ -267,6 +278,30 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
                 1);
         }
 
+        try {
+            return resolveAnalyzedOccurrence(
+                schema, source, assumptions, selected, occurrences.size(),
+                analysis, guards);
+        } catch (RuntimeException exception) {
+            return DirectResolution.technical(
+                technicalOutcome(
+                    schema,
+                    PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(analysis),
+                    "UNIFIED_V3_DIRECT_METADATA_TECHNICAL_FAILURE"),
+                occurrences.size(),
+                1);
+        }
+    }
+
+    private DirectResolution resolveAnalyzedOccurrence(
+        RewriteApplicabilitySchema schema,
+        String source,
+        AssumptionSignature assumptions,
+        Occurrence selected,
+        int occurrenceCount,
+        PatternMatchAnalyzer.Analysis analysis,
+        SharedPreparationGuardFacts.Fact guards
+    ) {
         String transformed = ExpressionFormatter.format(
             selected.transformedRoot());
         String occurrenceHash = occurrenceHash(
@@ -276,18 +311,12 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
                 selected.sourceSubtree()));
         String applicationKey = baseApplicationKey
             + "->occurrence-v1:" + occurrenceHash.substring("sha256:".length());
-        Transformation candidate = directCandidate(
-            schema.executor(),
-            transformed,
-            applicationKey,
-            selected.emittedAssumptions(),
-            assumptions);
         DirectOccurrenceEvidence evidence = new DirectOccurrenceEvidence(
             schema.ruleId(),
             selected.path(),
             ExpressionFormatter.format(selected.sourceSubtree()),
             occurrenceHash,
-            candidate.applicationKey(),
+            applicationKey,
             PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(analysis),
             guards.status().name(),
             guards.detailCode(),
@@ -295,9 +324,15 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
 
         RulePreparationCoordinator.Outcome outcome;
         if (guards.satisfied()) {
+            Transformation candidate = directCandidate(
+                schema.executor(),
+                transformed,
+                applicationKey,
+                selected.emittedAssumptions(),
+                assumptions);
             outcome = new RulePreparationCoordinator.Outcome(
                 schema.ruleId(),
-                schema.contentHash(),
+                verifyAdmittedSchemaHash(schema),
                 PatternTargetedLocalBridgeSearch.Status.DIRECT_MATCH_AVAILABLE,
                 Optional.of(candidate),
                 true,
@@ -307,14 +342,10 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
                 "UNIFIED_V3_OCCURRENCE_DIRECT_REPLAYED",
                 "");
         } else {
-            PatternTargetedLocalBridgeSearch.Status status =
-                guards.status() == SharedPreparationGuardFacts.Status.INVALID
-                    ? PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE
-                    : PatternTargetedLocalBridgeSearch.Status.UNSUPPORTED;
             outcome = new RulePreparationCoordinator.Outcome(
                 schema.ruleId(),
-                schema.contentHash(),
-                status,
+                verifyAdmittedSchemaHash(schema),
+                rejectedStatus(analysis, guards),
                 Optional.empty(),
                 false,
                 PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(analysis),
@@ -328,8 +359,20 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
             true,
             outcome,
             Optional.of(evidence),
-            occurrences.size(),
+            occurrenceCount,
             1);
+    }
+
+    private static PatternTargetedLocalBridgeSearch.Status rejectedStatus(
+        PatternMatchAnalyzer.Analysis analysis,
+        SharedPreparationGuardFacts.Fact guards
+    ) {
+        if (analysis.status() == PatternMatchAnalyzer.Status.INCONCLUSIVE) {
+            return PatternTargetedLocalBridgeSearch.Status.BUDGET_INCONCLUSIVE;
+        }
+        return guards.status() == SharedPreparationGuardFacts.Status.INVALID
+            ? PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE
+            : PatternTargetedLocalBridgeSearch.Status.UNSUPPORTED;
     }
 
     private PatternMatchAnalyzer.Analysis analyzeOccurrence(
@@ -361,7 +404,8 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
                     path,
                     subtree,
                     rewritten,
-                    emitted == null ? List.of() : List.copyOf(emitted)));
+                    List.copyOf(Objects.requireNonNull(
+                        emitted, "concrete rule assumptions"))));
             }
         }
 
@@ -439,7 +483,7 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
     ) {
         return new RulePreparationCoordinator.Outcome(
             schema.ruleId(),
-            schema.contentHash(),
+            admittedSchemaHashes.get(schema.ruleId()),
             PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE,
             Optional.empty(),
             false,
@@ -450,6 +494,15 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
             "");
     }
 
+    /** Retain the admitted identity, but never authorize changed live metadata. */
+    private String verifyAdmittedSchemaHash(RewriteApplicabilitySchema schema) {
+        String admitted = admittedSchemaHashes.get(schema.ruleId());
+        if (!Objects.equals(admitted, schema.contentHash())) {
+            throw new IllegalStateException("principal schema changed after admission");
+        }
+        return admitted;
+    }
+
     private String occurrenceHash(
         RewriteApplicabilitySchema schema,
         String source,
@@ -458,7 +511,7 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
     ) {
         StringBuilder descriptor = new StringBuilder();
         append(descriptor, OCCURRENCE_BINDING_REVISION);
-        append(descriptor, schema.contentHash());
+        append(descriptor, verifyAdmittedSchemaHash(schema));
         append(descriptor, source);
         append(descriptor, occurrence.path());
         append(descriptor, ExpressionFormatter.format(
@@ -498,7 +551,8 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
     }
 
     private static void append(StringBuilder target, String value) {
-        target.append(value.length()).append(':').append(value);
+        target.append(value.getBytes(StandardCharsets.UTF_8).length)
+            .append(':').append(value);
     }
 
     private static String sha256(String value) {
