@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
+import java.util.jar.Attributes;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.stream.Stream;
@@ -322,8 +323,8 @@ public final class ExtensionRuntime implements AutoCloseable {
                     throw new IllegalArgumentException(
                         "external plugin provider not found: " + expected.getKey());
                 }
-                RegelsuchePlugin plugin = provider.get();
-                Path codeSource = codeSource(plugin.getClass());
+                // Resolve provenance without initializing or constructing a shadowing provider.
+                Path codeSource = codeSource(provider.type());
                 if (!expected.getValue().equals(codeSource)) {
                     throw new SecurityException(
                         "external plugin code source does not match admitted artifact: "
@@ -335,6 +336,7 @@ public final class ExtensionRuntime implements AutoCloseable {
                         "external plugin code source is not an admitted artifact: "
                             + expected.getKey());
                 }
+                RegelsuchePlugin plugin = provider.get();
                 plugins.add(externalPlugin(plugin, metadata));
             }
             return new ExternalResources(
@@ -354,6 +356,15 @@ public final class ExtensionRuntime implements AutoCloseable {
 
     private static List<String> serviceProviders(Path jar) throws IOException {
         try (JarFile file = new JarFile(jar.toFile())) {
+            // URLClassLoader follows manifest Class-Path transitively. Every dependency
+            // must instead appear explicitly in the admitted immutable artifact set.
+            var manifest = file.getManifest();
+            String classPath = manifest == null ? null
+                : manifest.getMainAttributes().getValue(Attributes.Name.CLASS_PATH);
+            if (classPath != null && !classPath.isBlank()) {
+                throw new SecurityException(
+                    "external JAR manifest Class-Path is not allowed; admit dependencies explicitly");
+            }
             JarEntry entry = file.getJarEntry(SERVICE_RESOURCE);
             if (entry == null) {
                 return List.of();
