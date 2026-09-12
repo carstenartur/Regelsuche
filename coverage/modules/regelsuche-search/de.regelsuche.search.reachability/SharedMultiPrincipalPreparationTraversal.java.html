@@ -436,8 +436,8 @@ final class SharedMultiPrincipalPreparationTraversal {
 <span class="fc" id="L436">            return new PrincipalOutcome(</span>
 <span class="fc" id="L437">                state.principal.ruleId(),</span>
 <span class="fc" id="L438">                state.principal.contentHash(),</span>
-<span class="pc bpc" id="L439" title="1 of 2 branches missed.">                terminal.path().isEmpty()</span>
-<span class="nc" id="L440">                    ? Status.MATCHED_AT_SOURCE</span>
+<span class="fc bfc" id="L439" title="All 2 branches covered.">                terminal.path().isEmpty()</span>
+<span class="fc" id="L440">                    ? Status.MATCHED_AT_SOURCE</span>
 <span class="fc" id="L441">                    : Status.PREPARED_MATCH,</span>
 <span class="fc" id="L442">                PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(</span>
                     state.initial),
@@ -559,7 +559,7 @@ final class SharedMultiPrincipalPreparationTraversal {
                 terminalAssumptions, &quot;terminalAssumptions&quot;);
 <span class="fc" id="L560">            preparationSteps = List.copyOf(Objects.requireNonNull(</span>
                 preparationSteps, &quot;preparationSteps&quot;));
-<span class="pc bpc" id="L562" title="1 of 4 branches missed.">            boolean positive = status == Status.MATCHED_AT_SOURCE</span>
+<span class="fc bfc" id="L562" title="All 4 branches covered.">            boolean positive = status == Status.MATCHED_AT_SOURCE</span>
                 || status == Status.PREPARED_MATCH;
 <span class="pc bpc" id="L564" title="1 of 4 branches missed.">            if (positive != !terminalExpression.isBlank()) {</span>
 <span class="nc" id="L565">                throw new IllegalArgumentException(</span>

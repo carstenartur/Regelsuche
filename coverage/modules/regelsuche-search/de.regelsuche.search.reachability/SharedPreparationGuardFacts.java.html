@@ -103,8 +103,8 @@ import java.util.TreeMap;
 <span class="fc bfc" id="L103" title="All 2 branches covered.">        if (templates.isEmpty()) {</span>
 <span class="fc" id="L104">            return Fact.satisfied(&quot;NO_REQUIRED_ASSUMPTIONS&quot;);</span>
         }
-<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (!matched) {</span>
-<span class="nc" id="L107">            return Fact.unknown(</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (!matched) {</span>
+<span class="fc" id="L107">            return Fact.unknown(</span>
                 &quot;REQUIRED_ASSUMPTION_BINDINGS_UNAVAILABLE&quot;);
         }
         try {
@@ -208,7 +208,7 @@ import java.util.TreeMap;
         }
 
         static Fact unknown(String detailCode) {
-<span class="nc" id="L211">            return new Fact(Status.UNKNOWN, detailCode, List.of());</span>
+<span class="fc" id="L211">            return new Fact(Status.UNKNOWN, detailCode, List.of());</span>
         }
 
         static Fact invalid(String detailCode) {

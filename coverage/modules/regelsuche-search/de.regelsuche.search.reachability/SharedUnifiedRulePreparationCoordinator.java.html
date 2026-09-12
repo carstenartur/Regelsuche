@@ -104,19 +104,19 @@ public final class SharedUnifiedRulePreparationCoordinator {
 <span class="fc" id="L104">    }</span>
 
     public List&lt;RewriteApplicabilitySchema&gt; principalSchemas() {
-<span class="nc" id="L107">        return principalSchemas;</span>
+<span class="fc" id="L107">        return principalSchemas;</span>
     }
 
     public String principalInventoryFingerprint() {
-<span class="nc" id="L111">        return principalInventoryFingerprint;</span>
+<span class="fc" id="L111">        return principalInventoryFingerprint;</span>
     }
 
     public String preparationInventoryFingerprint() {
-<span class="nc" id="L115">        return preparationInventoryFingerprint;</span>
+<span class="fc" id="L115">        return preparationInventoryFingerprint;</span>
     }
 
     public String exactRegistryFingerprint() {
-<span class="nc" id="L119">        return exactRegistryFingerprint;</span>
+<span class="fc" id="L119">        return exactRegistryFingerprint;</span>
     }
 
     /** Evaluates all visible principals with one shared bounded fallback. */
@@ -165,16 +165,16 @@ public final class SharedUnifiedRulePreparationCoordinator {
                 schema, sourceParsed, sourceAnalysis);
 <span class="fc" id="L166">            initialAnalyses.put(schema.ruleId(), initial);</span>
 
-<span class="pc bpc" id="L168" title="1 of 2 branches missed.">            if (direct.isPresent()) {</span>
-<span class="nc" id="L169">                RulePreparationCoordinator.Outcome outcome = directOutcome(</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            if (direct.isPresent()) {</span>
+<span class="fc" id="L169">                RulePreparationCoordinator.Outcome outcome = directOutcome(</span>
                     runtime,
                     initial,
                     assumptions,
-<span class="nc" id="L173">                    direct.orElseThrow(),</span>
+<span class="fc" id="L173">                    direct.orElseThrow(),</span>
                     guardFacts);
-<span class="nc" id="L175">                outcomesByRule.put(schema.ruleId(), outcome);</span>
-<span class="nc" id="L176">                nonFallbackOutcomes.add(outcome);</span>
-<span class="nc" id="L177">                continue;</span>
+<span class="fc" id="L175">                outcomesByRule.put(schema.ruleId(), outcome);</span>
+<span class="fc" id="L176">                nonFallbackOutcomes.add(outcome);</span>
+<span class="fc" id="L177">                continue;</span>
             }
 
 <span class="fc bfc" id="L180" title="All 2 branches covered.">            if (runtime.exactRegistry().supportsPrincipal(schema.ruleId())</span>
@@ -335,7 +335,7 @@ public final class SharedUnifiedRulePreparationCoordinator {
     ) {
         SharedPreparationGuardFacts.Fact guards;
         try {
-<span class="nc" id="L338">            guards = guardFacts.evaluate(runtime.schema(), initial, assumptions);</span>
+<span class="fc" id="L338">            guards = guardFacts.evaluate(runtime.schema(), initial, assumptions);</span>
 <span class="nc" id="L339">        } catch (RuntimeException exception) {</span>
 <span class="nc" id="L340">            return technicalOutcome(</span>
                 runtime,
@@ -343,9 +343,9 @@ public final class SharedUnifiedRulePreparationCoordinator {
 <span class="nc" id="L343">                PatternTargetedLocalBridgeSearch.Work.empty(),</span>
 <span class="nc" id="L344">                Set.of(),</span>
                 &quot;UNIFIED_V2_DIRECT_GUARD_TECHNICAL_FAILURE&quot;);
-<span class="nc" id="L346">        }</span>
-<span class="nc bnc" id="L347" title="All 2 branches missed.">        if (!guards.satisfied()) {</span>
-<span class="nc" id="L348">            return rejectedByGuards(runtime, initial, guards);</span>
+<span class="fc" id="L346">        }</span>
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">        if (!guards.satisfied()) {</span>
+<span class="fc" id="L348">            return rejectedByGuards(runtime, initial, guards);</span>
         }
 <span class="nc" id="L350">        return new RulePreparationCoordinator.Outcome(</span>
 <span class="nc" id="L351">            runtime.schema().ruleId(),</span>
@@ -384,19 +384,19 @@ public final class SharedUnifiedRulePreparationCoordinator {
         SharedPreparationGuardFacts.Fact guards
     ) {
         PatternTargetedLocalBridgeSearch.Status status =
-<span class="nc bnc" id="L387" title="All 2 branches missed.">            guards.status() == SharedPreparationGuardFacts.Status.INVALID</span>
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">            guards.status() == SharedPreparationGuardFacts.Status.INVALID</span>
 <span class="nc" id="L388">                ? PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE</span>
-<span class="nc" id="L389">                : PatternTargetedLocalBridgeSearch.Status.UNSUPPORTED;</span>
-<span class="nc" id="L390">        return new RulePreparationCoordinator.Outcome(</span>
-<span class="nc" id="L391">            runtime.schema().ruleId(),</span>
-<span class="nc" id="L392">            runtime.schema().contentHash(),</span>
+<span class="fc" id="L389">                : PatternTargetedLocalBridgeSearch.Status.UNSUPPORTED;</span>
+<span class="fc" id="L390">        return new RulePreparationCoordinator.Outcome(</span>
+<span class="fc" id="L391">            runtime.schema().ruleId(),</span>
+<span class="fc" id="L392">            runtime.schema().contentHash(),</span>
             status,
-<span class="nc" id="L394">            Optional.empty(),</span>
+<span class="fc" id="L394">            Optional.empty(),</span>
             false,
-<span class="nc" id="L396">            PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(initial),</span>
-<span class="nc" id="L397">            PatternTargetedLocalBridgeSearch.Work.empty(),</span>
-<span class="nc" id="L398">            Set.of(),</span>
-<span class="nc" id="L399">            guards.detailCode(),</span>
+<span class="fc" id="L396">            PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(initial),</span>
+<span class="fc" id="L397">            PatternTargetedLocalBridgeSearch.Work.empty(),</span>
+<span class="fc" id="L398">            Set.of(),</span>
+<span class="fc" id="L399">            guards.detailCode(),</span>
             &quot;&quot;);
     }
 
@@ -466,9 +466,9 @@ public final class SharedUnifiedRulePreparationCoordinator {
                 1)
 <span class="fc" id="L467">            .transform(source)</span>
 <span class="fc" id="L468">            .stream()</span>
-<span class="pc" id="L469">            .filter(value -&gt; executor.id().equals(value.rule()))</span>
+<span class="fc" id="L469">            .filter(value -&gt; executor.id().equals(value.rule()))</span>
 <span class="fc" id="L470">            .findFirst()</span>
-<span class="pc" id="L471">            .map(value -&gt; withCumulativeAssumptions(value, assumptions));</span>
+<span class="fc" id="L471">            .map(value -&gt; withCumulativeAssumptions(value, assumptions));</span>
     }
 
     private PatternMatchAnalyzer.Analysis analysisForEvidence(

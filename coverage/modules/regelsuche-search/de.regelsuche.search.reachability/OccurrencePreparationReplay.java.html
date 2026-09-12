@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OccurrencePreparationReplay.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.reachability</a> &gt; <span class="el_source">OccurrencePreparationReplay.java</span></div><h1>OccurrencePreparationReplay.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.reachability;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
+import de.regelsuche.transform.Transformation;
+import java.util.List;
+
+/** Independent concrete replay; occurrence/guard certificates are checked by V3. */
+final class OccurrencePreparationReplay {
+    private OccurrencePreparationReplay() { }
+
+    static OccurrenceAwareSharedRulePreparationCoordinator.Verification verify(
+        OccurrenceAwareSharedRulePreparationCoordinator.Evaluation evaluation,
+        List&lt;RewriteApplicabilitySchema&gt; schemas
+    ) {
+<span class="fc bfc" id="L17" title="All 2 branches covered.">        for (RewriteApplicabilitySchema schema : schemas) {</span>
+<span class="fc" id="L18">            var outcome = evaluation.outcome(schema.ruleId()).orElseThrow();</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">            if (!outcome.direct()) {</span>
+<span class="fc" id="L20">                continue;</span>
+            }
+            try {
+                // V3 selects the first unfiltered direct occurrence. Product
+                // search limits are a separate policy, not replay authority.
+<span class="fc" id="L25">                var replayed = new AstRewriteTransformationEngine(</span>
+<span class="fc" id="L26">                    List.of(schema.executor()), Integer.MAX_VALUE, 1)</span>
+<span class="fc" id="L27">                    .transform(evaluation.sourceExpression()).stream()</span>
+<span class="fc" id="L28">                    .findFirst()</span>
+<span class="fc" id="L29">                    .map(step -&gt; withSourceAssumptions(step, evaluation.sourceAssumptions()));</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">                if (!replayed.equals(outcome.candidate())) {</span>
+<span class="fc" id="L31">                    return new OccurrenceAwareSharedRulePreparationCoordinator.Verification(</span>
+                        false, &quot;DIRECT_PRIMITIVE_REPLAY_MISMATCH&quot;);
+                }
+<span class="fc" id="L34">            } catch (RuntimeException exception) {</span>
+<span class="fc" id="L35">                return new OccurrenceAwareSharedRulePreparationCoordinator.Verification(</span>
+                    false, &quot;DIRECT_PRIMITIVE_REPLAY_TECHNICAL_FAILURE&quot;);
+<span class="fc" id="L37">            }</span>
+<span class="fc" id="L38">        }</span>
+<span class="fc" id="L39">        return new OccurrenceAwareSharedRulePreparationCoordinator.Verification(true, &quot;VERIFIED&quot;);</span>
+    }
+
+    private static Transformation withSourceAssumptions(
+        Transformation step, AssumptionSignature sourceAssumptions
+    ) {
+<span class="fc" id="L45">        AssumptionSignature cumulative = AssumptionSignature.merge(</span>
+<span class="fc" id="L46">            sourceAssumptions, AssumptionSignature.ofExpressions(step.assumptions()));</span>
+<span class="fc" id="L47">        return new Transformation(</span>
+<span class="fc" id="L48">            step.rule(), step.transformedExpression(), step.kind(),</span>
+<span class="fc" id="L49">            step.mayIncreaseComplexity(), step.estimatedCostDelta(),</span>
+<span class="fc" id="L50">            step.equivalencePreservingByConstruction(), step.applicationKey(),</span>
+<span class="fc" id="L51">            cumulative.normalizedAssumptions(), step.packId(), step.license(),</span>
+<span class="fc" id="L52">            step.primitiveRuleIds());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

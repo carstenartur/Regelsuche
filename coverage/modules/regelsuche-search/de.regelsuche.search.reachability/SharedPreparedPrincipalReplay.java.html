@@ -74,21 +74,21 @@ final class SharedPreparedPrincipalReplay {
 <span class="fc" id="L74">        PatternTargetedLocalBridgeSearch.Work sharedWork =</span>
 <span class="fc" id="L75">            legacyWork(sharedEvaluation.work());</span>
 <span class="fc" id="L76">        Set&lt;String&gt; limits = sharedEvaluation.work().reachedLimits();</span>
-<span class="pc bpc" id="L77" title="3 of 4 branches missed.">        return switch (sharedOutcome.status()) {</span>
+<span class="pc bpc" id="L77" title="1 of 4 branches missed.">        return switch (sharedOutcome.status()) {</span>
 <span class="fc" id="L78">            case PREPARED_MATCH -&gt; prepared(</span>
                 schema,
                 sharedEvaluation,
                 sharedOutcome,
                 sharedWork,
                 limits);
-<span class="nc" id="L84">            case MATCHED_AT_SOURCE -&gt; negative(</span>
+<span class="fc" id="L84">            case MATCHED_AT_SOURCE -&gt; negative(</span>
                 schema,
                 sharedOutcome,
                 PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE,
                 sharedWork,
                 limits,
                 &quot;UNIFIED_SCHEMA_MATCH_WITHOUT_DIRECT_REPLAY&quot;);
-<span class="nc" id="L91">            case NO_MATCH_IN_COMPLETE_FROZEN_CLOSURE -&gt; negative(</span>
+<span class="fc" id="L91">            case NO_MATCH_IN_COMPLETE_FROZEN_CLOSURE -&gt; negative(</span>
                 schema,
                 sharedOutcome,
                 PatternTargetedLocalBridgeSearch.Status

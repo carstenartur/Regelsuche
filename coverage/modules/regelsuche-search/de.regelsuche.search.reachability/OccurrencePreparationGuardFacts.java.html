@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OccurrencePreparationGuardFacts.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.reachability</a> &gt; <span class="el_source">OccurrencePreparationGuardFacts.java</span></div><h1>OccurrencePreparationGuardFacts.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.reachability;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.search.reachability.SharedPreparationGuardFacts.Fact;
+import de.regelsuche.search.reachability.SharedPreparationGuardFacts.Status;
+import de.regelsuche.search.reachability.SharedPreparationGuardFacts.Work;
+import de.regelsuche.transform.PatternMatchAnalyzer;
+import de.regelsuche.transform.RequiredAssumptionTemplate;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+
+/**
+ * V3 guard cache that checks every template and retains every instantiable guard.
+ * The historical V2 guard evaluator and its short-circuit evidence are unchanged.
+ */
+<span class="fc" id="L24">final class OccurrencePreparationGuardFacts {</span>
+<span class="fc" id="L25">    private final Map&lt;Key, Fact&gt; facts = new LinkedHashMap&lt;&gt;();</span>
+    private long requests;
+    private long cacheHits;
+
+    Fact evaluate(
+        RewriteApplicabilitySchema schema,
+        PatternMatchAnalyzer.Analysis analysis,
+        AssumptionSignature available
+    ) {
+<span class="fc" id="L34">        Objects.requireNonNull(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L35">        Objects.requireNonNull(analysis, &quot;analysis&quot;);</span>
+<span class="fc" id="L36">        AssumptionSignature assumptions = AssumptionSignature.ofExpressions(</span>
+<span class="fc" id="L37">            Objects.requireNonNull(available, &quot;availableAssumptions&quot;).normalizedAssumptions());</span>
+<span class="fc" id="L38">        Map&lt;String, String&gt; bindings = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L39">        analysis.bindings().forEach((name, expression) -&gt;</span>
+<span class="fc" id="L40">            bindings.put(name, ExpressionFormatter.format(expression)));</span>
+<span class="fc" id="L41">        Key key = new Key(</span>
+<span class="fc" id="L42">            schema.requiredAssumptions().stream()</span>
+<span class="fc" id="L43">                .map(RequiredAssumptionTemplate::contentHash).toList(),</span>
+<span class="fc" id="L44">            analysis.status(), Map.copyOf(bindings), assumptions.fingerprint());</span>
+<span class="fc" id="L45">        requests = Math.addExact(requests, 1);</span>
+<span class="fc" id="L46">        Fact retained = facts.get(key);</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (retained != null) {</span>
+<span class="fc" id="L48">            cacheHits = Math.addExact(cacheHits, 1);</span>
+<span class="fc" id="L49">            return retained;</span>
+        }
+<span class="fc" id="L51">        Fact result = compute(schema.requiredAssumptions(), analysis, assumptions);</span>
+<span class="fc" id="L52">        facts.put(key, result);</span>
+<span class="fc" id="L53">        return result;</span>
+    }
+
+    Work work() {
+<span class="fc" id="L57">        return new Work(requests, facts.size(), cacheHits);</span>
+    }
+
+    private static Fact compute(
+        List&lt;RequiredAssumptionTemplate&gt; templates,
+        PatternMatchAnalyzer.Analysis analysis,
+        AssumptionSignature available
+    ) {
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (templates.isEmpty()) {</span>
+<span class="fc" id="L66">            return Fact.satisfied(&quot;NO_REQUIRED_ASSUMPTIONS&quot;);</span>
+        }
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (!analysis.matched()) {</span>
+<span class="nc" id="L69">            return Fact.unknown(&quot;REQUIRED_ASSUMPTION_BINDINGS_UNAVAILABLE&quot;);</span>
+        }
+<span class="fc" id="L71">        Map&lt;String, Expr&gt; bindings = analysis.bindings();</span>
+<span class="fc" id="L72">        List&lt;String&gt; required = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L73">        boolean invalid = false;</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        for (RequiredAssumptionTemplate template : templates) {</span>
+            try {
+<span class="fc" id="L76">                required.add(AssumptionSignature.normalizeExpression(</span>
+<span class="fc" id="L77">                    template.instantiate(bindings).expression()));</span>
+<span class="fc" id="L78">            } catch (RuntimeException exception) {</span>
+                // A malformed template takes precedence over unknown guards,
+                // but cannot hide valid obligations that follow it.
+<span class="fc" id="L81">                invalid = true;</span>
+<span class="fc" id="L82">            }</span>
+<span class="fc" id="L83">        }</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (invalid) {</span>
+<span class="fc" id="L85">            return new Fact(Status.INVALID,</span>
+                &quot;REQUIRED_ASSUMPTION_TEMPLATE_INVALID&quot;, required);
+        }
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (!Set.copyOf(available.normalizedAssumptions()).containsAll(required)) {</span>
+<span class="fc" id="L89">            return new Fact(Status.UNKNOWN, &quot;REQUIRED_ASSUMPTION_UNKNOWN&quot;, required);</span>
+        }
+<span class="fc" id="L91">        return new Fact(Status.SATISFIED, &quot;REQUIRED_ASSUMPTIONS_SATISFIED&quot;, required);</span>
+    }
+
+<span class="fc" id="L94">    private record Key(</span>
+        List&lt;String&gt; templateHashes,
+        PatternMatchAnalyzer.Status analysisStatus,
+        Map&lt;String, String&gt; bindings,
+        String assumptionFingerprint
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

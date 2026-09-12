@@ -1,0 +1,918 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OccurrenceAwareSharedRulePreparationCoordinator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.reachability</a> &gt; <span class="el_source">OccurrenceAwareSharedRulePreparationCoordinator.java</span></div><h1>OccurrenceAwareSharedRulePreparationCoordinator.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.reachability;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.EquivalentExpressionProvider;
+import de.regelsuche.transform.ExprMatcher;
+import de.regelsuche.transform.PatternMatchAnalyzer;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * Versioned SAFE-preparation authority with occurrence-local direct guard binding.
+ *
+ * &lt;p&gt;The historical {@link SharedUnifiedRulePreparationCoordinator} remains the
+ * complete v2 authority. This v3 authority changes only the direct stage: it
+ * retains the exact AST occurrence selected by the concrete executor, analyzes
+ * the applicability pattern against that occurrence, and instantiates typed
+ * guards from those occurrence-local bindings. Principals without a direct
+ * candidate are delegated to an unchanged v2 coordinator, preserving the
+ * already-qualified exact and shared-fallback semantics.&lt;/p&gt;
+ */
+public final class OccurrenceAwareSharedRulePreparationCoordinator {
+    public static final String COORDINATOR_ID =
+        &quot;regelsuche.unified-safe-rule-preparation-coordinator/v3&quot;;
+    public static final String OCCURRENCE_BINDING_REVISION =
+        &quot;regelsuche.direct-occurrence-guard-binding/v1&quot;;
+
+    /** Versioned logical work units; not wall time or CPU instructions. */
+    public static final String OCCURRENCE_WORK_REVISION =
+        &quot;regelsuche.occurrence-preparation-work/v2&quot;;
+
+    private final List&lt;RewriteApplicabilitySchema&gt; principalSchemas;
+    private final Map&lt;String, String&gt; admittedSchemaHashes;
+    private final List&lt;RewriteRule&gt; preparationRules;
+    private final String repositoryRevision;
+    private final PatternTargetedLocalBridgeSearch.Budget bridgeBudget;
+    private final String principalInventoryFingerprint;
+    private final String preparationInventoryFingerprint;
+    private final String exactRegistryFingerprint;
+<span class="fc" id="L59">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L60">    private final ExpressionCanonicalizer canonicalizer =</span>
+        new ExpressionCanonicalizer();
+<span class="fc" id="L62">    private final PatternMatchAnalyzer analyzer = new PatternMatchAnalyzer();</span>
+
+    public OccurrenceAwareSharedRulePreparationCoordinator(
+        List&lt;RewriteApplicabilitySchema&gt; principalSchemas,
+        List&lt;? extends RewriteRule&gt; preparationRules,
+        String repositoryRevision,
+        PatternTargetedLocalBridgeSearch.Budget bridgeBudget
+<span class="fc" id="L69">    ) {</span>
+<span class="fc" id="L70">        SharedUnifiedRulePreparationCoordinator validated =</span>
+            new SharedUnifiedRulePreparationCoordinator(
+                principalSchemas,
+                preparationRules,
+                repositoryRevision,
+                bridgeBudget);
+<span class="fc" id="L76">        this.principalSchemas = validated.principalSchemas();</span>
+        // Failure diagnostics must not call the failed executor's descriptor again.
+<span class="fc" id="L78">        Map&lt;String, String&gt; hashes = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L79">        this.principalSchemas.forEach(schema -&gt;</span>
+<span class="fc" id="L80">            hashes.put(schema.ruleId(), schema.contentHash()));</span>
+<span class="fc" id="L81">        this.admittedSchemaHashes = Map.copyOf(hashes);</span>
+<span class="fc" id="L82">        this.preparationRules = List.copyOf(Objects.requireNonNull(</span>
+            preparationRules, &quot;preparationRules&quot;));
+<span class="fc" id="L84">        this.repositoryRevision = requireRevision(repositoryRevision);</span>
+<span class="fc" id="L85">        this.bridgeBudget = Objects.requireNonNull(</span>
+            bridgeBudget, &quot;bridgeBudget&quot;);
+<span class="fc" id="L87">        this.principalInventoryFingerprint =</span>
+<span class="fc" id="L88">            validated.principalInventoryFingerprint();</span>
+<span class="fc" id="L89">        this.preparationInventoryFingerprint =</span>
+<span class="fc" id="L90">            validated.preparationInventoryFingerprint();</span>
+<span class="fc" id="L91">        this.exactRegistryFingerprint = validated.exactRegistryFingerprint();</span>
+<span class="fc" id="L92">    }</span>
+
+    public List&lt;RewriteApplicabilitySchema&gt; principalSchemas() {
+<span class="nc" id="L95">        return principalSchemas;</span>
+    }
+
+    public String principalInventoryFingerprint() {
+<span class="nc" id="L99">        return principalInventoryFingerprint;</span>
+    }
+
+    public String preparationInventoryFingerprint() {
+<span class="nc" id="L103">        return preparationInventoryFingerprint;</span>
+    }
+
+    public String exactRegistryFingerprint() {
+<span class="nc" id="L107">        return exactRegistryFingerprint;</span>
+    }
+
+    /**
+     * Evaluates direct principals with retained occurrence-local bindings and
+     * delegates only unresolved principals to the historical v2 authority.
+     */
+    public Evaluation analyze(
+        String sourceExpression,
+        AssumptionSignature initialAssumptions
+    ) {
+<span class="fc" id="L118">        String source = normalize(sourceExpression);</span>
+<span class="fc" id="L119">        AssumptionSignature assumptions = normalized(initialAssumptions);</span>
+<span class="fc" id="L120">        Expr root = parser.parseTerm(source);</span>
+<span class="fc" id="L121">        OccurrencePreparationGuardFacts guardFacts =</span>
+            new OccurrencePreparationGuardFacts();
+<span class="fc" id="L123">        Map&lt;String, RulePreparationCoordinator.Outcome&gt; outcomes =</span>
+            new LinkedHashMap&lt;&gt;();
+<span class="fc" id="L125">        List&lt;DirectOccurrenceEvidence&gt; occurrenceEvidence =</span>
+            new ArrayList&lt;&gt;();
+<span class="fc" id="L127">        List&lt;RewriteApplicabilitySchema&gt; unresolved = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L129">        DirectTraversalWork traversalWork = new DirectTraversalWork();</span>
+<span class="fc" id="L130">        long directRuleExecutions = 0;</span>
+<span class="fc" id="L131">        long directCandidates = 0;</span>
+<span class="fc" id="L132">        long occurrenceCandidates = 0;</span>
+<span class="fc" id="L133">        long occurrenceAnalyses = 0;</span>
+
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        for (RewriteApplicabilitySchema schema : principalSchemas) {</span>
+<span class="fc" id="L136">            directRuleExecutions++;</span>
+<span class="fc" id="L137">            DirectResolution direct = resolveDirect(</span>
+                schema, root, source, assumptions, guardFacts, traversalWork);
+<span class="fc" id="L139">            occurrenceCandidates = Math.addExact(</span>
+<span class="fc" id="L140">                occurrenceCandidates, direct.occurrenceCandidates());</span>
+<span class="fc" id="L141">            occurrenceAnalyses = Math.addExact(</span>
+<span class="fc" id="L142">                occurrenceAnalyses, direct.occurrenceAnalyses());</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            if (!direct.handled()) {</span>
+<span class="fc" id="L144">                unresolved.add(schema);</span>
+<span class="fc" id="L145">                continue;</span>
+            }
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            if (direct.candidateFound()) {</span>
+<span class="fc" id="L148">                directCandidates++;</span>
+            }
+<span class="fc" id="L150">            outcomes.put(schema.ruleId(), direct.outcome());</span>
+<span class="fc" id="L151">            direct.evidence().ifPresent(occurrenceEvidence::add);</span>
+<span class="fc" id="L152">        }</span>
+
+        // V2 setup is repeated for this subset. Charge its input-sized construction
+        // separately instead of silently treating it as precomputed/free work.
+<span class="fc" id="L156">        long delegateSetupUnits = delegateSetupUnits(unresolved.size(), preparationRules.size());</span>
+<span class="fc" id="L157">        Optional&lt;SharedUnifiedRulePreparationCoordinator.Evaluation&gt; delegated = Optional.empty();</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (!unresolved.isEmpty()) {</span>
+            try {
+<span class="fc" id="L160">                delegated = Optional.of(new SharedUnifiedRulePreparationCoordinator(</span>
+                    unresolved, preparationRules, repositoryRevision, bridgeBudget)
+<span class="fc" id="L162">                    .analyze(source, assumptions));</span>
+<span class="fc" id="L163">            } catch (RuntimeException exception) {</span>
+                // Setup can fail before V2's own execution boundary is entered.
+                // Retain the attempted setup charge, but do not invent a completed
+                // delegated-work receipt or discard independent direct candidates.
+<span class="fc bfc" id="L167" title="All 2 branches covered.">                for (RewriteApplicabilitySchema schema : unresolved) {</span>
+<span class="fc" id="L168">                    outcomes.put(schema.ruleId(), technicalOutcome(</span>
+                        schema, &quot;UNIFIED_V3_DELEGATE_TECHNICAL_FAILURE&quot;));
+<span class="fc" id="L170">                }</span>
+<span class="fc" id="L171">            }</span>
+        }
+<span class="fc" id="L173">        delegated.ifPresent(evaluation -&gt; evaluation.outcomes().forEach(</span>
+<span class="fc" id="L174">            outcome -&gt; outcomes.put(outcome.ruleId(), outcome)));</span>
+
+<span class="fc" id="L176">        List&lt;RulePreparationCoordinator.Outcome&gt; orderedOutcomes =</span>
+<span class="fc" id="L177">            principalSchemas.stream()</span>
+<span class="fc" id="L178">                .map(schema -&gt; Objects.requireNonNull(</span>
+<span class="fc" id="L179">                    outcomes.get(schema.ruleId()),</span>
+<span class="fc" id="L180">                    &quot;missing v3 principal outcome: &quot; + schema.ruleId()))</span>
+<span class="fc" id="L181">                .toList();</span>
+<span class="fc" id="L182">        RulePreparationCoordinator.AggregateWork aggregateWork = delegated</span>
+<span class="fc" id="L183">            .map(SharedUnifiedRulePreparationCoordinator.Evaluation::aggregateWork)</span>
+<span class="fc" id="L184">            .orElseGet(OccurrenceAwareSharedRulePreparationCoordinator::emptyAggregateWork);</span>
+<span class="fc" id="L185">        SharedPreparationGuardFacts.Work guardWork = guardFacts.work();</span>
+<span class="fc" id="L186">        OccurrenceWork occurrenceWork = new OccurrenceWork(</span>
+            directRuleExecutions,
+            directCandidates,
+            occurrenceCandidates,
+            occurrenceAnalyses,
+<span class="fc" id="L191">            guardWork.requests(),</span>
+<span class="fc" id="L192">            guardWork.uniqueFacts(),</span>
+<span class="fc" id="L193">            guardWork.cacheHits(),</span>
+            traversalWork.matchAttempts,
+            traversalWork.applyAttempts,
+            traversalWork.assumptionRequests,
+            delegateSetupUnits);
+
+<span class="fc" id="L199">        return new Evaluation(</span>
+            COORDINATOR_ID,
+            OCCURRENCE_BINDING_REVISION,
+            repositoryRevision,
+            principalInventoryFingerprint,
+            preparationInventoryFingerprint,
+            exactRegistryFingerprint,
+            bridgeBudget,
+            source,
+            assumptions,
+            orderedOutcomes,
+            aggregateWork,
+            occurrenceWork,
+            occurrenceEvidence,
+<span class="fc" id="L213">            unresolved.stream().map(RewriteApplicabilitySchema::ruleId).toList(),</span>
+<span class="fc" id="L214">            delegated.map(</span>
+                SharedUnifiedRulePreparationCoordinator.Evaluation::sharedExecutionWork));
+    }
+
+    /**
+     * Recomputes occurrence selection, guards and delegated v2 work, then checks
+     * direct candidates against the independent concrete AST replay path.
+     * Verification work is separate from the retained analyze-work ledger.
+     */
+    public Verification verify(Evaluation evaluation) {
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        if (evaluation == null) {</span>
+<span class="nc" id="L225">            return new Verification(false, &quot;EVALUATION_MISSING&quot;);</span>
+        }
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (!COORDINATOR_ID.equals(evaluation.coordinatorId())</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">                || !OCCURRENCE_BINDING_REVISION.equals(</span>
+<span class="fc" id="L229">                    evaluation.occurrenceBindingRevision())</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">                || !repositoryRevision.equals(evaluation.repositoryRevision())</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">                || !principalInventoryFingerprint.equals(</span>
+<span class="fc" id="L232">                    evaluation.principalInventoryFingerprint())</span>
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">                || !preparationInventoryFingerprint.equals(</span>
+<span class="fc" id="L234">                    evaluation.preparationInventoryFingerprint())</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">                || !exactRegistryFingerprint.equals(</span>
+<span class="fc" id="L236">                    evaluation.exactRegistryFingerprint())</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">                || !bridgeBudget.equals(evaluation.bridgeBudget())) {</span>
+<span class="nc" id="L238">            return new Verification(</span>
+                false, &quot;COORDINATOR_CONFIGURATION_MISMATCH&quot;);
+        }
+        final Evaluation recomputed;
+        try {
+<span class="fc" id="L243">            recomputed = analyze(evaluation.sourceExpression(), evaluation.sourceAssumptions());</span>
+<span class="fc" id="L244">        } catch (RuntimeException exception) {</span>
+<span class="fc" id="L245">            return new Verification(false, &quot;EVALUATION_RECOMPUTATION_TECHNICAL_FAILURE&quot;);</span>
+<span class="fc" id="L246">        }</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        if (!recomputed.equals(evaluation)) {</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            for (RulePreparationCoordinator.Outcome outcome : recomputed.outcomes()) {</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">                if (outcome.status() == PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">                        &amp;&amp; !evaluation.outcome(outcome.ruleId()).filter(outcome::equals).isPresent()) {</span>
+<span class="fc" id="L251">                    return new Verification(false, outcome.detailCode());</span>
+                }
+<span class="fc" id="L253">            }</span>
+<span class="fc" id="L254">            return new Verification(false, &quot;EVALUATION_RECOMPUTATION_MISMATCH&quot;);</span>
+        }
+        // Recomputing our own occurrence traversal is not independent replay.
+        // Also require the real AST executor to reproduce every direct candidate.
+<span class="fc" id="L258">        return OccurrencePreparationReplay.verify(evaluation, principalSchemas);</span>
+    }
+
+    private DirectResolution resolveDirect(
+        RewriteApplicabilitySchema schema,
+        Expr root,
+        String source,
+        AssumptionSignature assumptions,
+        OccurrencePreparationGuardFacts guardFacts,
+        DirectTraversalWork traversalWork
+    ) {
+        final List&lt;Occurrence&gt; occurrences;
+        try {
+<span class="fc" id="L271">            verifyAdmittedSchemaHash(schema);</span>
+<span class="fc" id="L272">            occurrences = directOccurrences(schema.executor(), root, &quot;$&quot;, traversalWork)</span>
+<span class="fc" id="L273">                .stream()</span>
+<span class="fc" id="L274">                .filter(occurrence -&gt; !ExpressionFormatter.format(</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">                    occurrence.transformedRoot()).equals(source))</span>
+<span class="fc" id="L276">                .toList();</span>
+<span class="fc" id="L277">        } catch (RuntimeException exception) {</span>
+<span class="fc" id="L278">            return DirectResolution.technical(</span>
+<span class="fc" id="L279">                technicalOutcome(</span>
+                    schema,
+                    &quot;UNIFIED_V3_DIRECT_REPLAY_TECHNICAL_FAILURE&quot;),
+                0);
+<span class="fc" id="L283">        }</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">        if (occurrences.isEmpty()) {</span>
+<span class="fc" id="L285">            return DirectResolution.absent();</span>
+        }
+
+<span class="fc" id="L288">        Occurrence selected = occurrences.getFirst();</span>
+        PatternMatchAnalyzer.Analysis analysis;
+        try {
+<span class="fc" id="L291">            analysis = analyzeOccurrence(schema, selected.sourceSubtree());</span>
+<span class="nc" id="L292">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L293">            return DirectResolution.technical(</span>
+<span class="nc" id="L294">                technicalOutcome(</span>
+                    schema,
+                    &quot;UNIFIED_V3_OCCURRENCE_ANALYSIS_TECHNICAL_FAILURE&quot;),
+<span class="nc" id="L297">                occurrences.size());</span>
+<span class="fc" id="L298">        }</span>
+
+        SharedPreparationGuardFacts.Fact guards;
+        try {
+            // An empty guard list cannot turn an inconclusive match into success.
+<span class="fc bfc" id="L303" title="All 2 branches covered.">            guards = analysis.matched()</span>
+<span class="fc" id="L304">                ? guardFacts.evaluate(schema, analysis, assumptions)</span>
+<span class="fc" id="L305">                : SharedPreparationGuardFacts.Fact.unknown(</span>
+                    &quot;REQUIRED_ASSUMPTION_BINDINGS_UNAVAILABLE&quot;);
+<span class="nc" id="L307">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L308">            return DirectResolution.technical(</span>
+<span class="nc" id="L309">                technicalOutcome(</span>
+                    schema,
+<span class="nc" id="L311">                    PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(analysis),</span>
+                    &quot;UNIFIED_V3_DIRECT_GUARD_TECHNICAL_FAILURE&quot;),
+<span class="nc" id="L313">                occurrences.size(),</span>
+                1);
+<span class="fc" id="L315">        }</span>
+
+        try {
+<span class="fc" id="L318">            return resolveAnalyzedOccurrence(</span>
+<span class="fc" id="L319">                schema, source, assumptions, selected, occurrences.size(),</span>
+                analysis, guards);
+<span class="fc" id="L321">        } catch (RuntimeException exception) {</span>
+<span class="fc" id="L322">            return DirectResolution.technical(</span>
+<span class="fc" id="L323">                technicalOutcome(</span>
+                    schema,
+<span class="fc" id="L325">                    PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(analysis),</span>
+                    &quot;UNIFIED_V3_DIRECT_METADATA_TECHNICAL_FAILURE&quot;),
+<span class="fc" id="L327">                occurrences.size(),</span>
+                1);
+        }
+    }
+
+    private DirectResolution resolveAnalyzedOccurrence(
+        RewriteApplicabilitySchema schema,
+        String source,
+        AssumptionSignature assumptions,
+        Occurrence selected,
+        int occurrenceCount,
+        PatternMatchAnalyzer.Analysis analysis,
+        SharedPreparationGuardFacts.Fact guards
+    ) {
+<span class="fc" id="L341">        String transformed = ExpressionFormatter.format(</span>
+<span class="fc" id="L342">            selected.transformedRoot());</span>
+<span class="fc" id="L343">        String occurrenceHash = occurrenceHash(</span>
+            schema, source, selected, transformed);
+        // Keep the primitive identity understood by the concrete replay engine.
+        // The separate occurrenceHash binds source, path, subtree and target.
+<span class="fc" id="L347">        String applicationKey = schema.ruleId() + &quot;:&quot;</span>
+<span class="fc" id="L348">            + canonicalizer.stableHash(ExpressionFormatter.format(</span>
+<span class="fc" id="L349">                selected.sourceSubtree()));</span>
+<span class="fc" id="L350">        DirectOccurrenceEvidence evidence = new DirectOccurrenceEvidence(</span>
+<span class="fc" id="L351">            schema.ruleId(),</span>
+<span class="fc" id="L352">            selected.path(),</span>
+<span class="fc" id="L353">            ExpressionFormatter.format(selected.sourceSubtree()),</span>
+            occurrenceHash,
+            applicationKey,
+<span class="fc" id="L356">            PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(analysis),</span>
+<span class="fc" id="L357">            guards.status().name(),</span>
+<span class="fc" id="L358">            guards.detailCode(),</span>
+<span class="fc" id="L359">            guards.requiredAssumptions());</span>
+
+        RulePreparationCoordinator.Outcome outcome;
+<span class="fc bfc" id="L362" title="All 2 branches covered.">        if (guards.satisfied()) {</span>
+<span class="fc" id="L363">            Transformation candidate = directCandidate(</span>
+<span class="fc" id="L364">                schema.executor(),</span>
+                transformed,
+                applicationKey,
+<span class="fc" id="L367">                selected.emittedAssumptions(),</span>
+                assumptions);
+<span class="fc" id="L369">            outcome = new RulePreparationCoordinator.Outcome(</span>
+<span class="fc" id="L370">                schema.ruleId(),</span>
+<span class="fc" id="L371">                verifyAdmittedSchemaHash(schema),</span>
+                PatternTargetedLocalBridgeSearch.Status.DIRECT_MATCH_AVAILABLE,
+<span class="fc" id="L373">                Optional.of(candidate),</span>
+                true,
+<span class="fc" id="L375">                PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(analysis),</span>
+<span class="fc" id="L376">                PatternTargetedLocalBridgeSearch.Work.empty(),</span>
+<span class="fc" id="L377">                Set.of(),</span>
+                &quot;UNIFIED_V3_OCCURRENCE_DIRECT_REPLAYED&quot;,
+                &quot;&quot;);
+<span class="fc" id="L380">        } else {</span>
+<span class="fc" id="L381">            outcome = new RulePreparationCoordinator.Outcome(</span>
+<span class="fc" id="L382">                schema.ruleId(),</span>
+<span class="fc" id="L383">                verifyAdmittedSchemaHash(schema),</span>
+<span class="fc" id="L384">                rejectedStatus(analysis, guards),</span>
+<span class="fc" id="L385">                Optional.empty(),</span>
+                false,
+<span class="fc" id="L387">                PatternTargetedLocalBridgeSearch.AnalysisSnapshot.from(analysis),</span>
+<span class="fc" id="L388">                PatternTargetedLocalBridgeSearch.Work.empty(),</span>
+<span class="fc" id="L389">                Set.of(),</span>
+<span class="fc" id="L390">                guards.detailCode(),</span>
+                &quot;&quot;);
+        }
+<span class="fc" id="L393">        return new DirectResolution(</span>
+            true,
+<span class="fc" id="L395">            outcome.candidate().isPresent(),</span>
+            outcome,
+<span class="fc" id="L397">            Optional.of(evidence),</span>
+            occurrenceCount,
+            1);
+    }
+
+    private static PatternTargetedLocalBridgeSearch.Status rejectedStatus(
+        PatternMatchAnalyzer.Analysis analysis,
+        SharedPreparationGuardFacts.Fact guards
+    ) {
+<span class="fc bfc" id="L406" title="All 2 branches covered.">        if (analysis.status() == PatternMatchAnalyzer.Status.INCONCLUSIVE) {</span>
+<span class="fc" id="L407">            return PatternTargetedLocalBridgeSearch.Status.BUDGET_INCONCLUSIVE;</span>
+        }
+<span class="fc bfc" id="L409" title="All 2 branches covered.">        return guards.status() == SharedPreparationGuardFacts.Status.INVALID</span>
+<span class="fc" id="L410">            ? PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE</span>
+<span class="fc" id="L411">            : PatternTargetedLocalBridgeSearch.Status.UNSUPPORTED;</span>
+    }
+
+    private PatternMatchAnalyzer.Analysis analyzeOccurrence(
+        RewriteApplicabilitySchema schema,
+        Expr occurrence
+    ) {
+<span class="fc" id="L418">        return analyzer.analyze(</span>
+<span class="fc" id="L419">            schema.pattern(),</span>
+            occurrence,
+<span class="fc" id="L421">            schema.recognitionProfile(),</span>
+            new ExprMatcher.MatchOptions(
+<span class="fc" id="L423">                EquivalentExpressionProvider.identity(),</span>
+<span class="fc" id="L424">                bridgeBudget.maxMatchResults(),</span>
+<span class="fc" id="L425">                bridgeBudget.maxMatchSteps(),</span>
+<span class="fc" id="L426">                bridgeBudget.maxPatternBranches()));</span>
+    }
+
+    private List&lt;Occurrence&gt; directOccurrences(
+        RewriteRule rule,
+        Expr subtree,
+        String path,
+        DirectTraversalWork work
+    ) {
+<span class="fc" id="L435">        List&lt;Occurrence&gt; result = new ArrayList&lt;&gt;();</span>
+        // Count before invocation: failed matches, no-op rewrites and exceptions
+        // consume work too, even when no candidate/evidence can be retained.
+<span class="fc" id="L438">        work.matchAttempts = Math.addExact(work.matchAttempts, 1);</span>
+<span class="fc bfc" id="L439" title="All 2 branches covered.">        if (rule.matches(subtree)) {</span>
+<span class="fc" id="L440">            work.applyAttempts = Math.addExact(work.applyAttempts, 1);</span>
+<span class="fc" id="L441">            Expr rewritten = rule.apply(subtree);</span>
+<span class="fc bfc" id="L442" title="All 2 branches covered.">            if (!rewritten.equals(subtree)) {</span>
+<span class="fc" id="L443">                work.assumptionRequests = Math.addExact(work.assumptionRequests, 1);</span>
+<span class="fc" id="L444">                List&lt;Assumption&gt; emitted = rule.assumptions(subtree);</span>
+<span class="fc" id="L445">                result.add(new Occurrence(</span>
+                    path,
+                    subtree,
+                    rewritten,
+<span class="fc" id="L449">                    List.copyOf(Objects.requireNonNull(</span>
+                        emitted, &quot;concrete rule assumptions&quot;))));
+            }
+        }
+
+<span class="fc bfc" id="L454" title="All 2 branches covered.">        if (subtree instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L455" title="All 2 branches covered.">            for (Occurrence child : directOccurrences(</span>
+<span class="fc" id="L456">                    rule, binary.left(), path + &quot;L&quot;, work)) {</span>
+<span class="fc" id="L457">                result.add(child.withTransformedRoot(new BinaryExpr(</span>
+<span class="fc" id="L458">                    child.transformedRoot(),</span>
+<span class="fc" id="L459">                    binary.operator(),</span>
+<span class="fc" id="L460">                    binary.right())));</span>
+<span class="fc" id="L461">            }</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">            for (Occurrence child : directOccurrences(</span>
+<span class="fc" id="L463">                    rule, binary.right(), path + &quot;R&quot;, work)) {</span>
+<span class="fc" id="L464">                result.add(child.withTransformedRoot(new BinaryExpr(</span>
+<span class="fc" id="L465">                    binary.left(),</span>
+<span class="fc" id="L466">                    binary.operator(),</span>
+<span class="fc" id="L467">                    child.transformedRoot())));</span>
+<span class="fc" id="L468">            }</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">        } else if (subtree instanceof FunctionExpr function) {</span>
+<span class="fc" id="L470">            List&lt;Expr&gt; arguments = function.arguments();</span>
+<span class="fc bfc" id="L471" title="All 2 branches covered.">            for (int index = 0; index &lt; arguments.size(); index++) {</span>
+<span class="fc bfc" id="L472" title="All 2 branches covered.">                for (Occurrence child : directOccurrences(</span>
+                        rule,
+<span class="fc" id="L474">                        arguments.get(index),</span>
+                        path + &quot;A&quot; + index, work)) {
+<span class="fc" id="L476">                    List&lt;Expr&gt; replaced = new ArrayList&lt;&gt;(arguments);</span>
+<span class="fc" id="L477">                    replaced.set(index, child.transformedRoot());</span>
+<span class="fc" id="L478">                    result.add(child.withTransformedRoot(new FunctionExpr(</span>
+<span class="fc" id="L479">                        function.name(), replaced)));</span>
+<span class="fc" id="L480">                }</span>
+            }
+        }
+<span class="fc" id="L483">        return result;</span>
+    }
+
+    private static final class DirectTraversalWork {
+        private long matchAttempts;
+        private long applyAttempts;
+        private long assumptionRequests;
+    }
+
+    /**
+     * Logical setup quanta for R unresolved principals and P preparation rules:
+     * one construction, R+P inventory slots and R*(P+1) visible-rule slots.
+     * A slot includes V2's nested validation/indexing of that input; this is an
+     * input-sized composite unit, not a claim to count every internal operation.
+     * The zero-principal path constructs no delegate and incurs zero setup.
+     */
+    private static long delegateSetupUnits(int principals, int preparationRules) {
+<span class="fc bfc" id="L500" title="All 2 branches covered.">        if (principals == 0) {</span>
+<span class="fc" id="L501">            return 0;</span>
+        }
+<span class="fc" id="L503">        long inventorySlots = Math.addExact((long) principals, preparationRules);</span>
+<span class="fc" id="L504">        long visibleRuleSlots = Math.multiplyExact((long) principals,</span>
+<span class="fc" id="L505">            Math.addExact((long) preparationRules, 1));</span>
+<span class="fc" id="L506">        return Math.addExact(1, Math.addExact(inventorySlots, visibleRuleSlots));</span>
+    }
+
+    private Transformation directCandidate(
+        RewriteRule rule,
+        String transformedExpression,
+        String applicationKey,
+        List&lt;Assumption&gt; emittedAssumptions,
+        AssumptionSignature sourceAssumptions
+    ) {
+<span class="fc" id="L516">        AssumptionSignature emitted = AssumptionSignature.ofExpressions(</span>
+<span class="fc" id="L517">            emittedAssumptions.stream().map(Assumption::expression).toList());</span>
+<span class="fc" id="L518">        AssumptionSignature cumulative = AssumptionSignature.merge(</span>
+            sourceAssumptions, emitted);
+<span class="fc" id="L520">        return new Transformation(</span>
+<span class="fc" id="L521">            rule.id(),</span>
+            transformedExpression,
+<span class="fc" id="L523">            rule.kind(),</span>
+<span class="fc" id="L524">            rule.mayIncreaseComplexity(),</span>
+<span class="fc" id="L525">            rule.estimatedCostDelta(),</span>
+<span class="fc" id="L526">            rule.isEquivalencePreservingByConstruction(),</span>
+            applicationKey,
+<span class="fc" id="L528">            cumulative.normalizedAssumptions(),</span>
+<span class="fc" id="L529">            rule.descriptor().packId(),</span>
+<span class="fc" id="L530">            rule.descriptor().license(),</span>
+<span class="fc" id="L531">            List.of(rule.id()));</span>
+    }
+
+    private RulePreparationCoordinator.Outcome technicalOutcome(
+        RewriteApplicabilitySchema schema,
+        String detailCode
+    ) {
+<span class="fc" id="L538">        return technicalOutcome(</span>
+            schema,
+<span class="fc" id="L540">            PatternTargetedLocalBridgeSearch.AnalysisSnapshot.unavailable(),</span>
+            detailCode);
+    }
+
+    private RulePreparationCoordinator.Outcome technicalOutcome(
+        RewriteApplicabilitySchema schema,
+        PatternTargetedLocalBridgeSearch.AnalysisSnapshot analysis,
+        String detailCode
+    ) {
+<span class="fc" id="L549">        return new RulePreparationCoordinator.Outcome(</span>
+<span class="fc" id="L550">            schema.ruleId(),</span>
+<span class="fc" id="L551">            admittedSchemaHashes.get(schema.ruleId()),</span>
+            PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE,
+<span class="fc" id="L553">            Optional.empty(),</span>
+            false,
+            analysis,
+<span class="fc" id="L556">            PatternTargetedLocalBridgeSearch.Work.empty(),</span>
+<span class="fc" id="L557">            Set.of(),</span>
+            detailCode,
+            &quot;&quot;);
+    }
+
+    /** Retain the admitted identity, but never authorize changed live metadata. */
+    private String verifyAdmittedSchemaHash(RewriteApplicabilitySchema schema) {
+<span class="fc" id="L564">        String admitted = admittedSchemaHashes.get(schema.ruleId());</span>
+<span class="pc bpc" id="L565" title="1 of 2 branches missed.">        if (!Objects.equals(admitted, schema.contentHash())) {</span>
+<span class="nc" id="L566">            throw new IllegalStateException(&quot;principal schema changed after admission&quot;);</span>
+        }
+<span class="fc" id="L568">        return admitted;</span>
+    }
+
+    private String occurrenceHash(
+        RewriteApplicabilitySchema schema,
+        String source,
+        Occurrence occurrence,
+        String transformed
+    ) {
+<span class="fc" id="L577">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L578">        append(descriptor, OCCURRENCE_BINDING_REVISION);</span>
+<span class="fc" id="L579">        append(descriptor, verifyAdmittedSchemaHash(schema));</span>
+<span class="fc" id="L580">        append(descriptor, source);</span>
+<span class="fc" id="L581">        append(descriptor, occurrence.path());</span>
+<span class="fc" id="L582">        append(descriptor, ExpressionFormatter.format(</span>
+<span class="fc" id="L583">            occurrence.sourceSubtree()));</span>
+<span class="fc" id="L584">        append(descriptor, transformed);</span>
+<span class="fc" id="L585">        return sha256(descriptor.toString());</span>
+    }
+
+    private String normalize(String expression) {
+<span class="pc bpc" id="L589" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L590">            throw new IllegalArgumentException(</span>
+                &quot;sourceExpression must not be blank&quot;);
+        }
+<span class="fc" id="L593">        return ExpressionFormatter.format(parser.parseTerm(expression));</span>
+    }
+
+    private static AssumptionSignature normalized(
+        AssumptionSignature assumptions
+    ) {
+<span class="fc" id="L599">        AssumptionSignature supplied = Objects.requireNonNull(</span>
+            assumptions, &quot;initialAssumptions&quot;);
+<span class="fc" id="L601">        return AssumptionSignature.ofExpressions(</span>
+<span class="fc" id="L602">            supplied.normalizedAssumptions());</span>
+    }
+
+    private static String requireRevision(String revision) {
+<span class="pc bpc" id="L606" title="2 of 4 branches missed.">        if (revision == null || !revision.matches(&quot;[0-9a-f]{40}&quot;)) {</span>
+<span class="nc" id="L607">            throw new IllegalArgumentException(</span>
+                &quot;repositoryRevision must be a lowercase commit SHA&quot;);
+        }
+<span class="fc" id="L610">        return revision;</span>
+    }
+
+    private static RulePreparationCoordinator.AggregateWork emptyAggregateWork() {
+<span class="fc" id="L614">        return new RulePreparationCoordinator.AggregateWork(</span>
+            0, 0, 0, 0, 0, 0, 1);
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L619">        target.append(value.getBytes(StandardCharsets.UTF_8).length)</span>
+<span class="fc" id="L620">            .append(':').append(value);</span>
+<span class="fc" id="L621">    }</span>
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L625">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L626">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L627">                    .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L628">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L629">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    private record Occurrence(
+        String path,
+        Expr sourceSubtree,
+        Expr transformedRoot,
+        List&lt;Assumption&gt; emittedAssumptions
+    ) {
+<span class="fc" id="L639">        private Occurrence {</span>
+<span class="pc bpc" id="L640" title="2 of 4 branches missed.">            if (path == null || path.isBlank()) {</span>
+<span class="nc" id="L641">                throw new IllegalArgumentException(</span>
+                    &quot;occurrence path must not be blank&quot;);
+            }
+<span class="fc" id="L644">            sourceSubtree = Objects.requireNonNull(</span>
+                sourceSubtree, &quot;sourceSubtree&quot;);
+<span class="fc" id="L646">            transformedRoot = Objects.requireNonNull(</span>
+                transformedRoot, &quot;transformedRoot&quot;);
+<span class="fc" id="L648">            emittedAssumptions = List.copyOf(Objects.requireNonNull(</span>
+                emittedAssumptions, &quot;emittedAssumptions&quot;));
+<span class="fc" id="L650">        }</span>
+
+        private Occurrence withTransformedRoot(Expr root) {
+<span class="fc" id="L653">            return new Occurrence(</span>
+                path, sourceSubtree, root, emittedAssumptions);
+        }
+    }
+
+    private record DirectResolution(
+        boolean handled,
+        boolean candidateFound,
+        RulePreparationCoordinator.Outcome outcome,
+        Optional&lt;DirectOccurrenceEvidence&gt; evidence,
+        long occurrenceCandidates,
+        long occurrenceAnalyses
+    ) {
+<span class="fc" id="L666">        private DirectResolution {</span>
+<span class="fc" id="L667">            evidence = Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="pc bpc" id="L668" title="3 of 8 branches missed.">            if (handled != (outcome != null)</span>
+                    || occurrenceCandidates &lt; 0
+                    || occurrenceAnalyses &lt; 0) {
+<span class="nc" id="L671">                throw new IllegalArgumentException(</span>
+                    &quot;direct resolution is inconsistent&quot;);
+            }
+<span class="fc" id="L674">        }</span>
+
+        private static DirectResolution absent() {
+<span class="fc" id="L677">            return new DirectResolution(</span>
+<span class="fc" id="L678">                false, false, null, Optional.empty(), 0, 0);</span>
+        }
+
+        private static DirectResolution technical(
+            RulePreparationCoordinator.Outcome outcome,
+            long occurrenceCandidates
+        ) {
+<span class="fc" id="L685">            return technical(outcome, occurrenceCandidates, 0);</span>
+        }
+
+        private static DirectResolution technical(
+            RulePreparationCoordinator.Outcome outcome,
+            long occurrenceCandidates,
+            long occurrenceAnalyses
+        ) {
+<span class="fc" id="L693">            return new DirectResolution(</span>
+                true,
+                false,
+                outcome,
+<span class="fc" id="L697">                Optional.empty(),</span>
+                occurrenceCandidates,
+                occurrenceAnalyses);
+        }
+    }
+
+    public record DirectOccurrenceEvidence(
+        String ruleId,
+        String occurrencePath,
+        String sourceSubtree,
+        String occurrenceHash,
+        String applicationKey,
+        PatternTargetedLocalBridgeSearch.AnalysisSnapshot analysis,
+        String guardStatus,
+        String guardDetailCode,
+        List&lt;String&gt; requiredAssumptions
+    ) {
+<span class="fc" id="L714">        public DirectOccurrenceEvidence {</span>
+<span class="pc bpc" id="L715" title="3 of 6 branches missed.">            if (ruleId == null || ruleId.isBlank()</span>
+<span class="pc bpc" id="L716" title="2 of 4 branches missed.">                    || occurrencePath == null || occurrencePath.isBlank()</span>
+<span class="pc bpc" id="L717" title="2 of 4 branches missed.">                    || sourceSubtree == null || sourceSubtree.isBlank()</span>
+                    || occurrenceHash == null
+<span class="pc bpc" id="L719" title="2 of 4 branches missed.">                    || !occurrenceHash.matches(&quot;sha256:[0-9a-f]{64}&quot;)</span>
+<span class="pc bpc" id="L720" title="2 of 4 branches missed.">                    || applicationKey == null || applicationKey.isBlank()</span>
+<span class="pc bpc" id="L721" title="2 of 4 branches missed.">                    || guardStatus == null || guardStatus.isBlank()</span>
+<span class="pc bpc" id="L722" title="1 of 2 branches missed.">                    || guardDetailCode == null || guardDetailCode.isBlank()) {</span>
+<span class="nc" id="L723">                throw new IllegalArgumentException(</span>
+                    &quot;direct occurrence evidence identity is invalid&quot;);
+            }
+<span class="fc" id="L726">            analysis = Objects.requireNonNull(analysis, &quot;analysis&quot;);</span>
+<span class="fc" id="L727">            requiredAssumptions = List.copyOf(Objects.requireNonNull(</span>
+                requiredAssumptions, &quot;requiredAssumptions&quot;));
+<span class="fc" id="L729">        }</span>
+    }
+
+    /**
+     * Additional V3 analyze work, separate from delegated V2 execution and verify.
+     * Dispatches, retained candidates, analyses and guard requests retain their
+     * original units. Every visited node adds one match attempt; every apply and
+     * concrete-assumption call adds one unit, including no-ops and failed calls.
+     * Delegate setup uses the input-sized composite quanta documented above.
+     */
+    public record OccurrenceWork(
+        long directRuleExecutions,
+        long directCandidates,
+        long occurrenceCandidates,
+        long occurrenceAnalyses,
+        long guardRequests,
+        long uniqueGuardFacts,
+        long guardCacheHits,
+        long directMatchAttempts,
+        long directApplyAttempts,
+        long directAssumptionRequests,
+        long delegateSetupUnits
+    ) {
+<span class="fc" id="L752">        public OccurrenceWork {</span>
+<span class="pc bpc" id="L753" title="13 of 30 branches missed.">            if (directRuleExecutions &lt; 0 || directCandidates &lt; 0</span>
+                    || occurrenceCandidates &lt; 0 || occurrenceAnalyses &lt; 0
+                    || guardRequests &lt; 0 || uniqueGuardFacts &lt; 0
+                    || guardCacheHits &lt; 0
+                    || directMatchAttempts &lt; 0 || directApplyAttempts &lt; 0
+                    || directAssumptionRequests &lt; 0 || delegateSetupUnits &lt; 0
+                    || directApplyAttempts &gt; directMatchAttempts
+                    || directAssumptionRequests &gt; directApplyAttempts
+                    || directCandidates &gt; directRuleExecutions
+                    || guardRequests != uniqueGuardFacts + guardCacheHits) {
+<span class="fc" id="L763">                throw new IllegalArgumentException(</span>
+                    &quot;occurrence work ledger is inconsistent&quot;);
+            }
+<span class="fc" id="L766">        }</span>
+
+        public String revision() {
+<span class="fc" id="L769">            return OCCURRENCE_WORK_REVISION;</span>
+        }
+
+        public long chargedUnits() {
+<span class="fc" id="L773">            long retainedWork = Math.addExact(</span>
+<span class="fc" id="L774">                Math.addExact(directRuleExecutions, occurrenceCandidates),</span>
+<span class="fc" id="L775">                Math.addExact(occurrenceAnalyses, guardRequests));</span>
+<span class="fc" id="L776">            long traversalWork = Math.addExact(directMatchAttempts,</span>
+<span class="fc" id="L777">                Math.addExact(directApplyAttempts, directAssumptionRequests));</span>
+<span class="fc" id="L778">            return Math.addExact(retainedWork,</span>
+<span class="fc" id="L779">                Math.addExact(traversalWork, delegateSetupUnits));</span>
+        }
+    }
+
+    /**
+     * Retained analysis. Delegated work is absent with nonempty delegate IDs only
+     * when every attempted delegate has an explicit technical-failure outcome.
+     * In that case the setup charge remains, but completed V2 execution work is
+     * unavailable, not a zero-cost successful execution.
+     */
+    public record Evaluation(
+        String coordinatorId,
+        String occurrenceBindingRevision,
+        String repositoryRevision,
+        String principalInventoryFingerprint,
+        String preparationInventoryFingerprint,
+        String exactRegistryFingerprint,
+        PatternTargetedLocalBridgeSearch.Budget bridgeBudget,
+        String sourceExpression,
+        AssumptionSignature sourceAssumptions,
+        List&lt;RulePreparationCoordinator.Outcome&gt; outcomes,
+        RulePreparationCoordinator.AggregateWork aggregateWork,
+        OccurrenceWork occurrenceWork,
+        List&lt;DirectOccurrenceEvidence&gt; directOccurrenceEvidence,
+        List&lt;String&gt; delegatedV2PrincipalIds,
+        Optional&lt;SharedUnifiedRulePreparationCoordinator.SharedExecutionWork&gt;
+            delegatedSharedExecutionWork
+    ) {
+<span class="fc" id="L807">        public Evaluation {</span>
+<span class="pc bpc" id="L808" title="1 of 2 branches missed.">            if (!COORDINATOR_ID.equals(coordinatorId)</span>
+<span class="pc bpc" id="L809" title="2 of 4 branches missed.">                    || !OCCURRENCE_BINDING_REVISION.equals(</span>
+                        occurrenceBindingRevision)
+                    || repositoryRevision == null
+<span class="pc bpc" id="L812" title="1 of 2 branches missed.">                    || !repositoryRevision.matches(&quot;[0-9a-f]{40}&quot;)</span>
+<span class="pc bpc" id="L813" title="1 of 2 branches missed.">                    || !hash(principalInventoryFingerprint)</span>
+<span class="pc bpc" id="L814" title="1 of 2 branches missed.">                    || !hash(preparationInventoryFingerprint)</span>
+<span class="pc bpc" id="L815" title="1 of 2 branches missed.">                    || !hash(exactRegistryFingerprint)) {</span>
+<span class="nc" id="L816">                throw new IllegalArgumentException(</span>
+                    &quot;occurrence-aware unified evaluation identity is invalid&quot;);
+            }
+<span class="fc" id="L819">            bridgeBudget = Objects.requireNonNull(</span>
+                bridgeBudget, &quot;bridgeBudget&quot;);
+<span class="pc bpc" id="L821" title="2 of 4 branches missed.">            if (sourceExpression == null || sourceExpression.isBlank()) {</span>
+<span class="nc" id="L822">                throw new IllegalArgumentException(</span>
+                    &quot;sourceExpression must not be blank&quot;);
+            }
+<span class="fc" id="L825">            sourceAssumptions = normalized(sourceAssumptions);</span>
+<span class="fc" id="L826">            outcomes = List.copyOf(Objects.requireNonNull(</span>
+                outcomes, &quot;outcomes&quot;));
+<span class="pc bpc" id="L828" title="1 of 2 branches missed.">            if (outcomes.isEmpty()) {</span>
+<span class="nc" id="L829">                throw new IllegalArgumentException(</span>
+                    &quot;evaluation requires principal outcomes&quot;);
+            }
+<span class="fc" id="L832">            Set&lt;String&gt; outcomeIds = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L833">            outcomes.forEach(outcome -&gt; {</span>
+<span class="pc bpc" id="L834" title="1 of 2 branches missed.">                if (!outcomeIds.add(outcome.ruleId())) {</span>
+<span class="nc" id="L835">                    throw new IllegalArgumentException(</span>
+<span class="nc" id="L836">                        &quot;duplicate outcome rule ID: &quot; + outcome.ruleId());</span>
+                }
+<span class="fc" id="L838">            });</span>
+<span class="fc" id="L839">            aggregateWork = Objects.requireNonNull(</span>
+                aggregateWork, &quot;aggregateWork&quot;);
+<span class="fc" id="L841">            occurrenceWork = Objects.requireNonNull(</span>
+                occurrenceWork, &quot;occurrenceWork&quot;);
+<span class="fc" id="L843">            directOccurrenceEvidence = List.copyOf(Objects.requireNonNull(</span>
+                directOccurrenceEvidence, &quot;directOccurrenceEvidence&quot;));
+<span class="fc" id="L845">            delegatedV2PrincipalIds = List.copyOf(Objects.requireNonNull(</span>
+                delegatedV2PrincipalIds, &quot;delegatedV2PrincipalIds&quot;));
+<span class="fc" id="L847">            delegatedSharedExecutionWork = Objects.requireNonNull(</span>
+                delegatedSharedExecutionWork,
+                &quot;delegatedSharedExecutionWork&quot;);
+<span class="fc" id="L850">            Set&lt;String&gt; evidenceIds = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L851">            directOccurrenceEvidence.forEach(evidence -&gt; {</span>
+<span class="pc bpc" id="L852" title="1 of 2 branches missed.">                if (!evidenceIds.add(evidence.ruleId())) {</span>
+<span class="nc" id="L853">                    throw new IllegalArgumentException(</span>
+                        &quot;duplicate occurrence evidence rule ID: &quot;
+<span class="nc" id="L855">                            + evidence.ruleId());</span>
+                }
+<span class="fc" id="L857">            });</span>
+<span class="fc" id="L858">            if (delegatedV2PrincipalIds.isEmpty()</span>
+<span class="fc bfc" id="L859" title="All 2 branches covered.">                    != delegatedSharedExecutionWork.isEmpty()</span>
+<span class="fc bfc" id="L860" title="All 2 branches covered.">                    &amp;&amp; !failedDelegation(delegatedV2PrincipalIds, outcomes, occurrenceWork)) {</span>
+<span class="fc" id="L861">                throw new IllegalArgumentException(</span>
+                    &quot;delegated v2 work must match delegated principals or retained setup failure&quot;);
+            }
+<span class="fc" id="L864">        }</span>
+
+        public Optional&lt;RulePreparationCoordinator.Outcome&gt; outcome(
+            String ruleId
+        ) {
+<span class="fc" id="L869">            return outcomes.stream()</span>
+<span class="fc" id="L870">                .filter(value -&gt; value.ruleId().equals(ruleId))</span>
+<span class="fc" id="L871">                .findFirst();</span>
+        }
+
+        public Optional&lt;DirectOccurrenceEvidence&gt; directOccurrence(
+            String ruleId
+        ) {
+<span class="fc" id="L877">            return directOccurrenceEvidence.stream()</span>
+<span class="fc" id="L878">                .filter(value -&gt; value.ruleId().equals(ruleId))</span>
+<span class="fc" id="L879">                .findFirst();</span>
+        }
+
+        public List&lt;Transformation&gt; candidates() {
+<span class="fc" id="L883">            return outcomes.stream()</span>
+<span class="fc" id="L884">                .flatMap(value -&gt; value.candidate().stream())</span>
+<span class="fc" id="L885">                .toList();</span>
+        }
+
+        private static boolean failedDelegation(
+            List&lt;String&gt; principalIds,
+            List&lt;RulePreparationCoordinator.Outcome&gt; outcomes,
+            OccurrenceWork work
+        ) {
+<span class="pc bpc" id="L893" title="2 of 4 branches missed.">            if (principalIds.isEmpty() || work.delegateSetupUnits() == 0</span>
+<span class="pc bpc" id="L894" title="1 of 2 branches missed.">                    || new LinkedHashSet&lt;&gt;(principalIds).size() != principalIds.size()) {</span>
+<span class="nc" id="L895">                return false;</span>
+            }
+<span class="fc" id="L897">            return principalIds.stream().allMatch(id -&gt; outcomes.stream().anyMatch(outcome -&gt;</span>
+<span class="fc bfc" id="L898" title="All 2 branches covered.">                id.equals(outcome.ruleId())</span>
+<span class="fc bfc" id="L899" title="All 2 branches covered.">                    &amp;&amp; outcome.status() == PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE</span>
+<span class="pc bpc" id="L900" title="1 of 2 branches missed.">                    &amp;&amp; &quot;UNIFIED_V3_DELEGATE_TECHNICAL_FAILURE&quot;.equals(outcome.detailCode())</span>
+<span class="pc bpc" id="L901" title="1 of 2 branches missed.">                    &amp;&amp; outcome.candidate().isEmpty()));</span>
+        }
+
+        private static boolean hash(String value) {
+<span class="pc bpc" id="L905" title="2 of 4 branches missed.">            return value != null &amp;&amp; value.matches(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+        }
+    }
+
+    public record Verification(boolean valid, String detailCode) {
+<span class="fc" id="L910">        public Verification {</span>
+<span class="pc bpc" id="L911" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L912">                throw new IllegalArgumentException(</span>
+                    &quot;detailCode must not be blank&quot;);
+            }
+<span class="fc" id="L915">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
