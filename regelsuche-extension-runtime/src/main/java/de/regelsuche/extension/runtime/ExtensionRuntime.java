@@ -107,6 +107,8 @@ public final class ExtensionRuntime implements AutoCloseable {
         ExternalResources external = null;
         boolean success = false;
         try {
+            // Validate the host declaration even for an empty catalog, before plugin loading.
+            CoreCompatibilityVersion.parse(config.coreCompatibilityVersion());
             List<LoadedPlugin> loaded = new ArrayList<>();
             for (RegelsuchePlugin plugin : config.explicitPlugins()) {
                 loaded.add(classpathPlugin(plugin, "explicit"));
@@ -212,6 +214,11 @@ public final class ExtensionRuntime implements AutoCloseable {
 
         for (LoadedPlugin plugin : loaded) {
             for (PluginDependency dependency : plugin.descriptor().dependencies()) {
+                String constraint = dependency.versionConstraint();
+                if (!"any".equals(constraint) && !isExactVersionConstraint(constraint)) {
+                    throw new IllegalArgumentException(
+                        "unsupported plugin dependency constraint: " + constraint);
+                }
                 LoadedPlugin target = byId.get(dependency.pluginId());
                 if (target == null) {
                     if (!dependency.optional()) {
@@ -221,13 +228,8 @@ public final class ExtensionRuntime implements AutoCloseable {
                     }
                     continue;
                 }
-                String constraint = dependency.versionConstraint();
                 if ("any".equals(constraint)) {
                     continue;
-                }
-                if (!isExactVersionConstraint(constraint)) {
-                    throw new IllegalArgumentException(
-                        "unsupported plugin dependency constraint: " + constraint);
                 }
                 if (!target.descriptor().version().equals(constraint)) {
                     throw new IllegalArgumentException(
@@ -249,31 +251,8 @@ public final class ExtensionRuntime implements AutoCloseable {
     }
 
     private static boolean isNewerVersion(String required, String available) {
-        String[] requiredParts = required.split("\\.", 3);
-        String[] availableParts = available.split("\\.", 3);
-        int length = Math.max(requiredParts.length, availableParts.length);
-        for (int index = 0; index < length; index++) {
-            int requiredPart = index < requiredParts.length
-                ? numericPart(requiredParts[index]) : 0;
-            int availablePart = index < availableParts.length
-                ? numericPart(availableParts[index]) : 0;
-            if (requiredPart != availablePart) {
-                return requiredPart > availablePart;
-            }
-        }
-        return false;
-    }
-
-    private static int numericPart(String value) {
-        String digits = value.replaceAll("[^0-9]", "");
-        if (digits.isEmpty()) {
-            return 0;
-        }
-        try {
-            return Integer.parseInt(digits);
-        } catch (NumberFormatException invalid) {
-            return 0;
-        }
+        return CoreCompatibilityVersion.parse(required)
+            .compareTo(CoreCompatibilityVersion.parse(available)) > 0;
     }
 
     private static ExternalResources loadExternalPlugins(ExtensionRuntimeConfig config)
