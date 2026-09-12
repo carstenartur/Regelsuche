@@ -12,7 +12,9 @@ def verifyAiKnowledgeCoverageControls = tasks.register('verifyAiKnowledgeCoverag
     group = 'verification'
     description = 'Detects omitted preparation and replay boundaries in nonempty AI context packs.'
     workingDir rootProject.projectDir
-    commandLine aiKnowledgePython, '-m', 'unittest', 'discover',
+    // A verification run must preserve the clean checkout required by the
+    // source-bound reproduction artifact builder later in ciCheck.
+    commandLine aiKnowledgePython, '-B', '-m', 'unittest', 'discover',
         '-s', 'scripts', '-p', 'test_ai_knowledge_coverage.py'
     inputs.files(aiKnowledgeVerifierScript,
         rootProject.file('scripts/test_ai_knowledge_coverage.py'),
