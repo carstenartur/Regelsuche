@@ -151,7 +151,9 @@ gradle.beforeProject { candidate ->
             ':regelsuche-validation',
             ':regelsuche-discovery',
             ':regelsuche-discovery-sdk',
-            ':regelsuche-plugin-api'
+            ':regelsuche-plugin-api',
+            ':regelsuche-extension-api',
+            ':regelsuche-extension-runtime'
         ]) {
         candidate.apply from: new File(
             settingsDir,
@@ -191,6 +193,8 @@ include(
     'regelsuche-discovery',
     'regelsuche-discovery-sdk',
     'regelsuche-plugin-api',
+    'regelsuche-extension-api',
+    'regelsuche-extension-runtime',
     'regelsuche-bom',
     'regelsuche-quality',
     'regelsuche-benchmarks',

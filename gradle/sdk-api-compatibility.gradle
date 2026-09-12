@@ -6,11 +6,12 @@ dependencies { sdkApiDiffTool 'com.github.siom79.japicmp:japicmp:0.26.2:jar-with
 
 def sdkApiModules = [
     'regelsuche-core', 'regelsuche-egraph', 'regelsuche-search', 'regelsuche-validation',
-    'regelsuche-discovery', 'regelsuche-discovery-sdk', 'regelsuche-plugin-api'
+    'regelsuche-discovery', 'regelsuche-discovery-sdk', 'regelsuche-plugin-api',
+    'regelsuche-extension-api', 'regelsuche-extension-runtime'
 ]
 def verifySdkApiCompatibility = tasks.register('verifySdkApiCompatibility', Exec) {
     group = 'verification'
-    description = 'Checks public Java API compatibility against the pinned 0.4.0 release.'
+    description = 'Checks public Java API compatibility against the pinned 0.4.0 release and validates new API revisions.'
     dependsOn sdkApiModules.collect { ":${it}:jar" }
     workingDir rootDir
     outputs.upToDateWhen { false }
