@@ -243,6 +243,8 @@ public interface PolynomialTheoryUtilityProfileAdapter {
     final class CandidateBatch {
         public static final String SCHEMA =
             "regelsuche.polynomial-theory-utility-candidate-batch/v2";
+        public static final String OBSERVED_SCHEMA =
+            "regelsuche.polynomial-theory-utility-candidate-batch/v3";
         public static final String EVIDENCE_STATUS =
             "TARGET_BLIND_RESULTS_COLLECTED_NOT_FROZEN";
 
@@ -280,6 +282,9 @@ public interface PolynomialTheoryUtilityProfileAdapter {
                     index % formationCases.size()
                 );
                 result.validateAgainst(input, formationCase);
+                if (!result.schema().equals(this.results.getFirst().schema())) {
+                    throw new IllegalArgumentException("candidate batch mixes historical and observed result revisions");
+                }
                 if (!identities.add(result.resultId())) {
                     throw new IllegalArgumentException(
                         "candidate result identities are not unique"
@@ -298,7 +303,7 @@ public interface PolynomialTheoryUtilityProfileAdapter {
         }
 
         public String schema() {
-            return SCHEMA;
+            return results.getFirst().observations() == null ? SCHEMA : OBSERVED_SCHEMA;
         }
 
         public String studyId() {

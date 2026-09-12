@@ -19,10 +19,13 @@ public record PolynomialTheoryUtilityCandidateResult(
     String detailCode,
     PolynomialTheoryUtilityWorkBreakdown work,
     List<PolynomialTheoryUtilityTransitionOutcome> transitions,
-    String verifierOutcome
+    String verifierOutcome,
+    PolynomialTheoryUtilityExecutionObservations observations
 ) {
     public static final String SCHEMA =
         "regelsuche.polynomial-theory-utility-candidate-result/v2";
+    public static final String OBSERVED_SCHEMA =
+        "regelsuche.polynomial-theory-utility-candidate-result/v3";
     public static final String NO_TRANSITION_EVIDENCE = "NONE";
     private static final Pattern SHA_256 =
         Pattern.compile("sha256:[0-9a-f]{64}");
@@ -34,6 +37,14 @@ public record PolynomialTheoryUtilityCandidateResult(
         String,
         PolynomialTheoryUtilityCaseCorpus.FormationCase
     > FORMATION_CASES = loadFormationCases();
+
+    /** Historical v2 constructor; its identity and validation remain unchanged. */
+    public PolynomialTheoryUtilityCandidateResult(String resultId, PolynomialTheoryUtilityExecutionInput input,
+            String sourceRootExpression, TerminalStatus terminalStatus, String detailCode,
+            PolynomialTheoryUtilityWorkBreakdown work, List<PolynomialTheoryUtilityTransitionOutcome> transitions,
+            String verifierOutcome) {
+        this(resultId, input, sourceRootExpression, terminalStatus, detailCode, work, transitions, verifierOutcome, null);
+    }
 
     public PolynomialTheoryUtilityCandidateResult {
         resultId = requireHash(resultId, "resultId");
@@ -71,8 +82,20 @@ public record PolynomialTheoryUtilityCandidateResult(
             );
         }
         requireWorkWithinAuthority(input, work);
-        requireEvidence(terminalStatus, transitions, verifierOutcome);
-        requireProfileWork(profile, work, transitions);
+        if (observations == null && terminalStatus == TerminalStatus.MIXED_OUTCOMES) {
+            throw new IllegalArgumentException("mixed outcomes require the observed result revision");
+        }
+        if (terminalStatus == TerminalStatus.MIXED_OUTCOMES) {
+            if (!"RETAINED_OCCURRENCE_OUTCOMES".equals(verifierOutcome)) {
+                throw new IllegalArgumentException("mixed result must retain individual verifier outcomes");
+            }
+        } else {
+            requireEvidence(terminalStatus, transitions, verifierOutcome);
+        }
+        requireProfileWork(profile, work, transitions, observations != null);
+        if (observations != null) {
+            observations.validateAgainst(input, formationCase, terminalStatus, work, transitions);
+        }
         requireTransitions(
             input,
             formationCase,
@@ -88,7 +111,7 @@ public record PolynomialTheoryUtilityCandidateResult(
                 detailCode,
                 work,
                 transitions,
-                verifierOutcome))) {
+                verifierOutcome, observations))) {
             throw new IllegalArgumentException(
                 "candidate result identity differs from its fields"
             );
@@ -154,8 +177,26 @@ public record PolynomialTheoryUtilityCandidateResult(
         );
     }
 
+    /** Explicit result revision retaining every occurrence and the exact raw work partition. */
+    public static PolynomialTheoryUtilityCandidateResult createObserved(
+            PolynomialTheoryUtilityExecutionInput input,
+            PolynomialTheoryUtilityCaseCorpus.FormationCase formationCase, String detailCode,
+            List<PolynomialTheoryUtilityTransitionOutcome> transitions, String verifierOutcome,
+            PolynomialTheoryUtilityExecutionObservations observations) {
+        Objects.requireNonNull(observations, "observations");
+        if (!formationCase(input.caseId()).equals(formationCase)) {
+            throw new IllegalArgumentException("candidate result received a substituted formation case");
+        }
+        var work = PolynomialTheoryUtilityCanonicalWorkProjection.project(input, observations.rawWork()).work();
+        var retained = List.copyOf(transitions);
+        var terminal = observations.terminalStatus();
+        return new PolynomialTheoryUtilityCandidateResult(identity(input, formationCase.sourceExpression(),
+            terminal, detailCode, work, retained, verifierOutcome, observations), input, formationCase.sourceExpression(),
+            terminal, detailCode, work, retained, verifierOutcome, observations);
+    }
+
     public String schema() {
-        return SCHEMA;
+        return observations == null ? SCHEMA : OBSERVED_SCHEMA;
     }
 
     public int generatedTransitions() {
@@ -239,7 +280,8 @@ public record PolynomialTheoryUtilityCandidateResult(
     private static void requireProfileWork(
         PolynomialTheoryUtilityExecutionProfile profile,
         PolynomialTheoryUtilityWorkBreakdown work,
-        List<PolynomialTheoryUtilityTransitionOutcome> transitions
+        List<PolynomialTheoryUtilityTransitionOutcome> transitions,
+        boolean observed
     ) {
         if ("DISABLED".equals(profile.factorizationMode())
                 && work.factorizationWork() != 0L) {
@@ -256,7 +298,7 @@ public record PolynomialTheoryUtilityCandidateResult(
                 "cache-disabled profile retained aggregate cache work"
             );
         }
-        if (transitions.isEmpty()
+        if (!observed && transitions.isEmpty()
                 && (work.cacheInsertionWork() != 0L
                     || work.cacheEvictionWork() != 0L
                     || work.cacheReplayWork() != 0L)) {
@@ -309,8 +351,15 @@ public record PolynomialTheoryUtilityCandidateResult(
         List<PolynomialTheoryUtilityTransitionOutcome> transitions,
         String verifier
     ) {
+        return identity(input, sourceRootExpression, status, detail, work, transitions, verifier, null);
+    }
+
+    private static String identity(PolynomialTheoryUtilityExecutionInput input, String sourceRootExpression,
+            TerminalStatus status, String detail, PolynomialTheoryUtilityWorkBreakdown work,
+            List<PolynomialTheoryUtilityTransitionOutcome> transitions, String verifier,
+            PolynomialTheoryUtilityExecutionObservations observations) {
         StringBuilder material = new StringBuilder();
-        append(material, SCHEMA);
+        append(material, observations == null ? SCHEMA : OBSERVED_SCHEMA);
         append(material, PolynomialTheoryUtilityPreregistration.STUDY_ID);
         append(material, Objects.requireNonNull(input, "input").inputId());
         append(
@@ -326,6 +375,7 @@ public record PolynomialTheoryUtilityCandidateResult(
             material,
             Objects.requireNonNull(value, "transition").transitionId()
         ));
+        if (observations != null) append(material, observations.observationId());
         return PolynomialTheoryUtilityExecutionIdentity.sha256(
             material.toString().getBytes(StandardCharsets.UTF_8)
         );
@@ -412,6 +462,7 @@ public record PolynomialTheoryUtilityCandidateResult(
         NO_TRANSITION,
         UNSUPPORTED,
         BUDGET_INCONCLUSIVE,
-        TECHNICAL_FAILURE
+        TECHNICAL_FAILURE,
+        MIXED_OUTCOMES
     }
 }
