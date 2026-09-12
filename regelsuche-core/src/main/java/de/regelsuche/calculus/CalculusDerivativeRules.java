@@ -32,7 +32,8 @@ import java.util.List;
  *   <li>{@code diff(sin(x), x) -> cos(x)}, {@code diff(cos(x), x) -> -sin(x)}
  *       (and {@code -} as {@code 0 - sin(x)})</li>
  *   <li>{@code diff(exp(x), x) -> exp(x)}</li>
- *   <li>{@code diff(log(x), x) -> 1/x}, {@code diff(ln(x), x) -> 1/x}</li>
+ *   <li>{@code diff(log(x), x) -> 1/(x*ln(10))} for base-10 {@code log},
+ *       {@code diff(ln(x), x) -> 1/x}</li>
  * </ul>
  *
  * <p>The rules only fire when the derivation variable matches the symbol
@@ -60,9 +61,19 @@ public final class CalculusDerivativeRules {
             new DiffOfStandardFunction("cos", (arg) ->
                 new BinaryExpr(new NumberExpr(0), BinaryOperator.SUB, new FunctionExpr("sin", arg))),
             new DiffOfStandardFunction("exp", (arg) -> new FunctionExpr("exp", arg)),
-            new DiffOfStandardFunction("log", (arg) -> new BinaryExpr(new NumberExpr(1), BinaryOperator.DIV, arg)),
+            new DiffOfStandardFunction("log", CalculusDerivativeRules::baseTenLogDerivative),
             new DiffOfStandardFunction("ln", (arg) -> new BinaryExpr(new NumberExpr(1), BinaryOperator.DIV, arg))
         );
+    }
+
+    private static Expr baseTenLogDerivative(Expr argument) {
+        return new BinaryExpr(
+            new NumberExpr(1),
+            BinaryOperator.DIV,
+            new BinaryExpr(
+                argument,
+                BinaryOperator.MUL,
+                new FunctionExpr("ln", new NumberExpr(10))));
     }
 
     /**
