@@ -119,7 +119,44 @@ class OccurrencePreparationFailureContractTest {
         assertEquals("MATCH_BUDGET_INCONCLUSIVE",
             evaluation.directOccurrence(rule.id()).orElseThrow()
                 .analysis().detailCode());
+        assertEquals(0, evaluation.occurrenceWork().directCandidates());
         assertTrue(coordinator.verify(evaluation).valid());
+    }
+
+    @Test
+    void metadataFailureAfterOccurrenceDiscoveryDoesNotRetainADirectCandidate() {
+        var a = PatternExpr.var("A");
+        var rule = new PatternRewriteRule(
+            "review_metadata_after_apply", PatternExpr.fn("ln", a), a) {
+            private boolean applied;
+
+            @Override
+            public Expr apply(Expr subtree) {
+                Expr transformed = super.apply(subtree);
+                applied = true;
+                return transformed;
+            }
+
+            @Override
+            public RuleDescriptor descriptor() {
+                if (applied) {
+                    throw new IllegalStateException("metadata unavailable after apply");
+                }
+                return super.descriptor();
+            }
+        };
+        var coordinator = coordinator(rule, false);
+
+        var evaluation = coordinator.analyze("1 + ln(x)", assumptions());
+        var outcome = evaluation.outcome(rule.id()).orElseThrow();
+
+        assertEquals(PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE,
+            outcome.status());
+        assertEquals("UNIFIED_V3_DIRECT_METADATA_TECHNICAL_FAILURE", outcome.detailCode());
+        assertTrue(evaluation.candidates().isEmpty());
+        assertEquals(1, evaluation.occurrenceWork().occurrenceCandidates());
+        assertEquals(1, evaluation.occurrenceWork().occurrenceAnalyses());
+        assertEquals(0, evaluation.occurrenceWork().directCandidates());
     }
 
     private static OccurrenceAwareSharedRulePreparationCoordinator coordinator(

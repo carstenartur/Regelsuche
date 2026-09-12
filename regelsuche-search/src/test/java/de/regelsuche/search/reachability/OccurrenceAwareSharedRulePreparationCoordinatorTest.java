@@ -35,6 +35,7 @@ class OccurrenceAwareSharedRulePreparationCoordinatorTest {
         var evidence = evaluation.directOccurrence(rule.id()).orElseThrow();
 
         assertTrue(outcome.direct());
+        assertEquals(1, evaluation.occurrenceWork().directCandidates());
         assertEquals("$", evidence.occurrencePath());
         assertEquals("REQUIRED_ASSUMPTIONS_SATISFIED",
             evidence.guardDetailCode());
@@ -82,6 +83,7 @@ class OccurrenceAwareSharedRulePreparationCoordinatorTest {
             outcome.status());
         assertEquals("REQUIRED_ASSUMPTION_UNKNOWN", outcome.detailCode());
         assertEquals("$R", evidence.occurrencePath());
+        assertEquals(0, evaluation.occurrenceWork().directCandidates());
         assertTrue(coordinator.verify(evaluation).valid());
     }
 
@@ -118,7 +120,7 @@ class OccurrenceAwareSharedRulePreparationCoordinatorTest {
         var outcome = evaluation.outcome(rule.id()).orElseThrow();
 
         assertEquals("$L", evidence.occurrencePath());
-        assertEquals(List.of("b != 0"), evidence.requiredAssumptions());
+        assertEquals(List.of("b != 0", "d != 0"), evidence.requiredAssumptions());
         assertFalse(outcome.positive());
         assertEquals("REQUIRED_ASSUMPTION_UNKNOWN", outcome.detailCode());
     }
@@ -206,6 +208,7 @@ class OccurrenceAwareSharedRulePreparationCoordinatorTest {
             outcome.status());
         assertEquals("REQUIRED_ASSUMPTION_TEMPLATE_INVALID",
             outcome.detailCode());
+        assertEquals(0, evaluation.occurrenceWork().directCandidates());
         assertTrue(coordinator.verify(evaluation).valid());
     }
 

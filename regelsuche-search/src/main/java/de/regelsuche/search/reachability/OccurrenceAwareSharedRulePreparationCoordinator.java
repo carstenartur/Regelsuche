@@ -118,8 +118,8 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
         String source = normalize(sourceExpression);
         AssumptionSignature assumptions = normalized(initialAssumptions);
         Expr root = parser.parseTerm(source);
-        SharedPreparationGuardFacts guardFacts =
-            new SharedPreparationGuardFacts();
+        OccurrencePreparationGuardFacts guardFacts =
+            new OccurrencePreparationGuardFacts();
         Map<String, RulePreparationCoordinator.Outcome> outcomes =
             new LinkedHashMap<>();
         List<DirectOccurrenceEvidence> occurrenceEvidence =
@@ -263,7 +263,7 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
         Expr root,
         String source,
         AssumptionSignature assumptions,
-        SharedPreparationGuardFacts guardFacts,
+        OccurrencePreparationGuardFacts guardFacts,
         DirectTraversalWork traversalWork
     ) {
         final List<Occurrence> occurrences;
@@ -392,7 +392,7 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
         }
         return new DirectResolution(
             true,
-            true,
+            outcome.candidate().isPresent(),
             outcome,
             Optional.of(evidence),
             occurrenceCount,
@@ -692,7 +692,7 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
         ) {
             return new DirectResolution(
                 true,
-                occurrenceCandidates > 0,
+                false,
                 outcome,
                 Optional.empty(),
                 occurrenceCandidates,
