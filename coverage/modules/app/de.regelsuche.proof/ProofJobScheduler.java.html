@@ -178,8 +178,8 @@ public final class ProofJobScheduler implements AutoCloseable {
 <span class="fc" id="L178">        cancelRequests.add(jobId);</span>
         // Interrupt a running future if present
 <span class="fc" id="L180">        Future&lt;?&gt; future = runningFutures.get(jobId);</span>
-<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        if (future != null) {</span>
-<span class="nc" id="L182">            future.cancel(true);</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (future != null) {</span>
+<span class="fc" id="L182">            future.cancel(true);</span>
         }
 <span class="fc" id="L184">        ProofJob cancelled = job.withStatus(ProofJobStatus.CANCELLED);</span>
 <span class="fc" id="L185">        jobRepository.save(cancelled);</span>
@@ -265,14 +265,14 @@ public final class ProofJobScheduler implements AutoCloseable {
 <span class="nc" id="L265">            future.cancel(true);</span>
 <span class="nc" id="L266">            runningFutures.remove(job.id());</span>
 <span class="nc" id="L267">            handleFailure(job, &quot;timeout after &quot; + jobTimeoutMillis + &quot;ms&quot;);</span>
-<span class="fc" id="L268">        } catch (InterruptedException ex) {</span>
-<span class="fc" id="L269">            Thread.currentThread().interrupt();</span>
-<span class="fc" id="L270">            runningFutures.remove(job.id());</span>
-<span class="fc" id="L271">            jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));</span>
-<span class="nc" id="L272">        } catch (CancellationException ex) {</span>
-<span class="nc" id="L273">            runningFutures.remove(job.id());</span>
-<span class="nc" id="L274">            cancelRequests.remove(job.id());</span>
-<span class="nc" id="L275">            jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));</span>
+<span class="nc" id="L268">        } catch (InterruptedException ex) {</span>
+<span class="nc" id="L269">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L270">            runningFutures.remove(job.id());</span>
+<span class="nc" id="L271">            jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));</span>
+<span class="fc" id="L272">        } catch (CancellationException ex) {</span>
+<span class="fc" id="L273">            runningFutures.remove(job.id());</span>
+<span class="fc" id="L274">            cancelRequests.remove(job.id());</span>
+<span class="fc" id="L275">            jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));</span>
 <span class="fc" id="L276">        } catch (Exception ex) {</span>
 <span class="fc" id="L277">            runningFutures.remove(job.id());</span>
 <span class="pc bpc" id="L278" title="1 of 2 branches missed.">            if (cancelRequests.contains(job.id())) {</span>
