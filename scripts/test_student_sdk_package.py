@@ -24,7 +24,9 @@ class SdkPackageTest(unittest.TestCase):
                      'gradle/wrapper/gradle-wrapper.jar', 'gradle/wrapper/gradle-wrapper.properties',
                      'scripts/create-student-discovery-domain.py', 'docs/java-discovery-sdk.md',
                      'docs/java-sdk-quickstart.md', 'docs/java-sdk-api-policy.md',
-                     'docs/java-sdk-domain-tutorial.md', 'docs/java-sdk-human-dx.md'):
+                     'docs/java-sdk-domain-tutorial.md', 'docs/java-sdk-human-dx.md',
+                     'docs/generic-extensions.md',
+                     'docs/superpowers/specs/2026-09-11-generic-extension-program-discovery-design.md'):
             self.write(path, 'fixture')
         for example in package.EXAMPLES:
             self.write(f'examples/external-consumers/{example}/build.gradle', 'version=0.5.0-SNAPSHOT')
@@ -63,6 +65,45 @@ class SdkPackageTest(unittest.TestCase):
                 self.assertEqual(b'version=0.5.0-SNAPSHOT' if example == 'number-theory-plan-java25' else b'version=0.5.0', archive.read(prefix + f'examples/external-consumers/{example}/build.gradle'))
         with self.assertRaises(FileExistsError):
             package.package(self.root, self.repo, self.version, one)
+
+    def test_bundle_includes_extension_example_and_lifetime_documentation(self):
+        # Deliberately name the required consumer independently of package.EXAMPLES.
+        base = 'examples/external-consumers/extension-runtime-java25/'
+        files = {
+            'build.gradle': 'implementation "de.regelsuche:regelsuche-extension-runtime:0.5.0-SNAPSHOT"',
+            'settings.gradle': "rootProject.name = 'extension-runtime-consumer'",
+            'README.md': '# Generic extensions 0.5.0-SNAPSHOT',
+            'src/main/java/example/GreetingPlugin.java': 'class GreetingPlugin {}',
+            'src/test/java/example/ExtensionRuntimeConsumerTest.java': 'class ExtensionRuntimeConsumerTest {}',
+            'src/main/resources/META-INF/services/de.regelsuche.extension.RegelsuchePlugin': 'example.GreetingPlugin\n',
+        }
+        for name, data in files.items():
+            self.write(base + name, data)
+        self.write('docs/generic-extensions.md', 'Published generations live until runtime.close().')
+        output = self.root / 'extensions.zip'
+        package.package(self.root, self.repo, self.version, output)
+        with zipfile.ZipFile(output) as archive:
+            prefix = 'regelsuche-sdk-0.5.0/'
+            checksums = archive.read(prefix + 'SHA256SUMS.txt').decode().splitlines()
+            for name, original in files.items():
+                expected = original.replace('0.5.0-SNAPSHOT', self.version).encode()
+                self.assertIn(prefix + base + name, archive.namelist())
+                self.assertEqual(expected, archive.read(prefix + base + name))
+                self.assertIn(hashlib.sha256(expected).hexdigest() + '  ' + base + name, checksums)
+            self.assertEqual(b'Published generations live until runtime.close().',
+                             archive.read(prefix + 'docs/generic-extensions.md'))
+            self.assertIn(prefix + 'docs/superpowers/specs/2026-09-11-generic-extension-program-discovery-design.md',
+                          archive.namelist())
+
+    def test_missing_required_extension_example_prevents_publication(self):
+        import shutil
+        consumer = self.root / 'examples/external-consumers/extension-runtime-java25'
+        if consumer.exists():
+            shutil.rmtree(consumer)
+        output = self.root / 'missing-extension.zip'
+        with self.assertRaisesRegex(ValueError, 'required SDK example'):
+            package.package(self.root, self.repo, self.version, output)
+        self.assertFalse(output.exists())
 
     def test_missing_sources_prevents_publication(self):
         source = next(self.repo.rglob('*-sources.jar'))
