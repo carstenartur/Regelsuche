@@ -1,5 +1,6 @@
 package de.regelsuche.extension.runtime;
 
+import de.regelsuche.api.IncubatingApi;
 import de.regelsuche.api.StableApi;
 import de.regelsuche.extension.RegelsuchePlugin;
 import java.io.IOException;
@@ -52,12 +53,12 @@ final class AdmittedPluginClassLoader extends URLClassLoader {
         if (sharedHostTypes.contains(type)) {
             return true;
         }
-        // Exact package and loader identity, not all de.regelsuche.* implementation classes.
-        return Modifier.isPublic(type.getModifiers())
-            && ((owner == RegelsuchePlugin.class.getClassLoader()
-                    && type.getPackageName().equals(RegelsuchePlugin.class.getPackageName()))
-                || (owner == StableApi.class.getClassLoader()
-                    && type.getPackageName().equals(StableApi.class.getPackageName())));
+        // Only the lifecycle annotations are automatic exports from de.regelsuche.api.
+        // An application may define unrelated public types in that same package/loader.
+        return type == StableApi.class || type == IncubatingApi.class
+            || (Modifier.isPublic(type.getModifiers())
+                && owner == RegelsuchePlugin.class.getClassLoader()
+                && type.getPackageName().equals(RegelsuchePlugin.class.getPackageName()));
     }
 
     private boolean isAdmittedType(Class<?> type) {

@@ -51,6 +51,7 @@ public final class ExtensionRuntime implements AutoCloseable {
     private Snapshot active;
     private final List<ExternalResources> retiredResources = new ArrayList<>();
     private boolean closed;
+    private boolean reloading;
 
     private ExtensionRuntime(Snapshot active) {
         this.active = active;
@@ -83,10 +84,17 @@ public final class ExtensionRuntime implements AutoCloseable {
      * resources are released immediately. Retention grows with successful external
      * reloads; use a runtime scoped to the host's unit of work rather than an
      * indefinitely reloaded runtime when that bound matters.</p>
+     *
+     * <p>Plugin callbacks may read the previously published catalog, but cannot
+     * reenter {@code reload} or {@code close} on this runtime while a candidate
+     * is being built. Such mutation attempts throw {@link IllegalStateException}
+     * before changing the runtime's state.</p>
      */
     public synchronized CatalogReloadResult reload(ExtensionRuntimeConfig config) {
         ensureOpen();
+        ensureNoReentrantLifecycleMutation();
         String previousHash = active.catalog().contentHash();
+        reloading = true;
         try {
             Snapshot candidate = build(Objects.requireNonNull(config, "config"));
             Snapshot previous = active;
@@ -102,12 +110,15 @@ public final class ExtensionRuntime implements AutoCloseable {
                 previousHash,
                 active.catalog().contentHash(),
                 failure.getClass().getSimpleName() + ": " + String.valueOf(failure.getMessage()));
+        } finally {
+            reloading = false;
         }
     }
 
     /** Releases the current and all retired published external generations. */
     @Override
     public synchronized void close() {
+        ensureNoReentrantLifecycleMutation();
         if (!closed) {
             closed = true;
             active.close();
@@ -115,6 +126,12 @@ public final class ExtensionRuntime implements AutoCloseable {
                 resources.close();
             }
             retiredResources.clear();
+        }
+    }
+
+    private void ensureNoReentrantLifecycleMutation() {
+        if (reloading) {
+            throw new IllegalStateException("reentrant extension runtime lifecycle mutation");
         }
     }
 
@@ -345,11 +362,8 @@ public final class ExtensionRuntime implements AutoCloseable {
                 }
                 // Resolve provenance without initializing or constructing a shadowing provider.
                 Path codeSource = codeSource(provider.type());
-                if (!expected.getValue().equals(codeSource)) {
-                    throw new SecurityException(
-                        "external plugin code source does not match admitted artifact: "
-                            + expected.getKey());
-                }
+                // A descriptor may name a provider in another admitted artifact.
+                // Bind contribution provenance to the actual defining artifact.
                 ArtifactMetadata metadata = metadataByPath.get(codeSource);
                 if (metadata == null) {
                     throw new SecurityException(
