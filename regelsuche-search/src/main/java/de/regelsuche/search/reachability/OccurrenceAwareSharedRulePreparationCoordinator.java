@@ -154,15 +154,22 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
         // V2 setup is repeated for this subset. Charge its input-sized construction
         // separately instead of silently treating it as precomputed/free work.
         long delegateSetupUnits = delegateSetupUnits(unresolved.size(), preparationRules.size());
-        Optional<SharedUnifiedRulePreparationCoordinator.Evaluation> delegated =
-            unresolved.isEmpty()
-                ? Optional.empty()
-                : Optional.of(new SharedUnifiedRulePreparationCoordinator(
-                    unresolved,
-                    preparationRules,
-                    repositoryRevision,
-                    bridgeBudget)
+        Optional<SharedUnifiedRulePreparationCoordinator.Evaluation> delegated = Optional.empty();
+        if (!unresolved.isEmpty()) {
+            try {
+                delegated = Optional.of(new SharedUnifiedRulePreparationCoordinator(
+                    unresolved, preparationRules, repositoryRevision, bridgeBudget)
                     .analyze(source, assumptions));
+            } catch (RuntimeException exception) {
+                // Setup can fail before V2's own execution boundary is entered.
+                // Retain the attempted setup charge, but do not invent a completed
+                // delegated-work receipt or discard independent direct candidates.
+                for (RewriteApplicabilitySchema schema : unresolved) {
+                    outcomes.put(schema.ruleId(), technicalOutcome(
+                        schema, "UNIFIED_V3_DELEGATE_TECHNICAL_FAILURE"));
+                }
+            }
+        }
         delegated.ifPresent(evaluation -> evaluation.outcomes().forEach(
             outcome -> outcomes.put(outcome.ruleId(), outcome)));
 
@@ -233,21 +240,18 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
         }
         final Evaluation recomputed;
         try {
-            recomputed = analyze(
-                evaluation.sourceExpression(),
-                evaluation.sourceAssumptions());
+            recomputed = analyze(evaluation.sourceExpression(), evaluation.sourceAssumptions());
         } catch (RuntimeException exception) {
             return new Verification(false, "EVALUATION_RECOMPUTATION_TECHNICAL_FAILURE");
         }
         if (!recomputed.equals(evaluation)) {
-            // A newly failing executor is not evidence of ordinary certificate drift.
-            // Equal negative evaluations remain verifiable diagnostic evidence below.
-            return recomputed.outcomes().stream()
-                .filter(outcome -> outcome.status()
-                    == PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE)
-                .findFirst()
-                .map(outcome -> new Verification(false, outcome.detailCode()))
-                .orElseGet(() -> new Verification(false, "EVALUATION_RECOMPUTATION_MISMATCH"));
+            for (RulePreparationCoordinator.Outcome outcome : recomputed.outcomes()) {
+                if (outcome.status() == PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE
+                        && !evaluation.outcome(outcome.ruleId()).filter(outcome::equals).isPresent()) {
+                    return new Verification(false, outcome.detailCode());
+                }
+            }
+            return new Verification(false, "EVALUATION_RECOMPUTATION_MISMATCH");
         }
         // Recomputing our own occurrence traversal is not independent replay.
         // Also require the real AST executor to reproduce every direct candidate.
@@ -776,6 +780,12 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
         }
     }
 
+    /**
+     * Retained analysis. Delegated work is absent with nonempty delegate IDs only
+     * when every attempted delegate has an explicit technical-failure outcome.
+     * In that case the setup charge remains, but completed V2 execution work is
+     * unavailable, not a zero-cost successful execution.
+     */
     public record Evaluation(
         String coordinatorId,
         String occurrenceBindingRevision,
@@ -846,9 +856,10 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
                 }
             });
             if (delegatedV2PrincipalIds.isEmpty()
-                    != delegatedSharedExecutionWork.isEmpty()) {
+                    != delegatedSharedExecutionWork.isEmpty()
+                    && !failedDelegation(delegatedV2PrincipalIds, outcomes, occurrenceWork)) {
                 throw new IllegalArgumentException(
-                    "delegated v2 work must match delegated principals");
+                    "delegated v2 work must match delegated principals or retained setup failure");
             }
         }
 
@@ -872,6 +883,22 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
             return outcomes.stream()
                 .flatMap(value -> value.candidate().stream())
                 .toList();
+        }
+
+        private static boolean failedDelegation(
+            List<String> principalIds,
+            List<RulePreparationCoordinator.Outcome> outcomes,
+            OccurrenceWork work
+        ) {
+            if (principalIds.isEmpty() || work.delegateSetupUnits() == 0
+                    || new LinkedHashSet<>(principalIds).size() != principalIds.size()) {
+                return false;
+            }
+            return principalIds.stream().allMatch(id -> outcomes.stream().anyMatch(outcome ->
+                id.equals(outcome.ruleId())
+                    && outcome.status() == PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE
+                    && "UNIFIED_V3_DELEGATE_TECHNICAL_FAILURE".equals(outcome.detailCode())
+                    && outcome.candidate().isEmpty()));
         }
 
         private static boolean hash(String value) {
