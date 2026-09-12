@@ -88,8 +88,7 @@ class OccurrencePreparationFailureContractTest {
             evidence.sourceSubtree(),
             candidate.transformedExpression());
         assertEquals(expectedHash, evidence.occurrenceHash());
-        assertTrue(candidate.applicationKey().endsWith(
-            "->occurrence-v1:" + expectedHash.substring("sha256:".length())));
+        assertEquals(candidate.applicationKey(), evidence.applicationKey());
         assertTrue(coordinator.verify(evaluation).valid());
     }
 

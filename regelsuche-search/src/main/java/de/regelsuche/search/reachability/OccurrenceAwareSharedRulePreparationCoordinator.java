@@ -196,7 +196,11 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
                 SharedUnifiedRulePreparationCoordinator.Evaluation::sharedExecutionWork));
     }
 
-    /** Recomputes occurrence selection, guard binding, replay and delegated v2 work. */
+    /**
+     * Recomputes occurrence selection, guards and delegated v2 work, then checks
+     * direct candidates against the independent concrete AST replay path.
+     * Verification work is separate from the retained analyze-work ledger.
+     */
     public Verification verify(Evaluation evaluation) {
         if (evaluation == null) {
             return new Verification(false, "EVALUATION_MISSING");
@@ -218,9 +222,12 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
         Evaluation recomputed = analyze(
             evaluation.sourceExpression(),
             evaluation.sourceAssumptions());
-        return recomputed.equals(evaluation)
-            ? new Verification(true, "VERIFIED")
-            : new Verification(false, "EVALUATION_RECOMPUTATION_MISMATCH");
+        if (!recomputed.equals(evaluation)) {
+            return new Verification(false, "EVALUATION_RECOMPUTATION_MISMATCH");
+        }
+        // Recomputing our own occurrence traversal is not independent replay.
+        // Also require the real AST executor to reproduce every direct candidate.
+        return OccurrencePreparationReplay.verify(evaluation, principalSchemas);
     }
 
     private DirectResolution resolveDirect(
@@ -306,11 +313,11 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
             selected.transformedRoot());
         String occurrenceHash = occurrenceHash(
             schema, source, selected, transformed);
-        String baseApplicationKey = schema.ruleId() + ":"
+        // Keep the primitive identity understood by the concrete replay engine.
+        // The separate occurrenceHash binds source, path, subtree and target.
+        String applicationKey = schema.ruleId() + ":"
             + canonicalizer.stableHash(ExpressionFormatter.format(
                 selected.sourceSubtree()));
-        String applicationKey = baseApplicationKey
-            + "->occurrence-v1:" + occurrenceHash.substring("sha256:".length());
         DirectOccurrenceEvidence evidence = new DirectOccurrenceEvidence(
             schema.ruleId(),
             selected.path(),

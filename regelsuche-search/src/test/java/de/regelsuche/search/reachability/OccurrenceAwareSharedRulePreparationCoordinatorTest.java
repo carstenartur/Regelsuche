@@ -60,8 +60,9 @@ class OccurrenceAwareSharedRulePreparationCoordinatorTest {
         assertEquals("a / b * (c / d)", evidence.sourceSubtree());
         assertEquals(List.of("b != 0", "d != 0"),
             evidence.requiredAssumptions());
-        assertTrue(outcome.candidate().orElseThrow().applicationKey()
-            .contains("->occurrence-v1:"));
+        assertEquals(outcome.candidate().orElseThrow().applicationKey(),
+            evidence.applicationKey());
+        assertTrue(evidence.occurrenceHash().matches("sha256:[0-9a-f]{64}"));
         assertTrue(coordinator.verify(evaluation).valid());
     }
 
