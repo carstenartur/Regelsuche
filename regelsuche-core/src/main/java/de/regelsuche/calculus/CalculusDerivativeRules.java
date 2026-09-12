@@ -1,5 +1,6 @@
 package de.regelsuche.calculus;
 
+import de.regelsuche.assumption.Assumption;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
@@ -36,8 +37,17 @@ import java.util.List;
  *       {@code diff(ln(x), x) -> 1/x}</li>
  * </ul>
  *
- * <p>The rules only fire when the derivation variable matches the symbol
- * being differentiated against — that keeps them sound without needing a
+ * <p>{@code diff(body, variable)} is a partial real function on the domain
+ * where {@code body} is differentiable in {@code variable}. Construction
+ * equivalence is conditional on every retained {@link Assumption}, including
+ * original logarithm/quotient domains and the strictly positive-base branch
+ * used for non-integer or symbolic powers. These are sufficient domains, not
+ * necessarily maximal ones. Symbolic sum/product splitting of unsupported
+ * operands explicitly requires their differentiability; definedness alone
+ * does not justify that step (for example, {@code abs(x) - abs(x)} at zero).</p>
+ *
+ * <p>The standard-function rules only fire when the derivation variable
+ * matches the symbol being differentiated against, without adding a
  * full chain-rule rewrite (which would introduce free metavariables not
  * yet supported by {@code PatternRewriteRule}).</p>
  */
@@ -105,6 +115,18 @@ public final class CalculusDerivativeRules {
 
         @Override
         public final boolean isEquivalencePreservingByConstruction() {
+            return true; // conditional on all assumptions(source), never formula-only equivalence
+        }
+
+        @Override
+        public final List<Assumption> assumptions(Expr subtree) {
+            DiffMatch match = matchDiff(subtree);
+            return match == null ? List.of()
+                : DifferentiationDomain.assumptions(match.body(), match.variable().name());
+        }
+
+        @Override
+        public final boolean mayEmitAssumptions() {
             return true;
         }
 
@@ -229,6 +251,9 @@ public final class CalculusDerivativeRules {
             BinaryExpr power = (BinaryExpr) m.body();
             NumberExpr exponent = (NumberExpr) power.right();
             ExactRational n = exponent.value();
+            if (n.equalsInteger(1)) {
+                return new NumberExpr(1);
+            }
             return new BinaryExpr(
                 new NumberExpr(n),
                 BinaryOperator.MUL,

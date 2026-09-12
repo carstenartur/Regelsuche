@@ -1,5 +1,6 @@
 package de.regelsuche.calculus;
 
+import de.regelsuche.assumption.Assumption;
 import de.regelsuche.assumption.ExpressionDefinedness;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryExpr;
@@ -36,10 +37,37 @@ import java.util.Objects;
  */
 public final class Differentiator {
 
+    /**
+     * Returns only a derivative formula for compatibility with AST consumers.
+     * Its syntactic real domain is not the domain of the original derivative:
+     * for example, {@code ln(x)} needs {@code x > 0} even though {@code 1/x}
+     * also exists for negative x. Call {@link #differentiateWithAssumptions}
+     * when retaining, evaluating or exporting the derivative as a function.
+     */
     public Expr differentiate(Expr expr, String variable) {
         Objects.requireNonNull(expr, "expr");
         Objects.requireNonNull(variable, "variable");
         return simplify(diff(expr, variable));
+    }
+
+    /**
+     * Returns a formula with typed, sufficient conditions under which it equals
+     * the partial derivative of {@code expr}. All conditions must be retained.
+     * Non-integer and symbolic powers use the strictly positive-base branch;
+     * this deliberately need not describe every differentiable boundary point
+     * or every other real branch of the source expression.
+     */
+    public Result differentiateWithAssumptions(Expr expr, String variable) {
+        Expr formula = differentiate(expr, variable);
+        return new Result(formula, DifferentiationDomain.assumptions(expr, variable));
+    }
+
+    /** A derivative formula interpreted only under all retained assumptions. */
+    public record Result(Expr formula, List<Assumption> assumptions) {
+        public Result {
+            Objects.requireNonNull(formula, "formula");
+            assumptions = List.copyOf(assumptions);
+        }
     }
 
     private Expr diff(Expr expr, String variable) {
@@ -106,7 +134,9 @@ public final class Differentiator {
     }
 
     private Expr powerRule(Expr base, Expr exponent, Expr baseDerivative, String variable) {
-        if (exponent instanceof NumberExpr n) {
+        // The parser represents signed literals as 0 - n. Fold that exact
+        // arithmetic before choosing the logarithmic general-power formula.
+        if (simplify(exponent) instanceof NumberExpr n) {
             ExactRational power = n.value();
             if (power.equalsInteger(1)) {
                 return baseDerivative;

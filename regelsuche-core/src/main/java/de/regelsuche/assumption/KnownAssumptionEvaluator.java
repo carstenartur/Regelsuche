@@ -9,7 +9,7 @@ public final class KnownAssumptionEvaluator implements AssumptionEvaluator {
         new KnownAssumptionEvaluator();
 
     private static final String ID = "core.known-assumptions";
-    private static final String REVISION = "known-assumptions/v1";
+    private static final String REVISION = "known-assumptions/v2";
 
     private KnownAssumptionEvaluator() {
     }

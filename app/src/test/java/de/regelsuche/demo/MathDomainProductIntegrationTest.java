@@ -197,6 +197,7 @@ class MathDomainProductIntegrationTest {
                 "Workbench derivative rule inventory did not rewrite " + original));
 
         assertEquals("1 / (x * ln(10))", logDerivative.transformedExpression());
+        assertEquals(List.of("x > 0"), logDerivative.assumptions());
     }
 
     /* ----- 4. Matrix export contains bmatrix LaTeX ----- */
