@@ -1,15 +1,64 @@
-"""Artifact completeness and reproducibility, independent of Maven/Gradle orchestration."""
+"""SDK artifact completeness, reproducibility and release reactor coverage."""
 import importlib.util
 import json
 import hashlib
 from pathlib import Path
+import re
+import shlex
 import tempfile
 import unittest
 import zipfile
+import xml.etree.ElementTree as ET
 
 spec = importlib.util.spec_from_file_location('sdk_package', Path(__file__).with_name('package-student-sdk.py'))
 package = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(package)
+
+
+class MavenReleaseWorkflowContractTest(unittest.TestCase):
+    def test_isolated_release_reactor_installs_every_packaged_sdk_module(self):
+        root = Path(__file__).resolve().parents[1]
+        workflow = (root / '.github/workflows/release.yml').read_text()
+        step = re.search(
+            r'^      - name: Build independent Java SDK distribution\n.*?(?=^      - name: |\Z)',
+            workflow, re.MULTILINE | re.DOTALL).group()
+        command = re.search(r'^\s*mvn (.+?)(?<!\\)\n', step, re.MULTILINE | re.DOTALL).group(1)
+        arguments = shlex.split(command.replace('\\\n', ' '))
+        selections = [arguments[index + 1] for index, value in enumerate(arguments)
+                      if value in ('-pl', '--projects')]
+        self.assertEqual(1, len(selections), 'SDK release must select its isolated reactor')
+        selected = set(selections[0].split(','))
+
+        namespace = {'m': 'http://maven.apache.org/POM/4.0.0'}
+        parent = ET.parse(root / 'pom.xml').getroot()
+        models = {parent.findtext('m:artifactId', namespaces=namespace): parent}
+        for module in parent.findall('m:modules/m:module', namespace):
+            model = ET.parse(root / module.text / 'pom.xml').getroot()
+            models[model.findtext('m:artifactId', namespaces=namespace)] = model
+        self.assertFalse(selected - models.keys(), 'SDK release selects unknown reactor modules')
+
+        installed = set()
+        pending = list(selected)
+        while pending:
+            module = pending.pop()
+            if module in installed:
+                continue
+            installed.add(module)
+            if '-am' in arguments or '--also-make' in arguments:
+                model = models[module]
+                dependencies = model.findall('m:dependencies/m:dependency', namespace)
+                dependencies += model.findall('m:parent', namespace)
+                for dependency in dependencies:
+                    if dependency.findtext('m:groupId', namespaces=namespace) == 'de.regelsuche':
+                        owner = dependency.findtext('m:artifactId', namespaces=namespace)
+                        if owner in models:
+                            pending.append(owner)
+
+        policy = json.loads((root / 'config/sdk/public-api.json').read_text())
+        required = set(policy['modules']) | {'regelsuche-bom', 'regelsuche-parent'}
+        self.assertFalse(required - installed,
+                         'Isolated Maven release omits packaged SDK artifacts: '
+                         + ', '.join(sorted(required - installed)))
 
 
 class SdkPackageTest(unittest.TestCase):

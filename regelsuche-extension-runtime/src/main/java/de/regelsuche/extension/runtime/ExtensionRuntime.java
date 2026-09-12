@@ -399,18 +399,27 @@ public final class ExtensionRuntime implements AutoCloseable {
                 throw new SecurityException(
                     "external JAR manifest Class-Path is not allowed; admit dependencies explicitly");
             }
-            JarEntry entry = file.getJarEntry(SERVICE_RESOURCE);
-            if (entry == null) {
+            List<JarEntry> entries = file.stream()
+                .filter(entry -> SERVICE_RESOURCE.equals(entry.getName()))
+                .limit(2)
+                .toList();
+            if (entries.size() > 1) {
+                throw new IllegalArgumentException(
+                    "duplicate external service descriptor: " + SERVICE_RESOURCE);
+            }
+            if (entries.isEmpty()) {
                 return List.of();
             }
+            JarEntry entry = entries.get(0);
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(
                     file.getInputStream(entry), StandardCharsets.UTF_8))) {
                 var names = new java.util.LinkedHashSet<String>();
                 String line;
                 while ((line = reader.readLine()) != null) {
                     String value = line.split("#", 2)[0].trim();
-                    if (!value.isEmpty()) {
-                        names.add(value);
+                    if (!value.isEmpty() && !names.add(value)) {
+                        throw new IllegalArgumentException(
+                            "duplicate external provider class: " + value);
                     }
                 }
                 return List.copyOf(names);

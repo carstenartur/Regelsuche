@@ -3,12 +3,16 @@ package de.regelsuche.extension.runtime;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
 import javax.tools.ToolProvider;
 
@@ -17,11 +21,57 @@ final class TestPluginJar {
     }
 
     static Path buildPlugin(Path root) throws IOException {
-        return buildPlugin(root, List.of(), false);
+        return buildPluginWithServiceDescriptor(root, "fixture.ExternalPlugin");
+    }
+
+    static Path buildPluginWithServiceDescriptor(Path root, String descriptor) throws IOException {
+        return buildPlugin(root, List.of(), false, descriptor);
+    }
+
+    static Path withDuplicateServiceDescriptorEntry(Path source, Path output) throws IOException {
+        String service = "META-INF/services/de.regelsuche.extension.RegelsuchePlugin";
+        String alternate = "META-INF/serviceX/de.regelsuche.extension.RegelsuchePlugin";
+        try (var input = new JarFile(source.toFile());
+                var jar = new JarOutputStream(Files.newOutputStream(output))) {
+            for (var entry : input.stream().toList()) {
+                jar.putNextEntry(new JarEntry(entry.getName()));
+                try (var content = input.getInputStream(entry)) {
+                    content.transferTo(jar);
+                }
+                jar.closeEntry();
+            }
+            jar.putNextEntry(new JarEntry(alternate));
+            jar.write("fixture.ExternalPlugin\n".getBytes(StandardCharsets.UTF_8));
+            jar.closeEntry();
+        }
+
+        // JarOutputStream rejects duplicates. Rename the placeholder in the local
+        // and central ZIP headers without changing payload bytes or their CRCs.
+        byte[] bytes = Files.readAllBytes(output);
+        var headers = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
+        byte[] from = alternate.getBytes(StandardCharsets.UTF_8);
+        byte[] to = service.getBytes(StandardCharsets.UTF_8);
+        int renamed = 0;
+        for (int offset = 0; offset + 4 <= bytes.length; offset++) {
+            int nameOffset = switch (headers.getInt(offset)) {
+                case 0x04034b50 -> offset + 30;
+                case 0x02014b50 -> offset + 46;
+                default -> -1;
+            };
+            if (nameOffset >= 0 && nameOffset + from.length <= bytes.length
+                    && Arrays.equals(bytes, nameOffset, nameOffset + from.length,
+                        from, 0, from.length)) {
+                System.arraycopy(to, 0, bytes, nameOffset, to.length);
+                renamed++;
+            }
+        }
+        assertEquals(2, renamed, "fixture must rename both ZIP entry headers");
+        Files.write(output, bytes);
+        return output;
     }
 
     static Path buildPluginUsingLibrary(Path root, Path libraryJar) throws IOException {
-        return buildPlugin(root, List.of(libraryJar), true);
+        return buildPlugin(root, List.of(libraryJar), true, "fixture.ExternalPlugin");
     }
 
     static Path buildLibrary(Path root) throws IOException {
@@ -45,7 +95,8 @@ final class TestPluginJar {
     private static Path buildPlugin(
         Path root,
         List<Path> extraClasspath,
-        boolean useLibrary
+        boolean useLibrary,
+        String serviceDescriptor
     ) throws IOException {
         Path sourceRoot = Files.createDirectories(root.resolve("src"));
         Path classes = Files.createDirectories(root.resolve("classes"));
@@ -104,7 +155,7 @@ final class TestPluginJar {
             """.formatted(contributionName), StandardCharsets.UTF_8);
         compile(List.of(source), classes, extraClasspath);
         Path jar = root.resolve("plugin.jar");
-        pack(classes, jar, "fixture.ExternalPlugin");
+        pack(classes, jar, serviceDescriptor);
         return jar;
     }
 

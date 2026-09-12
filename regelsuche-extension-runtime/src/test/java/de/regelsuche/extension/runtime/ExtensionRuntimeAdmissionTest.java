@@ -2,7 +2,9 @@ package de.regelsuche.extension.runtime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.extension.ExtensionApi;
 import de.regelsuche.extension.ExtensionPoint;
@@ -21,6 +23,8 @@ import java.util.jar.Manifest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.parallel.Isolated;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** Real JAR/classloader probes; the sentinel observes class initialization, not a mock. */
 @Isolated("The existing dynamic fixture observes a process-wide sentinel property")
@@ -101,6 +105,69 @@ class ExtensionRuntimeAdmissionTest {
             assertEquals("from-library", contribution.descriptor().name());
             contribution.implementation().run();
             assertEquals(2, admissions.get());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "fixture.ExternalPlugin\nfixture.ExternalPlugin",
+        "# providers\n fixture.ExternalPlugin # first\n\n\tfixture.ExternalPlugin\t# repeated"
+    })
+    void repeatedProviderInOneDescriptorIsRejectedBeforeInitialization(
+        String descriptor, @TempDir Path temp
+    ) throws Exception {
+        Path valid = TestPluginJar.buildPluginWithServiceDescriptor(temp.resolve("valid"),
+            "# providers\n\n fixture.ExternalPlugin\t# only provider\n\n");
+        Path duplicate = TestPluginJar.buildPluginWithServiceDescriptor(
+            temp.resolve("duplicate"), descriptor);
+        assertRejectedBeforeProviderInitialization(valid, duplicate, temp);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"fixture.ExternalPlugin", "# shadowed descriptor"})
+    void repeatedServiceDescriptorZipEntryIsRejectedBeforeInitialization(
+        String firstDescriptor, @TempDir Path temp
+    ) throws Exception {
+        Path valid = TestPluginJar.buildPlugin(temp.resolve("valid"));
+        Path source = TestPluginJar.buildPluginWithServiceDescriptor(
+            temp.resolve("source"), firstDescriptor);
+        Path duplicate = TestPluginJar.withDuplicateServiceDescriptorEntry(
+            source, temp.resolve("duplicate-entry.jar"));
+        try (var jar = new JarFile(duplicate.toFile())) {
+            assertEquals(2, jar.stream().filter(entry -> entry.getName().equals(
+                "META-INF/services/de.regelsuche.extension.RegelsuchePlugin")).count());
+        }
+        assertRejectedBeforeProviderInitialization(valid, duplicate, temp);
+    }
+
+    private void assertRejectedBeforeProviderInitialization(
+        Path valid, Path duplicate, Path temp
+    ) throws Exception {
+        var admissions = new AtomicInteger();
+        var validConfig = config(List.of(valid), getClass().getClassLoader(), admissions);
+        var duplicateConfig = config(List.of(duplicate), getClass().getClassLoader(), admissions);
+        try (var runtime = ExtensionRuntime.open(validConfig)) {
+            var published = runtime.catalog();
+            Path sentinel = temp.resolve("initialized.txt");
+            String previous = System.setProperty(SENTINEL_PROPERTY, sentinel.toString());
+            try {
+                assertThrows(IllegalArgumentException.class, () -> {
+                    try (var ignored = ExtensionRuntime.open(duplicateConfig)) {
+                    }
+                });
+                var result = runtime.reload(duplicateConfig);
+                assertFalse(result.applied());
+                assertSame(published, runtime.catalog());
+                assertEquals(published.contentHash(), result.currentCatalogHash());
+                published.find(POINT, "run").orElseThrow().implementation().run();
+                assertFalse(Files.exists(sentinel));
+
+                assertTrue(runtime.reload(validConfig).applied());
+                assertEquals("loaded", Files.readString(sentinel));
+                runtime.catalog().find(POINT, "run").orElseThrow().implementation().run();
+            } finally {
+                restoreSentinel(previous);
+            }
         }
     }
 
