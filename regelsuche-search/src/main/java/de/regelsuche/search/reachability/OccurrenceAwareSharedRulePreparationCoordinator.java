@@ -231,11 +231,23 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
             return new Verification(
                 false, "COORDINATOR_CONFIGURATION_MISMATCH");
         }
-        Evaluation recomputed = analyze(
-            evaluation.sourceExpression(),
-            evaluation.sourceAssumptions());
+        final Evaluation recomputed;
+        try {
+            recomputed = analyze(
+                evaluation.sourceExpression(),
+                evaluation.sourceAssumptions());
+        } catch (RuntimeException exception) {
+            return new Verification(false, "EVALUATION_RECOMPUTATION_TECHNICAL_FAILURE");
+        }
         if (!recomputed.equals(evaluation)) {
-            return new Verification(false, "EVALUATION_RECOMPUTATION_MISMATCH");
+            // A newly failing executor is not evidence of ordinary certificate drift.
+            // Equal negative evaluations remain verifiable diagnostic evidence below.
+            return recomputed.outcomes().stream()
+                .filter(outcome -> outcome.status()
+                    == PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE)
+                .findFirst()
+                .map(outcome -> new Verification(false, outcome.detailCode()))
+                .orElseGet(() -> new Verification(false, "EVALUATION_RECOMPUTATION_MISMATCH"));
         }
         // Recomputing our own occurrence traversal is not independent replay.
         // Also require the real AST executor to reproduce every direct candidate.

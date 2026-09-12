@@ -50,7 +50,9 @@ class OccurrencePreparationConcreteVerifierTest {
 
         assertFalse(result.valid());
         assertEquals("DIRECT_PRIMITIVE_REPLAY_MISMATCH", result.detailCode());
-        assertFalse(fixture.coordinator().verify(tampered).valid());
+        var publicResult = fixture.coordinator().verify(tampered);
+        assertFalse(publicResult.valid());
+        assertEquals("EVALUATION_RECOMPUTATION_MISMATCH", publicResult.detailCode());
     }
 
     @Test
@@ -75,6 +77,50 @@ class OccurrencePreparationConcreteVerifierTest {
 
         assertFalse(result.valid());
         assertEquals("DIRECT_PRIMITIVE_REPLAY_TECHNICAL_FAILURE", result.detailCode());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1 + (", "ln(", "* x"})
+    void publicVerificationContainsMalformedSource(String source) {
+        var fixture = fixture();
+        var original = fixture.evaluation();
+        var malformed = new OccurrenceAwareSharedRulePreparationCoordinator.Evaluation(
+            original.coordinatorId(), original.occurrenceBindingRevision(),
+            original.repositoryRevision(), original.principalInventoryFingerprint(),
+            original.preparationInventoryFingerprint(), original.exactRegistryFingerprint(),
+            original.bridgeBudget(), source, original.sourceAssumptions(),
+            original.outcomes(), original.aggregateWork(), original.occurrenceWork(),
+            original.directOccurrenceEvidence(), original.delegatedV2PrincipalIds(),
+            original.delegatedSharedExecutionWork());
+
+        var result = assertDoesNotThrow(() -> fixture.coordinator().verify(malformed));
+
+        assertFalse(result.valid());
+        assertEquals("EVALUATION_RECOMPUTATION_TECHNICAL_FAILURE", result.detailCode());
+    }
+
+    @Test
+    void publicVerificationPreservesExecutorFailureAfterPositiveEvaluation() {
+        var fixture = fixture();
+        fixture.rule().broken = true;
+
+        var result = assertDoesNotThrow(() ->
+            fixture.coordinator().verify(fixture.evaluation()));
+
+        assertFalse(result.valid());
+        assertEquals("UNIFIED_V3_DIRECT_REPLAY_TECHNICAL_FAILURE", result.detailCode());
+    }
+
+    @Test
+    void publicVerificationPreservesDelegatedSchemaReplayFailure() {
+        var fixture = fixture();
+        fixture.rule().suppress = true;
+
+        var result = assertDoesNotThrow(() ->
+            fixture.coordinator().verify(fixture.evaluation()));
+
+        assertFalse(result.valid());
+        assertEquals("UNIFIED_SCHEMA_MATCH_WITHOUT_DIRECT_REPLAY", result.detailCode());
     }
 
     private static Fixture fixture() {
