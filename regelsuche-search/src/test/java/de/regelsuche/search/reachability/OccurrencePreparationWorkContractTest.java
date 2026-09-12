@@ -15,12 +15,14 @@ import org.junit.jupiter.api.Test;
 class OccurrencePreparationWorkContractTest {
     private static final String REVISION =
         "0123456789abcdef0123456789abcdef01234567";
+    private static final AssumptionSignature NO_ASSUMPTIONS =
+        AssumptionSignature.ofExpressions(List.of());
 
     @Test
     void noMatchTraversalWorkGrowsWithVisitedNodes() {
         var coordinator = coordinator(List.of());
-        var small = coordinator.analyze("x", AssumptionSignature.empty());
-        var large = coordinator.analyze("f(a,b,c,d,e,f,g,h)", AssumptionSignature.empty());
+        var small = coordinator.analyze("x", NO_ASSUMPTIONS);
+        var large = coordinator.analyze("f(a,b,c,d,e,f,g,h)", NO_ASSUMPTIONS);
 
         assertEquals(0, small.occurrenceWork().occurrenceCandidates());
         assertEquals(0, large.occurrenceWork().occurrenceCandidates());
@@ -32,7 +34,7 @@ class OccurrencePreparationWorkContractTest {
     @Test
     void fallbackConstructionHasAnExplicitNonzeroCharge() {
         var coordinator = coordinator(List.of());
-        var evaluation = coordinator.analyze("x", AssumptionSignature.empty());
+        var evaluation = coordinator.analyze("x", NO_ASSUMPTIONS);
 
         assertEquals(List.of("work_log"), evaluation.delegatedV2PrincipalIds());
         assertTrue(evaluation.occurrenceWork().chargedUnits() > 2,
@@ -46,8 +48,8 @@ class OccurrencePreparationWorkContractTest {
         var preparation = new PatternRewriteRule(
             "work_add_zero", PatternExpr.op(BinaryOperator.ADD, a, PatternExpr.num(0)),
             a, RewriteKind.SIMPLIFY, false, -1, true);
-        var empty = coordinator(List.of()).analyze("x", AssumptionSignature.empty());
-        var larger = coordinator(List.of(preparation)).analyze("x", AssumptionSignature.empty());
+        var empty = coordinator(List.of()).analyze("x", NO_ASSUMPTIONS);
+        var larger = coordinator(List.of(preparation)).analyze("x", NO_ASSUMPTIONS);
 
         assertTrue(larger.occurrenceWork().chargedUnits()
                 > empty.occurrenceWork().chargedUnits(),
@@ -57,11 +59,11 @@ class OccurrencePreparationWorkContractTest {
     @Test
     void repeatedAnalysisAndVerificationRetainDeterministicWork() {
         var coordinator = coordinator(List.of());
-        var first = coordinator.analyze("f(a,b,c)", AssumptionSignature.empty());
-        var second = coordinator.analyze("f(a,b,c)", AssumptionSignature.empty());
+        var first = coordinator.analyze("f(a,b,c)", NO_ASSUMPTIONS);
+        var second = coordinator.analyze("f(a,b,c)", NO_ASSUMPTIONS);
         assertEquals(first, second);
         assertTrue(coordinator.verify(first).valid());
-        assertEquals(first, coordinator.analyze("f(a,b,c)", AssumptionSignature.empty()));
+        assertEquals(first, coordinator.analyze("f(a,b,c)", NO_ASSUMPTIONS));
     }
 
     private static OccurrenceAwareSharedRulePreparationCoordinator coordinator(
