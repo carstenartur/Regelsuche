@@ -29,8 +29,28 @@ Explicit/classpath plugins are trusted in-process code. External JARs require a
 host-supplied `PluginArtifactAdmission`. All selected artifacts are admitted as
 immutable byte snapshots before creating the external classloader. The runtime
 privately stages and rehashes those bytes, rejects manifest `Class-Path`, and
-checks each provider's code source before instantiation. Library dependencies
-must be explicitly included in the admitted artifact set.
+checks each provider's code source before instantiation. The external loader also
+checks every dependency class it returns, including lazy resolutions after catalog
+publication. Non-host classes must be defined by that loader from a privately
+staged admitted JAR. A parent-classpath copy is rejected before initialization,
+even if another copy was admitted; dependencies cannot silently change version
+because of the host classpath. Library dependencies must be explicitly included in
+the admitted artifact set. External resources and service descriptors are resolved
+only from those artifacts, not inherited from the parent.
+
+External code may share platform types, the public lifecycle annotations in
+`de.regelsuche.api`, and public types in the exact `de.regelsuche.extension` API package. The six-argument `ExtensionRuntimeConfig`
+constructor keeps this default. To expose additional host-owned contracts, use the
+seven-argument constructor with an immutable `Set<Class<?>> sharedHostTypes`.
+Admission compares actual class identity, not a name or package prefix; exporting
+one type does not export its siblings or resources. Such types and their host-side
+implementations are explicitly trusted host code, not covered by an external JAR's
+hash. This is not a claim that the catalog hash attests the transitive code closure.
+Classpath/explicit plugins keep their separate trusted in-process behavior.
+
+Numeric compatibility declarations are preserved verbatim for the strict parser.
+Only a null plugin minimum-core declaration defaults to `0.0.0`; supplied empty,
+whitespace-only, padded or otherwise malformed text is rejected, not repaired.
 
 A failed reload leaves the exact published catalog and external resources usable.
 A successful reload publishes a new catalog but does not invalidate previously

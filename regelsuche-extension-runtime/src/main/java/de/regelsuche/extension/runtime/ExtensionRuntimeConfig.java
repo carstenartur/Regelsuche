@@ -6,6 +6,7 @@ import de.regelsuche.extension.RegelsuchePlugin;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /** Immutable configuration for one extension-runtime snapshot build. */
 @StableApi(since = "2")
@@ -15,13 +16,15 @@ public record ExtensionRuntimeConfig(
     List<RegelsuchePlugin> explicitPlugins,
     List<Path> externalPluginJars,
     PluginArtifactAdmission artifactAdmission,
-    ClassLoader parentClassLoader
+    ClassLoader parentClassLoader,
+    Set<Class<?>> sharedHostTypes
 ) {
     public ExtensionRuntimeConfig {
         if (coreCompatibilityVersion == null || coreCompatibilityVersion.isBlank()) {
             throw new IllegalArgumentException("coreCompatibilityVersion must not be blank");
         }
-        coreCompatibilityVersion = coreCompatibilityVersion.trim();
+        // Preserve supplied numeric text for fail-closed compatibility parsing.
+        sharedHostTypes = Set.copyOf(Objects.requireNonNull(sharedHostTypes, "sharedHostTypes"));
         explicitPlugins = List.copyOf(Objects.requireNonNull(explicitPlugins, "explicitPlugins"));
         externalPluginJars = List.copyOf(
             Objects.requireNonNull(externalPluginJars, "externalPluginJars"));
@@ -32,6 +35,23 @@ public record ExtensionRuntimeConfig(
         parentClassLoader = parentClassLoader == null
             ? ExtensionRuntimeConfig.class.getClassLoader()
             : parentClassLoader;
+    }
+
+    /**
+     * Configuration sharing only platform types and the public extension API with external JARs.
+     * Other host contracts must be explicitly listed in the canonical constructor's
+     * {@code sharedHostTypes}; exporting a type does not export its package or dependencies.
+     */
+    public ExtensionRuntimeConfig(
+        String coreCompatibilityVersion,
+        boolean loadClasspathPlugins,
+        List<RegelsuchePlugin> explicitPlugins,
+        List<Path> externalPluginJars,
+        PluginArtifactAdmission artifactAdmission,
+        ClassLoader parentClassLoader
+    ) {
+        this(coreCompatibilityVersion, loadClasspathPlugins, explicitPlugins, externalPluginJars,
+            artifactAdmission, parentClassLoader, Set.of());
     }
 
     /** Configuration containing only explicitly supplied trusted in-process plugins. */

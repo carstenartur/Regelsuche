@@ -8,6 +8,7 @@ than being compared to classes that did not exist in that baseline.
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import tarfile
@@ -17,12 +18,24 @@ import zipfile
 BASELINE = 'a5f17cfe7ce9a6bed71c4a56f80254f509eebc46'
 MODULES = ('regelsuche-core', 'regelsuche-egraph', 'regelsuche-search',
            'regelsuche-validation', 'regelsuche-discovery', 'regelsuche-discovery-sdk')
-REQUIRED_EXTENSION_CLASSES = {
-    'de/regelsuche/extension/ExtensionPoint.class',
-    'de/regelsuche/extension/RegelsuchePlugin.class',
-    'de/regelsuche/extension/runtime/AdmittedPluginArtifact.class',
-    'de/regelsuche/extension/runtime/ExtensionRuntime.class',
+# Every public revision-2 type, including public nested types, belongs to its own JAR.
+REQUIRED_EXTENSION_CLASSES_BY_MODULE = {
+    'regelsuche-extension-api': {
+        'de/regelsuche/extension/' + name + '.class' for name in (
+            'ExtensionApi', 'ExtensionCatalog', 'ExtensionCatalogs', 'ExtensionContext',
+            'ExtensionDescriptor', 'ExtensionOrigin', 'ExtensionOrigin$OriginKind',
+            'ExtensionPoint', 'PluginDependency', 'PluginDescriptor', 'RegelsuchePlugin',
+            'RegisteredExtension',
+        )
+    },
+    'regelsuche-extension-runtime': {
+        'de/regelsuche/extension/runtime/' + name + '.class' for name in (
+            'AdmittedPluginArtifact', 'CatalogReloadResult', 'ExtensionRuntime',
+            'ExtensionRuntimeConfig', 'PluginArtifactAdmission',
+        )
+    },
 }
+REQUIRED_EXTENSION_CLASSES = set().union(*REQUIRED_EXTENSION_CLASSES_BY_MODULE.values())
 REQUIRED_EXTENSION_PACKAGES = {
     'de.regelsuche.extension',
     'de.regelsuche.extension.runtime',
@@ -50,15 +63,24 @@ def validate_extension_revision(policy, jars):
             f'{overlap}'
         )
 
-    observed = set()
+    contents = []
     for jar in jars:
         with zipfile.ZipFile(jar) as archive:
-            observed.update(REQUIRED_EXTENSION_CLASSES & set(archive.namelist()))
-    missing_classes = sorted(REQUIRED_EXTENSION_CLASSES - observed)
-    if missing_classes:
-        raise RuntimeError(
-            f'current extension API artifacts are incomplete: {missing_classes}'
-        )
+            contents.append((Path(jar), set(archive.namelist())))
+    for module, required in REQUIRED_EXTENSION_CLASSES_BY_MODULE.items():
+        owned = [(jar, entries) for jar, entries in contents
+                 if re.fullmatch(re.escape(module) + r'-[0-9][A-Za-z0-9.+_-]*\.jar', jar.name)
+                 and not jar.name.endswith(('-sources.jar', '-javadoc.jar'))]
+        if len(owned) != 1:
+            raise RuntimeError(f'expected exactly one current {module} binary artifact')
+        owner, observed = owned[0]
+        missing = sorted(required - observed)
+        if missing:
+            raise RuntimeError(f'current {module} API artifact is incomplete: {missing}')
+        for jar, entries in contents:
+            misplaced = sorted(required & entries) if jar != owner else []
+            if misplaced:
+                raise RuntimeError(f'extension API classes in the wrong artifact {jar}: {misplaced}')
 
 
 def main():

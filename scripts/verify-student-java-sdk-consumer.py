@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -194,6 +195,11 @@ def require_output(execution: str, expected: tuple[str, ...], label: str) -> Non
     missing = [value for value in expected if value not in execution]
     if missing:
         raise RuntimeError(f"{label} output is incomplete: {missing}")
+    if label == "extension-runtime-java25":
+        identities = [token.removeprefix("catalog=") for token in execution.split()
+                      if token.startswith("catalog=")]
+        if len(identities) != 1 or re.fullmatch(r"sha256:[0-9a-f]{64}", identities[0]) is None:
+            raise RuntimeError(f"{label} output has an invalid or ambiguous catalog hash")
 
 
 def verify_generated_project_shape(starter: Path) -> dict:

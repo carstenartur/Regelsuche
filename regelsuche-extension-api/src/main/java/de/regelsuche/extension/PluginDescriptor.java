@@ -26,9 +26,8 @@ public record PluginDescriptor(
         name = ExtensionIdentifiers.requiredText(name, "plugin name");
         version = ExtensionIdentifiers.requiredText(version, "plugin version");
         apiVersion = ExtensionIdentifiers.requiredText(apiVersion, "apiVersion");
-        minimumCoreVersion = minimumCoreVersion == null || minimumCoreVersion.isBlank()
-            ? "0.0.0"
-            : minimumCoreVersion.trim();
+        // Only an absent declaration defaults; supplied text must reach the strict parser.
+        minimumCoreVersion = minimumCoreVersion == null ? "0.0.0" : minimumCoreVersion;
         capabilities = Collections.unmodifiableSet(
             new TreeSet<>(ExtensionIdentifiers.normalizedStrings(capabilities, "capabilities"))
         );

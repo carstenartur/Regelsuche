@@ -321,8 +321,8 @@ public final class ExtensionRuntime implements AutoCloseable {
                 }
             }
 
-            classLoader = new URLClassLoader(
-                urls.toArray(URL[]::new), config.parentClassLoader());
+            classLoader = new AdmittedPluginClassLoader(
+                urls.toArray(URL[]::new), config.parentClassLoader(), config.sharedHostTypes());
             Map<String, ServiceLoader.Provider<RegelsuchePlugin>> discovered = new HashMap<>();
             for (ServiceLoader.Provider<RegelsuchePlugin> provider
                     : ServiceLoader.load(RegelsuchePlugin.class, classLoader).stream().toList()) {
