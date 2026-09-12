@@ -48,7 +48,7 @@ The artifact manifest binds:
 
 - the exact Git commit, development or published release label and deterministic
   source archive;
-- the digest-pinned Eclipse Temurin 21.0.11 image definition;
+- the digest-pinned Eclipse Temurin 25.0.3_9 image definition;
 - the Gradle distribution URL and SHA-256;
 - operating system, architecture, runtime user and network policies;
 - proof-backend identity, version, invocation and retained result;
@@ -62,6 +62,10 @@ By default the checkout tasks create a
 `development-<commit>`. A public artifact may be built with status `PUBLISHED`
 only when the named Git tag resolves to the exact checked-out commit; the
 builder then emits `FROZEN_PUBLIC_RELEASE`.
+
+These v1 environment definitions are excluded from routine Dependabot updates.
+See [reproduction environment maintenance](reproduction-environment-maintenance.md)
+for ownership, immutable schema bytes and the future versioned v2 migration path.
 
 ## Determinism and source-state guarantees
 
