@@ -17,18 +17,23 @@ import java.util.List;
 import java.util.Optional;
 
 /** Pauses the real preorder traversal; matcher, setup and one candidate's construction remain atomic. */
-final class PreparedTransformationCursor implements TransformationCursor {
+sealed class PreparedTransformationCursor implements TransformationCursor permits PreparedShapeIndexedTransformationCursor {
     private static final class Frame {
         final Expr expression;
         final List<Integer> path;
         int ruleIndex, childIndex;
         boolean entered;
         String hash;
+        NativeRuleShapeIndex.Features features;
+        NativeRuleShapeIndex.Candidates candidates;
         Frame(Expr expression, List<Integer> path) { this.expression = expression; this.path = path; }
     }
     private final PreparedAstRewriteTransformationEngine engine;
     private final String source;
     private final Definition definition;
+    private final boolean shapeIndexed;
+    private final List<ShapeIndexedTransformationCursor.Selection> selections;
+    private NativeRuleShapeIndex shapeIndex;
     private final ArrayDeque<Frame> stack = new ArrayDeque<>();
     private final EnumMap<Operation, Long> operations = new EnumMap<>(Operation.class);
     private final List<Attempt> attempts = new ArrayList<>();
@@ -42,7 +47,13 @@ final class PreparedTransformationCursor implements TransformationCursor {
     private String detail = "";
 
     PreparedTransformationCursor(PreparedAstRewriteTransformationEngine engine, String source, Definition definition) {
+        this(engine, source, definition, false);
+    }
+
+    PreparedTransformationCursor(PreparedAstRewriteTransformationEngine engine, String source, Definition definition, boolean shapeIndexed) {
         this.engine = engine; this.source = source; this.definition = definition;
+        this.shapeIndexed = shapeIndexed;
+        this.selections = shapeIndexed ? new ArrayList<>() : List.of();
         charge(Operation.OPEN, 1);
     }
 
@@ -55,7 +66,7 @@ final class PreparedTransformationCursor implements TransformationCursor {
         while (status == Status.READY && available(before, allowance)) {
             Frame frame = nextFrame(before, allowance);
             if (frame == null) return Optional.empty();
-            var result = executeRule(frame);
+            var result = executeRule(frame, before, allowance);
             if (result.isPresent()) return result;
         }
         return Optional.empty();
@@ -77,6 +88,7 @@ final class PreparedTransformationCursor implements TransformationCursor {
         }
         charge(Operation.FORMAT, 1); formattedSource = ExpressionFormatter.format(root);
         charge(Operation.CANONICAL_SIZE, 1); originalSize = engine.canonicalAstNodeCount(root);
+        if (shapeIndexed) shapeIndex = new NativeRuleShapeIndex(engine.rules(), this::charge);
         stack.push(new Frame(root, List.of()));
     }
 
@@ -85,7 +97,15 @@ final class PreparedTransformationCursor implements TransformationCursor {
             var frame = stack.peek();
             if (!frame.entered) { frame.entered = true; charge(Operation.OCCURRENCE_VISIT, 1); }
             if (!available(before, allowance)) return null;
-            if (frame.ruleIndex < engine.rules().size()) return frame;
+            if (shapeIndexed) {
+                if (frame.candidates == null) {
+                    frame.features = shapeIndex.features(frame.expression);
+                    frame.candidates = shapeIndex.candidates(frame.features);
+                    selections.add(new ShapeIndexedTransformationCursor.Selection(frame.path, frame.candidates.rootExcludedRules()));
+                }
+                if (!available(before, allowance)) return null;
+                if (frame.candidates.hasNext()) return frame;
+            } else if (frame.ruleIndex < engine.rules().size()) return frame;
             Expr child = child(frame.expression, frame.childIndex);
             if (child == null) { stack.pop(); continue; }
             var path = new ArrayList<>(frame.path); path.add(frame.childIndex++);
@@ -104,8 +124,19 @@ final class PreparedTransformationCursor implements TransformationCursor {
         return null;
     }
 
-    private Optional<Transformation> executeRule(Frame frame) {
-        int index = frame.ruleIndex++;
+    private Optional<Transformation> executeRule(Frame frame, long before, long allowance) {
+        int index;
+        if (shapeIndexed) {
+            index = frame.candidates.nextRuleIndex();
+            if (!frame.candidates.currentShapeAdmits(frame.features)) {
+                record(frame, index, AttemptOutcome.SHAPE_REJECTED, 0, "EXACT_CHILD_ROOT_MISMATCH");
+                return Optional.empty();
+            }
+            if (!available(before, allowance)) {
+                record(frame, index, AttemptOutcome.MATCH_NOT_STARTED, 0, "SHAPE_SELECTION_WORK_EXHAUSTED");
+                return Optional.empty();
+            }
+        } else index = frame.ruleIndex++;
         var rule = (PatternRewriteRule) engine.rules().get(index);
         charge(Operation.RULE_MATCH, 1);
         var match = EquivalenceAwarePatternMatcher.matchDetailed(rule.source(), frame.expression, new HashMap<>(),
@@ -166,7 +197,12 @@ final class PreparedTransformationCursor implements TransformationCursor {
         return new Work(named, primitiveRewrites);
     }
     @Override public Snapshot snapshot() {
-        return new Snapshot(WORK_REVISION, definition, source, status, closed, work(), attempts, emitted.size(), detail);
+        return new Snapshot(shapeIndexed ? ShapeIndexedTransformationCursor.WORK_REVISION : WORK_REVISION,
+            definition, source, status, closed, work(), attempts, emitted.size(), detail);
+    }
+    protected final ShapeIndexedTransformationCursor.IndexReceipt retainedIndexReceipt() {
+        if (!shapeIndexed) throw new IllegalStateException("shape index is not enabled");
+        return new ShapeIndexedTransformationCursor.IndexReceipt(ShapeIndexedTransformationCursor.INDEX_REVISION, snapshot(), selections);
     }
     @Override public void close() {
         if (closed) return;

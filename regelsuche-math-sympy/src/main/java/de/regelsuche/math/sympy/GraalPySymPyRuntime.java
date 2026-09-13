@@ -40,6 +40,13 @@ final class GraalPySymPyRuntime implements AutoCloseable {
     private volatile boolean closed;
 
     GraalPySymPyRuntime() {
+        this(SymPyScript.source(), "factor_payload");
+    }
+
+    /** Trusted module-owned protocols share only the existing pinned runtime lifecycle. */
+    GraalPySymPyRuntime(String adapterSource, String entryPoint) {
+        Objects.requireNonNull(adapterSource, "adapterSource");
+        Objects.requireNonNull(entryPoint, "entryPoint");
         Path extracted = extractResources();
         Engine createdEngine = null;
         try {
@@ -48,7 +55,7 @@ final class GraalPySymPyRuntime implements AutoCloseable {
             Engine ownedEngine = createdEngine;
             // SymPyFactorizationPolicy already owns the configurable payload byte limits.
             // Do not introduce an undocumented, tighter limit in the shared lifecycle layer.
-            runtime = new ManagedPythonRuntime(() -> new Worker(ownedEngine, extracted),
+            runtime = new ManagedPythonRuntime(() -> new Worker(ownedEngine, extracted, adapterSource, entryPoint),
                     Integer.MAX_VALUE, Integer.MAX_VALUE, "regelsuche-graalpy-sympy-");
         } catch (RuntimeException exception) {
             if (createdEngine != null) {
@@ -161,11 +168,16 @@ final class GraalPySymPyRuntime implements AutoCloseable {
     private static final class Worker implements ManagedPythonRuntime.Session {
         private final Engine engine;
         private final Path resources;
+        private final String adapterSource;
+        private final String entryPoint;
         private final AtomicReference<Context> active = new AtomicReference<>();
         private final AtomicBoolean retired = new AtomicBoolean();
         private Value factorFunction;
 
-        Worker(Engine engine, Path resources) { this.engine = engine; this.resources = resources; }
+        Worker(Engine engine, Path resources, String adapterSource, String entryPoint) {
+            this.engine = engine; this.resources = resources;
+            this.adapterSource = adapterSource; this.entryPoint = entryPoint;
+        }
 
         @Override public String initialize() {
             if (retired.get()) throw new IllegalStateException("retired SymPy startup");
@@ -185,10 +197,10 @@ final class GraalPySymPyRuntime implements AutoCloseable {
                 // Publish before imports/evaluation, so a timeout can cancel a hanging bootstrap.
                 active.set(context);
                 if (retired.get()) { closeActive(); throw new IllegalStateException("retired SymPy startup"); }
-                Source source = Source.newBuilder("python", SymPyScript.source(), "<regelsuche-sympy-adapter>")
+                Source source = Source.newBuilder("python", adapterSource, "<regelsuche-sympy-adapter>")
                         .internal(true).build();
                 Value adapter = context.eval(source);
-                factorFunction = adapter.getMember("factor_payload");
+                factorFunction = adapter.getMember(entryPoint);
                 Value runtimeInfo = adapter.getMember("runtime_info");
                 if (!adapter.hasMembers() || factorFunction == null || !factorFunction.canExecute()
                         || runtimeInfo == null || !runtimeInfo.canExecute()) {

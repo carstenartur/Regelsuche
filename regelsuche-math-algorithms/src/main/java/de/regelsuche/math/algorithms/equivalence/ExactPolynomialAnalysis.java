@@ -19,8 +19,12 @@ public final class ExactPolynomialAnalysis {
     public ExactPolynomialAnalysis() { this(null); }
     /** Optional exact node/term and alpha-renaming work receipt; mathematical results are unchanged. */
     public ExactPolynomialAnalysis(java.util.function.LongConsumer workObserver) {
+        this(workObserver, null);
+    }
+    ExactPolynomialAnalysis(java.util.function.LongConsumer workObserver,
+        java.util.function.LongConsumer operationAllowance) {
         this.workObserver = workObserver;
-        arithmetic = new ExactResidualPolynomialArithmetic(workObserver);
+        arithmetic = new ExactResidualPolynomialArithmetic(workObserver, operationAllowance);
     }
 
     public void requireEquivalent(String source, String candidate) {

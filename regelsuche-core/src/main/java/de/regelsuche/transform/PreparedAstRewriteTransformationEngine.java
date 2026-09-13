@@ -91,6 +91,21 @@ public final class PreparedAstRewriteTransformationEngine
         return new PreparedTransformationCursor(this, expression, cursorDefinition(matcherBranchLimit));
     }
 
+    /** Opt-in conservative root/shape selection; the historical cursor remains selectable. */
+    public ShapeIndexedTransformationCursor openShapeIndexedCursor(String expression) {
+        return openShapeIndexedCursor(expression, TransformationCursor.DEFAULT_MATCHER_BRANCH_LIMIT);
+    }
+
+    public ShapeIndexedTransformationCursor openShapeIndexedCursor(String expression, int matcherBranchLimit) {
+        return new PreparedShapeIndexedTransformationCursor(this, expression, shapeIndexedCursorDefinition(matcherBranchLimit));
+    }
+
+    public TransformationCursor.Definition shapeIndexedCursorDefinition(int matcherBranchLimit) {
+        var original = cursorDefinition(matcherBranchLimit);
+        return new TransformationCursor.Definition(ShapeIndexedTransformationCursor.SELECTION_REVISION,
+            original.rules(), original.maxAstSizeIncrease(), original.maxCandidates(), original.matcherBranchLimit());
+    }
+
     /** Preflight rejects custom dispatch rather than silently materializing an unsupported provider. */
     public TransformationCursor.Definition cursorDefinition(int matcherBranchLimit) {
         if (maxCandidatesPerState < 1 || matcherBranchLimit < 1)
@@ -265,6 +280,14 @@ public final class PreparedAstRewriteTransformationEngine
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 unavailable", ex);
         }
+    }
+
+    /** Selected local AST execution with explicit owner-local identity and separate operation bounds. */
+    public NativeValueRewriteSession openValueSession(
+            de.regelsuche.value.CompactValueArena.Projection source,
+            de.regelsuche.assumption.AssumptionSignature assumptions,
+            NativeValueRewriteSession.Budget budget) {
+        return new NativeValueRewriteSession(this, source, assumptions, budget);
     }
 
     private record RewriteResult(

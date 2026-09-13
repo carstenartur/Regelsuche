@@ -81,6 +81,8 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 - [Typisierte Suchausführung und Artefakt-Replay](recorded-search-execution.md) —
   getrennte primitive und exakte Theorie-Arbeit, persistierte Provenienz und
   erneute unabhängige Verifikation geladener Suchpfade.
+- [Kompakte lokale Wertidentität](compact-native-value-identity.md) — begrenzte
+  ownerlokale Arena und native AST-Umschreibungen mit expliziter Exportgrenze.
 - [Sicherer Regelvorbereitungskoordinator](safe-rule-preparation-coordinator.md) —
   direkte Ausführung, native Exact-Registry, lokale Pattern-Bridges, Guards und
   Zertifikate.

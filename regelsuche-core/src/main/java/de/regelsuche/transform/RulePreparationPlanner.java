@@ -6,6 +6,8 @@ import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.polynomial.PolynomialWorkAuthority;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -37,6 +39,8 @@ public final class RulePreparationPlanner {
         "prepare_exact_polynomial_factor";
     public static final String PRINCIPAL_RULE_ID =
         "ast_cancel_division_factor";
+    public static final String MEASUREMENT_CONTRACT =
+        "regelsuche.exact-polynomial-preparation-work/v1";
 
     private final Budget budget;
 
@@ -52,6 +56,96 @@ public final class RulePreparationPlanner {
         return budget;
     }
 
+    /** Observes one plan through the caller's shared, non-resetting authority. */
+    public MeasuredAttempt planObserved(Expr subtree, PolynomialWorkAuthority authority) {
+        Objects.requireNonNull(subtree, "subtree");
+        var observation = new PreparationObservation(authority);
+        try {
+            PlanAttempt attempt = plan(subtree, observation.scope("plan"));
+            return new MeasuredAttempt(subtree, Optional.of(attempt), MeasurementOutcome.COMPLETED,
+                "COMPLETED", "", observation.ledger(), observation.refusedCharge());
+        } catch (PolynomialWorkAuthority.LimitReached failure) {
+            return new MeasuredAttempt(subtree, Optional.empty(), MeasurementOutcome.BUDGET_INCONCLUSIVE,
+                "SHARED_POLYNOMIAL_WORK_AUTHORITY_EXHAUSTED", failure.getClass().getName(),
+                observation.ledger(), observation.refusedCharge());
+        } catch (RuntimeException | StackOverflowError failure) {
+            return new MeasuredAttempt(subtree, Optional.empty(), MeasurementOutcome.TECHNICAL_FAILURE,
+                "EXACT_PREPARATION_TECHNICAL_FAILURE", failure.getClass().getName(),
+                observation.ledger(), observation.refusedCharge());
+        }
+    }
+
+    /** Independently repeats verification through the same cumulative authority. */
+    public MeasuredVerification verifyObserved(PreparedRuleApplication application,
+            PolynomialWorkAuthority authority) {
+        var observation = new PreparationObservation(authority);
+        try {
+            boolean verified = verify(application, observation.scope("verify"));
+            return new MeasuredVerification(application, verified, MeasurementOutcome.COMPLETED,
+                verified ? "VERIFIED" : "REJECTED", "", observation.ledger(), observation.refusedCharge());
+        } catch (PolynomialWorkAuthority.LimitReached failure) {
+            return new MeasuredVerification(application, false, MeasurementOutcome.BUDGET_INCONCLUSIVE,
+                "SHARED_POLYNOMIAL_WORK_AUTHORITY_EXHAUSTED", failure.getClass().getName(),
+                observation.ledger(), observation.refusedCharge());
+        } catch (RuntimeException | StackOverflowError failure) {
+            return new MeasuredVerification(application, false, MeasurementOutcome.TECHNICAL_FAILURE,
+                "EXACT_PREPARATION_VERIFICATION_TECHNICAL_FAILURE", failure.getClass().getName(),
+                observation.ledger(), observation.refusedCharge());
+        }
+    }
+
+    public enum MeasurementOutcome { COMPLETED, BUDGET_INCONCLUSIVE, TECHNICAL_FAILURE }
+
+    /** Issued only by actual planner execution; caller ledgers cannot construct an observation. */
+    public static final class MeasuredAttempt {
+        private final Expr input;
+        private final Optional<PlanAttempt> attempt;
+        private final MeasurementOutcome outcome;
+        private final String detailCode, failureClass;
+        private final PolynomialWorkLedger work;
+        private final Optional<PolynomialWorkLedger> refusedCharge;
+        private MeasuredAttempt(Expr input, Optional<PlanAttempt> attempt, MeasurementOutcome outcome,
+                String detailCode, String failureClass, PolynomialWorkLedger work,
+                Optional<PolynomialWorkLedger> refusedCharge) {
+            this.input = input; this.attempt = attempt; this.outcome = outcome; this.detailCode = detailCode;
+            this.failureClass = failureClass; this.work = work; this.refusedCharge = refusedCharge;
+        }
+        public Expr input() { return input; }
+        public Optional<PlanAttempt> attempt() { return attempt; }
+        public MeasurementOutcome outcome() { return outcome; }
+        public boolean completed() { return outcome == MeasurementOutcome.COMPLETED; }
+        public String detailCode() { return detailCode; }
+        public String failureClass() { return failureClass; }
+        public String measurementContract() { return MEASUREMENT_CONTRACT; }
+        public PolynomialWorkLedger work() { return work; }
+        public Optional<PolynomialWorkLedger> refusedCharge() { return refusedCharge; }
+    }
+
+    /** A fresh verification observation, never a caller-issued proof or reset budget. */
+    public static final class MeasuredVerification {
+        private final PreparedRuleApplication input;
+        private final boolean verified;
+        private final MeasurementOutcome outcome;
+        private final String detailCode, failureClass;
+        private final PolynomialWorkLedger work;
+        private final Optional<PolynomialWorkLedger> refusedCharge;
+        private MeasuredVerification(PreparedRuleApplication input, boolean verified, MeasurementOutcome outcome,
+                String detailCode, String failureClass, PolynomialWorkLedger work,
+                Optional<PolynomialWorkLedger> refusedCharge) {
+            this.input = input; this.verified = verified; this.outcome = outcome; this.detailCode = detailCode;
+            this.failureClass = failureClass; this.work = work; this.refusedCharge = refusedCharge;
+        }
+        public Optional<PreparedRuleApplication> input() { return Optional.ofNullable(input); }
+        public boolean verified() { return verified; }
+        public MeasurementOutcome outcome() { return outcome; }
+        public boolean completed() { return outcome == MeasurementOutcome.COMPLETED; }
+        public String detailCode() { return detailCode; }
+        public String failureClass() { return failureClass; }
+        public String measurementContract() { return MEASUREMENT_CONTRACT; }
+        public PolynomialWorkLedger work() { return work; }
+        public Optional<PolynomialWorkLedger> refusedCharge() { return refusedCharge; }
+    }
+
     /**
      * Analyzes one AST subtree against the cancellation preparation schema.
      *
@@ -59,7 +153,13 @@ public final class RulePreparationPlanner {
      *     unsupported input, an absent exact quotient and budget exhaustion
      */
     public PlanAttempt plan(Expr subtree) {
+        return plan(subtree, PolynomialWorkAuthority.unbounded());
+    }
+
+    private PlanAttempt plan(Expr subtree, PolynomialWorkAuthority work) {
         Objects.requireNonNull(subtree, "subtree");
+        work.consume("planner.dispatches", 1);
+        var arithmetic = new PreparationArithmetic(work);
         WorkLedger untouched = WorkLedger.untouched(budget.maxSolverAttempts());
         if (!(subtree instanceof BinaryExpr division)
                 || division.operator() != BinaryOperator.DIV) {
@@ -68,19 +168,19 @@ public final class RulePreparationPlanner {
                 untouched,
                 "root-is-not-division");
         }
-        if (isExplicitZero(division.right())) {
+        if (isExplicitZero(division.right(), arithmetic)) {
             return PlanAttempt.withoutApplication(
                 Status.UNSUPPORTED,
                 untouched,
                 "explicit-zero-divisor");
         }
-        if (isDirectCancellation(division.left(), division.right())) {
+        if (isDirectCancellation(division.left(), division.right(), arithmetic)) {
             return PlanAttempt.withoutApplication(
                 Status.DIRECT_MATCH_AVAILABLE,
                 untouched,
                 "principal-rule-already-matches");
         }
-        ResidualObligation obligation = residualObligation(division);
+        ResidualObligation obligation = residualObligation(division, work);
         if (budget.maxSolverAttempts() == 0) {
             return PlanAttempt.withoutApplication(
                 Status.BUDGET_INCONCLUSIVE,
@@ -91,8 +191,9 @@ public final class RulePreparationPlanner {
 
         WorkLedger attempted = WorkLedger.afterOneAttempt(
             budget.maxSolverAttempts());
+        work.consume("solver.invocations", 1);
         UnivariatePolynomial divisor =
-            UnivariatePolynomial.of(division.right());
+            UnivariatePolynomial.of(division.right(), work);
         if (divisor == null || divisor.isConstant()) {
             return PlanAttempt.withoutApplication(
                 Status.UNSUPPORTED,
@@ -101,7 +202,7 @@ public final class RulePreparationPlanner {
                 "divisor-outside-exact-nonconstant-univariate-polynomial-fragment");
         }
         UnivariatePolynomial dividend =
-            UnivariatePolynomial.of(division.left());
+            UnivariatePolynomial.of(division.left(), work);
         if (dividend == null) {
             return PlanAttempt.withoutApplication(
                 Status.UNSUPPORTED,
@@ -119,20 +220,20 @@ public final class RulePreparationPlanner {
         }
 
         Expr quotientExpression = quotient.toExpression();
-        Expr preparedNumerator = new BinaryExpr(
+        Expr preparedNumerator = arithmetic.binary(
             division.right(),
             BinaryOperator.MUL,
             quotientExpression);
-        Expr preparedSubtree = new BinaryExpr(
+        Expr preparedSubtree = arithmetic.binary(
             preparedNumerator,
             BinaryOperator.DIV,
             division.right());
-        List<String> assumptions = assumptionsFor(division.right());
+        List<String> assumptions = assumptionsFor(division.right(), work);
         Certificate certificate = certificate(
             division.left(),
             division.right(),
             quotientExpression,
-            preparedSubtree);
+            preparedSubtree, work);
         PreparedRuleApplication application = new PreparedRuleApplication(
             APPLICATION_SCHEMA,
             PLANNER_ID,
@@ -148,7 +249,7 @@ public final class RulePreparationPlanner {
             List.of(PREPARATION_RULE_ID, PRINCIPAL_RULE_ID),
             certificate,
             attempted);
-        if (!verify(application)) {
+        if (!verify(application, PreparationObservation.phase(work, "internal-verification"))) {
             throw new IllegalStateException(
                 "generated rule-preparation application failed verification");
         }
@@ -157,22 +258,28 @@ public final class RulePreparationPlanner {
 
     /** Independently recomputes the exact quotient and all bound plan fields. */
     public boolean verify(PreparedRuleApplication application) {
+        return verify(application, PolynomialWorkAuthority.unbounded());
+    }
+
+    private boolean verify(PreparedRuleApplication application, PolynomialWorkAuthority work) {
+        work.consume("verification.dispatches", 1);
+        var arithmetic = new PreparationArithmetic(work);
         if (application == null
-                || !APPLICATION_SCHEMA.equals(application.schema())
-                || !PLANNER_ID.equals(application.plannerId())
-                || !PRINCIPAL_RULE_ID.equals(application.principalRuleId())
-                || !List.of(PREPARATION_RULE_ID, PRINCIPAL_RULE_ID)
-                    .equals(application.primitiveRuleIds())
+                || !arithmetic.sameText(APPLICATION_SCHEMA, application.schema())
+                || !arithmetic.sameText(PLANNER_ID, application.plannerId())
+                || !arithmetic.sameText(PRINCIPAL_RULE_ID, application.principalRuleId())
+                || !arithmetic.sameStrings(List.of(PREPARATION_RULE_ID, PRINCIPAL_RULE_ID), application.primitiveRuleIds())
                 || !(application.originalSubtree()
                     instanceof BinaryExpr division)
                 || division.operator() != BinaryOperator.DIV
-                || isExplicitZero(division.right())) {
+                || isExplicitZero(division.right(), arithmetic)) {
             return false;
         }
+        work.consume("solver.invocations", 1);
         UnivariatePolynomial divisor =
-            UnivariatePolynomial.of(division.right());
+            UnivariatePolynomial.of(division.right(), work);
         UnivariatePolynomial dividend =
-            UnivariatePolynomial.of(division.left());
+            UnivariatePolynomial.of(division.left(), work);
         if (divisor == null || divisor.isConstant() || dividend == null) {
             return false;
         }
@@ -181,30 +288,28 @@ public final class RulePreparationPlanner {
             return false;
         }
         Expr expectedResult = quotient.toExpression();
-        Expr expectedPrepared = new BinaryExpr(
-            new BinaryExpr(
+        Expr expectedPrepared = arithmetic.binary(
+            arithmetic.binary(
                 division.right(),
                 BinaryOperator.MUL,
                 expectedResult),
             BinaryOperator.DIV,
             division.right());
-        if (!expectedResult.equals(application.resultSubtree())
-                || !expectedPrepared.equals(application.preparedSubtree())
-                || !division.right().equals(application.bindings().get("A"))
-                || !expectedResult.equals(application.bindings().get("B"))
+        if (!arithmetic.sameExpression(expectedResult, application.resultSubtree())
+                || !arithmetic.sameExpression(expectedPrepared, application.preparedSubtree())
+                || !arithmetic.sameExpression(division.right(), application.bindings().get("A"))
+                || !arithmetic.sameExpression(expectedResult, application.bindings().get("B"))
                 || application.bindings().size() != 2
-                || !residualObligation(division)
-                    .equals(application.residualObligation())
-                || !assumptionsFor(division.right())
-                    .equals(application.assumptions())) {
+                || !sameObligation(residualObligation(division, work), application.residualObligation(), arithmetic)
+                || !arithmetic.sameStrings(assumptionsFor(division.right(), work), application.assumptions())) {
             return false;
         }
         Certificate expectedCertificate = certificate(
             division.left(),
             division.right(),
             expectedResult,
-            expectedPrepared);
-        return expectedCertificate.equals(application.certificate())
+            expectedPrepared, work);
+        return sameCertificate(expectedCertificate, application.certificate(), arithmetic)
             && application.work().consumedSolverAttempts() == 1;
     }
 
@@ -212,22 +317,30 @@ public final class RulePreparationPlanner {
         Expr dividend,
         Expr divisor,
         Expr quotient,
-        Expr preparedSubtree
+        Expr preparedSubtree,
+        PolynomialWorkAuthority work
     ) {
-        String dividendText = ExpressionFormatter.format(dividend);
-        String divisorText = ExpressionFormatter.format(divisor);
-        String quotientText = ExpressionFormatter.format(quotient);
-        String preparedText = ExpressionFormatter.format(preparedSubtree);
-        String payload = String.join("\n",
-            "schema=" + CERTIFICATE_SCHEMA,
-            "planner=" + PLANNER_ID,
-            "principalRule=" + PRINCIPAL_RULE_ID,
-            "solver=" + SOLVER_ID,
-            "dividend=" + dividendText,
-            "divisor=" + divisorText,
-            "quotient=" + quotientText,
-            "remainder=0",
-            "prepared=" + preparedText);
+        String dividendText = format(dividend, work);
+        String divisorText = format(divisor, work);
+        String quotientText = format(quotient, work);
+        String preparedText = format(preparedSubtree, work);
+        String payload;
+        if (work == PolynomialWorkAuthority.unbounded()) {
+            payload = String.join("\n", "schema=" + CERTIFICATE_SCHEMA, "planner=" + PLANNER_ID,
+                "principalRule=" + PRINCIPAL_RULE_ID, "solver=" + SOLVER_ID,
+                "dividend=" + dividendText, "divisor=" + divisorText, "quotient=" + quotientText,
+                "remainder=0", "prepared=" + preparedText);
+        } else {
+            String[] fields = { certificateField(work, "schema=", CERTIFICATE_SCHEMA),
+                certificateField(work, "planner=", PLANNER_ID), certificateField(work, "principalRule=", PRINCIPAL_RULE_ID),
+                certificateField(work, "solver=", SOLVER_ID), certificateField(work, "dividend=", dividendText),
+                certificateField(work, "divisor=", divisorText), certificateField(work, "quotient=", quotientText),
+                "remainder=0", certificateField(work, "prepared=", preparedText) };
+            long materialLength = fields.length - 1L;
+            for (String field : fields) materialLength = Math.addExact(materialLength, field.length());
+            work.consume("certificate.material-code-units", materialLength);
+            payload = String.join("\n", fields);
+        }
         return new Certificate(
             CERTIFICATE_SCHEMA,
             SOLVER_ID,
@@ -236,14 +349,16 @@ public final class RulePreparationPlanner {
             quotientText,
             "0",
             preparedText,
-            sha256(payload));
+            sha256(payload, work));
     }
 
     private static ResidualObligation residualObligation(
-        BinaryExpr division
+        BinaryExpr division,
+        PolynomialWorkAuthority work
     ) {
-        String dividend = ExpressionFormatter.format(division.left());
-        String divisor = ExpressionFormatter.format(division.right());
+        String dividend = format(division.left(), work);
+        String divisor = format(division.right(), work);
+        work.consume("obligation.material-code-units", dividend.length() + 9L + divisor.length());
         return new ResidualObligation(
             "EXACT_FACTOR",
             dividend,
@@ -252,40 +367,83 @@ public final class RulePreparationPlanner {
             dividend + " = (" + divisor + ") * B");
     }
 
-    private static List<String> assumptionsFor(Expr divisor) {
+    private static List<String> assumptionsFor(Expr divisor, PolynomialWorkAuthority work) {
         if (divisor instanceof NumberExpr) {
             return List.of();
         }
-        return List.of(
-            Assumption.nonZero(ExpressionFormatter.format(divisor))
-                .expression());
+        String text = format(divisor, work);
+        work.consume("assumption.material-code-units", text.length() + 5L);
+        return List.of(Assumption.nonZero(text).expression());
     }
 
     private static boolean isDirectCancellation(
         Expr numerator,
-        Expr divisor
+        Expr divisor,
+        PreparationArithmetic arithmetic
     ) {
         if (!(numerator instanceof BinaryExpr product)
                 || product.operator() != BinaryOperator.MUL) {
             return false;
         }
-        return product.left().equals(divisor)
-            || product.right().equals(divisor);
+        return arithmetic.sameExpression(product.left(), divisor)
+            || arithmetic.sameExpression(product.right(), divisor);
     }
 
-    private static boolean isExplicitZero(Expr expression) {
-        return expression instanceof NumberExpr number
+    private static boolean isExplicitZero(Expr expression, PreparationArithmetic arithmetic) {
+        if (arithmetic.work == PolynomialWorkAuthority.unbounded()) return expression instanceof NumberExpr number
             && number.value().equalsInteger(0);
+        return expression instanceof NumberExpr number
+            && arithmetic.isInteger(number.value())
+            && arithmetic.equal(number.value().numerator(), java.math.BigInteger.ZERO);
     }
 
-    private static String sha256(String value) {
+    private static String sha256(String value, PolynomialWorkAuthority work) {
         try {
+            if (work == PolynomialWorkAuthority.unbounded()) {
+                byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+                return java.util.HexFormat.of().formatHex(digest);
+            }
+            work.consume("certificate.utf8-input-code-units", value.length());
+            byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+            work.consume(new PolynomialWorkLedger(Map.of("certificate.sha256-invocations", 1L,
+                "certificate.sha256-input-bytes", (long) bytes.length)));
             byte[] digest = MessageDigest.getInstance("SHA-256")
-                .digest(value.getBytes(StandardCharsets.UTF_8));
+                .digest(bytes);
+            work.consume("certificate.hex-output-code-units", digest.length * 2L);
             return java.util.HexFormat.of().formatHex(digest);
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 unavailable", exception);
         }
+    }
+
+    private static String certificateField(PolynomialWorkAuthority work, String label, String value) {
+        work.consume("certificate.field-code-units", label.length() + (long) value.length());
+        return label + value;
+    }
+
+    private static String format(Expr expression, PolynomialWorkAuthority work) {
+        return work == PolynomialWorkAuthority.unbounded() ? ExpressionFormatter.format(expression)
+            : ExpressionFormatter.formatMeasured(expression, work);
+    }
+
+    private static boolean sameObligation(ResidualObligation first, ResidualObligation second, PreparationArithmetic arithmetic) {
+        if (arithmetic.work == PolynomialWorkAuthority.unbounded()) return first.equals(second);
+        return arithmetic.sameText(first.kind(), second.kind())
+            && arithmetic.sameText(first.actualExpression(), second.actualExpression())
+            && arithmetic.sameText(first.knownFactorExpression(), second.knownFactorExpression())
+            && arithmetic.sameText(first.quotientPlaceholder(), second.quotientPlaceholder())
+            && arithmetic.sameText(first.equationTemplate(), second.equationTemplate());
+    }
+
+    private static boolean sameCertificate(Certificate first, Certificate second, PreparationArithmetic arithmetic) {
+        if (arithmetic.work == PolynomialWorkAuthority.unbounded()) return first.equals(second);
+        return arithmetic.sameText(first.schema(), second.schema()) && arithmetic.sameText(first.solverId(), second.solverId())
+            && arithmetic.sameText(first.dividendExpression(), second.dividendExpression())
+            && arithmetic.sameText(first.divisorExpression(), second.divisorExpression())
+            && arithmetic.sameText(first.quotientExpression(), second.quotientExpression())
+            && arithmetic.sameText(first.remainderExpression(), second.remainderExpression())
+            && arithmetic.sameText(first.preparedExpression(), second.preparedExpression())
+            && arithmetic.sameText(first.contentHash(), second.contentHash());
     }
 
     public enum Status {

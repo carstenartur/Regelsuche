@@ -182,6 +182,10 @@ Vorzeichenbelegung innerhalb eines vorgegebenen Ansatzes. Er belegt noch nicht:
 - generationengetrennten Taktiktransfer;
 - mathematische Neuheit.
 
+Der separate [lineare Koeffizientenadapter](exact-linear-polynomial-hole-solver.md) ergänzt inzwischen
+exakte rationale Elimination für affine Hole-Abhängigkeiten. Er verwendet eine additive Identität;
+seine Ergebnisse werden nicht als Belege einer ausgeführten endlichen Enumeration ausgegeben.
+
 Die nachgelagerte `ExactFinitePolynomialPlanResolver`-Stufe bindet eine
 Solver-Lösung an die passenden `SchematicProofPlan`-Lücken und erzeugt eine
 exakte `EQUIVALENT`-Obligation. Der Replay-Verifier führt den vollständigen Lauf

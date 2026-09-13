@@ -126,3 +126,7 @@ AC-internal suspension, arbitrary global priority order, plugin/learned/theory
 providers, product defaults, large search studies and runtime qualification are
 outside this slice. This work does not close the full #696 issue or claim that
 the admitted-work diagnostics from #620 constitute full runtime profiling.
+
+An additional opt-in [native rule/shape index](native-rule-shape-index.md) now
+filters impossible root/child shapes before the production matcher. It has its
+own selection/work revision and retains the historical cursor as its reference.

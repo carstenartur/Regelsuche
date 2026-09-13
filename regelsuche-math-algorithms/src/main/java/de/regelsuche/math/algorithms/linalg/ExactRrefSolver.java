@@ -36,10 +36,33 @@ public final class ExactRrefSolver {
 
     public Result solve(ExactLinearSystem source, Budget budget) {
         Objects.requireNonNull(source, "source");
-        Objects.requireNonNull(budget, "budget");
-        WorkCounter work = new WorkCounter(budget.maxWorkUnits());
+        return solve(source, source.coefficients(), source.variables(), source.rightHandSide(),
+            source.rowOrigins(), budget, Integer.MAX_VALUE);
+    }
+
+    /** Derives ranks from admitted raw coefficients; no caller-supplied rank or solution status is needed. */
+    public Result solveCoefficients(CoefficientSystem source, Budget budget, int maxScalarBits) {
+        Objects.requireNonNull(source, "source");
+        if (maxScalarBits < 1 || maxScalarBits > 4_096) {
+            throw new IllegalArgumentException("coefficient bit limit must be in [1,4096]");
+        }
+        return solve(null, source.coefficients(), source.variables(), source.rightHandSide(),
+            source.rowOrigins(), budget, maxScalarBits);
+    }
+
+    public boolean verifyCoefficients(CoefficientSystem source, Result result, int maxScalarBits) {
+        if (source == null || result == null || result.status() != Status.SOLVED) { return false; }
         try {
-            MutableAugmentedMatrix matrix = copy(source, work);
+            return solveCoefficients(source, new Budget(result.work().configuredWorkUnits()), maxScalarBits).equals(result);
+        } catch (IllegalArgumentException exception) { return false; }
+    }
+
+    private Result solve(ExactLinearSystem expectedSource, ExactMatrix coefficients, List<String> variables,
+        ExactVector rightHandSide, List<ExactLinearSystem.RowOrigin> rowOrigins, Budget budget, int maxScalarBits) {
+        Objects.requireNonNull(budget, "budget");
+        WorkCounter work = new WorkCounter(budget.maxWorkUnits(), maxScalarBits);
+        try {
+            MutableAugmentedMatrix matrix = copy(coefficients, rightHandSide, work);
             List<RowOperation> operations = new ArrayList<>();
             List<Pivot> coefficientPivots = new ArrayList<>();
             int pivotRow = 0;
@@ -58,7 +81,7 @@ public final class ExactRrefSolver {
                 Rational pivot = matrix.get(pivotRow, column);
                 work.consume();
                 if (!pivot.isOne()) {
-                    Rational multiplier = Rational.ONE.divide(pivot);
+                    Rational multiplier = work.checked(Rational.ONE.divide(pivot));
                     scaleRow(matrix, pivotRow, multiplier, work);
                     operations.add(RowOperation.scale(pivotRow, multiplier));
                 }
@@ -100,14 +123,17 @@ public final class ExactRrefSolver {
                     ? SolutionClassification.UNIQUE
                     : SolutionClassification.UNDERDETERMINED
                 : SolutionClassification.INCONSISTENT;
-            if (source.coefficientRank() != coefficientRank
-                    || source.augmentedRank() != augmentedRank
-                    || source.solutionClassification() != classification) {
+            if (expectedSource != null && (expectedSource.coefficientRank() != coefficientRank
+                    || expectedSource.augmentedRank() != augmentedRank
+                    || expectedSource.solutionClassification() != classification)) {
                 return Result.withoutReduction(
                     Status.INVALID_SOURCE,
                     work.ledger(),
                     "SOURCE_RANK_METADATA_MISMATCH");
             }
+
+            ExactLinearSystem source = expectedSource != null ? expectedSource : new ExactLinearSystem(
+                coefficients, variables, rightHandSide, rowOrigins, coefficientRank, augmentedRank, classification);
 
             ExactMatrix reducedCoefficients = reducedCoefficients(matrix);
             ExactVector reducedRightHandSide = reducedRightHandSide(matrix);
@@ -120,6 +146,9 @@ public final class ExactRrefSolver {
                 coefficientPivots,
                 freeColumns,
                 contradictionRows);
+            if (expectedSource == null) {
+                checkRawSolutionWork(reducedCoefficients, reducedRightHandSide, solutionData, work);
+            }
             CapabilityFrontier frontier = capabilityFrontier(classification);
             ExactRrefReduction reduction = new ExactRrefReduction(
                 reducedCoefficients,
@@ -144,6 +173,9 @@ public final class ExactRrefSolver {
 
             Certificate certificate = certificate(source, reduction);
             return Result.solved(reduction, certificate, work.ledger());
+        } catch (BitLimitExceeded exception) {
+            return Result.withoutReduction(Status.BUDGET_INCONCLUSIVE, work.ledger(),
+                "RREF_COEFFICIENT_BIT_BUDGET_EXHAUSTED");
         } catch (BudgetExceeded exception) {
             return Result.withoutReduction(
                 Status.BUDGET_INCONCLUSIVE,
@@ -172,21 +204,25 @@ public final class ExactRrefSolver {
         ExactLinearSystem source,
         WorkCounter work
     ) {
-        List<List<Rational>> rows = new ArrayList<>(source.equationCount());
-        for (int row = 0; row < source.equationCount(); row++) {
+        return copy(source.coefficients(), source.rightHandSide(), work);
+    }
+
+    private static MutableAugmentedMatrix copy(ExactMatrix coefficients, ExactVector rightHandSide, WorkCounter work) {
+        List<List<Rational>> rows = new ArrayList<>(coefficients.rowCount());
+        for (int row = 0; row < coefficients.rowCount(); row++) {
             List<Rational> retained = new ArrayList<>(
-                source.variableCount() + 1);
+                coefficients.columns() + 1);
             for (int column = 0;
-                    column < source.variableCount();
+                    column < coefficients.columns();
                     column++) {
                 work.consume();
-                retained.add(source.coefficients().get(row, column));
+                retained.add(work.checked(coefficients.get(row, column)));
             }
             work.consume();
-            retained.add(source.rightHandSide().get(row));
+            retained.add(work.checked(rightHandSide.get(row)));
             rows.add(retained);
         }
-        return new MutableAugmentedMatrix(rows, source.variableCount());
+        return new MutableAugmentedMatrix(rows, coefficients.columns());
     }
 
     private static int findPivot(
@@ -225,7 +261,7 @@ public final class ExactRrefSolver {
             matrix.set(
                 row,
                 column,
-                matrix.get(row, column).multiply(multiplier));
+                work.multiply(matrix.get(row, column), multiplier));
         }
     }
 
@@ -238,8 +274,8 @@ public final class ExactRrefSolver {
     ) {
         for (int column = 0; column < matrix.width(); column++) {
             work.consume();
-            Rational replacement = matrix.get(targetRow, column).add(
-                matrix.get(sourceRow, column).multiply(multiplier));
+            Rational replacement = work.add(matrix.get(targetRow, column),
+                work.multiply(matrix.get(sourceRow, column), multiplier));
             matrix.set(targetRow, column, replacement);
         }
     }
@@ -339,6 +375,27 @@ public final class ExactRrefSolver {
         return new ArrayList<>(Collections.nCopies(
             dimension,
             Rational.ZERO));
+    }
+
+    private static void checkRawSolutionWork(ExactMatrix coefficients, ExactVector rhs, SolutionData data, WorkCounter work) {
+        List<ExactVector> vectors = new ArrayList<>();
+        data.particularSolution().ifPresent(vectors::add);
+        vectors.addAll(data.nullspaceBasis());
+        for (int vectorIndex = 0; vectorIndex < vectors.size(); vectorIndex++) {
+            var vector = vectors.get(vectorIndex);
+            for (int row = 0; row < coefficients.rowCount(); row++) {
+                Rational sum = Rational.ZERO;
+                for (int column = 0; column < coefficients.columns(); column++) {
+                    // Two operations here plus the identical two in the existing reduction constructor.
+                    // Admission and bit checks happen before either copy can perform large arithmetic.
+                    work.consume(4);
+                    sum = work.add(sum, work.multiply(coefficients.get(row, column), vector.get(column)));
+                }
+                work.consume(2);
+                Rational expected = vectorIndex == 0 ? rhs.get(row) : Rational.ZERO;
+                if (!sum.equals(expected)) { throw new IllegalStateException("raw coefficient solution failed back-substitution"); }
+            }
+        }
     }
 
     private static CapabilityFrontier capabilityFrontier(
@@ -577,6 +634,29 @@ public final class ExactRrefSolver {
                     value.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 unavailable", exception);
+        }
+    }
+
+    /** Bounded raw-matrix admission for coefficient matching; ordinary v1 system admission is unchanged. */
+    public record CoefficientSystem(ExactMatrix coefficients, List<String> variables, ExactVector rightHandSide,
+        List<ExactLinearSystem.RowOrigin> rowOrigins) {
+        public CoefficientSystem {
+            Objects.requireNonNull(coefficients, "coefficients");
+            Objects.requireNonNull(rightHandSide, "rightHandSide");
+            Objects.requireNonNull(variables, "variables");
+            Objects.requireNonNull(rowOrigins, "rowOrigins");
+            if (coefficients.columns() > 12 || coefficients.rowCount() > 128
+                    || coefficients.columns() != variables.size() || coefficients.rowCount() != rightHandSide.dimension()
+                    || coefficients.rowCount() != rowOrigins.size()) {
+                throw new IllegalArgumentException("raw coefficient dimensions exceed or disagree with the bounded system");
+            }
+            variables = List.copyOf(variables);
+            rowOrigins = List.copyOf(rowOrigins);
+            if (variables.stream().anyMatch(value -> value.isBlank() || value.length() > 128 || !value.equals(value.trim()))
+                    || rowOrigins.stream().anyMatch(origin -> origin.sourceEquation().length() > 16_384)
+                    || new HashSet<>(variables).size() != variables.size()) {
+                throw new IllegalArgumentException("raw coefficient variables must be nonempty, unique exact names");
+            }
         }
     }
 
@@ -828,10 +908,40 @@ public final class ExactRrefSolver {
 
     private static final class WorkCounter {
         private final int configured;
+        private final int maxScalarBits;
         private int consumed;
 
-        private WorkCounter(int configured) {
+        private WorkCounter(int configured, int maxScalarBits) {
             this.configured = configured;
+            this.maxScalarBits = maxScalarBits;
+        }
+
+        private Rational checked(Rational value) {
+            if (maxScalarBits != Integer.MAX_VALUE) {
+                requireBits(value.numerator().abs().bitLength(), value.denominator().bitLength());
+            }
+            return value;
+        }
+
+        private void requireBits(long numerator, long denominator) {
+            if (numerator > maxScalarBits || denominator > maxScalarBits) { throw new BitLimitExceeded(); }
+        }
+
+        private Rational multiply(Rational left, Rational right) {
+            if (maxScalarBits != Integer.MAX_VALUE && !left.isZero() && !right.isZero() && !left.isOne() && !right.isOne()) {
+                requireBits((long) left.numerator().abs().bitLength() + right.numerator().abs().bitLength(),
+                    (long) left.denominator().bitLength() + right.denominator().bitLength());
+            }
+            return checked(left.multiply(right));
+        }
+
+        private Rational add(Rational left, Rational right) {
+            if (maxScalarBits != Integer.MAX_VALUE && !left.isZero() && !right.isZero()) {
+                requireBits(1L + Math.max((long) left.numerator().abs().bitLength() + right.denominator().bitLength(),
+                    (long) right.numerator().abs().bitLength() + left.denominator().bitLength()),
+                    (long) left.denominator().bitLength() + right.denominator().bitLength());
+            }
+            return checked(left.add(right));
         }
 
         private void consume() {
@@ -856,6 +966,10 @@ public final class ExactRrefSolver {
     }
 
     private static final class BudgetExceeded extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
+
+    private static final class BitLimitExceeded extends RuntimeException {
         private static final long serialVersionUID = 1L;
     }
 }

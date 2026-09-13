@@ -14,6 +14,7 @@ java {
 }
 
 dependencies {
+    api project(':regelsuche-math-sympy')
     api project(':regelsuche-search')
     api project(':regelsuche-validation')
     api project(':regelsuche-discovery')
@@ -26,6 +27,21 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
     finalizedBy tasks.named('jacocoTestReport')
+}
+
+// Explicit local/CI transport only; never added to check/ciCheck or historical pilots.
+tasks.register('writeAmplificationRuntimeClasspath') {
+    group = 'verification'
+    description = 'Prepares the existing Java runtime for the explicitly invoked #730 source-only runner.'
+    dependsOn tasks.named('classes')
+    dependsOn configurations.runtimeClasspath
+    def destination = layout.buildDirectory.file('amplification-runtime-classpath.txt')
+    outputs.file(destination)
+    inputs.files(sourceSets.main.runtimeClasspath)
+    doLast {
+        destination.get().asFile.parentFile.mkdirs()
+        destination.get().asFile.setText(sourceSets.main.runtimeClasspath.asPath, 'UTF-8')
+    }
 }
 
 jacoco {

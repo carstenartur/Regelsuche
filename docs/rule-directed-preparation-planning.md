@@ -145,6 +145,7 @@ Repository-Revision
 Die spezialisierten Solver dokumentieren weitere fragmentbezogene Witnesses:
 
 - [Exakter Polynomquotient und AC-Faktorexposition](#native-exact-spezialisten)
+- [Beobachtete Arbeit des exakten Polynomquotienten](exact-polynomial-preparation-observed-work.md)
 - [Gemeinsamer Monomfaktor](monomial-common-factor-preparation.md)
 - [Exakte Quadratexposition](perfect-square-structure-preparation.md)
 - [Gemeinsamer Nenner](rational-common-denominator-preparation.md)

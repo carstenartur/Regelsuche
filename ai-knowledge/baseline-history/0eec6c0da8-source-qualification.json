@@ -1,0 +1,144 @@
+{
+  "schema": "regelsuche.ai-knowledge-source-qualification/v1",
+  "repository": "carstenartur/Regelsuche",
+  "independentlyRecheckedAtUtc": "2026-09-13T08:11:43.008Z",
+  "pullRequest": {
+    "number": 1000,
+    "url": "https://github.com/carstenartur/Regelsuche/pull/1000",
+    "state": "closed",
+    "merged": true,
+    "merged_at": "2026-09-13T08:08:37Z",
+    "head_sha": "b542a4227cf911c29e34359a63452386150c8668",
+    "merge_commit_sha": "0eec6c0da83cd0cb548817782bc5f11431d25d2c"
+  },
+  "workflowRun": {
+    "id": 34744840693,
+    "run_number": 5589,
+    "head_sha": "b542a4227cf911c29e34359a63452386150c8668",
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/carstenartur/Regelsuche/actions/runs/34744840693"
+  },
+  "jobs": [
+    {
+      "id": 103690725665,
+      "name": "External polynomial comparison",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 34744840693
+    },
+    {
+      "id": 103690725687,
+      "name": "Isolated JMH authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 34744840693
+    },
+    {
+      "id": 103690725691,
+      "name": "Checkout-local Gradle authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 34744840693
+    },
+    {
+      "id": 103690725740,
+      "name": "Isolated SymPy runtime authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 34744840693
+    },
+    {
+      "id": 103690725808,
+      "name": "Complete Maven product and Docker authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 34744840693
+    },
+    {
+      "id": 103690726221,
+      "name": "JMH precision study replica ${{ matrix.replicate }}",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 34744840693
+    },
+    {
+      "id": 103690726246,
+      "name": "JMH precision study v2 replica ${{ matrix.replicate }}",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 34744840693
+    },
+    {
+      "id": 103690726294,
+      "name": "Retained JMH precision study analysis",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 34744840693
+    },
+    {
+      "id": 103690726317,
+      "name": "Retained JMH precision study v2 analysis",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 34744840693
+    },
+    {
+      "id": 103695292117,
+      "name": "Checkout-local ciCheck",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 34744840693
+    },
+    {
+      "id": 103695357210,
+      "name": "Publish generated reports",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 34744840693
+    }
+  ],
+  "repositoryVerificationArtifact": {
+    "archive_download_url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10314630795/zip",
+    "created_at": "2026-09-13T07:57:54Z",
+    "digest": "sha256:b42edfbfe68531931460371fecfa185531cbc682f66f0b6e9dfc31814ee1b96a",
+    "expired": false,
+    "expires_at": "2026-12-12T07:16:56Z",
+    "id": 10314630795,
+    "name": "repository-verification",
+    "size_in_bytes": 387118564,
+    "updated_at": "2026-09-13T07:57:54Z",
+    "url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10314630795",
+    "workflow_run": {
+      "head_branch": "codex/integrate-safe-runtime-product-qualification",
+      "head_repository_id": 1243764016,
+      "head_sha": "b542a4227cf911c29e34359a63452386150c8668",
+      "id": 34744840693,
+      "repository_id": 1243764016
+    }
+  },
+  "acceptanceEvidenceArtifact": {
+    "archive_download_url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10314786082/zip",
+    "created_at": "2026-09-13T07:58:31Z",
+    "digest": "sha256:19cc820749d2af0401f7faef4695d68a1b1215f85676098e43812283fccce19f",
+    "expired": false,
+    "expires_at": "2026-12-12T07:16:56Z",
+    "id": 10314786082,
+    "name": "quality-acceptance-evidence",
+    "size_in_bytes": 29157164,
+    "updated_at": "2026-09-13T07:58:31Z",
+    "url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10314786082",
+    "workflow_run": {
+      "head_branch": "codex/integrate-safe-runtime-product-qualification",
+      "head_repository_id": 1243764016,
+      "head_sha": "b542a4227cf911c29e34359a63452386150c8668",
+      "id": 34744840693,
+      "repository_id": 1243764016
+    }
+  },
+  "localGitTreeEquality": {
+    "0eec6c0da83cd0cb548817782bc5f11431d25d2c": "3d7c3de8d80acfe4e5d3dbea02ab2e884696e412",
+    "b542a4227cf911c29e34359a63452386150c8668": "3d7c3de8d80acfe4e5d3dbea02ab2e884696e412"
+  },
+  "evidenceBoundary": "The merged main commit and exact source-head workflow were independently checked through read-only GitHub calls. All six required authorities passed. The CI convergence log independently checked transferred artifact digests and reported qualityAcceptanceEvidence=COMPLETE; the artifact ZIP was not locally downloaded or hashed. Four manual JMH study jobs and report publication were skipped. Baseline metrics are derived only from the separate fresh clean local execution of accepted main."
+}

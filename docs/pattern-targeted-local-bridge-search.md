@@ -106,6 +106,11 @@ inventory, result or certificate fails closed.
 
 ## SymPy rule-amplification pilot
 
+The separately versioned [four-profile amplification runner](ablatable-rule-amplification.md)
+adds structural/AC/exact/bridge ablations, named external operations and a
+plan/freeze/qualification contract. Its identities and stricter source-only
+guard policy do not reinterpret the historical pilot below.
+
 The first retained pilot uses the unchanged imported rule
 `sympy.trig.pythagorean`:
 

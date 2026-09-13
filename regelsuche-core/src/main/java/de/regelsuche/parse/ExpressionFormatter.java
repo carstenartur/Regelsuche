@@ -7,6 +7,9 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.polynomial.PolynomialOperationAccounting;
+import de.regelsuche.polynomial.PolynomialWorkAuthority;
+import java.math.BigInteger;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
@@ -29,6 +32,14 @@ public final class ExpressionFormatter {
             Objects.requireNonNull(expr, "expr"),
             0,
             builder);
+        return builder.toString();
+    }
+
+    /** Also admits visited AST nodes and actual numeric projections before execution. */
+    public static String formatMeasured(Expr expr, PolynomialWorkAuthority authority) {
+        Objects.requireNonNull(authority, "authority");
+        Output builder = new Output(units -> authority.consume("format.output-code-units", units), authority);
+        append(Objects.requireNonNull(expr, "expr"), 0, builder);
         return builder.toString();
     }
 
@@ -71,6 +82,7 @@ public final class ExpressionFormatter {
         Deque<Action> pending,
         Output builder
     ) {
+        builder.authority.consume("format.ast-node-visits", 1);
         if (expression instanceof NumberExpr number) {
             appendNumber(number, parentPrecedence, builder);
             return;
@@ -98,27 +110,28 @@ public final class ExpressionFormatter {
         Output builder
     ) {
         var value = number.value();
-        if (!withinNumericSyntaxLimits(value)) {
+        if (!withinNumericSyntaxLimits(value, builder)) {
             throw new IllegalArgumentException("Numeric leaf exceeds parser digit limits");
         }
         String formatted;
         boolean fraction = false;
+        builder.numberOperation("format.scalar-integer-tests", value.denominator());
         if (value.isInteger()) {
+            builder.numberOperation("format.integer-decimal-conversions", value.numerator());
             formatted = value.numerator().toString();
-        } else try {
-            var decimal = value.toBigDecimal(java.math.MathContext.UNLIMITED).stripTrailingZeros();
-            if (decimal.scale() > de.regelsuche.scalar.ExactRationalDomain.MAX_DECIMAL_SCALE) {
-                throw new ArithmeticException("render using integer fraction syntax");
+        } else {
+            formatted = decimalTextOrNull(value, builder);
+            if (formatted == null) {
+                builder.numberOperation("format.integer-decimal-conversions", value.numerator());
+                String numerator = value.numerator().toString();
+                builder.numberOperation("format.integer-decimal-conversions", value.denominator());
+                String denominator = value.denominator().toString();
+                builder.authority.consume("format.fraction-material-code-units", numerator.length() + 3L + denominator.length());
+                formatted = numerator + " / " + denominator;
+                fraction = true;
             }
-            formatted = decimal.toPlainString();
-            if (formatted.replace("-", "").replace(".", "").length()
-                    > de.regelsuche.scalar.ExactRationalDomain.MAX_DIGITS) {
-                throw new ArithmeticException("render using integer fraction syntax");
-            }
-        } catch (ArithmeticException repeatingDecimal) {
-            formatted = value.numerator() + " / " + value.denominator();
-            fraction = true;
         }
+        builder.numberOperation("format.scalar-sign-tests", value.numerator());
         if ((value.signum() < 0 && parentPrecedence > 0)
                 || (fraction && parentPrecedence > 0)) {
             builder.append('(').append(formatted).append(')');
@@ -127,10 +140,40 @@ public final class ExpressionFormatter {
         }
     }
 
+    /** Only numerical conversion failures select fraction syntax; admission failures propagate. */
+    private static String decimalTextOrNull(de.regelsuche.scalar.ExactRational value, Output builder) {
+        builder.numberOperation("format.rational-decimal-conversions", value.numerator(), value.denominator());
+        java.math.BigDecimal decimal;
+        try { decimal = value.toBigDecimal(java.math.MathContext.UNLIMITED); }
+        catch (ArithmeticException repeatingDecimal) { return null; }
+        builder.numberOperation("format.decimal-trailing-zero-normalizations");
+        try { decimal = decimal.stripTrailingZeros(); }
+        catch (ArithmeticException unsupportedScale) { return null; }
+        if (decimal.scale() > de.regelsuche.scalar.ExactRationalDomain.MAX_DECIMAL_SCALE) return null;
+        builder.numberOperation("format.decimal-text-conversions");
+        String formatted;
+        try { formatted = decimal.toPlainString(); }
+        catch (ArithmeticException unsupportedScale) { return null; }
+        builder.authority.consume("format.numeric-text-scan-code-units", formatted.length());
+        String withoutSign = formatted.replace("-", "");
+        builder.authority.consume("format.numeric-text-scan-code-units", withoutSign.length());
+        return withoutSign.replace(".", "").length() > de.regelsuche.scalar.ExactRationalDomain.MAX_DIGITS
+            ? null : formatted;
+    }
+
     /** Whether integer/fraction syntax can represent both components within parser limits. */
     public static boolean withinNumericSyntaxLimits(de.regelsuche.scalar.ExactRational value) {
         return value.numerator().abs().compareTo(NUMERIC_SYNTAX_LIMIT) < 0
             && value.denominator().compareTo(NUMERIC_SYNTAX_LIMIT) < 0;
+    }
+
+    private static boolean withinNumericSyntaxLimits(de.regelsuche.scalar.ExactRational value, Output builder) {
+        builder.numberOperation("format.integer-absolute-values", value.numerator());
+        BigInteger absolute = value.numerator().abs();
+        builder.numberOperation("format.integer-bound-comparisons", absolute, NUMERIC_SYNTAX_LIMIT);
+        if (absolute.compareTo(NUMERIC_SYNTAX_LIMIT) >= 0) return false;
+        builder.numberOperation("format.integer-bound-comparisons", value.denominator(), NUMERIC_SYNTAX_LIMIT);
+        return value.denominator().compareTo(NUMERIC_SYNTAX_LIMIT) < 0;
     }
 
     private static void scheduleFunction(
@@ -192,9 +235,19 @@ public final class ExpressionFormatter {
     private static final class Output {
         private final StringBuilder text = new StringBuilder();
         private final java.util.function.LongConsumer emittedCodeUnits;
+        private final PolynomialWorkAuthority authority;
 
         private Output(java.util.function.LongConsumer emittedCodeUnits) {
+            this(emittedCodeUnits, PolynomialWorkAuthority.unbounded());
+        }
+
+        private Output(java.util.function.LongConsumer emittedCodeUnits, PolynomialWorkAuthority authority) {
             this.emittedCodeUnits = Objects.requireNonNull(emittedCodeUnits, "emittedCodeUnits");
+            this.authority = authority;
+        }
+
+        private void numberOperation(String operation, BigInteger... operands) {
+            PolynomialOperationAccounting.before(authority, operation, operands);
         }
 
         private Output append(String value) {
@@ -211,6 +264,7 @@ public final class ExpressionFormatter {
 
         @Override
         public String toString() {
+            authority.consume("format.materialized-code-units", text.length());
             return text.toString();
         }
     }
