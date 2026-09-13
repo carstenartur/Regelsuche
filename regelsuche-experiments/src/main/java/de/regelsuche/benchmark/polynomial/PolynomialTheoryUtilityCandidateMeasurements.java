@@ -25,6 +25,8 @@ public record PolynomialTheoryUtilityCandidateMeasurements(
 ) {
     public static final String SCHEMA =
         "regelsuche.polynomial-theory-utility-candidate-measurements/v1";
+    public static final String OBSERVED_SCHEMA =
+        "regelsuche.polynomial-theory-utility-candidate-measurements/v2";
     private static final Pattern SHA_256 =
         Pattern.compile("sha256:[0-9a-f]{64}");
     private static final ThreadLocal<ExpressionCanonicalizer> CANONICALIZER =
@@ -139,7 +141,7 @@ public record PolynomialTheoryUtilityCandidateMeasurements(
     }
 
     public String schema() {
-        return SCHEMA;
+        return result.observations() == null ? SCHEMA : OBSERVED_SCHEMA;
     }
 
     public int generatedTransitionCount() {
@@ -258,7 +260,7 @@ public record PolynomialTheoryUtilityCandidateMeasurements(
         List<PolynomialTheoryUtilityCacheEvent> events
     ) {
         StringBuilder material = new StringBuilder();
-        append(material, SCHEMA);
+        append(material, result.observations() == null ? SCHEMA : OBSERVED_SCHEMA);
         append(material, PolynomialTheoryUtilityPreregistration.STUDY_ID);
         append(
             material,

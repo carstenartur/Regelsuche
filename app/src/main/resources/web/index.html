@@ -6,6 +6,7 @@
     <title>Regelsuche Workbench</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="rule-radar.css">
+    <link rel="stylesheet" href="run-workspace.css">
     <link rel="stylesheet" href="vendor/katex/katex.min.css">
     <script defer src="vendor/katex/katex.min.js"></script>
     <script defer src="vendor/katex/contrib/auto-render.min.js"></script>
@@ -18,6 +19,7 @@
     </div>
     <nav class="tabs">
         <button class="tab active" data-tab="workbench">Workbench</button>
+        <button class="tab" data-tab="runs">Gespeicherte Runs</button>
         <button class="tab" data-tab="paths">Pfade</button>
         <button class="tab" data-tab="graph">Graph</button>
         <button class="tab" data-tab="candidates">Regelkandidaten</button>
@@ -36,7 +38,39 @@
     </nav>
 </header>
 
+<aside id="retainedRunBanner" class="retained-run-banner" hidden aria-label="Aktiver gespeicherter Run">
+    <span>Gespeicherter Run: <code id="retainedRunId"></code></span>
+    <button type="button" id="leaveRetainedRun">Zur aktuellen Sitzung</button>
+</aside>
+
 <main>
+    <section id="tab-runs" class="tab-panel" aria-labelledby="runsTitle">
+        <h2 id="runsTitle">Gespeicherte Discovery-Runs</h2>
+        <p>Öffne einen unveränderlichen Run, prüfe seine gebundenen Nachweise und vergleiche die gespeicherten Einstellungen.</p>
+        <div class="card run-controls">
+            <form id="openRetainedRun" class="actions">
+                <label class="field"><span>Run-ID</span><input id="retainedRunInput" type="text" required spellcheck="false" placeholder="sha256:… oder 64-stelliger Digest"></label>
+                <button type="submit">Run öffnen</button>
+            </form>
+            <label class="field"><span>Kanonisches Run-Manifest importieren (max. 1 MiB)</span><input id="importRetainedRun" type="file" accept=".json,application/json"></label>
+        </div>
+        <p id="retainedRunStatus" role="status" aria-live="polite"></p>
+        <div class="run-layout">
+            <section class="card run-history" aria-labelledby="runHistoryTitle">
+                <h3 id="runHistoryTitle">Run-Historie</h3>
+                <div class="actions"><button type="button" id="reloadRetainedRuns">Aktualisieren</button></div>
+                <p id="runHistoryStatus" role="status" aria-live="polite"></p>
+                <ol id="retainedRunsList"></ol>
+                <div class="actions"><button type="button" id="previousRetainedRuns" disabled>Vorherige</button><button type="button" id="nextRetainedRuns" disabled>Nächste</button></div>
+            </section>
+            <section class="card run-detail" aria-labelledby="runDetailTitle">
+                <h3 id="runDetailTitle">Run-Manifest und Nachweise</h3>
+                <div class="actions"><button type="button" id="downloadRetainedRun" disabled>Original-Manifest herunterladen</button><a id="retainedRunPermalink" hidden>Link zu diesem Run</a></div>
+                <div id="retainedRunDetail"><p>Öffne einen Run aus der Historie oder importiere sein kanonisches Manifest.</p></div>
+                <section id="retainedRunComparison" hidden aria-labelledby="runComparisonTitle"><h4 id="runComparisonTitle">Manifestvergleich</h4><div id="runComparisonDetail"></div></section>
+            </section>
+        </div>
+    </section>
     <!-- ─────────── Demo hero (Mathematik als Spiel) ─────────── -->
     <section id="demoHero" class="demo-hero">
         <div class="card demo-card">
@@ -584,6 +618,8 @@
 </footer>
 
 <script src="app.js"></script>
+<script src="run-workspace-state.js"></script>
+<script src="run-workspace.js"></script>
     <script src="rule-radar.js"></script>
 </body>
 </html>

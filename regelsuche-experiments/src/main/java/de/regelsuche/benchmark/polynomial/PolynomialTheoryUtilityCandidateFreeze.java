@@ -27,6 +27,10 @@ public record PolynomialTheoryUtilityCandidateFreeze(
         "regelsuche.polynomial-theory-utility-candidate-freeze/v1";
     public static final String FILE_NAME =
         "polynomial-theory-utility-candidate-freeze-v1.json";
+    public static final String OBSERVED_SCHEMA =
+        "regelsuche.polynomial-theory-utility-candidate-freeze/v2";
+    public static final String OBSERVED_FILE_NAME =
+        "polynomial-theory-utility-candidate-freeze-v2.json";
     public static final String EVIDENCE_STATUS =
         "CANDIDATES_FROZEN_QUALIFICATION_NOT_OPENED";
     public static final String QUALIFICATION_EXPOSURE =
@@ -83,7 +87,7 @@ public record PolynomialTheoryUtilityCandidateFreeze(
     }
 
     public String schema() {
-        return SCHEMA;
+        return schema(measuredBatch);
     }
 
     public String studyId() {
@@ -143,7 +147,7 @@ public record PolynomialTheoryUtilityCandidateFreeze(
                 "candidate freeze output contains sealed qualification"
             );
         }
-        Path target = root.resolve(FILE_NAME);
+        Path target = root.resolve(SCHEMA.equals(schema()) ? FILE_NAME : OBSERVED_FILE_NAME);
         AtomicJsonFile.writeUtf8(target, canonicalJson);
         requireVerified(Files.readAllBytes(target));
         if (Files.exists(qualification, LinkOption.NOFOLLOW_LINKS)) {
@@ -162,7 +166,7 @@ public record PolynomialTheoryUtilityCandidateFreeze(
             "measuredBatch"
         );
         JsonWriter json = new JsonWriter().beginObject();
-        json.property("schema", SCHEMA);
+        json.property("schema", schema(batch));
         json.property(
             "studyId",
             PolynomialTheoryUtilityPreregistration.STUDY_ID
@@ -234,6 +238,10 @@ public record PolynomialTheoryUtilityCandidateFreeze(
             value.property("byteLength", byteLength);
             value.property("contentHash", bindingHash);
         });
+    }
+
+    private static String schema(PolynomialTheoryUtilityCandidateMeasurementBatch batch) {
+        return PolynomialTheoryUtilityCandidateMeasurementBatch.SCHEMA.equals(batch.schema()) ? SCHEMA : OBSERVED_SCHEMA;
     }
 
     private static void appendMeasuredBatch(
@@ -328,6 +336,7 @@ public record PolynomialTheoryUtilityCandidateFreeze(
                     )
                 )
             );
+            if (result.observations() != null) PolynomialTheoryUtilityObservationJson.append(value, result);
         });
     }
 
@@ -558,6 +567,16 @@ public record PolynomialTheoryUtilityCandidateFreeze(
         json.property("transitionId", attempt.transitionId());
         json.property("verifierOutcome", attempt.verifierOutcome());
         json.property("reportEvidenceHash", attempt.reportEvidenceHash());
+        if (attempt.observedExecution() != null) {
+            var execution = attempt.observedExecution();
+            json.object("observedExecution", value -> {
+                value.property("occurrenceIndex", execution.occurrenceIndex());
+                value.array("path", path -> execution.path().forEach(path::numberValue));
+                value.property("pipelineEvidenceHash", execution.pipelineEvidenceHash());
+                value.property("sourceRootEvidenceHash", execution.sourceRootEvidenceHash());
+                value.object("rawWork", work -> execution.rawWork().stages().forEach(work::property));
+            });
+        }
     }
 
     private static void appendCacheEvent(
@@ -573,6 +592,7 @@ public record PolynomialTheoryUtilityCandidateFreeze(
         json.property("cacheRevision", event.cacheRevision());
         json.property("entryId", event.entryId());
         json.property("evidenceHash", event.evidenceHash());
+        if (event.replayOutcome() != null) json.property("replayOutcome", event.replayOutcome().name());
     }
 
     private static void intArray(

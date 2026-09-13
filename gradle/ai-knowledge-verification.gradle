@@ -8,18 +8,33 @@ def aiKnowledgeArtifactPath = aiKnowledgeArtifactDirectory.get().asFile.absolute
 def pluginLifecycle = tasks.named('aiKnowledgeCheck')
 def pluginArtifactVerification = tasks.named('verifyAiKnowledgeArtifacts')
 
+def verifyAiKnowledgeCoverageControls = tasks.register('verifyAiKnowledgeCoverageControls', Exec) {
+    group = 'verification'
+    description = 'Detects omitted preparation and replay boundaries in nonempty AI context packs.'
+    workingDir rootProject.projectDir
+    // A verification run must preserve the clean checkout required by the
+    // source-bound reproduction artifact builder later in ciCheck.
+    commandLine aiKnowledgePython, '-B', '-m', 'unittest', 'discover',
+        '-s', 'scripts', '-p', 'test_ai_knowledge_coverage.py'
+    inputs.files(aiKnowledgeVerifierScript,
+        rootProject.file('scripts/test_ai_knowledge_coverage.py'),
+        rootProject.file('config/ai-knowledge-capability-coverage.json'))
+    outputs.upToDateWhen { false }
+}
+
 def verifyRegelsucheAiKnowledgeArtifacts = tasks.register(
     'verifyRegelsucheAiKnowledgeArtifacts',
     Exec
 ) {
     group = 'verification'
     description = 'Verifies generated AI knowledge evidence and Regelsuche context-footprint contracts.'
-    dependsOn pluginLifecycle
+    dependsOn pluginLifecycle, verifyAiKnowledgeCoverageControls
     workingDir rootProject.projectDir
     commandLine aiKnowledgePython,
         aiKnowledgeVerifierPath,
         '--root', aiKnowledgeArtifactPath
     inputs.file(aiKnowledgeVerifierScript)
+    inputs.file(rootProject.file('config/ai-knowledge-capability-coverage.json'))
     inputs.dir(aiKnowledgeArtifactDirectory)
     outputs.upToDateWhen { false }
 }

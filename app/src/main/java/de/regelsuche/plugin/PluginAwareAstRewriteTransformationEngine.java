@@ -1,5 +1,6 @@
 package de.regelsuche.plugin;
 
+import de.regelsuche.assumption.Assumption;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
@@ -147,7 +148,8 @@ public final class PluginAwareAstRewriteTransformationEngine implements Transfor
                 rule.mayIncreaseComplexity(),
                 rule.estimatedCostDelta(),
                 rule.isEquivalencePreservingByConstruction(),
-                rule.id() + ":" + result.sourceSubtreeHash()
+                rule.id() + ":" + result.sourceSubtreeHash(),
+                result.assumptions().stream().map(Assumption::expression).toList()
             ));
         }
         visitorRegistry.execute(AstVisitorPhase.BEFORE_OUTPUT, root, context);
@@ -170,7 +172,7 @@ public final class PluginAwareAstRewriteTransformationEngine implements Transfor
             visitorRegistry.execute(AstVisitorPhase.DURING_SEARCH, subtree, visitorContext);
             Expr rewritten = applyRule(rule, subtree, visitorContext, attempts);
             if (rewritten != null && !rewritten.equals(subtree)) {
-                results.add(new RewriteResult(rule, rewritten, subtreeHash));
+                results.add(new RewriteResult(rule, rewritten, subtreeHash, rule.assumptions(subtree)));
             }
         }
         if (subtree instanceof BinaryExpr binaryExpr) {
@@ -178,14 +180,16 @@ public final class PluginAwareAstRewriteTransformationEngine implements Transfor
                 results.add(new RewriteResult(
                     leftRewrite.rule(),
                     new BinaryExpr(leftRewrite.expression(), binaryExpr.operator(), binaryExpr.right()),
-                    leftRewrite.sourceSubtreeHash()
+                    leftRewrite.sourceSubtreeHash(),
+                    leftRewrite.assumptions()
                 ));
             }
             for (RewriteResult rightRewrite : rewriteEverywhere(binaryExpr.right(), visitorContext, attempts)) {
                 results.add(new RewriteResult(
                     rightRewrite.rule(),
                     new BinaryExpr(binaryExpr.left(), binaryExpr.operator(), rightRewrite.expression()),
-                    rightRewrite.sourceSubtreeHash()
+                    rightRewrite.sourceSubtreeHash(),
+                    rightRewrite.assumptions()
                 ));
             }
         } else if (subtree instanceof FunctionExpr functionExpr) {
@@ -198,7 +202,8 @@ public final class PluginAwareAstRewriteTransformationEngine implements Transfor
                     results.add(new RewriteResult(
                         argRewrite.rule(),
                         new FunctionExpr(functionExpr.name(), replaced),
-                        argRewrite.sourceSubtreeHash()
+                        argRewrite.sourceSubtreeHash(),
+                        argRewrite.assumptions()
                     ));
                 }
             }
@@ -306,6 +311,11 @@ public final class PluginAwareAstRewriteTransformationEngine implements Transfor
         }
     }
 
-    private record RewriteResult(RewriteRule rule, Expr expression, String sourceSubtreeHash) {
+    private record RewriteResult(
+        RewriteRule rule, Expr expression, String sourceSubtreeHash, List<Assumption> assumptions
+    ) {
+        private RewriteResult {
+            assumptions = List.copyOf(assumptions);
+        }
     }
 }

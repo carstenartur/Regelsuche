@@ -18,9 +18,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class OpenApiStaticReferenceTest {
     private static final Set<String> HTTP_METHODS =
@@ -52,6 +55,30 @@ class OpenApiStaticReferenceTest {
         assertTrue(workbench.body().contains("Technische REST-Referenz"));
         assertTrue(workbench.body().contains("href=\"/static/openapi/index.html\""));
         assertTrue(workbench.body().contains("href=\"/static/openapi/openapi.json\""));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/", "/index.html", "/static/index.html"})
+    void everyWorkbenchEntryPointServesItsReferencedAssets(String entryPoint) throws IOException {
+        StaticResource page = get(entryPoint);
+        assertEquals(200, page.status());
+        var assets = Pattern.compile("<(?:script\\b[^>]*\\bsrc|link\\b[^>]*\\bhref)=\"([^\"]+)\"")
+            .matcher(page.body());
+        int assetCount = 0;
+        while (assets.find()) {
+            String source = assets.group(1);
+            String resolved = URI.create(entryPoint).resolve(source).getPath();
+            StaticResource asset = get(resolved);
+            assertEquals(200, asset.status(), entryPoint + " -> " + resolved);
+            String expectedType = source.endsWith(".css") ? "text/css" : "application/javascript";
+            assertTrue(asset.contentType().startsWith(expectedType), resolved);
+            try (InputStream expected = getClass().getResourceAsStream("/web/" + source)) {
+                assertNotNull(expected, source);
+                assertEquals(new String(expected.readAllBytes(), StandardCharsets.UTF_8), asset.body(), resolved);
+            }
+            assetCount++;
+        }
+        assertTrue(assetCount > 0, "the workbench must reference its scripts and stylesheets");
     }
 
     @Test

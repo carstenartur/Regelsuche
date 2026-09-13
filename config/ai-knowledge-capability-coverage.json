@@ -1,0 +1,18 @@
+{
+  "schema": "regelsuche.ai-knowledge-capability-coverage/v1",
+  "capabilities": [
+    {
+      "id": "rewrite-search",
+      "requiredTypes": [
+        "de.regelsuche.search.reachability.SharedUnifiedRulePreparationCoordinator",
+        "de.regelsuche.search.reachability.OccurrenceAwareSharedRulePreparationCoordinator",
+        "de.regelsuche.search.reachability.OccurrencePreparationReplay"
+      ],
+      "requiredTests": [
+        "de.regelsuche.search.reachability.SharedUnifiedRulePreparationCoordinatorTest",
+        "de.regelsuche.search.reachability.OccurrenceAwareSharedRulePreparationCoordinatorTest",
+        "de.regelsuche.search.reachability.OccurrencePreparationConcreteVerifierTest"
+      ]
+    }
+  ]
+}

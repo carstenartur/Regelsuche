@@ -1,0 +1,164 @@
+{
+  "schema": "regelsuche.ai-knowledge-baseline-provenance/v1",
+  "decision": "Advance the stacked-PR trend baseline to an independently fully qualified predecessor; preserve the old baseline and the rejected integration measurement.",
+  "acceptedSource": {
+    "mainCommit": "85f6ce9301a7f3dcf3243937d5b463113c61846f",
+    "publishedPullRequest": 985,
+    "publishedPullRequestHead": "cbd7ccbda90c7f3e3c96a02ca2830938fcb5a75a",
+    "tree": "b8fd2b7721f19049d11d703cbe1c53869b3ccd7b"
+  },
+  "independentQualification": {
+    "runId": 34726058558,
+    "runNumber": 5546,
+    "url": "https://github.com/carstenartur/Regelsuche/actions/runs/34726058558",
+    "conclusion": "success",
+    "jobs": {
+      "gradle": 103640248104,
+      "mavenProductDocker": 103640248181,
+      "isolatedJmh": 103640248200,
+      "externalPolynomialComparison": 103640248203,
+      "isolatedSymPy": 103640248242,
+      "convergedCiCheck": 103643289311
+    },
+    "allListedJobConclusions": "success",
+    "repositoryVerificationArtifact": {
+      "id": 10308038746,
+      "sizeBytes": 316463363,
+      "apiReportedDigest": "sha256:2d13e3b3e4079984c68086a0925bc25447d9af6f50233d8ad96296a4cb230064"
+    },
+    "evidenceBoundary": "CI status and artifact metadata were rechecked through the GitHub API. The artifact ZIP was not downloaded for this update. Baseline values come exclusively from the clean local reproduction below."
+  },
+  "localReproduction": {
+    "checkoutCommit": "61650a81b69ee62264212a9ccca0f0d38e09d942",
+    "tree": "b8fd2b7721f19049d11d703cbe1c53869b3ccd7b",
+    "cleanBeforeAndAfter": true,
+    "extractorVersion": "0.1.10",
+    "extractorCommit": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+    "extractorCheckoutClean": true,
+    "gradleVersion": "9.7.1",
+    "runtimeJdk": "25.0.4.1+1",
+    "extractorCompilerJdk": "17.0.20.1+1",
+    "command": "AI_KNOWLEDGE_EXTRACTOR_ENABLED=true ../runtime/gradle-9.7.1/bin/gradle --offline --no-daemon --no-configuration-cache -PuseLocalAiKnowledgeExtractor=true -PaiKnowledgeExtractorCheckout=../ai-knowledge-extractor -Porg.gradle.java.installations.paths=/workspace/scratch/a1f484c28baf/runtime/jdk-25.0.4.1+1,/workspace/scratch/a1f484c28baf/runtime/jdk-17.0.20.1+1 aiKnowledgeCheck",
+    "exitCode": 0,
+    "elapsedSeconds": 13,
+    "tasks": 11,
+    "complexityHotspotsPassed": 16,
+    "sourceFileSha256": {
+      "ai-knowledge/complexity-baseline.json": "aea907748449180b6b681f5003a435048cc912bed67482f729ca007eb2c2b096",
+      "ai-knowledge/capabilities.seed.yaml": "831e6d021d1a2f92ed764c89a1520c4ee609f176d01b0d7d170b86c3e16bd6fb",
+      "ai-knowledge/claims.seed.yaml": "013935ebad67ff3868602be8c68b73dba723610ad5ba728113f87e114f3dc108",
+      "ai-knowledge/claims.json": "cce03fad40abaa23770707154b2cab60afe37f1b0cbc8fb4d8865a886480b0c1",
+      "gradle.properties": "2d0c622ff20ce78d0432c004df2dba7af170bdb50f5ce68faffdc5bcd1f1b285",
+      "ai-knowledge-verification/build.gradle": "2aaf02538386418eeb3a5de354942514ba697cedd5cd658edf0cd44e2cdbfdd5",
+      "gradle/ai-knowledge-verification.gradle": "91a1e920c3923b19a55af816a928cf91434aeef9b0c86f56fe203cc07aa5f947",
+      "config/quality/complexity-hotspots.json": "8e9e8b549bc388f4638ec62de498a240ccb92e83108e848d75e7fcf94a02fbc2"
+    },
+    "generatedReportSha256": {
+      "benchmark.json": "caa539c5075622b0fa4aa5c64c81198e8a8ca7860cc532fb05b7059473ac2f4e",
+      "capabilities.json": "bc318ed93c47585696e9f3345da9b8aa1198c5c2a2f7140b2ee0a335f897b7c1",
+      "check.json": "d4f8affad1f85f4639fcbecaf378f385c407d32ce86a084fa0a257f222dd67ad",
+      "claims.json": "b522704dafe348f98c21888d4c4668461ad9ae678f92be3b899cc9813055a8e3",
+      "classes.json": "a9855b2f2891a5f737ba1101c4bfe45455cff6e91afe874ac9892d563294456b",
+      "complexity.json": "cda83ebf0e2816284d47a8e60c2bb6ff952a8e296b938697daa714df15749843",
+      "dependencies.json": "c6970d42a844555ad59bc82e92335c6e71c96465723408ea2224527b60c757f5",
+      "docs.json": "d0a774399d3126aa66de1e4ab36bde3bfd3bc91373c70bafbdb442e041f09454",
+      "evidence.json": "ea721326448bcb448f57de5655e6e287f9fd32e86dbb21bfb6aa22ab24bc6422",
+      "index.json": "d2009fc929f16e43076a0ee1c5f494abc0b6e58f48941b31f1f36ccc46514288",
+      "metrics-snapshot.json": "d9c1071f10b856f9e909174a0aa5562278958590f27d92a7f02764f5c74155f5",
+      "modules.json": "1a54fbfbe0046465113e1dd5b0eccfa613af78c076ea406a445e309ed0c0ea04",
+      "optimization.json": "5a00e6bf113c7a61e7c72b291e6df53bf101a79b6012894c2bcb53560666df92",
+      "tests.json": "950197f51ec6445f00c95b38729c49479717995805346c9af1b7cf6163d99d73",
+      "trend.json": "f670f28a368f2a264dcff89a66ddeaae165282f6b94dd40483d4053bb1fc2079"
+    }
+  },
+  "previousBaseline": {
+    "sourceCommit": "f19ee628fca26bd00950195a38eb940de9293ebc",
+    "ciRunId": 34581736197,
+    "artifactId": 10192975764,
+    "retainedFile": "f19ee628-complexity-baseline.json",
+    "sha256": "aea907748449180b6b681f5003a435048cc912bed67482f729ca007eb2c2b096",
+    "preservation": "Exact bytes of the formerly committed baseline."
+  },
+  "newBaseline": {
+    "sourceCommit": "85f6ce9301a7f3dcf3243937d5b463113c61846f",
+    "retainedFile": "85f6ce9301-metrics-snapshot.json",
+    "sha256": "d9c1071f10b856f9e909174a0aa5562278958590f27d92a7f02764f5c74155f5",
+    "derivation": "Exact generated metrics-snapshot.json bytes copied without numeric edits to ai-knowledge/complexity-baseline.json."
+  },
+  "rejectedIntegration": {
+    "localCommit": "f2da31bf6652bbfaffd9541b7deb79ecc6327499",
+    "tree": "927605dc6339d8c693adbbe26e44213646d75325",
+    "ciRunId": 34729137577,
+    "gradleJobId": 103648581806,
+    "localCheckExitCode": 1,
+    "estimatedContextTokens": 575165,
+    "baselineEstimatedContextTokens": 557650,
+    "increase": 17515,
+    "threshold": 15000,
+    "trendViolationCount": 1,
+    "retainedTrend": "f2da31bf66-rejected-trend.json",
+    "retainedCheck": "f2da31bf66-rejected-check.json"
+  },
+  "integrationAgainstAcceptedPredecessor": {
+    "estimatedContextTokens": 5655.0,
+    "conceptRadius": 1.0,
+    "dependencyRadius": 1.0,
+    "aiContextDebt": -0.13
+  },
+  "weightedInventoryDifference": {
+    "classes": {
+      "predecessor": 1473,
+      "integration": 1482,
+      "weight": 260,
+      "delta": 2340
+    },
+    "tests": {
+      "predecessor": 863,
+      "integration": 880,
+      "weight": 140,
+      "delta": 2380
+    },
+    "docs": {
+      "predecessor": 305,
+      "integration": 310,
+      "weight": 180,
+      "delta": 900
+    },
+    "dependencies": {
+      "predecessor": 270,
+      "integration": 271,
+      "weight": 35,
+      "delta": 35
+    },
+    "capabilities": {
+      "predecessor": 17,
+      "integration": 17,
+      "weight": 80,
+      "delta": 0
+    }
+  },
+  "comparisonBoundary": "The integration retains issue #984 additional reachability, preparation/replay test and document selectors and semantic coverage controls; the predecessor was measured with its own committed selectors. Both resolve 17 capabilities and use context-footprint-v3. Normalized debt deltas also reflect the expanded selectors; they are not a controlled source-only comparison. No selector is removed or changed by this update.",
+  "unchangedPolicy": {
+    "maxCognitiveDebt": 21.7,
+    "maxCognitiveDebtIncrease": 10.0,
+    "maxContextTokenIncrease": 15000.0,
+    "maxConceptRadiusIncrease": 3.0,
+    "maxMethodCognitiveComplexity": 65,
+    "maxMethodCyclomaticComplexity": 35,
+    "maxAverageMethodCognitiveComplexity": 4.0,
+    "maxAverageMethodCyclomaticComplexity": 4.0,
+    "methodHotspotPolicySha256": "8e9e8b549bc388f4638ec62de498a240ccb92e83108e848d75e7fcf94a02fbc2",
+    "integrationCapabilitySeedSha256": "16d64630109485ca14a5c1566d64084f3b932d7edf52bf70facd4274de0b8d0b",
+    "integrationCoveragePolicySha256": "9c1705776a062b5784cd9bad1cdc847878338f1ce32ac1fc66e7769ed98adbed"
+  },
+  "retainedFileSha256": {
+    "f19ee628-complexity-baseline.json": "aea907748449180b6b681f5003a435048cc912bed67482f729ca007eb2c2b096",
+    "85f6ce9301-metrics-snapshot.json": "d9c1071f10b856f9e909174a0aa5562278958590f27d92a7f02764f5c74155f5",
+    "85f6ce9301-trend.json": "f670f28a368f2a264dcff89a66ddeaae165282f6b94dd40483d4053bb1fc2079",
+    "85f6ce9301-check.json": "d4f8affad1f85f4639fcbecaf378f385c407d32ce86a084fa0a257f222dd67ad",
+    "85f6ce9301-aiKnowledgeCheck.log": "df5c16f3a7b33ff92e5c671079845ecf2a04c42667f51ba4f00f113b5f31330e",
+    "f2da31bf66-rejected-trend.json": "a80000d436657157db757bf0c1ada27a31fb86fe112b824fdbbe572688a061a9",
+    "f2da31bf66-rejected-check.json": "7e77a6fb46bc26a3128d7e2e96613ef2a06156c0d5ee46368e93b5549a38de87",
+    "f2da31bf66-rejected-aiKnowledgeCheck.log": "df02231e0f12035c0e60b7d6204351eadc2280ffeae9491af1c0a50397754ed7"
+  }
+}

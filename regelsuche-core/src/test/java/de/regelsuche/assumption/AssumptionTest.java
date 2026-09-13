@@ -49,6 +49,17 @@ class AssumptionTest {
     }
 
     @Test
+    @SuppressWarnings("deprecation")
+    void customPredicatesRequireIdentityEvenWithMatchingSymbols() {
+        for (Assumption.Kind kind : java.util.List.of(Assumption.Kind.CUSTOM_PREDICATE, Assumption.Kind.CUSTOM)) {
+            Assumption required = new Assumption(kind, "differentiable(f, x)", java.util.List.of("f", "x"));
+            Assumption continuous = new Assumption(kind, "continuous(f, x)", java.util.List.of("f", "x"));
+            assertEquals(AssumptionTruthValue.UNKNOWN, required.truthValueUnder(java.util.List.of(continuous)));
+            assertEquals(AssumptionTruthValue.TRUE, required.truthValueUnder(java.util.List.of(required)));
+        }
+    }
+
+    @Test
     void integerKnowledgeImpliesRationalButUnknownStaysUnknown() {
         assertEquals(AssumptionTruthValue.TRUE,
             Assumption.rational("n").truthValueUnder(java.util.List.of(Assumption.integer("n"))));
