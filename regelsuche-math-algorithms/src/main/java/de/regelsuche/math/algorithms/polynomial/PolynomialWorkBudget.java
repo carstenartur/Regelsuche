@@ -39,6 +39,11 @@ final class PolynomialWorkBudget implements PolynomialWorkSink {
         stages.merge(stage, units, Math::addExact);
     }
 
+    /** Current charged work, without allocating an immutable evidence snapshot. */
+    long totalWorkUnits() {
+        return total;
+    }
+
     PolynomialWorkLedger ledger() {
         return new PolynomialWorkLedger(stages);
     }
