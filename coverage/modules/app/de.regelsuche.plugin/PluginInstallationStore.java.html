@@ -177,8 +177,8 @@ final class PluginInstallationStore {
 <span class="fc" id="L177">        Path current = path.getRoot();</span>
 <span class="fc bfc" id="L178" title="All 2 branches covered.">        for (Path part : path) {</span>
 <span class="fc" id="L179">            current = current.resolve(part);</span>
-<span class="pc bpc" id="L180" title="1 of 2 branches missed.">            if (!Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) {</span>
-<span class="nc" id="L181">                throw new SecurityException(&quot;installation path contains a missing or non-directory component&quot;);</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">            if (!Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L181">                throw new SecurityException(&quot;installation path contains a missing or non-directory component&quot;);</span>
             }
 <span class="fc" id="L183">        }</span>
 <span class="fc" id="L184">    }</span>

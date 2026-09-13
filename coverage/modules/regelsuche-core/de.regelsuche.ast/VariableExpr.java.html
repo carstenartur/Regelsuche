@@ -1,10 +1,63 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VariableExpr.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.ast</a> &gt; <span class="el_source">VariableExpr.java</span></div><h1>VariableExpr.java</h1><pre class="source lang-java linenums">package de.regelsuche.ast;
 
-public record VariableExpr(String name) implements Expr {
-<span class="fc" id="L4">    public VariableExpr {</span>
-<span class="pc bpc" id="L5" title="2 of 4 branches missed.">        if (name == null || name.isBlank()) {</span>
-<span class="nc" id="L6">            throw new IllegalArgumentException(&quot;name must not be blank&quot;);</span>
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import de.regelsuche.symbol.SymbolId;
+import java.util.Objects;
+import java.util.Optional;
+
+/** One syntax occurrence. Scoped occurrences carry an ID, never a display label. */
+public final class VariableExpr implements Expr {
+    private final String name;
+    private final SymbolId symbol;
+
+    @JsonCreator(mode = JsonCreator.Mode.PROPERTIES)
+<span class="fc" id="L16">    public VariableExpr(@JsonProperty(&quot;name&quot;) String name) {</span>
+<span class="pc bpc" id="L17" title="1 of 4 branches missed.">        if (name == null || name.isBlank()) {</span>
+<span class="fc" id="L18">            throw new IllegalArgumentException(&quot;name must not be blank&quot;);</span>
         }
-<span class="fc" id="L8">    }</span>
+<span class="fc" id="L20">        this.name = name;</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        this.symbol = name.startsWith(SymbolId.IDENTIFIER_PREFIX) ? SymbolId.fromIdentifier(name) : null;</span>
+<span class="fc" id="L22">    }</span>
+
+<span class="fc" id="L24">    private VariableExpr(SymbolId symbol) {</span>
+<span class="fc" id="L25">        this.symbol = Objects.requireNonNull(symbol, &quot;symbol&quot;);</span>
+<span class="fc" id="L26">        this.name = symbol.identifier();</span>
+<span class="fc" id="L27">    }</span>
+
+    /** Creates a fresh occurrence of an existing mathematical symbol. */
+    public static VariableExpr scoped(SymbolId symbol) {
+<span class="fc" id="L31">        return new VariableExpr(symbol);</span>
+    }
+
+    /** Legacy name or lossless identity transport, not the scoped symbol's display label. */
+    @JsonProperty(&quot;name&quot;)
+    public String name() {
+<span class="fc" id="L37">        return name;</span>
+    }
+
+    @JsonIgnore
+    public Optional&lt;SymbolId&gt; symbol() {
+<span class="fc" id="L42">        return Optional.ofNullable(symbol);</span>
+    }
+
+    @Override
+    public boolean equals(Object other) {
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (this == other) return true;</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (!(other instanceof VariableExpr variable)) return false;</span>
+<span class="pc bpc" id="L49" title="1 of 6 branches missed.">        return symbol == null ? variable.symbol == null &amp;&amp; name.equals(variable.name)</span>
+<span class="fc" id="L50">            : symbol.equals(variable.symbol);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        return symbol == null ? name.hashCode() : symbol.hashCode();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L60">        return &quot;VariableExpr[name=&quot; + name + &quot;]&quot;;</span>
+    }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

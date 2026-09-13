@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginCheckpointTransactions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginCheckpointTransactions.java</span></div><h1>PluginCheckpointTransactions.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.plugin.PluginCheckpointAuthority.AcceptedState;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * External, installation-scoped transaction ledger. Unlike the legacy boolean CAS,
+ * a lost response can leave a submitted operation's outcome unknown.
+ * Providers must commit the selected pair and immutable terminal receipt together.
+ * Missing receipts are not proof of rejection: a request may still be in flight.
+ */
+public interface PluginCheckpointTransactions {
+    Scope scope();
+    AcceptedState read() throws IOException;
+    Optional&lt;Decision&gt; lookup(String operationId) throws IOException;
+    Decision submit(Operation operation) throws IOException;
+
+<span class="fc" id="L27">    enum Outcome { COMMITTED, REJECTED, OUTCOME_UNKNOWN }</span>
+
+    record Scope(String installationId, String trustDomain, String rootTrustStoreHash) {
+<span class="fc" id="L30">        public Scope {</span>
+<span class="fc" id="L31">            identifier(installationId);</span>
+<span class="fc" id="L32">            identifier(trustDomain);</span>
+<span class="fc" id="L33">            PluginSignatureManifest.requireSha256(rootTrustStoreHash, &quot;rootTrustStoreHash&quot;);</span>
+<span class="fc" id="L34">        }</span>
+    }
+
+    record Operation(String schema, Scope scope, String operationId, String intentHash,
+            AcceptedState expected, AcceptedState update) {
+        public static final String SCHEMA = &quot;regelsuche.plugin-checkpoint-operation/v1&quot;;
+        public static final int MAX_BYTES = 16384;
+<span class="fc" id="L41">        private static final com.fasterxml.jackson.databind.ObjectMapper JSON = JsonMapper.builder(</span>
+<span class="fc" id="L42">            JsonFactory.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build())</span>
+<span class="fc" id="L43">            .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)</span>
+<span class="fc" id="L44">            .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
+<span class="fc" id="L45">            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
+<span class="fc" id="L46">            .enable(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES)</span>
+<span class="fc" id="L47">            .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES).build();</span>
+
+        public Operation(Scope scope, String id, String intent, AcceptedState expected, AcceptedState update) {
+<span class="fc" id="L50">            this(SCHEMA, scope, id, intent, expected, update);</span>
+<span class="fc" id="L51">        }</span>
+
+<span class="fc" id="L53">        public Operation {</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) throw new IllegalArgumentException(&quot;unsupported checkpoint operation&quot;);</span>
+<span class="fc" id="L55">            Objects.requireNonNull(scope, &quot;scope&quot;);</span>
+<span class="fc" id="L56">            identifier(operationId);</span>
+<span class="fc" id="L57">            PluginSignatureManifest.requireSha256(intentHash, &quot;intentHash&quot;);</span>
+<span class="fc" id="L58">            Objects.requireNonNull(expected, &quot;expected&quot;);</span>
+<span class="fc" id="L59">            Objects.requireNonNull(update, &quot;update&quot;);</span>
+<span class="pc bpc" id="L60" title="2 of 4 branches missed.">            if (update.checkpoint() == null || update.installationHash().equals(expected.installationHash())</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">                    || !scope.trustDomain().equals(update.checkpoint().trustDomainId())</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">                    || expected.checkpoint() != null</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">                        &amp;&amp; !scope.trustDomain().equals(expected.checkpoint().trustDomainId())) {</span>
+<span class="fc" id="L64">                throw new IllegalArgumentException(&quot;operation must bind a changed generation in the same trust domain&quot;);</span>
+            }
+<span class="fc bfc" id="L66" title="All 2 branches covered.">            long prior = expected.checkpoint() == null ? 0 : expected.checkpoint().sequence();</span>
+<span class="fc" id="L67">            boolean identicalTrust = update.checkpoint().equals(expected.checkpoint());</span>
+<span class="pc bpc" id="L68" title="1 of 6 branches missed.">            if (!identicalTrust &amp;&amp; (prior == Long.MAX_VALUE || update.checkpoint().sequence() != prior + 1)) {</span>
+<span class="fc" id="L69">                throw new IllegalArgumentException(&quot;operation trust must be unchanged or the immediate successor&quot;);</span>
+            }
+<span class="fc" id="L71">        }</span>
+
+        public byte[] canonicalBytes() {
+<span class="fc" id="L74">            return PluginDistributionJson.canonical(this).getBytes(StandardCharsets.UTF_8);</span>
+        }
+
+        public static Operation read(byte[] bytes) {
+<span class="pc bpc" id="L78" title="2 of 4 branches missed.">            if (bytes == null || bytes.length &gt; MAX_BYTES) throw new IllegalArgumentException(&quot;operation byte limit&quot;);</span>
+            try {
+<span class="fc" id="L80">                Operation value = JSON.readValue(bytes, Operation.class);</span>
+<span class="pc bpc" id="L81" title="2 of 4 branches missed.">                if (value == null || !Arrays.equals(bytes, value.canonicalBytes())) {</span>
+<span class="nc" id="L82">                    throw new IllegalArgumentException(&quot;operation must have exact canonical bytes&quot;);</span>
+                }
+<span class="fc" id="L84">                return value;</span>
+<span class="fc" id="L85">            } catch (IOException malformed) {</span>
+<span class="fc" id="L86">                throw new IllegalArgumentException(&quot;invalid checkpoint operation&quot;, malformed);</span>
+            }
+        }
+    }
+
+    /** Data from the externally authenticated authority, not a caller-supplied admission gate. */
+    record Decision(Operation operation, Outcome outcome) {
+<span class="fc" id="L93">        public Decision {</span>
+<span class="fc" id="L94">            Objects.requireNonNull(operation, &quot;operation&quot;);</span>
+<span class="fc" id="L95">            Objects.requireNonNull(outcome, &quot;outcome&quot;);</span>
+<span class="fc" id="L96">        }</span>
+    }
+
+    static String identifier(String value) {
+<span class="pc bpc" id="L100" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;[A-Za-z0-9][A-Za-z0-9_.-]{0,127}&quot;)) {</span>
+<span class="nc" id="L101">            throw new IllegalArgumentException(&quot;checkpoint identifier must contain 1..128 ASCII identifier characters&quot;);</span>
+        }
+<span class="fc" id="L103">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

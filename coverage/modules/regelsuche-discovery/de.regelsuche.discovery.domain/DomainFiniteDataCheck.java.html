@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DomainFiniteDataCheck.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">DomainFiniteDataCheck.java</span></div><h1>DomainFiniteDataCheck.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
+
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.discovery.domain.FiniteDifferenceSequenceDomain.*;
+import de.regelsuche.discovery.domain.LinearRecurrenceSequenceDomain.*;
+import de.regelsuche.scalar.ExactRational;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/** Independent finite checks, not inference, source authority or an infinite-sequence proof. */
+public final class DomainFiniteDataCheck {
+    public static final String SCHEMA = &quot;regelsuche.domain-finite-data-check/v1&quot;;
+    public static final String NEWTON_CONTRACT = &quot;regelsuche.newton-binomial-finite-check/v1&quot;;
+    public static final String RESIDUAL_CONTRACT = &quot;regelsuche.recurrence-residual-finite-check/v1&quot;;
+    private static final int MAX_TERMS = 256, MAX_ORDER = 8, MAX_INPUT_ITEMS = 2048;
+
+    private DomainFiniteDataCheck() { }
+
+<span class="fc" id="L22">    public enum Status { CONFIRMED_FINITE_DATA, REFUTED_FINITE_DATA, INVALID_WITNESS, INCONCLUSIVE, UNSUPPORTED, TECHNICAL_FAILURE }</span>
+
+    /** Hard ceilings bound this ordinary checker, independently of the historical search budget. */
+    public record Budget(int maxTermChecks, int maxScalarOperations, int maxScalarBits) {
+<span class="fc" id="L26">        public Budget {</span>
+<span class="pc bpc" id="L27" title="6 of 12 branches missed.">            if (maxTermChecks &lt; 0 || maxTermChecks &gt; MAX_TERMS || maxScalarOperations &lt; 0</span>
+                    || maxScalarOperations &gt; 100_000 || maxScalarBits &lt; 1 || maxScalarBits &gt; 4096) {
+<span class="nc" id="L29">                throw new IllegalArgumentException(&quot;invalid finite-check budget&quot;);</span>
+            }
+<span class="fc" id="L31">        }</span>
+<span class="fc" id="L32">        public static Budget defaults() { return new Budget(MAX_TERMS, 20_000, 1024); }</span>
+    }
+
+    /** Privately issued by a completed or interrupted execution; its hash alone is not source authority. */
+    public static final class Result {
+        private final Status status;
+        private final boolean complete;
+        private final String canonicalJson, contentHash;
+
+<span class="fc" id="L41">        private Result(Execution execution, Status status, String detail) {</span>
+<span class="fc" id="L42">            this.status = status;</span>
+<span class="pc bpc" id="L43" title="1 of 4 branches missed.">            this.complete = execution.rows.size() == execution.total &amp;&amp; execution.total &gt; 0;</span>
+<span class="fc" id="L44">            ObjectNode value = DomainExportWorkspace.JSON.createObjectNode();</span>
+<span class="fc" id="L45">            value.put(&quot;schema&quot;, SCHEMA).put(&quot;checkerContract&quot;, execution.contract).put(&quot;status&quot;, status.name())</span>
+<span class="fc" id="L46">                .put(&quot;complete&quot;, complete).put(&quot;detail&quot;, detail).put(&quot;retainedTermCount&quot;, execution.total)</span>
+<span class="fc" id="L47">                .put(&quot;observedCount&quot;, execution.observedCount).put(&quot;holdoutCount&quot;, execution.total - execution.observedCount)</span>
+<span class="fc bfc" id="L48" title="All 4 branches covered.">                .put(&quot;counterexampleStatus&quot;, execution.counterexample &gt;= 0 ? &quot;FOUND&quot; : complete ? &quot;NONE_FOUND&quot; : &quot;INCONCLUSIVE&quot;);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            if (execution.counterexample &gt;= 0) value.put(&quot;firstCounterexampleIndex&quot;, execution.counterexample);</span>
+<span class="fc" id="L50">            else value.putNull(&quot;firstCounterexampleIndex&quot;);</span>
+<span class="fc" id="L51">            value.set(&quot;rows&quot;, execution.rows);</span>
+<span class="fc" id="L52">            ObjectNode work = value.putObject(&quot;work&quot;);</span>
+<span class="fc" id="L53">            work.put(&quot;contract&quot;, &quot;regelsuche.finite-check-admitted-dispatch-work/v1&quot;);</span>
+<span class="fc" id="L54">            line(work, &quot;inputItems&quot;, MAX_INPUT_ITEMS, execution.inputItems);</span>
+<span class="fc" id="L55">            line(work, &quot;termChecks&quot;, execution.budget.maxTermChecks(), execution.terms);</span>
+<span class="fc" id="L56">            line(work, &quot;scalarOperations&quot;, execution.budget.maxScalarOperations(), execution.operations);</span>
+<span class="fc" id="L57">            work.put(&quot;maxScalarBits&quot;, execution.budget.maxScalarBits()).put(&quot;refusedDimension&quot;, execution.refused)</span>
+<span class="fc" id="L58">                .put(&quot;totalArithmeticWork&quot;, &quot;UNAVAILABLE&quot;).put(&quot;primitiveArithmeticWork&quot;, &quot;UNAVAILABLE&quot;)</span>
+<span class="fc" id="L59">                .put(&quot;encodingAndHashWork&quot;, &quot;UNAVAILABLE&quot;);</span>
+<span class="fc" id="L60">            value.put(&quot;claimBoundary&quot;, &quot;Agreement or counterexamples on retained finite data only; no unique infinite continuation, minimal order or universal proof.&quot;);</span>
+<span class="fc" id="L61">            this.contentHash = DomainCanonical.sha256(DomainExportWorkspace.write(value));</span>
+<span class="fc" id="L62">            value.put(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L63">            this.canonicalJson = DomainExportWorkspace.write(value);</span>
+<span class="fc" id="L64">        }</span>
+<span class="fc" id="L65">        public Status status() { return status; }</span>
+<span class="fc" id="L66">        public boolean complete() { return complete; }</span>
+<span class="fc" id="L67">        public String contentHash() { return contentHash; }</span>
+<span class="fc" id="L68">        public String toCanonicalJson() { return canonicalJson; }</span>
+    }
+
+    public static Result check(FiniteDifferenceCandidate candidate, FiniteDifferenceCertificate witness, Budget budget) {
+<span class="fc" id="L72">        Objects.requireNonNull(candidate); Objects.requireNonNull(witness);</span>
+<span class="fc" id="L73">        Execution e = new Execution(NEWTON_CONTRACT, candidate.observed().size(), candidate.holdout().size(), budget);</span>
+        try {
+<span class="fc" id="L75">            e.admit(candidate.order(), (long) e.total + witness.generatedTerms().size()</span>
+<span class="fc" id="L76">                + candidate.initialDifferences().size() + witness.initialDifferences().size());</span>
+<span class="fc" id="L77">            e.longs(candidate.observed()); e.longs(candidate.holdout()); e.longs(candidate.initialDifferences());</span>
+<span class="fc" id="L78">            e.longs(witness.generatedTerms()); e.longs(witness.initialDifferences());</span>
+<span class="pc bpc" id="L79" title="2 of 4 branches missed.">            if (candidate.order() != witness.order() || !candidate.initialDifferences().equals(witness.initialDifferences())</span>
+<span class="pc bpc" id="L80" title="1 of 4 branches missed.">                    || witness.observedCount() != e.observedCount || witness.holdoutCount() != candidate.holdout().size()</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">                    || !&quot;FINITE_DIFFERENCE_VALIDATION_NOT_FORMAL_PROOF&quot;.equals(witness.evidenceStrength())) {</span>
+<span class="fc" id="L82">                return e.result(Status.INVALID_WITNESS, &quot;MODEL_COUNTS_OR_STRENGTH_MISMATCH&quot;);</span>
+            }
+<span class="fc" id="L84">            List&lt;Long&gt; retained = joined(candidate.observed(), candidate.holdout());</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            for (int n = 0; n &lt; e.total; n++) {</span>
+<span class="fc" id="L86">                e.term();</span>
+<span class="fc" id="L87">                ExactRational sum = ExactRational.ZERO, choose = ExactRational.ONE;</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">                for (int j = 0; j &lt;= Math.min(n, candidate.order()); j++) {</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                    if (j &gt; 0) choose = e.operation(e.operation(choose, ExactRational.integer(n-j+1), '*'), ExactRational.integer(j), '/');</span>
+<span class="fc" id="L90">                    sum = e.operation(sum, e.operation(choose, ExactRational.integer(candidate.initialDifferences().get(j)), '*'), '+');</span>
+                }
+<span class="fc" id="L92">                ExactRational actual = ExactRational.integer(retained.get(n));</span>
+<span class="fc" id="L93">                e.row(n, &quot;NEWTON_TERM&quot;, actual, sum, e.operation(actual, sum, '-'),</span>
+<span class="fc" id="L94">                    Long.toString(witness.generatedTerms().get(n)), -1, -1);</span>
+            }
+<span class="fc" id="L96">            return e.finished();</span>
+<span class="fc" id="L97">        } catch (Refusal ignored) { return e.result(Status.INCONCLUSIVE, &quot;RESOURCE_ADMISSION_REFUSED&quot;); }</span>
+<span class="nc" id="L98">        catch (UnsupportedInput ignored) { return e.result(Status.UNSUPPORTED, &quot;OUTSIDE_FINITE_CHECK_FRAGMENT&quot;); }</span>
+<span class="nc" id="L99">        catch (RuntimeException failure) { return e.result(Status.TECHNICAL_FAILURE, failure.getClass().getName()); }</span>
+    }
+
+    public static Result check(LinearRecurrenceCandidate candidate, LinearRecurrenceCertificate witness, Budget budget) {
+<span class="fc" id="L103">        Objects.requireNonNull(candidate); Objects.requireNonNull(witness);</span>
+<span class="fc" id="L104">        Execution e = new Execution(RESIDUAL_CONTRACT, candidate.observed().size(), candidate.holdout().size(), budget);</span>
+        try {
+<span class="fc" id="L106">            int order = candidate.model().order();</span>
+<span class="fc" id="L107">            e.admit(order, (long) e.total + witness.generatedTerms().size()</span>
+<span class="fc" id="L108">                + 2L * (candidate.model().coefficients().size() + witness.model().coefficients().size()));</span>
+<span class="fc" id="L109">            e.longs(candidate.observed()); e.longs(candidate.holdout());</span>
+<span class="fc bfc" id="L110" title="All 4 branches covered.">            for (var model : List.of(candidate.model(), witness.model())) for (var coefficient : model.coefficients()) {</span>
+<span class="fc" id="L111">                e.bits(width(coefficient.numerator())); e.bits(width(coefficient.denominator()));</span>
+<span class="fc" id="L112">            }</span>
+            // Witness text is compared with independently computed canonical values; never parsed as input to arithmetic.
+<span class="pc bpc" id="L114" title="1 of 4 branches missed.">            for (String term : witness.generatedTerms()) if (term.length() &gt; 4096) throw new UnsupportedInput();</span>
+<span class="pc bpc" id="L115" title="1 of 4 branches missed.">            if (!candidate.model().equals(witness.model()) || witness.observedCount() != e.observedCount</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">                    || witness.holdoutCount() != candidate.holdout().size()</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">                    || !&quot;LINEAR_RECURRENCE_FINITE_DATA_VALIDATION_NOT_FORMAL_PROOF&quot;.equals(witness.evidenceStrength())) {</span>
+<span class="fc" id="L118">                return e.result(Status.INVALID_WITNESS, &quot;MODEL_COUNTS_OR_STRENGTH_MISMATCH&quot;);</span>
+            }
+<span class="fc" id="L120">            List&lt;ExactRational&gt; coefficients = candidate.model().coefficients().stream()</span>
+<span class="fc" id="L121">                .map(c -&gt; new ExactRational(c.numerator(), c.denominator())).toList();</span>
+<span class="fc" id="L122">            List&lt;Long&gt; retained = joined(candidate.observed(), candidate.holdout());</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            for (int n = 0; n &lt; e.total; n++) {</span>
+<span class="fc" id="L124">                e.term();</span>
+<span class="fc" id="L125">                ExactRational actual = ExactRational.integer(retained.get(n));</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">                ExactRational predicted = n &lt; order ? actual : ExactRational.ZERO;</span>
+<span class="fc bfc" id="L127" title="All 4 branches covered.">                if (n &gt;= order) for (int j = 0; j &lt; order; j++) {</span>
+<span class="fc" id="L128">                    predicted = e.operation(predicted,</span>
+<span class="fc" id="L129">                        e.operation(coefficients.get(j), ExactRational.integer(retained.get(n-j-1)), '*'), '+');</span>
+                }
+<span class="fc bfc" id="L131" title="All 2 branches covered.">                e.row(n, n &lt; order ? &quot;SEED_IDENTITY&quot; : &quot;RECURRENCE_RESIDUAL&quot;, actual, predicted,</span>
+<span class="fc bfc" id="L132" title="All 4 branches covered.">                    e.operation(actual, predicted, '-'), witness.generatedTerms().get(n), n &lt; order ? -1 : n-order, n &lt; order ? -1 : n);</span>
+            }
+<span class="fc" id="L134">            return e.finished();</span>
+<span class="fc" id="L135">        } catch (Refusal ignored) { return e.result(Status.INCONCLUSIVE, &quot;RESOURCE_ADMISSION_REFUSED&quot;); }</span>
+<span class="nc" id="L136">        catch (UnsupportedInput ignored) { return e.result(Status.UNSUPPORTED, &quot;OUTSIDE_FINITE_CHECK_FRAGMENT&quot;); }</span>
+<span class="nc" id="L137">        catch (RuntimeException failure) { return e.result(Status.TECHNICAL_FAILURE, failure.getClass().getName()); }</span>
+    }
+
+    private static List&lt;Long&gt; joined(List&lt;Long&gt; observed, List&lt;Long&gt; holdout) {
+<span class="fc" id="L141">        List&lt;Long&gt; result = new ArrayList&lt;&gt;(observed); result.addAll(holdout); return result;</span>
+    }
+<span class="fc" id="L143">    private static int width(BigInteger value) { return value.bitLength() + 1; }</span>
+    private static void line(ObjectNode owner, String name, int configured, int executed) {
+<span class="fc" id="L145">        owner.putObject(name).put(&quot;configured&quot;, configured).put(&quot;executed&quot;, executed).put(&quot;skipped&quot;, 0).put(&quot;remaining&quot;, configured-executed);</span>
+<span class="fc" id="L146">    }</span>
+    private static final class Refusal extends RuntimeException { }
+    private static final class UnsupportedInput extends RuntimeException { }
+
+    private static final class Execution {
+        final String contract;
+        final int observedCount, total;
+        final Budget budget;
+<span class="fc" id="L154">        final ArrayNode rows = DomainExportWorkspace.JSON.createArrayNode();</span>
+<span class="fc" id="L155">        int terms, operations, inputItems, counterexample = -1;</span>
+        boolean witnessMismatch;
+<span class="fc" id="L157">        String refused = &quot;NONE&quot;;</span>
+<span class="fc" id="L158">        Execution(String contract, int observed, int holdout, Budget budget) {</span>
+<span class="fc" id="L159">            this.contract = contract; this.observedCount = observed; this.total = Math.addExact(observed, holdout);</span>
+<span class="fc" id="L160">            this.budget = Objects.requireNonNull(budget);</span>
+<span class="fc" id="L161">        }</span>
+        void admit(int order, long inputCount) {
+<span class="pc bpc" id="L163" title="3 of 6 branches missed.">            if (total &gt; MAX_TERMS || order &gt; MAX_ORDER || inputCount &gt; MAX_INPUT_ITEMS) throw new UnsupportedInput();</span>
+<span class="fc" id="L164">            inputItems = (int) inputCount;</span>
+<span class="fc" id="L165">        }</span>
+<span class="fc bfc" id="L166" title="All 6 branches covered.">        void longs(List&lt;Long&gt; values) { for (long value : values) bits(value == 0 ? 1 : 65 - Long.numberOfLeadingZeros(value &lt; 0 ? ~value : value)); }</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        void bits(int upperBound) { if (upperBound &gt; budget.maxScalarBits()) refuse(&quot;SCALAR_BITS&quot;); }</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        void term() { if (terms == budget.maxTermChecks()) refuse(&quot;TERM_CHECKS&quot;); terms++; }</span>
+<span class="fc" id="L169">        void refuse(String dimension) { refused = dimension; throw new Refusal(); }</span>
+        ExactRational operation(ExactRational a, ExactRational b, char operator) {
+<span class="fc" id="L171">            int an = width(a.numerator()), ad = width(a.denominator()), bn = width(b.numerator()), bd = width(b.denominator());</span>
+<span class="fc bfc" id="L172" title="All 4 branches covered.">            int numeratorBound = operator == '*' ? an+bn : operator == '/' ? an+bd : Math.max(an+bd,bn+ad)+1;</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">            int denominatorBound = operator == '/' ? ad+bn : ad+bd;</span>
+<span class="fc" id="L174">            bits(Math.max(numeratorBound, denominatorBound));</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">            if (operations == budget.maxScalarOperations()) refuse(&quot;SCALAR_OPERATIONS&quot;);</span>
+<span class="fc" id="L176">            operations++;</span>
+<span class="pc bpc" id="L177" title="1 of 5 branches missed.">            return switch (operator) {</span>
+<span class="fc" id="L178">                case '*' -&gt; a.multiply(b); case '/' -&gt; a.divide(b); case '+' -&gt; a.add(b); case '-' -&gt; a.subtract(b);</span>
+<span class="nc" id="L179">                default -&gt; throw new IllegalArgumentException(&quot;unknown exact operation&quot;);</span>
+            };
+        }
+        void row(int index, String kind, ExactRational actual, ExactRational computed, ExactRational residual,
+                String witness, int windowStart, int windowEnd) {
+<span class="fc" id="L184">            boolean agrees = actual.equals(computed), witnessAgrees = computed.canonicalText().equals(witness);</span>
+<span class="fc bfc" id="L185" title="All 4 branches covered.">            if (!agrees &amp;&amp; counterexample &lt; 0) counterexample = index;</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">            witnessMismatch |= !witnessAgrees;</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            ObjectNode row = rows.addObject().put(&quot;index&quot;, index).put(&quot;partition&quot;, index &lt; observedCount ? &quot;OBSERVED&quot; : &quot;HOLDOUT&quot;)</span>
+<span class="fc" id="L188">                .put(&quot;kind&quot;, kind).put(&quot;retained&quot;, actual.canonicalText()).put(&quot;computed&quot;, computed.canonicalText())</span>
+<span class="fc" id="L189">                .put(&quot;residual&quot;, residual.canonicalText()).put(&quot;witness&quot;, witness)</span>
+<span class="fc" id="L190">                .put(&quot;dataAgrees&quot;, agrees).put(&quot;witnessAgrees&quot;, witnessAgrees);</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            if (windowStart &lt; 0) row.putNull(&quot;windowStartInclusive&quot;).putNull(&quot;windowEndExclusive&quot;);</span>
+<span class="fc" id="L192">            else row.put(&quot;windowStartInclusive&quot;, windowStart).put(&quot;windowEndExclusive&quot;, windowEnd);</span>
+<span class="fc" id="L193">        }</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        Result finished() { return result(counterexample &gt;= 0 ? Status.REFUTED_FINITE_DATA</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">            : witnessMismatch ? Status.INVALID_WITNESS : Status.CONFIRMED_FINITE_DATA, &quot;ALL_RETAINED_TERMS_CHECKED&quot;); }</span>
+<span class="fc" id="L196">        Result result(Status status, String detail) { return new Result(this, status, detail); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

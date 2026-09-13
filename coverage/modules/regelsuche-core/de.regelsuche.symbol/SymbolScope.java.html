@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SymbolScope.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.symbol</a> &gt; <span class="el_source">SymbolScope.java</span></div><h1>SymbolScope.java</h1><pre class="source lang-java linenums">package de.regelsuche.symbol;
+
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+
+/**
+ * Bounded, thread-safe name resolution at the input boundary. One allocation
+ * namespace is shared by all symbols declared in this scope. Snapshot restoration
+ * is single-writer resumption; independent writers must allocate fresh namespaces.
+ */
+public final class SymbolScope {
+    public static final int MAXIMUM_NAME_LENGTH = 128;
+    private final UUID namespace;
+    private final SymbolScope parent;
+    private final Limits limits;
+    private final Registry registry;
+    private final int depth;
+<span class="fc" id="L25">    private final Map&lt;String, SymbolId&gt; bindings = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L26">    private long nextOrdinal = 1;</span>
+
+    public SymbolScope() {
+<span class="nc" id="L29">        this(UUID.randomUUID());</span>
+<span class="nc" id="L30">    }</span>
+
+    public SymbolScope(UUID namespace) {
+<span class="fc" id="L33">        this(namespace, Limits.defaults());</span>
+<span class="fc" id="L34">    }</span>
+
+    public SymbolScope(UUID namespace, Limits limits) {
+<span class="fc" id="L37">        this(namespace, null, Objects.requireNonNull(limits, &quot;limits&quot;), new Registry(limits.maximumScopes()));</span>
+<span class="fc" id="L38">    }</span>
+
+<span class="fc" id="L40">    private SymbolScope(UUID namespace, SymbolScope parent, Limits limits, Registry registry) {</span>
+<span class="fc" id="L41">        this.namespace = Objects.requireNonNull(namespace, &quot;namespace&quot;);</span>
+<span class="fc" id="L42">        this.parent = parent;</span>
+<span class="fc" id="L43">        this.limits = limits;</span>
+<span class="fc" id="L44">        this.registry = registry;</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        this.depth = parent == null ? 0 : parent.depth + 1;</span>
+<span class="fc" id="L46">        registry.register(namespace, depth, limits.maximumDepth());</span>
+<span class="fc" id="L47">    }</span>
+
+    public UUID namespace() {
+<span class="fc" id="L50">        return namespace;</span>
+    }
+
+    public SymbolScope child() {
+<span class="nc" id="L54">        return child(UUID.randomUUID());</span>
+    }
+
+    public SymbolScope child(UUID childNamespace) {
+<span class="fc" id="L58">        synchronized (registry) {</span>
+<span class="fc" id="L59">            return new SymbolScope(childNamespace, this, limits, registry);</span>
+        }
+    }
+
+    public SymbolId resolve(String name) {
+<span class="fc" id="L64">        return resolveAll(java.util.List.of(requireName(name))).get(name);</span>
+    }
+
+    /** Resolves a bounded batch atomically, including validation and allocation. */
+    public Map&lt;String, SymbolId&gt; resolveAll(Collection&lt;String&gt; names) {
+<span class="fc" id="L69">        var checked = checkedNames(names);</span>
+<span class="fc" id="L70">        synchronized (registry) {</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            long unknown = checked.stream().filter(name -&gt; find(name) == null).count();</span>
+<span class="fc" id="L72">            requireCapacity(unknown);</span>
+<span class="fc" id="L73">            Map&lt;String, SymbolId&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            for (String name : checked) {</span>
+<span class="fc" id="L75">                SymbolId symbol = find(name);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">                if (symbol == null) {</span>
+<span class="fc" id="L77">                    symbol = new SymbolId(namespace, nextOrdinal++);</span>
+<span class="fc" id="L78">                    bindings.put(name, symbol);</span>
+                }
+<span class="fc" id="L80">                result.put(name, symbol);</span>
+<span class="fc" id="L81">            }</span>
+<span class="fc" id="L82">            return Map.copyOf(result);</span>
+        }
+    }
+
+    /** Explicit declaration may shadow a parent, but never replaces a local binding. */
+    public SymbolId declare(String name) {
+<span class="fc" id="L88">        requireName(name);</span>
+<span class="fc" id="L89">        synchronized (registry) {</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            if (bindings.containsKey(name)) throw new IllegalArgumentException(&quot;name is already declared locally&quot;);</span>
+<span class="fc" id="L91">            requireCapacity(1);</span>
+<span class="fc" id="L92">            var symbol = new SymbolId(namespace, nextOrdinal++);</span>
+<span class="fc" id="L93">            bindings.put(name, symbol);</span>
+<span class="fc" id="L94">            return symbol;</span>
+        }
+    }
+
+    /** An alias must refer to a symbol already known in this lexical ancestry. */
+    public SymbolId alias(String name, SymbolId symbol) {
+<span class="fc" id="L100">        requireName(name);</span>
+<span class="fc" id="L101">        Objects.requireNonNull(symbol, &quot;symbol&quot;);</span>
+<span class="fc" id="L102">        synchronized (registry) {</span>
+<span class="fc" id="L103">            SymbolId canonical = knownSymbol(symbol);</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            if (canonical == null) throw new IllegalArgumentException(&quot;alias refers to an unknown symbol&quot;);</span>
+<span class="fc" id="L105">            SymbolId existing = bindings.get(name);</span>
+<span class="pc bpc" id="L106" title="1 of 4 branches missed.">            if (existing != null &amp;&amp; !existing.equals(symbol)) throw new IllegalArgumentException(&quot;alias replaces a local binding&quot;);</span>
+<span class="pc bpc" id="L107" title="1 of 4 branches missed.">            if (existing == null &amp;&amp; bindings.size() &gt;= limits.maximumBindings()) {</span>
+<span class="fc" id="L108">                throw new IllegalArgumentException(&quot;symbol binding capacity exceeded&quot;);</span>
+            }
+<span class="fc" id="L110">            bindings.put(name, canonical);</span>
+<span class="fc" id="L111">            return canonical;</span>
+        }
+    }
+
+    public Snapshot snapshot() {
+<span class="fc" id="L116">        synchronized (registry) {</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            return new Snapshot(namespace, parent == null ? null : parent.namespace, nextOrdinal, bindings, limits);</span>
+        }
+    }
+
+    /** Restores a root; restore each child into its restored parent before continuing allocation. */
+    public static SymbolScope restore(Snapshot snapshot) {
+<span class="fc" id="L123">        Map&lt;String, SymbolId&gt; restored = validateSnapshot(snapshot, null);</span>
+<span class="fc" id="L124">        var scope = new SymbolScope(snapshot.namespace(), snapshot.limits());</span>
+<span class="fc" id="L125">        scope.bindings.putAll(restored);</span>
+<span class="fc" id="L126">        scope.nextOrdinal = snapshot.nextOrdinal();</span>
+<span class="fc" id="L127">        return scope;</span>
+    }
+
+    public SymbolScope restoreChild(Snapshot snapshot) {
+<span class="fc" id="L131">        synchronized (registry) {</span>
+<span class="fc" id="L132">            Map&lt;String, SymbolId&gt; restored = validateSnapshot(snapshot, this);</span>
+<span class="fc" id="L133">            var child = new SymbolScope(snapshot.namespace(), this, limits, registry);</span>
+<span class="fc" id="L134">            child.bindings.putAll(restored);</span>
+<span class="fc" id="L135">            child.nextOrdinal = snapshot.nextOrdinal();</span>
+<span class="fc" id="L136">            return child;</span>
+        }
+    }
+
+    /** Names are syntax only. This check does not assign or compare symbol identities. */
+    public static String requireName(String name) {
+<span class="pc bpc" id="L142" title="1 of 6 branches missed.">        if (name == null || name.isEmpty() || name.length() &gt; MAXIMUM_NAME_LENGTH</span>
+<span class="fc bfc" id="L143" title="All 4 branches covered.">                || !Character.isLetter(name.charAt(0)) || name.startsWith(SymbolId.IDENTIFIER_PREFIX)) {</span>
+<span class="fc" id="L144">            throw new IllegalArgumentException(&quot;invalid input symbol name&quot;);</span>
+        }
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        for (int i = 1; i &lt; name.length(); i++) {</span>
+<span class="fc" id="L147">            char ch = name.charAt(i);</span>
+<span class="pc bpc" id="L148" title="1 of 4 branches missed.">            if (!Character.isLetterOrDigit(ch) &amp;&amp; ch != '_') {</span>
+<span class="fc" id="L149">                throw new IllegalArgumentException(&quot;invalid input symbol name&quot;);</span>
+            }
+        }
+<span class="fc" id="L152">        return name;</span>
+    }
+
+    private Set&lt;String&gt; checkedNames(Collection&lt;String&gt; names) {
+<span class="fc" id="L156">        Objects.requireNonNull(names, &quot;names&quot;);</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (names.size() &gt; limits.maximumBindings()) throw new IllegalArgumentException(&quot;symbol batch capacity exceeded&quot;);</span>
+<span class="fc" id="L158">        var checked = new LinkedHashSet&lt;String&gt;();</span>
+<span class="fc" id="L159">        int inspected = 0;</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        for (String name : names) {</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">            if (++inspected &gt; limits.maximumBindings()) throw new IllegalArgumentException(&quot;symbol batch capacity exceeded&quot;);</span>
+<span class="fc" id="L162">            checked.add(requireName(name));</span>
+<span class="fc" id="L163">        }</span>
+<span class="fc" id="L164">        return checked;</span>
+    }
+
+    private void requireCapacity(long count) {
+<span class="pc bpc" id="L168" title="1 of 4 branches missed.">        if (count &gt; limits.maximumBindings() - bindings.size() || count &gt; Long.MAX_VALUE - nextOrdinal) {</span>
+<span class="fc" id="L169">            throw new IllegalArgumentException(&quot;symbol allocation capacity exceeded&quot;);</span>
+        }
+<span class="fc" id="L171">    }</span>
+
+    private SymbolId find(String name) {
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        for (var scope = this; scope != null; scope = scope.parent) {</span>
+<span class="fc" id="L175">            SymbolId symbol = scope.bindings.get(name);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            if (symbol != null) return symbol;</span>
+        }
+<span class="fc" id="L178">        return null;</span>
+    }
+
+    private SymbolId knownSymbol(SymbolId id) {
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        for (var scope = this; scope != null; scope = scope.parent) {</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            for (var symbol : scope.bindings.values()) {</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">                if (symbol.equals(id)) return symbol;</span>
+<span class="fc" id="L185">            }</span>
+        }
+<span class="fc" id="L187">        return null;</span>
+    }
+
+    private static Map&lt;String, SymbolId&gt; validateSnapshot(Snapshot snapshot, SymbolScope parent) {
+<span class="fc" id="L191">        Objects.requireNonNull(snapshot, &quot;snapshot&quot;);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        UUID expectedParent = parent == null ? null : parent.namespace;</span>
+<span class="fc bfc" id="L193" title="All 4 branches covered.">        if (!Objects.equals(expectedParent, snapshot.parentNamespace())</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">                || parent != null &amp;&amp; !parent.limits.equals(snapshot.limits())</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">                || snapshot.bindings().size() &gt; snapshot.limits().maximumBindings()</span>
+<span class="pc bpc" id="L196" title="2 of 4 branches missed.">                || snapshot.nextOrdinal() &lt; 1 || snapshot.nextOrdinal() &gt; snapshot.limits().maximumBindings() + 1L) {</span>
+<span class="fc" id="L197">            throw new IllegalArgumentException(&quot;inconsistent symbol scope snapshot&quot;);</span>
+        }
+<span class="fc" id="L199">        Map&lt;String, SymbolId&gt; restored = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L200">        Map&lt;SymbolId, SymbolId&gt; localSymbols = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        for (var entry : snapshot.bindings().entrySet()) {</span>
+<span class="fc" id="L202">            String name = requireName(entry.getKey());</span>
+<span class="fc" id="L203">            SymbolId id = entry.getValue();</span>
+            SymbolId canonical;
+<span class="fc bfc" id="L205" title="All 2 branches covered.">            if (id.namespace().equals(snapshot.namespace())) {</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">                if (id.ordinal() &gt;= snapshot.nextOrdinal()) throw new IllegalArgumentException(&quot;snapshot reuses an ordinal&quot;);</span>
+<span class="fc" id="L207">                canonical = localSymbols.computeIfAbsent(id, value -&gt; value);</span>
+            } else {
+<span class="fc bfc" id="L209" title="All 2 branches covered.">                canonical = parent == null ? null : parent.knownSymbol(id);</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">                if (canonical == null) throw new IllegalArgumentException(&quot;snapshot refers to an unknown inherited symbol&quot;);</span>
+            }
+<span class="fc" id="L212">            restored.put(name, canonical);</span>
+<span class="fc" id="L213">        }</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        if (localSymbols.size() != snapshot.nextOrdinal() - 1) {</span>
+<span class="fc" id="L215">            throw new IllegalArgumentException(&quot;snapshot omits an allocated symbol&quot;);</span>
+        }
+<span class="fc" id="L217">        return restored;</span>
+    }
+
+    public record Limits(int maximumBindings, int maximumScopes, int maximumDepth) {
+<span class="fc" id="L221">        public Limits {</span>
+<span class="pc bpc" id="L222" title="3 of 12 branches missed.">            if (maximumBindings &lt; 1 || maximumBindings &gt; 4096 || maximumScopes &lt; 1 || maximumScopes &gt; 1024</span>
+                    || maximumDepth &lt; 0 || maximumDepth &gt; 64) {
+<span class="fc" id="L224">                throw new IllegalArgumentException(&quot;invalid symbol scope limits&quot;);</span>
+            }
+<span class="fc" id="L226">        }</span>
+<span class="fc" id="L227">        public static Limits defaults() { return new Limits(1024, 256, 32); }</span>
+    }
+
+    /** A data snapshot, not an authorization to fork multiple writers into one namespace. */
+    public record Snapshot(UUID namespace, UUID parentNamespace, long nextOrdinal,
+            Map&lt;String, SymbolId&gt; bindings, Limits limits) {
+<span class="fc" id="L233">        public Snapshot {</span>
+<span class="fc" id="L234">            Objects.requireNonNull(namespace, &quot;namespace&quot;);</span>
+<span class="fc" id="L235">            bindings = Map.copyOf(Objects.requireNonNull(bindings, &quot;bindings&quot;));</span>
+<span class="fc" id="L236">            Objects.requireNonNull(limits, &quot;limits&quot;);</span>
+<span class="fc" id="L237">        }</span>
+    }
+
+    private static final class Registry {
+        private final int maximumScopes;
+<span class="fc" id="L242">        private final Set&lt;UUID&gt; namespaces = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L243">        private Registry(int maximumScopes) { this.maximumScopes = maximumScopes; }</span>
+        private void register(UUID namespace, int depth, int maximumDepth) {
+<span class="fc bfc" id="L245" title="All 6 branches covered.">            if (depth &gt; maximumDepth || namespaces.size() &gt;= maximumScopes || namespaces.contains(namespace)) {</span>
+<span class="fc" id="L246">                throw new IllegalArgumentException(&quot;duplicate namespace or symbol scope capacity exceeded&quot;);</span>
+            }
+<span class="fc" id="L248">            namespaces.add(namespace);</span>
+<span class="fc" id="L249">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

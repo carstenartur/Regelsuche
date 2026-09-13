@@ -511,11 +511,11 @@ import java.util.Optional;
 <span class="fc" id="L511">        java.util.Arrays.fill(pivotRows, -1);</span>
 <span class="pc bpc" id="L512" title="1 of 4 branches missed.">        for (int column = 0; column &lt; variableCount &amp;&amp; pivotRow &lt; rowCount; column++) {</span>
 <span class="fc" id="L513">            int selected = pivotRow;</span>
-<span class="pc bpc" id="L514" title="2 of 4 branches missed.">            while (selected &lt; rowCount &amp;&amp; matrix[selected][column].isZero()) {</span>
-<span class="nc" id="L515">                selected++;</span>
+<span class="fc bfc" id="L514" title="All 4 branches covered.">            while (selected &lt; rowCount &amp;&amp; matrix[selected][column].isZero()) {</span>
+<span class="fc" id="L515">                selected++;</span>
             }
-<span class="pc bpc" id="L517" title="1 of 2 branches missed.">            if (selected == rowCount) {</span>
-<span class="nc" id="L518">                continue;</span>
+<span class="fc bfc" id="L517" title="All 2 branches covered.">            if (selected == rowCount) {</span>
+<span class="fc" id="L518">                continue;</span>
             }
 <span class="fc" id="L520">            Rational[] swap = matrix[pivotRow];</span>
 <span class="fc" id="L521">            matrix[pivotRow] = matrix[selected];</span>
@@ -547,8 +547,8 @@ import java.util.Optional;
             }
         }
 <span class="fc bfc" id="L549" title="All 2 branches covered.">        for (int row : pivotRows) {</span>
-<span class="pc bpc" id="L550" title="1 of 2 branches missed.">            if (row &lt; 0) {</span>
-<span class="nc" id="L551">                return Optional.empty();</span>
+<span class="fc bfc" id="L550" title="All 2 branches covered.">            if (row &lt; 0) {</span>
+<span class="fc" id="L551">                return Optional.empty();</span>
             }
         }
 <span class="fc" id="L554">        List&lt;Rational&gt; solution = new ArrayList&lt;&gt;(variableCount);</span>

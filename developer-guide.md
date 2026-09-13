@@ -22,6 +22,32 @@ Für Browser-, Container- und vollständige Evidence-Tests zusätzlich:
 Die genaue Zuordnung von Tasks und Voraussetzungen steht in
 [Testing](testing.md).
 
+### Plattformgrenze der vollständigen Release-Prüfung
+
+**JDK 25 allein genügt nicht für die vollständige Verifikation.** Der sichere
+Dateileser der Release-Evidence verwendet derzeit die Linux-AMD64-ABI für
+`openat` und `statx`. Er unterstützt Linux mit `amd64` beziehungsweise `x86_64`
+und benötigt freigeschalteten nativen Zugriff. macOS, Windows und Linux/ARM
+werden ausdrücklich mit `UNSUPPORTED_PLATFORM` abgewiesen; fehlender nativer
+Zugriff führt zu `UNSUPPORTED_NATIVE_ACCESS`.
+
+Diese Grenze betrifft auch das normale `mvn verify` und `mvn -Pfull verify`,
+die beide die verpflichtende Java-Release-Prüfung ausführen, sowie die
+Gradle-Prüfwege, die diese Release-Evidence konsumieren. Die vorhandenen
+Build-Einstiegspunkte konfigurieren den nativen Zugriff; für einen direkten
+Java-Aufruf gilt der dokumentierte Launcher-Vertrag. Details stehen unter
+[Java-Release-Verifikation](release-readiness-java-verification.md).
+
+Für die lokale Arbeit an einem Kernmodul können dessen gezielte Compile- und
+Test-Tasks aus der folgenden Tabelle verwendet werden. Das ist ein begrenzter
+Entwicklungsprüfumfang, keine plattformübergreifende Produktqualifikation. Die
+vollständigen erforderlichen Prüfungen müssen auf dem unterstützten
+Linux/AMD64-Runner mit allen jeweiligen Voraussetzungen erfolgreich sein.
+Weder ein übersprungener Test noch ein schwächerer Dateileser darf diese
+Qualifikation ersetzen. Gleichwertige sichere Adapter für weitere Plattformen
+sind noch nicht implementiert; ein nativer oder emulierter ARM-Prüfer wird
+hier nicht als bereits qualifiziert ausgewiesen.
+
 ## Repository-Struktur
 
 ```text

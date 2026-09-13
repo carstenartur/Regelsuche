@@ -30,8 +30,8 @@ public record PluginInstallationEvidence(
     public static final String SCHEMA = &quot;regelsuche.plugin-installation/v1&quot;;
 
 <span class="fc" id="L32">    public PluginInstallationEvidence {</span>
-<span class="pc bpc" id="L33" title="2 of 4 branches missed.">        if (!SCHEMA.equals(schema) || !Set.of(&quot;INSTALL&quot;, &quot;UPDATE&quot;, &quot;REMOVE&quot;, &quot;ROLLBACK&quot;).contains(operation)) {</span>
-<span class="nc" id="L34">            throw new IllegalArgumentException(&quot;unsupported installation schema or operation&quot;);</span>
+<span class="pc bpc" id="L33" title="1 of 4 branches missed.">        if (!SCHEMA.equals(schema) || !Set.of(&quot;INSTALL&quot;, &quot;UPDATE&quot;, &quot;REMOVE&quot;, &quot;ROLLBACK&quot;).contains(operation)) {</span>
+<span class="fc" id="L34">            throw new IllegalArgumentException(&quot;unsupported installation schema or operation&quot;);</span>
         }
 <span class="fc" id="L36">        previousInstallationHash = optionalHash(previousInstallationHash);</span>
 <span class="fc" id="L37">        rollbackSourceHash = optionalHash(rollbackSourceHash);</span>

@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DomainDownstreamValidation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">DomainDownstreamValidation.java</span></div><h1>DomainDownstreamValidation.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
+
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.discovery.domain.FiniteDifferenceSequenceDomain.*;
+import de.regelsuche.discovery.domain.LinearRecurrenceSequenceDomain.*;
+import java.util.Objects;
+
+/** Productive, bounded consumer of an immutable verified export. Never authorizes a later lifecycle stage. */
+public final class DomainDownstreamValidation {
+    public static final String SCHEMA = &quot;regelsuche.domain-downstream-validation/v1&quot;;
+    public static final String CONTRACT = &quot;regelsuche.builtin-sequence-export-validation/v1&quot;;
+    private DomainDownstreamValidation() { }
+
+    public record Budget(int maxReplayAttempts, int maxPayloadCharacters, DomainFiniteDataCheck.Budget check) {
+<span class="fc" id="L16">        public Budget {</span>
+<span class="pc bpc" id="L17" title="4 of 8 branches missed.">            if (maxReplayAttempts &lt; 0 || maxReplayAttempts &gt; 1 || maxPayloadCharacters &lt; 0 || maxPayloadCharacters &gt; 512) {</span>
+<span class="nc" id="L18">                throw new IllegalArgumentException(&quot;invalid downstream replay admission&quot;);</span>
+            }
+<span class="fc" id="L20">            Objects.requireNonNull(check, &quot;check&quot;);</span>
+<span class="fc" id="L21">        }</span>
+<span class="fc" id="L22">        public static Budget defaults() { return new Budget(1, 512, DomainFiniteDataCheck.Budget.defaults()); }</span>
+    }
+
+    public static final class Receipt {
+        private final String canonicalJson, contentHash;
+<span class="fc" id="L27">        private Receipt(ObjectNode value) {</span>
+<span class="fc" id="L28">            contentHash = DomainCanonical.sha256(DomainExportWorkspace.write(value));</span>
+<span class="fc" id="L29">            value.put(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L30">            canonicalJson = DomainExportWorkspace.write(value);</span>
+<span class="fc" id="L31">        }</span>
+<span class="nc" id="L32">        public String contentHash() { return contentHash; }</span>
+<span class="fc" id="L33">        public String toCanonicalJson() { return canonicalJson; }</span>
+    }
+
+<span class="fc" id="L36">    public static Receipt validate(DomainExportWorkspace workspace) { return validate(workspace, Budget.defaults()); }</span>
+
+    public static Receipt validate(DomainExportWorkspace workspace, Budget budget) {
+<span class="fc" id="L39">        Objects.requireNonNull(workspace, &quot;workspace&quot;); Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L40">        var execution = new Execution(workspace, budget);</span>
+<span class="pc bpc" id="L41" title="1 of 4 branches missed.">        if (budget.maxReplayAttempts() == 0 || !workspace.replaySupported()</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">                || workspace.evidence().seed().payload().length() &gt; budget.maxPayloadCharacters()) {</span>
+<span class="fc" id="L43">            return execution.receipt(&quot;INCONCLUSIVE&quot;, &quot;SOURCE_EXCEEDS_DOWNSTREAM_REPLAY_ADMISSION&quot;);</span>
+        }
+<span class="fc" id="L45">        execution.replayAttempts++; // Admit the actual call before invoking the historical runner, without changing its budget.</span>
+        try {
+<span class="fc" id="L47">            var observation = workspace.replayObserved();</span>
+<span class="fc" id="L48">            var result = observation.result();</span>
+<span class="fc" id="L49">            execution.replayed = result.evidence();</span>
+<span class="fc" id="L50">            execution.replayStatus = &quot;IDENTICAL_CANONICAL_EVIDENCE&quot;;</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">            if (result.selectedCandidate().isEmpty()) {</span>
+<span class="fc" id="L52">                return execution.receipt(&quot;NOT_EVALUATED_NO_SELECTED_CANDIDATE&quot;, &quot;SOURCE_RETAINS_NO_SELECTED_TYPED_CANDIDATE&quot;);</span>
+            }
+<span class="fc" id="L54">            execution.selectedBound = true;</span>
+<span class="fc" id="L55">            Object candidate = result.selectedCandidate().orElseThrow(), witness = result.selectedCertificate().orElseThrow();</span>
+<span class="pc bpc" id="L56" title="1 of 4 branches missed.">            if (candidate instanceof FiniteDifferenceCandidate c &amp;&amp; witness instanceof FiniteDifferenceCertificate k) {</span>
+<span class="fc" id="L57">                execution.check = DomainFiniteDataCheck.check(c, k, budget.check());</span>
+<span class="pc bpc" id="L58" title="2 of 4 branches missed.">            } else if (candidate instanceof LinearRecurrenceCandidate c &amp;&amp; witness instanceof LinearRecurrenceCertificate k) {</span>
+<span class="fc" id="L59">                execution.check = DomainFiniteDataCheck.check(c, k, budget.check());</span>
+<span class="nc" id="L60">            } else return execution.receipt(&quot;UNSUPPORTED&quot;, &quot;NO_INDEPENDENT_CHECKER_FOR_SELECTED_TYPES&quot;);</span>
+<span class="fc" id="L61">            return execution.receipt(execution.check.status().name(), &quot;INDEPENDENT_FINITE_CHECK_RETURNED&quot;);</span>
+<span class="fc" id="L62">        } catch (DomainExportWorkspace.ReplayMismatch mismatch) {</span>
+<span class="fc" id="L63">            execution.replayed = mismatch.actual(); execution.replayStatus = &quot;MISMATCH&quot;;</span>
+<span class="fc" id="L64">            return execution.receipt(&quot;REPLAY_MISMATCH&quot;, &quot;COMPLETE_CANONICAL_SOURCE_OR_SELECTED_OBJECT_BINDING_DIFFERS&quot;);</span>
+<span class="nc" id="L65">        } catch (RuntimeException failure) {</span>
+<span class="nc" id="L66">            execution.failureClass = failure.getClass().getName();</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">            if (execution.replayed == null) execution.replayStatus = &quot;TECHNICAL_FAILURE&quot;;</span>
+<span class="nc" id="L68">            return execution.receipt(&quot;TECHNICAL_FAILURE&quot;, &quot;EXECUTION_DID_NOT_RETURN_A_CHECK_RESULT&quot;);</span>
+        }
+    }
+
+    private static final class Execution {
+        final DomainExportWorkspace workspace;
+        final Budget budget;
+        int replayAttempts;
+<span class="fc" id="L76">        String replayStatus = &quot;NOT_EVALUATED&quot;, failureClass = &quot;&quot;;</span>
+        boolean selectedBound;
+        DomainDiscoveryEvidence replayed;
+        DomainFiniteDataCheck.Result check;
+<span class="fc" id="L80">        Execution(DomainExportWorkspace workspace, Budget budget) { this.workspace = workspace; this.budget = budget; }</span>
+
+        Receipt receipt(String status, String detail) {
+<span class="fc" id="L83">            var snapshot = workspace.snapshot(); var manifest = snapshot.manifest(); var source = workspace.evidence();</span>
+<span class="fc" id="L84">            ObjectNode value = DomainExportWorkspace.JSON.createObjectNode();</span>
+<span class="fc" id="L85">            value.put(&quot;schema&quot;, SCHEMA).put(&quot;consumerContract&quot;, CONTRACT).put(&quot;status&quot;, status).put(&quot;detail&quot;, detail)</span>
+<span class="fc" id="L86">                .put(&quot;failureClass&quot;, failureClass).put(&quot;sourceOutcome&quot;, source.outcome().name());</span>
+<span class="fc" id="L87">            ObjectNode binding = value.putObject(&quot;source&quot;);</span>
+<span class="fc" id="L88">            binding.put(&quot;runId&quot;, workspace.runId()).put(&quot;domainId&quot;, manifest.domainId()).put(&quot;domainRevision&quot;, manifest.domainRevision())</span>
+<span class="fc" id="L89">                .put(&quot;manifestHash&quot;, manifest.contentHash()).put(&quot;manifestByteHash&quot;, snapshot.verification().manifestByteHash())</span>
+<span class="fc" id="L90">                .put(&quot;verificationHash&quot;, snapshot.verification().contentHash()).put(&quot;workspaceHash&quot;, workspace.contentHash())</span>
+<span class="fc" id="L91">                .put(&quot;descriptorHash&quot;, manifest.domainDescriptorHash()).put(&quot;seedHash&quot;, source.seed().contentHash())</span>
+<span class="fc" id="L92">                .put(&quot;evidenceHash&quot;, source.contentHash()).put(&quot;handoffHash&quot;, manifest.lifecycleHandoffHash());</span>
+<span class="fc" id="L93">            binding.set(&quot;artifactBytes&quot;, DomainExportWorkspace.read(manifest.toCanonicalJson()).required(&quot;artifacts&quot;));</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            nullable(binding, &quot;selectedCandidateHash&quot;, source.selectedCandidateHash().isEmpty() ? null : source.selectedCandidateHash());</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            nullable(binding, &quot;certificateObjectHash&quot;, source.certificate() == null ? null : source.certificate().certificateObjectHash());</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            nullable(binding, &quot;renderedCertificateHash&quot;, source.certificate() == null ? null : source.certificate().contentHash());</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">            nullable(value, &quot;verifiedCandidateHash&quot;, selectedBound ? source.selectedCandidateHash() : null);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            nullable(value, &quot;verifiedCertificateObjectHash&quot;, selectedBound ? source.certificate().certificateObjectHash() : null);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            nullable(value, &quot;verifiedRenderedCertificateHash&quot;, selectedBound ? source.certificate().contentHash() : null);</span>
+
+<span class="fc" id="L101">            ObjectNode replay = value.putObject(&quot;replay&quot;);</span>
+<span class="fc" id="L102">            replay.put(&quot;status&quot;, replayStatus).put(&quot;maxPayloadCharacters&quot;, budget.maxPayloadCharacters());</span>
+<span class="fc" id="L103">            replay.putObject(&quot;admission&quot;).put(&quot;configured&quot;, budget.maxReplayAttempts()).put(&quot;executed&quot;, replayAttempts)</span>
+<span class="fc" id="L104">                .put(&quot;skipped&quot;, 0).put(&quot;remaining&quot;, budget.maxReplayAttempts()-replayAttempts);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            nullable(replay, &quot;actualEvidenceHash&quot;, replayed == null ? null : replayed.contentHash());</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            if (replayed == null) replay.putNull(&quot;resources&quot;);</span>
+<span class="fc" id="L107">            else replay.set(&quot;resources&quot;, DomainExportWorkspace.read(replayed.toCanonicalJson()).required(&quot;resources&quot;));</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            replay.put(&quot;resourceObservation&quot;, replayed == null ? &quot;UNAVAILABLE&quot; : &quot;RETURNED_RUNNER_ROLE_COUNTS&quot;)</span>
+<span class="fc" id="L109">                .put(&quot;internalArithmeticWork&quot;, &quot;UNAVAILABLE&quot;);</span>
+<span class="fc" id="L110">            value.putObject(&quot;checkBudget&quot;).put(&quot;maxTermChecks&quot;, budget.check().maxTermChecks())</span>
+<span class="fc" id="L111">                .put(&quot;maxScalarOperations&quot;, budget.check().maxScalarOperations()).put(&quot;maxScalarBits&quot;, budget.check().maxScalarBits());</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            if (check == null) value.putNull(&quot;check&quot;);</span>
+<span class="fc" id="L113">            else value.set(&quot;check&quot;, DomainExportWorkspace.read(check.toCanonicalJson()));</span>
+<span class="pc bpc" id="L114" title="2 of 6 branches missed.">            value.put(&quot;evaluationStatus&quot;, check == null ? &quot;NOT_EVALUATED&quot; : switch (check.status()) {</span>
+<span class="pc" id="L115">                case CONFIRMED_FINITE_DATA -&gt; &quot;CONFIRMED&quot;; case REFUTED_FINITE_DATA -&gt; &quot;REFUTED&quot;;</span>
+<span class="pc" id="L116">                case UNSUPPORTED -&gt; &quot;UNSUPPORTED&quot;; default -&gt; &quot;INCONCLUSIVE&quot;;</span>
+            });
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            value.put(&quot;counterexampleStatus&quot;, check == null ? &quot;NOT_EVALUATED&quot;</span>
+<span class="fc" id="L119">                : DomainExportWorkspace.read(check.toCanonicalJson()).required(&quot;counterexampleStatus&quot;).asText());</span>
+<span class="fc" id="L120">            value.put(&quot;proofStatus&quot;, &quot;NOT_EVALUATED&quot;).put(&quot;universalProofStatus&quot;, &quot;NOT_PRODUCED&quot;)</span>
+<span class="fc" id="L121">                .put(&quot;externalNoveltyStatus&quot;, &quot;NOT_EVALUATED&quot;).put(&quot;promotionStatus&quot;, &quot;NOT_EVALUATED&quot;).put(&quot;publicEvidenceStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc" id="L122">            ArrayNode roles = value.putArray(&quot;artifacts&quot;);</span>
+<span class="fc" id="L123">            role(roles, &quot;SOURCE_LIFECYCLE_HANDOFF&quot;, &quot;AVAILABLE&quot;, DiscoveryLifecycleHandoff.SCHEMA, manifest.lifecycleHandoffHash());</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            for (String name : new String[]{&quot;VALIDATION_EVIDENCE&quot;, &quot;FINITE_COUNTEREXAMPLE_CHECK&quot;}) {</span>
+<span class="fc bfc" id="L125" title="All 4 branches covered.">                role(roles, name, check == null ? &quot;NOT_EVALUATED&quot; : &quot;AVAILABLE&quot;, check == null ? null : DomainFiniteDataCheck.SCHEMA,</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">                    check == null ? null : check.contentHash());</span>
+            }
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            for (String name : new String[]{&quot;PROOF_OBLIGATIONS&quot;, &quot;UNIVERSAL_PROOF&quot;}) role(roles, name, &quot;NOT_PRODUCED&quot;, null, null);</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            for (String name : new String[]{&quot;EXTERNAL_NOVELTY&quot;, &quot;PROMOTION&quot;, &quot;PUBLIC_EVIDENCE&quot;}) role(roles, name, &quot;NOT_EVALUATED&quot;, null, null);</span>
+<span class="fc" id="L130">            value.put(&quot;claimBoundary&quot;, &quot;Source identity, deterministic replay and independent retained finite-data checking only. &quot;</span>
+                + &quot;No universal proof, external novelty, promotion, Public Evidence or later lifecycle authorization; total work remains unavailable.&quot;);
+<span class="fc" id="L132">            return new Receipt(value);</span>
+        }
+    }
+
+<span class="fc bfc" id="L136" title="All 2 branches covered.">    private static void nullable(ObjectNode value, String key, String text) { if (text == null) value.putNull(key); else value.put(key, text); }</span>
+    private static void role(ArrayNode roles, String name, String status, String schema, String hash) {
+<span class="fc" id="L138">        ObjectNode role = roles.addObject().put(&quot;role&quot;, name).put(&quot;status&quot;, status);</span>
+<span class="fc" id="L139">        nullable(role, &quot;artifactSchema&quot;, schema); nullable(role, &quot;targetContentHash&quot;, hash);</span>
+<span class="fc" id="L140">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

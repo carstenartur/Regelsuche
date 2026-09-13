@@ -66,6 +66,26 @@ findet nicht statt. Die Workbench zeigt diese Vorkommen zusammen mit der
 ausgewählten Graphkante und der gespeicherten Schrittabfolge. Neuladen und
 Auswahlwechsel behalten die Run-/Kandidaten-/Kantenbindung bei.
 
+Ein nativer Schritt lässt sich zusätzlich mit
+`#run=<Run-Digest>&candidate=<Zustands-ID>&artifact=PATH_REPLAY&generation=<Sequenz>`
+öffnen. `generation` bezeichnet die globale, bei **0** beginnende
+Erzeugungssequenz im gespeicherten Lauf, nicht die sichtbare Schrittnummer.
+Die Sequenz muss im `generationSequences`-Pfad dieses Kandidaten enthalten sein.
+Vor/Zurück sowie die Schrittschaltflächen behalten den Endkandidaten bei; auch
+eine frühere Kante wird über ihren exakten gespeicherten Präfixzustand gebunden.
+Die Graphansicht öffnet diese Kante und führt zurück zum selben Replay-Schritt.
+Vorkommen werden ausschließlich aus dessen gespeicherter `occurrencePath`
+angezeigt, auch bei identischen Subtermen.
+
+Ein zusätzliches `edge` muss genau zu dieser Generierung und diesem Pfad passen.
+Fremde Generierungen, widersprüchliche Kanten oder ungültige Sequenzschreibweisen
+werden sichtbar abgewiesen. Alte Links ohne `generation` behalten ihre bisherige
+Bedeutung: eine explizite Kante muss zum Endkandidaten führen. Beim Wechsel des
+Kandidaten werden Schritt und Kante gelöscht; Rollenwechsel und Neuladen behalten
+die Auswahl. Verspätete Antworten dürfen einen neueren Run oder Auswahlschritt
+nicht ersetzen. Das ältere SymPy-Brückendossier enthält keine adressierbaren
+nativen Generierungen und akzeptiert diesen zusätzlichen Auswahlparameter nicht.
+
 `executionHash` bezeichnet die kanonische Ausführungsprovenienz. Er ist kein
 formaler Proof Root. Die primitive Ausführung erzeugt keine formalen
 Beweisobligationen; `PROOF_OBLIGATIONS` bleibt `NOT_PRODUCED`.

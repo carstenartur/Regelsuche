@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SymbolId.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.symbol</a> &gt; <span class="el_source">SymbolId.java</span></div><h1>SymbolId.java</h1><pre class="source lang-java linenums">package de.regelsuche.symbol;
+
+import java.util.Objects;
+import java.util.UUID;
+import java.util.regex.Pattern;
+
+/** Stable symbol identity; neither a display name nor a mathematical proof. */
+public record SymbolId(UUID namespace, long ordinal) {
+    public static final String IDENTIFIER_PREFIX = &quot;rsym_&quot;;
+<span class="fc" id="L10">    private static final Pattern IDENTIFIER = Pattern.compile(&quot;rsym_[0-9a-f]{32}_[1-9][0-9]{0,18}&quot;);</span>
+
+<span class="fc" id="L12">    public SymbolId {</span>
+<span class="fc" id="L13">        Objects.requireNonNull(namespace, &quot;namespace&quot;);</span>
+<span class="fc bfc" id="L14" title="All 2 branches covered.">        if (ordinal &lt; 1) {</span>
+<span class="fc" id="L15">            throw new IllegalArgumentException(&quot;symbol ordinal must be positive&quot;);</span>
+        }
+<span class="fc" id="L17">    }</span>
+
+    public String canonicalText() {
+<span class="fc" id="L20">        return namespace + &quot;:&quot; + ordinal;</span>
+    }
+
+    /** Reserved identifier understood by the existing expression parser and text engines. */
+    public String identifier() {
+<span class="fc" id="L25">        return IDENTIFIER_PREFIX + namespace.toString().replace(&quot;-&quot;, &quot;&quot;) + &quot;_&quot; + ordinal;</span>
+    }
+
+    public static SymbolId fromCanonicalText(String text) {
+<span class="fc" id="L29">        Objects.requireNonNull(text, &quot;text&quot;);</span>
+<span class="pc bpc" id="L30" title="1 of 6 branches missed.">        if (text.length() &lt; 38 || text.length() &gt; 56 || text.charAt(36) != ':') {</span>
+<span class="fc" id="L31">            throw new IllegalArgumentException(&quot;invalid canonical symbol ID&quot;);</span>
+        }
+<span class="fc" id="L33">        var id = new SymbolId(UUID.fromString(text.substring(0, 36)), Long.parseLong(text.substring(37)));</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (!id.canonicalText().equals(text)) {</span>
+<span class="fc" id="L35">            throw new IllegalArgumentException(&quot;noncanonical symbol ID&quot;);</span>
+        }
+<span class="fc" id="L37">        return id;</span>
+    }
+
+    public static SymbolId fromIdentifier(String identifier) {
+<span class="fc" id="L41">        Objects.requireNonNull(identifier, &quot;identifier&quot;);</span>
+<span class="pc bpc" id="L42" title="1 of 4 branches missed.">        if (identifier.length() &gt; 57 || !IDENTIFIER.matcher(identifier).matches()) {</span>
+<span class="fc" id="L43">            throw new IllegalArgumentException(&quot;invalid reserved symbol identifier&quot;);</span>
+        }
+<span class="fc" id="L45">        String hex = identifier.substring(5, 37);</span>
+<span class="fc" id="L46">        String uuid = hex.substring(0, 8) + &quot;-&quot; + hex.substring(8, 12) + &quot;-&quot; + hex.substring(12, 16)</span>
+<span class="fc" id="L47">            + &quot;-&quot; + hex.substring(16, 20) + &quot;-&quot; + hex.substring(20);</span>
+<span class="fc" id="L48">        return fromCanonicalText(uuid + &quot;:&quot; + identifier.substring(38));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

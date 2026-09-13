@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SymbolicExpression.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.symbol</a> &gt; <span class="el_source">SymbolicExpression.java</span></div><h1>SymbolicExpression.java</h1><pre class="source lang-java linenums">package de.regelsuche.symbol;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.parse.ExactParsedTerm;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayDeque;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
+
+/**
+ * Explicit scoped input document. Original parser evidence, identity-bound
+ * expression and presentation are separate; this document grants no proof authority.
+ */
+public final class SymbolicExpression {
+    public static final int MAXIMUM_SOURCE_LENGTH = 16_384;
+    public static final int MAXIMUM_BINDINGS = 128;
+    private static final int MAXIMUM_SYNTAX_MARKERS = 128;
+    private static final int MAXIMUM_NODES = 512;
+    private static final int MAXIMUM_DEPTH = 128;
+
+    private final ExactParsedTerm original;
+    private final Expr expression;
+    private final Map&lt;String, SymbolId&gt; sourceBindings;
+    private final Map&lt;SymbolId, String&gt; displayNames;
+    private final Map&lt;Expr, Expr&gt; originalByScopedOccurrence;
+
+    private SymbolicExpression(ExactParsedTerm original, Expr expression, Map&lt;String, SymbolId&gt; bindings,
+<span class="fc" id="L41">            Map&lt;SymbolId, String&gt; labels, Map&lt;Expr, Expr&gt; occurrences) {</span>
+<span class="fc" id="L42">        this.original = original;</span>
+<span class="fc" id="L43">        this.expression = expression;</span>
+<span class="fc" id="L44">        this.sourceBindings = bindings;</span>
+<span class="fc" id="L45">        this.displayNames = labels;</span>
+<span class="fc" id="L46">        this.originalByScopedOccurrence = occurrences;</span>
+<span class="fc" id="L47">    }</span>
+
+    public static SymbolicExpression parse(String source, SymbolScope scope) {
+<span class="fc" id="L50">        Objects.requireNonNull(scope, &quot;scope&quot;);</span>
+<span class="fc" id="L51">        var prepared = prepare(source);</span>
+        // All source validation precedes the allocator's atomic batch operation.
+<span class="fc" id="L53">        var bindings = scope.resolveAll(prepared.names());</span>
+<span class="fc" id="L54">        Map&lt;SymbolId, String&gt; labels = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        for (String name : prepared.names()) labels.putIfAbsent(bindings.get(name), name);</span>
+<span class="fc" id="L56">        return project(prepared.parsed(), bindings, Map.copyOf(labels));</span>
+    }
+
+    /** Restores explicit bindings, without allocating or deriving identity from labels. */
+    public static SymbolicExpression fromBindings(String source, Map&lt;String, SymbolId&gt; bindings,
+            Map&lt;SymbolId, String&gt; labels) {
+<span class="fc" id="L62">        var prepared = prepare(source);</span>
+<span class="fc" id="L63">        Objects.requireNonNull(bindings, &quot;bindings&quot;);</span>
+<span class="pc bpc" id="L64" title="1 of 4 branches missed.">        if (bindings.size() &gt; MAXIMUM_BINDINGS || !bindings.keySet().equals(new HashSet&lt;&gt;(prepared.names()))</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                || bindings.values().stream().anyMatch(Objects::isNull)) {</span>
+<span class="fc" id="L66">            throw new IllegalArgumentException(&quot;source symbol bindings must have exact coverage&quot;);</span>
+        }
+<span class="fc" id="L68">        var copy = Map.copyOf(bindings);</span>
+<span class="fc" id="L69">        return project(prepared.parsed(), copy, validateLabels(copy, labels));</span>
+    }
+
+<span class="fc" id="L72">    public ExactParsedTerm original() { return original; }</span>
+<span class="fc" id="L73">    public Expr expression() { return expression; }</span>
+<span class="fc" id="L74">    public Map&lt;String, SymbolId&gt; sourceBindings() { return sourceBindings; }</span>
+<span class="fc" id="L75">    public Map&lt;SymbolId, String&gt; displayNames() { return displayNames; }</span>
+<span class="fc" id="L76">    public String identityText() { return ExpressionFormatter.format(expression); }</span>
+<span class="fc" id="L77">    public String displayText() { return display(expression); }</span>
+
+    /** Formats a result only when every variable retains an explicitly known symbol ID. */
+    public String display(Expr result) {
+<span class="fc" id="L81">        inspect(result, false);</span>
+<span class="fc" id="L82">        Expr visible = map(result, variable -&gt; {</span>
+<span class="fc" id="L83">            SymbolId id = variable.symbol().orElseThrow(() -&gt; new IllegalArgumentException(&quot;result lost symbol identity&quot;));</span>
+<span class="fc" id="L84">            String label = displayNames.get(id);</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            if (label == null) throw new IllegalArgumentException(&quot;result contains an unknown symbol&quot;);</span>
+<span class="fc" id="L86">            return new VariableExpr(label);</span>
+        }, null);
+<span class="fc" id="L88">        return ExpressionFormatter.format(visible);</span>
+    }
+
+    public SymbolicExpression withDisplayName(SymbolId symbol, String label) {
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (!displayNames.containsKey(symbol)) throw new IllegalArgumentException(&quot;unknown display symbol&quot;);</span>
+<span class="fc" id="L93">        var labels = new HashMap&lt;&gt;(displayNames);</span>
+<span class="fc" id="L94">        labels.put(symbol, label);</span>
+<span class="fc" id="L95">        return withDisplayNames(labels);</span>
+    }
+
+    /** Changes presentation atomically, including simultaneous label swaps. */
+    public SymbolicExpression withDisplayNames(Map&lt;SymbolId, String&gt; labels) {
+<span class="fc" id="L100">        return new SymbolicExpression(original, expression, sourceBindings,</span>
+<span class="fc" id="L101">            validateLabels(sourceBindings, labels), originalByScopedOccurrence);</span>
+    }
+
+    public Optional&lt;ExactParsedTerm.SourceRange&gt; sourceRangeFor(Expr occurrence) {
+<span class="fc" id="L105">        Objects.requireNonNull(occurrence, &quot;occurrence&quot;);</span>
+<span class="fc" id="L106">        Expr sourceNode = originalByScopedOccurrence.get(occurrence);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        return sourceNode == null ? Optional.empty() : original.sourceRangeFor(sourceNode);</span>
+    }
+
+    private static SymbolicExpression project(ExactParsedTerm parsed, Map&lt;String, SymbolId&gt; bindings,
+            Map&lt;SymbolId, String&gt; labels) {
+<span class="fc" id="L112">        var originals = new IdentityHashMap&lt;Expr, Expr&gt;();</span>
+<span class="fc" id="L113">        Expr scoped = map(parsed.expression(), variable -&gt; VariableExpr.scoped(bindings.get(variable.name())), originals);</span>
+<span class="fc" id="L114">        return new SymbolicExpression(parsed, scoped, bindings, labels, Collections.unmodifiableMap(originals));</span>
+    }
+
+    private static Map&lt;SymbolId, String&gt; validateLabels(Map&lt;String, SymbolId&gt; bindings, Map&lt;SymbolId, String&gt; labels) {
+<span class="fc" id="L118">        Objects.requireNonNull(labels, &quot;labels&quot;);</span>
+<span class="pc bpc" id="L119" title="1 of 4 branches missed.">        if (labels.size() &gt; MAXIMUM_BINDINGS || !labels.keySet().equals(new HashSet&lt;&gt;(bindings.values()))) {</span>
+<span class="fc" id="L120">            throw new IllegalArgumentException(&quot;display labels must cover exactly the source symbols&quot;);</span>
+        }
+<span class="fc" id="L122">        Set&lt;String&gt; unique = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (String label : labels.values()) {</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            if (!unique.add(SymbolScope.requireName(label))) throw new IllegalArgumentException(&quot;ambiguous display labels&quot;);</span>
+<span class="fc" id="L125">        }</span>
+<span class="fc" id="L126">        return Map.copyOf(labels);</span>
+    }
+
+    private static Prepared prepare(String source) {
+<span class="fc" id="L130">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (source.length() &gt; MAXIMUM_SOURCE_LENGTH) throw new IllegalArgumentException(&quot;symbolic source is too large&quot;);</span>
+<span class="fc" id="L132">        int markers = 0;</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (int i = 0; i &lt; source.length(); i++) {</span>
+<span class="fc" id="L134">            char ch = source.charAt(i);</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (Character.isSurrogate(ch)) throw new IllegalArgumentException(&quot;unsupported source character&quot;);</span>
+<span class="fc bfc" id="L136" title="All 4 branches covered.">            if (&quot;()+-*/^,&quot;.indexOf(ch) &gt;= 0 &amp;&amp; ++markers &gt; MAXIMUM_SYNTAX_MARKERS) {</span>
+<span class="fc" id="L137">                throw new IllegalArgumentException(&quot;symbolic source exceeds parser depth/work envelope&quot;);</span>
+            }
+        }
+<span class="fc" id="L140">        var parsed = new ExpressionParser().parseExactTerm(source);</span>
+<span class="fc" id="L141">        return new Prepared(parsed, inspect(parsed.expression(), true));</span>
+    }
+
+    private static List&lt;String&gt; inspect(Expr expression, boolean sourceNames) {
+<span class="fc" id="L145">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L146">        var pending = new ArrayDeque&lt;Visit&gt;();</span>
+<span class="fc" id="L147">        pending.push(new Visit(expression, 1));</span>
+<span class="fc" id="L148">        var names = new LinkedHashSet&lt;String&gt;();</span>
+<span class="fc" id="L149">        int visited = 0;</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L151">            var visit = pending.pop();</span>
+<span class="pc bpc" id="L152" title="2 of 4 branches missed.">            if (++visited &gt; MAXIMUM_NODES || visit.depth() &gt; MAXIMUM_DEPTH) {</span>
+<span class="nc" id="L153">                throw new IllegalArgumentException(&quot;symbolic expression exceeds node/depth envelope&quot;);</span>
+            }
+<span class="fc bfc" id="L155" title="All 4 branches covered.">            if (visit.node() instanceof VariableExpr variable &amp;&amp; sourceNames) {</span>
+<span class="fc" id="L156">                names.add(SymbolScope.requireName(variable.name()));</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            } else if (visit.node() instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L158">                pending.push(new Visit(binary.right(), visit.depth() + 1));</span>
+<span class="fc" id="L159">                pending.push(new Visit(binary.left(), visit.depth() + 1));</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            } else if (visit.node() instanceof FunctionExpr function) {</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">                if (sourceNames) SymbolScope.requireName(function.name());</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">                for (int i = function.arguments().size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L163">                    pending.push(new Visit(function.arguments().get(i), visit.depth() + 1));</span>
+                }
+            }
+<span class="fc" id="L166">        }</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (names.size() &gt; MAXIMUM_BINDINGS) throw new IllegalArgumentException(&quot;too many source symbols&quot;);</span>
+<span class="fc" id="L168">        return List.copyOf(names);</span>
+    }
+
+    private static Expr map(Expr original, Function&lt;VariableExpr, Expr&gt; variables, Map&lt;Expr, Expr&gt; occurrences) {
+<span class="fc" id="L172">        Expr mapped = original;</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (original instanceof VariableExpr variable) {</span>
+<span class="fc" id="L174">            mapped = variables.apply(variable);</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        } else if (original instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L176">            mapped = new BinaryExpr(map(binary.left(), variables, occurrences), binary.operator(),</span>
+<span class="fc" id="L177">                map(binary.right(), variables, occurrences));</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        } else if (original instanceof FunctionExpr function) {</span>
+<span class="fc" id="L179">            mapped = new FunctionExpr(function.name(), function.arguments().stream()</span>
+<span class="fc" id="L180">                .map(argument -&gt; map(argument, variables, occurrences)).toList());</span>
+        }
+        // NumberExpr instances remain the actual original, evidence-bound occurrences.
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        if (occurrences != null) occurrences.put(mapped, original);</span>
+<span class="fc" id="L184">        return mapped;</span>
+    }
+
+<span class="fc" id="L187">    private record Prepared(ExactParsedTerm parsed, List&lt;String&gt; names) { }</span>
+<span class="fc" id="L188">    private record Visit(Expr node, int depth) { }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

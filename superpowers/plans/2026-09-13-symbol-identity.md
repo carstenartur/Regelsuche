@@ -31,23 +31,23 @@ search engine or global mutable symbol registry.
 
 ## Ordered implementation
 
-- [ ] Qualify and merge integration #1003, which preserves the exact source heads
+- [x] Qualify and merge integration #1003, which preserves the exact source heads
   of #1001 and #1002; verify all initial PRs are merged. Start feature work from
   the resulting main. All repository protection rules remain required.
-- [ ] Add SymbolId and a bounded SymbolScope with aliases, explicit declarations,
+- [x] Add SymbolId and a bounded SymbolScope with aliases, explicit declarations,
   child scopes and restart-safe allocator snapshots. Reject noncanonical IDs,
   namespace collisions, ordinal reuse and partial allocation on invalid input.
-- [ ] Integrate IDs into VariableExpr and ExprValueFactory. Preserve legacy
+- [x] Integrate IDs into VariableExpr and ExprValueFactory. Preserve legacy
   diagnostics and JSON. Test interning within a factory and stable equality
   across factories without depending on Java reference equality.
-- [ ] Add source-preserving scoped parsing and SymbolicExpression. Keep the
+- [x] Add source-preserving scoped parsing and SymbolicExpression. Keep the
   original parser evidence; do not relabel certificates. Test every repeated
   occurrence, numeric provenance, immutable display renaming and actual existing
   normalizer/formatter/reparser round trips.
-- [ ] Add a bounded versioned document codec. Strictly decode UTF-8 and JSON;
+- [x] Add a bounded versioned document codec. Strictly decode UTF-8 and JSON;
   reject duplicate/unknown fields, trailing values, missing/unused bindings,
   malformed IDs and ambiguous display mappings. A document is not proof authority.
-- [ ] Add typed AST entry points to the existing RulePatternMatcher and exercise
+- [x] Add typed AST entry points to the existing RulePatternMatcher and exercise
   existing e-graph insertion/extraction. Test same-symbol versus distinct-symbol
   cancellation, aliases, identical labels in distinct scopes, renamed displays
   and composite placeholder bindings.
@@ -77,3 +77,31 @@ GraalPy resource processing with `artifact.downloadAttestation is not a function
 GitHub also rejected both targeted job and failed-run retry requests. This
 planning commit changes no build/runtime policy; the newly published head must
 receive its own normal CI and CodeQL qualification before merge.
+
+## Implementation checkpoint after the merge
+
+All initially open PRs #1001, #1002 and #1003 merged on 13 September 2026 through
+merge commit `779bcfaebd7eaa0656202169953f69392e3586b0`. Its tree is exactly the
+qualified #1003 head d80fdf tree `c6af6da4f1050bfceed96ecb7a967bc25e914ea6`.
+CI run 34752823179 passed all six authorities; no protection was bypassed.
+Production symbol changes began only after that merge. The newly appearing
+draft #1004 is outside this initial merge set and is qualified independently.
+
+The scoped Java input/document path is implemented and documented in
+[scoped-symbol-identity.md](../../scoped-symbol-identity.md). The typed matcher
+entrypoint is named `matchExpression`, avoiding ambiguity for existing null
+string arguments. Legacy ordinary-name JSON and v2 keys remain characterized.
+The `rsym_` identity-transport namespace is explicitly reserved.
+
+Supplementary local verification uses Java 21.0.11: all 766 core tests, 40
+e-graph tests and six matcher tests pass (812 distinct cases, no skips).
+The original current-main core baseline passed 736 cases. The only main source
+omitted from supplementary local compilation is the unchanged Java-25
+`VerifiedPolynomialTransitionCacheStore`; no repository build exclusion was added.
+The three original behavioral controls failed on the predecessor, then passed.
+Eight deliberately broken implementations were detected by the symbol tests.
+Missing-new-API compilation checks are recorded separately from behavioral reds.
+
+Publication, independent review and fresh exact-head full Java-25 product CI are
+not replaced by these local checks. No protected experiment was executed, no
+assumption/proof checker was removed and no performance advantage is claimed.

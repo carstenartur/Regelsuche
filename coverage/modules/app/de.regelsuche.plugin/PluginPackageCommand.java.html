@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginPackageCommand.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginPackageCommand.java</span></div><h1>PluginPackageCommand.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.plugin.PluginCheckpointTransactions.Scope;
+import java.io.*;
+import java.net.URI;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.*;
+import java.time.Duration;
+import java.util.*;
+
+/** Explicit package CLI; no discovery/latest selection or runtime activation. */
+public final class PluginPackageCommand {
+    private static final int CONFIG_BYTES = 262144;
+<span class="fc" id="L20">    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = JsonMapper.builder(</span>
+<span class="fc" id="L21">        JsonFactory.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build())</span>
+<span class="fc" id="L22">        .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)</span>
+<span class="fc" id="L23">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
+<span class="fc" id="L24">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
+<span class="fc" id="L25">        .enable(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES)</span>
+<span class="fc" id="L26">        .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES).build();</span>
+
+    private PluginPackageCommand() { }
+
+    public static int run(String[] args, PrintStream out, Map&lt;String, String&gt; environment) {
+        try {
+<span class="pc bpc" id="L32" title="2 of 4 branches missed.">            if (args.length &lt; 1 || !Set.of(&quot;install&quot;, &quot;status&quot;, &quot;recover&quot;, &quot;remove&quot;, &quot;rollback&quot;).contains(args[0])) {</span>
+<span class="nc" id="L33">                throw new IllegalArgumentException(&quot;package action required&quot;);</span>
+            }
+<span class="fc" id="L35">            String action = args[0];</span>
+<span class="fc" id="L36">            Map&lt;String, String&gt; options = options(args);</span>
+<span class="fc" id="L37">            String operation = options.get(&quot;operation&quot;);</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">            if (!action.equals(&quot;status&quot;)) PluginCheckpointTransactions.identifier(operation);</span>
+<span class="pc bpc" id="L39" title="5 of 8 branches missed.">            if (action.equals(&quot;status&quot;) &amp;&amp; operation != null || !action.equals(&quot;rollback&quot;) &amp;&amp; options.containsKey(&quot;target&quot;)) {</span>
+<span class="nc" id="L40">                throw new IllegalArgumentException(&quot;irrelevant package option&quot;);</span>
+            }
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">            if (action.equals(&quot;rollback&quot;)) PluginSignatureManifest.requireSha256(options.get(&quot;target&quot;), &quot;target&quot;);</span>
+<span class="fc" id="L43">            var config = JSON.readValue(read(Path.of(Objects.requireNonNull(options.get(&quot;config&quot;), &quot;explicit config&quot;))), Config.class);</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">            if (config == null) throw new IllegalArgumentException(&quot;null package config&quot;);</span>
+<span class="fc" id="L45">            String password = environment.get(config.authority().passwordEnvironment());</span>
+<span class="fc" id="L46">            var scope = new Scope(config.installationId(), config.trustDomain(),</span>
+<span class="fc" id="L47">                PluginDistributionJson.hash(config.pinnedRoots().toCanonicalJson()));</span>
+<span class="fc" id="L48">            var authority = PostgresPluginCheckpointAuthority.connect(config.authority().jdbcUrl(), config.authority().user(),</span>
+<span class="fc" id="L49">                password, absolute(config.authority().tlsRootCertificate()), scope, config.authority().timeoutSeconds());</span>
+<span class="fc" id="L50">            try (var transport = new PluginDistributionTransport(config.allowedOrigins(),</span>
+<span class="fc" id="L51">                    Duration.ofSeconds(config.connectTimeoutSeconds()), Duration.ofSeconds(config.responseTimeoutSeconds()), false, null)) {</span>
+<span class="fc" id="L52">                var client = new PluginDistributionTransactions(absolute(config.packageDirectory()),</span>
+<span class="fc" id="L53">                    config.pinnedRoots(), authority, transport, config.limits());</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">                if (action.equals(&quot;status&quot;)) {</span>
+<span class="nc" id="L55">                    var response = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L56">                    response.put(&quot;schema&quot;, &quot;regelsuche.plugin-package-status/v1&quot;);</span>
+<span class="nc" id="L57">                    response.put(&quot;scope&quot;, scope); response.put(&quot;installation&quot;, client.active().orElse(null));</span>
+<span class="nc" id="L58">                    out.print(PluginDistributionJson.canonical(response));</span>
+<span class="nc" id="L59">                    return 0;</span>
+                }
+<span class="pc bpc" id="L61" title="4 of 5 branches missed.">                var result = switch (action) {</span>
+<span class="nc" id="L62">                    case &quot;install&quot; -&gt; client.install(operation, Objects.requireNonNull(config.sources(), &quot;exact sources&quot;),</span>
+<span class="nc" id="L63">                        Objects.requireNonNull(config.selection(), &quot;exact selection&quot;).request());</span>
+<span class="nc" id="L64">                    case &quot;remove&quot; -&gt; client.remove(operation);</span>
+<span class="nc" id="L65">                    case &quot;rollback&quot; -&gt; client.rollback(operation, options.get(&quot;target&quot;));</span>
+<span class="fc" id="L66">                    case &quot;recover&quot; -&gt; client.recover(operation);</span>
+<span class="nc" id="L67">                    default -&gt; throw new IllegalStateException(&quot;unknown package action&quot;);</span>
+                };
+<span class="fc" id="L69">                out.print(result.toCanonicalJson());</span>
+<span class="pc bpc" id="L70" title="2 of 3 branches missed.">                return switch (result.outcome()) {</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">                    case COMMITTED -&gt; result.installation() == null ? 5 : 0;</span>
+<span class="nc" id="L72">                    case REJECTED -&gt; 4;</span>
+<span class="fc" id="L73">                    case OUTCOME_UNKNOWN -&gt; 3;</span>
+                };
+<span class="nc" id="L75">            }</span>
+<span class="fc" id="L76">        } catch (IOException | RuntimeException failure) {</span>
+            // No config, JDBC URI, password, downloaded body or nested driver error is printed.
+<span class="fc" id="L78">            out.println(&quot;PACKAGE_CONFIGURATION_ERROR_OR_UNAVAILABLE: &quot; + failure.getClass().getSimpleName()</span>
+                + &quot;; check explicit package configuration and authority availability; use recover with the original operation ID.&quot;);
+<span class="fc" id="L80">            return 2;</span>
+        }
+    }
+
+    private static Map&lt;String, String&gt; options(String[] args) {
+<span class="fc" id="L85">        Map&lt;String, String&gt; values = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        for (int i = 1; i &lt; args.length; i += 2) {</span>
+<span class="pc bpc" id="L87" title="2 of 4 branches missed.">            if (!Set.of(&quot;--config&quot;, &quot;--operation&quot;, &quot;--target&quot;).contains(args[i])</span>
+<span class="pc bpc" id="L88" title="2 of 4 branches missed.">                    || i + 1 &gt;= args.length || args[i + 1].isBlank() || args[i + 1].startsWith(&quot;--&quot;)</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                    || values.putIfAbsent(args[i].substring(2), args[i + 1]) != null) {</span>
+<span class="fc" id="L90">                throw new IllegalArgumentException(&quot;package options must be explicit, unique key/value pairs&quot;);</span>
+            }
+        }
+<span class="fc" id="L93">        return values;</span>
+    }
+
+    private static Path absolute(String value) {
+<span class="fc" id="L97">        Path path = Path.of(Objects.requireNonNull(value, &quot;absolute path&quot;));</span>
+<span class="pc bpc" id="L98" title="2 of 4 branches missed.">        if (!path.isAbsolute() || !path.normalize().equals(path)) throw new IllegalArgumentException(&quot;normalized absolute path required&quot;);</span>
+<span class="fc" id="L99">        return path;</span>
+    }
+
+    private static byte[] read(Path file) throws IOException {
+<span class="fc" id="L103">        Path path = file.toAbsolutePath().normalize();</span>
+<span class="fc" id="L104">        Path cursor = path.getRoot();</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        for (Path part : path) {</span>
+<span class="fc" id="L106">            cursor = cursor.resolve(part);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">            if (Files.isSymbolicLink(cursor)) throw new IOException(&quot;configuration symlink rejected&quot;);</span>
+<span class="fc" id="L108">        }</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) throw new IOException(&quot;regular configuration file required&quot;);</span>
+<span class="fc" id="L110">        try (var input = FileChannel.open(path, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L111">            ByteArrayOutputStream bytes = new ByteArrayOutputStream();</span>
+<span class="fc" id="L112">            ByteBuffer block = ByteBuffer.allocate(8192);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            for (int count; (count = input.read(block)) &gt;= 0;) {</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">                if (count &gt; CONFIG_BYTES - bytes.size()) throw new IOException(&quot;package configuration byte limit&quot;);</span>
+<span class="fc" id="L115">                bytes.write(block.array(), 0, count); block.clear();</span>
+            }
+<span class="fc" id="L117">            return bytes.toByteArray();</span>
+        }
+    }
+
+    public record Config(String schema, String packageDirectory, String installationId, String trustDomain,
+            PluginTrustStore pinnedRoots, Authority authority, Set&lt;URI&gt; allowedOrigins,
+            int connectTimeoutSeconds, int responseTimeoutSeconds, PluginDistributionClient.Limits limits,
+            PluginDistributionClient.Sources sources, Selection selection) {
+<span class="fc" id="L125">        public Config {</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">            if (!&quot;regelsuche.plugin-package-config/v1&quot;.equals(schema)) throw new IllegalArgumentException(&quot;unsupported package config&quot;);</span>
+<span class="fc" id="L127">            absolute(packageDirectory); PluginCheckpointTransactions.identifier(installationId);</span>
+<span class="fc" id="L128">            PluginCheckpointTransactions.identifier(trustDomain); Objects.requireNonNull(pinnedRoots, &quot;pinned roots&quot;);</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (pinnedRoots.keys().isEmpty()) throw new IllegalArgumentException(&quot;pinned authority roots required&quot;);</span>
+<span class="fc" id="L130">            Objects.requireNonNull(authority, &quot;authority&quot;); Objects.requireNonNull(limits, &quot;finite limits&quot;);</span>
+<span class="fc" id="L131">            allowedOrigins = Set.copyOf(Objects.requireNonNull(allowedOrigins, &quot;allowed origins&quot;));</span>
+<span class="pc bpc" id="L132" title="4 of 8 branches missed.">            if (connectTimeoutSeconds &lt; 1 || connectTimeoutSeconds &gt; 60 || responseTimeoutSeconds &lt; 1</span>
+<span class="nc" id="L133">                    || responseTimeoutSeconds &gt; 120) throw new IllegalArgumentException(&quot;bounded transport deadlines required&quot;);</span>
+<span class="fc" id="L134">        }</span>
+    }
+
+    public record Authority(String jdbcUrl, String user, String passwordEnvironment, String tlsRootCertificate, int timeoutSeconds) {
+<span class="fc" id="L138">        public Authority {</span>
+<span class="fc" id="L139">            Objects.requireNonNull(jdbcUrl, &quot;JDBC URL&quot;); PluginCheckpointTransactions.identifier(user);</span>
+<span class="pc bpc" id="L140" title="2 of 4 branches missed.">            if (passwordEnvironment == null || !passwordEnvironment.matches(&quot;[A-Z][A-Z0-9_]{0,127}&quot;)) {</span>
+<span class="nc" id="L141">                throw new IllegalArgumentException(&quot;explicit password environment variable required&quot;);</span>
+            }
+<span class="fc" id="L143">            absolute(tlsRootCertificate);</span>
+<span class="pc bpc" id="L144" title="2 of 4 branches missed.">            if (timeoutSeconds &lt; 1 || timeoutSeconds &gt; 60) throw new IllegalArgumentException(&quot;bounded authority deadline required&quot;);</span>
+<span class="fc" id="L145">        }</span>
+    }
+
+    public record Selection(String requestId, String componentId, String version, String coreVersion,
+            String apiVersion, List&lt;String&gt; requiredCapabilities) {
+<span class="nc" id="L150">        public Selection {</span>
+<span class="nc" id="L151">            requiredCapabilities = List.copyOf(Objects.requireNonNull(requiredCapabilities, &quot;capabilities&quot;));</span>
+<span class="nc" id="L152">            PluginArtifactResolver.ResolutionRequest.exact(requestId, PluginArtifactIndex.ArtifactKind.JAVA_PLUGIN,</span>
+                componentId, version, coreVersion, apiVersion, requiredCapabilities);
+<span class="nc" id="L154">        }</span>
+        PluginArtifactResolver.ResolutionRequest request() {
+<span class="nc" id="L156">            return PluginArtifactResolver.ResolutionRequest.exact(requestId, PluginArtifactIndex.ArtifactKind.JAVA_PLUGIN,</span>
+                componentId, version, coreVersion, apiVersion, requiredCapabilities);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
