@@ -67,8 +67,7 @@ public final class TargetFreeRepresentationDiscoveryRun {
     public static TargetFreeSearchExecution.RunResult writeTargetFree(Path runDirectory, String sourceExpression,
             de.regelsuche.search.SearchHeuristic heuristic, String repositoryRevision) throws IOException {
         var result = runTargetFree(sourceExpression, heuristic, repositoryRevision);
-        TargetFreeSearchArtifactStore.retain(runDirectory, result.workspace(), result.artifact().toCanonicalJson().getBytes(StandardCharsets.UTF_8));
-        RepresentationDiscoveryRunWorkspace.retain(runDirectory, result.workspace());
+        TargetFreeSearchArtifactStore.retainRun(runDirectory, result.workspace(), result.artifact().toCanonicalJson().getBytes(StandardCharsets.UTF_8));
         return result;
     }
 

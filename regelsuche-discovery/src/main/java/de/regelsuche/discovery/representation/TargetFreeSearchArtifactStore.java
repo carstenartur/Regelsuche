@@ -21,12 +21,25 @@ public final class TargetFreeSearchArtifactStore {
     }
 
     public static synchronized String retain(Path runs, RepresentationDiscoveryRunWorkspace run, byte[] bytes) throws IOException {
+        return retain(runs, run, bytes, false);
+    }
+
+    /** Exception-safe pair retention in this JVM; this is not a crash or cross-process transaction. */
+    static synchronized void retainRun(Path runs, RepresentationDiscoveryRunWorkspace run, byte[] bytes) throws IOException {
+        // Always acquire the artifact-store monitor before the workspace monitor.
+        synchronized (RepresentationDiscoveryRunWorkspace.class) {
+            retain(runs, run, bytes, true);
+        }
+    }
+
+    private static String retain(Path runs, RepresentationDiscoveryRunWorkspace run, byte[] bytes, boolean retainWorkspace) throws IOException {
         String canonical = TargetFreeSearchExecution.fromCanonicalBytes(run, bytes).toCanonicalJson();
         Path target = target(runs, run), root = target.getParent();
         Files.createDirectories(root); rejectLinks(root);
         var existing = read(runs, run);
         if (existing.isPresent()) {
             if (!existing.get().equals(canonical)) throw new IllegalStateException("immutable native execution conflict");
+            if (retainWorkspace) RepresentationDiscoveryRunWorkspace.retain(runs, run);
             return canonical;
         }
         try (var entries = Files.list(root)) {
@@ -35,14 +48,39 @@ public final class TargetFreeSearchArtifactStore {
             }
         }
         Path temporary = Files.createTempFile(root, ".native-execution-", ".tmp");
+        boolean published = false;
+        Throwable failure = null;
         try {
             Files.writeString(temporary, canonical, StandardCharsets.UTF_8);
-            try { Files.createLink(target, temporary); }
+            try { Files.createLink(target, temporary); published = true; }
             catch (FileAlreadyExistsException exception) {
                 if (!read(runs, run).orElseThrow().equals(canonical)) throw new IllegalStateException("immutable native execution conflict", exception);
             }
-        } finally { Files.deleteIfExists(temporary); }
+            if (retainWorkspace) RepresentationDiscoveryRunWorkspace.retain(runs, run);
+        } catch (IOException | RuntimeException | Error exception) {
+            failure = exception;
+            if (retainWorkspace && published) rollbackPublished(target, temporary, exception);
+            throw exception;
+        } finally {
+            try { Files.deleteIfExists(temporary); }
+            catch (IOException exception) {
+                if (failure == null) throw exception;
+                failure.addSuppressed(exception);
+            }
+        }
         return canonical;
+    }
+
+    private static void rollbackPublished(Path target, Path temporary, Throwable failure) {
+        try {
+            // The still-owned temporary hard link proves that this is the file just published here.
+            if (Files.isSymbolicLink(target) || !Files.isSameFile(target, temporary)) {
+                throw new IOException("native execution changed before rollback; existing file preserved");
+            }
+            Files.delete(target);
+        } catch (IOException | RuntimeException exception) {
+            failure.addSuppressed(exception);
+        }
     }
 
     private static Path target(Path runs, RepresentationDiscoveryRunWorkspace run) {

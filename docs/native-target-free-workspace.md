@@ -22,6 +22,17 @@ Repository-Revision des ausgeführten Checkouts. Die Workbench mit
 lädt die gespeicherten Dateien erneut geprüft; es gibt keine zusätzliche
 Laufidentität und keinen neuen HTTP-Suchstart.
 
+`writeTargetFree(...)` speichert Dossier und Workspace unter den bestehenden
+Monitoren in der Reihenfolge Dossier-Store, dann Workspace. Wenn die
+Workspace-Aufnahme fehlschlägt, nimmt der Aufruf ausschließlich seinen eigenen
+neu veröffentlichten Dossier-Hardlink zurück. Der noch gehaltene temporäre
+Hardlink bindet die Rücknahme an dieselbe Datei. Bereits gespeicherte Dossiers
+werden auch bei Konflikten nicht gelöscht oder ersetzt; Fehler der Rücknahme
+bleiben als unterdrückte Exceptions am ursprünglichen Fehler sichtbar.
+Dies koordiniert die vorhandenen Repository-APIs innerhalb einer JVM. Es ist
+keine Transaktion über Prozessabstürze, mehrere JVMs oder gleichzeitig von außen
+veränderte Repository-Pfade.
+
 `runTargetFree(...)` führt denselben Lauf ohne Speicherung aus. Nur der Runner
 kann dessen `RunResult` erzeugen. Er enthält den tatsächlichen
 `GoalSearchResult`, die unveränderliche Beobachtung und den bestehenden Workspace.

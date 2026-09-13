@@ -113,11 +113,11 @@ public final class DomainExportWorkspaceRepository {
         rejectLinks(directory);
         if (!Files.exists(directory, LinkOption.NOFOLLOW_LINKS)) return List.of();
         try (var stream = Files.list(directory)) {
-            List<Path> paths = stream.limit(MAX_EXPORTS + 2L).toList();
-            if (paths.size() > MAX_EXPORTS + 1) throw new IllegalStateException("domain export repository limit exceeded");
+            List<Path> paths = stream.filter(path -> !path.getFileName().toString().startsWith(".pending-"))
+                .limit(MAX_EXPORTS + 1L).toList();
+            if (paths.size() > MAX_EXPORTS) throw new IllegalStateException("domain export repository limit exceeded");
             List<Path> retained = new ArrayList<>();
             for (Path path : paths) {
-                if (path.getFileName().toString().startsWith(".pending-")) continue;
                 if (!path.getFileName().toString().matches("[0-9a-f]{64}") || !Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
                     throw new IllegalArgumentException("invalid domain export repository entry");
                 }
