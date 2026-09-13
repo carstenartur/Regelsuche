@@ -1,0 +1,128 @@
+{
+  "schema": "regelsuche.ai-knowledge-source-qualification/v1",
+  "repository": "carstenartur/Regelsuche",
+  "independentlyRecheckedAtUtc": "2026-09-13T05:47:18.132Z",
+  "pullRequest": {
+    "number": 998,
+    "url": "https://github.com/carstenartur/Regelsuche/pull/998",
+    "state": "closed",
+    "merged": true,
+    "merged_at": "2026-09-13T05:41:58Z",
+    "head_sha": "d57fc92d97c5535cbd19cbaa37b1b5b1c02f943d",
+    "merge_commit_sha": "5041f9d88047b3eb4171c8bfc4017c30355f6a52"
+  },
+  "workflowRun": {
+    "conclusion": "success",
+    "id": 34739558945,
+    "jobs_url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/runs/34739558945/jobs",
+    "logs_url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/runs/34739558945/logs",
+    "name": "CI",
+    "run_number": 5582,
+    "status": "completed",
+    "workflow_id": 282724469
+  },
+  "jobs": [
+    {
+      "id": 103676824012,
+      "name": "Isolated SymPy runtime authority",
+      "run_id": 34739558945,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103676824021,
+      "name": "Isolated JMH authority",
+      "run_id": 34739558945,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103676824022,
+      "name": "External polynomial comparison",
+      "run_id": 34739558945,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103676824029,
+      "name": "Complete Maven product and Docker authority",
+      "run_id": 34739558945,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103676824112,
+      "name": "Checkout-local Gradle authority",
+      "run_id": 34739558945,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103676824479,
+      "name": "Retained JMH precision study analysis",
+      "run_id": 34739558945,
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 103676824480,
+      "name": "JMH precision study replica ${{ matrix.replicate }}",
+      "run_id": 34739558945,
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 103676824488,
+      "name": "JMH precision study v2 replica ${{ matrix.replicate }}",
+      "run_id": 34739558945,
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 103676824673,
+      "name": "Retained JMH precision study v2 analysis",
+      "run_id": 34739558945,
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 103679684430,
+      "name": "Checkout-local ciCheck",
+      "run_id": 34739558945,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103679722161,
+      "name": "Publish generated reports",
+      "run_id": 34739558945,
+      "status": "completed",
+      "conclusion": "skipped"
+    }
+  ],
+  "repositoryVerificationArtifact": {
+    "archive_download_url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10312069326/zip",
+    "created_at": "2026-09-13T05:35:00Z",
+    "digest": "sha256:d6a27a818f34422dffdc4314cc921858225ac54e1f0c6641032acff869833bdb",
+    "expired": false,
+    "expires_at": "2026-12-12T05:08:26Z",
+    "id": 10312069326,
+    "name": "repository-verification",
+    "size_in_bytes": 379735393,
+    "updated_at": "2026-09-13T05:35:00Z",
+    "url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10312069326",
+    "workflow_run": {
+      "head_branch": "codex/integrate-reviewed-security-and-search-20260913",
+      "head_repository_id": 1243764016,
+      "head_sha": "d57fc92d97c5535cbd19cbaa37b1b5b1c02f943d",
+      "id": 34739558945,
+      "repository_id": 1243764016
+    }
+  },
+  "localGitTreeEquality": {
+    "5041f9d88047b3eb4171c8bfc4017c30355f6a52": "536dabef711c38a8f435dd75df4c332583abd929",
+    "d57fc92d97c5535cbd19cbaa37b1b5b1c02f943d": "536dabef711c38a8f435dd75df4c332583abd929",
+    "34aba8461edb39d4c983d5d087a1820081aada87": "536dabef711c38a8f435dd75df4c332583abd929"
+  },
+  "evidenceBoundary": "PR #998 merge state, source-head workflow run, latest-attempt jobs and artifact metadata were independently checked through read-only GitHub API calls. All six verification authorities passed. Four manually triggered JMH study jobs and report publication were skipped; the frozen studies were not rerun. Tree equality was checked against local Git objects. The artifact ZIP was not downloaded or hashed. Baseline values come exclusively from the fresh clean local reproduction on accepted main 5041f9d880."
+}

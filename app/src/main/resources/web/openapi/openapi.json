@@ -387,6 +387,58 @@
         }
       }
     },
+    "/api/discovery-runs/{runDigest}/dossier": {
+      "get": {
+        "tags": ["Discovery Runs"],
+        "operationId": "getRetainedCandidateDossier",
+        "summary": "Gebundenes kanonisches Kandidatenartefakt laden",
+        "description": "Lädt ausschließlich das vom Run gebundene regelsuche.target-free-sympy-bridge-discovery/v1-Artefakt. Kanonische Bytes, Inhaltshashes und RunBundle-Bindungen werden bei jedem Lesen geprüft. Es wird keine neue Suche oder Validierung ausgeführt.",
+        "x-regelsuche-context": "/api/discovery-runs",
+        "parameters": [{"name": "runDigest", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}],
+        "responses": {
+          "200": {"description": "Kanonisches ScenarioArtifact mit content und contentHash", "headers": {"ETag": {"schema": {"type": "string"}}, "X-Regelsuche-Run-Id": {"schema": {"type": "string"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RetainedCandidateDossier"}}}},
+          "400": {"$ref": "#/components/responses/BadRequestJson"},
+          "404": {"description": "RUN_NOT_FOUND oder DOSSIER_NOT_RETAINED", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+          "409": {"description": "DOSSIER_UNAVAILABLE oder UNSUPPORTED_DOSSIER", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+          "405": {"$ref": "#/components/responses/MethodNotAllowed"}
+        }
+      },
+      "post": {
+        "tags": ["Discovery Runs"],
+        "operationId": "retainCandidateDossier",
+        "summary": "Das bereits vom Run gebundene Kandidatenartefakt importieren",
+        "description": "Höchstens 1 MiB; exaktes kanonisches UTF-8-JSON mit optionalem abschließenden LF. Inhaltsidentität und Bindung an den bestehenden Run werden geprüft. Ein gleicher Import ist idempotent.",
+        "x-regelsuche-context": "/api/discovery-runs",
+        "parameters": [{"name": "runDigest", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RetainedCandidateDossier"}}}},
+        "responses": {
+          "201": {"description": "Unveränderlich abgelegtes Kandidatenartefakt", "headers": {"ETag": {"schema": {"type": "string"}}, "X-Regelsuche-Run-Id": {"schema": {"type": "string"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RetainedCandidateDossier"}}}},
+          "400": {"$ref": "#/components/responses/BadRequestJson"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "409": {"description": "Artefakt ist nicht verfügbar oder inkompatibel", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+          "405": {"$ref": "#/components/responses/MethodNotAllowed"},
+          "413": {"$ref": "#/components/responses/PayloadTooLarge"}
+        }
+      }
+    },
+    "/api/discovery-runs/{runDigest}/duplicate": {
+      "post": {
+        "tags": ["Discovery Runs"],
+        "operationId": "duplicateRetainedRunWithSeedChange",
+        "summary": "Run mit genau einem sichtbaren Seed-Wechsel duplizieren",
+        "description": "Bindet Eltern-Run und changedPlanParameter=deterministicSeed. Behält die deklarierten Revisionen als Konfiguration bei, setzt Zustand auf CREATED / NOT_STARTED und alle Artefakte auf NOT_PRODUCED. Führt keine Suche aus.",
+        "x-regelsuche-context": "/api/discovery-runs",
+        "parameters": [{"name": "runDigest", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "additionalProperties": false, "required": ["deterministicSeed"], "properties": {"deterministicSeed": {"description": "Exakter Java-long-Wert; Zeichenkette vermeidet Rundung in JavaScript.", "oneOf": [{"type": "string", "pattern": "^-?(0|[1-9][0-9]*)$"}, {"type": "integer", "format": "int64"}]}}}}}},
+        "responses": {
+          "201": {"description": "Neuer unveränderlicher CREATED-Run", "headers": {"Location": {"schema": {"type": "string"}}, "ETag": {"schema": {"type": "string"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+          "400": {"$ref": "#/components/responses/BadRequestJson"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "405": {"$ref": "#/components/responses/MethodNotAllowed"},
+          "413": {"$ref": "#/components/responses/PayloadTooLarge"}
+        }
+      }
+    },
     "/api/search": {
       "post": {
         "tags": ["Search"],
@@ -1009,6 +1061,30 @@
       "Unavailable": {"description": "Funktion ist in der aktuellen Konfiguration deaktiviert oder nicht verfügbar"}
     },
     "schemas": {
+      "RetainedCandidateDossier": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["content", "contentHash"],
+        "properties": {
+          "contentHash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "content": {
+            "type": "object",
+            "required": ["schema", "search", "searchContentHash", "freeze", "discoveredBridge", "classification", "followOnExecution", "informationTrack", "claimBoundary"],
+            "properties": {
+              "schema": {"type": "string", "enum": ["regelsuche.target-free-sympy-bridge-discovery/v1"]},
+              "search": {"$ref": "#/components/schemas/JsonObject"},
+              "searchContentHash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+              "freeze": {"$ref": "#/components/schemas/JsonObject"},
+              "discoveredBridge": {"$ref": "#/components/schemas/JsonObject"},
+              "classification": {"$ref": "#/components/schemas/JsonObject"},
+              "followOnExecution": {"$ref": "#/components/schemas/JsonObject"},
+              "informationTrack": {"type": "string"},
+              "claimBoundary": {"type": "string"}
+            }
+          }
+        }
+      },
+
       "LinearSolveRequest": {
         "type": "object",
         "additionalProperties": false,

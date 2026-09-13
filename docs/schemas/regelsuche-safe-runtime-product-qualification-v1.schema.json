@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.de/schemas/regelsuche-safe-runtime-product-qualification-v1.schema.json",
+  "title": "Bounded public qualification of the actual DIRECT/V4 runtime",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "contentHash", "evidence"],
+  "properties": {
+    "schema": {"const": "regelsuche.safe-runtime-product-qualification/v1"},
+    "contentHash": {"$ref": "#/$defs/hash"},
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["configurationId", "repositoryRevision", "manifestHash", "criteria", "inputs", "physicalRuntime", "artifacts", "comparisons", "controls", "coverage", "summary", "status", "defaultDecision", "defaultChanged"],
+      "properties": {
+        "configurationId": {"const": "direct-v1-vs-safe-preparation-v4-actual-runtime-v1"},
+        "repositoryRevision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "manifestHash": {"const": "sha256:3915a0630ee9f2a58a2f17a282a60a0a43bbf8d66e668a5d6cb0389964bf86d9"},
+        "criteria": {"type": "object"},
+        "inputs": {
+          "type": "object", "additionalProperties": false, "required": ["manifest", "files"],
+          "properties": {"manifest": {"type": "object"}, "files": {"$ref": "#/$defs/hashes"}}
+        },
+        "physicalRuntime": {
+          "type": "object", "additionalProperties": false,
+          "required": ["implementation", "applicationFiles", "pluginHash"],
+          "properties": {
+            "implementation": {
+              "type": "object", "additionalProperties": false,
+              "required": ["revision", "contentHash", "authorityRevisionKind"],
+              "properties": {
+                "revision": {"const": "regelsuche.runtime-class-content/v1"},
+                "contentHash": {"$ref": "#/$defs/hash"},
+                "authorityRevisionKind": {"const": "RUNTIME_CLASS_SHA256_PREFIX_160"}
+              }
+            },
+            "applicationFiles": {"$ref": "#/$defs/hashes"},
+            "pluginHash": {"$ref": "#/$defs/hash"}
+          }
+        },
+        "artifacts": {"$ref": "#/$defs/hashes"},
+        "comparisons": {
+          "type": "array", "minItems": 14, "maxItems": 14,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["id", "expectationsSatisfied", "commonCandidateRegression", "newPrincipalAvailable", "directPrincipalPresent", "safePrincipalPresent", "directCandidateCount", "safeCandidateCount", "directChargedWork", "safeChargedWork"],
+            "properties": {
+              "id": {"type": "string"},
+              "expectationsSatisfied": {"type": "boolean"},
+              "commonCandidateRegression": {"type": "boolean"},
+              "newPrincipalAvailable": {"type": "boolean"},
+              "directPrincipalPresent": {"type": "boolean"},
+              "safePrincipalPresent": {"type": "boolean"},
+              "directCandidateCount": {"$ref": "#/$defs/units"},
+              "safeCandidateCount": {"$ref": "#/$defs/units"},
+              "directChargedWork": {"$ref": "#/$defs/units"},
+              "safeChargedWork": {"$ref": "#/$defs/units"}
+            }
+          }
+        },
+        "controls": {"type": "array", "minItems": 8, "maxItems": 8, "items": {"type": "object"}},
+        "coverage": {
+          "type": "object", "additionalProperties": false,
+          "required": ["visibleRuleCount", "selectedRuleCount", "candidateRuleCount", "selectedRuleIds", "unselectedRuleIds", "runtimePreparationEligibleCount", "baseInventoryFingerprint", "completeVisibleInventorySelected"],
+          "properties": {
+            "visibleRuleCount": {"$ref": "#/$defs/units"},
+            "selectedRuleCount": {"$ref": "#/$defs/units"},
+            "candidateRuleCount": {"$ref": "#/$defs/units"},
+            "selectedRuleIds": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+            "unselectedRuleIds": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+            "runtimePreparationEligibleCount": {"$ref": "#/$defs/units"},
+            "baseInventoryFingerprint": {"$ref": "#/$defs/hash"},
+            "completeVisibleInventorySelected": {"type": "boolean"}
+          }
+        },
+        "summary": {
+          "type": "object", "additionalProperties": false,
+          "required": ["caseCount", "profileCount", "surfaceObservations", "gains", "commonCandidateRegressions", "expectationFailures", "directChargedWork", "safeChargedWork"],
+          "properties": {
+            "caseCount": {"const": 14}, "profileCount": {"const": 2}, "surfaceObservations": {"const": 112},
+            "gains": {"$ref": "#/$defs/units"},
+            "commonCandidateRegressions": {"$ref": "#/$defs/units"},
+            "expectationFailures": {"$ref": "#/$defs/units"},
+            "directChargedWork": {"$ref": "#/$defs/units"},
+            "safeChargedWork": {"$ref": "#/$defs/units"}
+          }
+        },
+        "status": {"enum": ["QUALIFIED_BOUNDED_PUBLIC_CASES", "QUALIFICATION_FAILED"]},
+        "defaultDecision": {"enum": ["KEEP_OPT_IN_BOUNDED_PUBLIC_COVERAGE", "KEEP_OPT_IN_QUALIFICATION_FAILED"]},
+        "defaultChanged": {"const": false}
+      }
+    }
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "hashes": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/hash"}},
+    "units": {"type": "integer", "minimum": 0}
+  }
+}

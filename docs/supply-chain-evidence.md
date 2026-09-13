@@ -43,13 +43,15 @@ output-directory and output-file symlink cases.
 
 ## Vulnerability boundary
 
-This tranche does **not** claim that the listed dependencies are free of known
-vulnerabilities. A vulnerability decision requires a scanner plus a
-content-addressed advisory-database snapshot. The future scan contract must bind
-at least provider, revision, creation time, SHA-256 and license, and it must fail
-closed for unknown severity, scanner failure and expired or imprecise
+The v1 inventory alone does **not** claim that the listed dependencies are free
+of known vulnerabilities. The separate required
+[vulnerability gate](supply-chain-vulnerability-evidence.md) now binds provider,
+revision, creation time, SHA-256, licenses and a pinned scanner execution. It
+fails closed for unknown/ambiguous severity or scanner failure and permits no
 suppressions.
 
-Until that database and its raw scanner output are retained, the evidence states
-`NOT_EVALUATED`. This prevents a successful SBOM generation from being mistaken
-for a security assessment.
+This inventory schema still states `NOT_EVALUATED`; its meaning is not changed
+retroactively. Read the separate snapshot-bound decision and its complete
+retained run for vulnerability evidence. The
+[acceptance collection](quality-acceptance-evidence.md) binds both without
+turning SBOM generation into a security assessment.

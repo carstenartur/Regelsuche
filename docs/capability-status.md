@@ -14,7 +14,15 @@ Der Generator `scripts/generate-capability-status.py` konsumiert:
 - `regelsuche.domain-generic-discovery-qualification/v1`;
 - `regelsuche.domain-generic-discovery-qualification-run/v1`;
 - für reine `IMPLEMENTED`-Aussagen die explizit aufgeführten Source-, Schema- und
-  Workflow-Verträge des Plugin-Trust-Stacks.
+  Workflow-Verträge des Plugin-Trust-Stacks;
+- für `SAFE_PREPARATION_PRODUCT=EXPERIMENTAL` die hashgebundenen Runtime-,
+  Verifier- und öffentlichen Manifestverträge mit unveränderter opt-in-Grenze.
+
+Die [öffentliche DIRECT-/V4-Produktqualifikation](safe-runtime-product-qualification.md)
+erzeugt ihre konkreten Messwerte und unabhängigen Replay-Nachweise separat.
+Ihr begrenzter grüner Vergleich stellt keine Qualifikation des vollständigen
+sichtbaren Inventars oder eines allgemeinen Defaults dar. Die Matrix trägt
+deshalb `FULL_VISIBLE_INVENTORY_NOT_QUALIFIED` ausdrücklich als Blocker.
 
 Der Generator prüft die Run-/Report-Wurzelbindungen, den vollständigen erwarteten
 Release-Profile-Satz und die Claim-Grenzen des domänengenerischen Profils. Fehlt ein
@@ -73,7 +81,7 @@ Der Runner:
 3. verwendet ein Build-lokales Python-Venv mit `jsonschema==4.25.1`;
 4. validiert das Statusdokument gegen sein Draft-2020-12-Schema;
 5. berechnet den kanonischen `contentHash` unabhängig neu;
-6. verlangt den exakten, eindeutig sortierten Satz von 13 Capabilities und deren
+6. verlangt den exakten, eindeutig sortierten Satz von 14 Capabilities und deren
    zulässige Status-, Evidence- und Blockerbeziehungen.
 
 Die Logs liegen unter `build/logs/capability-status-*.log`. GitHub Actions ruft nur

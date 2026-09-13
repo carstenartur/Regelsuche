@@ -320,7 +320,7 @@ Details und Produktionsgrenzen stehen in
 | --- | --- | --- |
 | Suchraum und Erklärung | mehrere Suchverfahren, explizite Zustände und Kanten, Pfade, Replay und Exporte | [Search Intelligence](docs/search-intelligence.md) |
 | Lokale Regelanwendung | positionsbezogene Kandidaten, Bindungen, Annahmen, Vorschau und Suchstatus | [AST-Regelradar](docs/ast-rule-radar.md) |
-| Regelvorbereitung | direkte Anwendung, typisierte Guards, native Exact-Spezialisten und begrenzte lokale Bridges | [Safe Rule Preparation Coordinator](docs/safe-rule-preparation-coordinator.md) |
+| Regelvorbereitung | gemeinsamer opt-in DIRECT-/SAFE-V4-Pfad in CLI und Workbench, lokale Guards, typisierte und gelernte Autoritäten | [Öffentliche Produktqualifikation](docs/safe-runtime-product-qualification.md) |
 | Lernen und Wiederverwendung | Kandidatenbildung, Counterexamples, Holdouts, Generationsbarrieren und Schatteninventare | [Generational Rule Mining](docs/generational-rule-mining.md) |
 | Zahlen | exakte Ganzzahlen, Dezimalwerte und Brüche in AST, Matching und numerischen Umformungen | [Exakte Zahlensemantik](docs/exact-numeric-ast.md) |
 | Polynome | exakte `Z[x]`-/`Q[x]`-Repräsentation, native univariate Faktorisierung, Vorschlagsadapter und unabhängige Produktprüfung | [Polynomfaktorisierung](docs/domain-aware-polynomial-factorization.md) |
@@ -333,6 +333,16 @@ Details und Produktionsgrenzen stehen in
 Nicht jede implementierte Fähigkeit ist bereits als allgemeines
 Workbench-Defaultprofil qualifiziert. Der datierte Stand mit ausgeführten und
 noch offenen Prüfungen steht in [Discovery- und Forschungsstatus](docs/discovery-status.md).
+
+Der öffentliche DIRECT-/SAFE-V4-Vergleich umfasst 14 festgelegte Fälle über die
+installierte CLI und den Workbench-Endpunkt. Er erhält zwei zusätzliche
+SAFE-Hauptregeln und alle gemeinsamen DIRECT-Kandidaten. Die 112 kanonischen
+Analyse-/Replay-Aufzeichnungen stimmen überein; unabhängiges frisches Replay
+prüft sie erneut. SAFE bleibt **opt-in**: acht von 69 sichtbaren Regeln werden
+selektiert, und SAFE verbraucht in diesem Korpus 4587 statt 1811 logische
+Arbeitseinheiten. Das ist keine allgemeine Vollständigkeits- oder
+Geschwindigkeitsaussage. [Kriterien, Ergebnisse und Reproduktion](docs/safe-runtime-product-qualification.md)
+benennen die Grenzen sowie die noch erforderliche vollständige CI-Evidenz.
 
 ## Discovery evidence
 
@@ -357,7 +367,7 @@ nachgezeichnete Erfolgsbilder sind kein Ersatz für gebundene Artefakte.
 <!-- capability-status:start -->
 ## Verifizierter Capability- und Claim-Status
 
-Die folgende Kurzmatrix wird aus den kanonischen Release-, Domain- und Trust-Verträgen erzeugt. Die vollständige Matrix mit Evidence-Roots steht in [`capability-status.md`](docs/generated/capability-status.md).
+Die folgende Kurzmatrix wird aus den kanonischen Release-, Domain-, Trust- und Runtime-Verträgen erzeugt. Die vollständige Matrix mit Evidence-Roots steht in [`capability-status.md`](docs/generated/capability-status.md).
 
 | Capability | Status |
 |---|---|
@@ -371,6 +381,7 @@ Die folgende Kurzmatrix wird aus den kanonischen Release-, Domain- und Trust-Ver
 | `PROMOTION` | `NOT_EVALUATED` |
 | `PUBLIC_EVIDENCE` | `NOT_EVALUATED` |
 | `PUBLIC_PLUGIN_DISTRIBUTION` | `BLOCKED` |
+| `SAFE_PREPARATION_PRODUCT` | `EXPERIMENTAL` |
 
 `QUALIFIED` autorisiert nur den jeweils benannten Claim. Externe mathematische Neuheit, formaler Beweis, Promotion und Public Evidence werden nicht aus einem anderen erfolgreichen Profil abgeleitet.
 <!-- capability-status:end -->

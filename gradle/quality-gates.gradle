@@ -221,3 +221,26 @@ tasks.matching { candidate -> candidate.name == 'check' }.configureEach {
 tasks.matching { candidate -> candidate.name == 'ciCheck' }.configureEach {
     dependsOn reportSlowTests
 }
+
+def acceptanceEvidencePython = providers.gradleProperty('pythonExecutable').getOrElse('python3')
+def testQualityAcceptanceEvidence = tasks.register('testQualityAcceptanceEvidence', Exec) {
+    group = 'verification'
+    description = 'Checks finite quality evidence collection without running any gate or experiment.'
+    workingDir qualityRepositoryRoot
+    commandLine acceptanceEvidencePython, '-B', 'scripts/test-quality-acceptance-evidence.py'
+    outputs.upToDateWhen { false }
+}
+
+tasks.matching { candidate -> candidate.name == 'check' }.configureEach {
+    dependsOn testQualityAcceptanceEvidence
+}
+
+tasks.register('collectQualityAcceptanceEvidence', Exec) {
+    group = 'reporting'
+    description = 'Requires and collects existing quality gate outputs into a fresh acceptance bundle.'
+    workingDir qualityRepositoryRoot
+    mustRunAfter 'ciCheck', 'fullCheck', 'reportSlowTests'
+    commandLine acceptanceEvidencePython, '-B', 'scripts/collect-quality-acceptance-evidence.py',
+        '--root', qualityRepositoryRoot.asFile.absolutePath, '--require-complete'
+    outputs.upToDateWhen { false }
+}

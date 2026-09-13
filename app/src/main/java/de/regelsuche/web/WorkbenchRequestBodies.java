@@ -44,8 +44,14 @@ final class WorkbenchRequestBodies {
             String type = InputType.TERM.name();
             String profile = SearchProfile.FAST_SIMPLIFY.name();
             String goal = "";
+            java.util.Map<String, Object> runtimeRequest = null;
+            java.util.Map<String, Object> runtimeArtifact = null;
+            boolean otherFields = false;
             while (object.nextField()) {
+                if (!object.fieldName().equals("runtimeRequest") && !object.fieldName().equals("runtimeArtifact")) otherFields = true;
                 switch (object.fieldName()) {
+                    case "runtimeRequest" -> runtimeRequest = object.readNullableObject(StreamingJsonRequestBody.ObjectCursor::readRemainingObject);
+                    case "runtimeArtifact" -> runtimeArtifact = object.readNullableObject(StreamingJsonRequestBody.ObjectCursor::readRemainingObject);
                     case "expression" -> expression = stringOr(
                         object.readNullableString(), "");
                     case "type" -> type = stringOr(
@@ -58,7 +64,7 @@ final class WorkbenchRequestBodies {
                     default -> object.skipValue();
                 }
             }
-            return new SearchRequest(expression, type, profile, goal);
+            return new SearchRequest(expression, type, profile, goal, runtimeRequest, runtimeArtifact, otherFields);
         });
     }
 
@@ -300,7 +306,10 @@ final class WorkbenchRequestBodies {
         String expression,
         String type,
         String profile,
-        String goal
+        String goal,
+        java.util.Map<String, Object> runtimeRequest,
+        java.util.Map<String, Object> runtimeArtifact,
+        boolean otherFields
     ) {
     }
 

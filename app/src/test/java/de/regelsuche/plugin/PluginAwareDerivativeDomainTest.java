@@ -21,12 +21,12 @@ class PluginAwareDerivativeDomainTest {
     ) {
         var engine = new PluginAwareAstRewriteTransformationEngine(
             CalculusDerivativeRules.rules(), new AstVisitorRegistry());
-        var transformations = engine.transform(source);
-
-        assertEquals(1, transformations.size());
-        var transformation = transformations.getFirst();
-        assertEquals(target, transformation.transformedExpression());
-        assertEquals(List.of(guard), transformation.assumptions());
-        assertTrue(transformation.equivalencePreservingByConstruction());
+        for (var transformations : List.of(engine.transform(source), engine.transformForRuntime(source))) {
+            assertEquals(1, transformations.size());
+            var transformation = transformations.getFirst();
+            assertEquals(target, transformation.transformedExpression());
+            assertEquals(List.of(guard), transformation.assumptions());
+            assertTrue(transformation.equivalencePreservingByConstruction());
+        }
     }
 }

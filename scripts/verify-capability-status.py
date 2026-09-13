@@ -36,6 +36,7 @@ EXPECTED_STATUSES = {
     "PUBLIC_EVIDENCE": "NOT_EVALUATED",
     "PUBLIC_PLUGIN_DISTRIBUTION": "BLOCKED",
     "SEARCH_REPRODUCIBILITY": "QUALIFIED",
+    "SAFE_PREPARATION_PRODUCT": "EXPERIMENTAL",
 }
 
 
@@ -122,6 +123,9 @@ def main() -> int:
             require(blockers, f"{capability} is BLOCKED without blockers")
         if expected_status == "NOT_EVALUATED":
             require(blockers, f"{capability} is NOT_EVALUATED without an explicit reason")
+        if capability == "SAFE_PREPARATION_PRODUCT":
+            require(roots and blockers == ["FULL_VISIBLE_INVENTORY_NOT_QUALIFIED"],
+                    "runtime opt-in coverage boundary is missing")
 
     source_evidence = status.get("sourceEvidence", {})
     expected_roots = {

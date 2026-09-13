@@ -2,6 +2,8 @@ package de.regelsuche.discovery.representation;
 
 import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_KNOWN_FORM_WITHOUT_NEW_CAPABILITY;
 import static de.regelsuche.discovery.representation.RepresentationCandidateAssessment.WARNING_KNOWN_STRUCTURE_EVIDENCE_BELOW_MINIMUM;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireSha256;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireText;
 import static de.regelsuche.validation.OracleValidator.OracleValidationStatus.AGREE;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -10,6 +12,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import de.regelsuche.knowledge.KnowledgePackRegistry;
 import de.regelsuche.knowledge.KnowledgePackSelection;
+import de.regelsuche.knowledge.KnowledgePack.KnownStructureEvidence;
 import de.regelsuche.knowledge.RuleStatus;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.RewriteRule;
@@ -588,6 +591,75 @@ public final class TargetFreeSymPyBridgeDiscoveryScenario {
             if (!expected.equals(contentHash)) {
                 throw new IllegalArgumentException(
                     "scenario hash does not match canonical content");
+            }
+        }
+
+        /**
+         * Checks the supported retained DTO, including required leaf values.
+         * This does not replay discovery, verify a proof or reconstruct absent
+         * guard, occurrence or provenance evidence.
+         */
+        public void validateRetainedContract() {
+            try {
+                if (!SCHEMA.equals(content.schema())) {
+                    throw new IllegalArgumentException("unsupported dossier schema");
+                }
+                requireText(content.scenarioId(), "scenarioId");
+                requireText(content.informationTrack(), "informationTrack");
+                requireText(content.claimBoundary(), "claimBoundary");
+                Objects.requireNonNull(content.search(), "search");
+                requireCanonicalHash(content.searchContentHash(), "searchContentHash");
+                var freeze = Objects.requireNonNull(content.freeze(), "freeze");
+                requireCanonicalHash(freeze.disabledBoundaryHash(), "disabledBoundaryHash");
+                requireCanonicalHash(freeze.enabledBoundaryHash(), "enabledBoundaryHash");
+                requireCanonicalHash(freeze.candidateSetHash(), "candidateSetHash");
+                requireCanonicalHash(freeze.disabledFreezeReceiptHash(), "disabledFreezeReceiptHash");
+                requireCanonicalHash(freeze.enabledFreezeReceiptHash(), "enabledFreezeReceiptHash");
+                requireCanonicalHash(freeze.disabledCatalogHash(), "disabledCatalogHash");
+                requireCanonicalHash(freeze.enabledCatalogHash(), "enabledCatalogHash");
+
+                var bridge = Objects.requireNonNull(content.discoveredBridge(), "discoveredBridge");
+                CandidateProofStatus.valueOf(requireText(bridge.candidateProofStatus(), "candidateProofStatus"));
+                KnownStructureEvidence.valueOf(requireText(bridge.minimumEvidence(), "minimumEvidence"));
+                if (!Set.of(KnownStructureMatch.RECOGNITION_EXACT,
+                        KnownStructureMatch.RECOGNITION_EQUIVALENCE_AWARE,
+                        KnownStructureMatch.RECOGNITION_BOUNDED_REPRESENTATIVE)
+                        .contains(requireText(bridge.recognitionMode(), "recognitionMode"))) {
+                    throw new IllegalArgumentException("unsupported recognitionMode");
+                }
+                requireText(bridge.structureId(), "structureId");
+                requireText(bridge.consequenceId(), "consequenceId");
+                requireText(bridge.sourceProject(), "sourceProject");
+                requireText(bridge.sourceReference(), "sourceReference");
+                requireText(bridge.license(), "license");
+
+                var classification = Objects.requireNonNull(content.classification(), "classification");
+                if (classification.disabledMatches() < 0 || classification.provisionalMatches() < 0
+                        || classification.verifiedMatches() < 0) {
+                    throw new IllegalArgumentException("classification counts must not be negative");
+                }
+                var follow = Objects.requireNonNull(content.followOnExecution(), "followOnExecution");
+                requireCanonicalHash(follow.disabledRuleInventoryHash(), "disabledRuleInventoryHash");
+                requireCanonicalHash(follow.enabledRuleInventoryHash(), "enabledRuleInventoryHash");
+                if (follow.formationTotalSuccessors() < follow.formationTargetSuccessors().size()
+                        || follow.disabledTotalSuccessors() < follow.disabledTargetSuccessors().size()
+                        || follow.enabledTotalSuccessors() < follow.enabledTargetSuccessors().size()) {
+                    throw new IllegalArgumentException("follow-on successor counts do not balance");
+                }
+                for (var values : List.of(bridge.pathRuleIds(), bridge.primitiveRuleIds(), bridge.assumptions(),
+                        bridge.packIds(), classification.provisionalUnlocks(), classification.provisionalWarnings(),
+                        classification.verifiedUnlocks(), classification.verifiedWarnings(), follow.formationTargetSuccessors(),
+                        follow.disabledTargetSuccessors(), follow.enabledTargetSuccessors())) {
+                    for (String value : values) requireText(value, "recorded evidence entry");
+                }
+            } catch (NullPointerException exception) {
+                throw new IllegalArgumentException("candidate dossier evidence is incomplete", exception);
+            }
+        }
+
+        private static void requireCanonicalHash(String value, String field) {
+            if (!requireSha256(value, field).equals(value)) {
+                throw new IllegalArgumentException(field + " must be a canonical SHA-256 identity");
             }
         }
 

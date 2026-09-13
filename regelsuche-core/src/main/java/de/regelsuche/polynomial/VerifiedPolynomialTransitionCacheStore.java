@@ -48,6 +48,7 @@ public final class VerifiedPolynomialTransitionCacheStore {
     private static final int MAX_IDENTITY_CODE_UNITS = 512;
     private static final int MAX_SOURCE_CODE_UNITS = 1_000_000;
     private static final int MAX_OBSERVATION_CODE_UNITS = 65_536;
+    private static final ScopedValue<CacheWork> CACHE_WORK = ScopedValue.newInstance();
 
     private final int capacity;
     private final int maxLineagesPerEntry;
@@ -94,14 +95,17 @@ public final class VerifiedPolynomialTransitionCacheStore {
         String cacheRevision,
         Observation observation
     ) {
+        retentionCharge("cache.insertion.verified-transition-issuances", 1);
         VerifiedTransition transition = VerifiedTransition.from(
             Objects.requireNonNull(transformation, "transformation"));
+        if (CACHE_WORK.isBound()) CACHE_WORK.get().retainedTransition = transition;
         LookupRequest request = new LookupRequest(
             cacheId,
             cacheRevision,
             transition.sourceEvidenceHash(),
             transition.sourceExpression());
         Lineage lineage = Lineage.create(transition, observation);
+        retentionCharge("cache.insertion.exact-key-probes", 1);
         Entry existing = entries.get(request);
         if (existing != null) {
             if (!existing.transition().id().equals(transition.id())) {
@@ -121,6 +125,7 @@ public final class VerifiedPolynomialTransitionCacheStore {
                     Optional.empty());
             }
             Entry updated = existing.withLineage(lineage);
+            retentionCharge("cache.insertion.entry-writes", 1);
             entries.put(request, updated);
             return RetentionResult.create(
                 RetentionStatus.LINEAGE_ADDED,
@@ -140,9 +145,11 @@ public final class VerifiedPolynomialTransitionCacheStore {
         if (entries.size() == capacity) {
             nextEvictions = increment(evictions, "evictions");
             LookupRequest oldest = entries.keySet().iterator().next();
+            retentionCharge("cache.eviction.fifo-entry-removals", 1);
             Entry removed = entries.remove(oldest);
             eviction = Optional.of(Eviction.from(removed));
         }
+        retentionCharge("cache.insertion.entry-writes", 1);
         entries.put(request, retained);
         insertions = retentionGeneration;
         evictions = nextEvictions;
@@ -152,17 +159,150 @@ public final class VerifiedPolynomialTransitionCacheStore {
             eviction);
     }
 
+    /**
+     * Measures the existing retention operation, including every framed hash
+     * input. Admission is conservative and precedes issuance or mutation. The
+     * historical source/replacement/provenance + 1024 floor is retained; the
+     * additional bound covers repeated identity checks of the immutable entry
+     * graph. Neither bound is reported as work that was actually performed.
+     */
+    public synchronized MeasuredRetention retainMeasured(
+            ExactFactorizationTransformationPipeline.Result transformation,
+            String cacheId, String cacheRevision, Observation observation,
+            PolynomialWorkAuthority authority) {
+        Objects.requireNonNull(transformation, "transformation");
+        Objects.requireNonNull(observation, "observation");
+        Objects.requireNonNull(authority, "authority");
+        long source = transformation.occurrence().sourceText().length();
+        long replacement = transformation.transformedExpression().orElseThrow().length();
+        long provenance = observation.sourceProvenance().stream().mapToLong(String::length).sum();
+        long historicalFloor = Math.addExact(1024L, Math.addExact(source, Math.addExact(replacement, provenance)));
+        if (authority.remainingOpaqueWorkUnits() < historicalFloor) throw new PolynomialWorkAuthority.LimitReached();
+
+        // At most four UTF-8 bytes per code unit. Sixty-four traversals bound
+        // the repeated transition, entry, lineage and retention identities.
+        // Existing lineages are bounded by their actual immutable input size.
+        long lineageMaterial = 0;
+        for (var entry : entries.values()) {
+            long entryMaterial = 0;
+            for (var lineage : entry.lineages()) {
+                var value = lineage.observation();
+                entryMaterial = Math.addExact(entryMaterial, observationSize(value));
+            }
+            lineageMaterial = Math.max(lineageMaterial, entryMaterial);
+        }
+        long material = Math.addExact(Math.addExact(source, replacement),
+            Math.addExact(transformation.totalWork().canonicalMaterial().length(),
+                Math.addExact(observationSize(observation), lineageMaterial)));
+        material = Math.addExact(material, cacheId.length() + (long) cacheRevision.length());
+        // Reparse evidence contains the original lexeme and one fixed hash per literal.
+        for (var literal : transformation.reparsed().orElseThrow().literals()) {
+            material = Math.addExact(material, literal.sourceLexeme().length() + 256L);
+        }
+        long ceiling = Math.addExact(65_536L, Math.multiplyExact(256L, material));
+        if (authority.remainingOpaqueWorkUnits() < ceiling) throw new PolynomialWorkAuthority.LimitReached();
+        var work = new CacheWork(authority, ceiling, "cache.insertion.");
+        var retained = ScopedValue.where(CACHE_WORK, work).call(() ->
+            retain(transformation, cacheId, cacheRevision, observation));
+        return new MeasuredRetention(retained, work.ledger(), work.retainedTransition.primitiveExpansion());
+    }
+
+    private static long observationSize(Observation observation) {
+        long result = observation.observationId().length() + 1024L;
+        for (String value : observation.sourceProvenance()) result = Math.addExact(result, value.length() + 32L);
+        for (String value : observation.assumptions()) result = Math.addExact(result, value.length() + 32L);
+        return result;
+    }
+
+    /** Issuer-owned receipt; its ledger contains only executed operations. */
+    public static final class MeasuredRetention {
+        private final RetentionResult retention;
+        private final PolynomialWorkLedger work;
+        private final List<PrimitiveStep> primitiveExpansion;
+        private MeasuredRetention(RetentionResult retention, PolynomialWorkLedger work, List<PrimitiveStep> primitiveExpansion) {
+            this.retention = retention;
+            this.work = work;
+            this.primitiveExpansion = primitiveExpansion;
+        }
+        public RetentionResult retention() { return retention; }
+        public PolynomialWorkLedger work() { return work; }
+        /** Already-issued immutable evidence; reading it performs no certificate reconstruction. */
+        public List<PrimitiveStep> primitiveExpansion() { return primitiveExpansion; }
+    }
+
+    private static void retentionCharge(String stage, long units) {
+        if (CACHE_WORK.isBound()) CACHE_WORK.get().consume(stage, units);
+    }
+
+    private static void evidenceCharge(String stage, long units) {
+        if (CACHE_WORK.isBound()) {
+            var work = CACHE_WORK.get();
+            work.consume(work.prefix + stage, units);
+        }
+    }
+
+    private static void operationCharge(PolynomialWorkLedger ledger) {
+        if (CACHE_WORK.isBound()) {
+            var work = CACHE_WORK.get();
+            ledger.stages().forEach((stage, units) -> work.consume(work.prefix + stage, units));
+        }
+    }
+
+    private static final class CacheWork {
+        private final PolynomialWorkAuthority authority;
+        private final long ceiling;
+        private final String prefix;
+        private final Map<String, Long> stages = new LinkedHashMap<>();
+        private long total;
+        private VerifiedTransition retainedTransition;
+        private CacheWork(PolynomialWorkAuthority authority, long ceiling, String prefix) {
+            this.authority = authority;
+            this.ceiling = ceiling;
+            this.prefix = prefix;
+        }
+        private void consume(String stage, long units) {
+            if (units > ceiling - total) throw new IllegalStateException("cache operation exceeded its admitted ceiling");
+            authority.consume(stage, units);
+            stages.merge(stage, units, Math::addExact);
+            total = Math.addExact(total, units);
+        }
+        private PolynomialWorkLedger ledger() { return new PolynomialWorkLedger(stages); }
+    }
+
     /** Exact lookup; cache id and revision are never normalized or widened. */
     public synchronized LookupResult lookup(LookupRequest request) {
         Objects.requireNonNull(request, "request");
         Entry entry = entries.get(request);
         PolynomialWorkLedger work = lookupWork(request, entry != null);
+        operationCharge(work);
         if (entry == null) {
             misses = increment(misses, "misses");
             return LookupResult.miss(request, work, replayAuthority);
         }
         hits = increment(hits, "hits");
         return LookupResult.hit(request, entry, work, replayAuthority);
+    }
+
+    /** Adds real evidence construction work without changing historical lookup bytes. */
+    public synchronized MeasuredLookup lookupMeasured(LookupRequest request, PolynomialWorkAuthority authority) {
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(authority, "authority");
+        // Certificates hash fixed schema/stage names, 67-character commitments and long counters.
+        // Six framed digests are below 16 KiB; source-dependent lookup work is reserved separately.
+        long ceiling = Math.addExact(16_384L, lookupWork(request, true).totalWorkUnits());
+        if (authority.remainingOpaqueWorkUnits() < ceiling) throw new PolynomialWorkAuthority.LimitReached();
+        var work = new CacheWork(authority, ceiling, "cache.lookup.");
+        var lookup = ScopedValue.where(CACHE_WORK, work).call(() -> lookup(request));
+        return new MeasuredLookup(lookup, work.ledger());
+    }
+
+    /** Issuer-owned measured receipt; it grants no additional lookup or replay authority. */
+    public static final class MeasuredLookup {
+        private final LookupResult lookup;
+        private final PolynomialWorkLedger work;
+        private MeasuredLookup(LookupResult lookup, PolynomialWorkLedger work) { this.lookup = lookup; this.work = work; }
+        public LookupResult lookup() { return lookup; }
+        public PolynomialWorkLedger work() { return work; }
     }
 
     /**
@@ -214,6 +354,26 @@ public final class VerifiedPolynomialTransitionCacheStore {
             Optional.of(current));
         replays = increment(replays, "replays");
         return ReplayResult.replayed(lookup, current, work);
+    }
+
+    /** Rechecks the original store/generation authority and measures its complete cache evidence. */
+    public synchronized MeasuredReplay replayMeasured(LookupResult lookup, PolynomialWorkAuthority authority) {
+        Objects.requireNonNull(lookup, "lookup");
+        Objects.requireNonNull(authority, "authority");
+        // The two replay receipts and retention bindings have the same fixed-size evidence bound.
+        long ceiling = Math.addExact(16_384L, replayWorkCeiling(lookup));
+        if (authority.remainingOpaqueWorkUnits() < ceiling) throw new PolynomialWorkAuthority.LimitReached();
+        var work = new CacheWork(authority, ceiling, "cache.replay.");
+        var replay = ScopedValue.where(CACHE_WORK, work).call(() -> replay(lookup));
+        return new MeasuredReplay(replay, work.ledger());
+    }
+
+    public static final class MeasuredReplay {
+        private final ReplayResult replay;
+        private final PolynomialWorkLedger work;
+        private MeasuredReplay(ReplayResult replay, PolynomialWorkLedger work) { this.replay = replay; this.work = work; }
+        public ReplayResult replay() { return replay; }
+        public PolynomialWorkLedger work() { return work; }
     }
 
     /** Admission bound only; it releases neither a transition nor its authority. */
@@ -845,8 +1005,11 @@ public final class VerifiedPolynomialTransitionCacheStore {
         }
 
         private boolean containsLineage(String lineageId) {
-            return lineages.stream().anyMatch(existing ->
-                existing.id().equals(lineageId));
+            for (var existing : lineages) {
+                retentionCharge("cache.insertion.lineage-comparisons", 1);
+                if (existing.id().equals(lineageId)) return true;
+            }
+            return false;
         }
 
         private Entry withLineage(Lineage lineage) {
@@ -1334,6 +1497,7 @@ public final class VerifiedPolynomialTransitionCacheStore {
             Optional<Entry> releasedEntry,
             PolynomialWorkLedger replayWork
         ) {
+            operationCharge(replayWork);
             PolynomialWorkLedger actual = merge(
                 lookup.lookupWork(),
                 replayWork);
@@ -1453,6 +1617,7 @@ public final class VerifiedPolynomialTransitionCacheStore {
                 .getBytes(StandardCharsets.UTF_8);
             byte[] length = Integer.toString(bytes.length)
                 .getBytes(StandardCharsets.US_ASCII);
+            evidenceCharge("evidence-hash-utf8-bytes", bytes.length + (long) length.length + 2L);
             digest.update(length);
             digest.update((byte) ':');
             digest.update(bytes);
@@ -1460,6 +1625,7 @@ public final class VerifiedPolynomialTransitionCacheStore {
         }
 
         private String finish() {
+            evidenceCharge("evidence-hash-completions", 1);
             return "sha256:" + HexFormat.of().formatHex(digest.digest());
         }
     }

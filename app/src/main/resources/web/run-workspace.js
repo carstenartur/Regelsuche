@@ -33,16 +33,24 @@
             try { const error = JSON.parse(raw); detail = [error.code, error.message].filter(Boolean).join(': '); } catch (_) { /* HTTP status remains visible. */ }
             throw new Error('HTTP ' + response.status + (detail ? ' · ' + detail : ''));
         }
-        return {raw, etag: response.headers.get('ETag')};
+        return {raw, etag: response.headers.get('ETag'), runId: response.headers.get('X-Regelsuche-Run-Id')};
     }
     const load = async (digest) => responseReply(await fetch(base + '/' + digest, {cache: 'no-store'}));
-    function link(digest, role = '') {
+    const dossierUrl = (workspace) => base + '/' + workspace.runId.slice(7) + '/dossier';
+    const dossier = window.RegelsucheCandidateDossier.createController(
+        async (workspace) => responseReply(await fetch(dossierUrl(workspace), {cache: 'no-store'})),
+        async (workspace, raw) => responseReply(await fetch(dossierUrl(workspace), {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: raw
+        })));
+    function link(digest, role = '', candidate = '', edge = '') {
         const query = new URLSearchParams({run: digest});
         if (role) query.set('artifact', role);
+        if (candidate) query.set('candidate', candidate);
+        if (edge) query.set('edge', edge);
         return '#' + query.toString();
     }
     function setLink(state) {
-        const target = link(state.digest, state.role);
+        const target = link(state.digest, state.role, state.candidate, state.edge);
         if (location.hash !== target) history.replaceState(null, '', target);
         $('retainedRunPermalink').href = target;
     }
@@ -68,6 +76,7 @@
         const detail = $('retainedRunDetail');
         detail.replaceChildren();
         if (!ready) {
+            dossier.clear();
             element('p', active ? 'Kein Run-Inhalt geladen.' : 'Öffne einen Run aus der Historie oder importiere sein kanonisches Manifest.', detail);
             renderHistory();
             return;
@@ -75,6 +84,10 @@
         const run = state.workspace, input = run.input, plan = run.plan, outcome = run.outcome;
         $('retainedRunInput').value = run.runId;
         setLink(state);
+        const dossierPanel = element('section', undefined, detail);
+        dossierPanel.className = 'run-candidate-dossier';
+        dossier.render(dossierPanel, state, (candidate, edge, role) => store.selectCandidate(candidate, edge, role));
+        element('h3', 'Run-Konfiguration', detail);
         table(detail, [['Run-ID', run.runId], ['Quelle', input.displayText], ['Domäne', input.domainId],
             ['Annahmen', input.assumptions.length ? input.assumptions.join('\n') : 'Keine deklariert'],
             ['Informationsgrenze', plan.informationTrack], ['Strategie / Profil', plan.searchStrategyId + ' / ' + plan.searchProfileId],
@@ -84,9 +97,10 @@
             ['Verbrauchte Arbeit', outcome.consumedWork], ['Verbleibende Arbeit', outcome.state === 'CREATED' ? 'Unbekannt' : api.remainingWork(outcome.configuredWork, outcome.consumedWork)],
             ['Beziehung', run.relation], ['Eltern-Run', run.parentRunId || 'Keiner'],
             ['Geänderter Parameter', run.changedPlanParameter || 'Keiner']]);
+        renderDuplication(detail, run);
         if (outcome.state === 'RUNNING') element('p', 'Gespeicherter Zwischenstand. Diese Ansicht erhält keine Live-Fortschrittsdaten; spätere Fortsetzungen besitzen eine eigene Run-ID.', detail);
         element('h4', 'Gebundene Artefakte', detail);
-        element('p', 'Die folgenden Referenzen stammen aus diesem Manifest. Artefaktinhalte werden hier nicht geladen oder erneut geprüft.', detail);
+        element('p', 'Die folgenden Referenzen stammen aus diesem Manifest. Das unterstützte Kandidatenartefakt wird im Dossier geöffnet; andere Rollen bleiben explizite Referenzen.', detail);
         run.artifacts.forEach((artifact) => {
             const card = element('section', undefined, detail);
             card.className = 'run-artifact';
@@ -116,6 +130,42 @@
     }
 
     const store = api.createStore(load, render);
+
+    function renderDuplication(parent, run) {
+        const form = element('form', undefined, parent); form.id = 'duplicateRetainedRun';
+        element('h4', 'Mit einem geänderten Parameter duplizieren', form);
+        element('p', 'Eltern-Run: ' + run.runId, form);
+        element('p', 'Änderung: deterministicSeed. Das Duplikat startet als CREATED / NOT_STARTED; es wurde noch keine Suche ausgeführt.', form);
+        const label = element('label', 'Seed: ' + run.plan.deterministicSeed + ' → ', form);
+        const input = element('input', undefined, label); input.id = 'duplicateRunSeed'; input.type = 'text'; input.required = true;
+        input.inputMode = 'text'; input.pattern = '-?(0|[1-9][0-9]*)'; input.maxLength = 20;
+        input.value = String(BigInt(run.plan.deterministicSeed) === 9223372036854775807n
+            ? BigInt(run.plan.deterministicSeed) - 1n : BigInt(run.plan.deterministicSeed) + 1n);
+        const button = element('button', 'Seed ändern und neuen Run anlegen', form); button.type = 'submit';
+        const status = element('p', undefined, form); status.setAttribute('role', 'status');
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault(); button.disabled = true; status.textContent = 'Duplikat anlegen …';
+            const requestedSelection = store.state();
+            const seed = input.value;
+            try {
+                const reply = await responseReply(await fetch(base + '/' + run.runId.slice(7) + '/duplicate', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({deterministicSeed: seed})
+                }));
+                if (store.state() !== requestedSelection) return;
+                const child = api.parseExactJson(reply.raw);
+                if (child.parentRunId !== run.runId || child.changedPlanParameter !== 'deterministicSeed'
+                    || BigInt(child.plan.deterministicSeed) !== BigInt(seed) || child.outcome.state !== 'CREATED') {
+                    throw new Error('Duplikat gehört nicht zur angeforderten Parameteränderung');
+                }
+                await store.import(async () => reply);
+                if (store.state().status === 'READY' && store.state().workspace.parentRunId === run.runId) {
+                    await comparison.open(run.runId.slice(7)); offset = 0; loadHistory();
+                }
+            } catch (error) {
+                if (store.state() === requestedSelection) { status.textContent = 'Duplikat fehlgeschlagen: ' + error.message; button.disabled = false; }
+            }
+        });
+    }
     comparison = api.createStore(load, (state) => {
         const panel = $('retainedRunComparison'), detail = $('runComparisonDetail');
         panel.hidden = state.status === 'EMPTY';
@@ -216,7 +266,7 @@
             if (store.state().status !== 'EMPTY') store.clear();
             return;
         }
-        activateRun(); store.open(query.get('run'), query.get('artifact') || '');
+        activateRun(); store.open(query.get('run'), query.get('artifact') || '', query.get('candidate') || '', query.get('edge') || '');
     }
     window.addEventListener('hashchange', restore);
     restore();

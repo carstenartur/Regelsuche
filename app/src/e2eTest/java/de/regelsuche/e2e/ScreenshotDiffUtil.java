@@ -2,6 +2,7 @@ package de.regelsuche.e2e;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.options.ScreenshotAnimations;
 import com.microsoft.playwright.options.ScreenshotType;
@@ -9,7 +10,12 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import javax.imageio.ImageIO;
 
 final class ScreenshotDiffUtil {
@@ -40,6 +46,11 @@ final class ScreenshotDiffUtil {
             Files.copy(actual, baseline, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             return;
         }
+        assertImagesMatchBaseline(baseline, actual, diff, baselineName);
+    }
+
+    static void assertImagesMatchBaseline(Path baseline, Path actual, Path diff, String baselineName)
+            throws IOException {
         assertTrue(Files.isRegularFile(baseline),
             "Missing committed screenshot baseline " + baseline
                 + "; refresh it only with regelsuche.updateScreenshots=true in the pinned container");
@@ -75,9 +86,28 @@ final class ScreenshotDiffUtil {
         } else {
             Files.deleteIfExists(diff);
         }
+        new ObjectMapper().writeValue(actual.resolveSibling(baselineName + ".comparison.json").toFile(), new TreeMap<>(Map.of(
+            "schema", "regelsuche.visual-comparison/v1",
+            "status", ratio <= MAX_DIFF_RATIO ? "PASSED" : "FAILED",
+            "changedPixels", changed,
+            "totalPixels", width * height,
+            "diffRatio", ratio,
+            "channelTolerance", CHANNEL_TOLERANCE,
+            "maxDiffRatio", MAX_DIFF_RATIO,
+            "baselineSha256", sha256(baseline),
+            "actualSha256", sha256(actual))));
         assertTrue(ratio <= MAX_DIFF_RATIO,
             "Screenshot diff for " + baselineName + " exceeded threshold: "
                 + changed + " pixels (" + ratio + "), see " + diff);
+    }
+
+    private static String sha256(Path path) throws IOException {
+        try {
+            return "sha256:" + HexFormat.of().formatHex(
+                MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(path)));
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new AssertionError(impossible);
+        }
     }
 
     private static boolean withinTolerance(int expectedRgb, int actualRgb) {

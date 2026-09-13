@@ -329,3 +329,5 @@ def verifyReleaseMetadata = tasks.register('verifyReleaseMetadata', Exec) {
 repositoryCheck.configure {
     dependsOn verifyReleaseMetadata
 }
+
+apply from: rootProject.file('gradle/safe-runtime-product-qualification.gradle')

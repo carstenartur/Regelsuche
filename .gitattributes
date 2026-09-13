@@ -23,6 +23,10 @@
 # These are Windows script files and should use crlf
 *.bat           text eol=crlf
 
+# Additive public runtime reproduction has its own immutable v1 identities
+/Dockerfile.safe-runtime-qualification text eol=lf
+/docs/schemas/regelsuche-safe-runtime-product-qualification-v1.schema.json text eol=lf
+
 # Binary files should be left untouched
 *.jar           binary
-
+*.bundle        binary

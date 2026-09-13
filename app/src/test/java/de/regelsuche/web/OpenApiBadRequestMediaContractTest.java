@@ -18,6 +18,9 @@ class OpenApiBadRequestMediaContractTest {
         "GET /api/discovery-runs",
         "POST /api/discovery-runs",
         "GET /api/discovery-runs/{runDigest}",
+        "GET /api/discovery-runs/{runDigest}/dossier",
+        "POST /api/discovery-runs/{runDigest}/dossier",
+        "POST /api/discovery-runs/{runDigest}/duplicate",
         "POST /api/rule-radar/inspect",
         "POST /api/rule-radar/apply",
         "POST /api/rule-radar/search"

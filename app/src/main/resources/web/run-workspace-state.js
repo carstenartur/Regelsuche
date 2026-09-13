@@ -102,16 +102,18 @@
             current = freeze(value);
             onChange(current);
         }
-        async function execute(digest, role, loader) {
+        async function execute(digest, role, loader, candidate = '', edge = '') {
             const token = ++generation;
-            publish({status: 'LOADING', digest: digest || '', role: role || '', workspace: null, raw: '', error: ''});
+            publish({status: 'LOADING', digest: digest || '', role: role || '', candidate, edge, workspace: null, raw: '', error: ''});
             try {
                 if (digest !== null && (typeof digest !== 'string' || !DIGEST.test(digest))) fail('Ungültige Run-ID');
                 if (role && !ROLES.includes(role)) fail('Ungebundene Artefaktauswahl');
+                if (candidate && !HASH.test(candidate)) fail('Ungültige Kandidaten-ID');
+                if (edge && (!candidate || !/^[1-9][0-9]*$/.test(edge))) fail('Ungültige Graphkanten-Auswahl');
                 const reply = await loader();
                 if (token !== generation) return;
                 const workspace = decode(reply, digest);
-                publish({status: 'READY', digest: workspace.runId.slice(7), role: role || '',
+                publish({status: 'READY', digest: workspace.runId.slice(7), role: role || '', candidate, edge,
                     workspace, raw: reply.raw, error: ''});
             } catch (error) {
                 if (token !== generation) return;
@@ -121,7 +123,7 @@
         }
         return Object.freeze({
             state: () => current,
-            open: (digest, role = '') => execute(digest, role, () => load(digest)),
+            open: (digest, role = '', candidate = '', edge = '') => execute(digest, role, () => load(digest), candidate, edge),
             import: (loader) => execute(null, '', loader),
             clear: () => {
                 generation++;
@@ -131,6 +133,12 @@
                 if (!ROLES.includes(role)) fail('Ungebundene Artefaktauswahl');
                 if (current.status !== 'READY') fail('Kein gespeicherter Run geöffnet');
                 publish({...current, role});
+            },
+            selectCandidate: (candidate, edge = '', role = edge ? 'SEARCH_GRAPH' : 'CANDIDATE_DOSSIERS') => {
+                if (current.status !== 'READY') fail('Kein gespeicherter Run geöffnet');
+                if (!HASH.test(candidate) || (edge && !/^[1-9][0-9]*$/.test(edge))) fail('Ungültige Kandidatenauswahl');
+                if (!ROLES.includes(role)) fail('Ungebundene Artefaktauswahl');
+                publish({...current, candidate, edge, role});
             }
         });
     }

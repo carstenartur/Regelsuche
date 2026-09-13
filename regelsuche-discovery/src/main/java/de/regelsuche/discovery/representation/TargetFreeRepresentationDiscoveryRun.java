@@ -384,6 +384,17 @@ public final class TargetFreeRepresentationDiscoveryRun {
                 "workspace canonical work ledger"
             );
             requireEqual(
+                budgetHash(scenario.content().search().budget()),
+                workspace.plan().budgetHash(),
+                "workspace search budget"
+            );
+            requireEqual(
+                (long) scenario.content().search().budget()
+                    .maxGeneratedTransitions(),
+                workspace.outcome().configuredWork(),
+                "workspace configured work"
+            );
+            requireEqual(
                 scenario.content().search().generatedTransitionCount(),
                 Math.toIntExact(workspace.outcome().consumedWork()),
                 "workspace consumed work"

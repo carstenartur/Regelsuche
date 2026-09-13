@@ -3,7 +3,8 @@
 
 The generator intentionally reports only bounded claims. It consumes canonical release
 and domain-generic qualification artifacts, verifies their cross-document roots, and
-uses source-contract hashes only for IMPLEMENTED plugin capabilities. It never turns
+uses source-contract hashes for IMPLEMENTED plugin capabilities and the opt-in
+EXPERIMENTAL runtime boundary. It never turns
 implementation presence into a qualification, novelty, proof, promotion, or public-
 evidence decision.
 """
@@ -197,6 +198,35 @@ def implementation_capabilities(root: Path) -> list[dict[str, Any]]:
     return capabilities
 
 
+def safe_runtime_capability(root: Path) -> dict[str, Any]:
+    """Publish the opt-in boundary without promoting source presence into qualification."""
+    paths = (
+        "app/src/main/java/de/regelsuche/runtime/SafeRuntimeAdapter.java",
+        "config/qualification/safe-runtime-public-v1.json",
+        "scripts/safe_runtime_qualification/protocol.py",
+        "scripts/safe_runtime_qualification/verify.py",
+        "docs/schemas/regelsuche-safe-runtime-product-qualification-v1.schema.json",
+    )
+    manifest = load_json(root / paths[1])
+    if (manifest.get("schema") != "regelsuche.safe-runtime-public-cases/v1"
+            or manifest.get("profiles") != ["DIRECT_V1", "SAFE_PREPARATION_V4"]
+            or manifest.get("criteria", {}).get("defaultMutationAllowed") is not False):
+        raise ContractError("SAFE product public manifest changes the opt-in authority")
+    return {
+        "capability": "SAFE_PREPARATION_PRODUCT",
+        "status": "EXPERIMENTAL",
+        "claim": "Shared opt-in DIRECT_V1/SAFE_PREPARATION_V4 runtime with bounded public contract qualification; broader inventory and default qualification remain open.",
+        "evidenceRoots": sorted(file_hash(root, path) for path in paths),
+        "blockers": ["FULL_VISIBLE_INVENTORY_NOT_QUALIFIED"],
+        "notes": [
+            f"The frozen manifest declares {len(manifest['cases'])} public source-side cases; it does not authorize a general default.",
+            "Actual measured counts, raw CLI/Workbench exports and independent replay are retained in build/reports/safe-runtime-product-qualification/run/qualification.json.",
+            "Complete clean-checkout/container reproduction is a separate mandatory ciCheck gate; source hashes alone do not establish that it passed.",
+            "Historical V2 qualification, protected FINAL TEST, arbitrary learned-rule promotion and global completeness are not reinterpreted.",
+        ],
+    }
+
+
 def derive_status(
     root: Path,
     release_report: dict[str, Any],
@@ -276,6 +306,7 @@ def derive_status(
     )
 
     capabilities.extend(implementation_capabilities(root))
+    capabilities.append(safe_runtime_capability(root))
     capabilities.extend(
         [
             {
@@ -375,6 +406,7 @@ def render_markdown(status: dict[str, Any]) -> str:
             "",
             "- `IMPLEMENTED` means that the named software contracts, schemas and checkout-local validators are present and hash-bound; it is not a qualification of a wider service.",
             "- `QUALIFIED` means that the named evidence profile is ready for exactly its recorded claim.",
+            "- `EXPERIMENTAL` retains an explicit opt-in boundary even when a separate bounded public contract comparison is green.",
             "- `BLOCKED` and `NOT_EVALUATED` remain visible and must not be paraphrased as success.",
             "- Project novelty, external novelty, symbolic validation, formal proof, promotion and Public Evidence remain distinct.",
             "",
@@ -395,13 +427,14 @@ def render_embedded(status: dict[str, Any], heading: str, full_status_link: str)
         "FORMAL_PROOF_OF_RETAINED_CANDIDATE",
         "PROMOTION",
         "PUBLIC_EVIDENCE",
+        "SAFE_PREPARATION_PRODUCT",
     }
     rows = [item for item in status["capabilities"] if item["capability"] in wanted]
     lines = [
         MARKER_START,
         heading,
         "",
-        f"Die folgende Kurzmatrix wird aus den kanonischen Release-, Domain- und Trust-Verträgen erzeugt. Die vollständige Matrix mit Evidence-Roots steht in [`capability-status.md`]({full_status_link}).",
+        f"Die folgende Kurzmatrix wird aus den kanonischen Release-, Domain-, Trust- und Runtime-Verträgen erzeugt. Die vollständige Matrix mit Evidence-Roots steht in [`capability-status.md`]({full_status_link}).",
         "",
         "| Capability | Status |",
         "|---|---|",
