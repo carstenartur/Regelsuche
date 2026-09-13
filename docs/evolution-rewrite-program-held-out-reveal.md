@@ -102,6 +102,12 @@ Every declared population terminal outcome denotes that TRAIN execution has
 finished and is retained. No VALIDATION selection or FINAL TEST artifact may be
 present in this authorization.
 
+The additive combined-program overload accepts the exact `EvolutionRewriteProgramStudyPlan`,
+manifest, protocol-bound retained terminal run and a durable VALIDATION reservation receipt.
+`EvolutionRewriteProgramValidationRunner` obtains that receipt before invoking its lazy private
+loader. The complete terminal candidate/configuration matrix and native execution boundary are
+documented in [`evolution-validation-selection.md`](evolution-validation-selection.md).
+
 ### FINAL TEST
 
 The authorization is created from:
@@ -115,6 +121,21 @@ The authorization is created from:
 The suite case-material hashes must equal the committed private reveal-entry
 hashes. A substituted selection, suite, reservation, study, split or commitment
 is rejected before concrete material is returned.
+
+The additive combined-program overload instead requires the exact combined study, manifest,
+protocol-bound retained TRAIN run and the winning private
+`FileEvolutionRewriteProgramFinalTestAttemptStore.Reservation` receipt. That receipt cannot be
+constructed from deserialized JSON: it is returned only after exclusive durable creation under the
+same study/split identity and filename used by the genome-only final ledger. Its separate final-plan
+artifact binds the complete frozen VALIDATION handoff and selected program/genome/work configuration.
+The execution-capable reservation overload verifies the actual private VALIDATION directory,
+reservation and selection before reserving FINAL TEST. The runner uses that overload before calling
+its lazy loader. A low-level reservation without this predecessor check only blocks later attempts;
+it cannot create a reveal authorization or write final evidence. The existing authorization hash algorithm is unchanged; the generic
+prerequisite/selection/suite fields contain the actual combined reservation, selection and final-plan
+hashes. No old genome field is repurposed. See
+[`evolution-final-test-once.md`](evolution-final-test-once.md#combined-genome-and-rewriteprogram-adapter)
+for private custody, failed-attempt behavior and the separate conservative qualification assessment.
 
 `OpenedReveal` has no public constructor. Ordinary callers cannot fabricate an
 opened value and bypass `open(...)`.

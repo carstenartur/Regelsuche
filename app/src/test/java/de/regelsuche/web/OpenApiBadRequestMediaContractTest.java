@@ -15,6 +15,11 @@ import org.junit.jupiter.api.Test;
 class OpenApiBadRequestMediaContractTest {
 
     private static final Set<String> JSON_BAD_REQUEST_OPERATIONS = Set.of(
+        "GET /api/discovery-domains/exports",
+        "POST /api/discovery-domains/exports",
+        "GET /api/discovery-domains/exports/{runDigest}",
+        "POST /api/discovery-domains/exports/{runDigest}/replay",
+        "GET /api/discovery-domains/exports/{runDigest}/files/{fileName}",
         "GET /api/discovery-runs",
         "POST /api/discovery-runs",
         "GET /api/discovery-runs/{runDigest}",

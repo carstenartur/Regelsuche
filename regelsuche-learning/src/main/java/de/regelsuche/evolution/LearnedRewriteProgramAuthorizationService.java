@@ -2,6 +2,10 @@ package de.regelsuche.evolution;
 
 import de.regelsuche.knowledge.RuleInventoryFingerprint;
 import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.MeasuredTransformationEngine;
+import de.regelsuche.transform.MeasuredTransformationEngines;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -22,6 +26,10 @@ import java.util.TreeSet;
  * then substitutes those promoted rules into the topology and deterministic
  * replay binds sequence/choice/repeat/guard/prioritize/prune behaviour together
  * with primitive and theory work accounting.</p>
+ *
+ * <p>The additive selected-program methods consume opaque combined-study leaf
+ * authorities directly and retain the full selected search configuration in a
+ * bounded internal executor. They do not require another genome-only study.</p>
  *
  * <p>This contract establishes executable identity and deterministic replay. It
  * does not by itself claim that the learned strategy improves search quality or
@@ -152,6 +160,130 @@ public final class LearnedRewriteProgramAuthorizationService {
         }
         receipt.requireUsableAt(asOf, repositoryRevision, candidate);
         return replayed;
+    }
+
+    /** Captures real public-input replay using leaves verified from the same one-shot combined study. */
+    public LearnedSelectedProgramReplayEvidence evaluateSelectedReplay(EvolutionRewriteProgramFinalTestPlan plan,
+        List<LearnedPatternRuleAuthorizationService.SelectedLeafAuthorization> leafAuthorizations,
+        List<LearnedSelectedProgramReplayEvidence.Input> inputs, String repositoryRevision, Instant asOf) {
+        var selected = verifySelected(plan, leafAuthorizations, repositoryRevision, asOf);
+        return LearnedSelectedProgramReplayEvidence.capture(plan, selected.bundle(), selected.leafHashes(),
+            selected.compiled(), selected.engine(), inputs);
+    }
+
+    /** Internal execution authority only; scientific, publication and release claims remain separate. */
+    public SelectedAuthorization authorizeSelected(EvolutionRewriteProgramFinalTestPlan plan,
+        List<LearnedPatternRuleAuthorizationService.SelectedLeafAuthorization> leafAuthorizations,
+        LearnedSelectedProgramReplayEvidence evidence, String repositoryRevision, Clock clock) {
+        Objects.requireNonNull(clock, "clock");
+        Instant startedAt = clock.instant();
+        var selected = verifySelected(plan, leafAuthorizations, repositoryRevision, startedAt);
+        Objects.requireNonNull(evidence, "evidence");
+        var replay = LearnedSelectedProgramReplayEvidence.capture(plan, selected.bundle(), selected.leafHashes(),
+            selected.compiled(), selected.engine(), evidence.inputs());
+        if (!replay.equals(evidence)) {
+            throw new IllegalArgumentException("selected-program replay differs from actual authorized execution");
+        }
+        if (replay.cases().stream().anyMatch(item -> !item.programReplay().complete() || !item.search().complete()
+                || (item.search().reached() && item.search().correctness()
+                    != EvolutionRewriteProgramTrainFitnessEvidence.PathCorrectness.CONFIRMED)
+                || item.programReplay().candidates().stream().anyMatch(candidate ->
+                    !item.input().assumptions().containsAll(candidate.assumptions())))) {
+            throw new IllegalArgumentException("selected-program replay retains incomplete or unqualified concrete outcomes");
+        }
+        Instant authorizedAt = clock.instant();
+        if (authorizedAt.isBefore(startedAt)) { throw new IllegalArgumentException("authorization clock moved backwards during replay"); }
+        for (var leaf : selected.leaves()) { leaf.requireUsableAt(plan, repositoryRevision, authorizedAt); }
+        return new SelectedAuthorization(plan, selected, replay, repositoryRevision, clock, authorizedAt);
+    }
+
+    private VerifiedSelected verifySelected(EvolutionRewriteProgramFinalTestPlan plan,
+        List<LearnedPatternRuleAuthorizationService.SelectedLeafAuthorization> authorizations, String revision, Instant asOf) {
+        Objects.requireNonNull(plan, "plan");
+        Objects.requireNonNull(authorizations, "authorizations");
+        LearnedPatternAuthorizationJson.requireRevision(revision, "repositoryRevision");
+        var genome = plan.selectedConfiguration().candidate().genome();
+        Set<String> executing = new TreeSet<>(genome.rewrites().stream().map(EvolutionGenome.RewriteGene::geneId).toList());
+        if (authorizations.size() != executing.size()) {
+            throw new IllegalArgumentException("selected runtime requires exactly one authority for every executing genome gene");
+        }
+        Map<String, RewriteRule> allRules = new TreeMap<>();
+        Map<String, String> hashes = new TreeMap<>();
+        LearnedSelectedProgramAuthorizationBundle bundle = null;
+        for (var leaf : authorizations) {
+            Objects.requireNonNull(leaf, "leaf").requireUsableAt(plan, revision, asOf);
+            if (!executing.contains(leaf.geneId()) || allRules.put(leaf.geneId(), leaf.promotion().rule()) != null) {
+                throw new IllegalArgumentException("duplicate or foreign selected leaf authority");
+            }
+            if (bundle != null && !bundle.equals(leaf.bundle())) {
+                throw new IllegalArgumentException("selected leaves have different full evidence or validity bindings");
+            }
+            bundle = leaf.bundle();
+            hashes.put(leaf.geneId(), leaf.contentHash());
+        }
+        if (!allRules.keySet().equals(executing)) { throw new IllegalArgumentException("selected leaf inventory differs from genome"); }
+        var candidate = plan.selectedConfiguration().candidate();
+        Map<String, RewriteRule> referenced = new TreeMap<>();
+        for (String id : candidate.plan().referencedGeneIds()) { referenced.put(id, allRules.get(id)); }
+        var compiled = compiler.compileAuthorized(genome, candidate.plan(), referenced);
+        var budget = plan.selectedConfiguration().effectiveBudget();
+        var ordinary = MeasuredTransformationEngines.counting(new AstRewriteTransformationEngine(
+            AstRewriteTransformationEngine.defaultRules(), genome.budget().maxAstGrowthPerStep(), budget.maxCandidatesPerState()));
+        var flat = MeasuredTransformationEngines.counting(new AstRewriteTransformationEngine(
+            List.copyOf(allRules.values()), genome.budget().maxAstGrowthPerStep(), budget.maxCandidatesPerState()));
+        return new VerifiedSelected(Objects.requireNonNull(bundle, "bundle"), Map.copyOf(hashes), compiled,
+            MeasuredTransformationEngines.union(ordinary, flat, compiled.engine()), List.copyOf(authorizations));
+    }
+
+    private record VerifiedSelected(LearnedSelectedProgramAuthorizationBundle bundle, Map<String, String> leafHashes,
+        EvolutionRewriteProgramCompiler.CompiledRewriteProgram compiled, MeasuredTransformationEngine engine,
+        List<LearnedPatternRuleAuthorizationService.SelectedLeafAuthorization> leaves) { }
+
+    /** Opaque, bounded executor. It never exposes its compiled program, promoted rules or underlying engine. */
+    public static final class SelectedAuthorization {
+        private final EvolutionRewriteProgramFinalTestPlan plan;
+        private final VerifiedSelected verified;
+        private final LearnedSelectedProgramReplayEvidence replay;
+        private final String repositoryRevision;
+        private final Clock clock;
+        private final Instant authorizedAt;
+        private final String bindingHash;
+
+        private SelectedAuthorization(EvolutionRewriteProgramFinalTestPlan plan, VerifiedSelected verified,
+            LearnedSelectedProgramReplayEvidence replay, String revision, Clock clock, Instant authorizedAt) {
+            this.plan = plan;
+            this.verified = verified;
+            this.replay = replay;
+            this.repositoryRevision = revision;
+            this.clock = clock;
+            this.authorizedAt = authorizedAt;
+            this.bindingHash = EvolutionProgramValidationJson.hash(EvolutionProgramValidationJson.material(
+                "regelsuche.learned-selected-program-internal-authorization/v1", "finalPlanHash", plan.contentHash(),
+                "configurationHash", plan.selectedConfiguration().contentHash(), "bundleHash", verified.bundle().contentHash(),
+                "leafAuthorizationHashes", verified.leafHashes(), "replayHash", replay.contentHash(), "scope", scope(),
+                "authorizedAt", authorizedAt, "claimStatuses", claimStatuses()));
+        }
+
+        public EvolutionRewriteProgramValidationEvidence.Measurement execute(LearnedSelectedProgramReplayEvidence.Input input,
+            String expectedRepositoryRevision) {
+            Objects.requireNonNull(input, "input");
+            if (!repositoryRevision.equals(expectedRepositoryRevision)) {
+                throw new IllegalArgumentException("selected runtime repository revision has changed");
+            }
+            Instant asOf = clock.instant();
+            if (asOf.isBefore(authorizedAt)) { throw new IllegalArgumentException("selected capability predates actual program authorization"); }
+            for (var leaf : verified.leaves()) { leaf.requireUsableAt(plan, expectedRepositoryRevision, asOf); }
+            return new NativeEvolutionRewriteProgramValidationEvaluator().evaluateSide(verified.engine(), input.inputExpression(),
+                input.targetExpression(), input.assumptions(), plan.selectedConfiguration().effectiveBudget());
+        }
+
+        public String bindingHash() { return bindingHash; }
+        public String scope() { return "INTERNAL_EXECUTION_ONLY"; }
+        public LearnedSelectedProgramReplayEvidence replayEvidence() { return replay; }
+        public Map<String, String> claimStatuses() {
+            return Map.of("projectNovelty", "NOT_EVALUATED", "externalNovelty", "NOT_EVALUATED", "publicEvidence", "NOT_EVALUATED",
+                "publicPromotion", "NOT_EVALUATED", "release", "NOT_EVALUATED");
+        }
     }
 
     private VerifiedProgram verifyProgram(
