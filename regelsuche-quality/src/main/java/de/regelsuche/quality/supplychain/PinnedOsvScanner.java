@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /** Official executable provisioning is online; the separate scan always uses the retained local DB. */
@@ -74,8 +75,13 @@ final class PinnedOsvScanner {
             "scanner executable hash or size differs");
     }
 
-    static ObjectNode scan(Path root, Path output, Path binary, VulnerabilityPolicy policy,
+    static ScanExecution scan(Path root, Path output, Path binary, VulnerabilityPolicy policy,
             AdvisorySnapshot snapshot, MavenScanInputs inputs) throws Exception {
+        verifyBinary(policy.scanner(), binary);
+        inputs.verifyFiles(root, output);
+        String manifestHash = hash(canonical(snapshot.manifest()));
+        String archiveHash = hash(snapshot.archive());
+        String inputsHash = hash(canonical(inputs.bindings()));
         Path database = output.resolve("cache/osv-scalibr/Maven/all.zip");
         write(root, database, snapshot.archive());
         require(hash(database).equals(text(snapshot.manifest().path("archive"), "sha256")),
@@ -86,15 +92,17 @@ final class PinnedOsvScanner {
             "--config", "osv-scanner.toml", "--format", "json"));
         inputs.components().values().stream().sorted(java.util.Comparator.comparing(MavenScanInputs.Component::purl))
             .forEach(component -> command.addAll(List.of("-L", component.source())));
-        ObjectNode execution = execute(root, output, command, Duration.ofSeconds(policy.timeoutSeconds()));
+        ProcessExecution execution = execute(root, output, command, Duration.ofSeconds(policy.timeoutSeconds()));
         verifyBinary(policy.scanner(), binary);
         inputs.verifyFiles(root, output);
         require(hash(file(root, database)).equals(text(snapshot.manifest().path("archive"), "sha256")),
             "scanner database changed during execution");
-        return execution;
+        var result = new ScanExecution(root, output, execution, manifestHash, archiveHash, inputsHash, inputs.components());
+        result.verifyBindings(snapshot, inputs, output);
+        return result;
     }
 
-    static ObjectNode execute(Path root, Path output, List<String> command, Duration timeout) throws Exception {
+    static ProcessExecution execute(Path root, Path output, List<String> command, Duration timeout) throws Exception {
         Path stdout = checked(root, output.resolve("scanner.stdout.json"));
         Path stderr = checked(root, output.resolve("scanner.stderr.log"));
         ObjectNode result = JSON.createObjectNode();
@@ -103,48 +111,78 @@ final class PinnedOsvScanner {
         result.put("timeoutMillis", timeout.toMillis());
         result.put("networkMode", "OSV_SCANNER_OFFLINE_LOCAL_DATABASE");
         result.set("command", JSON.valueToTree(command));
-        Process process = null;
-        try {
-            ProcessBuilder builder = new ProcessBuilder(command).directory(output.toFile())
-                .redirectOutput(stdout.toFile()).redirectError(stderr.toFile());
-            // No ambient scanner configuration, proxy, token or user cache is needed by the offline subprocess.
-            builder.environment().clear();
-            builder.environment().put("LANG", "C.UTF-8");
-            process = builder.start();
-            process.getOutputStream().close();
-            if (process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
-                result.put("outcome", "EXITED").put("exitCode", process.exitValue());
-            } else {
-                result.put("outcome", "TIMED_OUT");
-            }
-        } catch (IOException failure) {
-            result.put("outcome", "START_FAILURE").put("error", failure.toString());
-        } catch (InterruptedException interruption) {
-            result.put("outcome", "INTERRUPTED");
-            Thread.currentThread().interrupt();
-        } finally {
-            if (process != null && process.isAlive()) {
-                process.destroyForcibly();
-                // The fixed offline SBOM worker starts no children. Wait using the actual Process object;
-                // ProcessHandle PID namespaces are not reliable in every supported container runtime.
-                boolean interrupted = Thread.interrupted();
-                try {
-                    require(process.waitFor(10, TimeUnit.SECONDS), "scanner did not terminate after forced destruction");
-                } finally {
-                    if (interrupted) Thread.currentThread().interrupt();
-                }
-            }
-            if (process != null && !process.isAlive()) result.put("exitCode", process.exitValue());
-            result.put("finishedAt", Instant.now().toString());
-            for (Path path : List.of(stdout, stderr)) {
-                if (!Files.exists(path)) write(root, path, new byte[0]);
-                String prefix = path.equals(stdout) ? "stdout" : "stderr";
-                result.put(prefix + "Path", path.getFileName().toString());
-                result.put(prefix + "Hash", hash(path)).put(prefix + "Bytes", Files.size(path));
-            }
-            write(root, output.resolve("scanner-execution.json"), canonical(result));
+        result.put("outputLimitBytes", MAX_JSON_BYTES);
+        BoundedScannerProcess.Result captured = BoundedScannerProcess.run(output, command, timeout, MAX_JSON_BYTES);
+        result.put("outcome", captured.outcome());
+        if (captured.exitCode() != null) result.put("exitCode", captured.exitCode());
+        if (!captured.error().isEmpty()) result.put("error", captured.error());
+        result.put("finishedAt", Instant.now().toString());
+        retain(root, stdout, "stdout", captured.stdout(), result);
+        retain(root, stderr, "stderr", captured.stderr(), result);
+        write(root, output.resolve("scanner-execution.json"), canonical(result));
+        return new ProcessExecution(result, captured.stdout().bytes());
+    }
+
+    private static void retain(Path root, Path path, String prefix, BoundedScannerProcess.Captured captured,
+            ObjectNode receipt) throws IOException {
+        write(root, path, captured.bytes());
+        receipt.put(prefix + "Path", path.getFileName().toString());
+        receipt.put(prefix + "Hash", hash(captured.bytes())).put(prefix + "Bytes", captured.bytes().length);
+        receipt.put(prefix + "ObservedBytes", captured.observedBytes()).put(prefix + "Truncated", captured.truncated());
+        if (!captured.error().isEmpty()) receipt.put(prefix + "CaptureError", captured.error());
+    }
+
+    /** Created only from an actual process; exported JSON and bytes are defensive copies. */
+    static final class ProcessExecution {
+        private final ObjectNode receipt;
+        private final byte[] stdout;
+
+        private ProcessExecution(ObjectNode receipt, byte[] stdout) {
+            this.receipt = receipt.deepCopy();
+            // Ownership transfers from the private capture path; the capture never escapes execute().
+            this.stdout = stdout;
         }
-        return result;
+        ObjectNode receipt() { return receipt.deepCopy(); }
+        byte[] stdoutBytes() { return stdout.clone(); }
+
+        private void verifyRetained(Path root, Path output) throws IOException {
+            for (String prefix : List.of("stdout", "stderr")) {
+                Path retained = file(root, output.resolve(text(receipt, prefix + "Path")));
+                require(Files.size(retained) == integer(receipt, prefix + "Bytes")
+                    && hash(retained).equals(text(receipt, prefix + "Hash")),
+                    "retained scanner " + prefix + " differs from actual execution");
+            }
+            require(hash(file(root, output.resolve("scanner-execution.json"))).equals(hash(canonical(receipt))),
+                "retained scanner receipt differs from actual execution");
+        }
+    }
+
+    /** Only scan() can qualify a process for a vulnerability decision, after verifying its inputs and binary. */
+    static final class ScanExecution {
+        private final Path root, output;
+        private final ProcessExecution process;
+        private final String manifestHash, archiveHash, inputsHash;
+        private final Map<String, MavenScanInputs.Component> components;
+
+        private ScanExecution(Path root, Path output, ProcessExecution process, String manifestHash,
+                String archiveHash, String inputsHash, Map<String, MavenScanInputs.Component> components) {
+            this.root = root.toAbsolutePath().normalize();
+            this.output = output.toAbsolutePath().normalize();
+            this.process = process; this.manifestHash = manifestHash; this.archiveHash = archiveHash;
+            this.inputsHash = inputsHash; this.components = Map.copyOf(components);
+        }
+        ObjectNode receipt() { return process.receipt(); }
+        byte[] stdoutBytes() { return process.stdoutBytes(); }
+
+        void verifyBindings(AdvisorySnapshot snapshot, MavenScanInputs inputs, Path output) throws IOException {
+            require(this.output.equals(output.toAbsolutePath().normalize()), "scanner output directory differs");
+            require(manifestHash.equals(hash(canonical(snapshot.manifest()))) && archiveHash.equals(hash(snapshot.archive())),
+                "scanner snapshot binding differs");
+            require(inputsHash.equals(hash(canonical(inputs.bindings()))) && components.equals(inputs.components()),
+                "scanner input binding differs from actual execution");
+            inputs.verifyFiles(root, this.output);
+            process.verifyRetained(root, this.output);
+        }
     }
 
     private static final class SetHolder {
