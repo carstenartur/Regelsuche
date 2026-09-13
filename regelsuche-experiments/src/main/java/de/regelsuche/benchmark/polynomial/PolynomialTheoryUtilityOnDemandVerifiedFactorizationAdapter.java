@@ -51,6 +51,12 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
     public String adapterId() { return ADAPTER_ID; }
 
     @Override
+    public String resultSchema() {
+        return observed ? PolynomialTheoryUtilityCandidateResult.OBSERVED_SCHEMA
+            : PolynomialTheoryUtilityCandidateResult.SCHEMA;
+    }
+
+    @Override
     public Run openRun(RunDescriptor descriptor) {
         Objects.requireNonNull(descriptor, "descriptor");
         var expected = PolynomialTheoryUtilityExecutionInputs.freeze().inputs().stream()

@@ -1,5 +1,7 @@
 package de.regelsuche.benchmark.polynomial;
 
+import de.regelsuche.benchmark.polynomial.PolynomialTheoryUtilityMeasuredExecution.MeasuredRun;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -14,6 +16,15 @@ public interface PolynomialTheoryUtilityProfileAdapter {
     String profileId();
 
     String adapterId();
+
+    /**
+     * Declared result contract for explicit observed execution preflight.
+     * Existing adapters retain the historical contract unless they opt in;
+     * the measured runner also checks the actual result of every execution.
+     */
+    default String resultSchema() {
+        return PolynomialTheoryUtilityCandidateResult.SCHEMA;
+    }
 
     Run openRun(RunDescriptor descriptor);
 
@@ -55,6 +66,20 @@ public interface PolynomialTheoryUtilityProfileAdapter {
             "regelsuche.polynomial-theory-utility.no-factorization/v1";
         public static final String DETAIL_CODE =
             "FACTORIZATION_DISABLED_BY_FROZEN_PROFILE";
+        private final boolean observed;
+
+        public NoFactorizationAdapter() {
+            this(false);
+        }
+
+        private NoFactorizationAdapter(boolean observed) {
+            this.observed = observed;
+        }
+
+        /** Retains disabled outcomes in result v3; the constructor remains historical. */
+        public static NoFactorizationAdapter observed() {
+            return new NoFactorizationAdapter(true);
+        }
 
         @Override
         public String profileId() {
@@ -64,6 +89,12 @@ public interface PolynomialTheoryUtilityProfileAdapter {
         @Override
         public String adapterId() {
             return ADAPTER_ID;
+        }
+
+        @Override
+        public String resultSchema() {
+            return observed ? PolynomialTheoryUtilityCandidateResult.OBSERVED_SCHEMA
+                : PolynomialTheoryUtilityCandidateResult.SCHEMA;
         }
 
         @Override
@@ -104,7 +135,23 @@ public interface PolynomialTheoryUtilityProfileAdapter {
                     "no-factorization run input count differs from the freeze"
                 );
             }
-            return new BaselineRun(descriptor, expectedInputs);
+            var run = new BaselineRun(descriptor, expectedInputs, observed);
+            return observed ? new ObservedBaselineRun(run) : run;
+        }
+
+        private record ObservedBaselineRun(BaselineRun delegate) implements MeasuredRun {
+            @Override
+            public PolynomialTheoryUtilityMeasuredCandidate executeMeasured(
+                    PolynomialTheoryUtilityExecutionInput input,
+                    PolynomialTheoryUtilityCaseCorpus.FormationCase formationCase) {
+                return PolynomialTheoryUtilityMeasuredCandidate.withoutObservations(
+                    delegate.execute(input, formationCase));
+            }
+
+            @Override
+            public void close() {
+                delegate.close();
+            }
         }
 
         private static final class BaselineRun implements Run {
@@ -113,13 +160,16 @@ public interface PolynomialTheoryUtilityProfileAdapter {
                 expectedInputs;
             private int nextCase;
             private boolean closed;
+            private final boolean observed;
 
             private BaselineRun(
                 RunDescriptor descriptor,
-                List<PolynomialTheoryUtilityExecutionInput> expectedInputs
+                List<PolynomialTheoryUtilityExecutionInput> expectedInputs,
+                boolean observed
             ) {
                 this.descriptor = descriptor;
                 this.expectedInputs = List.copyOf(expectedInputs);
+                this.observed = observed;
             }
 
             @Override
@@ -144,6 +194,23 @@ public interface PolynomialTheoryUtilityProfileAdapter {
                     );
                 }
                 nextCase++;
+                if (observed) {
+                    var occurrences = new ArrayList<
+                        PolynomialTheoryUtilityExecutionObservations.Occurrence>();
+                    for (var path : PolynomialTheoryUtilityExecutionObservations
+                            .paths(formationCase)) {
+                        occurrences.add(
+                            new PolynomialTheoryUtilityExecutionObservations.Occurrence(
+                                occurrences.size(), path,
+                                PolynomialTheoryUtilityCandidateResult.TerminalStatus.NO_TRANSITION,
+                                DETAIL_CODE, "NONE", "NONE", 0, PolynomialWorkLedger.empty(),
+                                List.of(), List.of()));
+                    }
+                    return PolynomialTheoryUtilityCandidateResult.createObserved(
+                        input, formationCase, DETAIL_CODE, List.of(), "NOT_REQUESTED",
+                        PolynomialTheoryUtilityExecutionObservations.create(
+                            PolynomialWorkLedger.empty(), occurrences));
+                }
                 return PolynomialTheoryUtilityCandidateResult.noTransition(
                     input,
                     formationCase,

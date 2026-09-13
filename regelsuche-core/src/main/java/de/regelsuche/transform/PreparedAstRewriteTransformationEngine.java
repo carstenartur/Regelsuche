@@ -82,6 +82,28 @@ public final class PreparedAstRewriteTransformationEngine
         return rules;
     }
 
+    /** Explicit native cursor capability; the historical list-based transformation path is unchanged. */
+    public TransformationCursor openCursor(String expression) {
+        return openCursor(expression, TransformationCursor.DEFAULT_MATCHER_BRANCH_LIMIT);
+    }
+
+    public TransformationCursor openCursor(String expression, int matcherBranchLimit) {
+        return new PreparedTransformationCursor(this, expression, cursorDefinition(matcherBranchLimit));
+    }
+
+    /** Preflight rejects custom dispatch rather than silently materializing an unsupported provider. */
+    public TransformationCursor.Definition cursorDefinition(int matcherBranchLimit) {
+        if (maxCandidatesPerState < 1 || matcherBranchLimit < 1)
+            throw new IllegalArgumentException("invalid native cursor bounds");
+        var definitions = rules.stream().map(rule -> {
+            if (rule.getClass() != PatternRewriteRule.class)
+                throw new IllegalArgumentException("native cursor requires exact PatternRewriteRule instances");
+            return TransformationCursor.RuleDefinition.of((PatternRewriteRule) rule);
+        }).toList();
+        return new TransformationCursor.Definition(TransformationCursor.ORDER_REVISION, definitions,
+            maxAstSizeIncreasePerStep, maxCandidatesPerState, matcherBranchLimit);
+    }
+
     @Override
     public List<Transformation> transform(String expression) {
         Expr root;
@@ -212,7 +234,7 @@ public final class PreparedAstRewriteTransformationEngine
         return rule.apply(subtree);
     }
 
-    private int canonicalAstNodeCount(Expr expression) {
+    int canonicalAstNodeCount(Expr expression) {
         return count(canonicalizer.canonicalize(expression));
     }
 
@@ -230,7 +252,7 @@ public final class PreparedAstRewriteTransformationEngine
         return 1;
     }
 
-    private String stableHash(Expr expression) {
+    String stableHash(Expr expression) {
         Expr canonical = canonicalizer.canonicalize(expression);
         return sha256(ExpressionFormatter.format(canonical));
     }

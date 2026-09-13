@@ -7,6 +7,7 @@ import de.regelsuche.search.moves.SearchMove;
 import de.regelsuche.transform.MeasuredTransformationEngine;
 import de.regelsuche.transform.MeasuredTransformationEngines;
 import de.regelsuche.transform.PreparedAstRewriteTransformationEngine;
+import de.regelsuche.transform.PatternRewriteRule;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +21,17 @@ public final class PrimitiveReplayMoveVerifier implements MoveVerifier {
         primitives = new EvolutionGenomeCompiler().compile(inventory).rules().stream().collect(Collectors.toUnmodifiableMap(
             rule -> rule.id(), rule -> MeasuredTransformationEngines.counting(
                 new PreparedAstRewriteTransformationEngine(List.of(rule), Integer.MAX_VALUE, Integer.MAX_VALUE))));
+    }
+    /** Explicit native inventory; replay still re-executes the rule and independently proves polynomial identity. */
+    public static PrimitiveReplayMoveVerifier nativePatterns(List<PatternRewriteRule> inventory) {
+        return new PrimitiveReplayMoveVerifier(List.copyOf(inventory));
+    }
+    private PrimitiveReplayMoveVerifier(List<PatternRewriteRule> inventory) {
+        new PreparedAstRewriteTransformationEngine(new ArrayList<>(inventory), Integer.MAX_VALUE, Integer.MAX_VALUE)
+            .cursorDefinition(de.regelsuche.transform.TransformationCursor.DEFAULT_MATCHER_BRANCH_LIMIT);
+        primitives = inventory.stream().collect(Collectors.toUnmodifiableMap(PatternRewriteRule::id,
+            rule -> MeasuredTransformationEngines.counting(new PreparedAstRewriteTransformationEngine(
+                List.of(rule), Integer.MAX_VALUE, Integer.MAX_VALUE))));
     }
     @Override public Verification verify(MoveState source, SearchMove move, MoveContext context) {
         long work = 1;

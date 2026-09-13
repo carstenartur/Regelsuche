@@ -183,6 +183,15 @@ Die gepinnte Umgebung wird unter `build/verification-venv` erzeugt. Verifier
 starten Gradle nicht rekursiv, sondern prüfen die im selben Taskgraphen erzeugten
 Artefakte.
 
+Der Release-Readiness-Verifier benötigt zusätzlich POSIX-Verzeichnisdeskriptoren
+mit `O_NOFOLLOW`; diese Dateigrenze ist unter Linux kontrolliert. Ohne die
+erforderlichen Funktionen endet er ausdrücklich mit `UNSUPPORTED_PLATFORM`,
+auch im aggregierten `check`-Pfad. Ein nicht unterstütztes System erhält keine
+erfolgreiche Qualifikation. Gewöhnliche Java-Modultests sind davon unabhängig;
+Windows und andere nicht ausgeführte Plattformen sind für diesen Verifier nicht
+qualifiziert. Details stehen bei der
+[Release-Evidence-Integrität](release-evidence-task-reuse.md#evidence-integrity).
+
 ### AI-Knowledge-Vertrag
 
 Der optionale Vertrag wird explizit aktiviert:

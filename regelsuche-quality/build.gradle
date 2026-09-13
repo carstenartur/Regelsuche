@@ -83,3 +83,27 @@ tasks.named('check') {
 rootProject.tasks.named('check') {
     dependsOn tasks.named('renderJmhHistory')
 }
+
+// The Maven/JUnit-tested Java implementation owns policy, scanner provisioning,
+// offline execution, retained outcomes and the failure decision. Gradle only
+// provides the existing aggregate inventory and invokes that same authority.
+tasks.register('verifySupplyChainVulnerabilities', JavaExec) {
+    group = 'verification'
+    description = 'Runs the required content-addressed offline Maven vulnerability gate.'
+    dependsOn tasks.named('classes'), tasks.named('test'),
+        rootProject.tasks.named('verifySupplyChainInventory')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.quality.supplychain.VulnerabilityGateMain'
+    args '--root', rootProject.projectDir.absolutePath,
+        '--inventory', rootProject.file('build/reports/quality/supply-chain').absolutePath,
+        '--output', rootProject.file('build/reports/quality/supply-chain/vulnerability').absolutePath
+    outputs.upToDateWhen { false }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('verifySupplyChainVulnerabilities')
+}
+
+rootProject.tasks.named('check') {
+    dependsOn tasks.named('verifySupplyChainVulnerabilities')
+}

@@ -1,0 +1,197 @@
+{
+  "schema": "regelsuche.quality.jmh-precision-study-policy/v1",
+  "studyId": "issue-981-shared-runner-precision-v1",
+  "thresholdPolicyPath": "config/quality/jmh-regression-policy-v2.json",
+  "thresholdPolicySha256": "8c17b5f2eaed6cdbcc686ce9eaefee70f44e97ba741bb614e0a39be36ee6bd92",
+  "decisionPolicyPath": "config/quality/jmh-regression-decision-policy-v3.json",
+  "decisionPolicySha256": "e86ffe2695511342de163abab929d0f7e35d44d00e08dd715ab34d68ad1b30e9",
+  "benchmarkCount": 29,
+  "execution": {
+    "jmhVersion": "1.36",
+    "jdkMajor": 25,
+    "mode": "avgt",
+    "threads": 1
+  },
+  "sharedRunnerLaunch": {
+    "repository": "carstenartur/Regelsuche",
+    "eventName": "pull_request",
+    "eventAction": "opened",
+    "headBranch": "codex/issue-981-jmh-precision-study",
+    "runAttempt": "1",
+    "job": "jmh-precision-study"
+  },
+  "protocols": [
+    {
+      "id": "baseline",
+      "execution": {
+        "warmupIterations": 2,
+        "measurementIterations": 3,
+        "forks": 1,
+        "warmupSeconds": 1,
+        "measurementSeconds": 1
+      },
+      "profiler": "none"
+    },
+    {
+      "id": "more-measurements",
+      "execution": {
+        "warmupIterations": 2,
+        "measurementIterations": 8,
+        "forks": 1,
+        "warmupSeconds": 1,
+        "measurementSeconds": 1
+      },
+      "profiler": "none"
+    },
+    {
+      "id": "more-warmup",
+      "execution": {
+        "warmupIterations": 6,
+        "measurementIterations": 3,
+        "forks": 1,
+        "warmupSeconds": 1,
+        "measurementSeconds": 1
+      },
+      "profiler": "none"
+    },
+    {
+      "id": "more-forks",
+      "execution": {
+        "warmupIterations": 2,
+        "measurementIterations": 3,
+        "forks": 2,
+        "warmupSeconds": 1,
+        "measurementSeconds": 1
+      },
+      "profiler": "none"
+    },
+    {
+      "id": "longer-measurements",
+      "execution": {
+        "warmupIterations": 2,
+        "measurementIterations": 3,
+        "forks": 1,
+        "warmupSeconds": 1,
+        "measurementSeconds": 2
+      },
+      "profiler": "none"
+    },
+    {
+      "id": "family-contract",
+      "execution": {
+        "warmupIterations": 2,
+        "measurementIterations": 3,
+        "forks": 1,
+        "warmupSeconds": 1,
+        "measurementSeconds": 1
+      },
+      "profiler": "none",
+      "familyOverrides": {
+        "REWRITE_PROGRAM": {
+          "warmupIterations": 4,
+          "measurementIterations": 6,
+          "forks": 2
+        },
+        "END_TO_END_SEARCH": {
+          "warmupIterations": 6,
+          "measurementIterations": 6,
+          "forks": 2
+        }
+      }
+    },
+    {
+      "id": "gc-profile",
+      "execution": {
+        "warmupIterations": 2,
+        "measurementIterations": 3,
+        "forks": 1,
+        "warmupSeconds": 1,
+        "measurementSeconds": 1
+      },
+      "profiler": "gc"
+    }
+  ],
+  "replicates": [
+    {
+      "id": 1,
+      "order": [
+        "baseline",
+        "more-measurements",
+        "more-warmup",
+        "more-forks",
+        "longer-measurements",
+        "family-contract",
+        "gc-profile"
+      ]
+    },
+    {
+      "id": 2,
+      "order": [
+        "more-warmup",
+        "more-forks",
+        "longer-measurements",
+        "family-contract",
+        "gc-profile",
+        "baseline",
+        "more-measurements"
+      ]
+    },
+    {
+      "id": 3,
+      "order": [
+        "gc-profile",
+        "family-contract",
+        "longer-measurements",
+        "more-forks",
+        "more-warmup",
+        "more-measurements",
+        "baseline"
+      ]
+    }
+  ],
+  "budgets": {
+    "nominalIterationSecondsPerReplicate": 1809,
+    "replicateTimeoutSeconds": 3600,
+    "buildTimeoutSeconds": 900,
+    "cellTimeoutNominalMultiplier": 2,
+    "cellTimeoutOverheadSeconds": 60,
+    "maximumCellTimeoutSeconds": 900,
+    "automaticRetries": 0
+  },
+  "analysis": {
+    "relativeErrorPercentiles": [
+      50,
+      90
+    ],
+    "percentileMethod": "nearest-rank; median averages the two middle values",
+    "aggregation": "descriptive-medians-and-worst-status; no pooled confidence interval",
+    "maximumLowPrecisionRatioToControl": 0.5,
+    "maximumMedianWallclockRatioToControl": 3.5,
+    "requireNoFamilyLowPrecisionIncrease": true,
+    "requireAllCandidateRatchetsPassed": true,
+    "selection": "manual-review-after-complete-three-replicate-evidence",
+    "rankComparison": "within-family pair inversions; descriptive, not a semantic proof",
+    "requirePositiveControlLowPrecisionCount": true,
+    "requireLowerMedianRelativeError": true,
+    "requireLowerP90RelativeError": true,
+    "requireCompleteReplicateInventory": true,
+    "requireSemanticWorkParity": true,
+    "requireManualRankingReview": true,
+    "requireNewProductionAuthorityAndBaseline": true,
+    "incompleteEvidenceOutcome": "NO_SELECTION; retain errors; no retries or partial-corpus qualification",
+    "noEligibleProtocolOutcome": "NO_PROTOCOL_QUALIFIES",
+    "zeroControlLowPrecisionOutcome": "NO_LOW_PRECISION_IMPROVEMENT_ESTABLISHED"
+  },
+  "selectedProtocol": null,
+  "claimBoundary": "A finite protocol study of the existing shared-runner average-time ratchet on unchanged code. Study observations are not v2/v3 replacement evidence, cross-hardware absolute performance, a pooled confidence interval, statistical proof, or an automatically selected production contract.",
+  "jvm": {
+    "systemProperties": [
+      "-Dfile.encoding=UTF-8",
+      "-Duser.country",
+      "-Duser.language=en",
+      "-Duser.variant"
+    ],
+    "temporaryDirectoryPath": "app/build/tmp/jmh",
+    "inheritedJavaOptions": "reject JAVA_TOOL_OPTIONS, JDK_JAVA_OPTIONS and _JAVA_OPTIONS"
+  }
+}
