@@ -1,0 +1,100 @@
+{
+  "schema": "regelsuche.ai-knowledge-source-qualification/v1",
+  "repository": "carstenartur/Regelsuche",
+  "independentlyRecheckedAtUtc": "2026-09-13T05:01:07.246Z",
+  "pullRequest": {
+    "number": 997,
+    "url": "https://github.com/carstenartur/Regelsuche/pull/997",
+    "state": "closed",
+    "merged": true,
+    "merged_at": "2026-09-13T04:37:01Z",
+    "head_sha": "067619282e4ac4778900c893170283e2a9e57260",
+    "merge_commit_sha": "e673c6c89bca00f68ca47b8df2a7d20203089b29"
+  },
+  "workflowRun": {
+    "conclusion": "success",
+    "id": 34737310998,
+    "jobs_url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/runs/34737310998/jobs",
+    "logs_url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/runs/34737310998/logs",
+    "name": "CI",
+    "run_number": 5576,
+    "status": "completed",
+    "workflow_id": 282724469
+  },
+  "jobs": [
+    {
+      "id": 103670879084,
+      "name": "Complete Maven product and Docker authority",
+      "run_id": 34737310998,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103670879162,
+      "name": "Isolated JMH authority",
+      "run_id": 34737310998,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103670879170,
+      "name": "External polynomial comparison",
+      "run_id": 34737310998,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103670879188,
+      "name": "Isolated SymPy runtime authority",
+      "run_id": 34737310998,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103670879190,
+      "name": "Checkout-local Gradle authority",
+      "run_id": 34737310998,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103673245409,
+      "name": "Checkout-local ciCheck",
+      "run_id": 34737310998,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 103673291409,
+      "name": "Publish generated reports",
+      "run_id": 34737310998,
+      "status": "completed",
+      "conclusion": "skipped"
+    }
+  ],
+  "repositoryVerificationArtifact": {
+    "archive_download_url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10311229494/zip",
+    "created_at": "2026-09-13T04:31:52Z",
+    "digest": "sha256:2352c426bf8101becb4f7f21a8cf98f36b705fbaf15090c25e593db087cf44ea",
+    "expired": false,
+    "expires_at": "2026-12-12T04:11:35Z",
+    "id": 10311229494,
+    "name": "repository-verification",
+    "size_in_bytes": 320717542,
+    "updated_at": "2026-09-13T04:31:52Z",
+    "url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10311229494",
+    "workflow_run": {
+      "head_branch": "dependabot/github_actions/workflow-actions-4cf73e6ad1",
+      "head_repository_id": 1243764016,
+      "head_sha": "067619282e4ac4778900c893170283e2a9e57260",
+      "id": 34737310998,
+      "repository_id": 1243764016
+    }
+  },
+  "localGitTreeEquality": {
+    "e673c6c89bca00f68ca47b8df2a7d20203089b29": "3a271c01bac233259e47a46c78f6f49274804eb7",
+    "067619282e4ac4778900c893170283e2a9e57260": "3a271c01bac233259e47a46c78f6f49274804eb7",
+    "1dad1683e9b08c6fb2626d687b978f2f0456ef70": "3a271c01bac233259e47a46c78f6f49274804eb7"
+  },
+  "evidenceBoundary": "The PR, source-head workflow run, latest-attempt jobs and artifact metadata were independently rechecked through read-only GitHub API calls. All six verification authorities passed; the separate report-publication job was skipped. Tree equality was checked against local Git objects. The artifact ZIP was not downloaded or hashed. Baseline values come exclusively from the retained clean local predecessor reproduction."
+}

@@ -187,7 +187,8 @@ def testReleaseReadinessEvidence = tasks.register('testReleaseReadinessEvidence'
         ':regelsuche-release:runQualifiedReleaseReadinessWithHiddenRuleEvidence'
     workingDir rootDir
     inputs.files('scripts/test-release-readiness-evidence.py',
-        'scripts/verify-release-readiness-evidence.py', 'scripts/release_readiness_bindings.py')
+        'scripts/verify-release-readiness-evidence.py', 'scripts/release_readiness_bindings.py',
+        'scripts/release_readiness_files.py', 'scripts/release_readiness_identities.py')
     inputs.dir('docs/schemas')
     doFirst {
         commandLine verificationPythonFile.get().absolutePath, '-B',
@@ -203,7 +204,8 @@ def verifyReleaseReadinessEvidence = tasks.register('verifyReleaseReadinessEvide
         ':regelsuche-release:runQualifiedReleaseReadinessWithHiddenRuleEvidence'
     workingDir rootDir
     inputs.files('scripts/verify-release-readiness-evidence.py',
-        'scripts/release_readiness_bindings.py')
+        'scripts/release_readiness_bindings.py', 'scripts/release_readiness_files.py',
+        'scripts/release_readiness_identities.py')
     doFirst {
         commandLine verificationPythonFile.get().absolutePath,
             'scripts/verify-release-readiness-evidence.py',

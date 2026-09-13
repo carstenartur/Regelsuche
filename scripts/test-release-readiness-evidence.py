@@ -15,6 +15,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.dont_write_bytecode = True
 REPOSITORY = Path(__file__).resolve().parents[1]
@@ -120,6 +121,144 @@ class ReleaseReadinessBindingsTest(unittest.TestCase):
         self.assertEqual(run["contentHash"], rehashed_run(run))
         self.assertEqual(matrix["contentHash"], rehashed_matrix(matrix))
         self.validate()
+
+    def test_root_catalog_and_nested_directory_symlinks_are_rejected(self) -> None:
+        for relative in ("profiles.json", "campaign", "."):
+            with self.subTest(relative=relative):
+                target = self.root / relative
+                outside = self.root.parent / "outside"
+                target.rename(outside)
+                target.symlink_to(outside, target_is_directory=outside.is_dir())
+                try:
+                    self.reject()
+                finally:
+                    target.unlink()
+                    outside.rename(target)
+
+    def test_symbolic_ancestor_of_the_requested_root_is_rejected(self) -> None:
+        alias = self.root.parent / "alias"
+        alias.symlink_to(self.root.parent, target_is_directory=True)
+        with self.assertRaises(SystemExit):
+            self.verifier.validate(alias / self.root.name)
+
+    def test_consumed_identity_fields_cannot_change_under_the_original_hash(self) -> None:
+        mutations = (
+            ("evidence-summary.json", "candidateCount", 2),
+            ("campaign/production-campaign-manifest.json", "candidateCount", 2),
+            ("hidden-rule-release-evidence.json", "generatedValidationExamples", 176),
+            ("qualification/candidate-qualification-evidence.json", "pairedUtilityPermille", 999),
+            ("qualification/candidate-qualification-run.json", "suiteHash", FORGED_HASH),
+        )
+        for relative, field, value in mutations:
+            with self.subTest(relative=relative, field=field):
+                original = read(self.root, relative)
+                changed = copy.deepcopy(original)
+                self.assertNotEqual(value, changed[field])
+                changed[field] = value
+                write(self.root, relative, changed)
+                try:
+                    self.reject()
+                finally:
+                    write(self.root, relative, original)
+
+    def test_every_root_binding_source_requires_its_existing_schema(self) -> None:
+        for relative in ("evidence-summary.json", "hidden-rule-release-evidence.json",
+                         "campaign/production-campaign-manifest.json"):
+            with self.subTest(relative=relative):
+                original = read(self.root, relative)
+                changed = copy.deepcopy(original)
+                changed["schema"] = "unrecognized-evidence/v999"
+                write(self.root, relative, changed)
+                try:
+                    self.reject()
+                finally:
+                    write(self.root, relative, original)
+
+    def test_unsupported_no_follow_platform_fails_instead_of_skipping_verification(self) -> None:
+        with mock.patch("release_readiness_files.os.supports_dir_fd", set()):
+            with self.assertRaisesRegex(SystemExit, "UNSUPPORTED_PLATFORM"):
+                self.validate()
+
+    def test_schema_symlink_is_rejected(self) -> None:
+        schemas = self.root.parent / "schemas"
+        shutil.copytree(self.verifier.SCHEMAS, schemas)
+        schema = schemas / self.verifier.SCHEMA_PAIRS[0][0]
+        original = schema.read_bytes()
+        outside = self.root.parent / "outside-schema.json"
+        outside.write_bytes(original)
+        schema.unlink()
+        schema.symlink_to(outside)
+        with mock.patch.object(self.verifier, "SCHEMAS", schemas):
+            self.reject()
+
+    def test_opened_root_and_first_read_bytes_remain_owned_after_path_replacement(self) -> None:
+        from release_readiness_files import EvidenceFiles
+        expected = (self.root / "profiles.json").read_bytes()
+        outside = self.root.parent / "outside"
+        outside.mkdir()
+        (outside / "profiles.json").write_bytes(b"outside-data")
+        moved = self.root.parent / "moved-root"
+        with EvidenceFiles(self.root) as files:
+            self.root.rename(moved)
+            self.root.symlink_to(outside, target_is_directory=True)
+            try:
+                self.assertEqual(expected, files.read_bytes("profiles.json"))
+                (moved / "profiles.json").write_bytes(b"changed-after-first-read")
+                self.assertEqual(expected, files.read_bytes(Path("profiles.json")))
+            finally:
+                self.root.unlink()
+                moved.rename(self.root)
+
+    def test_reader_refuses_relative_escape_and_nonregular_members(self) -> None:
+        from release_readiness_files import EvidenceFiles
+        import os
+        pipe = self.root / "not-a-file"
+        os.mkfifo(pipe)
+        with EvidenceFiles(self.root) as files:
+            for name in ("../outside.json", str(self.root / "profiles.json"), ".", "not-a-file"):
+                with self.subTest(name=name), self.assertRaises(ValueError):
+                    files.read_bytes(name)
+
+    def test_campaign_count_still_requires_summary_binding_after_manifest_rehash(self) -> None:
+        from release_readiness_identities import campaign_hash
+        relative = "campaign/production-campaign-manifest.json"
+        manifest = read(self.root, relative)
+        manifest["candidateCount"] += 1
+        self.assertEqual(manifest["contentHash"], campaign_hash(manifest),
+                         "historical campaign v2 hash does not cover the summary counts")
+        write(self.root, relative, manifest)
+        self.reject()
+
+    def test_each_direct_dependency_hash_is_recomputed_before_root_use(self) -> None:
+        mutations = (
+            ("evidence-summary.json", "evidenceHash"),
+            ("hidden-rule-release-evidence.json", "evidenceHash"),
+            ("campaign/production-campaign-manifest.json", "contentHash"),
+            ("qualification/candidate-qualification-evidence.json", "contentHash"),
+            ("qualification/candidate-qualification-run.json", "contentHash"),
+        )
+        for relative, field in mutations:
+            with self.subTest(relative=relative):
+                original = read(self.root, relative)
+                forged = copy.deepcopy(original)
+                forged[field] = FORGED_HASH
+                write(self.root, relative, forged)
+                try:
+                    with self.assertRaisesRegex(SystemExit, "canonical identity differs"):
+                        self.validate()
+                finally:
+                    write(self.root, relative, original)
+
+    def test_java_unicode_order_blank_filter_and_utf8_replacement_are_preserved(self) -> None:
+        from release_readiness_identities import java_hash, java_list, sorted_java_strings
+        # Oracle: JDK 25 List.stream().filter(!String.isBlank).distinct().sorted(),
+        # List.toString(), and SHA-256 of String.getBytes(StandardCharsets.UTF_8).
+        values = ["\u000b", "\u0085", "\u00a0", "\u2007", "\u2000", "\u202f",
+                  "z", "\U00010000", "\ue000", "z"]
+        self.assertEqual("sha256:f5f38822fd19e7c857d71db71027eb0a412044c2d02ea9bb1d3aacb10010324b",
+                         java_hash(java_list(sorted_java_strings(values))))
+        self.assertEqual("sha256:c55874dc1cdc737315a4af6031e71eda35060469b02592bcf570b8611f0c22f6",
+                         java_hash("\ud800|\udc00|\ud800\udc00|Ä\n"))
 
     def test_original_zero_matrix_hash_reproducer(self) -> None:
         run = read(self.root, RUN)

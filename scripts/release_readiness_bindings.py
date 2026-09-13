@@ -2,26 +2,15 @@
 
 from __future__ import annotations
 
-import hashlib
 from pathlib import Path
+from release_readiness_identities import (
+    java_hash, java_list, java_string_key, sha256, verify_artifact_identities,
+)
 
 PROFILES = {
     "SEARCH_REPRODUCIBILITY", "HIDDEN_RULE_REDISCOVERY", "OPEN_TARGET_DISCOVERY",
     "AUTONOMOUS_CAMPAIGN", "EXTERNAL_NOVELTY_REVIEW",
 }
-
-
-def sha256(value: bytes) -> str:
-    return "sha256:" + hashlib.sha256(value).hexdigest()
-
-
-def java_string_key(value: str) -> bytes:
-    # Java String.compareTo orders UTF-16 code units, including supplementary text.
-    return value.encode("utf-16-be", errors="surrogatepass")
-
-
-def java_list(values) -> str:
-    return "[" + ", ".join(values) + "]"
 
 
 def profile_material(profile: dict) -> str:
@@ -48,7 +37,7 @@ def matrix_hash(matrix: dict) -> str:
         + "\nprofiles=" + java_list(profile_material(item) for item in profiles)
         + "\nautonomy=" + matrix["autonomousCampaignStatus"]
     )
-    return sha256(material.encode("utf-8", errors="replace"))
+    return java_hash(material)
 
 
 def run_hash(run: dict) -> str:
@@ -61,7 +50,7 @@ def run_hash(run: dict) -> str:
         + "\nmatrix=" + run["matrixHash"]
         + "\ncampaign=" + run["campaignManifestHash"]
     )
-    return sha256(material.encode("utf-8"))
+    return java_hash(material)
 
 
 def profiles_by_name(document: dict, label: str, require) -> dict:
@@ -102,7 +91,7 @@ def verify_matrix_profiles(matrix: dict, catalog: dict, require) -> None:
             "matrix autonomy summary is inconsistent")
 
 
-def verify_root_bindings(root: Path, load, require) -> None:
+def verify_root_bindings(root: Path, load, require, read_bytes) -> None:
     run = load(root / "release-readiness-run.json")
     matrix = load(root / "release-readiness-report.json")
     campaign = load(root / "campaign/production-campaign-manifest.json")
@@ -112,9 +101,11 @@ def verify_root_bindings(root: Path, load, require) -> None:
     qualification_run = load(root / "qualification/candidate-qualification-run.json")
     catalog = load(root / "profiles.json")
 
+    verify_artifact_identities(campaign, evidence, hidden, qualification, qualification_run, require)
+
     expected = {
         "campaignManifestHash": campaign.get("contentHash"),
-        "profileCatalogHash": sha256((root / "profiles.json").read_bytes()),
+        "profileCatalogHash": sha256(read_bytes(root / "profiles.json")),
         "evidenceHash": evidence.get("evidenceHash"),
         "hiddenRuleEvidenceHash": hidden.get("evidenceHash"),
         "qualificationEvidenceHash": qualification.get("contentHash"),
