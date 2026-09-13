@@ -15,6 +15,8 @@ public record PolynomialTheoryUtilityCandidateMeasurementBatch(
 ) {
     public static final String SCHEMA =
         "regelsuche.polynomial-theory-utility-candidate-measurement-batch/v1";
+    public static final String OBSERVED_SCHEMA =
+        "regelsuche.polynomial-theory-utility-candidate-measurement-batch/v2";
     public static final String EVIDENCE_STATUS =
         "TARGET_BLIND_MEASUREMENTS_BOUND_NOT_FROZEN";
     private static final Pattern SHA_256 =
@@ -56,7 +58,7 @@ public record PolynomialTheoryUtilityCandidateMeasurementBatch(
     }
 
     public String schema() {
-        return SCHEMA;
+        return schema(candidateBatch);
     }
 
     public String studyId() {
@@ -102,8 +104,8 @@ public record PolynomialTheoryUtilityCandidateMeasurementBatch(
         PolynomialTheoryUtilityProfileAdapter.CandidateBatch candidateBatch,
         List<PolynomialTheoryUtilityCandidateMeasurements> measurements
     ) {
-        if (!PolynomialTheoryUtilityProfileAdapter.CandidateBatch.SCHEMA.equals(
-                candidateBatch.schema())
+        if (!List.of(PolynomialTheoryUtilityProfileAdapter.CandidateBatch.SCHEMA,
+                PolynomialTheoryUtilityProfileAdapter.CandidateBatch.OBSERVED_SCHEMA).contains(candidateBatch.schema())
                 || measurements.size() != candidateBatch.results().size()
                 || measurements.size()
                     != PolynomialTheoryUtilityExecutionInputs
@@ -134,7 +136,7 @@ public record PolynomialTheoryUtilityCandidateMeasurementBatch(
         List<PolynomialTheoryUtilityCandidateMeasurements> measurements
     ) {
         StringBuilder material = new StringBuilder();
-        append(material, SCHEMA);
+        append(material, schema(candidateBatch));
         append(material, PolynomialTheoryUtilityPreregistration.STUDY_ID);
         append(material, EVIDENCE_STATUS);
         append(
@@ -168,6 +170,10 @@ public record PolynomialTheoryUtilityCandidateMeasurementBatch(
             throw new IllegalArgumentException(name + " is not SHA-256");
         }
         return text;
+    }
+
+    private static String schema(PolynomialTheoryUtilityProfileAdapter.CandidateBatch batch) {
+        return PolynomialTheoryUtilityProfileAdapter.CandidateBatch.SCHEMA.equals(batch.schema()) ? SCHEMA : OBSERVED_SCHEMA;
     }
 
     private static String requireText(String value, String name) {

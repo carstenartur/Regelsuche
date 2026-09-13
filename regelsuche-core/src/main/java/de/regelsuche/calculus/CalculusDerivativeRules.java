@@ -1,5 +1,6 @@
 package de.regelsuche.calculus;
 
+import de.regelsuche.assumption.Assumption;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
@@ -25,8 +26,8 @@ import java.util.List;
  * <ul>
  *   <li>{@code diff(f + g, x) -> diff(f, x) + diff(g, x)} (and {@code -})</li>
  *   <li>{@code diff(f * g, x) -> diff(f, x)*g + f*diff(g, x)} (product rule)</li>
- *   <li>{@code diff(x^n, x) -> n * x^(n-1)} for {@link NumberExpr}
- *       exponents (power rule, the textbook example)</li>
+ *   <li>{@code diff(x^n, x) -> n * x^(n-1)} for numeric literal exponents,
+ *       including the parser's signed-literal shape (power rule)</li>
  *   <li>{@code diff(c, x) -> 0} for constants</li>
  *   <li>{@code diff(x, x) -> 1} for the variable itself</li>
  *   <li>{@code diff(sin(x), x) -> cos(x)}, {@code diff(cos(x), x) -> -sin(x)}
@@ -36,8 +37,17 @@ import java.util.List;
  *       {@code diff(ln(x), x) -> 1/x}</li>
  * </ul>
  *
- * <p>The rules only fire when the derivation variable matches the symbol
- * being differentiated against — that keeps them sound without needing a
+ * <p>{@code diff(body, variable)} is a partial real function on the domain
+ * where {@code body} is differentiable in {@code variable}. Construction
+ * equivalence is conditional on every retained {@link Assumption}, including
+ * original logarithm/quotient domains and the strictly positive-base branch
+ * used for non-integer or symbolic powers. These are sufficient domains, not
+ * necessarily maximal ones. Symbolic sum/product splitting of unsupported
+ * operands explicitly requires their differentiability; definedness alone
+ * does not justify that step (for example, {@code abs(x) - abs(x)} at zero).</p>
+ *
+ * <p>The standard-function rules only fire when the derivation variable
+ * matches the symbol being differentiated against, without adding a
  * full chain-rule rewrite (which would introduce free metavariables not
  * yet supported by {@code PatternRewriteRule}).</p>
  */
@@ -105,6 +115,18 @@ public final class CalculusDerivativeRules {
 
         @Override
         public final boolean isEquivalencePreservingByConstruction() {
+            return true; // conditional on all assumptions(source), never formula-only equivalence
+        }
+
+        @Override
+        public final List<Assumption> assumptions(Expr subtree) {
+            DiffMatch match = matchDiff(subtree);
+            return match == null ? List.of()
+                : DifferentiationDomain.assumptions(match.body(), match.variable().name());
+        }
+
+        @Override
+        public final boolean mayEmitAssumptions() {
             return true;
         }
 
@@ -201,7 +223,7 @@ public final class CalculusDerivativeRules {
 
     /**
      * Power rule for the textbook case {@code diff(x^n, x) -> n * x^(n-1)}
-     * where {@code n} is a literal number and the base is exactly the
+     * where {@code n} is a signed literal number and the base is exactly the
      * derivation variable. This is the rule the
      * {@code derivativePowerRuleWorks} test pins.
      */
@@ -220,20 +242,40 @@ public final class CalculusDerivativeRules {
             }
             return power.left() instanceof VariableExpr base
                 && base.name().equals(m.variable().name())
-                && power.right() instanceof NumberExpr;
+                && literalExponent(power.right()) != null;
         }
 
         @Override
         public Expr apply(Expr subtree) {
             DiffMatch m = matchDiff(subtree);
             BinaryExpr power = (BinaryExpr) m.body();
-            NumberExpr exponent = (NumberExpr) power.right();
-            ExactRational n = exponent.value();
+            ExactRational n = literalExponent(power.right());
+            if (n == null) {
+                throw new IllegalArgumentException("Power rule requires a numeric literal exponent");
+            }
+            if (n.equalsInteger(1)) {
+                return new NumberExpr(1);
+            }
             return new BinaryExpr(
                 new NumberExpr(n),
                 BinaryOperator.MUL,
                 new BinaryExpr(power.left(), BinaryOperator.POW, new NumberExpr(n.subtract(ExactRational.ONE)))
             );
+        }
+
+        private static ExactRational literalExponent(Expr expression) {
+            if (expression instanceof NumberExpr number) {
+                return number.value();
+            }
+            // Unary minus is represented by the parser as 0 - literal.
+            if (expression instanceof BinaryExpr binary
+                    && binary.operator() == BinaryOperator.SUB
+                    && binary.left() instanceof NumberExpr zero
+                    && zero.value().equalsInteger(0)
+                    && binary.right() instanceof NumberExpr magnitude) {
+                return magnitude.value().negate();
+            }
+            return null;
         }
     }
 

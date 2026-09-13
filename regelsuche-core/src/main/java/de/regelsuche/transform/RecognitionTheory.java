@@ -10,7 +10,8 @@ import java.util.Map;
 /**
  * Expands expressions with an explicitly allow-listed set of recognition-safe
  * rules. Expansion is deterministic and bounded by profile depth and a hard
- * representative limit.
+ * representative limit. This expression-only API cannot retain assumptions,
+ * so only concrete applications with an empty assumption list are admitted.
  */
 public final class RecognitionTheory implements EquivalentExpressionProvider {
     private static final int MAX_REPRESENTATIVES = 64;
@@ -42,6 +43,9 @@ public final class RecognitionTheory implements EquivalentExpressionProvider {
             for (String ruleId : sortedRuleIds) {
                 RewriteRule rule = rules.get(ruleId);
                 if (rule == null || !rule.isEquivalencePreservingByConstruction() || !rule.matches(current)) {
+                    continue;
+                }
+                if (!rule.assumptions(current).isEmpty()) {
                     continue;
                 }
                 Expr next = rule.apply(current);

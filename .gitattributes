@@ -8,6 +8,13 @@
 /config/quality/jmh-regression-policy-v2.json text eol=lf
 /config/quality/jmh-regression-decision-policy-v3.json text eol=lf
 
+# Historical reproduction definitions and schema bytes must survive every checkout
+/Dockerfile.target-free-held-out-reproduction text eol=lf
+/reproduction/Dockerfile.reproduction text eol=lf
+/docs/schemas/regelsuche-independent-reproduction-artifact-v1.schema.json text eol=lf
+/docs/schemas/regelsuche-independent-reproduction-receipt-v1.schema.json text eol=lf
+/docs/schemas/regelsuche-target-free-held-out-container-reproduction-v1.schema.json text eol=lf
+
 # Frozen polynomial study resources are byte-bound and must stay LF-normalized
 /regelsuche-experiments/src/main/resources/de/regelsuche/benchmark/polynomial/*.json text eol=lf
 

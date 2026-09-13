@@ -231,3 +231,53 @@ mindestens binden:
 Damit kann die Discovery-Oberfläche aus Issue #669 später nachvollziehbar
 anzeigen, welche Annahme erfüllt, widerlegt, unbekannt oder zwischen Evaluatoren
 umstritten ist, ohne aus einem Backend-Label einen stärkeren Claim abzuleiten.
+
+## Real domains of symbolic derivatives
+
+`diff(body, variable)` denotes a partial real function: the derivative exists
+only where the original `body` is differentiable in `variable`. A derivative
+formula's standalone AST can have a larger domain. In particular, `1/x` is not
+an unconditional replacement for `diff(ln(x), x)` at negative `x`.
+
+The elementary calculus rules retain typed side conditions from the original
+body through `RewriteRule.assumptions(source)`. They reuse
+`ExpressionDefinedness` for nested logarithm arguments, original quotient
+denominators and integer powers. Both `ln(u)` and base-10 `log(u)` require the
+actual argument `u > 0`; the latter's formula also retains `ln(10)`.
+Non-integer and symbolic powers are treated on the explicitly retained
+strictly positive-base branch. These are sufficient conditions, not a claim to
+compute the maximal differentiability domain: they may exclude zero or other
+real branches on which a particular power is differentiable. Integer powers
+retain their usual real branch, including parsed negative integer literals;
+`diff(x^1, x)` is `1` and does not introduce an excluded zero.
+
+Sum, difference and product splitting require differentiability of their
+operands. When an operand is outside the supported elementary fragment,
+rewrites retain a typed `CUSTOM_PREDICATE` of the form
+`differentiable(operand, variable)`. This predicate means the operand is defined
+in a neighborhood and has a finite real derivative there in that variable.
+For example, splitting `diff(abs(x) - abs(x), x)` requires
+`differentiable(abs(x), x)`; the rewritten expression is not asserted equivalent
+at zero. Such predicates remain unresolved unless a caller supplies appropriate
+assumption-aware evidence. The local evaluator requires exact custom-predicate
+identity: knowledge of `continuous(abs(x), x)` does not establish
+`differentiable(abs(x), x)` merely because the symbols match. This corrected
+implication behavior is identified by evaluator revision `known-assumptions/v2`.
+These predicates do not add standalone differentiation support
+for `abs`, unknown functions or other unsupported operands.
+
+`isEquivalencePreservingByConstruction()` for these rewrites describes the
+transformation **together with all its retained assumptions**. Assumptions flow
+through ordinary transformation/search evidence, stored steps, graph views,
+export and replay. A validator with only an unconditional `EquivalenceService`
+returns `UNKNOWN` for guarded transformations and retains the conditions in its
+result; an `AssumptionAwareEquivalenceService` can decide the conditional claim.
+
+Standalone callers should use
+`Differentiator.differentiateWithAssumptions(body, variable)`, which returns a
+`Result(formula, assumptions)` under the same sufficient-domain contract. The
+legacy `differentiate` method still returns only a formula AST and must not be
+used to infer the derivative's real domain. Any later simplification, evaluation
+or export of the result must keep the assumptions, even if a denominator or
+logarithm disappears from the formula. The explicit positive-power mode used by
+calculus does not change the default domain-preserving simplifier guard.

@@ -28,9 +28,20 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
         "regelsuche.polynomial-theory-utility.on-demand-verified-factorization/v1";
     private static final int PRIMITIVE_EXPANSION_LENGTH = 7;
     private final Consumer<Execution> evidence;
+    private final boolean observed;
 
     public PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter(Consumer<Execution> evidence) {
+        this(evidence, false);
+    }
+
+    private PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter(Consumer<Execution> evidence, boolean observed) {
         this.evidence = Objects.requireNonNull(evidence, "evidence");
+        this.observed = observed;
+    }
+
+    /** Opts into result v3 without changing the frozen adapter inventory or work scale. */
+    public static PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter observed(Consumer<Execution> evidence) {
+        return new PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter(evidence, true);
     }
 
     @Override
@@ -72,7 +83,7 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
             }
             requireFormation(input, formation);
             try {
-                Execution execution = executeCase(input, formation);
+                Execution execution = executeCase(input, formation, observed);
                 evidence.accept(execution);
                 next++;
                 return execution.measured();
@@ -93,6 +104,11 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
 
     static Execution executeCase(PolynomialTheoryUtilityExecutionInput input,
             PolynomialTheoryUtilityCaseCorpus.FormationCase formation) {
+        return executeCase(input, formation, false);
+    }
+
+    private static Execution executeCase(PolynomialTheoryUtilityExecutionInput input,
+            PolynomialTheoryUtilityCaseCorpus.FormationCase formation, boolean observed) {
         requireFormation(input, formation);
         var authority = new PolynomialTheoryUtilityWorkAuthority(input);
         List<List<Integer>> paths = paths(formation);
@@ -100,8 +116,12 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
         var transitions = new ArrayList<PolynomialTheoryUtilityTransitionOutcome>();
         var traces = new ArrayList<PolynomialTheoryUtilityTransitionTrace>();
         var attempts = new ArrayList<PolynomialTheoryUtilityFactorizationAttempt>();
+        var retainedOccurrences = new ArrayList<PolynomialTheoryUtilityExecutionObservations.Occurrence>();
         ExactParsedTerm parsed = parse(formation.sourceExpression(), authority);
+        var preparation = authority.ledger();
         for (List<Integer> path : paths) {
+            var beforeRaw = authority.ledger();
+            int firstAttempt = attempts.size();
             Occurrence occurrence = executeOccurrence(parsed, path, authority);
             observations.add(occurrence);
             var nested = occurrence.pipeline();
@@ -115,18 +135,37 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
                 var attempt = attempt(input, nested, transition, attempts.size());
                 if (attempt != null) attempts.add(attempt);
             }
+            if (observed) {
+                retainedOccurrences.add(new PolynomialTheoryUtilityExecutionObservations.Occurrence(
+                    retainedOccurrences.size(), path, terminal(List.of(occurrence)), occurrence.detailCode(),
+                    nested == null ? "NONE" : nested.certificateHash(),
+                    transition == null ? "NONE" : transition.transitionId(), occurrence.work().primitiveWork(),
+                    PolynomialTheoryUtilityExecutionObservations.difference(authority.ledger(), beforeRaw),
+                    attempts.subList(firstAttempt, attempts.size()).stream()
+                        .map(PolynomialTheoryUtilityFactorizationAttempt::attemptId).toList(), List.of()));
+            }
         }
-        TerminalStatus terminal = terminal(observations);
-        if (!transitions.isEmpty() && terminal != TerminalStatus.VALIDATED_TRANSITION) {
+        var retained = observed ? PolynomialTheoryUtilityExecutionObservations.create(preparation, retainedOccurrences) : null;
+        TerminalStatus terminal = observed ? retained.terminalStatus() : terminal(observations);
+        if (!observed && !transitions.isEmpty() && terminal != TerminalStatus.VALIDATED_TRANSITION) {
             throw new UnrepresentableExecution(observations, authority.ledger(), authority.projection());
         }
         String proof = executionHash(authority.projection(), observations);
-        var result = PolynomialTheoryUtilityCandidateResult.create(input, formation, terminal,
-            "NATIVE_SHARED_CANONICAL_AUTHORITY:" + proof, authority.work(), transitions,
-            terminal == TerminalStatus.VALIDATED_TRANSITION ? "VERIFIED"
-                : attempts.isEmpty() ? "NOT_REQUESTED" : "RETAINED_ATTEMPT_OUTCOMES");
+        String verifier = terminal == TerminalStatus.MIXED_OUTCOMES ? "RETAINED_OCCURRENCE_OUTCOMES"
+            : terminal == TerminalStatus.VALIDATED_TRANSITION ? "VERIFIED"
+                : attempts.isEmpty() ? "NOT_REQUESTED" : "RETAINED_ATTEMPT_OUTCOMES";
+        var result = observed ? PolynomialTheoryUtilityCandidateResult.createObserved(input, formation,
+            "NATIVE_SHARED_CANONICAL_AUTHORITY:" + proof, transitions, verifier, retained)
+            : PolynomialTheoryUtilityCandidateResult.create(input, formation, terminal,
+                "NATIVE_SHARED_CANONICAL_AUTHORITY:" + proof, authority.work(), transitions, verifier);
         var measured = PolynomialTheoryUtilityMeasuredCandidate.create(result, traces, attempts, List.of());
         return new Execution(measured, authority.ledger(), authority.projection(), observations, proof);
+    }
+
+    /** Explicit observed-result entry point using the same frozen row authority. */
+    public static Execution executeObservedCase(PolynomialTheoryUtilityExecutionInput input,
+            PolynomialTheoryUtilityCaseCorpus.FormationCase formation) {
+        return executeCase(input, formation, true);
     }
 
     private static ExactParsedTerm parse(String source, PolynomialTheoryUtilityWorkAuthority authority) {
@@ -345,6 +384,38 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
             }
             if (required.entrySet().stream().anyMatch(entry -> rawWork.units(entry.getKey()) < entry.getValue())) {
                 throw new IllegalArgumentException("native execution omitted consumed pipeline work");
+            }
+            if (result.observations() != null) {
+                var retained = result.observations();
+                if (!retained.rawWork().totalMechanicalWork().equals(rawWork)
+                        || retained.occurrences().size() != occurrences.size()) {
+                    throw new IllegalArgumentException("native observed result differs from its raw execution");
+                }
+                var cumulative = retained.preparationWork();
+                long primitive = 0;
+                for (int index = 0; index < occurrences.size(); index++) {
+                    var actual = occurrences.get(index);
+                    var recorded = retained.occurrences().get(index);
+                    var before = PolynomialTheoryUtilityCanonicalWorkProjection.project(result.input(),
+                        PolynomialTheoryUtilityCanonicalWorkProjection.partition(primitive, cumulative)).work();
+                    cumulative = PolynomialTheoryUtilityExecutionObservations.plus(cumulative, recorded.rawWork());
+                    primitive = Math.addExact(primitive, recorded.primitiveWork());
+                    var after = PolynomialTheoryUtilityCanonicalWorkProjection.project(result.input(),
+                        PolynomialTheoryUtilityCanonicalWorkProjection.partition(primitive, cumulative)).work();
+                    if (!PolynomialTheoryUtilityExecutionObservations.difference(after, before).equals(actual.work())) {
+                        throw new IllegalArgumentException("native occurrence work differs from its consumed prefix");
+                    }
+                    var pipeline = actual.pipeline();
+                    if (!actual.path().equals(recorded.path())
+                            || terminal(List.of(actual)) != recorded.terminalStatus()
+                            || !actual.detailCode().equals(recorded.detailCode())
+                            || !Objects.equals(pipeline == null ? "NONE" : pipeline.certificateHash(),
+                                recorded.pipelineEvidenceHash())
+                            || (pipeline != null && pipeline.totalWork().stages().entrySet().stream()
+                                .anyMatch(entry -> recorded.rawWork().units(entry.getKey()) < entry.getValue()))) {
+                        throw new IllegalArgumentException("native occurrence omitted its actual outcome or pipeline work");
+                    }
+                }
             }
         }
     }

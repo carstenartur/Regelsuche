@@ -4,7 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
@@ -78,7 +81,7 @@ class DifferentiatorTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"0 / 0", "0 / x", "0 * (1 / x)", "0 * log(x)", "0 * mystery(x)", "(1 / 0) * 0"})
+    @ValueSource(strings = {"0 / 0", "0 / x", "0 * (1 / x)", "0 * log(x)", "0 * mystery(x)", "(1 / 0) * 0", "0 * (x^0.5)", "0 * (x^y)"})
     void simplifyingZeroDoesNotRemoveUndefinedInputs(String expression) {
         assertNotEquals(new NumberExpr(0), Differentiator.simplify(parser.parseTerm(expression)));
     }
@@ -103,6 +106,13 @@ class DifferentiatorTest {
     void derivativeOfLinearPowerDoesNotIntroduceAnExcludedZero() {
         var derivative = new Differentiator().differentiate(parser.parseTerm("x ^ 1"), "x");
         assertEquals(new NumberExpr(1), derivative);
+    }
+
+    @Test
+    void parsedNegativeIntegerPowerKeepsItsNegativeRealBranch() {
+        Expr derivative = differentiator.differentiate(parser.parseTerm("x ^ -2"), "x");
+        assertEquals(new BinaryExpr(new NumberExpr(-2), BinaryOperator.MUL,
+            new BinaryExpr(new VariableExpr("x"), BinaryOperator.POW, new NumberExpr(-3))), derivative);
     }
 
     @Test

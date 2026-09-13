@@ -29,6 +29,7 @@ final class PolynomialTheoryUtilityCandidateMeasurementValidator {
         );
         requireFactorizationAttempts(result, profile, attempts);
         requireCacheEvents(result, profile, events);
+        if (result.observations() != null) requireOccurrenceEvidence(result, attempts, events);
     }
 
     private static void requireTransitionTraces(
@@ -140,7 +141,7 @@ final class PolynomialTheoryUtilityCandidateMeasurementValidator {
                 );
             }
             if (!event.transitionBound()) {
-                requireUnboundLookup(event);
+                if (event.replayOutcome() == null) requireUnboundLookup(event);
                 continue;
             }
             int current = transitionOrder.get(event.transitionId());
@@ -182,6 +183,66 @@ final class PolynomialTheoryUtilityCandidateMeasurementValidator {
             order.put(result.transitions().get(index).transitionId(), index);
         }
         return order;
+    }
+
+    private static void requireOccurrenceEvidence(PolynomialTheoryUtilityCandidateResult result,
+            List<PolynomialTheoryUtilityFactorizationAttempt> attempts,
+            List<PolynomialTheoryUtilityCacheEvent> events) {
+        var observations = result.observations();
+        var occurrences = observations.occurrences();
+        if (!occurrences.stream().flatMap(value -> value.factorizationAttemptIds().stream()).toList()
+                    .equals(attempts.stream().map(PolynomialTheoryUtilityFactorizationAttempt::attemptId).toList())
+                || !occurrences.stream().flatMap(value -> value.cacheEventIds().stream()).toList()
+                    .equals(events.stream().map(PolynomialTheoryUtilityCacheEvent::eventId).toList())) {
+            throw new IllegalArgumentException("occurrences omit, duplicate or reorder execution attempts or cache events");
+        }
+        var preparation = PolynomialTheoryUtilityCanonicalWorkProjection.measure(
+            PolynomialTheoryUtilityCanonicalWorkProjection.partition(0, observations.preparationWork()));
+        requireCacheWork(preparation, List.of());
+        if (preparation.factorizationWork() != 0) {
+            throw new IllegalArgumentException("preparation cannot conceal an unbound factorization attempt");
+        }
+        Map<String, PolynomialTheoryUtilityFactorizationAttempt> byAttempt = new HashMap<>();
+        attempts.forEach(value -> byAttempt.put(value.attemptId(), value));
+        Map<String, PolynomialTheoryUtilityCacheEvent> byEvent = new HashMap<>();
+        events.forEach(value -> byEvent.put(value.eventId(), value));
+        Map<String, PolynomialTheoryUtilityTransitionOutcome> byTransition = new HashMap<>();
+        result.transitions().forEach(value -> byTransition.put(value.transitionId(), value));
+        for (var occurrence : occurrences) {
+            var ownAttempts = occurrence.factorizationAttemptIds().stream().map(byAttempt::get).toList();
+            var ownEvents = occurrence.cacheEventIds().stream().map(byEvent::get).toList();
+            // Only check presence here. Admission and transition work use cumulative rounding, never this sum.
+            var work = PolynomialTheoryUtilityCanonicalWorkProjection.measure(
+                PolynomialTheoryUtilityCanonicalWorkProjection.partition(occurrence.primitiveWork(), occurrence.rawWork()));
+            if (ownAttempts.isEmpty() == (work.factorizationWork() > 0)
+                    || ownAttempts.stream().anyMatch(value -> value.producedTransition()
+                        && !value.transitionId().equals(occurrence.transitionId()))) {
+                throw new IllegalArgumentException("occurrence factorization evidence differs from its work or transition");
+            }
+            requireCacheWork(work, ownEvents);
+            if (ownEvents.stream().anyMatch(value -> value.transitionBound()
+                    && !value.transitionId().equals(occurrence.transitionId()))) {
+                throw new IllegalArgumentException("occurrence cache event belongs to another transition");
+            }
+            if (occurrence.terminalStatus() == PolynomialTheoryUtilityCandidateResult.TerminalStatus.VALIDATED_TRANSITION) {
+                requireCacheSequence(byTransition.get(occurrence.transitionId()), ownEvents);
+            } else {
+                var kinds = ownEvents.stream().map(PolynomialTheoryUtilityCacheEvent::kind).toList();
+                var hit = PolynomialTheoryUtilityCacheEvent.Kind.LOOKUP_HIT;
+                var miss = PolynomialTheoryUtilityCacheEvent.Kind.LOOKUP_MISS;
+                var replay = PolynomialTheoryUtilityCacheEvent.Kind.REPLAY;
+                if (!List.of(List.of(), List.of(hit), List.of(miss), List.of(hit, replay)).contains(kinds)) {
+                    throw new IllegalArgumentException("negative occurrence has invalid cache attempt order");
+                }
+                if (kinds.contains(replay)) {
+                    var attempted = ownEvents.getLast();
+                    if (attempted.replayOutcome() != occurrence.terminalStatus()
+                            || !attempted.entryId().equals(ownEvents.getFirst().entryId())) {
+                        throw new IllegalArgumentException("negative replay lacks its lookup entry or terminal outcome");
+                    }
+                }
+            }
+        }
     }
 
     private static void requireUnboundLookup(

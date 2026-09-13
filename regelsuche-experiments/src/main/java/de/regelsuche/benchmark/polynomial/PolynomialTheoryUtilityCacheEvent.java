@@ -1,5 +1,6 @@
 package de.regelsuche.benchmark.polynomial;
 
+import de.regelsuche.benchmark.polynomial.PolynomialTheoryUtilityCandidateResult.TerminalStatus;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -13,10 +14,27 @@ public record PolynomialTheoryUtilityCacheEvent(
     Kind kind,
     String cacheRevision,
     String entryId,
-    String evidenceHash
+    String evidenceHash,
+    TerminalStatus replayOutcome
 ) {
+    public PolynomialTheoryUtilityCacheEvent(String eventId, int eventIndex, String executionInputId,
+            String transitionId, Kind kind, String cacheRevision, String entryId, String evidenceHash) {
+        this(eventId, eventIndex, executionInputId, transitionId, kind, cacheRevision, entryId, evidenceHash, null);
+    }
+
+    public static PolynomialTheoryUtilityCacheEvent createReplayAttempt(int eventIndex, String executionInputId,
+            String transitionId, String cacheRevision, String entryId, String evidenceHash,
+            TerminalStatus outcome) {
+        Objects.requireNonNull(outcome, "outcome");
+        return new PolynomialTheoryUtilityCacheEvent(identity(eventIndex, executionInputId, transitionId,
+            Kind.REPLAY, cacheRevision, entryId, evidenceHash, outcome), eventIndex, executionInputId,
+            transitionId, Kind.REPLAY, cacheRevision, entryId, evidenceHash, outcome);
+    }
+
     public static final String SCHEMA =
         "regelsuche.polynomial-theory-utility-cache-event/v1";
+    public static final String ATTEMPT_SCHEMA =
+        "regelsuche.polynomial-theory-utility-cache-event/v2";
     public static final String NO_TRANSITION = "NONE";
     private static final Pattern SHA_256 =
         Pattern.compile("sha256:[0-9a-f]{64}");
@@ -46,6 +64,10 @@ public record PolynomialTheoryUtilityCacheEvent(
             evidenceHash,
             "evidenceHash"
         );
+        if (replayOutcome != null && (kind != Kind.REPLAY || replayOutcome == TerminalStatus.MIXED_OUTCOMES
+                || ((replayOutcome == TerminalStatus.VALIDATED_TRANSITION) == NO_TRANSITION.equals(transitionId)))) {
+            throw new IllegalArgumentException("replay attempt outcome and accepted transition disagree");
+        }
         if (!eventId.equals(identity(
                 eventIndex,
                 executionInputId,
@@ -53,7 +75,7 @@ public record PolynomialTheoryUtilityCacheEvent(
                 kind,
                 cacheRevision,
                 entryId,
-                evidenceHash))) {
+                evidenceHash, replayOutcome))) {
             throw new IllegalArgumentException(
                 "cache event identity differs from its fields"
             );
@@ -90,7 +112,7 @@ public record PolynomialTheoryUtilityCacheEvent(
     }
 
     public String schema() {
-        return SCHEMA;
+        return replayOutcome == null ? SCHEMA : ATTEMPT_SCHEMA;
     }
 
     public boolean lookup() {
@@ -124,8 +146,11 @@ public record PolynomialTheoryUtilityCacheEvent(
                 "cache event differs from its result profile"
             );
         }
+        if (replayOutcome != null && result.observations() == null) {
+            throw new IllegalArgumentException("replay attempt requires the observed result revision");
+        }
         if (!transitionBound()) {
-            if (!lookup()) {
+            if (!lookup() && replayOutcome == null) {
                 throw new IllegalArgumentException(
                     "cache mutation or replay lacks transition lineage"
                 );
@@ -192,8 +217,13 @@ public record PolynomialTheoryUtilityCacheEvent(
         String entryId,
         String evidenceHash
     ) {
+        return identity(eventIndex, executionInputId, transitionId, kind, cacheRevision, entryId, evidenceHash, null);
+    }
+
+    private static String identity(int eventIndex, String executionInputId, String transitionId, Kind kind,
+            String cacheRevision, String entryId, String evidenceHash, TerminalStatus replayOutcome) {
         StringBuilder material = new StringBuilder();
-        append(material, SCHEMA);
+        append(material, replayOutcome == null ? SCHEMA : ATTEMPT_SCHEMA);
         append(material, Integer.toString(eventIndex));
         append(
             material,
@@ -216,6 +246,7 @@ public record PolynomialTheoryUtilityCacheEvent(
             material,
             requireHash(evidenceHash, "evidenceHash")
         );
+        if (replayOutcome != null) append(material, replayOutcome.name());
         return hash(material.toString());
     }
 

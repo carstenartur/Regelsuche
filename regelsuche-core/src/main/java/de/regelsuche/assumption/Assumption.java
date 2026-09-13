@@ -144,7 +144,9 @@ public record Assumption(Kind kind, String expression, List<String> symbols) {
 
     private static boolean implies(Kind known, Kind required) {
         if (known == required) {
-            return true;
+            // Unlike numeric kinds, custom predicates carry their meaning in
+            // the expression. Exact identity was already checked by the caller.
+            return required != Kind.CUSTOM_PREDICATE && required != Kind.CUSTOM;
         }
         return switch (required) {
             case NON_ZERO -> known == Kind.POSITIVE;

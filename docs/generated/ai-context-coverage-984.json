@@ -1,0 +1,741 @@
+{
+  "schema": "regelsuche.ai-context-coverage-comparison/v1",
+  "purpose": "diagnostic coverage repair; no architecture or performance improvement claim",
+  "extractor": {
+    "release": "0.1.10",
+    "commit": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+    "javaProvider": "basic",
+    "jdtMode": "ast",
+    "contextDebtModelVersion": "context-footprint-v3"
+  },
+  "execution": {
+    "gradle": "9.7.1",
+    "runtime": "Temurin 25.0.4.1+1",
+    "extractorCompiler": "Temurin 17.0.20.1+1",
+    "measurementTask": "analyzeAiComplexity",
+    "workingSetProbe": "scripts/report-ai-context-working-sets.py"
+  },
+  "correctedSeedAndModelInputsSha256": {
+    "capabilities.seed.yaml": "16d64630109485ca14a5c1566d64084f3b932d7edf52bf70facd4274de0b8d0b",
+    "claims.json": "cce03fad40abaa23770707154b2cab60afe37f1b0cbc8fb4d8865a886480b0c1",
+    "claims.seed.yaml": "013935ebad67ff3868602be8c68b73dba723610ad5ba728113f87e114f3dc108",
+    "complexity-baseline.json": "aea907748449180b6b681f5003a435048cc912bed67482f729ca007eb2c2b096"
+  },
+  "sourceOverlay": "Base and candidate use identical corrected capabilities.seed.yaml. Production and documentation are from the recorded source commits, before this report was added. The original-selectors control has the same candidate production/documentation and its original seed. No baseline/threshold was changed.",
+  "measurements": {
+    "base": {
+      "contextFootprint": {
+        "schemaVersion": 3,
+        "measurementStatus": "MEASURED",
+        "repositoryContextTokens": 3623380,
+        "productionContextTokens": 2438520,
+        "testEvidenceTokens": 1130680,
+        "documentationContextTokens": 54180,
+        "productionLines": 304815,
+        "totalContextLines": 446150,
+        "tokensPerKloc": 8121.44,
+        "medianCapabilityWorkingSetTokens": 99240,
+        "p90CapabilityWorkingSetTokens": 619528,
+        "p90RepositoryContextShare": 0.171,
+        "evidenceToProductionRatio": 0.4859,
+        "normalizedContextDebt": 17.1,
+        "contextEfficiencyScore": 82.9,
+        "capabilityCount": 17,
+        "capabilitySampleCount": 17,
+        "capabilitiesWithoutSelectors": 0,
+        "capabilitiesWithoutResolvedTypes": 0,
+        "unresolvedCapabilityTypeReferences": 0,
+        "unresolvedCapabilityModuleReferences": 0,
+        "unresolvedCapabilityPackageReferences": 0,
+        "capabilityReferenceSources": {
+          "matchedTypes": 1214,
+          "classes": 0,
+          "matchedModules": 54,
+          "modules": 54,
+          "ownerModules": 24,
+          "matchedPackages": 42,
+          "packages": 43
+        },
+        "capabilityWorkingSetSources": {
+          "typeOrPackage": 16,
+          "ownerModules": 1,
+          "modules": 0
+        },
+        "method": "line-weighted-prioritized-capability-selector-working-set-proxy"
+      },
+      "capabilities": [
+        {
+          "id": "rewrite-search",
+          "productionWorkingSetTokens": 551456,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 333,
+          "contextTestCount": 118,
+          "serializedContextPackTokenEstimate": 13969
+        },
+        {
+          "id": "equality-saturation",
+          "productionWorkingSetTokens": 15664,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 11,
+          "contextTestCount": 4,
+          "serializedContextPackTokenEstimate": 534
+        },
+        {
+          "id": "hypothesis-mining",
+          "productionWorkingSetTokens": 248528,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 159,
+          "contextTestCount": 76,
+          "serializedContextPackTokenEstimate": 6881
+        },
+        {
+          "id": "counterexample-search",
+          "productionWorkingSetTokens": 100008,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 67,
+          "contextTestCount": 41,
+          "serializedContextPackTokenEstimate": 3542
+        },
+        {
+          "id": "verified-trace-strategy-learning",
+          "productionWorkingSetTokens": 13808,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 8,
+          "contextTestCount": 8,
+          "serializedContextPackTokenEstimate": 668
+        },
+        {
+          "id": "proof-workflows",
+          "productionWorkingSetTokens": 281296,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 61,
+          "contextTestCount": 50,
+          "serializedContextPackTokenEstimate": 2994
+        },
+        {
+          "id": "discovery",
+          "productionWorkingSetTokens": 626200,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 193,
+          "contextTestCount": 157,
+          "serializedContextPackTokenEstimate": 9441
+        },
+        {
+          "id": "persistence",
+          "productionWorkingSetTokens": 99240,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 64,
+          "contextTestCount": 32,
+          "serializedContextPackTokenEstimate": 2955
+        },
+        {
+          "id": "web-workbench",
+          "productionWorkingSetTokens": 179728,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 144,
+          "contextTestCount": 79,
+          "serializedContextPackTokenEstimate": 5596
+        },
+        {
+          "id": "proof-carrying-showcase",
+          "productionWorkingSetTokens": 47048,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 18,
+          "contextTestCount": 12,
+          "serializedContextPackTokenEstimate": 1167
+        },
+        {
+          "id": "maven-build-contract",
+          "productionWorkingSetTokens": 619528,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 0,
+          "contextTestCount": 3,
+          "serializedContextPackTokenEstimate": 154
+        },
+        {
+          "id": "static-reference-publication",
+          "productionWorkingSetTokens": 2944,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 1,
+          "contextTestCount": 2,
+          "serializedContextPackTokenEstimate": 184
+        },
+        {
+          "id": "historical-rediscovery-diagnostics",
+          "productionWorkingSetTokens": 31368,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 6,
+          "contextTestCount": 4,
+          "serializedContextPackTokenEstimate": 518
+        },
+        {
+          "id": "polynomial-factorization",
+          "productionWorkingSetTokens": 206384,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 88,
+          "contextTestCount": 48,
+          "serializedContextPackTokenEstimate": 4719
+        },
+        {
+          "id": "exact-matrix-representation",
+          "productionWorkingSetTokens": 63352,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 22,
+          "contextTestCount": 11,
+          "serializedContextPackTokenEstimate": 1397
+        },
+        {
+          "id": "schematic-exact-plan-replay",
+          "productionWorkingSetTokens": 69600,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 30,
+          "contextTestCount": 23,
+          "serializedContextPackTokenEstimate": 1939
+        },
+        {
+          "id": "public-java-sdk",
+          "productionWorkingSetTokens": 10480,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 9,
+          "contextTestCount": 5,
+          "serializedContextPackTokenEstimate": 543
+        }
+      ],
+      "extractorCoreJarSha256": "75fbcd25df9f4ad32b047e809ed1a237fb7967bdc9637c397de4ed9b36ce48af",
+      "artifactsSha256": {
+        "capabilities.json": "09913b51d3fa045894492f88ef14cf31f0d78ca1f8cca7c7c9e3469399a18765",
+        "claims.json": "b522704dafe348f98c21888d4c4668461ad9ae678f92be3b899cc9813055a8e3",
+        "classes.json": "9d8af4dfe65b3632c857092c50f43ae8537015220453bdbdd77047d9972433d3",
+        "complexity.json": "8501fa7cb34ac16bb9c5197759dab83227a42a90274b7ccc20b4009ed4f26ed5",
+        "context-packs/counterexample-search.json": "0e801d0a877b610f6591f47476f7e69ed7726b855df348785b02f5f8fb628485",
+        "context-packs/discovery.json": "9075aaeba31adcb1045107ad939d84310c69f7131a2a9bcb8d086d364cf9fae2",
+        "context-packs/equality-saturation.json": "6548a559ef83089703ef965f13d73a65a7cdf3723e31b68c6ce15139ae72b7c5",
+        "context-packs/exact-matrix-representation.json": "975a23e14b1294114d1873a4cb8eeafbffc0ccfe687a3fd349f05138dbb1f3d2",
+        "context-packs/historical-rediscovery-diagnostics.json": "0ee56d713ca06653a036d0d9f4cb817dc55f40c1bfb03cd219bb64c1c4759975",
+        "context-packs/hypothesis-mining.json": "07695e511d7971c8bac92b4f17b91be79d5453bf5d297c6ebb38b75d857e94cc",
+        "context-packs/index.json": "4b0a1405c4523076304c0e410212ea8dcc2a89437e2ba412dd4fd0b61ceeb210",
+        "context-packs/maven-build-contract.json": "71ac265c052fba6d9278a11308d33ffc7333f9123e27851bf53ac069a62cfceb",
+        "context-packs/persistence.json": "efe1ff51ec4fa6bf170be76812ce91d6045ead4c745b4b89583140e267c9c822",
+        "context-packs/polynomial-factorization.json": "a2b94679badce4498e65cc9092d54581a3a4bdf91c4acda6778bec0b695705a5",
+        "context-packs/proof-carrying-showcase.json": "d1967d09258a552268621e3ad489be7db35556548f8dfd187a95e9ef3d6a4526",
+        "context-packs/proof-workflows.json": "cdf16e5b724c0a823ae34bf6ef46adcd0057b5411e68f8ae76117f0cecf547e6",
+        "context-packs/public-java-sdk.json": "8da7a96ac450bbee04b23dbb16698cd1eb2d03b135186b8ba3d4944306d63509",
+        "context-packs/rewrite-search.json": "27e23aadee49ee35e2d646fdf0dd6e036ff49c37dbdf14cf7da3a82928b75ea5",
+        "context-packs/schematic-exact-plan-replay.json": "64285551e31bf644e722c910f3f07878379eded4386c422175d78721bdf18583",
+        "context-packs/static-reference-publication.json": "54339d738168b55990472c08121059b2dfadce953484e1b76c11ce4b9aa5bbf5",
+        "context-packs/verified-trace-strategy-learning.json": "7d365b35775efd2fa11ab17e6bbdfde4eba47bc54d27d5f5e9e8f4a3ff2b9130",
+        "context-packs/web-workbench.json": "38d8b0e8f8ee5e58fb97e1d00d4ba69f1a3dba0b9082fadd3bf58772373cdb50",
+        "dependencies.json": "bf4ae7088dcf16dd68410ad0e2f730c20b653c1da84095490d4762e21e935ba6",
+        "docs.json": "93149f85cee98c76a530a3a25231bb2327b03c1c9ba440c2d6475eb183c99b9e",
+        "evidence.json": "025854065f9bf9eca696719ad5b46b30985ff365373f07cae8f127cc446e1ac2",
+        "index.json": "03a46e718ac4444df85c98dbec473918e3d0b26f074e9be28cd53dae9b79ceb2",
+        "metrics-snapshot.json": "0c0c120a66ec9b513cde4f8b2732b0f5084f7fad0e3974eda1c1ec10facc85f8",
+        "modules.json": "817ee453da71c4853d20b885b68b1bfd12f22d7b019a159ed9c99bf007f8a557",
+        "tests.json": "49410928072b1553cfac5151934f0a5517ae6a40208b4678fedba8fbbc0709d2",
+        "trend.json": "8f12af56bf6079c52c56c358d5e09d891496fd33f86c2e1e6a0f5fd190ec5bbf"
+      },
+      "sourceCommit": "8afeda1a538c6726b0f6b8a6c8014dfcced0fbe2",
+      "sourceTree": "9a499fe7b72f2bb14227e1c2d430d8a56b3ab738",
+      "capabilitySeedSha256": "16d64630109485ca14a5c1566d64084f3b932d7edf52bf70facd4274de0b8d0b",
+      "metricsSnapshot": {
+        "schemaVersion": 1,
+        "estimatedContextTokens": 558010.0,
+        "conceptRadius": 85.0,
+        "dependencyRadius": 254.0,
+        "knowledgeDensity": 152.23529411764707,
+        "contextLocality": 0.0,
+        "compressionRatio": 0.021504990949982976,
+        "aiCognitiveComplexity": 685.01,
+        "aiCognitiveDebt": 626.045294117647,
+        "aiContextDebt": 17.1,
+        "contextDebtModelVersion": "context-footprint-v3"
+      },
+      "inventoryCounts": {
+        "modules": 59,
+        "classes": 1445,
+        "tests": 842,
+        "docs": 301,
+        "dependencies": 254,
+        "capabilities": 17,
+        "claims": 8,
+        "evidence": 9
+      }
+    },
+    "candidate": {
+      "contextFootprint": {
+        "schemaVersion": 3,
+        "measurementStatus": "MEASURED",
+        "repositoryContextTokens": 3641912,
+        "productionContextTokens": 2447120,
+        "testEvidenceTokens": 1140432,
+        "documentationContextTokens": 54360,
+        "productionLines": 305890,
+        "totalContextLines": 448444,
+        "tokensPerKloc": 8121.22,
+        "medianCapabilityWorkingSetTokens": 99240,
+        "p90CapabilityWorkingSetTokens": 619528,
+        "p90RepositoryContextShare": 0.1701,
+        "evidenceToProductionRatio": 0.4882,
+        "normalizedContextDebt": 17.01,
+        "contextEfficiencyScore": 82.99,
+        "capabilityCount": 17,
+        "capabilitySampleCount": 17,
+        "capabilitiesWithoutSelectors": 0,
+        "capabilitiesWithoutResolvedTypes": 0,
+        "unresolvedCapabilityTypeReferences": 0,
+        "unresolvedCapabilityModuleReferences": 0,
+        "unresolvedCapabilityPackageReferences": 0,
+        "capabilityReferenceSources": {
+          "matchedTypes": 1217,
+          "classes": 0,
+          "matchedModules": 54,
+          "modules": 54,
+          "ownerModules": 24,
+          "matchedPackages": 42,
+          "packages": 43
+        },
+        "capabilityWorkingSetSources": {
+          "typeOrPackage": 16,
+          "ownerModules": 1,
+          "modules": 0
+        },
+        "method": "line-weighted-prioritized-capability-selector-working-set-proxy"
+      },
+      "capabilities": [
+        {
+          "id": "rewrite-search",
+          "productionWorkingSetTokens": 560056,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 336,
+          "contextTestCount": 125,
+          "serializedContextPackTokenEstimate": 14260
+        },
+        {
+          "id": "equality-saturation",
+          "productionWorkingSetTokens": 15664,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 11,
+          "contextTestCount": 4,
+          "serializedContextPackTokenEstimate": 534
+        },
+        {
+          "id": "hypothesis-mining",
+          "productionWorkingSetTokens": 248528,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 159,
+          "contextTestCount": 76,
+          "serializedContextPackTokenEstimate": 6881
+        },
+        {
+          "id": "counterexample-search",
+          "productionWorkingSetTokens": 100008,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 67,
+          "contextTestCount": 41,
+          "serializedContextPackTokenEstimate": 3542
+        },
+        {
+          "id": "verified-trace-strategy-learning",
+          "productionWorkingSetTokens": 13808,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 8,
+          "contextTestCount": 8,
+          "serializedContextPackTokenEstimate": 668
+        },
+        {
+          "id": "proof-workflows",
+          "productionWorkingSetTokens": 281296,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 61,
+          "contextTestCount": 50,
+          "serializedContextPackTokenEstimate": 2994
+        },
+        {
+          "id": "discovery",
+          "productionWorkingSetTokens": 626200,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 193,
+          "contextTestCount": 157,
+          "serializedContextPackTokenEstimate": 9441
+        },
+        {
+          "id": "persistence",
+          "productionWorkingSetTokens": 99240,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 64,
+          "contextTestCount": 32,
+          "serializedContextPackTokenEstimate": 2955
+        },
+        {
+          "id": "web-workbench",
+          "productionWorkingSetTokens": 179728,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 144,
+          "contextTestCount": 79,
+          "serializedContextPackTokenEstimate": 5596
+        },
+        {
+          "id": "proof-carrying-showcase",
+          "productionWorkingSetTokens": 47048,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 18,
+          "contextTestCount": 12,
+          "serializedContextPackTokenEstimate": 1167
+        },
+        {
+          "id": "maven-build-contract",
+          "productionWorkingSetTokens": 619528,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 0,
+          "contextTestCount": 3,
+          "serializedContextPackTokenEstimate": 154
+        },
+        {
+          "id": "static-reference-publication",
+          "productionWorkingSetTokens": 2944,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 1,
+          "contextTestCount": 2,
+          "serializedContextPackTokenEstimate": 184
+        },
+        {
+          "id": "historical-rediscovery-diagnostics",
+          "productionWorkingSetTokens": 31368,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 6,
+          "contextTestCount": 4,
+          "serializedContextPackTokenEstimate": 518
+        },
+        {
+          "id": "polynomial-factorization",
+          "productionWorkingSetTokens": 206384,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 88,
+          "contextTestCount": 48,
+          "serializedContextPackTokenEstimate": 4719
+        },
+        {
+          "id": "exact-matrix-representation",
+          "productionWorkingSetTokens": 63352,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 22,
+          "contextTestCount": 11,
+          "serializedContextPackTokenEstimate": 1397
+        },
+        {
+          "id": "schematic-exact-plan-replay",
+          "productionWorkingSetTokens": 69600,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 30,
+          "contextTestCount": 23,
+          "serializedContextPackTokenEstimate": 1939
+        },
+        {
+          "id": "public-java-sdk",
+          "productionWorkingSetTokens": 10480,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 9,
+          "contextTestCount": 5,
+          "serializedContextPackTokenEstimate": 543
+        }
+      ],
+      "extractorCoreJarSha256": "75fbcd25df9f4ad32b047e809ed1a237fb7967bdc9637c397de4ed9b36ce48af",
+      "artifactsSha256": {
+        "capabilities.json": "69c11bee3c13d850dde7c4f7ef444cc9d1e52cdf3c7b93b235f300d9a3139a8d",
+        "claims.json": "b522704dafe348f98c21888d4c4668461ad9ae678f92be3b899cc9813055a8e3",
+        "classes.json": "bdebcc118f06b3ba659dd2b2d0144094096f5561f8e16c4df0c973d6ae997add",
+        "complexity.json": "e1a0b874bb451f463c53b3531873609a8e174537cd778b026e0e7959d819a307",
+        "context-packs/counterexample-search.json": "0e801d0a877b610f6591f47476f7e69ed7726b855df348785b02f5f8fb628485",
+        "context-packs/discovery.json": "9075aaeba31adcb1045107ad939d84310c69f7131a2a9bcb8d086d364cf9fae2",
+        "context-packs/equality-saturation.json": "6548a559ef83089703ef965f13d73a65a7cdf3723e31b68c6ce15139ae72b7c5",
+        "context-packs/exact-matrix-representation.json": "975a23e14b1294114d1873a4cb8eeafbffc0ccfe687a3fd349f05138dbb1f3d2",
+        "context-packs/historical-rediscovery-diagnostics.json": "0ee56d713ca06653a036d0d9f4cb817dc55f40c1bfb03cd219bb64c1c4759975",
+        "context-packs/hypothesis-mining.json": "07695e511d7971c8bac92b4f17b91be79d5453bf5d297c6ebb38b75d857e94cc",
+        "context-packs/index.json": "268e0719e8ae9d4342292d1f68653ca6c262babdeb743db93ad3ad9341ea3112",
+        "context-packs/maven-build-contract.json": "71ac265c052fba6d9278a11308d33ffc7333f9123e27851bf53ac069a62cfceb",
+        "context-packs/persistence.json": "efe1ff51ec4fa6bf170be76812ce91d6045ead4c745b4b89583140e267c9c822",
+        "context-packs/polynomial-factorization.json": "a2b94679badce4498e65cc9092d54581a3a4bdf91c4acda6778bec0b695705a5",
+        "context-packs/proof-carrying-showcase.json": "d1967d09258a552268621e3ad489be7db35556548f8dfd187a95e9ef3d6a4526",
+        "context-packs/proof-workflows.json": "cdf16e5b724c0a823ae34bf6ef46adcd0057b5411e68f8ae76117f0cecf547e6",
+        "context-packs/public-java-sdk.json": "8da7a96ac450bbee04b23dbb16698cd1eb2d03b135186b8ba3d4944306d63509",
+        "context-packs/rewrite-search.json": "66207e7a616c34b7ededd65f053e01d680fae7c60118eeb066a93c9d18a5f67b",
+        "context-packs/schematic-exact-plan-replay.json": "64285551e31bf644e722c910f3f07878379eded4386c422175d78721bdf18583",
+        "context-packs/static-reference-publication.json": "54339d738168b55990472c08121059b2dfadce953484e1b76c11ce4b9aa5bbf5",
+        "context-packs/verified-trace-strategy-learning.json": "7d365b35775efd2fa11ab17e6bbdfde4eba47bc54d27d5f5e9e8f4a3ff2b9130",
+        "context-packs/web-workbench.json": "38d8b0e8f8ee5e58fb97e1d00d4ba69f1a3dba0b9082fadd3bf58772373cdb50",
+        "dependencies.json": "bf4ae7088dcf16dd68410ad0e2f730c20b653c1da84095490d4762e21e935ba6",
+        "docs.json": "a3add72f3b964d2b8453a4f9e0e7e188222fb68d13579c6100ab2ae3b0be1d43",
+        "evidence.json": "025854065f9bf9eca696719ad5b46b30985ff365373f07cae8f127cc446e1ac2",
+        "index.json": "403c04324df0ead1196e566629cfe91be58982075f47cbb61c3f72cc4ed60cca",
+        "metrics-snapshot.json": "33dbe9fa748e03c03f00c76f485ba9024dc039bad9d264ddea8938eef54ea7b3",
+        "modules.json": "1fd558bc73191d3c9082aa94587ba3652111c620ba636341d648098b6c5463ed",
+        "tests.json": "37fb0d0b528d2d050cac8cf0d3b9bb5bca8a6946751a448626a936014693c27b",
+        "trend.json": "fe6b986cb7cf86822ff7fdc3d1df8dd823d43e711360682430c10762fea97c54"
+      },
+      "sourceCommit": "67ea97116db21ff4050b0ed33a34f5456b2581ea",
+      "sourceTree": "74184affe1c8bc9a0e2666e51e716666e951d43f",
+      "capabilitySeedSha256": "16d64630109485ca14a5c1566d64084f3b932d7edf52bf70facd4274de0b8d0b",
+      "metricsSnapshot": {
+        "schemaVersion": 1,
+        "estimatedContextTokens": 559950.0,
+        "conceptRadius": 85.0,
+        "dependencyRadius": 254.0,
+        "knowledgeDensity": 152.88235294117646,
+        "contextLocality": 0.0,
+        "compressionRatio": 0.021430484864720063,
+        "aiCognitiveComplexity": 686.95,
+        "aiCognitiveDebt": 627.9323529411765,
+        "aiContextDebt": 17.01,
+        "contextDebtModelVersion": "context-footprint-v3"
+      },
+      "inventoryCounts": {
+        "modules": 59,
+        "classes": 1448,
+        "tests": 849,
+        "docs": 302,
+        "dependencies": 254,
+        "capabilities": 17,
+        "claims": 8,
+        "evidence": 9
+      }
+    },
+    "original-selectors": {
+      "contextFootprint": {
+        "schemaVersion": 3,
+        "measurementStatus": "MEASURED",
+        "repositoryContextTokens": 3641912,
+        "productionContextTokens": 2447120,
+        "testEvidenceTokens": 1140432,
+        "documentationContextTokens": 54360,
+        "productionLines": 305890,
+        "totalContextLines": 448444,
+        "tokensPerKloc": 8121.22,
+        "medianCapabilityWorkingSetTokens": 99240,
+        "p90CapabilityWorkingSetTokens": 619528,
+        "p90RepositoryContextShare": 0.1701,
+        "evidenceToProductionRatio": 0.4882,
+        "normalizedContextDebt": 17.01,
+        "contextEfficiencyScore": 82.99,
+        "capabilityCount": 17,
+        "capabilitySampleCount": 17,
+        "capabilitiesWithoutSelectors": 0,
+        "capabilitiesWithoutResolvedTypes": 0,
+        "unresolvedCapabilityTypeReferences": 0,
+        "unresolvedCapabilityModuleReferences": 0,
+        "unresolvedCapabilityPackageReferences": 0,
+        "capabilityReferenceSources": {
+          "matchedTypes": 1205,
+          "classes": 0,
+          "matchedModules": 54,
+          "modules": 54,
+          "ownerModules": 24,
+          "matchedPackages": 41,
+          "packages": 42
+        },
+        "capabilityWorkingSetSources": {
+          "typeOrPackage": 16,
+          "ownerModules": 1,
+          "modules": 0
+        },
+        "method": "line-weighted-prioritized-capability-selector-working-set-proxy"
+      },
+      "capabilities": [
+        {
+          "id": "rewrite-search",
+          "productionWorkingSetTokens": 560056,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 324,
+          "contextTestCount": 94,
+          "serializedContextPackTokenEstimate": 13134
+        },
+        {
+          "id": "equality-saturation",
+          "productionWorkingSetTokens": 15664,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 11,
+          "contextTestCount": 4,
+          "serializedContextPackTokenEstimate": 534
+        },
+        {
+          "id": "hypothesis-mining",
+          "productionWorkingSetTokens": 248528,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 159,
+          "contextTestCount": 76,
+          "serializedContextPackTokenEstimate": 6881
+        },
+        {
+          "id": "counterexample-search",
+          "productionWorkingSetTokens": 100008,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 67,
+          "contextTestCount": 41,
+          "serializedContextPackTokenEstimate": 3542
+        },
+        {
+          "id": "verified-trace-strategy-learning",
+          "productionWorkingSetTokens": 13808,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 8,
+          "contextTestCount": 8,
+          "serializedContextPackTokenEstimate": 668
+        },
+        {
+          "id": "proof-workflows",
+          "productionWorkingSetTokens": 281296,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 61,
+          "contextTestCount": 50,
+          "serializedContextPackTokenEstimate": 2994
+        },
+        {
+          "id": "discovery",
+          "productionWorkingSetTokens": 626200,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 193,
+          "contextTestCount": 157,
+          "serializedContextPackTokenEstimate": 9441
+        },
+        {
+          "id": "persistence",
+          "productionWorkingSetTokens": 99240,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 64,
+          "contextTestCount": 32,
+          "serializedContextPackTokenEstimate": 2955
+        },
+        {
+          "id": "web-workbench",
+          "productionWorkingSetTokens": 179728,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 144,
+          "contextTestCount": 79,
+          "serializedContextPackTokenEstimate": 5596
+        },
+        {
+          "id": "proof-carrying-showcase",
+          "productionWorkingSetTokens": 47048,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 18,
+          "contextTestCount": 12,
+          "serializedContextPackTokenEstimate": 1167
+        },
+        {
+          "id": "maven-build-contract",
+          "productionWorkingSetTokens": 619528,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 0,
+          "contextTestCount": 3,
+          "serializedContextPackTokenEstimate": 154
+        },
+        {
+          "id": "static-reference-publication",
+          "productionWorkingSetTokens": 2944,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 1,
+          "contextTestCount": 2,
+          "serializedContextPackTokenEstimate": 184
+        },
+        {
+          "id": "historical-rediscovery-diagnostics",
+          "productionWorkingSetTokens": 31368,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 6,
+          "contextTestCount": 4,
+          "serializedContextPackTokenEstimate": 518
+        },
+        {
+          "id": "polynomial-factorization",
+          "productionWorkingSetTokens": 206384,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 88,
+          "contextTestCount": 48,
+          "serializedContextPackTokenEstimate": 4719
+        },
+        {
+          "id": "exact-matrix-representation",
+          "productionWorkingSetTokens": 63352,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 22,
+          "contextTestCount": 11,
+          "serializedContextPackTokenEstimate": 1397
+        },
+        {
+          "id": "schematic-exact-plan-replay",
+          "productionWorkingSetTokens": 69600,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 30,
+          "contextTestCount": 23,
+          "serializedContextPackTokenEstimate": 1939
+        },
+        {
+          "id": "public-java-sdk",
+          "productionWorkingSetTokens": 10480,
+          "measurementStatus": "MEASURED",
+          "contextTypeCount": 9,
+          "contextTestCount": 5,
+          "serializedContextPackTokenEstimate": 543
+        }
+      ],
+      "extractorCoreJarSha256": "75fbcd25df9f4ad32b047e809ed1a237fb7967bdc9637c397de4ed9b36ce48af",
+      "artifactsSha256": {
+        "capabilities.json": "509dd1af848b8b2e1738d73b52db10f2770b7d84caf8d01085dbdcd7b466cca2",
+        "claims.json": "b522704dafe348f98c21888d4c4668461ad9ae678f92be3b899cc9813055a8e3",
+        "classes.json": "bdebcc118f06b3ba659dd2b2d0144094096f5561f8e16c4df0c973d6ae997add",
+        "complexity.json": "937ee9c26329a2d98c847254880632961cc5c4c262bc83d0e51527acdbd6eff1",
+        "context-packs/counterexample-search.json": "0e801d0a877b610f6591f47476f7e69ed7726b855df348785b02f5f8fb628485",
+        "context-packs/discovery.json": "9075aaeba31adcb1045107ad939d84310c69f7131a2a9bcb8d086d364cf9fae2",
+        "context-packs/equality-saturation.json": "6548a559ef83089703ef965f13d73a65a7cdf3723e31b68c6ce15139ae72b7c5",
+        "context-packs/exact-matrix-representation.json": "975a23e14b1294114d1873a4cb8eeafbffc0ccfe687a3fd349f05138dbb1f3d2",
+        "context-packs/historical-rediscovery-diagnostics.json": "0ee56d713ca06653a036d0d9f4cb817dc55f40c1bfb03cd219bb64c1c4759975",
+        "context-packs/hypothesis-mining.json": "07695e511d7971c8bac92b4f17b91be79d5453bf5d297c6ebb38b75d857e94cc",
+        "context-packs/index.json": "33e9b9ee4848ef363a66b26209abc1702e57d38d1d20b85c9d4c6db116266c32",
+        "context-packs/maven-build-contract.json": "71ac265c052fba6d9278a11308d33ffc7333f9123e27851bf53ac069a62cfceb",
+        "context-packs/persistence.json": "efe1ff51ec4fa6bf170be76812ce91d6045ead4c745b4b89583140e267c9c822",
+        "context-packs/polynomial-factorization.json": "a2b94679badce4498e65cc9092d54581a3a4bdf91c4acda6778bec0b695705a5",
+        "context-packs/proof-carrying-showcase.json": "d1967d09258a552268621e3ad489be7db35556548f8dfd187a95e9ef3d6a4526",
+        "context-packs/proof-workflows.json": "cdf16e5b724c0a823ae34bf6ef46adcd0057b5411e68f8ae76117f0cecf547e6",
+        "context-packs/public-java-sdk.json": "8da7a96ac450bbee04b23dbb16698cd1eb2d03b135186b8ba3d4944306d63509",
+        "context-packs/rewrite-search.json": "37833cbc416e96565f9528b622f8ab2744c57cee7db487c2995a7fd4902de8e3",
+        "context-packs/schematic-exact-plan-replay.json": "64285551e31bf644e722c910f3f07878379eded4386c422175d78721bdf18583",
+        "context-packs/static-reference-publication.json": "54339d738168b55990472c08121059b2dfadce953484e1b76c11ce4b9aa5bbf5",
+        "context-packs/verified-trace-strategy-learning.json": "7d365b35775efd2fa11ab17e6bbdfde4eba47bc54d27d5f5e9e8f4a3ff2b9130",
+        "context-packs/web-workbench.json": "38d8b0e8f8ee5e58fb97e1d00d4ba69f1a3dba0b9082fadd3bf58772373cdb50",
+        "dependencies.json": "bf4ae7088dcf16dd68410ad0e2f730c20b653c1da84095490d4762e21e935ba6",
+        "docs.json": "a3add72f3b964d2b8453a4f9e0e7e188222fb68d13579c6100ab2ae3b0be1d43",
+        "evidence.json": "025854065f9bf9eca696719ad5b46b30985ff365373f07cae8f127cc446e1ac2",
+        "index.json": "104824bb28a9c65cd5cbb2fc3644c83cbde1fa1af5ccf16263efe1aec38822dd",
+        "metrics-snapshot.json": "33dbe9fa748e03c03f00c76f485ba9024dc039bad9d264ddea8938eef54ea7b3",
+        "modules.json": "e55e15e120ac14e6560f02d01784c7b0d25bf586a7a5dc01a97efbbe517fc4e4",
+        "tests.json": "37fb0d0b528d2d050cac8cf0d3b9bb5bca8a6946751a448626a936014693c27b",
+        "trend.json": "fe6b986cb7cf86822ff7fdc3d1df8dd823d43e711360682430c10762fea97c54"
+      },
+      "sourceCommit": "67ea97116db21ff4050b0ed33a34f5456b2581ea",
+      "sourceTree": "74184affe1c8bc9a0e2666e51e716666e951d43f",
+      "capabilitySeedSha256": "831e6d021d1a2f92ed764c89a1520c4ee609f176d01b0d7d170b86c3e16bd6fb",
+      "metricsSnapshot": {
+        "schemaVersion": 1,
+        "estimatedContextTokens": 559950.0,
+        "conceptRadius": 85.0,
+        "dependencyRadius": 254.0,
+        "knowledgeDensity": 152.88235294117646,
+        "contextLocality": 0.0,
+        "compressionRatio": 0.021430484864720063,
+        "aiCognitiveComplexity": 686.95,
+        "aiCognitiveDebt": 627.9323529411765,
+        "aiContextDebt": 17.01,
+        "contextDebtModelVersion": "context-footprint-v3"
+      },
+      "inventoryCounts": {
+        "modules": 59,
+        "classes": 1448,
+        "tests": 849,
+        "docs": 302,
+        "dependencies": 254,
+        "capabilities": 17,
+        "claims": 8,
+        "evidence": 9
+      }
+    }
+  }
+}
