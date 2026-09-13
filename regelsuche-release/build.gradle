@@ -45,6 +45,7 @@ dependencies {
     api project(':regelsuche-discovery')
     implementation project(':regelsuche-math-algorithms')
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.2'
+    implementation 'com.networknt:json-schema-validator:2.0.7'
 
     testImplementation libs.junit.jupiter
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -60,6 +61,25 @@ dependencies {
     independentReproductionContainerTestImplementation libs.testcontainers.junit
     independentReproductionContainerTestImplementation libs.junit.jupiter
     independentReproductionContainerTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(Test).configureEach {
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
+    systemProperty 'regelsuche.repositoryRoot', rootProject.projectDir.absolutePath
+}
+
+// Read-only alternative retained beside the required Python gate pending independent review.
+// This task deliberately has no evidence-generation dependency.
+tasks.register('verifyRetainedReleaseReadinessJava', JavaExec) {
+    group = 'verification'
+    description = 'Validates existing qualified release evidence through the Java authority (Linux AMD64).'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.release.ReleaseReadinessEvidenceVerifier'
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
+    args '--root', providers.gradleProperty('releaseReadinessEvidenceRoot')
+        .orElse(layout.buildDirectory.dir('reports/release-readiness-qualified').map { it.asFile.absolutePath }).get(),
+        '--schemas', rootProject.layout.projectDirectory.dir('docs/schemas').asFile.absolutePath
 }
 
 def hiddenRuleReport = project(':app').layout.buildDirectory

@@ -114,14 +114,8 @@ public final class AutonomousCandidateQualificationRunner {
                 utility.gainPermille(),
                 utility.correctnessRegressionCount());
         validateSuccessfulQualification(split, evaluation, utility, evidence);
-        String contentHash = AutonomousResearchBriefV2.hash(
-            SCHEMA
-                + "\ncampaign=" + campaign.contentHash()
-                + "\nsuite=" + suiteHash
-                + "\nsplit=" + split.contentHash()
-                + "\nevaluation=" + evaluationHash
-                + "\nutility=" + utility.contentHash()
-                + "\nevidence=" + evidence.contentHash());
+        String contentHash = runHash(campaign.contentHash(), suiteHash, split.contentHash(),
+            evaluationHash, utility.contentHash(), evidence.contentHash());
         return new QualificationRun(
             SCHEMA,
             campaign,
@@ -295,6 +289,14 @@ public final class AutonomousCandidateQualificationRunner {
 
     private static boolean isSha(String value) {
         return value != null && value.matches("sha256:[0-9a-f]{64}");
+    }
+
+    /** Existing v1 identity shared by production and retained-evidence verification. */
+    static String runHash(String campaignHash, String suiteHash, String splitHash,
+            String evaluationHash, String utilityHash, String evidenceHash) {
+        return AutonomousResearchBriefV2.hash(SCHEMA + "\ncampaign=" + campaignHash
+            + "\nsuite=" + suiteHash + "\nsplit=" + splitHash + "\nevaluation=" + evaluationHash
+            + "\nutility=" + utilityHash + "\nevidence=" + evidenceHash);
     }
 
     public record QualificationRun(

@@ -57,6 +57,394 @@
         }
       }
     },
+    "/api/discovery-domains/exports": {
+      "get": {
+        "tags": [
+          "Plugins"
+        ],
+        "operationId": "listRetainedDomainExports",
+        "summary": "Verifizierte Domain-Exporte begrenzt auflisten",
+        "x-regelsuche-context": "/api/discovery-domains",
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 25,
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Gebundene Original-Exportansicht mit getrennten Arbeitsdimensionen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestJson"
+          },
+          "404": {
+            "description": "Export oder Originaldatei fehlt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Source-Identitätskonflikt, falsche Replay-Bindung oder nicht reproduzierte Evidence",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Plugins"
+        ],
+        "operationId": "retainDomainExportWorkspace",
+        "summary": "Vier unveränderte Exportdateien verifizieren und unveränderlich speichern",
+        "x-regelsuche-context": "/api/discovery-domains",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "schema",
+                  "files"
+                ],
+                "properties": {
+                  "schema": {
+                    "type": "string",
+                    "enum": [
+                      "regelsuche.domain-export-upload/v1"
+                    ]
+                  },
+                  "files": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "domain.json",
+                      "evidence.json",
+                      "lifecycle-handoff.json",
+                      "export-manifest.json"
+                    ],
+                    "properties": {
+                      "domain.json": {
+                        "type": "string",
+                        "contentEncoding": "base64"
+                      },
+                      "evidence.json": {
+                        "type": "string",
+                        "contentEncoding": "base64"
+                      },
+                      "lifecycle-handoff.json": {
+                        "type": "string",
+                        "contentEncoding": "base64"
+                      },
+                      "export-manifest.json": {
+                        "type": "string",
+                        "contentEncoding": "base64"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Gebundene Original-Exportansicht mit getrennten Arbeitsdimensionen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestJson"
+          },
+          "404": {
+            "description": "Export oder Originaldatei fehlt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Source-Identitätskonflikt, falsche Replay-Bindung oder nicht reproduzierte Evidence",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          }
+        }
+      }
+    },
+    "/api/discovery-domains/exports/{runDigest}": {
+      "get": {
+        "tags": [
+          "Plugins"
+        ],
+        "operationId": "loadDomainExportWorkspace",
+        "summary": "Schema-spezifische Ansicht eines verifizierten Exports öffnen",
+        "x-regelsuche-context": "/api/discovery-domains",
+        "parameters": [
+          {
+            "name": "runDigest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Gebundene Original-Exportansicht mit getrennten Arbeitsdimensionen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestJson"
+          },
+          "404": {
+            "description": "Export oder Originaldatei fehlt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Source-Identitätskonflikt, falsche Replay-Bindung oder nicht reproduzierte Evidence",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          }
+        }
+      }
+    },
+    "/api/discovery-domains/exports/{runDigest}/replay": {
+      "post": {
+        "tags": [
+          "Plugins"
+        ],
+        "operationId": "replayDomainExportWorkspace",
+        "summary": "Gebundene Sequenz-Evidence unter den ursprünglichen Budgets erneut ausführen",
+        "x-regelsuche-context": "/api/discovery-domains",
+        "parameters": [
+          {
+            "name": "runDigest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "expectedWorkspaceHash",
+                  "expectedEvidenceHash"
+                ],
+                "properties": {
+                  "expectedWorkspaceHash": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  },
+                  "expectedEvidenceHash": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Gebundene Original-Exportansicht mit getrennten Arbeitsdimensionen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestJson"
+          },
+          "404": {
+            "description": "Export oder Originaldatei fehlt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Source-Identitätskonflikt, falsche Replay-Bindung oder nicht reproduzierte Evidence",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          }
+        }
+      }
+    },
+    "/api/discovery-domains/exports/{runDigest}/files/{fileName}": {
+      "get": {
+        "tags": [
+          "Plugins"
+        ],
+        "operationId": "downloadOriginalDomainExportFile",
+        "summary": "Exakte verifizierte Originalbytes laden",
+        "x-regelsuche-context": "/api/discovery-domains",
+        "parameters": [
+          {
+            "name": "runDigest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          {
+            "name": "fileName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "domain.json",
+                "evidence.json",
+                "lifecycle-handoff.json",
+                "export-manifest.json"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Gebundene Original-Exportansicht mit getrennten Arbeitsdimensionen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestJson"
+          },
+          "404": {
+            "description": "Export oder Originaldatei fehlt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Source-Identitätskonflikt, falsche Replay-Bindung oder nicht reproduzierte Evidence",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          }
+        }
+      }
+    },
     "/api/discovery-domains/run": {
       "post": {
         "tags": [
@@ -392,11 +780,11 @@
         "tags": ["Discovery Runs"],
         "operationId": "getRetainedCandidateDossier",
         "summary": "Gebundenes kanonisches Kandidatenartefakt laden",
-        "description": "Lädt ausschließlich das vom Run gebundene regelsuche.target-free-sympy-bridge-discovery/v1-Artefakt. Kanonische Bytes, Inhaltshashes und RunBundle-Bindungen werden bei jedem Lesen geprüft. Es wird keine neue Suche oder Validierung ausgeführt.",
+        "description": "Lädt das vom Run gebundene SymPy-Brückenartefakt oder regelsuche.target-free-search-execution/v1. Kanonische Bytes, Inhaltshashes und vollständige Workspace-Bindung werden bei jedem Lesen geprüft. Native Erzeugungen, besuchte Übergänge und geordnete Ausführung bleiben getrennt. Es wird keine neue Suche oder Validierung ausgeführt.",
         "x-regelsuche-context": "/api/discovery-runs",
         "parameters": [{"name": "runDigest", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}],
         "responses": {
-          "200": {"description": "Kanonisches ScenarioArtifact mit content und contentHash", "headers": {"ETag": {"schema": {"type": "string"}}, "X-Regelsuche-Run-Id": {"schema": {"type": "string"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RetainedCandidateDossier"}}}},
+          "200": {"description": "Gebundenes kanonisches Kandidatenartefakt mit content und contentHash; Schema-Dispatch im content", "headers": {"ETag": {"schema": {"type": "string"}}, "X-Regelsuche-Run-Id": {"schema": {"type": "string"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RetainedCandidateDossier"}}}},
           "400": {"$ref": "#/components/responses/BadRequestJson"},
           "404": {"description": "RUN_NOT_FOUND oder DOSSIER_NOT_RETAINED", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
           "409": {"description": "DOSSIER_UNAVAILABLE oder UNSUPPORTED_DOSSIER", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
@@ -1064,23 +1452,166 @@
       "RetainedCandidateDossier": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["content", "contentHash"],
+        "required": [
+          "content",
+          "contentHash"
+        ],
         "properties": {
-          "contentHash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "contentHash": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
           "content": {
-            "type": "object",
-            "required": ["schema", "search", "searchContentHash", "freeze", "discoveredBridge", "classification", "followOnExecution", "informationTrack", "claimBoundary"],
-            "properties": {
-              "schema": {"type": "string", "enum": ["regelsuche.target-free-sympy-bridge-discovery/v1"]},
-              "search": {"$ref": "#/components/schemas/JsonObject"},
-              "searchContentHash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
-              "freeze": {"$ref": "#/components/schemas/JsonObject"},
-              "discoveredBridge": {"$ref": "#/components/schemas/JsonObject"},
-              "classification": {"$ref": "#/components/schemas/JsonObject"},
-              "followOnExecution": {"$ref": "#/components/schemas/JsonObject"},
-              "informationTrack": {"type": "string"},
-              "claimBoundary": {"type": "string"}
-            }
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "schema",
+                  "search",
+                  "searchContentHash",
+                  "freeze",
+                  "discoveredBridge",
+                  "classification",
+                  "followOnExecution",
+                  "informationTrack",
+                  "claimBoundary"
+                ],
+                "properties": {
+                  "schema": {
+                    "type": "string",
+                    "enum": [
+                      "regelsuche.target-free-sympy-bridge-discovery/v1"
+                    ]
+                  },
+                  "search": {
+                    "$ref": "#/components/schemas/JsonObject"
+                  },
+                  "searchContentHash": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  },
+                  "freeze": {
+                    "$ref": "#/components/schemas/JsonObject"
+                  },
+                  "discoveredBridge": {
+                    "$ref": "#/components/schemas/JsonObject"
+                  },
+                  "classification": {
+                    "$ref": "#/components/schemas/JsonObject"
+                  },
+                  "followOnExecution": {
+                    "$ref": "#/components/schemas/JsonObject"
+                  },
+                  "informationTrack": {
+                    "type": "string"
+                  },
+                  "claimBoundary": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "schema",
+                  "input",
+                  "plan",
+                  "heuristic",
+                  "revisions",
+                  "goalStatus",
+                  "bestDistance",
+                  "bestStateId",
+                  "metrics",
+                  "states",
+                  "transitions",
+                  "generations",
+                  "events",
+                  "work",
+                  "stageAssessment",
+                  "recordingOverhead",
+                  "claimBoundary"
+                ],
+                "properties": {
+                  "schema": {
+                    "type": "string",
+                    "enum": [
+                      "regelsuche.target-free-search-execution/v1"
+                    ]
+                  },
+                  "input": {
+                    "$ref": "#/components/schemas/JsonObject"
+                  },
+                  "plan": {
+                    "$ref": "#/components/schemas/JsonObject"
+                  },
+                  "heuristic": {
+                    "$ref": "#/components/schemas/JsonObject"
+                  },
+                  "revisions": {
+                    "$ref": "#/components/schemas/JsonObject"
+                  },
+                  "metrics": {
+                    "$ref": "#/components/schemas/JsonObject"
+                  },
+                  "work": {
+                    "$ref": "#/components/schemas/JsonObject"
+                  },
+                  "goalStatus": {
+                    "type": "string",
+                    "enum": [
+                      "UNTARGETED"
+                    ]
+                  },
+                  "bestDistance": {
+                    "type": "integer",
+                    "enum": [
+                      -1
+                    ]
+                  },
+                  "bestStateId": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  },
+                  "states": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/JsonObject"
+                    }
+                  },
+                  "transitions": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/JsonObject"
+                    }
+                  },
+                  "generations": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/JsonObject"
+                    }
+                  },
+                  "events": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/JsonObject"
+                    }
+                  },
+                  "stageAssessment": {
+                    "type": "string",
+                    "enum": [
+                      "NOT_EVALUATED"
+                    ]
+                  },
+                  "recordingOverhead": {
+                    "type": "string"
+                  },
+                  "claimBoundary": {
+                    "type": "string"
+                  }
+                }
+              }
+            ]
           }
         }
       },

@@ -57,6 +57,21 @@ public final class TargetFreeRepresentationDiscoveryRun {
     private TargetFreeRepresentationDiscoveryRun() {
     }
 
+    /** Additive native run; the frozen SymPy/enumeration entry points remain separate. */
+    public static TargetFreeSearchExecution.RunResult runTargetFree(String sourceExpression,
+            de.regelsuche.search.SearchHeuristic heuristic, String repositoryRevision) {
+        return TargetFreeSearchExecution.run(sourceExpression, heuristic, requireRepositoryRevision(repositoryRevision));
+    }
+
+    /** Persists an actual native execution for the existing run and dossier consumers. */
+    public static TargetFreeSearchExecution.RunResult writeTargetFree(Path runDirectory, String sourceExpression,
+            de.regelsuche.search.SearchHeuristic heuristic, String repositoryRevision) throws IOException {
+        var result = runTargetFree(sourceExpression, heuristic, repositoryRevision);
+        TargetFreeSearchArtifactStore.retain(runDirectory, result.workspace(), result.artifact().toCanonicalJson().getBytes(StandardCharsets.UTF_8));
+        RepresentationDiscoveryRunWorkspace.retain(runDirectory, result.workspace());
+        return result;
+    }
+
     public static RunBundle run(String repositoryRevision) {
         String revision = requireRepositoryRevision(repositoryRevision);
         TargetFreeSymPyBridgeDiscoveryScenario.ScenarioArtifact scenario =

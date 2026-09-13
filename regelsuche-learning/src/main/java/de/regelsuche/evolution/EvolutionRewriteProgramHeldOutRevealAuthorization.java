@@ -112,6 +112,22 @@ public final class EvolutionRewriteProgramHeldOutRevealAuthorization {
             terminal);
     }
 
+    /** Additive combined-population path; a durable receipt is required before reveal. */
+    public static EvolutionRewriteProgramHeldOutRevealAuthorization validation(
+        EvolutionRewriteProgramStudyPlan study,
+        EvolutionSplitManifest manifest,
+        ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun train,
+        FileEvolutionRewriteProgramValidationAttemptStore.Reservation reservation
+    ) {
+        var validationPlan = Objects.requireNonNull(reservation, "reservation").plan();
+        validationPlan.requireInputs(study, manifest, train);
+        var run = train.retainedPopulation().populationRun();
+        return create(study.studyId(), Split.VALIDATION,
+            Stage.VALIDATION_AFTER_TRAIN_POPULATION_COMPLETE,
+            study.contentHash(), manifest.contentHash(), validationPlan.commitment().contentHash(),
+            run.contentHash(), "", "", run.terminalOutcome().name());
+    }
+
     public static EvolutionRewriteProgramHeldOutRevealAuthorization finalTest(
         EvolutionStudyPlan plan,
         EvolutionSplitManifest manifest,
@@ -159,6 +175,23 @@ public final class EvolutionRewriteProgramHeldOutRevealAuthorization {
             selection.contentHash(),
             suite.contentHash(),
             EvolutionFinalTestReservation.RESERVED);
+    }
+
+    /** Combined-program FINAL TEST requires the non-deserializable winning durable reservation. */
+    public static EvolutionRewriteProgramHeldOutRevealAuthorization finalTest(
+        EvolutionRewriteProgramStudyPlan study,
+        EvolutionSplitManifest manifest,
+        ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun train,
+        FileEvolutionRewriteProgramFinalTestAttemptStore.Reservation reservation
+    ) {
+        var finalPlan = Objects.requireNonNull(reservation, "reservation").plan();
+        reservation.requireRevealAuthority();
+        finalPlan.requireInputs(study, manifest, train);
+        return create(study.studyId(), Split.FINAL_TEST,
+            Stage.FINAL_TEST_AFTER_FROZEN_SELECTION_AND_RESERVATION,
+            study.contentHash(), manifest.contentHash(), finalPlan.commitment().contentHash(),
+            reservation.record().contentHash(), finalPlan.validationHandoff().selection().contentHash(),
+            finalPlan.contentHash(), EvolutionRewriteProgramFinalTestReservation.RESERVED);
     }
 
     private static EvolutionRewriteProgramHeldOutRevealAuthorization create(

@@ -22,7 +22,7 @@ The evidence verifier checks:
 
 - every mandatory release, campaign and qualification artifact;
 - absence of the obsolete `proof-obligation.json` path;
-- twelve Draft 2020-12 schema/artifact pairs;
+- sixteen Draft 2020-12 schema/artifact pairs;
 - solver obligation/result/proof/lifecycle hash binding;
 - `CONFIRMED` and `LOSSLESS` solver status;
 - `READY` Hidden Rule, Open Target and Autonomous Campaign profiles;
@@ -48,3 +48,7 @@ build/release-readiness-docker-output/
 ```
 
 The `Release Readiness` workflow only provisions Java/Gradle, calls the same runner and uploads diagnostics. It contains no release assertions, expected values, schema programs or Docker lifecycle semantics.
+
+Issue #749 also provides a [Java retained-evidence verifier](release-readiness-java-verification.md)
+with ordinary Maven/JUnit controls. The Python verifier remains required while the
+Java alternative, its native reader and build integration receive independent review.
