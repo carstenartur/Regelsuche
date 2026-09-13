@@ -367,22 +367,39 @@ public final class UnivariatePolynomialView<C> {
             domain,
             degree() - divisor.degree() + 1);
         ArrayList<C> remainder = new ArrayList<>(coefficients);
-        int remainderDegree = trimmedDegree(remainder, domain);
+        int remainderDegree = degree();
+        String iterationStage = stage + ".iterations";
+        String divisionStage = stage + ".coefficient-divisions";
+        String updateStage = stage + ".coefficient-updates";
+        // Only the concrete immutable prime field has this specialization.
+        // Generic field implementations keep their own divide operation.
+        boolean reuseInverse = field instanceof PrimeField
+            && domain instanceof PrimeField;
+        C inverse = null;
 
         while (remainderDegree >= divisor.degree()) {
-            consume(work, stage + ".iterations", 1);
+            consume(work, iterationStage, 1);
             int shift = remainderDegree - divisor.degree();
-            consume(work, stage + ".coefficient-divisions", 1);
-            C scale = field.divide(
-                remainder.get(remainderDegree),
-                divisor.leadingCoefficient());
+            consume(work, divisionStage, 1);
+            C scale;
+            if (reuseInverse) {
+                // Lazy initialization stays after both existing budget charges.
+                if (inverse == null) {
+                    inverse = field.divide(field.one(), divisor.leadingCoefficient());
+                }
+                scale = field.multiply(remainder.get(remainderDegree), inverse);
+            } else {
+                scale = field.divide(
+                    remainder.get(remainderDegree),
+                    divisor.leadingCoefficient());
+            }
             quotient.set(
                 shift,
                 domain.add(quotient.get(shift), scale));
             for (int exponent = 0;
                     exponent <= divisor.degree();
                     exponent++) {
-                consume(work, stage + ".coefficient-updates", 2);
+                consume(work, updateStage, 2);
                 int index = exponent + shift;
                 remainder.set(
                     index,
@@ -392,7 +409,7 @@ public final class UnivariatePolynomialView<C> {
                             scale,
                             divisor.coefficient(exponent))));
             }
-            remainderDegree = trimmedDegree(remainder, domain);
+            remainderDegree = trimmedDegree(remainder, domain, remainderDegree);
         }
 
         return new DivisionResult<>(
@@ -474,9 +491,10 @@ public final class UnivariatePolynomialView<C> {
 
     private static <C> int trimmedDegree(
         List<C> values,
-        CoefficientDomain<C> domain
+        CoefficientDomain<C> domain,
+        int degree
     ) {
-        int degree = values.size() - 1;
+        // Entries above the previous remainder degree are already known zero.
         while (degree >= 0 && domain.isZero(values.get(degree))) {
             degree--;
         }

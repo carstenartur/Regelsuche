@@ -1,0 +1,230 @@
+{
+  "schema": "regelsuche.ai-knowledge-baseline-provenance/v1",
+  "decision": "Advance the trend baseline only to freshly measured, actually merged and fully qualified main 0eec6c0da8. Preserve all prior history and rejected candidate diagnostics; candidate measurements supply no baseline values.",
+  "acceptedSource": {
+    "mainCommit": "0eec6c0da83cd0cb548817782bc5f11431d25d2c",
+    "publishedPullRequest": 1000,
+    "publishedPullRequestHead": "b542a4227cf911c29e34359a63452386150c8668",
+    "tree": "3d7c3de8d80acfe4e5d3dbea02ab2e884696e412"
+  },
+  "independentQualification": {
+    "runId": 34744840693,
+    "runNumber": 5589,
+    "url": "https://github.com/carstenartur/Regelsuche/actions/runs/34744840693",
+    "conclusion": "success",
+    "allRequiredAuthorityCount": 6,
+    "retainedSourceQualification": "0eec6c0da8-source-qualification.json",
+    "evidenceBoundary": "The merged main commit and exact source-head workflow were independently checked through read-only GitHub calls. All six required authorities passed. The CI convergence log independently checked transferred artifact digests and reported qualityAcceptanceEvidence=COMPLETE; the artifact ZIP was not locally downloaded or hashed. Four manual JMH study jobs and report publication were skipped. Baseline metrics are derived only from the separate fresh clean local execution of accepted main."
+  },
+  "localReproduction": {
+    "checkoutCommit": "0eec6c0da83cd0cb548817782bc5f11431d25d2c",
+    "tree": "3d7c3de8d80acfe4e5d3dbea02ab2e884696e412",
+    "cleanBefore": true,
+    "sourceFileSha256": {
+      "ai-knowledge/complexity-baseline.json": "c0336da54cdaec31497aaf47214fafed518beaccde32699811116ba76ffa8881",
+      "ai-knowledge/capabilities.seed.yaml": "16d64630109485ca14a5c1566d64084f3b932d7edf52bf70facd4274de0b8d0b",
+      "ai-knowledge/claims.seed.yaml": "013935ebad67ff3868602be8c68b73dba723610ad5ba728113f87e114f3dc108",
+      "ai-knowledge/claims.json": "cce03fad40abaa23770707154b2cab60afe37f1b0cbc8fb4d8865a886480b0c1",
+      "gradle.properties": "2d0c622ff20ce78d0432c004df2dba7af170bdb50f5ce68faffdc5bcd1f1b285",
+      "settings.gradle": "6cba76fe53a076ce6ae2ca44f85a7e60fc27c2c11f491bfe79b33fd31272812b",
+      "ai-knowledge-verification/build.gradle": "2aaf02538386418eeb3a5de354942514ba697cedd5cd658edf0cd44e2cdbfdd5",
+      "gradle/ai-knowledge-verification.gradle": "f1df0d336d519f10a0bf35129e1b80cd8cbbad5d0d3939e0fffd2cd5d7ee91b8",
+      "config/quality/complexity-hotspots.json": "8e9e8b549bc388f4638ec62de498a240ccb92e83108e848d75e7fcf94a02fbc2",
+      "config/ai-knowledge-capability-coverage.json": "9c1705776a062b5784cd9bad1cdc847878338f1ce32ac1fc66e7769ed98adbed",
+      "scripts/verify-ai-knowledge-artifacts.py": "845708cb45420565d5636539b00b60034162db762132bf781b6d3f9b4a7b3f7b",
+      "scripts/test_ai_knowledge_coverage.py": "ec21b3b2050f528c221e118c5e87948847e9de32384ee5eb6b382eea2210bca4",
+      "scripts/verify-complexity-hotspots.py": "d792435d075d8102bbe5504af83f84d6c660a20b1234e8516f8a5d5ac3775bfa"
+    },
+    "command": "source ../runtime/env.sh\nAI_KNOWLEDGE_EXTRACTOR_ENABLED=true ../runtime/gradle-9.7.1/bin/gradle --offline --no-daemon --no-configuration-cache --max-workers=2 -PuseLocalAiKnowledgeExtractor=true -PaiKnowledgeExtractorCheckout=../ai-knowledge-extractor -Porg.gradle.java.installations.paths=/workspace/scratch/a1f484c28baf/runtime/jdk-25.0.4.1+1,/workspace/scratch/a1f484c28baf/runtime/jdk-17.0.20.1+1 aiKnowledgeCheck",
+    "extractorCommit": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+    "startedAtUtc": "2026-09-13T08:10:24Z",
+    "exitCode": 0,
+    "elapsedSeconds": 14.43,
+    "cleanAfter": true,
+    "extractorCheckoutCleanBeforeAndAfter": true,
+    "generatedReportSha256": {
+      "benchmark.json": "d228728b1a9366521c10395d0f7a60fa3a25a4a6c6b83f42899480a8cab28744",
+      "capabilities.json": "03042101423ae6fe15299944d7d234b8c3daec32c2a5c49e3654d6b002e371ea",
+      "check.json": "711368ff338209bdc4f7c4fd19f58af0e89a439fbbd829bc83c7d9c3b11c6b31",
+      "claims.json": "b522704dafe348f98c21888d4c4668461ad9ae678f92be3b899cc9813055a8e3",
+      "classes.json": "186fbac3ac51732f4c85047436410681641a5dc675771279feb82cbf0e71587a",
+      "complexity.json": "f2efec002eaab1f4f16f584a2ade2c26828a3662296370c540cb12f69706765f",
+      "dependencies.json": "ac2e55909754aff24e41edbe4d713b1ec8fa5f54e424a2d3e98ec12554b1f056",
+      "docs.json": "c3086f8295329f071f785096f161f7fc037bfec6c7367052b49e88dc624598ce",
+      "evidence.json": "407f3bb57a2bb63390603ddabcb0f468ffdaca70716dff00e0cdf1e992b0949e",
+      "index.json": "241292a5a4229f4dbdec55f1438d612743176592fccf6565bc862328d4aa167e",
+      "metrics-snapshot.json": "3d2b0f4ef3816c2a7b72faae36f8f266426a33d7a9b9f266f85dda7aa2cce885",
+      "modules.json": "319a3f93a79e081a7e3f3e72b1556d4dca2e2757cd964999056d96aa27d82db6",
+      "optimization.json": "bacc73c39b394c38cdfec0c5ca2af8f88958076dad83abc73d43ffb36ae359bf",
+      "tests.json": "4bec341a8d1e211ce453d9c40856332bfdc37a3cbc911f17613941008c725673",
+      "trend.json": "4295d91bdacb625567b8728be209c44e7e525f2d3a41179b4b69757600cc0eb0"
+    },
+    "commandLogSha256": "d1f28400738b41571e9843f36d5e627e6eea5ad07663ccb77064873ddef0b2de",
+    "retainedSourceExecution": "0eec6c0da8-source-execution.json"
+  },
+  "previousBaseline": {
+    "sourceCommit": "5041f9d88047b3eb4171c8bfc4017c30355f6a52",
+    "retainedFile": "5041f9d880-metrics-snapshot.json",
+    "sha256": "c0336da54cdaec31497aaf47214fafed518beaccde32699811116ba76ffa8881",
+    "retainedProvenance": "2026-09-13-main5041-provenance.json"
+  },
+  "newBaseline": {
+    "sourceCommit": "0eec6c0da83cd0cb548817782bc5f11431d25d2c",
+    "retainedFile": "0eec6c0da8-metrics-snapshot.json",
+    "sha256": "3d2b0f4ef3816c2a7b72faae36f8f266426a33d7a9b9f266f85dda7aa2cce885",
+    "derivation": "Exact generated metrics-snapshot.json bytes, copied without numeric edits.",
+    "metrics": {
+      "schemaVersion": 1,
+      "estimatedContextTokens": 595135.0,
+      "conceptRadius": 89.0,
+      "dependencyRadius": 273.0,
+      "knowledgeDensity": 163.23529411764707,
+      "contextLocality": 0.0,
+      "compressionRatio": 0.020163492316869282,
+      "aiCognitiveComplexity": 731.635,
+      "aiCognitiveDebt": 666.3702941176471,
+      "aiContextDebt": 16.81,
+      "contextDebtModelVersion": "context-footprint-v3"
+    }
+  },
+  "rejectedCandidateDiagnostics": [
+    {
+      "diagnostic": "learning-600095",
+      "sourceAssociation": {
+        "reportedCommit": "bc981aafb027143329b447f85341ca2f98191c1d",
+        "reportedTree": "2a9b8055be23301c8cda449f61fbb5bf2b6cd2a6"
+      },
+      "originalDirectory": "learning-validation-integration/target/learning-integration-review/rejected-ai-600095",
+      "bindingBoundary": "The exact original receipt is retained with its source association and observation limits. A metrics snapshot is retained only when originally archived. These rejected outputs are not accepted-source qualification or baseline values.",
+      "usedAsBaseline": false,
+      "retainedFileSha256": {
+        "2026-09-13-learning-600095-rejected-check.json": "505a6e9e8ecc32a3f466d7a337451c52cb95fca9d4defbf9cf69bc915b37f020",
+        "2026-09-13-learning-600095-rejected-combined-learning-ai-current-baseline.log": "aa1a5c1ab127ccead9d4ffbd665a5aee0fab62d2deee42503f1a2263f6cfe45b",
+        "2026-09-13-learning-600095-rejected-complexity-baseline.json": "c0336da54cdaec31497aaf47214fafed518beaccde32699811116ba76ffa8881",
+        "2026-09-13-learning-600095-rejected-complexity.json": "dfb4dca55e15f0f0846e691a0865685dfcd9bd3a7c4404e4c3f95bdddef40f6e",
+        "2026-09-13-learning-600095-rejected-receipt.json": "8a9a16e354f34b8921ca014b679a528d34a3c59d150a4be81ac152203213e2ff",
+        "2026-09-13-learning-600095-rejected-trend.json": "6dc13537bec06957056bfabafa42e0263523ece5a061141366274fb3879fc383"
+      }
+    },
+    {
+      "diagnostic": "learning-605640",
+      "sourceAssociation": {
+        "reportedCommit": "50db0062481e12389dd17e2922b85a4895a8d041",
+        "reportedTree": "3563db3b25618d023441e3b4da13b3cd7e6f3f32"
+      },
+      "originalDirectory": "learning-validation-integration/target/learning-integration-review/rejected-ai-605640",
+      "bindingBoundary": "The exact original receipt is retained with its source association and observation limits. A metrics snapshot is retained only when originally archived. These rejected outputs are not accepted-source qualification or baseline values.",
+      "usedAsBaseline": false,
+      "retainedFileSha256": {
+        "2026-09-13-learning-605640-rejected-check.json": "739be869566d6ad44a666dd624ee5f1044f849256784d4f9c7482f0ac638a6a6",
+        "2026-09-13-learning-605640-rejected-complexity-baseline.json": "c0336da54cdaec31497aaf47214fafed518beaccde32699811116ba76ffa8881",
+        "2026-09-13-learning-605640-rejected-complexity.json": "937cfdef2fd3e286a6f78cac584deee44aa1284d518df3ea0b96e28ea7b32222",
+        "2026-09-13-learning-605640-rejected-current-batch-ai-original-baseline.log": "1b7c873b0b796c7eee02cf048b204dbce201119482868b2b94211e8116089927",
+        "2026-09-13-learning-605640-rejected-receipt.json": "9c07b925249102e5da410fd1b196fb22bf2f30eff0374db22996e8b89de7bf44",
+        "2026-09-13-learning-605640-rejected-trend.json": "2407d080148a0987eea723d85cf41071d24b8dfcc564386b2bb47a1714679ec3"
+      }
+    },
+    {
+      "diagnostic": "math-600945",
+      "sourceAssociation": {
+        "reportedCommit": "dfb98d931de2b6eed0da0d6055419e77e29117be",
+        "reportedTree": "580260739b0d97a0b6edcc169980f86766e7878f"
+      },
+      "originalDirectory": "mathematical-search-integration/target/math-search-integration-review/rejected-ai-600945",
+      "bindingBoundary": "The exact original receipt is retained with its source association and observation limits. A metrics snapshot is retained only when originally archived. These rejected outputs are not accepted-source qualification or baseline values.",
+      "usedAsBaseline": false,
+      "retainedFileSha256": {
+        "2026-09-13-math-600945-rejected-aiKnowledgeCheck.log": "19389536c80c37edddd700e9a1911a118b5fe3f96d5ea8672ecae186a9addcb5",
+        "2026-09-13-math-600945-rejected-check.json": "2de6820823c06bb0bcede2b49573f3ba84714949c3c30119cf1d7d698cfb0ead",
+        "2026-09-13-math-600945-rejected-complexity-baseline.json": "c0336da54cdaec31497aaf47214fafed518beaccde32699811116ba76ffa8881",
+        "2026-09-13-math-600945-rejected-complexity.json": "916db2e4c5a1430c056dcb4856869cea56d5d770a3bdf6ce96324ac84c6625b5",
+        "2026-09-13-math-600945-rejected-metrics-snapshot.json": "eefcfaa9c861ac49dc58b4ee45b2fb88a01857300136d42c9019b479207c8904",
+        "2026-09-13-math-600945-rejected-receipt.json": "b9d60ca95953d0a26f0b3730619e0e681af8fc83c93d77601862b42eb88e6e9f",
+        "2026-09-13-math-600945-rejected-trend.json": "9845fca9750bf6b8e524dad6692c903330f82f17bb2fcbfa7bc4f73c13fad599"
+      }
+    }
+  ],
+  "comparisonBoundary": "Only the already merged predecessor supplies the new baseline. This does not qualify any candidate or retroactively turn a rejected run into a passing one. New code still requires its own unchanged full lifecycle.",
+  "unchangedPolicy": {
+    "maxCognitiveDebt": 21.7,
+    "maxCognitiveDebtIncrease": 10.0,
+    "maxContextTokenIncrease": 15000.0,
+    "maxConceptRadiusIncrease": 3.0,
+    "maxMethodCognitiveComplexity": 65,
+    "maxMethodCyclomaticComplexity": 35,
+    "maxAverageMethodCognitiveComplexity": 4.0,
+    "maxAverageMethodCyclomaticComplexity": 4.0,
+    "methodHotspotPolicySha256": "8e9e8b549bc388f4638ec62de498a240ccb92e83108e848d75e7fcf94a02fbc2",
+    "capabilitySeedSha256": "16d64630109485ca14a5c1566d64084f3b932d7edf52bf70facd4274de0b8d0b",
+    "coveragePolicySha256": "9c1705776a062b5784cd9bad1cdc847878338f1ce32ac1fc66e7769ed98adbed",
+    "consumerConfigurationSha256": "2aaf02538386418eeb3a5de354942514ba697cedd5cd658edf0cd44e2cdbfdd5",
+    "inventoryTokenWeights": {
+      "classes": 260,
+      "tests": 140,
+      "docs": 180,
+      "dependencies": 35,
+      "capabilities": 80
+    },
+    "extractorEstimatorSourceSha256": "7d7bc7cd0220a5424c287c1c019d3bf488c578b81f3a303633cbd85ee13bd700",
+    "assertion": "All thresholds, selectors, verification scripts, hotspot exceptions and the pinned extractor/estimator weights are unchanged by this baseline-only update."
+  },
+  "preservedHistoryFileSha256": {
+    "2026-09-13-e145-context-rejected-aiKnowledgeCheck.log": "ea0a49cad588cfce67e2f0bade2818d6a746d5c8dc46230b93af31e5ff1949de",
+    "2026-09-13-e145-context-rejected-check.json": "5f772b8a1bc60fbf6b763d34ec67a78bae010420aa27719eb02ca021e60bad88",
+    "2026-09-13-e145-context-rejected-metrics-snapshot.json": "cd1c4e3d2a1844a2bd1561714a65093358a7b1d58ecbb99230b9384e3aa43392",
+    "2026-09-13-e145-context-rejected-trend.json": "f27e602a418498854dfb4ea8d6144c09eb6a49f9042c0d7ebcd3d62e6cf6270e",
+    "2026-09-13-main5041-provenance.json": "c1b12758b9b05f25abcaf39d30161faa313fdaa6945a05b762fda14e42bcb836",
+    "2026-09-13-main85f6-provenance.json": "ac74514cd9ada9d5209f03a5386203fcb904fd315ef9daffe516d53783588d44",
+    "2026-09-13-maine673-provenance.json": "6f5478fc0c108dad8a2271cbe81b25b628339863c285b65925e9ca63484193a5",
+    "2026-09-13-runtime-wip-rejected-aiKnowledgeCheck.log": "7db5bbdc315f958aba1493e4dabb869c4f03388c1a939edcd7e49b16ec3120dd",
+    "2026-09-13-runtime-wip-rejected-check.json": "c0ef60dd1a54cc00152dd6cf09d860b727b7cdde86cd51eab19d390c484fe974",
+    "2026-09-13-runtime-wip-rejected-metrics-snapshot.json": "af349e942550e38b4bcd834407b943bb7d8565ea0ef59f7b1d108b3edbe4951f",
+    "2026-09-13-runtime-wip-rejected-trend.json": "29ba4745802b6b63dcd1bfb443a5f519229ba98df85dbd18d0b9fc8544f969b3",
+    "5041f9d880-aiKnowledgeCheck.log": "53c1fbddfb36927edca378ab81d187901ecfa6b90c510fc923de9ce48847411f",
+    "5041f9d880-check.json": "7c16a6e8073a9f1670de79fc88cc4b58b955f2eb2863ab219777fb6a1b6aed58",
+    "5041f9d880-metrics-snapshot.json": "c0336da54cdaec31497aaf47214fafed518beaccde32699811116ba76ffa8881",
+    "5041f9d880-source-execution.json": "69ed92452e111a8f75eeb335ef2a73127f137d385487d3d3f67c956490117b13",
+    "5041f9d880-source-qualification.json": "5849b987fb4bc630fcf2b0c603da62c31110bf2a896f6849e8d7aac790e03021",
+    "5041f9d880-trend.json": "a01aa67a818330d1289ad1d47382317ac3f17c4922408963e11b4273f6645447",
+    "85f6ce9301-aiKnowledgeCheck.log": "df5c16f3a7b33ff92e5c671079845ecf2a04c42667f51ba4f00f113b5f31330e",
+    "85f6ce9301-check.json": "d4f8affad1f85f4639fcbecaf378f385c407d32ce86a084fa0a257f222dd67ad",
+    "85f6ce9301-metrics-snapshot.json": "d9c1071f10b856f9e909174a0aa5562278958590f27d92a7f02764f5c74155f5",
+    "85f6ce9301-trend.json": "f670f28a368f2a264dcff89a66ddeaae165282f6b94dd40483d4053bb1fc2079",
+    "e673c6c89b-aiKnowledgeCheck.log": "21ab068ada93a4a87829e26414ceda1e72e8a289ba7fc3d00fd936151169653d",
+    "e673c6c89b-check.json": "42eb481961e01b7c1d0700a03c10458e78659c0e9c1ebc1003ec5d81a2e0be43",
+    "e673c6c89b-metrics-snapshot.json": "4e849da270eb40f15934c9a6ad5493aeb3e5c40efc86bedfdeb4c80687af0f24",
+    "e673c6c89b-source-qualification.json": "d9b0fee9243049e5de78e44b978bc62dc2566ae3dfe91280aafd49a6ae74c69e",
+    "e673c6c89b-trend.json": "cb02b23c1b8a858af149332c9e6b9a1f4f6d70db8a9e822a3917a2c7ae5e3bd0",
+    "f19ee628-complexity-baseline.json": "aea907748449180b6b681f5003a435048cc912bed67482f729ca007eb2c2b096",
+    "f2da31bf66-rejected-aiKnowledgeCheck.log": "df02231e0f12035c0e60b7d6204351eadc2280ffeae9491af1c0a50397754ed7",
+    "f2da31bf66-rejected-check.json": "7e77a6fb46bc26a3128d7e2e96613ef2a06156c0d5ee46368e93b5549a38de87",
+    "f2da31bf66-rejected-trend.json": "a80000d436657157db757bf0c1ada27a31fb86fe112b824fdbbe572688a061a9"
+  },
+  "retainedFileSha256": {
+    "2026-09-13-math-600945-rejected-trend.json": "9845fca9750bf6b8e524dad6692c903330f82f17bb2fcbfa7bc4f73c13fad599",
+    "2026-09-13-learning-600095-rejected-receipt.json": "8a9a16e354f34b8921ca014b679a528d34a3c59d150a4be81ac152203213e2ff",
+    "0eec6c0da8-source-execution.json": "7a011c2cd4a4b374c077afb0134f8c41663ab0faa7ce36d7fc18f2d8707967c7",
+    "2026-09-13-learning-600095-rejected-combined-learning-ai-current-baseline.log": "aa1a5c1ab127ccead9d4ffbd665a5aee0fab62d2deee42503f1a2263f6cfe45b",
+    "0eec6c0da8-trend.json": "4295d91bdacb625567b8728be209c44e7e525f2d3a41179b4b69757600cc0eb0",
+    "0eec6c0da8-aiKnowledgeCheck.log": "d1f28400738b41571e9843f36d5e627e6eea5ad07663ccb77064873ddef0b2de",
+    "2026-09-13-math-600945-rejected-check.json": "2de6820823c06bb0bcede2b49573f3ba84714949c3c30119cf1d7d698cfb0ead",
+    "2026-09-13-math-600945-rejected-aiKnowledgeCheck.log": "19389536c80c37edddd700e9a1911a118b5fe3f96d5ea8672ecae186a9addcb5",
+    "0eec6c0da8-source-qualification.json": "79206dd3257bc6a00529b207a6457778412563e160e6c9fd001251c9c9de8901",
+    "2026-09-13-learning-600095-rejected-complexity-baseline.json": "c0336da54cdaec31497aaf47214fafed518beaccde32699811116ba76ffa8881",
+    "2026-09-13-learning-600095-rejected-trend.json": "6dc13537bec06957056bfabafa42e0263523ece5a061141366274fb3879fc383",
+    "2026-09-13-math-600945-rejected-complexity.json": "916db2e4c5a1430c056dcb4856869cea56d5d770a3bdf6ce96324ac84c6625b5",
+    "2026-09-13-learning-605640-rejected-trend.json": "2407d080148a0987eea723d85cf41071d24b8dfcc564386b2bb47a1714679ec3",
+    "2026-09-13-math-600945-rejected-complexity-baseline.json": "c0336da54cdaec31497aaf47214fafed518beaccde32699811116ba76ffa8881",
+    "2026-09-13-math-600945-rejected-receipt.json": "b9d60ca95953d0a26f0b3730619e0e681af8fc83c93d77601862b42eb88e6e9f",
+    "2026-09-13-learning-605640-rejected-complexity-baseline.json": "c0336da54cdaec31497aaf47214fafed518beaccde32699811116ba76ffa8881",
+    "2026-09-13-learning-605640-rejected-receipt.json": "9c07b925249102e5da410fd1b196fb22bf2f30eff0374db22996e8b89de7bf44",
+    "2026-09-13-learning-605640-rejected-complexity.json": "937cfdef2fd3e286a6f78cac584deee44aa1284d518df3ea0b96e28ea7b32222",
+    "0eec6c0da8-metrics-snapshot.json": "3d2b0f4ef3816c2a7b72faae36f8f266426a33d7a9b9f266f85dda7aa2cce885",
+    "2026-09-13-learning-600095-rejected-check.json": "505a6e9e8ecc32a3f466d7a337451c52cb95fca9d4defbf9cf69bc915b37f020",
+    "2026-09-13-learning-600095-rejected-complexity.json": "dfb4dca55e15f0f0846e691a0865685dfcd9bd3a7c4404e4c3f95bdddef40f6e",
+    "2026-09-13-learning-605640-rejected-current-batch-ai-original-baseline.log": "1b7c873b0b796c7eee02cf048b204dbce201119482868b2b94211e8116089927",
+    "0eec6c0da8-check.json": "711368ff338209bdc4f7c4fd19f58af0e89a439fbbd829bc83c7d9c3b11c6b31",
+    "2026-09-13-math-600945-rejected-metrics-snapshot.json": "eefcfaa9c861ac49dc58b4ee45b2fb88a01857300136d42c9019b479207c8904",
+    "2026-09-13-learning-605640-rejected-check.json": "739be869566d6ad44a666dd624ee5f1044f849256784d4f9c7482f0ac638a6a6"
+  }
+}

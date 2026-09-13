@@ -2,9 +2,10 @@ package de.regelsuche.polynomial;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 
 /**
  * Backend-neutral factorization engine SPI.
@@ -114,12 +115,24 @@ public interface FactorizationEngine<C> {
                 throw new IllegalArgumentException(
                     "factorization proposal ring mismatch");
             }
-            ordered.sort(Comparator
-                .comparing((PolynomialFactor<C> factor) ->
-                    factor.polynomial().canonicalMaterial())
-                .thenComparingInt(PolynomialFactor::multiplicity));
-            List<PolynomialFactor<C>> merged = new ArrayList<>();
+            if (ordered.size() < 2) {
+                return List.copyOf(ordered);
+            }
+            // Canonical text is potentially large; build it once per factor,
+            // not once per comparison. Keep ties and multiplicity ordering.
+            List<Map.Entry<String, PolynomialFactor<C>>> keyed =
+                new ArrayList<>(ordered.size());
             for (PolynomialFactor<C> factor : ordered) {
+                keyed.add(Map.entry(
+                    factor.polynomial().canonicalMaterial(), factor));
+            }
+            keyed.sort(Comparator
+                .comparing((Map.Entry<String, PolynomialFactor<C>> entry) ->
+                    entry.getKey())
+                .thenComparingInt(entry -> entry.getValue().multiplicity()));
+            List<PolynomialFactor<C>> merged = new ArrayList<>();
+            for (Map.Entry<String, PolynomialFactor<C>> entry : keyed) {
+                PolynomialFactor<C> factor = entry.getValue();
                 if (!merged.isEmpty()
                         && merged.getLast().polynomial().equals(
                             factor.polynomial())) {
@@ -210,14 +223,13 @@ public interface FactorizationEngine<C> {
         private static <C> List<Proposal<C>> canonicalProposals(
             List<Proposal<C>> proposals
         ) {
-            LinkedHashMap<String, Proposal<C>> unique =
-                new LinkedHashMap<>();
-            proposals.stream()
-                .sorted(Comparator.comparing(
-                    Proposal::canonicalMaterial))
-                .forEach(proposal -> unique.putIfAbsent(
-                    proposal.canonicalMaterial(),
-                    proposal));
+            // Ordering and deduplication share the same materialized key.
+            // putIfAbsent retains the first input for equal keys, like the
+            // previous stable sort followed by insertion-order deduplication.
+            Map<String, Proposal<C>> unique = new TreeMap<>();
+            for (Proposal<C> proposal : proposals) {
+                unique.putIfAbsent(proposal.canonicalMaterial(), proposal);
+            }
             return List.copyOf(unique.values());
         }
     }

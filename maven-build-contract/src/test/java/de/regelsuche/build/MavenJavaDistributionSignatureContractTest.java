@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 class MavenJavaDistributionSignatureContractTest {
     private static final ObjectMapper YAML = new ObjectMapper(YAMLFactory.builder()
         .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build());
-    // Retained study environments use v6.0.0, whose omitted input already fails closed.
+    // Historical v6.0.0 fixture: its omitted input fails closed. Current workflow pins opt in explicitly.
     private static final String STRICT_DEFAULT_ACTION =
         "actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c";
 

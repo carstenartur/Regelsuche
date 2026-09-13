@@ -145,7 +145,7 @@ public final class ReleaseReadinessRunner {
         Files.writeString(path, content, StandardCharsets.UTF_8);
     }
 
-    private static String runHash(
+    static String runHash(
         String profileCatalogHash,
         String evidenceHash,
         String hiddenRuleEvidenceHash,
