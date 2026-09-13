@@ -122,6 +122,7 @@ class SuccessorMetricTests(unittest.TestCase):
             study.evaluate_result(payload, cell, self.inventory)
 
 
+@unittest.skipUnless(sys.platform == "linux", "the retained process fixtures require Linux")
 class SuccessorPipelineTests(unittest.TestCase):
     def setUp(self):
         SuccessorPolicyTests.setUp(self)

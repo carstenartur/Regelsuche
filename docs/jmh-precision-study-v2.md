@@ -8,8 +8,9 @@ byte-verified because their signed artifact download returned 403. Its exact
 raw-row counts and original jar-error strings remain unknown. New local controls
 neither repair those artifacts nor turn them into completed measurements.
 
-The successor is prepared for one separately reviewed PR-opened launch. No v2
-measurement, precision improvement or production protocol is claimed here.
+The separately reviewed, once-opened launch is complete; its
+[retained outcome and remaining adoption boundary](jmh-precision-study-v2-outcome.md)
+are documented separately from this preregistered collection contract.
 The [v1 preregistration](jmh-precision-study.md) remains the source of the unchanged
 matrix, budgets, numerical rules and interpretation boundaries.
 
