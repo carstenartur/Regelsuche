@@ -90,12 +90,16 @@ public final class PrimeField implements ExactField<BigInteger> {
 
     @Override
     public BigInteger canonical(BigInteger value) {
-        return Objects.requireNonNull(value, "value").mod(modulus);
+        Objects.requireNonNull(value, "value");
+        return value.signum() >= 0 && value.compareTo(modulus) < 0
+            ? value
+            : value.mod(modulus);
     }
 
     @Override
     public BigInteger add(BigInteger left, BigInteger right) {
-        return canonical(left).add(canonical(right)).mod(modulus);
+        long sum = canonical(left).longValue() + canonical(right).longValue();
+        return BigInteger.valueOf(sum >= prime ? sum - prime : sum);
     }
 
     @Override
@@ -108,7 +112,10 @@ public final class PrimeField implements ExactField<BigInteger> {
 
     @Override
     public BigInteger multiply(BigInteger left, BigInteger right) {
-        return canonical(left).multiply(canonical(right)).mod(modulus);
+        // Reduced operands are at most Integer.MAX_VALUE - 1. Their product
+        // is strictly below 2^62, so long arithmetic is exact, not truncation.
+        long product = canonical(left).longValue() * canonical(right).longValue();
+        return BigInteger.valueOf(product % prime);
     }
 
     @Override
@@ -136,9 +143,10 @@ public final class PrimeField implements ExactField<BigInteger> {
             throw new ArithmeticException(
                 "division by zero in prime field");
         }
-        return canonical(dividend)
-            .multiply(canonicalDivisor.modInverse(modulus))
-            .mod(modulus);
+        long reducedDividend = canonical(dividend).longValue();
+        long inverse = canonicalDivisor.modInverse(modulus).longValue();
+        // The same reduced-residue bound used by multiply applies here.
+        return BigInteger.valueOf((reducedDividend * inverse) % prime);
     }
 
     @Override

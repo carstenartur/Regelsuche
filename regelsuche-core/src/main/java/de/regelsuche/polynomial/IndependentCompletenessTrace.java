@@ -314,8 +314,12 @@ public final class IndependentCompletenessTrace {
                 validHash(candidateCertificateHash),
                 "candidate certificate hash is invalid");
             require(
-                factorCount >= 1,
-                "candidate must declare at least one factor");
+                factorCount >= 0,
+                "candidate factor count must not be negative");
+            require(
+                factorCount != 0
+                    || remainderOne && outcome == CandidateOutcome.CERTIFIED,
+                "empty factorization requires a certified unit remainder");
             require(
                 factorAttempts.size() <= factorCount,
                 "candidate retains more attempts than factors");

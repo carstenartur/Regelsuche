@@ -65,7 +65,9 @@ public final class ExactFactorizationExpressionRenderer {
 
             BoundedText output = new BoundedText(policy, work);
             int components = 0;
-            if (!candidate.unit().isOne()) {
+            if (!candidate.unit().isOne()
+                    || candidate.factors().isEmpty()
+                        && candidate.unresolvedRemainder().isOne()) {
                 appendComponentSeparator(output, components++);
                 output.append(renderRational(candidate.unit()));
                 work.consume("render.unit-components", 1);
