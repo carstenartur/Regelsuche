@@ -43,6 +43,12 @@ This keeps the historical v2 verifier and its reports unchanged and reproducible
 
 Measurement precision remains visible independently of the gate outcome. When `currentScoreError >= currentScore`, v3 retains the benchmark as `LOW_PRECISION` in JSON and Markdown evidence. A low-precision row whose point estimate remains below the ratchet can still pass the regression gate, but it is **not** evidence that performance is proven unchanged. If its point estimate exceeds the ratchet it is at least `INCONCLUSIVE`, and therefore fails closed. The rule remains a finite shared-runner ratchet and does not establish cross-hardware absolute performance or statistical significance beyond the recorded JMH uncertainty.
 
+The [finite JMH precision study](jmh-precision-study.md) preregisters a separate,
+bounded comparison of execution protocols for issue #981. It leaves this v3
+authority and the historical v2/v3 evidence unchanged. A production protocol
+may be adopted only after the retained shared-runner measurements, preregistered
+criteria and a new versioned execution authority/baseline have been reviewed.
+
 The writer recreates the dedicated chart directory before every run, so removed benchmarks cannot leave stale SVG evidence behind. It also validates all chart filenames before writing and fails closed if two benchmark identities would normalize to the same filename.
 
 ## Retained evidence contract

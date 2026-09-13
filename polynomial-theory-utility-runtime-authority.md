@@ -184,6 +184,68 @@ und später abgebrochene Replays in derselben Zeilenautorität. Seed-Ableitung
 und synthetische Serialisierungsbatches sind ausdrücklich Komponentenfixtures;
 sie ergeben keine gültige Studien-Cachehistorie oder Utility-Evidenz.
 
+## Revisionsstrenger Mess- und Runner-Einstieg
+
+`NoFactorizationAdapter.observed()` ergänzt den produktiven Kontrollpfad:
+jeder eingefrorene Auftretenspfad erhält den Ausgang `NO_TRANSITION` mit
+`FACTORIZATION_DISABLED_BY_FROZEN_PROFILE`, leerer Roharbeit und ohne
+Faktorisierungsversuche oder Cache-Ereignisse. Der gewöhnliche Konstruktor
+behält seinen bisherigen `Run` und historische Resultate v2. Der beobachtete
+Run liefert seine Nullmessung ausdrücklich über `MeasuredRun`; der Runner
+rekonstruiert keine vermeintlich fehlenden Messungen.
+
+`PolynomialTheoryUtilityProfileAdapter.resultSchema()` deklariert die
+Ergebnisrevision und ist für bestehende Adapter standardmäßig historisch.
+Beide produktiven `observed()`-Fabriken deklarieren ausdrücklich v3.
+`MeasuredRun.executeObserved` prüft das tatsächliche Resultat v3 samt
+Messungen v2. `PolynomialTheoryUtilityMeasuredExecution.executeObserved`
+prüft zuerst das vollständige eingefrorene Adapterinventar und sämtliche
+Revisionsdeklarationen, bevor ein Run öffnet. Anschließend fordert es pro Run
+`MeasuredRun` und prüft jede tatsächliche Ergebnisrevision unmittelbar nach
+der Ausführung. Ein falsch deklarierter oder im Verlauf auf v2 wechselnder
+Adapter wird an seiner ersten falschen Zeile abgewiesen; weitere Zeilen
+laufen nicht mehr und die bestehende Run-Schließung bleibt wirksam.
+
+Der Einstieg nutzt denselben `TargetBlindRunner`, dieselbe Eingabereihenfolge
+und dieselben bereits versionierten Batch-/Messverträge. Er verändert weder
+Adapter-/Profilidentitäten noch historische `execute`-/`executeMeasured`-
+Aufrufe, Arbeitsprojektion oder Receipts. Die explizite Deklaration ersetzt
+keine Prüfung der tatsächlichen Ergebnisse. Eine automatisch auf historische
+Resultate zurückfallende Ausführung gibt es in diesem Einstieg nicht.
+
+## Verbleibendes produktives Adapterinventar
+
+Die fünf eingefrorenen Profile entsprechen noch keinem vollständigen Satz
+produktiver Studienadapter. Die Produktkomposition
+`PolynomialSearchIntegration` ist von der Studienmessung zu unterscheiden:
+
+| Eingefrorenes Profil | Beobachteter Studienpfad | Noch nötige Arbeit |
+| --- | --- | --- |
+| `NO_FACTORIZATION` | `NoFactorizationAdapter.observed()` | Keine zusätzliche mathematische Messgrundlage für diesen Nullarbeits-Kontrollpfad. |
+| `ON_DEMAND_VERIFIED_FACTORIZATION` | `PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter.observed(...)` | Vollständige Studienausführung und Reproduktion bleiben separat. |
+| `VERIFIED_DERIVED_MACRO_CACHE` | Kein produktiver Studienadapter | Gemessene Retention mit Vorab-Arbeitszulassung sowie Auftreten-/Zeilen-übergreifende Eintrags- und FIFO-Lineage des tatsächlichen Run-Caches. Lookup und Replay besitzen bereits eigene Roharbeitsnachweise. |
+| `SPECIALIZED_BINARY_QUARTIC_CONTROL` | Kein produktiver Studienadapter | Additive Messgrenze für semantische Extraktion, Spezialzerlegung und Rendering einschließlich erfolgloser Ausgänge und Originalanforderung. Der vorhandene Spezialbericht enthält nur die Verifier-Arbeit. |
+| `OPTIONAL_EXTERNAL_VERIFIED_FACTORIZATION` | Kein produktiver Studienadapter | Ausdrücklich gebundene externe Engine und deren tatsächliche Arbeit, Fehlerausgänge und Nachweise in derselben Zeilenautorität; kein Ersatz durch den nativen Adapter. |
+
+Die Roharbeit dieser fehlenden Pfade darf nicht aus Ergebnisstrings geschätzt
+oder aus dem nativen Profil übernommen werden. Insbesondere bietet die
+vorhandene Cache-Retention noch keine vollständig gemessene Studiengrenze.
+Eine Produkt-Kostenschätzung für Cache-Einträge ist kein nachträglicher
+Roharbeitsnachweis. Diese Messfundamente benötigen eigene additive Verträge.
+
+`CandidateMeasurementBatch` bindet die Ergebnisse und Messungen jeder Zeile,
+prüft jedoch noch keine vollständige Insert-/Hit-/Evict-Geschichte über einen
+Run hinweg. Der revisionsstrenge Einstieg ergänzt diese fehlende
+Cache-Autorität nicht und ist keine vollständige produktive Adapterfactory.
+Die Runner-Kontrolle verwendet ausdrücklich synthetische Nullarbeitsadapter
+für die übrigen Profile und führt einen echten nativen Formationsfall innerhalb
+seines Mess-Runs aus; sie prüft nur Reihenfolge, Revision und Messbindung.
+Der zusätzliche native Kontrolllauf verwendet die 20 öffentlichen
+Formationsfälle eines vorhandenen Checkpoints. Weder diese Komponentenfälle
+noch die synthetischen Batches erzeugen eine Studien-Freeze oder belegen
+Utility. Historische APIs und der bekannte historische Receipt bleiben
+unverändert kontrolliert.
+
 Diese technische Vertragskorrektur schließt #748 nicht. Die vollständigen
 aktiven Profiladapter, alle 600 Zeilen unter der neuen Messrevision und die
 vorgeschriebenen Reproduktionen stehen weiterhin aus. Erst danach darf die

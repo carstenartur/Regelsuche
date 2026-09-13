@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IncrementalMoveExecution.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">IncrementalMoveExecution.java</span></div><h1>IncrementalMoveExecution.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.transform.TransformationCursor;
+import java.util.List;
+
+/** Additive evidence; legacy move-search exports contain no fields from this revision. */
+public record IncrementalMoveExecution(String workRevision, String orderRevision, List&lt;Provider&gt; providers,
+        List&lt;Expansion&gt; expansions) {
+    public static final String WORK_REVISION = &quot;regelsuche.incremental-native-move-search-work/v1&quot;;
+    public static final String ORDER_REVISION = &quot;regelsuche.provider-inventory-native-occurrence-order/v1&quot;;
+<span class="fc" id="L11">    public IncrementalMoveExecution { providers = List.copyOf(providers); expansions = List.copyOf(expansions); }</span>
+<span class="fc" id="L12">    public record Provider(MoveProvider.Descriptor descriptor, TransformationCursor.Definition definition) {}</span>
+<span class="fc" id="L13">    public record Lane(int providerIndex, boolean assumptionChecked, boolean assumptionRejected,</span>
+            TransformationCursor.Snapshot cursor) {}
+    public record Expansion(MoveState source, boolean closed, List&lt;Lane&gt; lanes) {
+<span class="fc" id="L16">        public Expansion { lanes = List.copyOf(lanes); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

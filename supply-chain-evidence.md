@@ -1,5 +1,11 @@
 # Supply-chain evidence
 
+The versioned v1 inventory contract described here remains unchanged. The
+additional required [offline vulnerability gate](supply-chain-vulnerability-evidence.md)
+now binds a complete retained Maven advisory snapshot and a pinned scanner in
+a separate evidence schema. It does not reinterpret historical v1
+`NOT_EVALUATED` reports.
+
 Regelsuche generates a checkout-owned aggregate CycloneDX dependency inventory
 from the dependency graph actually resolved by the multi-project Gradle build.
 The authoritative local task is:

@@ -55,13 +55,13 @@ public record TreePosition(List&lt;Integer&gt; path, String text) implements Com
      * for deterministic ordering. Compares path lists directly so that the root
      * (empty path) always precedes non-root positions regardless of their display form.
      */
-<span class="nc" id="L58">    public static final Comparator&lt;TreePosition&gt; CANONICAL_ORDER =</span>
-<span class="nc" id="L59">            Comparator.&lt;TreePosition, List&lt;Integer&gt;&gt;comparing(TreePosition::path, TreePosition::comparePaths)</span>
-<span class="nc" id="L60">                    .thenComparing(TreePosition::text);</span>
+<span class="fc" id="L58">    public static final Comparator&lt;TreePosition&gt; CANONICAL_ORDER =</span>
+<span class="fc" id="L59">            Comparator.&lt;TreePosition, List&lt;Integer&gt;&gt;comparing(TreePosition::path, TreePosition::comparePaths)</span>
+<span class="fc" id="L60">                    .thenComparing(TreePosition::text);</span>
 
-<span class="nc" id="L62">    public TreePosition {</span>
-<span class="nc" id="L63">        path = List.copyOf(path);</span>
-<span class="nc" id="L64">    }</span>
+<span class="fc" id="L62">    public TreePosition {</span>
+<span class="fc" id="L63">        path = List.copyOf(path);</span>
+<span class="fc" id="L64">    }</span>
 
     /** {@code true} when this position denotes the whole expression. */
     public boolean isRoot() {
@@ -113,23 +113,23 @@ public record TreePosition(List&lt;Integer&gt; path, String text) implements Com
      * @return a typed success or failure result; invalid and absent paths remain distinct
      */
     public ReplacementResult replaceAt(Expr root, Expr replacement) {
-<span class="nc" id="L116">        Objects.requireNonNull(replacement, &quot;replacement&quot;);</span>
-<span class="nc" id="L117">        Navigation navigation = navigate(root);</span>
-<span class="nc bnc" id="L118" title="All 2 branches missed.">        if (navigation.status() != Status.SELECTED) {</span>
+<span class="fc" id="L116">        Objects.requireNonNull(replacement, &quot;replacement&quot;);</span>
+<span class="fc" id="L117">        Navigation navigation = navigate(root);</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (navigation.status() != Status.SELECTED) {</span>
 <span class="nc" id="L119">            return ReplacementResult.failure(navigation.status(), path);</span>
         }
 
-<span class="nc" id="L122">        Expr rewritten = replacement;</span>
-<span class="nc" id="L123">        List&lt;ParentFrame&gt; parents = navigation.parents();</span>
-<span class="nc bnc" id="L124" title="All 2 branches missed.">        for (int index = parents.size() - 1; index &gt;= 0; index--) {</span>
-<span class="nc" id="L125">            ParentFrame frame = parents.get(index);</span>
-<span class="nc" id="L126">            rewritten = rebuildParent(frame.parent(), frame.childIndex(), rewritten);</span>
+<span class="fc" id="L122">        Expr rewritten = replacement;</span>
+<span class="fc" id="L123">        List&lt;ParentFrame&gt; parents = navigation.parents();</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        for (int index = parents.size() - 1; index &gt;= 0; index--) {</span>
+<span class="fc" id="L125">            ParentFrame frame = parents.get(index);</span>
+<span class="fc" id="L126">            rewritten = rebuildParent(frame.parent(), frame.childIndex(), rewritten);</span>
         }
-<span class="nc" id="L128">        return ReplacementResult.replaced(</span>
+<span class="fc" id="L128">        return ReplacementResult.replaced(</span>
                 path,
-<span class="nc" id="L130">                navigation.selected(),</span>
+<span class="fc" id="L130">                navigation.selected(),</span>
                 rewritten,
-<span class="nc" id="L132">                parents.size());</span>
+<span class="fc" id="L132">                parents.size());</span>
     }
 
     @Override
@@ -138,55 +138,55 @@ public record TreePosition(List&lt;Integer&gt; path, String text) implements Com
     }
 
     private Navigation navigate(Expr root) {
-<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (root == null) {</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (root == null) {</span>
 <span class="nc" id="L142">            return Navigation.failure(Status.INVALID_PATH, path);</span>
         }
 
-<span class="nc" id="L145">        Expr current = root;</span>
-<span class="nc" id="L146">        List&lt;ParentFrame&gt; parents = new ArrayList&lt;&gt;(path.size());</span>
-<span class="nc bnc" id="L147" title="All 2 branches missed.">        for (int childIndex : path) {</span>
-<span class="nc bnc" id="L148" title="All 2 branches missed.">            if (childIndex &lt; 0) {</span>
+<span class="fc" id="L145">        Expr current = root;</span>
+<span class="fc" id="L146">        List&lt;ParentFrame&gt; parents = new ArrayList&lt;&gt;(path.size());</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        for (int childIndex : path) {</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            if (childIndex &lt; 0) {</span>
 <span class="nc" id="L149">                return Navigation.failure(Status.INVALID_PATH, path);</span>
             }
 
             Expr child;
-<span class="nc bnc" id="L153" title="All 2 branches missed.">            if (current instanceof BinaryExpr binary) {</span>
-<span class="nc bnc" id="L154" title="All 3 branches missed.">                child = switch (childIndex) {</span>
-<span class="nc" id="L155">                    case 0 -&gt; binary.left();</span>
-<span class="nc" id="L156">                    case 1 -&gt; binary.right();</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            if (current instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L154" title="1 of 3 branches missed.">                child = switch (childIndex) {</span>
+<span class="fc" id="L155">                    case 0 -&gt; binary.left();</span>
+<span class="fc" id="L156">                    case 1 -&gt; binary.right();</span>
 <span class="nc" id="L157">                    default -&gt; null;</span>
-<span class="nc" id="L158">                };</span>
-<span class="nc bnc" id="L159" title="All 2 branches missed.">                if (child == null) {</span>
+<span class="fc" id="L158">                };</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">                if (child == null) {</span>
 <span class="nc" id="L160">                    return Navigation.failure(Status.INVALID_PATH, path);</span>
                 }
-<span class="nc bnc" id="L162" title="All 2 branches missed.">            } else if (current instanceof FunctionExpr function) {</span>
-<span class="nc bnc" id="L163" title="All 2 branches missed.">                if (childIndex &gt;= function.arguments().size()) {</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            } else if (current instanceof FunctionExpr function) {</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">                if (childIndex &gt;= function.arguments().size()) {</span>
 <span class="nc" id="L164">                    return Navigation.failure(Status.INVALID_PATH, path);</span>
                 }
-<span class="nc" id="L166">                child = function.arguments().get(childIndex);</span>
+<span class="fc" id="L166">                child = function.arguments().get(childIndex);</span>
             } else {
 <span class="nc" id="L168">                return Navigation.failure(Status.POSITION_NOT_PRESENT, path);</span>
             }
 
-<span class="nc" id="L171">            parents.add(new ParentFrame(current, childIndex));</span>
-<span class="nc" id="L172">            current = child;</span>
-<span class="nc" id="L173">        }</span>
-<span class="nc" id="L174">        return Navigation.selected(path, current, parents);</span>
+<span class="fc" id="L171">            parents.add(new ParentFrame(current, childIndex));</span>
+<span class="fc" id="L172">            current = child;</span>
+<span class="fc" id="L173">        }</span>
+<span class="fc" id="L174">        return Navigation.selected(path, current, parents);</span>
     }
 
     private static Expr rebuildParent(Expr parent, int childIndex, Expr rewrittenChild) {
-<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (parent instanceof BinaryExpr binary) {</span>
-<span class="nc bnc" id="L179" title="All 3 branches missed.">            return switch (childIndex) {</span>
-<span class="nc" id="L180">                case 0 -&gt; new BinaryExpr(rewrittenChild, binary.operator(), binary.right());</span>
-<span class="nc" id="L181">                case 1 -&gt; new BinaryExpr(binary.left(), binary.operator(), rewrittenChild);</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        if (parent instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L179" title="1 of 3 branches missed.">            return switch (childIndex) {</span>
+<span class="fc" id="L180">                case 0 -&gt; new BinaryExpr(rewrittenChild, binary.operator(), binary.right());</span>
+<span class="fc" id="L181">                case 1 -&gt; new BinaryExpr(binary.left(), binary.operator(), rewrittenChild);</span>
 <span class="nc" id="L182">                default -&gt; throw new IllegalStateException(</span>
                         &quot;validated binary path became invalid&quot;);
             };
         }
-<span class="nc bnc" id="L186" title="All 2 branches missed.">        if (parent instanceof FunctionExpr function) {</span>
-<span class="nc" id="L187">            List&lt;Expr&gt; arguments = new ArrayList&lt;&gt;(function.arguments());</span>
-<span class="nc" id="L188">            arguments.set(childIndex, rewrittenChild);</span>
-<span class="nc" id="L189">            return new FunctionExpr(function.name(), arguments);</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        if (parent instanceof FunctionExpr function) {</span>
+<span class="fc" id="L187">            List&lt;Expr&gt; arguments = new ArrayList&lt;&gt;(function.arguments());</span>
+<span class="fc" id="L188">            arguments.set(childIndex, rewrittenChild);</span>
+<span class="fc" id="L189">            return new FunctionExpr(function.name(), arguments);</span>
         }
 <span class="nc" id="L191">        throw new IllegalStateException(&quot;validated path parent is not traversable&quot;);</span>
     }
@@ -203,11 +203,11 @@ public record TreePosition(List&lt;Integer&gt; path, String text) implements Com
     }
 
     /** Outcome categories shared by iterative selection and replacement. */
-<span class="nc" id="L206">    public enum Status {</span>
-<span class="nc" id="L207">        SELECTED,</span>
-<span class="nc" id="L208">        REPLACED,</span>
-<span class="nc" id="L209">        INVALID_PATH,</span>
-<span class="nc" id="L210">        POSITION_NOT_PRESENT</span>
+<span class="fc" id="L206">    public enum Status {</span>
+<span class="fc" id="L207">        SELECTED,</span>
+<span class="fc" id="L208">        REPLACED,</span>
+<span class="fc" id="L209">        INVALID_PATH,</span>
+<span class="fc" id="L210">        POSITION_NOT_PRESENT</span>
     }
 
     /** Typed selection outcome. A successful result exposes the selected subtree. */
@@ -255,32 +255,32 @@ public record TreePosition(List&lt;Integer&gt; path, String text) implements Com
             Optional&lt;Expr&gt; selectedSubtree,
             Optional&lt;Expr&gt; rewrittenRoot,
             int copiedAncestors) {
-<span class="nc" id="L258">        public ReplacementResult {</span>
-<span class="nc" id="L259">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="nc" id="L260">            path = List.copyOf(path);</span>
-<span class="nc" id="L261">            selectedSubtree = Objects.requireNonNull(selectedSubtree, &quot;selectedSubtree&quot;);</span>
-<span class="nc" id="L262">            rewrittenRoot = Objects.requireNonNull(rewrittenRoot, &quot;rewrittenRoot&quot;);</span>
-<span class="nc bnc" id="L263" title="All 2 branches missed.">            if (copiedAncestors &lt; 0) {</span>
+<span class="fc" id="L258">        public ReplacementResult {</span>
+<span class="fc" id="L259">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L260">            path = List.copyOf(path);</span>
+<span class="fc" id="L261">            selectedSubtree = Objects.requireNonNull(selectedSubtree, &quot;selectedSubtree&quot;);</span>
+<span class="fc" id="L262">            rewrittenRoot = Objects.requireNonNull(rewrittenRoot, &quot;rewrittenRoot&quot;);</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">            if (copiedAncestors &lt; 0) {</span>
 <span class="nc" id="L264">                throw new IllegalArgumentException(&quot;copied ancestor count must not be negative&quot;);</span>
             }
-<span class="nc bnc" id="L266" title="All 2 branches missed.">            boolean replaced = status == Status.REPLACED;</span>
-<span class="nc bnc" id="L267" title="All 2 branches missed.">            if (replaced != selectedSubtree.isPresent()</span>
-<span class="nc bnc" id="L268" title="All 6 branches missed.">                    || replaced != rewrittenRoot.isPresent()</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">            boolean replaced = status == Status.REPLACED;</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">            if (replaced != selectedSubtree.isPresent()</span>
+<span class="pc bpc" id="L268" title="4 of 6 branches missed.">                    || replaced != rewrittenRoot.isPresent()</span>
                     || !replaced &amp;&amp; copiedAncestors != 0) {
 <span class="nc" id="L270">                throw new IllegalArgumentException(&quot;tree replacement status/payload mismatch&quot;);</span>
             }
-<span class="nc" id="L272">        }</span>
+<span class="fc" id="L272">        }</span>
 
         private static ReplacementResult replaced(
                 List&lt;Integer&gt; path,
                 Expr selectedSubtree,
                 Expr rewrittenRoot,
                 int copiedAncestors) {
-<span class="nc" id="L279">            return new ReplacementResult(</span>
+<span class="fc" id="L279">            return new ReplacementResult(</span>
                     Status.REPLACED,
                     path,
-<span class="nc" id="L282">                    Optional.of(selectedSubtree),</span>
-<span class="nc" id="L283">                    Optional.of(rewrittenRoot),</span>
+<span class="fc" id="L282">                    Optional.of(selectedSubtree),</span>
+<span class="fc" id="L283">                    Optional.of(rewrittenRoot),</span>
                     copiedAncestors);
         }
 
@@ -303,12 +303,12 @@ public record TreePosition(List&lt;Integer&gt; path, String text) implements Com
     }
 
     private record ParentFrame(Expr parent, int childIndex) {
-<span class="nc" id="L306">        private ParentFrame {</span>
-<span class="nc" id="L307">            Objects.requireNonNull(parent, &quot;parent&quot;);</span>
-<span class="nc bnc" id="L308" title="All 2 branches missed.">            if (childIndex &lt; 0) {</span>
+<span class="fc" id="L306">        private ParentFrame {</span>
+<span class="fc" id="L307">            Objects.requireNonNull(parent, &quot;parent&quot;);</span>
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">            if (childIndex &lt; 0) {</span>
 <span class="nc" id="L309">                throw new IllegalArgumentException(&quot;child index must not be negative&quot;);</span>
             }
-<span class="nc" id="L311">        }</span>
+<span class="fc" id="L311">        }</span>
     }
 
     private record Navigation(
@@ -316,25 +316,25 @@ public record TreePosition(List&lt;Integer&gt; path, String text) implements Com
             List&lt;Integer&gt; path,
             Expr selected,
             List&lt;ParentFrame&gt; parents) {
-<span class="nc" id="L319">        private Navigation {</span>
-<span class="nc" id="L320">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="nc" id="L321">            path = List.copyOf(path);</span>
-<span class="nc" id="L322">            parents = List.copyOf(parents);</span>
-<span class="nc bnc" id="L323" title="All 8 branches missed.">            if ((status == Status.SELECTED) != (selected != null)</span>
-<span class="nc bnc" id="L324" title="All 4 branches missed.">                    || status == Status.SELECTED &amp;&amp; parents.size() != path.size()</span>
+<span class="fc" id="L319">        private Navigation {</span>
+<span class="fc" id="L320">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L321">            path = List.copyOf(path);</span>
+<span class="fc" id="L322">            parents = List.copyOf(parents);</span>
+<span class="pc bpc" id="L323" title="4 of 8 branches missed.">            if ((status == Status.SELECTED) != (selected != null)</span>
+<span class="pc bpc" id="L324" title="2 of 4 branches missed.">                    || status == Status.SELECTED &amp;&amp; parents.size() != path.size()</span>
 <span class="nc bnc" id="L325" title="All 2 branches missed.">                    || status != Status.SELECTED &amp;&amp; !parents.isEmpty()) {</span>
 <span class="nc" id="L326">                throw new IllegalArgumentException(&quot;tree navigation status/payload mismatch&quot;);</span>
             }
-<span class="nc" id="L328">        }</span>
+<span class="fc" id="L328">        }</span>
 
         private static Navigation selected(
                 List&lt;Integer&gt; path,
                 Expr selected,
                 List&lt;ParentFrame&gt; parents) {
-<span class="nc" id="L334">            return new Navigation(</span>
+<span class="fc" id="L334">            return new Navigation(</span>
                     Status.SELECTED,
                     path,
-<span class="nc" id="L337">                    Objects.requireNonNull(selected, &quot;selected&quot;),</span>
+<span class="fc" id="L337">                    Objects.requireNonNull(selected, &quot;selected&quot;),</span>
                     parents);
         }
 

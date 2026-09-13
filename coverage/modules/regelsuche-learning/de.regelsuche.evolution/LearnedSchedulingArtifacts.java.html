@@ -121,49 +121,50 @@ public final class LearnedSchedulingArtifacts {
 <span class="fc" id="L121">    public static String resultJson(MoveSearch.Result result) { return json(resultPayload(result)); }</span>
     private static Map&lt;String, Object&gt; resultPayload(MoveSearch.Result result) {
 <span class="fc" id="L123">        var payload = new TreeMap&lt;String, Object&gt;(); payload.put(&quot;outcome&quot;, result.outcome()); payload.put(&quot;reached&quot;, result.reached());</span>
-<span class="fc" id="L124">        payload.put(&quot;completeBoundedRelation&quot;, result.completeBoundedRelation()); payload.put(&quot;witness&quot;, result.witness()); payload.put(&quot;events&quot;, result.events());</span>
-<span class="fc" id="L125">        payload.put(&quot;reachedStates&quot;, result.reachedStates()); payload.put(&quot;deadEndStates&quot;, result.deadEndStates()); payload.put(&quot;metrics&quot;, result.metrics());</span>
-<span class="fc" id="L126">        payload.put(&quot;totalWork&quot;, result.metrics().totalWork()); payload.put(&quot;effectiveBranchingFactor&quot;, result.metrics().effectiveBranchingFactor());</span>
-<span class="fc" id="L127">        payload.put(&quot;stateAssessments&quot;, result.stateAssessments().entrySet().stream()</span>
-<span class="fc" id="L128">            .map(entry -&gt; Map.of(&quot;state&quot;, entry.getKey(), &quot;assessment&quot;, entry.getValue())).sorted(java.util.Comparator.comparing(LearnedSchedulingArtifacts::json)).toList());</span>
-<span class="fc" id="L129">        return payload;</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (result.incrementalExecution() != null) payload.put(&quot;incrementalExecution&quot;, result.incrementalExecution());</span>
+<span class="fc" id="L125">        payload.put(&quot;completeBoundedRelation&quot;, result.completeBoundedRelation()); payload.put(&quot;witness&quot;, result.witness()); payload.put(&quot;events&quot;, result.events());</span>
+<span class="fc" id="L126">        payload.put(&quot;reachedStates&quot;, result.reachedStates()); payload.put(&quot;deadEndStates&quot;, result.deadEndStates()); payload.put(&quot;metrics&quot;, result.metrics());</span>
+<span class="fc" id="L127">        payload.put(&quot;totalWork&quot;, result.metrics().totalWork()); payload.put(&quot;effectiveBranchingFactor&quot;, result.metrics().effectiveBranchingFactor());</span>
+<span class="fc" id="L128">        payload.put(&quot;stateAssessments&quot;, result.stateAssessments().entrySet().stream()</span>
+<span class="fc" id="L129">            .map(entry -&gt; Map.of(&quot;state&quot;, entry.getKey(), &quot;assessment&quot;, entry.getValue())).sorted(java.util.Comparator.comparing(LearnedSchedulingArtifacts::json)).toList());</span>
+<span class="fc" id="L130">        return payload;</span>
     }
     private static String csv(LearnedSchedulingStudy.Report report) {
-<span class="fc" id="L132">        var csv = new StringBuilder(&quot;case,configuration,budget,status,solved,primitiveWork,searchWork,verificationWork,totalWork,exploredStates,expandedStates,generatedSuccessors,consumedSuccessors,discardedSuccessors,unconsumedSuccessors,effectiveBranchingFactor,firstHitDepth,firstHitPrimitiveDepth,duplicateRate,learnedRuleHitRate,capabilityUnlocks\n&quot;);</span>
-<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (var row : report.rows()) {</span>
-<span class="fc" id="L134">            csv.append(row.caseId()).append(',').append(row.configuration()).append(',').append(row.budget()).append(',').append(row.status()).append(',').append(row.reached());</span>
-<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (row.result() == null) { csv.append(&quot;,,,,,,,,,,,,,,,,\n&quot;); continue; }</span>
-<span class="fc bfc" id="L136" title="All 2 branches covered.">            var m = row.result().metrics(); long learned = row.result().witness().stream().filter(step -&gt; step.move().sourceKind() == SearchMove.SourceKind.LEARNED).count();</span>
-<span class="fc" id="L137">            long unlocks = row.result().witness().stream().mapToLong(step -&gt; step.move().capabilityDelta().size()).sum();</span>
-<span class="fc bfc" id="L138" title="All 2 branches covered.">            for (Object value : List.of(m.primitiveWork(), m.searchWork(), m.verificationWork(), m.totalWork(), m.exploredStates(), m.expandedStates(),</span>
-<span class="fc" id="L139">                    m.generatedSuccessors(), m.consumedSuccessors(), m.discardedSuccessors(), m.unconsumedSuccessors(), m.effectiveBranchingFactor(), m.firstHitDepth(),</span>
-<span class="fc bfc" id="L140" title="All 2 branches covered.">                    m.firstHitPrimitiveDepth(), m.consumedSuccessors() == 0 ? 0 : (double) m.duplicates() / m.consumedSuccessors(),</span>
-<span class="fc bfc" id="L141" title="All 2 branches covered.">                    row.result().witness().isEmpty() ? 0 : (double) learned / row.result().witness().size(), unlocks)) csv.append(',').append(value);</span>
-<span class="fc" id="L142">            csv.append('\n');</span>
-<span class="fc" id="L143">        }</span>
-<span class="fc" id="L144">        return csv.toString();</span>
+<span class="fc" id="L133">        var csv = new StringBuilder(&quot;case,configuration,budget,status,solved,primitiveWork,searchWork,verificationWork,totalWork,exploredStates,expandedStates,generatedSuccessors,consumedSuccessors,discardedSuccessors,unconsumedSuccessors,effectiveBranchingFactor,firstHitDepth,firstHitPrimitiveDepth,duplicateRate,learnedRuleHitRate,capabilityUnlocks\n&quot;);</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (var row : report.rows()) {</span>
+<span class="fc" id="L135">            csv.append(row.caseId()).append(',').append(row.configuration()).append(',').append(row.budget()).append(',').append(row.status()).append(',').append(row.reached());</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            if (row.result() == null) { csv.append(&quot;,,,,,,,,,,,,,,,,\n&quot;); continue; }</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            var m = row.result().metrics(); long learned = row.result().witness().stream().filter(step -&gt; step.move().sourceKind() == SearchMove.SourceKind.LEARNED).count();</span>
+<span class="fc" id="L138">            long unlocks = row.result().witness().stream().mapToLong(step -&gt; step.move().capabilityDelta().size()).sum();</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            for (Object value : List.of(m.primitiveWork(), m.searchWork(), m.verificationWork(), m.totalWork(), m.exploredStates(), m.expandedStates(),</span>
+<span class="fc" id="L140">                    m.generatedSuccessors(), m.consumedSuccessors(), m.discardedSuccessors(), m.unconsumedSuccessors(), m.effectiveBranchingFactor(), m.firstHitDepth(),</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">                    m.firstHitPrimitiveDepth(), m.consumedSuccessors() == 0 ? 0 : (double) m.duplicates() / m.consumedSuccessors(),</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">                    row.result().witness().isEmpty() ? 0 : (double) learned / row.result().witness().size(), unlocks)) csv.append(',').append(value);</span>
+<span class="fc" id="L143">            csv.append('\n');</span>
+<span class="fc" id="L144">        }</span>
+<span class="fc" id="L145">        return csv.toString();</span>
     }
     public static String json(Object value) {
-<span class="fc" id="L147">        try { return JSON.writeValueAsString(normalize(value)); }</span>
-<span class="nc" id="L148">        catch (IOException | ReflectiveOperationException exception) { throw new IllegalStateException(&quot;cannot write canonical scheduling evidence&quot;, exception); }</span>
+<span class="fc" id="L148">        try { return JSON.writeValueAsString(normalize(value)); }</span>
+<span class="nc" id="L149">        catch (IOException | ReflectiveOperationException exception) { throw new IllegalStateException(&quot;cannot write canonical scheduling evidence&quot;, exception); }</span>
     }
     private static Object normalize(Object value) throws ReflectiveOperationException, IOException {
-<span class="fc bfc" id="L151" title="All 8 branches covered.">        if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean) return value;</span>
-<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (value instanceof Enum&lt;?&gt; enumeration) return enumeration.name();</span>
-<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (value instanceof Map&lt;?, ?&gt; map) {</span>
-<span class="fc" id="L154">            var result = new TreeMap&lt;String, Object&gt;();</span>
-<span class="fc bfc" id="L155" title="All 2 branches covered.">            for (var entry : map.entrySet()) result.put((String) entry.getKey(), normalize(entry.getValue())); return result;</span>
+<span class="fc bfc" id="L152" title="All 8 branches covered.">        if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean) return value;</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (value instanceof Enum&lt;?&gt; enumeration) return enumeration.name();</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (value instanceof Map&lt;?, ?&gt; map) {</span>
+<span class="fc" id="L155">            var result = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            for (var entry : map.entrySet()) result.put((String) entry.getKey(), normalize(entry.getValue())); return result;</span>
         }
-<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (value instanceof Collection&lt;?&gt; collection) {</span>
-<span class="fc bfc" id="L158" title="All 2 branches covered.">            var result = new ArrayList&lt;Object&gt;(); for (Object element : collection) result.add(normalize(element));</span>
-<span class="fc bfc" id="L159" title="All 2 branches covered.">            if (value instanceof Set&lt;?&gt;) result.sort(java.util.Comparator.comparing(LearnedSchedulingArtifacts::json)); return result;</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (value instanceof Collection&lt;?&gt; collection) {</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            var result = new ArrayList&lt;Object&gt;(); for (Object element : collection) result.add(normalize(element));</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            if (value instanceof Set&lt;?&gt;) result.sort(java.util.Comparator.comparing(LearnedSchedulingArtifacts::json)); return result;</span>
         }
-<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        if (value.getClass().isRecord()) {</span>
-<span class="fc" id="L162">            var result = new TreeMap&lt;String, Object&gt;();</span>
-<span class="fc bfc" id="L163" title="All 2 branches covered.">            for (RecordComponent component : value.getClass().getRecordComponents()) result.put(component.getName(), normalize(component.getAccessor().invoke(value)));</span>
-<span class="fc" id="L164">            return result;</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (value.getClass().isRecord()) {</span>
+<span class="fc" id="L163">            var result = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">            for (RecordComponent component : value.getClass().getRecordComponents()) result.put(component.getName(), normalize(component.getAccessor().invoke(value)));</span>
+<span class="fc" id="L165">            return result;</span>
         }
-<span class="nc" id="L166">        throw new IllegalArgumentException(&quot;unsupported evidence value: &quot; + value.getClass());</span>
+<span class="nc" id="L167">        throw new IllegalArgumentException(&quot;unsupported evidence value: &quot; + value.getClass());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

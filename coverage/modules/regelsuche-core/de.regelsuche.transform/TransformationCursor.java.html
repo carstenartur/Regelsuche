@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransformationCursor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">TransformationCursor.java</span></div><h1>TransformationCursor.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.knowledge.RuleDescriptor;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.TreeMap;
+
+/** An actual suspended native traversal. A pull may finish an atomic operation beyond its allowance. */
+public interface TransformationCursor extends AutoCloseable {
+    String WORK_REVISION = &quot;regelsuche.native-transformation-cursor-work/v1&quot;;
+    String ORDER_REVISION = &quot;regelsuche.native-occurrence-preorder-rule-inventory/v1&quot;;
+    int DEFAULT_MATCHER_BRANCH_LIMIT = 10000;
+
+<span class="fc" id="L16">    enum Status { READY, EXHAUSTED, CANDIDATE_LIMIT, WORK_EXHAUSTED, INVALID_INPUT, FAILED, CLOSED }</span>
+<span class="fc" id="L17">    enum Operation { OPEN, PARSE, FORMAT, CANONICAL_SIZE, OCCURRENCE_VISIT, RULE_MATCH,</span>
+<span class="fc" id="L18">        MATCHER_BRANCH, INSTANTIATE, SOURCE_HASH, ANCESTOR_COPY, FILTER, EMIT, CLOSE }</span>
+<span class="fc" id="L19">    enum AttemptOutcome { NOT_MATCHED, MATCH_INCONCLUSIVE, UNCHANGED, GROWTH_REJECTED, DUPLICATE, EMITTED, FAILED }</span>
+
+    /** One unit per named event/atomic call, plus the matcher's actual branches and copied ancestors. */
+    record Work(Map&lt;String, Long&gt; operations, long primitiveRewrites) {
+<span class="fc" id="L23">        public Work {</span>
+<span class="fc" id="L24">            var copy = new TreeMap&lt;String, Long&gt;();</span>
+<span class="fc" id="L25">            operations.forEach((operation, units) -&gt; {</span>
+<span class="fc" id="L26">                Operation.valueOf(operation);</span>
+<span class="pc bpc" id="L27" title="2 of 4 branches missed.">                if (units == null || units &lt; 0) throw new IllegalArgumentException(&quot;negative cursor work&quot;);</span>
+<span class="fc" id="L28">                copy.put(operation, units);</span>
+<span class="fc" id="L29">            });</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">            if (primitiveRewrites &lt; 0) throw new IllegalArgumentException(&quot;negative rewrite work&quot;);</span>
+<span class="fc" id="L31">            operations = Collections.unmodifiableMap(copy);</span>
+<span class="fc" id="L32">        }</span>
+<span class="fc" id="L33">        public long units(Operation operation) { return operations.getOrDefault(operation.name(), 0L); }</span>
+<span class="fc" id="L34">        public long mechanicalUnits() { return operations.values().stream().reduce(0L, Math::addExact); }</span>
+<span class="fc" id="L35">        public long totalUnits() { return Math.addExact(mechanicalUnits(), primitiveRewrites); }</span>
+        public TransformationWorkMetrics metrics() {
+<span class="nc" id="L37">            return TransformationWorkMetrics.ZERO.withDelegatedMechanicalWork(mechanicalUnits())</span>
+<span class="nc" id="L38">                .withCandidateWork(new ExecutionWork(primitiveRewrites, 0, 0));</span>
+        }
+    }
+
+<span class="fc" id="L42">    enum PatternKind { PLACEHOLDER, LITERAL_NUMBER, LITERAL_VARIABLE, OPERATION, FUNCTION }</span>
+    /** Structured values avoid ambiguous display strings and preserve arbitrary literal/placeholder names. */
+    record PatternDefinition(PatternKind kind, String value, List&lt;PatternDefinition&gt; children) {
+<span class="fc" id="L45">        public PatternDefinition { children = List.copyOf(children); }</span>
+        static PatternDefinition of(PatternExpr pattern) {
+<span class="pc bpc" id="L47" title="1 of 5 branches missed.">            return switch (pattern) {</span>
+<span class="fc" id="L48">                case PatternExpr.Placeholder placeholder -&gt; new PatternDefinition(PatternKind.PLACEHOLDER, placeholder.name(), List.of());</span>
+<span class="fc" id="L49">                case PatternExpr.LiteralNumber number -&gt; new PatternDefinition(PatternKind.LITERAL_NUMBER, number.value().toString(), List.of());</span>
+<span class="fc" id="L50">                case PatternExpr.LiteralVariable variable -&gt; new PatternDefinition(PatternKind.LITERAL_VARIABLE, variable.name(), List.of());</span>
+<span class="fc" id="L51">                case PatternExpr.Operation operation -&gt; new PatternDefinition(PatternKind.OPERATION, operation.operator().name(),</span>
+<span class="fc" id="L52">                    List.of(of(operation.left()), of(operation.right())));</span>
+<span class="nc" id="L53">                case PatternExpr.Function function -&gt; new PatternDefinition(PatternKind.FUNCTION, function.name(),</span>
+<span class="nc" id="L54">                    function.arguments().stream().map(PatternDefinition::of).toList());</span>
+            };
+        }
+    }
+    /** Full immutable native rule definitions, in invocation order. */
+<span class="fc" id="L59">    record RuleDefinition(String id, PatternDefinition sourcePattern, PatternDefinition targetPattern, RewriteKind kind,</span>
+            boolean mayIncreaseComplexity, int estimatedCostDelta, boolean equivalencePreservingByConstruction,
+            RuleDescriptor descriptor, RecognitionProfile recognitionProfile) {
+        static RuleDefinition of(PatternRewriteRule rule) {
+<span class="fc" id="L63">            return new RuleDefinition(rule.id(), PatternDefinition.of(rule.source()), PatternDefinition.of(rule.target()), rule.kind(),</span>
+<span class="fc" id="L64">                rule.mayIncreaseComplexity(), rule.estimatedCostDelta(), rule.isEquivalencePreservingByConstruction(),</span>
+<span class="fc" id="L65">                rule.descriptor(), rule.recognitionProfile());</span>
+        }
+    }
+    record Definition(String orderRevision, List&lt;RuleDefinition&gt; rules, int maxAstSizeIncrease,
+            int maxCandidates, int matcherBranchLimit) {
+<span class="fc" id="L70">        public Definition { rules = List.copyOf(rules); }</span>
+    }
+    record Attempt(List&lt;Integer&gt; path, int ruleIndex, String ruleId, AttemptOutcome outcome,
+            int matcherBranches, String detailCode) {
+<span class="fc" id="L74">        public Attempt { path = List.copyOf(path); }</span>
+    }
+    record Snapshot(String workRevision, Definition definition, String source, Status status, boolean closed,
+            Work work, List&lt;Attempt&gt; attempts, long emittedCandidates, String detailCode) {
+<span class="fc" id="L78">        public Snapshot { attempts = List.copyOf(attempts); }</span>
+        public boolean complete() {
+<span class="fc bfc" id="L80" title="All 4 branches covered.">            return status == Status.EXHAUSTED &amp;&amp; attempts.stream().noneMatch(attempt -&gt;</span>
+<span class="pc bpc" id="L81" title="1 of 4 branches missed.">                attempt.outcome() == AttemptOutcome.MATCH_INCONCLUSIVE || attempt.outcome() == AttemptOutcome.FAILED);</span>
+        }
+    }
+
+    /** Pulls at most one distinct candidate. The allowance includes mathematical and mechanical cursor work. */
+    Optional&lt;Transformation&gt; next(long workAllowance);
+    Work work();
+    Snapshot snapshot();
+    @Override void close();
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

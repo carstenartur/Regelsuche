@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IncrementalMoveProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">IncrementalMoveProvider.java</span></div><h1>IncrementalMoveProvider.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.transform.TransformationCursor;
+
+/** Explicit native capability. This first revision does not admit opaque, learned or plugin providers. */
+public sealed interface IncrementalMoveProvider extends MoveProvider permits NativeIncrementalMoveProvider {
+    TransformationCursor.Definition definition();
+    /** Checks provider admission once, before opening/charging a transformation cursor. */
+    TransformationCursor openCursor(MoveState state, MoveContext context);
+
+    /** Typed admission rejection so the picker retains the check without treating it as a generation failure. */
+    final class AssumptionsNotCarried extends IllegalArgumentException {
+        private static final long serialVersionUID = 1L;
+<span class="fc" id="L14">        AssumptionsNotCarried() { super(&quot;native provider assumptions are not carried by the source context&quot;); }</span>
+    }
+
+    /** A batch adapter would discard this revision's suspension and work contract. */
+    @Override default Batch candidates(MoveState state, MoveContext context) {
+<span class="fc" id="L19">        throw new UnsupportedOperationException(&quot;incremental providers require INCREMENTAL_NATIVE_ORDER scheduling&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

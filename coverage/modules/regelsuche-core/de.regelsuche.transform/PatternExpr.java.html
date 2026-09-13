@@ -91,7 +91,7 @@ public sealed interface PatternExpr extends ExprTemplate
         @Override
         public Expr instantiate(Map&lt;String, Expr&gt; bindings) {
 <span class="fc" id="L93">            return Optional.ofNullable(bindings.get(name))</span>
-<span class="pc" id="L94">                .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+<span class="fc" id="L94">                .orElseThrow(() -&gt; new IllegalArgumentException(</span>
                     &quot;Missing binding for &quot; + name));
         }
     }
