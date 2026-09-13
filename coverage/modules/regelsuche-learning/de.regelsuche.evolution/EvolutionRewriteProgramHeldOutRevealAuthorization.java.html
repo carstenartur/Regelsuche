@@ -112,6 +112,22 @@ public final class EvolutionRewriteProgramHeldOutRevealAuthorization {
             terminal);
     }
 
+    /** Additive combined-population path; a durable receipt is required before reveal. */
+    public static EvolutionRewriteProgramHeldOutRevealAuthorization validation(
+        EvolutionRewriteProgramStudyPlan study,
+        EvolutionSplitManifest manifest,
+        ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun train,
+        FileEvolutionRewriteProgramValidationAttemptStore.Reservation reservation
+    ) {
+<span class="fc" id="L122">        var validationPlan = Objects.requireNonNull(reservation, &quot;reservation&quot;).plan();</span>
+<span class="fc" id="L123">        validationPlan.requireInputs(study, manifest, train);</span>
+<span class="fc" id="L124">        var run = train.retainedPopulation().populationRun();</span>
+<span class="fc" id="L125">        return create(study.studyId(), Split.VALIDATION,</span>
+            Stage.VALIDATION_AFTER_TRAIN_POPULATION_COMPLETE,
+<span class="fc" id="L127">            study.contentHash(), manifest.contentHash(), validationPlan.commitment().contentHash(),</span>
+<span class="fc" id="L128">            run.contentHash(), &quot;&quot;, &quot;&quot;, run.terminalOutcome().name());</span>
+    }
+
     public static EvolutionRewriteProgramHeldOutRevealAuthorization finalTest(
         EvolutionStudyPlan plan,
         EvolutionSplitManifest manifest,
@@ -120,45 +136,62 @@ public final class EvolutionRewriteProgramHeldOutRevealAuthorization {
         EvolutionFinalTestReservation reservation,
         EvolutionRewriteProgramHeldOutCommitment commitment
     ) {
-<span class="fc" id="L123">        requireStudy(plan, manifest);</span>
-<span class="fc" id="L124">        Objects.requireNonNull(selection, &quot;selection&quot;);</span>
-<span class="fc" id="L125">        Objects.requireNonNull(suite, &quot;suite&quot;);</span>
-<span class="fc" id="L126">        Objects.requireNonNull(reservation, &quot;reservation&quot;);</span>
-<span class="fc" id="L127">        requireCommitment(commitment, manifest, Split.FINAL_TEST);</span>
-<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (!selection.hasSelection()) {</span>
-<span class="nc" id="L129">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L139">        requireStudy(plan, manifest);</span>
+<span class="fc" id="L140">        Objects.requireNonNull(selection, &quot;selection&quot;);</span>
+<span class="fc" id="L141">        Objects.requireNonNull(suite, &quot;suite&quot;);</span>
+<span class="fc" id="L142">        Objects.requireNonNull(reservation, &quot;reservation&quot;);</span>
+<span class="fc" id="L143">        requireCommitment(commitment, manifest, Split.FINAL_TEST);</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (!selection.hasSelection()) {</span>
+<span class="nc" id="L145">            throw new IllegalArgumentException(</span>
                 &quot;FINAL TEST reveal requires a frozen selected configuration&quot;);
         }
-<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (!selection.studyPlanHash().equals(plan.contentHash())</span>
-<span class="pc bpc" id="L133" title="1 of 2 branches missed.">                || !selection.splitManifestHash().equals(manifest.contentHash())) {</span>
-<span class="nc" id="L134">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (!selection.studyPlanHash().equals(plan.contentHash())</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                || !selection.splitManifestHash().equals(manifest.contentHash())) {</span>
+<span class="nc" id="L150">            throw new IllegalArgumentException(</span>
                 &quot;VALIDATION selection differs from the frozen study or split&quot;);
         }
-<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (!suite.studyPlanHash().equals(plan.contentHash())</span>
-<span class="pc bpc" id="L138" title="1 of 2 branches missed.">                || !suite.splitManifestHash().equals(manifest.contentHash())) {</span>
-<span class="nc" id="L139">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (!suite.studyPlanHash().equals(plan.contentHash())</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">                || !suite.splitManifestHash().equals(manifest.contentHash())) {</span>
+<span class="nc" id="L155">            throw new IllegalArgumentException(</span>
                 &quot;FINAL TEST suite differs from the frozen study or split&quot;);
         }
-<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (!reservation.studyPlanHash().equals(plan.contentHash())</span>
-<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                || !reservation.splitManifestHash().equals(manifest.contentHash())</span>
-<span class="pc bpc" id="L144" title="1 of 2 branches missed.">                || !reservation.validationSelectionHash().equals(</span>
-<span class="fc" id="L145">                    selection.contentHash())</span>
-<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                || !reservation.finalTestSuiteHash().equals(suite.contentHash())) {</span>
-<span class="nc" id="L147">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        if (!reservation.studyPlanHash().equals(plan.contentHash())</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">                || !reservation.splitManifestHash().equals(manifest.contentHash())</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">                || !reservation.validationSelectionHash().equals(</span>
+<span class="fc" id="L161">                    selection.contentHash())</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">                || !reservation.finalTestSuiteHash().equals(suite.contentHash())) {</span>
+<span class="nc" id="L163">            throw new IllegalArgumentException(</span>
                 &quot;FINAL TEST reservation differs from selection or suite&quot;);
         }
-<span class="fc" id="L150">        requireSuiteMatchesCommitment(suite, commitment);</span>
-<span class="fc" id="L151">        return create(</span>
-<span class="fc" id="L152">            plan.studyId(),</span>
+<span class="fc" id="L166">        requireSuiteMatchesCommitment(suite, commitment);</span>
+<span class="fc" id="L167">        return create(</span>
+<span class="fc" id="L168">            plan.studyId(),</span>
             Split.FINAL_TEST,
             Stage.FINAL_TEST_AFTER_FROZEN_SELECTION_AND_RESERVATION,
-<span class="fc" id="L155">            plan.contentHash(),</span>
-<span class="fc" id="L156">            manifest.contentHash(),</span>
-<span class="fc" id="L157">            commitment.contentHash(),</span>
-<span class="fc" id="L158">            reservation.contentHash(),</span>
-<span class="fc" id="L159">            selection.contentHash(),</span>
-<span class="fc" id="L160">            suite.contentHash(),</span>
+<span class="fc" id="L171">            plan.contentHash(),</span>
+<span class="fc" id="L172">            manifest.contentHash(),</span>
+<span class="fc" id="L173">            commitment.contentHash(),</span>
+<span class="fc" id="L174">            reservation.contentHash(),</span>
+<span class="fc" id="L175">            selection.contentHash(),</span>
+<span class="fc" id="L176">            suite.contentHash(),</span>
             EvolutionFinalTestReservation.RESERVED);
+    }
+
+    /** Combined-program FINAL TEST requires the non-deserializable winning durable reservation. */
+    public static EvolutionRewriteProgramHeldOutRevealAuthorization finalTest(
+        EvolutionRewriteProgramStudyPlan study,
+        EvolutionSplitManifest manifest,
+        ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun train,
+        FileEvolutionRewriteProgramFinalTestAttemptStore.Reservation reservation
+    ) {
+<span class="fc" id="L187">        var finalPlan = Objects.requireNonNull(reservation, &quot;reservation&quot;).plan();</span>
+<span class="fc" id="L188">        reservation.requireRevealAuthority();</span>
+<span class="fc" id="L189">        finalPlan.requireInputs(study, manifest, train);</span>
+<span class="fc" id="L190">        return create(study.studyId(), Split.FINAL_TEST,</span>
+            Stage.FINAL_TEST_AFTER_FROZEN_SELECTION_AND_RESERVATION,
+<span class="fc" id="L192">            study.contentHash(), manifest.contentHash(), finalPlan.commitment().contentHash(),</span>
+<span class="fc" id="L193">            reservation.record().contentHash(), finalPlan.validationHandoff().selection().contentHash(),</span>
+<span class="fc" id="L194">            finalPlan.contentHash(), EvolutionRewriteProgramFinalTestReservation.RESERVED);</span>
     }
 
     private static EvolutionRewriteProgramHeldOutRevealAuthorization create(
@@ -173,7 +206,7 @@ public final class EvolutionRewriteProgramHeldOutRevealAuthorization {
         String heldOutSuiteHash,
         String terminalOutcome
     ) {
-<span class="fc" id="L176">        String hash = EvolutionGenome.hash(render(</span>
+<span class="fc" id="L209">        String hash = EvolutionGenome.hash(render(</span>
             studyId,
             split,
             stage,
@@ -185,7 +218,7 @@ public final class EvolutionRewriteProgramHeldOutRevealAuthorization {
             heldOutSuiteHash,
             terminalOutcome,
             null));
-<span class="fc" id="L188">        return new EvolutionRewriteProgramHeldOutRevealAuthorization(</span>
+<span class="fc" id="L221">        return new EvolutionRewriteProgramHeldOutRevealAuthorization(</span>
             studyId,
             split,
             stage,
@@ -203,64 +236,64 @@ public final class EvolutionRewriteProgramHeldOutRevealAuthorization {
         EvolutionRewriteProgramHeldOutRevealBundle bundle,
         EvolutionRewriteProgramHeldOutCommitment commitment
     ) {
-<span class="fc" id="L206">        Objects.requireNonNull(bundle, &quot;bundle&quot;);</span>
-<span class="fc" id="L207">        Objects.requireNonNull(commitment, &quot;commitment&quot;);</span>
-<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        if (!studyId.equals(bundle.studyId())</span>
-<span class="pc bpc" id="L209" title="1 of 2 branches missed.">                || split != bundle.split()</span>
-<span class="fc bfc" id="L210" title="All 2 branches covered.">                || !heldOutCommitmentHash.equals(commitment.contentHash())</span>
-<span class="pc bpc" id="L211" title="1 of 2 branches missed.">                || !bundle.commitment().equals(commitment)</span>
-<span class="pc bpc" id="L212" title="1 of 2 branches missed.">                || !bundle.contentHash().equals(commitment.sealedRevealHash())) {</span>
-<span class="fc" id="L213">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L239">        Objects.requireNonNull(bundle, &quot;bundle&quot;);</span>
+<span class="fc" id="L240">        Objects.requireNonNull(commitment, &quot;commitment&quot;);</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">        if (!studyId.equals(bundle.studyId())</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">                || split != bundle.split()</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">                || !heldOutCommitmentHash.equals(commitment.contentHash())</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">                || !bundle.commitment().equals(commitment)</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">                || !bundle.contentHash().equals(commitment.sealedRevealHash())) {</span>
+<span class="fc" id="L246">            throw new IllegalArgumentException(</span>
                 &quot;held-out reveal authorization differs from bundle or commitment&quot;);
         }
-<span class="fc" id="L216">    }</span>
+<span class="fc" id="L249">    }</span>
 
     public String studyId() {
-<span class="nc" id="L219">        return studyId;</span>
+<span class="nc" id="L252">        return studyId;</span>
     }
 
     public Split split() {
-<span class="nc" id="L223">        return split;</span>
+<span class="nc" id="L256">        return split;</span>
     }
 
     public Stage stage() {
-<span class="nc" id="L227">        return stage;</span>
+<span class="nc" id="L260">        return stage;</span>
     }
 
     public String studyPlanHash() {
-<span class="nc" id="L231">        return studyPlanHash;</span>
+<span class="nc" id="L264">        return studyPlanHash;</span>
     }
 
     public String splitManifestHash() {
-<span class="nc" id="L235">        return splitManifestHash;</span>
+<span class="nc" id="L268">        return splitManifestHash;</span>
     }
 
     public String heldOutCommitmentHash() {
-<span class="nc" id="L239">        return heldOutCommitmentHash;</span>
+<span class="fc" id="L272">        return heldOutCommitmentHash;</span>
     }
 
     public String prerequisiteArtifactHash() {
-<span class="fc" id="L243">        return prerequisiteArtifactHash;</span>
+<span class="fc" id="L276">        return prerequisiteArtifactHash;</span>
     }
 
     public String validationSelectionHash() {
-<span class="fc" id="L247">        return validationSelectionHash;</span>
+<span class="fc" id="L280">        return validationSelectionHash;</span>
     }
 
     public String heldOutSuiteHash() {
-<span class="fc" id="L251">        return heldOutSuiteHash;</span>
+<span class="fc" id="L284">        return heldOutSuiteHash;</span>
     }
 
     public String terminalOutcome() {
-<span class="fc" id="L255">        return terminalOutcome;</span>
+<span class="fc" id="L288">        return terminalOutcome;</span>
     }
 
     public String contentHash() {
-<span class="nc" id="L259">        return contentHash;</span>
+<span class="nc" id="L292">        return contentHash;</span>
     }
 
     public String toCanonicalJson() {
-<span class="fc" id="L263">        return render(</span>
+<span class="fc" id="L296">        return render(</span>
             studyId,
             split,
             stage,
@@ -275,86 +308,86 @@ public final class EvolutionRewriteProgramHeldOutRevealAuthorization {
     }
 
     private void requireStageShape() {
-<span class="pc bpc" id="L278" title="1 of 2 branches missed.">        if (stage.requiredSplit() != split) {</span>
-<span class="nc" id="L279">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">        if (stage.requiredSplit() != split) {</span>
+<span class="nc" id="L312">            throw new IllegalArgumentException(</span>
                 &quot;held-out reveal stage differs from split&quot;);
         }
-<span class="pc bpc" id="L282" title="1 of 3 branches missed.">        switch (stage) {</span>
+<span class="pc bpc" id="L315" title="1 of 3 branches missed.">        switch (stage) {</span>
             case VALIDATION_AFTER_TRAIN_POPULATION_COMPLETE -&gt; {
-<span class="pc bpc" id="L284" title="1 of 2 branches missed.">                if (!validationSelectionHash.isEmpty()</span>
-<span class="pc bpc" id="L285" title="1 of 2 branches missed.">                        || !heldOutSuiteHash.isEmpty()</span>
-<span class="pc bpc" id="L286" title="1 of 2 branches missed.">                        || terminalOutcome.isEmpty()) {</span>
-<span class="nc" id="L287">                    throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">                if (!validationSelectionHash.isEmpty()</span>
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">                        || !heldOutSuiteHash.isEmpty()</span>
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">                        || terminalOutcome.isEmpty()) {</span>
+<span class="nc" id="L320">                    throw new IllegalArgumentException(</span>
                         &quot;VALIDATION reveal authorization has invalid evidence shape&quot;);
                 }
             }
             case FINAL_TEST_AFTER_FROZEN_SELECTION_AND_RESERVATION -&gt; {
-<span class="pc bpc" id="L292" title="1 of 2 branches missed.">                if (validationSelectionHash.isEmpty()</span>
-<span class="pc bpc" id="L293" title="1 of 2 branches missed.">                        || heldOutSuiteHash.isEmpty()</span>
-<span class="pc bpc" id="L294" title="1 of 2 branches missed.">                        || !EvolutionFinalTestReservation.RESERVED.equals(</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">                if (validationSelectionHash.isEmpty()</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">                        || heldOutSuiteHash.isEmpty()</span>
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">                        || !EvolutionFinalTestReservation.RESERVED.equals(</span>
                             terminalOutcome)) {
-<span class="nc" id="L296">                    throw new IllegalArgumentException(</span>
+<span class="nc" id="L329">                    throw new IllegalArgumentException(</span>
                         &quot;FINAL TEST reveal authorization has invalid evidence shape&quot;);
                 }
             }
         }
-<span class="fc" id="L301">    }</span>
+<span class="fc" id="L334">    }</span>
 
     private static void requireStudy(
         EvolutionStudyPlan plan,
         EvolutionSplitManifest manifest
     ) {
-<span class="fc" id="L307">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
-<span class="fc" id="L308">        Objects.requireNonNull(manifest, &quot;manifest&quot;);</span>
-<span class="pc bpc" id="L309" title="1 of 2 branches missed.">        if (!plan.studyId().equals(manifest.studyId())</span>
-<span class="pc bpc" id="L310" title="1 of 2 branches missed.">                || !plan.splitManifestHash().equals(manifest.contentHash())) {</span>
-<span class="nc" id="L311">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L340">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L341">        Objects.requireNonNull(manifest, &quot;manifest&quot;);</span>
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">        if (!plan.studyId().equals(manifest.studyId())</span>
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">                || !plan.splitManifestHash().equals(manifest.contentHash())) {</span>
+<span class="nc" id="L344">            throw new IllegalArgumentException(</span>
                 &quot;study plan differs from split manifest&quot;);
         }
-<span class="fc" id="L314">    }</span>
+<span class="fc" id="L347">    }</span>
 
     private static void requireCommitment(
         EvolutionRewriteProgramHeldOutCommitment commitment,
         EvolutionSplitManifest manifest,
         Split expectedSplit
     ) {
-<span class="fc" id="L321">        Objects.requireNonNull(commitment, &quot;commitment&quot;);</span>
-<span class="pc bpc" id="L322" title="1 of 2 branches missed.">        if (commitment.split() != expectedSplit) {</span>
-<span class="nc" id="L323">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L354">        Objects.requireNonNull(commitment, &quot;commitment&quot;);</span>
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">        if (commitment.split() != expectedSplit) {</span>
+<span class="nc" id="L356">            throw new IllegalArgumentException(</span>
                 &quot;held-out commitment has the wrong split&quot;);
         }
-<span class="fc" id="L326">        commitment.requireMatches(manifest);</span>
-<span class="fc" id="L327">    }</span>
+<span class="fc" id="L359">        commitment.requireMatches(manifest);</span>
+<span class="fc" id="L360">    }</span>
 
     private static void requireSuiteMatchesCommitment(
         EvolutionFinalTestSuite suite,
         EvolutionRewriteProgramHeldOutCommitment commitment
     ) {
-<span class="fc" id="L333">        Map&lt;String, CaseCommitment&gt; committedById = new HashMap&lt;&gt;();</span>
-<span class="fc" id="L334">        commitment.cases().forEach(item -&gt;</span>
-<span class="fc" id="L335">            committedById.put(item.caseId(), item));</span>
-<span class="pc bpc" id="L336" title="1 of 2 branches missed.">        if (suite.cases().size() != committedById.size()) {</span>
-<span class="nc" id="L337">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L366">        Map&lt;String, CaseCommitment&gt; committedById = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L367">        commitment.cases().forEach(item -&gt;</span>
+<span class="fc" id="L368">            committedById.put(item.caseId(), item));</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">        if (suite.cases().size() != committedById.size()) {</span>
+<span class="nc" id="L370">            throw new IllegalArgumentException(</span>
                 &quot;FINAL TEST suite differs from held-out commitment size&quot;);
         }
-<span class="fc bfc" id="L340" title="All 2 branches covered.">        for (EvolutionFinalTestSuite.CaseDefinition item : suite.cases()) {</span>
-<span class="fc" id="L341">            CaseCommitment committed = committedById.get(item.caseId());</span>
-<span class="pc bpc" id="L342" title="1 of 2 branches missed.">            if (committed == null</span>
-<span class="fc bfc" id="L343" title="All 2 branches covered.">                    || !item.caseMaterialHash().equals(</span>
-<span class="fc" id="L344">                        committed.revealEntryHash())) {</span>
-<span class="fc" id="L345">                throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L373" title="All 2 branches covered.">        for (EvolutionFinalTestSuite.CaseDefinition item : suite.cases()) {</span>
+<span class="fc" id="L374">            CaseCommitment committed = committedById.get(item.caseId());</span>
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">            if (committed == null</span>
+<span class="fc bfc" id="L376" title="All 2 branches covered.">                    || !item.caseMaterialHash().equals(</span>
+<span class="fc" id="L377">                        committed.revealEntryHash())) {</span>
+<span class="fc" id="L378">                throw new IllegalArgumentException(</span>
                     &quot;FINAL TEST suite case differs from held-out commitment: &quot;
-<span class="fc" id="L347">                        + item.caseId());</span>
+<span class="fc" id="L380">                        + item.caseId());</span>
             }
-<span class="fc" id="L349">        }</span>
-<span class="fc" id="L350">    }</span>
+<span class="fc" id="L382">        }</span>
+<span class="fc" id="L383">    }</span>
 
     private static String normalizeOptionalHash(String value, String field) {
-<span class="pc bpc" id="L353" title="1 of 2 branches missed.">        String normalized = value == null ? &quot;&quot; : value;</span>
-<span class="fc bfc" id="L354" title="All 2 branches covered.">        if (!normalized.isEmpty()) {</span>
-<span class="fc" id="L355">            EvolutionGenome.requireSha256(normalized, field);</span>
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">        String normalized = value == null ? &quot;&quot; : value;</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        if (!normalized.isEmpty()) {</span>
+<span class="fc" id="L388">            EvolutionGenome.requireSha256(normalized, field);</span>
         }
-<span class="fc" id="L357">        return normalized;</span>
+<span class="fc" id="L390">        return normalized;</span>
     }
 
     private static String render(
@@ -370,36 +403,36 @@ public final class EvolutionRewriteProgramHeldOutRevealAuthorization {
         String terminalOutcome,
         String contentHash
     ) {
-<span class="fc" id="L373">        JsonWriter json = new JsonWriter().beginObject()</span>
-<span class="fc" id="L374">            .property(&quot;schema&quot;, SCHEMA)</span>
-<span class="fc" id="L375">            .property(&quot;studyId&quot;, studyId)</span>
-<span class="fc" id="L376">            .property(&quot;split&quot;, split.name())</span>
-<span class="fc" id="L377">            .property(&quot;stage&quot;, stage.name())</span>
-<span class="fc" id="L378">            .property(&quot;studyPlanHash&quot;, studyPlanHash)</span>
-<span class="fc" id="L379">            .property(&quot;splitManifestHash&quot;, splitManifestHash)</span>
-<span class="fc" id="L380">            .property(&quot;heldOutCommitmentHash&quot;, heldOutCommitmentHash)</span>
-<span class="fc" id="L381">            .property(&quot;prerequisiteArtifactHash&quot;, prerequisiteArtifactHash)</span>
-<span class="fc" id="L382">            .property(&quot;validationSelectionHash&quot;, validationSelectionHash)</span>
-<span class="fc" id="L383">            .property(&quot;heldOutSuiteHash&quot;, heldOutSuiteHash)</span>
-<span class="fc" id="L384">            .property(&quot;terminalOutcome&quot;, terminalOutcome);</span>
-<span class="fc bfc" id="L385" title="All 2 branches covered.">        if (contentHash != null) {</span>
-<span class="fc" id="L386">            json.property(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L406">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L407">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L408">            .property(&quot;studyId&quot;, studyId)</span>
+<span class="fc" id="L409">            .property(&quot;split&quot;, split.name())</span>
+<span class="fc" id="L410">            .property(&quot;stage&quot;, stage.name())</span>
+<span class="fc" id="L411">            .property(&quot;studyPlanHash&quot;, studyPlanHash)</span>
+<span class="fc" id="L412">            .property(&quot;splitManifestHash&quot;, splitManifestHash)</span>
+<span class="fc" id="L413">            .property(&quot;heldOutCommitmentHash&quot;, heldOutCommitmentHash)</span>
+<span class="fc" id="L414">            .property(&quot;prerequisiteArtifactHash&quot;, prerequisiteArtifactHash)</span>
+<span class="fc" id="L415">            .property(&quot;validationSelectionHash&quot;, validationSelectionHash)</span>
+<span class="fc" id="L416">            .property(&quot;heldOutSuiteHash&quot;, heldOutSuiteHash)</span>
+<span class="fc" id="L417">            .property(&quot;terminalOutcome&quot;, terminalOutcome);</span>
+<span class="fc bfc" id="L418" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L419">            json.property(&quot;contentHash&quot;, contentHash);</span>
         }
-<span class="fc" id="L388">        return json.endObject().toString();</span>
+<span class="fc" id="L421">        return json.endObject().toString();</span>
     }
 
-<span class="fc" id="L391">    public enum Stage {</span>
-<span class="fc" id="L392">        VALIDATION_AFTER_TRAIN_POPULATION_COMPLETE(Split.VALIDATION),</span>
-<span class="fc" id="L393">        FINAL_TEST_AFTER_FROZEN_SELECTION_AND_RESERVATION(Split.FINAL_TEST);</span>
+<span class="fc" id="L424">    public enum Stage {</span>
+<span class="fc" id="L425">        VALIDATION_AFTER_TRAIN_POPULATION_COMPLETE(Split.VALIDATION),</span>
+<span class="fc" id="L426">        FINAL_TEST_AFTER_FROZEN_SELECTION_AND_RESERVATION(Split.FINAL_TEST);</span>
 
         private final Split requiredSplit;
 
-<span class="fc" id="L397">        Stage(Split requiredSplit) {</span>
-<span class="fc" id="L398">            this.requiredSplit = requiredSplit;</span>
-<span class="fc" id="L399">        }</span>
+<span class="fc" id="L430">        Stage(Split requiredSplit) {</span>
+<span class="fc" id="L431">            this.requiredSplit = requiredSplit;</span>
+<span class="fc" id="L432">        }</span>
 
         Split requiredSplit() {
-<span class="fc" id="L402">            return requiredSplit;</span>
+<span class="fc" id="L435">            return requiredSplit;</span>
         }
     }
 }

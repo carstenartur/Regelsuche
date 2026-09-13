@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramFinalTestReservation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramFinalTestReservation.java</span></div><h1>EvolutionRewriteProgramFinalTestReservation.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import java.util.Map;
+import java.util.Objects;
+
+/** Durable record of the attempt; deserializing this record does not grant reveal authority. */
+public record EvolutionRewriteProgramFinalTestReservation(String schema, String runIdentity,
+    EvolutionRewriteProgramFinalTestPlan plan, String finalTestStatus, String contentHash) {
+    public static final String SCHEMA = &quot;regelsuche.evolution-rewrite-program-final-test-reservation/v1&quot;;
+    public static final String RESERVED = &quot;RESERVED&quot;;
+
+<span class="fc" id="L12">    public EvolutionRewriteProgramFinalTestReservation {</span>
+<span class="pc bpc" id="L13" title="2 of 4 branches missed.">        if (!SCHEMA.equals(schema) || !RESERVED.equals(finalTestStatus)</span>
+<span class="pc bpc" id="L14" title="1 of 2 branches missed.">                || !Objects.requireNonNull(plan, &quot;plan&quot;).runIdentity().equals(runIdentity)) {</span>
+<span class="nc" id="L15">            throw new IllegalArgumentException(&quot;invalid combined program FINAL TEST reservation&quot;);</span>
+        }
+<span class="fc" id="L17">        EvolutionProgramValidationJson.requireHash(contentHash, material(plan));</span>
+<span class="fc" id="L18">    }</span>
+
+    static EvolutionRewriteProgramFinalTestReservation create(EvolutionRewriteProgramFinalTestPlan plan) {
+<span class="fc" id="L21">        return new EvolutionRewriteProgramFinalTestReservation(SCHEMA, plan.runIdentity(), plan, RESERVED,</span>
+<span class="fc" id="L22">            EvolutionProgramValidationJson.hash(material(plan)));</span>
+    }
+
+<span class="fc" id="L25">    public String toCanonicalJson() { return EvolutionProgramValidationJson.write(this); }</span>
+    public static EvolutionRewriteProgramFinalTestReservation fromCanonicalJson(String json) {
+<span class="fc" id="L27">        return EvolutionProgramValidationJson.read(json, EvolutionRewriteProgramFinalTestReservation.class);</span>
+    }
+
+    private static Map&lt;String, Object&gt; material(EvolutionRewriteProgramFinalTestPlan plan) {
+<span class="fc" id="L31">        return EvolutionProgramValidationJson.material(SCHEMA, &quot;runIdentity&quot;, plan.runIdentity(),</span>
+            &quot;plan&quot;, plan, &quot;finalTestStatus&quot;, RESERVED);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

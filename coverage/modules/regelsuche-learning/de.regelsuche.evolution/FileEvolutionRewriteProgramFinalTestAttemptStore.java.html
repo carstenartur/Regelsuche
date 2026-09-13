@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileEvolutionRewriteProgramFinalTestAttemptStore.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">FileEvolutionRewriteProgramFinalTestAttemptStore.java</span></div><h1>FileEvolutionRewriteProgramFinalTestAttemptStore.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Objects;
+import java.util.Set;
+
+/** Private POSIX ledger. Reuse the authoritative directory across adapters, callers and restarts. */
+public final class FileEvolutionRewriteProgramFinalTestAttemptStore {
+    private final Path root;
+
+<span class="fc" id="L21">    public FileEvolutionRewriteProgramFinalTestAttemptStore(Path root) {</span>
+<span class="fc" id="L22">        this.root = Objects.requireNonNull(root, &quot;root&quot;).toAbsolutePath().normalize();</span>
+<span class="fc" id="L23">    }</span>
+
+    /** Consume the attempt without granting reveal or result-writing authority. */
+    public Reservation reserve(EvolutionRewriteProgramFinalTestPlan plan) throws IOException {
+<span class="fc" id="L27">        return reserve(plan, false);</span>
+    }
+
+    /** Verify the durable private predecessor before issuing an execution-capable reservation. */
+    public Reservation reserve(EvolutionRewriteProgramFinalTestPlan plan,
+        FileEvolutionRewriteProgramValidationAttemptStore validationStore) throws IOException {
+<span class="fc" id="L33">        var selected = Objects.requireNonNull(plan, &quot;plan&quot;).validationHandoff().selection();</span>
+<span class="fc" id="L34">        var persisted = Objects.requireNonNull(validationStore, &quot;validationStore&quot;).readSelection(selected.plan());</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (!persisted.equals(selected)) {</span>
+<span class="nc" id="L36">            throw new IOException(&quot;FINAL TEST handoff differs from the actual durable VALIDATION selection&quot;);</span>
+        }
+<span class="fc" id="L38">        return reserve(plan, true);</span>
+    }
+
+    private Reservation reserve(EvolutionRewriteProgramFinalTestPlan plan, boolean validationVerified) throws IOException {
+<span class="fc" id="L42">        var record = EvolutionRewriteProgramFinalTestReservation.create(Objects.requireNonNull(plan, &quot;plan&quot;));</span>
+<span class="fc" id="L43">        requireNoSymlinks(root);</span>
+<span class="fc" id="L44">        Files.createDirectories(root, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString(&quot;rwx------&quot;)));</span>
+<span class="fc" id="L45">        requirePrivateDirectory();</span>
+<span class="fc" id="L46">        writeCreateNew(reservationPath(plan), record.toCanonicalJson());</span>
+<span class="fc" id="L47">        return new Reservation(this, record, validationVerified);</span>
+    }
+
+    public void writeEvaluation(Reservation receipt, EvolutionRewriteProgramFinalTestEvaluation evaluation) throws IOException {
+<span class="fc" id="L51">        Objects.requireNonNull(receipt, &quot;receipt&quot;);</span>
+<span class="fc" id="L52">        Objects.requireNonNull(evaluation, &quot;evaluation&quot;);</span>
+<span class="pc bpc" id="L53" title="2 of 6 branches missed.">        if (receipt.owner != this || !receipt.validationVerified || !receipt.record.plan().equals(evaluation.plan())) {</span>
+<span class="fc" id="L54">            throw new IOException(&quot;FINAL TEST result requires the winning reservation and unchanged full selected identity&quot;);</span>
+        }
+<span class="fc" id="L56">        requireReservation(evaluation.plan());</span>
+<span class="fc" id="L57">        writeCreateNew(evaluationPath(evaluation.plan()), evaluation.toCanonicalJson());</span>
+<span class="fc" id="L58">    }</span>
+
+    public EvolutionRewriteProgramFinalTestEvaluation readEvaluation(EvolutionRewriteProgramFinalTestPlan expectedPlan)
+        throws IOException {
+<span class="fc" id="L62">        requireReservation(expectedPlan);</span>
+<span class="fc" id="L63">        return EvolutionRewriteProgramFinalTestEvaluation.fromCanonicalJson(</span>
+<span class="fc" id="L64">            readPrivate(evaluationPath(expectedPlan)), expectedPlan);</span>
+    }
+
+    public Path reservationPath(EvolutionRewriteProgramFinalTestPlan plan) {
+<span class="fc" id="L68">        return root.resolve(token(plan) + &quot;.reservation.json&quot;);</span>
+    }
+
+    public Path evaluationPath(EvolutionRewriteProgramFinalTestPlan plan) {
+<span class="fc" id="L72">        return root.resolve(token(plan) + &quot;.evaluation.json&quot;);</span>
+    }
+
+    private static String token(EvolutionRewriteProgramFinalTestPlan plan) {
+<span class="fc" id="L76">        return Objects.requireNonNull(plan, &quot;plan&quot;).runIdentity().substring(&quot;sha256:&quot;.length());</span>
+    }
+
+    private void requireReservation(EvolutionRewriteProgramFinalTestPlan expectedPlan) throws IOException {
+<span class="fc" id="L80">        requirePrivateDirectory();</span>
+<span class="fc" id="L81">        var reserved = EvolutionRewriteProgramFinalTestReservation.fromCanonicalJson(readPrivate(reservationPath(expectedPlan)));</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (!reserved.plan().equals(expectedPlan)) {</span>
+<span class="fc" id="L83">            throw new IOException(&quot;durable FINAL TEST reservation differs from externally expected full selected identity&quot;);</span>
+        }
+<span class="fc" id="L85">    }</span>
+
+    private void requirePrivateDirectory() throws IOException {
+<span class="fc" id="L88">        requireNoSymlinks(root);</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (!Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS)</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">                || !Files.getFileStore(root).supportsFileAttributeView(&quot;posix&quot;)) {</span>
+<span class="nc" id="L91">            throw new IOException(&quot;private FINAL TEST custody requires a POSIX directory&quot;);</span>
+        }
+<span class="fc" id="L93">        var permissions = Files.getPosixFilePermissions(root, LinkOption.NOFOLLOW_LINKS);</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (permissions.contains(java.nio.file.attribute.PosixFilePermission.GROUP_WRITE)</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">                || permissions.contains(java.nio.file.attribute.PosixFilePermission.OTHERS_WRITE)) {</span>
+<span class="nc" id="L96">            throw new IOException(&quot;FINAL TEST directory must not be writable by other users&quot;);</span>
+        }
+<span class="fc" id="L98">    }</span>
+
+    private void writeCreateNew(Path path, String text) throws IOException {
+<span class="fc" id="L101">        requirePrivateDirectory();</span>
+<span class="fc" id="L102">        ByteBuffer bytes = StandardCharsets.UTF_8.encode(text);</span>
+<span class="fc" id="L103">        try (var channel = FileChannel.open(path, Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE),</span>
+<span class="fc" id="L104">                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString(&quot;rw-------&quot;)))) {</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            while (bytes.hasRemaining()) { channel.write(bytes); }</span>
+<span class="fc" id="L106">            channel.force(true);</span>
+        }
+        // Persist every potentially new directory link, including the ledger root's parent entry.
+        // No reveal capability or successful result is returned if any required force fails.
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (Path directory = root; directory != null; directory = directory.getParent()) {</span>
+<span class="fc" id="L111">            try (var channel = FileChannel.open(directory, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L112">                channel.force(true);</span>
+<span class="fc" id="L113">            } catch (UnsupportedOperationException | IllegalArgumentException exception) {</span>
+<span class="fc" id="L114">                throw new IOException(&quot;FINAL TEST custody requires no-follow directory force&quot;, exception);</span>
+<span class="fc" id="L115">            }</span>
+        }
+<span class="fc" id="L117">    }</span>
+
+    static String readPrivate(Path path) throws IOException {
+<span class="fc" id="L120">        requireNoSymlinks(path);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">                || !Files.getFileStore(path).supportsFileAttributeView(&quot;posix&quot;)</span>
+<span class="fc" id="L123">                || !Files.getPosixFilePermissions(path, LinkOption.NOFOLLOW_LINKS)</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">                    .equals(PosixFilePermissions.fromString(&quot;rw-------&quot;))) {</span>
+<span class="fc" id="L125">            throw new IOException(&quot;held-out evidence requires a regular owner-only POSIX file&quot;);</span>
+        }
+<span class="fc" id="L127">        try (var channel = FileChannel.open(path, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)) {</span>
+            // Replacement decoding could alias changed bytes to an otherwise valid hashed authority.
+<span class="fc" id="L129">            return StandardCharsets.UTF_8.newDecoder()</span>
+<span class="fc" id="L130">                .onMalformedInput(CodingErrorAction.REPORT)</span>
+<span class="fc" id="L131">                .onUnmappableCharacter(CodingErrorAction.REPORT)</span>
+<span class="fc" id="L132">                .decode(ByteBuffer.wrap(Channels.newInputStream(channel).readAllBytes())).toString();</span>
+        }
+    }
+
+    private static void requireNoSymlinks(Path path) throws IOException {
+<span class="fc" id="L137">        Path current = path.toAbsolutePath().getRoot();</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        for (Path component : path.toAbsolutePath()) {</span>
+<span class="fc" id="L139">            current = current.resolve(component);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (Files.isSymbolicLink(current)) { throw new IOException(&quot;held-out custody cannot use symbolic links&quot;); }</span>
+<span class="fc" id="L141">        }</span>
+<span class="fc" id="L142">    }</span>
+
+    /** Private receipt; reveal requires verified durable VALIDATION in addition to exclusive forced creation. */
+    public static final class Reservation {
+        private final FileEvolutionRewriteProgramFinalTestAttemptStore owner;
+        private final EvolutionRewriteProgramFinalTestReservation record;
+        private final boolean validationVerified;
+        private Reservation(FileEvolutionRewriteProgramFinalTestAttemptStore owner,
+<span class="fc" id="L150">            EvolutionRewriteProgramFinalTestReservation record, boolean validationVerified) {</span>
+<span class="fc" id="L151">            this.owner = owner;</span>
+<span class="fc" id="L152">            this.record = record;</span>
+<span class="fc" id="L153">            this.validationVerified = validationVerified;</span>
+<span class="fc" id="L154">        }</span>
+        void requireRevealAuthority() {
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            if (!validationVerified) {</span>
+<span class="fc" id="L157">                throw new IllegalArgumentException(&quot;FINAL TEST reveal requires a verified durable VALIDATION predecessor&quot;);</span>
+            }
+<span class="fc" id="L159">        }</span>
+<span class="fc" id="L160">        public EvolutionRewriteProgramFinalTestReservation record() { return record; }</span>
+<span class="fc" id="L161">        public EvolutionRewriteProgramFinalTestPlan plan() { return record.plan(); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

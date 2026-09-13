@@ -208,9 +208,9 @@ public final class EvolutionRewriteProgramPopulationEngine {
                 state.trainEvaluations,
                 outcome));
 <span class="fc" id="L210">            state.population = selected;</span>
-<span class="pc bpc" id="L211" title="1 of 2 branches missed.">            if (outcome.terminal() != null) {</span>
-<span class="nc" id="L212">                state.terminalOutcome = outcome.terminal();</span>
-<span class="nc" id="L213">                return;</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">            if (outcome.terminal() != null) {</span>
+<span class="fc" id="L212">                state.terminalOutcome = outcome.terminal();</span>
+<span class="fc" id="L213">                return;</span>
             }
         }
 <span class="fc" id="L216">    }</span>
@@ -241,7 +241,7 @@ public final class EvolutionRewriteProgramPopulationEngine {
 <span class="fc bfc" id="L241" title="All 2 branches covered.">        for (EvolutionRewriteProgramCandidate parent : parents) {</span>
 <span class="fc" id="L242">            int remainingAttempts = plan.budget().maxMutationAttempts()</span>
                 - state.mutationAttempts;
-<span class="pc bpc" id="L244" title="1 of 4 branches missed.">            if (remainingAttempts &lt;= 0 || children.size() &gt;= poolLimit) {</span>
+<span class="fc bfc" id="L244" title="All 4 branches covered.">            if (remainingAttempts &lt;= 0 || children.size() &gt;= poolLimit) {</span>
 <span class="fc" id="L245">                break;</span>
             }
 <span class="fc" id="L247">            int maxProposals = Math.min(128, remainingAttempts);</span>
@@ -336,13 +336,13 @@ public final class EvolutionRewriteProgramPopulationEngine {
         }
 <span class="fc" id="L337">        state.trainEvaluations = Math.addExact(</span>
             state.trainEvaluations, executableCount);
-<span class="pc bpc" id="L339" title="1 of 2 branches missed.">        for (int index = executableCount; index &lt; pending.size(); index++) {</span>
-<span class="nc" id="L340">            EvolutionRewriteProgramCandidate candidate = pending.get(index);</span>
-<span class="nc" id="L341">            state.evaluations.put(</span>
-<span class="nc" id="L342">                candidate.contentHash(),</span>
-<span class="nc" id="L343">                CandidateEvaluation.blocked(</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        for (int index = executableCount; index &lt; pending.size(); index++) {</span>
+<span class="fc" id="L340">            EvolutionRewriteProgramCandidate candidate = pending.get(index);</span>
+<span class="fc" id="L341">            state.evaluations.put(</span>
+<span class="fc" id="L342">                candidate.contentHash(),</span>
+<span class="fc" id="L343">                CandidateEvaluation.blocked(</span>
                     candidate,
-<span class="nc" id="L345">                    List.of(&quot;TRAIN_EVALUATION_BUDGET_EXHAUSTED&quot;)));</span>
+<span class="fc" id="L345">                    List.of(&quot;TRAIN_EVALUATION_BUDGET_EXHAUSTED&quot;)));</span>
         }
 <span class="fc" id="L347">    }</span>
 
@@ -351,8 +351,8 @@ public final class EvolutionRewriteProgramPopulationEngine {
         List&lt;EvolutionRewriteProgramCandidate&gt; candidates,
         ProgramFitnessEvaluator evaluator
     ) {
-<span class="pc bpc" id="L354" title="1 of 2 branches missed.">        if (candidates.isEmpty()) {</span>
-<span class="nc" id="L355">            return List.of();</span>
+<span class="fc bfc" id="L354" title="All 2 branches covered.">        if (candidates.isEmpty()) {</span>
+<span class="fc" id="L355">            return List.of();</span>
         }
 <span class="fc" id="L357">        int parallelism = Math.min(</span>
 <span class="fc" id="L358">            plan.populationPolicy().parallelism(), candidates.size());</span>
@@ -468,9 +468,9 @@ public final class EvolutionRewriteProgramPopulationEngine {
 <span class="pc bpc" id="L468" title="1 of 2 branches missed.">                &lt; plan.populationPolicy().minimumDistinctAlphaStructures()) {</span>
 <span class="nc" id="L469">            return GenerationOutcome.DIVERSITY_FLOOR;</span>
         }
-<span class="pc bpc" id="L471" title="1 of 2 branches missed.">        if (state.trainEvaluations &gt;= plan.budget().maxTrainEvaluations()</span>
+<span class="fc bfc" id="L471" title="All 2 branches covered.">        if (state.trainEvaluations &gt;= plan.budget().maxTrainEvaluations()</span>
 <span class="pc bpc" id="L472" title="1 of 2 branches missed.">                || state.mutationAttempts &gt;= plan.budget().maxMutationAttempts()) {</span>
-<span class="nc" id="L473">            return GenerationOutcome.BUDGET_EXHAUSTED;</span>
+<span class="fc" id="L473">            return GenerationOutcome.BUDGET_EXHAUSTED;</span>
         }
 <span class="fc bfc" id="L475" title="All 2 branches covered.">        if (samePopulation(previous, selected)</span>
 <span class="pc bpc" id="L476" title="1 of 2 branches missed.">                &amp;&amp; mutationRound.children().isEmpty()) {</span>
@@ -591,7 +591,7 @@ public final class EvolutionRewriteProgramPopulationEngine {
 <span class="nc" id="L591">                throw new IllegalArgumentException(</span>
                     &quot;scalarFitness must be in [-1000,1000]&quot;);
             }
-<span class="pc bpc" id="L594" title="1 of 2 branches missed.">            if (evidenceHash != null) {</span>
+<span class="fc bfc" id="L594" title="All 2 branches covered.">            if (evidenceHash != null) {</span>
 <span class="fc" id="L595">                EvolutionGenome.requireSha256(evidenceHash, &quot;evidenceHash&quot;);</span>
             }
 <span class="fc" id="L597">            EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
@@ -646,7 +646,7 @@ public final class EvolutionRewriteProgramPopulationEngine {
             EvolutionRewriteProgramCandidate candidate,
             List&lt;String&gt; blockers
         ) {
-<span class="nc" id="L649">            return create(candidate, Map.of(), blockers, -1000, null);</span>
+<span class="fc" id="L649">            return create(candidate, Map.of(), blockers, -1000, null);</span>
         }
 
         private static CandidateEvaluation create(
@@ -716,8 +716,8 @@ public final class EvolutionRewriteProgramPopulationEngine {
 <span class="fc" id="L716">                })</span>
 <span class="fc" id="L717">                .stringArray(&quot;blockers&quot;, blockers)</span>
 <span class="fc" id="L718">                .property(&quot;scalarFitness&quot;, scalarFitness);</span>
-<span class="pc bpc" id="L719" title="1 of 2 branches missed.">            if (evidenceHash == null) {</span>
-<span class="nc" id="L720">                json.nullProperty(&quot;evidenceHash&quot;);</span>
+<span class="fc bfc" id="L719" title="All 2 branches covered.">            if (evidenceHash == null) {</span>
+<span class="fc" id="L720">                json.nullProperty(&quot;evidenceHash&quot;);</span>
             } else {
 <span class="fc" id="L722">                json.property(&quot;evidenceHash&quot;, evidenceHash);</span>
             }

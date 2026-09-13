@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramQualificationAssessment.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramQualificationAssessment.java</span></div><h1>EvolutionRewriteProgramQualificationAssessment.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/** Immutable native gate evidence, retaining the full selected identity without granting promotion authority. */
+public record EvolutionRewriteProgramQualificationAssessment(String schema, String repositoryRevision,
+    EvolutionRewriteProgramFinalTestEvaluation finalTest, EvolutionGenomeValidator.ValidationReport preflight,
+    List&lt;GeneAssessment&gt; genes, GateStatus preflightStatus, GateStatus proofStatus, GateStatus counterexampleStatus,
+    List&lt;String&gt; blockers, String externalNoveltyStatus, String promotionStatus, String publicEvidenceStatus,
+    String contentHash) {
+    public static final String SCHEMA = &quot;regelsuche.evolution-rewrite-program-qualification-assessment/v1&quot;;
+    private static final String NOT_EVALUATED = &quot;NOT_EVALUATED&quot;;
+
+<span class="fc" id="L16">    public EvolutionRewriteProgramQualificationAssessment {</span>
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) { throw new IllegalArgumentException(&quot;unsupported combined-program qualification assessment&quot;); }</span>
+<span class="fc" id="L18">        LearnedPatternAuthorizationJson.requireRevision(repositoryRevision, &quot;repositoryRevision&quot;);</span>
+<span class="fc" id="L19">        Objects.requireNonNull(finalTest, &quot;finalTest&quot;);</span>
+<span class="fc" id="L20">        genes = List.copyOf(Objects.requireNonNull(genes, &quot;genes&quot;));</span>
+<span class="fc" id="L21">        blockers = List.copyOf(Objects.requireNonNull(blockers, &quot;blockers&quot;));</span>
+<span class="fc" id="L22">        Objects.requireNonNull(preflightStatus, &quot;preflightStatus&quot;);</span>
+<span class="fc" id="L23">        Objects.requireNonNull(proofStatus, &quot;proofStatus&quot;);</span>
+<span class="fc" id="L24">        Objects.requireNonNull(counterexampleStatus, &quot;counterexampleStatus&quot;);</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        for (var status : List.of(externalNoveltyStatus, promotionStatus, publicEvidenceStatus)) {</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">            if (!NOT_EVALUATED.equals(status)) {</span>
+<span class="fc" id="L27">                throw new IllegalArgumentException(&quot;native assessment cannot claim external review or promotion authority&quot;);</span>
+            }
+<span class="fc" id="L29">        }</span>
+        // A self-rehashed PROVED summary is insufficient: rerun only public gene mathematics, never FINAL TEST.
+<span class="fc" id="L31">        var expected = EvolutionRewriteProgramQualificationService.evaluateNative(finalTest, repositoryRevision);</span>
+<span class="pc bpc" id="L32" title="1 of 4 branches missed.">        if (!Objects.equals(preflight, expected.preflight()) || !genes.equals(expected.genes())</span>
+<span class="pc bpc" id="L33" title="2 of 4 branches missed.">                || preflightStatus != expected.preflightStatus() || proofStatus != expected.proofStatus()</span>
+<span class="pc bpc" id="L34" title="2 of 4 branches missed.">                || counterexampleStatus != expected.counterexampleStatus() || !blockers.equals(expected.blockers())) {</span>
+<span class="fc" id="L35">            throw new IllegalArgumentException(&quot;qualification evidence differs from the existing native gate consumers&quot;);</span>
+        }
+<span class="fc" id="L37">        EvolutionProgramValidationJson.requireHash(contentHash, material(repositoryRevision, finalTest, expected));</span>
+<span class="fc" id="L38">    }</span>
+
+    static EvolutionRewriteProgramQualificationAssessment create(String revision,
+        EvolutionRewriteProgramFinalTestEvaluation finalTest) {
+<span class="fc" id="L42">        var actual = EvolutionRewriteProgramQualificationService.evaluateNative(finalTest, revision);</span>
+<span class="fc" id="L43">        return new EvolutionRewriteProgramQualificationAssessment(SCHEMA, revision, finalTest, actual.preflight(),</span>
+<span class="fc" id="L44">            actual.genes(), actual.preflightStatus(), actual.proofStatus(), actual.counterexampleStatus(), actual.blockers(),</span>
+            NOT_EVALUATED, NOT_EVALUATED, NOT_EVALUATED,
+<span class="fc" id="L46">            EvolutionProgramValidationJson.hash(material(revision, finalTest, actual)));</span>
+    }
+
+    public boolean nativeGatesPassed() {
+<span class="pc bpc" id="L50" title="2 of 8 branches missed.">        return finalTest.qualificationEligible() &amp;&amp; preflightStatus == GateStatus.PASSED</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">            &amp;&amp; proofStatus == GateStatus.PASSED &amp;&amp; counterexampleStatus == GateStatus.PASSED &amp;&amp; blockers.isEmpty();</span>
+    }
+
+<span class="fc" id="L54">    public String toCanonicalJson() { return EvolutionProgramValidationJson.write(this); }</span>
+
+    /** Structural import and native replay only; external artifact custody is checked by verifyAssessment. */
+    static EvolutionRewriteProgramQualificationAssessment fromCanonicalJson(String json) {
+<span class="fc" id="L58">        return EvolutionProgramValidationJson.read(json, EvolutionRewriteProgramQualificationAssessment.class);</span>
+    }
+
+<span class="fc" id="L61">    public enum GateStatus { PASSED, REJECTED, NOT_EVALUATED }</span>
+
+    public record GeneAssessment(String geneId, boolean referencedByProgram,
+        ExactPolynomialPatternIdentityVerifier.Verification proof, LearnedPatternCounterexampleEvidence counterexample,
+        GateStatus proofStatus, GateStatus counterexampleStatus, List&lt;String&gt; blockers) {
+<span class="fc" id="L66">        public GeneAssessment {</span>
+<span class="fc" id="L67">            EvolutionValidationArtifactSupport.requireText(geneId, &quot;geneId&quot;);</span>
+<span class="fc" id="L68">            Objects.requireNonNull(proofStatus, &quot;proofStatus&quot;);</span>
+<span class="fc" id="L69">            Objects.requireNonNull(counterexampleStatus, &quot;counterexampleStatus&quot;);</span>
+<span class="fc" id="L70">            blockers = List.copyOf(Objects.requireNonNull(blockers, &quot;blockers&quot;));</span>
+<span class="fc" id="L71">        }</span>
+    }
+
+    private static Map&lt;String, Object&gt; material(String revision, EvolutionRewriteProgramFinalTestEvaluation finalTest,
+        EvolutionRewriteProgramQualificationService.NativeGates gates) {
+<span class="fc" id="L76">        return EvolutionProgramValidationJson.material(SCHEMA, &quot;repositoryRevision&quot;, revision, &quot;finalTest&quot;, finalTest,</span>
+<span class="fc" id="L77">            &quot;preflight&quot;, gates.preflight(), &quot;genes&quot;, gates.genes(), &quot;preflightStatus&quot;, gates.preflightStatus(),</span>
+<span class="fc" id="L78">            &quot;proofStatus&quot;, gates.proofStatus(), &quot;counterexampleStatus&quot;, gates.counterexampleStatus(), &quot;blockers&quot;, gates.blockers(),</span>
+            &quot;externalNoveltyStatus&quot;, NOT_EVALUATED, &quot;promotionStatus&quot;, NOT_EVALUATED, &quot;publicEvidenceStatus&quot;, NOT_EVALUATED);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TargetFreeSearchExecution.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">TargetFreeSearchExecution.java</span></div><h1>TargetFreeSearchExecution.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.sha256;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole.*;
+
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.input.*;
+import de.regelsuche.knowledge.KnowledgePackSelection;
+import de.regelsuche.moves.enumerate.TreePosition;
+import de.regelsuche.parse.*;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.strategy.*;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.*;
+import de.regelsuche.search.telemetry.*;
+import de.regelsuche.transform.*;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+
+/** Native target-free execution evidence. Deserialization produces observations, never executable transformations. */
+public final class TargetFreeSearchExecution {
+    public static final String SCHEMA = &quot;regelsuche.target-free-search-execution/v1&quot;;
+    public static final int MAX_BYTES = 1_048_576;
+    public static final String CLAIM_BOUNDARY = &quot;Observed native target-free search, generation occurrences and retained execution paths; &quot;
+        + &quot;not complete closure, formal proof, recognition, novelty, salience qualification or search superiority.&quot;;
+    public static final String RECORDING_OVERHEAD = &quot;Occurrence observation, telemetry, serialization and persistence add work; &quot;
+        + &quot;runtime cost is not measured and is not included in generated-candidate or primitive-path counters.&quot;;
+<span class="fc" id="L32">    private static final String STRATEGY = BestFirstSearchStrategy.class.getName();</span>
+    private static final String PROFILE = &quot;CORE_WITH_OBSERVED_OCCURRENCES/v1&quot;;
+    private static final int MAX_AST_INCREASE = 12;
+<span class="fc" id="L35">    private static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L36">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L37">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
+<span class="fc" id="L38">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)</span>
+<span class="fc" id="L39">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
+<span class="fc" id="L40">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();</span>
+    private TargetFreeSearchExecution() { }
+
+    static RunResult run(String source, SearchHeuristic heuristic, String repositoryRevision) {
+<span class="fc" id="L44">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L45">        requireAdmission(source, heuristic);</span>
+<span class="fc" id="L46">        var input = RepresentationDiscoveryRunInput.expression(source, List.of());</span>
+<span class="fc" id="L47">        source = input.displayText();</span>
+<span class="fc" id="L48">        var boundary = RepresentationDiscoveryInformationBoundary.fromKnowledgePacks(</span>
+            RepresentationDiscoveryInformationBoundary.Track.R1_TARGET_FREE_COMPRESSION, KnowledgePackSelection.CORE);
+<span class="fc" id="L50">        var engine = new AstRewriteTransformationEngine(boundary.candidateFormationRules(), MAX_AST_INCREASE, heuristic.maxCandidatesPerState());</span>
+<span class="fc" id="L51">        var generations = new ArrayList&lt;Generation&gt;();</span>
+<span class="fc" id="L52">        var byTransformation = new IdentityHashMap&lt;Transformation, Integer&gt;();</span>
+<span class="fc" id="L53">        var events = new ArrayList&lt;Event&gt;();</span>
+<span class="fc" id="L54">        int[] calls = {0};</span>
+<span class="fc" id="L55">        TransformationEngine observed = expression -&gt; {</span>
+<span class="fc" id="L56">            int call = calls[0]++;</span>
+<span class="fc" id="L57">            return engine.transformWithOccurrences(expression, generated -&gt; {</span>
+<span class="fc" id="L58">                int sequence = generations.size();</span>
+<span class="fc" id="L59">                generations.add(Generation.capture(sequence, call, generated));</span>
+<span class="fc" id="L60">                byTransformation.put(generated.transformation(), sequence);</span>
+<span class="fc" id="L61">            });</span>
+        };
+<span class="fc" id="L63">        var problem = new SearchProblem(source, observed, new ExpressionScorer(), new ExpressionCanonicalizer(), heuristic)</span>
+<span class="fc" id="L64">            .withObserver(event -&gt; events.add(Event.capture(event)));</span>
+<span class="fc" id="L65">        var result = new BestFirstSearchStrategy().searchWithDiagnostics(problem);</span>
+<span class="fc" id="L66">        var states = new ArrayList&lt;State&gt;();</span>
+<span class="fc" id="L67">        var stateByPath = new HashMap&lt;List&lt;Transformation&gt;, String&gt;();</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (var state : result.states()) {</span>
+<span class="fc" id="L69">            String observation = SearchStateReplay.toCanonicalJson(state);</span>
+<span class="fc" id="L70">            var sequences = state.transformations().stream().map(step -&gt; Objects.requireNonNull(byTransformation.get(step), &quot;unobserved transformation&quot;)).toList();</span>
+<span class="fc" id="L71">            var retained = new State(states.size(), sha256(observation), observation, sequences, state.recordedExecution().orElseThrow().contentHash());</span>
+<span class="fc" id="L72">            states.add(retained); stateByPath.put(state.transformations(), retained.stateId());</span>
+<span class="fc" id="L73">        }</span>
+<span class="fc" id="L74">        var transitions = new ArrayList&lt;Transition&gt;();</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        for (int i = 0; i &lt; states.size(); i++) {</span>
+<span class="fc" id="L76">            var state = result.states().get(i);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            if (state.depth() == 0) continue;</span>
+<span class="fc" id="L78">            String parent = Objects.requireNonNull(stateByPath.get(state.transformations().subList(0, state.depth() - 1)), &quot;missing explored parent&quot;);</span>
+<span class="fc" id="L79">            transitions.add(new Transition(transitions.size() + 1, parent, states.get(i).stateId(), states.get(i).generationSequences().getLast()));</span>
+        }
+<span class="fc" id="L81">        var plan = RepresentationDiscoveryRunPlan.create(boundary.track(), boundary.contentHash(), boundary.candidateFormationRuleInventoryHash(),</span>
+<span class="fc" id="L82">            boundary.candidateFormationSelectionCommitment(), boundary.postFreezeCatalogCommitment(), STRATEGY, PROFILE,</span>
+<span class="fc" id="L83">            &quot;UNTARGETED_NATIVE_PRIORITY&quot;, sha256(canonical(heuristic)), 0, List.of(AstRewriteTransformationEngine.class.getName()));</span>
+<span class="fc" id="L84">        var work = new Work(calls[0], generations.size(), generations.stream().map(Generation::work).reduce(ExecutionWork.ZERO, ExecutionWork::plus));</span>
+<span class="fc" id="L85">        var content = new Content(SCHEMA, input, plan, heuristic,</span>
+<span class="fc" id="L86">            RepresentationDiscoveryRevisionEvidence.create(repositoryRevision, SCHEMA), result.status(), result.bestDistance(),</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">            result.bestState() == null ? &quot;&quot; : sha256(SearchStateReplay.toCanonicalJson(result.bestState())), result.metrics(),</span>
+            states, transitions, generations, events, work, &quot;NOT_EVALUATED&quot;, RECORDING_OVERHEAD, CLAIM_BOUNDARY);
+<span class="fc" id="L89">        var artifact = new Artifact(content, sha256(canonical(content)));</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (artifact.toCanonicalJson().getBytes(StandardCharsets.UTF_8).length &gt; MAX_BYTES) {</span>
+<span class="nc" id="L91">            throw new IllegalArgumentException(&quot;observed execution exceeds the bounded dossier storage admission&quot;);</span>
+        }
+<span class="fc" id="L93">        return new RunResult(result, artifact, workspace(artifact));</span>
+    }
+
+    public static final class RunResult {
+        private final GoalSearchResult searchResult;
+        private final Artifact artifact;
+        private final RepresentationDiscoveryRunWorkspace workspace;
+<span class="fc" id="L100">        private RunResult(GoalSearchResult searchResult, Artifact artifact, RepresentationDiscoveryRunWorkspace workspace) {</span>
+<span class="fc" id="L101">            this.searchResult = Objects.requireNonNull(searchResult);</span>
+<span class="fc" id="L102">            this.artifact = Objects.requireNonNull(artifact);</span>
+<span class="fc" id="L103">            this.workspace = Objects.requireNonNull(workspace);</span>
+<span class="fc" id="L104">            requireBound(workspace, artifact);</span>
+<span class="fc" id="L105">        }</span>
+<span class="fc" id="L106">        public GoalSearchResult searchResult() { return searchResult; }</span>
+<span class="fc" id="L107">        public Artifact artifact() { return artifact; }</span>
+<span class="fc" id="L108">        public RepresentationDiscoveryRunWorkspace workspace() { return workspace; }</span>
+    }
+
+    public record Artifact(Content content, String contentHash) {
+<span class="fc" id="L112">        public Artifact {</span>
+<span class="fc" id="L113">            Objects.requireNonNull(content, &quot;content&quot;);</span>
+<span class="fc" id="L114">            content.validate();</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">            if (!sha256(canonical(content)).equals(contentHash)) throw new IllegalArgumentException(&quot;target-free execution hash mismatch&quot;);</span>
+<span class="fc" id="L116">        }</span>
+<span class="fc" id="L117">        public String toCanonicalJson() { return canonical(this); }</span>
+        /** Explicit additional execution. Stored bytes cannot supply the independent comparison result. */
+        public RunResult replay() {
+<span class="fc" id="L120">            var replayed = run(content.input().displayText(), content.heuristic(), content.revisions().repositoryCommit());</span>
+<span class="fc" id="L121">            requireReplay(replayed.artifact());</span>
+<span class="fc" id="L122">            return replayed;</span>
+        }
+        private void requireReplay(Artifact independentlyExecuted) {
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            if (!toCanonicalJson().equals(Objects.requireNonNull(independentlyExecuted).toCanonicalJson())) {</span>
+<span class="fc" id="L126">                throw new IllegalArgumentException(&quot;native execution replay differs in trace, occurrences, paths, work or configuration&quot;);</span>
+            }
+<span class="fc" id="L128">        }</span>
+    }
+
+    public static Artifact fromCanonicalBytes(RepresentationDiscoveryRunWorkspace workspace, byte[] bytes) {
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (bytes.length &gt; MAX_BYTES) throw new IllegalArgumentException(&quot;target-free execution exceeds 1 MiB&quot;);</span>
+        try {
+<span class="fc" id="L134">            var artifact = JSON.readValue(bytes, Artifact.class);</span>
+<span class="pc bpc" id="L135" title="2 of 4 branches missed.">            if (artifact == null || (!Arrays.equals(bytes, artifact.toCanonicalJson().getBytes(StandardCharsets.UTF_8))</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">                    &amp;&amp; !Arrays.equals(bytes, (artifact.toCanonicalJson() + &quot;\n&quot;).getBytes(StandardCharsets.UTF_8)))) {</span>
+<span class="nc" id="L137">                throw new IllegalArgumentException(&quot;target-free execution must be canonical UTF-8 JSON&quot;);</span>
+            }
+<span class="fc" id="L139">            requireBound(workspace, artifact);</span>
+<span class="fc" id="L140">            return artifact;</span>
+<span class="fc" id="L141">        } catch (IOException exception) { throw new IllegalArgumentException(&quot;invalid target-free execution artifact&quot;, exception); }</span>
+    }
+
+    private static void requireBound(RepresentationDiscoveryRunWorkspace supplied, Artifact artifact) {
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (!workspace(artifact).equals(supplied)) throw new IllegalArgumentException(&quot;native execution belongs to another workspace&quot;);</span>
+<span class="fc" id="L146">    }</span>
+
+    private static RepresentationDiscoveryRunWorkspace workspace(Artifact artifact) {
+<span class="fc" id="L149">        var c = artifact.content();</span>
+<span class="fc" id="L150">        var roles = Arrays.stream(RepresentationDiscoveryArtifactReference.ArtifactRole.values()).map(role -&gt;</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">            Set.of(SEARCH_GRAPH, PROGRESS_LEDGER, REPRESENTATION_CANDIDATES, CANDIDATE_DOSSIERS, PATH_REPLAY).contains(role)</span>
+<span class="fc" id="L152">                ? RepresentationDiscoveryArtifactReference.available(role, SCHEMA, artifact.contentHash())</span>
+<span class="fc" id="L153">                : RepresentationDiscoveryArtifactReference.notProduced(role)).toList();</span>
+<span class="fc" id="L154">        return RepresentationDiscoveryRunWorkspace.create(c.input(), c.plan(), RepresentationDiscoveryRunOutcome.create(</span>
+            RepresentationDiscoveryRunOutcome.TerminalState.COMPLETED, &quot;UNTARGETED_NATIVE_EXECUTION_RETURNED&quot;,
+<span class="fc" id="L156">            (long) c.heuristic().maxVisitedExpressions() * c.heuristic().maxCandidatesPerState(), c.work().generatedTransformations(),</span>
+<span class="fc" id="L157">            artifact.contentHash(), sha256(RECORDING_OVERHEAD)), roles, c.revisions());</span>
+    }
+
+    public record Content(String schema, RepresentationDiscoveryRunInput input, RepresentationDiscoveryRunPlan plan,
+            SearchHeuristic heuristic, RepresentationDiscoveryRevisionEvidence revisions, GoalStatus goalStatus, int bestDistance,
+            String bestStateId, GoalMetrics metrics, List&lt;State&gt; states, List&lt;Transition&gt; transitions, List&lt;Generation&gt; generations,
+            List&lt;Event&gt; events, Work work, String stageAssessment, String recordingOverhead, String claimBoundary) {
+<span class="fc" id="L164">        public Content {</span>
+<span class="fc" id="L165">            states = List.copyOf(states); transitions = List.copyOf(transitions); generations = List.copyOf(generations); events = List.copyOf(events);</span>
+<span class="fc" id="L166">        }</span>
+        private void validate() {
+<span class="pc bpc" id="L168" title="3 of 6 branches missed.">            if (!SCHEMA.equals(schema) || !CLAIM_BOUNDARY.equals(claimBoundary) || !RECORDING_OVERHEAD.equals(recordingOverhead)</span>
+<span class="pc bpc" id="L169" title="3 of 6 branches missed.">                    || !&quot;NOT_EVALUATED&quot;.equals(stageAssessment) || goalStatus != GoalStatus.UNTARGETED || bestDistance != -1</span>
+<span class="pc bpc" id="L170" title="2 of 4 branches missed.">                    || !STRATEGY.equals(plan.searchStrategyId()) || !PROFILE.equals(plan.searchProfileId())</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">                    || plan.informationTrack() != RepresentationDiscoveryInformationBoundary.Track.R1_TARGET_FREE_COMPRESSION</span>
+<span class="pc bpc" id="L172" title="2 of 4 branches missed.">                    || !&quot;UNTARGETED_NATIVE_PRIORITY&quot;.equals(plan.objectiveId()) || plan.deterministicSeed() != 0</span>
+<span class="pc bpc" id="L173" title="2 of 4 branches missed.">                    || !plan.backendIdentities().equals(List.of(AstRewriteTransformationEngine.class.getName())) || !input.assumptions().isEmpty()</span>
+<span class="pc bpc" id="L174" title="2 of 4 branches missed.">                    || !sha256(canonical(heuristic)).equals(plan.budgetHash()) || !SCHEMA.equals(revisions.applicationRevision())) {</span>
+<span class="nc" id="L175">                throw new IllegalArgumentException(&quot;unsupported native execution contract&quot;);</span>
+            }
+<span class="fc" id="L177">            requireAdmission(input.displayText(), heuristic);</span>
+<span class="pc bpc" id="L178" title="3 of 6 branches missed.">            if (states.isEmpty() || states.size() &gt; heuristic.maxVisitedExpressions() || transitions.size() != states.size() - 1</span>
+<span class="pc bpc" id="L179" title="2 of 4 branches missed.">                    || events.size() &lt; 2 || events.getFirst().type() != SearchEventType.SEARCH_STARTED</span>
+<span class="pc bpc" id="L180" title="2 of 4 branches missed.">                    || events.getLast().type() != SearchEventType.SEARCH_FINISHED || metrics.exploredStates() != states.size()</span>
+<span class="pc bpc" id="L181" title="2 of 4 branches missed.">                    || metrics.expandedStates() != work.engineCalls() || metrics.generatedTransformations() != generations.size()</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">                    || work.generatedTransformations() != generations.size()</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">                    || generations.size() &gt; (long) heuristic.maxVisitedExpressions() * heuristic.maxCandidatesPerState()) {</span>
+<span class="nc" id="L184">                throw new IllegalArgumentException(&quot;native execution counters or trace membership differ&quot;);</span>
+            }
+<span class="pc bpc" id="L186" title="2 of 6 branches missed.">            for (JsonNode value : JSON.valueToTree(metrics)) if (!value.isIntegralNumber() || value.longValue() &lt; 0) {</span>
+<span class="nc" id="L187">                throw new IllegalArgumentException(&quot;invalid native search metrics&quot;);</span>
+            }
+<span class="fc" id="L189">            var ids = new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L190">            var byPath = new HashMap&lt;List&lt;Integer&gt;, String&gt;();</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            for (int i = 0; i &lt; generations.size(); i++) {</span>
+<span class="fc" id="L192">                var generation = generations.get(i);</span>
+<span class="pc bpc" id="L193" title="3 of 6 branches missed.">                if (generation.sequence() != i || generation.engineCall() &lt; 0 || generation.engineCall() &gt;= work.engineCalls()) {</span>
+<span class="nc" id="L194">                    throw new IllegalArgumentException(&quot;invalid generation identity&quot;);</span>
+                }
+<span class="fc" id="L196">                generation.validate();</span>
+            }
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">            if (!generations.stream().map(Generation::work).reduce(ExecutionWork.ZERO, ExecutionWork::plus).equals(work.returnedCandidateWork())) {</span>
+<span class="nc" id="L199">                throw new IllegalArgumentException(&quot;generated candidate work differs&quot;);</span>
+            }
+<span class="fc bfc" id="L201" title="All 2 branches covered.">            for (int i = 0; i &lt; states.size(); i++) {</span>
+<span class="fc" id="L202">                var state = states.get(i);</span>
+<span class="pc bpc" id="L203" title="2 of 4 branches missed.">                if (state.sequence() != i || !ids.add(state.stateId())) throw new IllegalArgumentException(&quot;invalid state identity&quot;);</span>
+<span class="fc" id="L204">                state.validate(input.displayText(), generations);</span>
+<span class="pc bpc" id="L205" title="1 of 4 branches missed.">                if (i == 0 &amp;&amp; !state.generationSequences().isEmpty()) throw new IllegalArgumentException(&quot;first state must be root&quot;);</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">                if (i &gt; 0) {</span>
+<span class="fc" id="L207">                    var edge = transitions.get(i - 1);</span>
+<span class="fc" id="L208">                    var path = state.generationSequences();</span>
+<span class="pc bpc" id="L209" title="3 of 6 branches missed.">                    if (path.isEmpty() || edge.sequence() != i || !edge.toStateId().equals(state.stateId())</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                            || edge.generationSequence() != path.getLast()</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">                            || !Objects.equals(edge.fromStateId(), byPath.get(path.subList(0, path.size() - 1)))) {</span>
+<span class="nc" id="L212">                        throw new IllegalArgumentException(&quot;explored transition differs from the retained execution path&quot;);</span>
+                    }
+                }
+<span class="fc" id="L215">                byPath.put(state.generationSequences(), state.stateId());</span>
+            }
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">            if (!ids.contains(bestStateId)) throw new IllegalArgumentException(&quot;best state is not retained&quot;);</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            for (int i = 0; i &lt; events.size(); i++) {</span>
+<span class="fc" id="L219">                var event = events.get(i);</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">                if (event.sequence() != i) throw new IllegalArgumentException(&quot;native event sequence differs&quot;);</span>
+<span class="fc" id="L221">                var execution = RecordedExecution.fromCanonicalJson(event.execution());</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">                if (!execution.transformedExpression().equals(event.expression())) throw new IllegalArgumentException(&quot;event output differs from execution&quot;);</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">                if (event.type() == SearchEventType.TRANSFORMATION_GENERATED) {</span>
+<span class="pc bpc" id="L224" title="2 of 4 branches missed.">                    if (!execution.sourceExpression().equals(event.parentExpression()) || generations.stream().noneMatch(g -&gt; g.execution().equals(event.execution()))) {</span>
+<span class="nc" id="L225">                        throw new IllegalArgumentException(&quot;native generation event lacks its actual engine occurrence&quot;);</span>
+                    }
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">                } else if (!execution.sourceExpression().equals(input.displayText())) throw new IllegalArgumentException(&quot;event execution belongs to another source&quot;);</span>
+            }
+<span class="pc bpc" id="L229" title="1 of 4 branches missed.">            if (events.stream().filter(e -&gt; e.type() == SearchEventType.STATE_VISITED).count() != states.size()</span>
+<span class="pc bpc" id="L230" title="1 of 4 branches missed.">                    || events.stream().filter(e -&gt; e.type() == SearchEventType.STATE_EXPANDED).count() != work.engineCalls()</span>
+<span class="pc bpc" id="L231" title="1 of 4 branches missed.">                    || events.stream().filter(e -&gt; e.type() == SearchEventType.STATE_ENQUEUED).count() != metrics.enqueuedStates()) {</span>
+<span class="nc" id="L232">                throw new IllegalArgumentException(&quot;native event accounting differs from result metrics&quot;);</span>
+            }
+<span class="fc" id="L234">        }</span>
+    }
+
+    public record State(int sequence, String stateId, String canonicalStateJson, List&lt;Integer&gt; generationSequences, String executionHash) {
+<span class="fc" id="L238">        public State { generationSequences = List.copyOf(generationSequences); }</span>
+        private void validate(String source, List&lt;Generation&gt; generations) {
+<span class="fc" id="L240">            var observation = tree(canonicalStateJson);</span>
+<span class="pc bpc" id="L241" title="2 of 4 branches missed.">            if (!sha256(canonicalStateJson).equals(stateId) || !SearchStateReplay.SCHEMA.equals(observation.path(&quot;schema&quot;).asText())</span>
+<span class="pc bpc" id="L242" title="2 of 4 branches missed.">                    || !observation.path(&quot;executionRetained&quot;).asBoolean() || observation.path(&quot;depth&quot;).asInt(-1) != generationSequences.size()) {</span>
+<span class="nc" id="L243">                throw new IllegalArgumentException(&quot;invalid native state observation&quot;);</span>
+            }
+<span class="fc" id="L245">            var execution = RecordedExecution.fromCanonicalJson(observation.required(&quot;execution&quot;).asText());</span>
+<span class="fc" id="L246">            execution.requireEndpoints(source, observation.required(&quot;expression&quot;).asText());</span>
+<span class="pc bpc" id="L247" title="2 of 4 branches missed.">            if (!execution.contentHash().equals(executionHash) || execution.edgeCount() != generationSequences.size()) {</span>
+<span class="nc" id="L248">                throw new IllegalArgumentException(&quot;state execution binding differs&quot;);</span>
+            }
+<span class="fc" id="L250">            var path = new ArrayList&lt;String&gt;(); path.add(source);</span>
+<span class="fc" id="L251">            var rules = new ArrayList&lt;String&gt;(); var applications = new TreeSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">            var steps = execution.edgeCount() == 0 ? JSON.createArrayNode() : tree(execution.provenance()).required(&quot;steps&quot;);</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">            for (int i = 0; i &lt; generationSequences.size(); i++) {</span>
+<span class="fc" id="L254">                int index = generationSequences.get(i);</span>
+<span class="pc bpc" id="L255" title="2 of 4 branches missed.">                if (index &lt; 0 || index &gt;= generations.size()) throw new IllegalArgumentException(&quot;unknown generation in path&quot;);</span>
+<span class="fc" id="L256">                var generation = generations.get(index);</span>
+<span class="fc" id="L257">                var incoming = RecordedExecution.fromCanonicalJson(generation.execution());</span>
+<span class="pc bpc" id="L258" title="2 of 4 branches missed.">                if (!incoming.sourceExpression().equals(path.getLast()) || !steps.get(i).equals(tree(incoming.provenance()).required(&quot;steps&quot;).get(0))) {</span>
+<span class="nc" id="L259">                    throw new IllegalArgumentException(&quot;state path substituted a generation or occurrence&quot;);</span>
+                }
+<span class="fc" id="L261">                path.add(generation.transformedExpression()); rules.add(generation.ruleId()); applications.add(generation.applicationKey());</span>
+            }
+<span class="pc bpc" id="L263" title="2 of 4 branches missed.">            if (!JSON.valueToTree(path).equals(observation.required(&quot;path&quot;)) || !JSON.valueToTree(rules).equals(observation.required(&quot;appliedRuleIds&quot;))</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">                    || !JSON.valueToTree(applications).equals(observation.required(&quot;applicationKeys&quot;))</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">                    || !textList(observation.required(&quot;assumptions&quot;)).containsAll(execution.assumptions())) {</span>
+<span class="nc" id="L266">                throw new IllegalArgumentException(&quot;native state path, identity set or assumptions differ&quot;);</span>
+            }
+<span class="fc" id="L268">        }</span>
+    }
+    /** Only transitions to actually visited states; engine generations and enqueues remain separate evidence. */
+<span class="fc" id="L271">    public record Transition(int sequence, String fromStateId, String toStateId, int generationSequence) { }</span>
+
+    public record Generation(int sequence, int engineCall, String sourceExpression, List&lt;Integer&gt; occurrencePath,
+            String sourceOccurrenceExpression, String transformedOccurrenceExpression, String transformedExpression,
+            String ruleId, String applicationKey, String execution, String executionHash, ExecutionWork work) {
+<span class="fc" id="L276">        public Generation { occurrencePath = List.copyOf(occurrencePath); }</span>
+        private static Generation capture(int sequence, int call, AstRewriteTransformationEngine.GeneratedTransformation generated) {
+<span class="fc" id="L278">            var step = generated.transformation();</span>
+<span class="fc" id="L279">            var execution = RecordedExecution.capture(generated.sourceExpression(), List.of(step));</span>
+<span class="fc" id="L280">            return new Generation(sequence, call, generated.sourceExpression(), generated.position().path(), generated.sourceOccurrenceExpression(),</span>
+<span class="fc" id="L281">                generated.transformedOccurrenceExpression(), step.transformedExpression(), step.rule(), step.applicationKey(),</span>
+<span class="fc" id="L282">                execution.toCanonicalJson(), execution.contentHash(), execution.work());</span>
+        }
+        private void validate() {
+<span class="fc" id="L285">            var retained = RecordedExecution.fromCanonicalJson(execution);</span>
+<span class="fc" id="L286">            retained.requireEndpoints(sourceExpression, transformedExpression);</span>
+<span class="pc bpc" id="L287" title="3 of 6 branches missed.">            if (retained.edgeCount() != 1 || !retained.contentHash().equals(executionHash) || !retained.work().equals(work)) {</span>
+<span class="nc" id="L288">                throw new IllegalArgumentException(&quot;generation execution root or work differs&quot;);</span>
+            }
+<span class="fc" id="L290">            var step = tree(retained.provenance()).required(&quot;steps&quot;).get(0);</span>
+<span class="pc bpc" id="L291" title="2 of 4 branches missed.">            if (!step.path(&quot;rule&quot;).asText().equals(ruleId) || !step.path(&quot;applicationKey&quot;).asText().equals(applicationKey)) {</span>
+<span class="nc" id="L292">                throw new IllegalArgumentException(&quot;generation application identity differs&quot;);</span>
+            }
+<span class="fc" id="L294">            var parser = new ExpressionParser();</span>
+<span class="fc" id="L295">            var root = parser.parse(new InputRequest(InputType.TERM, sourceExpression)).terms().getFirst();</span>
+<span class="fc" id="L296">            var replacement = parser.parse(new InputRequest(InputType.TERM, transformedOccurrenceExpression)).terms().getFirst();</span>
+<span class="fc" id="L297">            var position = new TreePosition(occurrencePath, sourceOccurrenceExpression);</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">            if (!position.subtreeAt(root).map(ExpressionFormatter::format).filter(sourceOccurrenceExpression::equals).isPresent()</span>
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">                    || !position.replaceAt(root, replacement).rewrittenRoot().map(ExpressionFormatter::format).filter(transformedExpression::equals).isPresent()) {</span>
+<span class="nc" id="L300">                throw new IllegalArgumentException(&quot;generation source occurrence does not produce its recorded output&quot;);</span>
+            }
+<span class="fc" id="L302">        }</span>
+    }
+
+    public record Event(long sequence, SearchEventType type, String expression, String canonicalHash, int depth, int score,
+            String parentCanonicalHash, String parentExpression, String ruleId, RewriteKind rewriteKind, boolean mayIncreaseComplexity,
+            int estimatedCostDelta, boolean equivalencePreservingByConstruction, List&lt;String&gt; assumptions, int frontierSize,
+            int visitedCount, int generatedCount, String pruningReason, String execution) {
+<span class="fc" id="L309">        public Event { assumptions = List.copyOf(assumptions); }</span>
+        private static Event capture(SearchEvent e) {
+<span class="fc" id="L311">            return new Event(e.sequence(), e.type(), e.expression(), e.canonicalHash(), e.depth(), e.score(), e.parentCanonicalHash(),</span>
+<span class="fc" id="L312">                e.parentExpression(), e.ruleId(), e.rewriteKind(), e.mayIncreaseComplexity(), e.estimatedCostDelta(),</span>
+<span class="fc" id="L313">                e.equivalencePreservingByConstruction(), e.assumptions(), e.frontierSize(), e.visitedCount(), e.generatedCount(),</span>
+<span class="fc" id="L314">                e.pruningReason(), Objects.requireNonNull(e.execution(), &quot;native event lacks retained execution&quot;).toCanonicalJson());</span>
+        }
+    }
+    /** Returned engine candidates, counted once per generation; never sums shared prefixes of retained state paths. */
+<span class="fc" id="L318">    public record Work(int engineCalls, int generatedTransformations, ExecutionWork returnedCandidateWork) { }</span>
+
+    private static void requireAdmission(String source, SearchHeuristic h) {
+<span class="fc" id="L321">        Objects.requireNonNull(h, &quot;heuristic&quot;);</span>
+<span class="pc bpc" id="L322" title="4 of 8 branches missed.">        if (source.isBlank() || source.length() &gt; 2048 || h.maxDepth() &gt; 8 || h.maxVisitedExpressions() &gt; 64</span>
+<span class="pc bpc" id="L323" title="3 of 6 branches missed.">                || h.maxCandidatesPerState() &gt; 32 || h.maxExpandingSteps() &gt; 8 || h.beamWidth() &gt; 64) {</span>
+<span class="nc" id="L324">            throw new IllegalArgumentException(&quot;source or heuristic exceeds bounded native trace admission&quot;);</span>
+        }
+<span class="fc" id="L326">    }</span>
+    private static List&lt;String&gt; textList(JsonNode value) {
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">        if (!value.isArray()) throw new IllegalArgumentException(&quot;expected string array&quot;);</span>
+<span class="fc" id="L329">        var result = new ArrayList&lt;String&gt;();</span>
+<span class="pc bpc" id="L330" title="3 of 4 branches missed.">        for (var item : value) { if (!item.isTextual()) throw new IllegalArgumentException(&quot;expected string&quot;); result.add(item.textValue()); }</span>
+<span class="fc" id="L331">        return List.copyOf(result);</span>
+    }
+    private static JsonNode tree(String value) {
+<span class="pc bpc" id="L334" title="2 of 4 branches missed.">        try { var node = JSON.readTree(value); if (node == null || !node.isObject()) throw new IllegalArgumentException(&quot;expected JSON object&quot;); return node; }</span>
+<span class="nc" id="L335">        catch (IOException exception) { throw new IllegalArgumentException(&quot;invalid native observation JSON&quot;, exception); }</span>
+    }
+    private static String canonical(Object value) {
+<span class="fc" id="L338">        try { return JSON.writeValueAsString(value); }</span>
+<span class="nc" id="L339">        catch (IOException exception) { throw new IllegalArgumentException(&quot;unable to render native execution&quot;, exception); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

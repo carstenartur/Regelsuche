@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TargetFreeSearchArtifactStore.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">TargetFreeSearchArtifactStore.java</span></div><h1>TargetFreeSearchArtifactStore.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.util.Optional;
+
+/** The native artifact uses the existing run-bound dossier location and immutable file convention. */
+public final class TargetFreeSearchArtifactStore {
+    private TargetFreeSearchArtifactStore() { }
+
+    public static synchronized Optional&lt;String&gt; read(Path runs, RepresentationDiscoveryRunWorkspace run) throws IOException {
+<span class="fc" id="L13">        Path target = target(runs, run);</span>
+<span class="fc bfc" id="L14" title="All 2 branches covered.">        if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) return Optional.empty();</span>
+<span class="pc bpc" id="L15" title="2 of 4 branches missed.">        if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS) || Files.size(target) &gt; TargetFreeSearchExecution.MAX_BYTES) {</span>
+<span class="nc" id="L16">            throw new IllegalArgumentException(&quot;invalid retained native execution file&quot;);</span>
+        }
+<span class="fc" id="L18">        try (var input = Files.newInputStream(target, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L19">            return Optional.of(TargetFreeSearchExecution.fromCanonicalBytes(run, input.readNBytes(TargetFreeSearchExecution.MAX_BYTES + 1)).toCanonicalJson());</span>
+        }
+    }
+
+    public static synchronized String retain(Path runs, RepresentationDiscoveryRunWorkspace run, byte[] bytes) throws IOException {
+<span class="fc" id="L24">        return retain(runs, run, bytes, false);</span>
+    }
+
+    /** Exception-safe pair retention in this JVM; this is not a crash or cross-process transaction. */
+    static synchronized void retainRun(Path runs, RepresentationDiscoveryRunWorkspace run, byte[] bytes) throws IOException {
+        // Always acquire the artifact-store monitor before the workspace monitor.
+<span class="fc" id="L30">        synchronized (RepresentationDiscoveryRunWorkspace.class) {</span>
+<span class="fc" id="L31">            retain(runs, run, bytes, true);</span>
+<span class="fc" id="L32">        }</span>
+<span class="fc" id="L33">    }</span>
+
+    private static String retain(Path runs, RepresentationDiscoveryRunWorkspace run, byte[] bytes, boolean retainWorkspace) throws IOException {
+<span class="fc" id="L36">        String canonical = TargetFreeSearchExecution.fromCanonicalBytes(run, bytes).toCanonicalJson();</span>
+<span class="fc" id="L37">        Path target = target(runs, run), root = target.getParent();</span>
+<span class="fc" id="L38">        Files.createDirectories(root); rejectLinks(root);</span>
+<span class="fc" id="L39">        var existing = read(runs, run);</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (existing.isPresent()) {</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">            if (!existing.get().equals(canonical)) throw new IllegalStateException(&quot;immutable native execution conflict&quot;);</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">            if (retainWorkspace) RepresentationDiscoveryRunWorkspace.retain(runs, run);</span>
+<span class="fc" id="L43">            return canonical;</span>
+        }
+<span class="fc" id="L45">        try (var entries = Files.list(root)) {</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">            if (entries.limit(RepresentationDiscoveryRunWorkspace.DEFAULT_MAX_RETAINED_RUNS).count() &gt;= RepresentationDiscoveryRunWorkspace.DEFAULT_MAX_RETAINED_RUNS) {</span>
+<span class="nc" id="L47">                throw new IllegalStateException(&quot;retained dossier repository limit exceeded&quot;);</span>
+            }
+        }
+<span class="fc" id="L50">        Path temporary = Files.createTempFile(root, &quot;.native-execution-&quot;, &quot;.tmp&quot;);</span>
+<span class="fc" id="L51">        boolean published = false;</span>
+<span class="fc" id="L52">        Throwable failure = null;</span>
+        try {
+<span class="fc" id="L54">            Files.writeString(temporary, canonical, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L55">            try { Files.createLink(target, temporary); published = true; }</span>
+<span class="nc" id="L56">            catch (FileAlreadyExistsException exception) {</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">                if (!read(runs, run).orElseThrow().equals(canonical)) throw new IllegalStateException(&quot;immutable native execution conflict&quot;, exception);</span>
+<span class="fc" id="L58">            }</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            if (retainWorkspace) RepresentationDiscoveryRunWorkspace.retain(runs, run);</span>
+<span class="fc" id="L60">        } catch (IOException | RuntimeException | Error exception) {</span>
+<span class="fc" id="L61">            failure = exception;</span>
+<span class="pc bpc" id="L62" title="2 of 4 branches missed.">            if (retainWorkspace &amp;&amp; published) rollbackPublished(target, temporary, exception);</span>
+<span class="fc" id="L63">            throw exception;</span>
+        } finally {
+<span class="fc" id="L65">            try { Files.deleteIfExists(temporary); }</span>
+<span class="nc" id="L66">            catch (IOException exception) {</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">                if (failure == null) throw exception;</span>
+<span class="nc" id="L68">                failure.addSuppressed(exception);</span>
+<span class="fc" id="L69">            }</span>
+        }
+<span class="fc" id="L71">        return canonical;</span>
+    }
+
+    private static void rollbackPublished(Path target, Path temporary, Throwable failure) {
+        try {
+            // The still-owned temporary hard link proves that this is the file just published here.
+<span class="pc bpc" id="L77" title="2 of 4 branches missed.">            if (Files.isSymbolicLink(target) || !Files.isSameFile(target, temporary)) {</span>
+<span class="nc" id="L78">                throw new IOException(&quot;native execution changed before rollback; existing file preserved&quot;);</span>
+            }
+<span class="fc" id="L80">            Files.delete(target);</span>
+<span class="nc" id="L81">        } catch (IOException | RuntimeException exception) {</span>
+<span class="nc" id="L82">            failure.addSuppressed(exception);</span>
+<span class="fc" id="L83">        }</span>
+<span class="fc" id="L84">    }</span>
+
+    private static Path target(Path runs, RepresentationDiscoveryRunWorkspace run) {
+<span class="fc" id="L87">        run.requireArtifact(RepresentationDiscoveryArtifactReference.ArtifactRole.CANDIDATE_DOSSIERS, TargetFreeSearchExecution.SCHEMA);</span>
+<span class="fc" id="L88">        Path absolute = runs.toAbsolutePath().normalize();</span>
+<span class="fc" id="L89">        Path root = absolute.resolveSibling(absolute.getFileName() + &quot;-dossiers&quot;);</span>
+<span class="fc" id="L90">        rejectLinks(root);</span>
+<span class="fc" id="L91">        return root.resolve(run.runId().substring(7) + &quot;.json&quot;);</span>
+    }
+    private static void rejectLinks(Path absolute) {
+<span class="fc" id="L94">        Path current = absolute.getRoot();</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        for (Path component : absolute) {</span>
+<span class="fc" id="L96">            current = current.resolve(component);</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">            if (Files.isSymbolicLink(current)) throw new IllegalArgumentException(&quot;symbolic native execution repository path&quot;);</span>
+<span class="fc" id="L98">        }</span>
+<span class="fc" id="L99">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

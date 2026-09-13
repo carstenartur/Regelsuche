@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DomainExportWorkspaceActions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.web</a> &gt; <span class="el_source">DomainExportWorkspaceActions.java</span></div><h1>DomainExportWorkspaceActions.java</h1><pre class="source lang-java linenums">package de.regelsuche.web;
+
+import com.sun.net.httpserver.HttpExchange;
+import de.regelsuche.discovery.domain.*;
+import de.regelsuche.json.JsonWriter;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.*;
+
+/** Schema-dispatched retained exports under the existing domain API context. */
+final class DomainExportWorkspaceActions {
+    static final String BASE = &quot;/api/discovery-domains/exports&quot;;
+    private DomainExportWorkspaceActions() { }
+
+    static void handle(HttpExchange exchange, Path directory, int maxBytes) throws IOException {
+<span class="fc" id="L17">        String suffix = exchange.getRequestURI().getPath().substring(BASE.length());</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">        if (suffix.endsWith(&quot;/&quot;)) suffix = suffix.substring(0, suffix.length() - 1);</span>
+        try {
+<span class="fc" id="L20">            boolean post = exchange.getRequestMethod().equals(&quot;POST&quot;);</span>
+<span class="fc bfc" id="L21" title="All 4 branches covered.">            var replayRequest = post &amp;&amp; suffix.endsWith(&quot;/replay&quot;)</span>
+<span class="fc" id="L22">                ? readReplayRequest(exchange, maxBytes) : Map.&lt;String, Object&gt;of();</span>
+<span class="fc" id="L23">            var repository = new DomainExportWorkspaceRepository(directory);</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">            if (suffix.isEmpty()) {</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">                if (post) {</span>
+<span class="fc" id="L26">                    var workspace = repository.importSnapshot(read(exchange, maxBytes));</span>
+<span class="fc" id="L27">                    exchange.getResponseHeaders().set(&quot;Location&quot;, BASE + &quot;/&quot; + workspace.runId().substring(7));</span>
+<span class="fc" id="L28">                    sendWorkspace(exchange, 201, workspace);</span>
+<span class="fc" id="L29">                } else {</span>
+<span class="fc" id="L30">                    var page = repository.list(queryInt(exchange, &quot;offset&quot;, 0), queryInt(exchange, &quot;limit&quot;, 25));</span>
+<span class="fc" id="L31">                    String body = new JsonWriter().beginObject().property(&quot;schema&quot;, &quot;regelsuche.domain-export-workspace-index/v1&quot;)</span>
+<span class="fc" id="L32">                        .property(&quot;offset&quot;, page.offset()).property(&quot;limit&quot;, page.limit()).property(&quot;total&quot;, page.total())</span>
+<span class="fc" id="L33">                        .array(&quot;exports&quot;, array -&gt; page.exports().forEach(workspace -&gt; array.objectValue(item -&gt;</span>
+<span class="fc" id="L34">                            item.property(&quot;runId&quot;, workspace.runId()).property(&quot;workspaceContentHash&quot;, workspace.contentHash())</span>
+<span class="fc" id="L35">                                .property(&quot;domainId&quot;, workspace.evidence().descriptor().domainId()).property(&quot;domainRevision&quot;, workspace.evidence().descriptor().revision())</span>
+<span class="fc" id="L36">                                .property(&quot;campaignId&quot;, workspace.evidence().campaignId()).property(&quot;outcome&quot;, workspace.evidence().outcome().name()))))</span>
+<span class="fc" id="L37">                        .endObject().toString();</span>
+<span class="fc" id="L38">                    send(exchange, 200, body);</span>
+                }
+<span class="fc" id="L40">                return;</span>
+            }
+<span class="fc" id="L42">            String[] path = suffix.substring(1).split(&quot;/&quot;, -1);</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            if (!path[0].matches(&quot;[0-9a-f]{64}&quot;)) throw new IllegalArgumentException(&quot;invalid export digest&quot;);</span>
+<span class="fc" id="L44">            var found = repository.find(&quot;sha256:&quot; + path[0]);</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">            if (found.isEmpty()) { error(exchange, 404, &quot;DOMAIN_EXPORT_NOT_FOUND&quot;, &quot;retained export not found&quot;); return; }</span>
+<span class="fc" id="L46">            var workspace = found.get();</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">            if (path.length == 1) sendWorkspace(exchange, 200, workspace);</span>
+<span class="pc bpc" id="L48" title="1 of 4 branches missed.">            else if (path.length == 2 &amp;&amp; path[1].equals(&quot;replay&quot;)) {</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">                if (!workspace.contentHash().equals(replayRequest.get(&quot;expectedWorkspaceHash&quot;))</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">                        || !workspace.evidence().contentHash().equals(replayRequest.get(&quot;expectedEvidenceHash&quot;))) {</span>
+<span class="fc" id="L51">                    error(exchange, 409, &quot;SOURCE_BINDING_MISMATCH&quot;, &quot;replay request belongs to another source view&quot;); return;</span>
+                }
+                try {
+<span class="fc" id="L54">                    var replayed = workspace.replay();</span>
+<span class="fc" id="L55">                    var json = new com.fasterxml.jackson.databind.json.JsonMapper();</span>
+<span class="fc" id="L56">                    var result = json.createObjectNode().put(&quot;schema&quot;, DomainExportWorkspace.REPLAY_SCHEMA)</span>
+<span class="fc" id="L57">                        .put(&quot;runId&quot;, workspace.runId()).put(&quot;workspaceContentHash&quot;, workspace.contentHash())</span>
+<span class="fc" id="L58">                        .put(&quot;sourceEvidenceHash&quot;, workspace.evidence().contentHash()).put(&quot;status&quot;, &quot;IDENTICAL_CANONICAL_EVIDENCE&quot;);</span>
+<span class="fc" id="L59">                    result.set(&quot;evidence&quot;, json.readTree(replayed.toCanonicalJson()));</span>
+<span class="fc" id="L60">                    exchange.getResponseHeaders().set(&quot;X-Regelsuche-Run-Id&quot;, workspace.runId());</span>
+<span class="fc" id="L61">                    send(exchange, 200, json.writeValueAsString(result));</span>
+<span class="pc" id="L62">                } catch (IllegalStateException exception) { error(exchange, 409, &quot;REPLAY_NOT_REPRODUCED&quot;, exception.getMessage()); }</span>
+<span class="pc bpc" id="L63" title="2 of 4 branches missed.">            } else if (path.length == 3 &amp;&amp; path[1].equals(&quot;files&quot;)) {</span>
+                byte[] bytes;
+<span class="fc bfc" id="L65" title="All 2 branches covered.">                if (path[2].equals(DomainDiscoveryExport.MANIFEST_FILE_NAME)) bytes = workspace.originalManifestBytes();</span>
+                else {
+<span class="fc" id="L67">                    var role = Arrays.stream(DomainDiscoveryExport.ArtifactRole.values()).filter(value -&gt; value.fileName().equals(path[2])).findFirst();</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                    if (role.isEmpty()) { error(exchange, 404, &quot;DOMAIN_EXPORT_FILE_NOT_FOUND&quot;, &quot;unsupported original file&quot;); return; }</span>
+<span class="fc" id="L69">                    bytes = workspace.originalArtifactBytes(role.get());</span>
+                }
+<span class="fc" id="L71">                exchange.getResponseHeaders().set(&quot;X-Regelsuche-Run-Id&quot;, workspace.runId());</span>
+<span class="fc" id="L72">                send(exchange, 200, bytes);</span>
+<span class="pc" id="L73">            } else error(exchange, 404, &quot;DOMAIN_EXPORT_ROUTE_NOT_FOUND&quot;, &quot;unsupported export action&quot;);</span>
+<span class="fc" id="L74">        } catch (DomainExportWorkspaceRepository.SourceIdentityConflictException exception) {</span>
+<span class="fc" id="L75">            error(exchange, 409, &quot;SOURCE_IDENTITY_CONFLICT&quot;, exception.getMessage());</span>
+<span class="fc" id="L76">        } catch (StreamingJsonRequestBody.MalformedJsonRequestException exception) {</span>
+<span class="fc" id="L77">            error(exchange, 400, &quot;INVALID_DOMAIN_EXPORT&quot;, &quot;invalid JSON replay request&quot;);</span>
+<span class="fc" id="L78">        } catch (IllegalArgumentException | DomainDiscoveryExportVerifier.ExportVerificationException exception) {</span>
+<span class="fc" id="L79">            error(exchange, 400, &quot;INVALID_DOMAIN_EXPORT&quot;, exception.getMessage());</span>
+<span class="nc" id="L80">        } catch (IllegalStateException exception) {</span>
+<span class="nc" id="L81">            error(exchange, 500, &quot;DOMAIN_EXPORT_REPOSITORY_FAILURE&quot;, exception.getMessage());</span>
+<span class="fc" id="L82">        }</span>
+<span class="fc" id="L83">    }</span>
+
+    private static Map&lt;String, Object&gt; readReplayRequest(HttpExchange exchange, int maxBytes) throws IOException {
+<span class="fc" id="L86">        requireJson(exchange);</span>
+<span class="fc" id="L87">        var request = new StreamingJsonRequestBody(Math.min(maxBytes, 4096)).readObject(exchange);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (!request.keySet().equals(Set.of(&quot;expectedWorkspaceHash&quot;, &quot;expectedEvidenceHash&quot;))</span>
+<span class="fc bfc" id="L89" title="All 6 branches covered.">                || request.values().stream().anyMatch(value -&gt; !(value instanceof String hash) || !hash.matches(&quot;sha256:[0-9a-f]{64}&quot;))) {</span>
+<span class="fc" id="L90">            throw new IllegalArgumentException(&quot;replay requires exact workspace and source evidence identities&quot;);</span>
+        }
+<span class="fc" id="L92">        return request;</span>
+    }
+
+    private static byte[] read(HttpExchange exchange, int maxBytes) throws IOException {
+<span class="fc" id="L96">        requireJson(exchange);</span>
+<span class="fc" id="L97">        try (var input = BoundedRequestBody.open(exchange, Math.min(maxBytes, DomainExportWorkspaceRepository.MAX_UPLOAD_BYTES))) { return input.readAllBytes(); }</span>
+    }
+
+    private static void requireJson(HttpExchange exchange) {
+<span class="fc" id="L101">        String type = exchange.getRequestHeaders().getFirst(&quot;Content-Type&quot;);</span>
+<span class="pc bpc" id="L102" title="1 of 4 branches missed.">        if (type == null || !type.split(&quot;;&quot;, 2)[0].trim().equalsIgnoreCase(&quot;application/json&quot;)) throw new IllegalArgumentException(&quot;Content-Type must be application/json&quot;);</span>
+<span class="fc" id="L103">    }</span>
+
+    private static int queryInt(HttpExchange exchange, String key, int fallback) {
+<span class="fc" id="L106">        String query = exchange.getRequestURI().getRawQuery();</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (query == null) return fallback;</span>
+<span class="fc" id="L108">        String result = null;</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        for (String part : query.split(&quot;&amp;&quot;)) {</span>
+<span class="fc" id="L110">            String[] pair = part.split(&quot;=&quot;, 2);</span>
+<span class="pc bpc" id="L111" title="2 of 4 branches missed.">            if (!Set.of(&quot;offset&quot;, &quot;limit&quot;).contains(pair[0]) || pair.length != 2) throw new IllegalArgumentException(&quot;unsupported list query&quot;);</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            if (pair[0].equals(key)) {</span>
+<span class="pc bpc" id="L113" title="2 of 4 branches missed.">                if (result != null || !pair[1].matches(&quot;[0-9]+&quot;)) throw new IllegalArgumentException(&quot;invalid list query&quot;);</span>
+<span class="fc" id="L114">                result = pair[1];</span>
+            }
+        }
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        return result == null ? fallback : Integer.parseInt(result);</span>
+    }
+
+    private static void sendWorkspace(HttpExchange exchange, int status, DomainExportWorkspace workspace) throws IOException {
+<span class="fc" id="L121">        exchange.getResponseHeaders().set(&quot;X-Regelsuche-Run-Id&quot;, workspace.runId());</span>
+<span class="fc" id="L122">        exchange.getResponseHeaders().set(&quot;ETag&quot;, &quot;\&quot;&quot; + workspace.contentHash().substring(7) + &quot;\&quot;&quot;);</span>
+<span class="fc" id="L123">        send(exchange, status, workspace.toCanonicalJson());</span>
+<span class="fc" id="L124">    }</span>
+    private static void error(HttpExchange exchange, int status, String code, String message) throws IOException {
+<span class="fc" id="L126">        send(exchange, status, new JsonWriter().beginObject().property(&quot;code&quot;, code).property(&quot;message&quot;, message).endObject().toString());</span>
+<span class="fc" id="L127">    }</span>
+<span class="fc" id="L128">    private static void send(HttpExchange exchange, int status, String body) throws IOException { send(exchange, status, body.getBytes(StandardCharsets.UTF_8)); }</span>
+    private static void send(HttpExchange exchange, int status, byte[] body) throws IOException {
+<span class="fc" id="L130">        exchange.getResponseHeaders().set(&quot;Content-Type&quot;, &quot;application/json; charset=utf-8&quot;);</span>
+<span class="fc" id="L131">        exchange.getResponseHeaders().set(&quot;Cache-Control&quot;, &quot;no-store&quot;);</span>
+<span class="fc" id="L132">        exchange.sendResponseHeaders(status, body.length);</span>
+<span class="fc" id="L133">        try (var output = exchange.getResponseBody()) { output.write(body); }</span>
+<span class="fc" id="L134">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

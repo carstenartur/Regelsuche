@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramValidationEvidence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramValidationEvidence.java</span></div><h1>EvolutionRewriteProgramValidationEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.EvolutionRewriteProgramTrainFitnessEvidence.PathCorrectness;
+import de.regelsuche.evolution.EvolutionRewriteProgramValidationPlan.Configuration;
+import de.regelsuche.search.strategy.SearchWorkMetrics;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Budget;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Status;
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/** Complete paired rows; technical failures preserve observations and unknown totals. */
+public final class EvolutionRewriteProgramValidationEvidence {
+    private EvolutionRewriteProgramValidationEvidence() { }
+
+    public record Measurement(String terminalReason, boolean reached, int depth, int primitiveSteps,
+        List&lt;String&gt; path, boolean programUsed, PathCorrectness correctness,
+        SearchWorkMetrics searchWork, TransformationWorkMetrics transformationWork,
+        long pathAuditCalls, Long totalWorkUnits, String failure) {
+<span class="fc" id="L21">        public Measurement {</span>
+<span class="fc" id="L22">            EvolutionValidationArtifactSupport.requireText(terminalReason, &quot;terminalReason&quot;);</span>
+<span class="fc" id="L23">            path = List.copyOf(Objects.requireNonNull(path, &quot;path&quot;));</span>
+<span class="fc" id="L24">            Objects.requireNonNull(correctness, &quot;correctness&quot;);</span>
+<span class="fc" id="L25">            Objects.requireNonNull(failure, &quot;failure&quot;);</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">            if (&quot;NOT_OBSERVED&quot;.equals(terminalReason)) {</span>
+<span class="pc bpc" id="L27" title="4 of 8 branches missed.">                if (failure.isEmpty() || reached || searchWork != null || transformationWork != null) {</span>
+<span class="nc" id="L28">                    throw new IllegalArgumentException(&quot;unobserved search cannot claim measured success&quot;);</span>
+                }
+            } else {
+<span class="fc" id="L31">                Status status = Status.valueOf(terminalReason);</span>
+<span class="fc bfc" id="L32" title="All 10 branches covered.">                if (reached != (status == Status.REACHED || status == Status.ROOT_ALREADY_TARGET)</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">                        || ((status == Status.INCOMPLETE_EXPANSION || status == Status.WORK_BUDGET) &amp;&amp; failure.isEmpty())) {</span>
+<span class="fc" id="L34">                    throw new IllegalArgumentException(&quot;terminal status contradicts search completeness or reachability&quot;);</span>
+                }
+            }
+<span class="pc bpc" id="L37" title="4 of 10 branches missed.">            if (depth &lt; -1 || primitiveSteps &lt; 0 || pathAuditCalls &lt; 0</span>
+<span class="pc bpc" id="L38" title="2 of 6 branches missed.">                    || (reached &amp;&amp; (depth &lt; 0 || path.size() != depth + 1))</span>
+<span class="pc bpc" id="L39" title="3 of 6 branches missed.">                    || (!reached &amp;&amp; (depth != -1 || !path.isEmpty() || programUsed</span>
+                        || correctness != PathCorrectness.NOT_EVALUATED))) {
+<span class="nc" id="L41">                throw new IllegalArgumentException(&quot;inconsistent program VALIDATION path evidence&quot;);</span>
+            }
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            if (failure.isEmpty()) {</span>
+<span class="fc" id="L44">                Objects.requireNonNull(searchWork, &quot;complete searchWork&quot;);</span>
+<span class="fc" id="L45">                Objects.requireNonNull(transformationWork, &quot;complete transformationWork&quot;);</span>
+<span class="fc" id="L46">                requireCompletedAudit(reached, depth, correctness, pathAuditCalls);</span>
+<span class="fc" id="L47">                long expected = sum(searchWork.totalWorkUnits(), transformationWork.totalWorkUnits(), pathAuditCalls);</span>
+<span class="pc bpc" id="L48" title="2 of 4 branches missed.">                if (totalWorkUnits == null || totalWorkUnits != expected) {</span>
+<span class="nc" id="L49">                    throw new IllegalArgumentException(&quot;total work differs from complete retained work vectors&quot;);</span>
+                }
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">            } else if (totalWorkUnits != null) {</span>
+<span class="nc" id="L52">                throw new IllegalArgumentException(&quot;technical failure cannot claim a complete work total&quot;);</span>
+            }
+<span class="fc" id="L54">        }</span>
+
+<span class="fc" id="L56">        public boolean complete() { return failure.isEmpty(); }</span>
+
+        private static void requireCompletedAudit(boolean reached, int depth, PathCorrectness correctness,
+            long pathAuditCalls) {
+<span class="pc bpc" id="L60" title="2 of 4 branches missed.">            if ((reached &amp;&amp; correctness == PathCorrectness.NOT_EVALUATED)</span>
+<span class="pc bpc" id="L61" title="2 of 8 branches missed.">                    || pathAuditCalls &gt; Math.max(0, depth)</span>
+                    || (reached &amp;&amp; correctness == PathCorrectness.CONFIRMED &amp;&amp; pathAuditCalls != depth)) {
+<span class="fc" id="L63">                throw new IllegalArgumentException(&quot;completed correctness audit differs from retained path edges&quot;);</span>
+            }
+<span class="fc" id="L65">        }</span>
+
+        void requireBudget(Budget budget) {
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            if (!complete()) { return; } // Partial observations retain actual work and remain ineligible.</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            if (primitiveSteps &gt; budget.maxPrimitiveSteps()</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">                    || searchWork.exploredStates() &gt; budget.maxExploredStates()) {</span>
+<span class="fc" id="L71">                throw new IllegalArgumentException(&quot;complete measurement exceeds the bound path or state allowance&quot;);</span>
+            }
+<span class="fc" id="L73">            if (sum(searchWork.totalWorkUnits(), transformationWork.totalWorkUnits())</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">                        &gt; budget.mechanicalSearchWorkBudget()) {</span>
+<span class="fc" id="L75">                throw new IllegalArgumentException(&quot;complete terminal outcome contradicts its bound search work allowance&quot;);</span>
+            }
+<span class="fc" id="L77">        }</span>
+
+        static Measurement unavailable(String reason) {
+<span class="fc" id="L80">            return new Measurement(&quot;NOT_OBSERVED&quot;, false, -1, 0, List.of(), false,</span>
+                PathCorrectness.NOT_EVALUATED, null, null, 0, null, reason);
+        }
+    }
+
+    public record PairedCase(String caseId, String familyId, Measurement baseline, Measurement candidate) {
+<span class="fc" id="L86">        public PairedCase {</span>
+<span class="fc" id="L87">            EvolutionValidationArtifactSupport.requireText(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L88">            EvolutionValidationArtifactSupport.requireText(familyId, &quot;familyId&quot;);</span>
+<span class="fc" id="L89">            Objects.requireNonNull(baseline, &quot;baseline&quot;);</span>
+<span class="fc" id="L90">            Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc" id="L91">        }</span>
+
+        static PairedCase unavailable(EvolutionSplitManifest.CaseReference reference, String reason) {
+<span class="fc" id="L94">            return new PairedCase(reference.caseId(), reference.familyId(),</span>
+<span class="fc" id="L95">                Measurement.unavailable(reason), Measurement.unavailable(reason));</span>
+        }
+    }
+
+    public record CandidateEvidence(String configurationHash, List&lt;PairedCase&gt; cases,
+        EvolutionValidationCandidate validationMetrics, List&lt;String&gt; blockers) {
+<span class="fc" id="L101">        public CandidateEvidence {</span>
+<span class="fc" id="L102">            EvolutionGenome.requireSha256(configurationHash, &quot;configurationHash&quot;);</span>
+<span class="fc" id="L103">            cases = List.copyOf(Objects.requireNonNull(cases, &quot;cases&quot;));</span>
+<span class="fc" id="L104">            blockers = List.copyOf(Objects.requireNonNull(blockers, &quot;blockers&quot;));</span>
+<span class="pc bpc" id="L105" title="2 of 4 branches missed.">            if (cases.isEmpty() || cases.stream().map(PairedCase::caseId).distinct().count() != cases.size()</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">                    || !blockers.equals(EvolutionRewriteProgramValidationEvidence.blockers(cases))) {</span>
+<span class="nc" id="L107">                throw new IllegalArgumentException(&quot;incomplete or inconsistent paired VALIDATION evidence&quot;);</span>
+            }
+<span class="fc" id="L109">        }</span>
+
+        static CandidateEvidence create(Configuration configuration, List&lt;PairedCase&gt; cases) {
+<span class="fc" id="L112">            List&lt;String&gt; blockers = EvolutionRewriteProgramValidationEvidence.blockers(cases);</span>
+<span class="fc" id="L113">            return new CandidateEvidence(configuration.contentHash(), cases,</span>
+<span class="fc" id="L114">                metrics(configuration, cases, blockers), blockers);</span>
+        }
+
+        void requireConfiguration(Configuration configuration) {
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            if (!configurationHash.equals(configuration.contentHash())</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">                    || !Objects.equals(validationMetrics, metrics(configuration, cases, blockers))) {</span>
+<span class="fc" id="L120">                throw new IllegalArgumentException(&quot;VALIDATION metrics differ from full configuration and paired rows&quot;);</span>
+            }
+<span class="fc" id="L122">            Budget budget = configuration.effectiveBudget();</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            for (PairedCase item : cases) {</span>
+<span class="fc" id="L124">                item.baseline().requireBudget(budget);</span>
+<span class="fc" id="L125">                item.candidate().requireBudget(budget);</span>
+<span class="fc" id="L126">            }</span>
+<span class="fc" id="L127">        }</span>
+
+        public boolean eligible() {
+<span class="pc bpc" id="L130" title="1 of 6 branches missed.">            return validationMetrics != null &amp;&amp; validationMetrics.eligible() &amp;&amp; blockers.isEmpty();</span>
+        }
+    }
+
+    private static List&lt;String&gt; blockers(List&lt;PairedCase&gt; cases) {
+<span class="fc" id="L135">        List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        for (PairedCase item : cases) {</span>
+<span class="fc" id="L137">            sideBlockers(result, item.caseId(), &quot;BASELINE&quot;, item.baseline());</span>
+<span class="fc" id="L138">            sideBlockers(result, item.caseId(), &quot;CANDIDATE&quot;, item.candidate());</span>
+<span class="fc" id="L139">        }</span>
+<span class="fc" id="L140">        return result.stream().distinct().sorted().toList();</span>
+    }
+
+    private static void sideBlockers(List&lt;String&gt; result, String id, String side, Measurement measurement) {
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (!measurement.complete()) {</span>
+<span class="fc" id="L145">            result.add(side + &quot;:&quot; + id + &quot;:&quot; + measurement.failure());</span>
+<span class="pc bpc" id="L146" title="1 of 4 branches missed.">        } else if (measurement.reached() &amp;&amp; measurement.correctness() != PathCorrectness.CONFIRMED) {</span>
+<span class="fc" id="L147">            result.add(side + &quot;:&quot; + id + &quot;:&quot; + measurement.correctness());</span>
+        }
+<span class="fc" id="L149">    }</span>
+
+    private static EvolutionValidationCandidate metrics(Configuration configuration, List&lt;PairedCase&gt; cases,
+        List&lt;String&gt; blockers) {
+<span class="fc bfc" id="L153" title="All 6 branches covered.">        if (cases.stream().anyMatch(item -&gt; !item.baseline().complete() || !item.candidate().complete())) {</span>
+<span class="fc" id="L154">            return null; // There is no honest numeric aggregate over unknown work.</span>
+        }
+<span class="fc" id="L156">        var genome = configuration.candidate().genome();</span>
+<span class="fc" id="L157">        var budget = configuration.effectiveBudget();</span>
+<span class="fc" id="L158">        return EvolutionValidationCandidate.create(genome.contentHash(), genome.alphaStructuralHash(),</span>
+            new EvolutionValidationSearchConfiguration(
+<span class="fc" id="L160">                budget.maxPrimitiveSteps(), budget.maxExploredStates(), budget.maxCandidatesPerState()),</span>
+<span class="fc" id="L161">            cases.stream().map(EvolutionRewriteProgramValidationEvidence::legacyCase).toList(), blockers);</span>
+    }
+
+    private static EvolutionValidationCaseEvidence legacyCase(PairedCase row) {
+<span class="fc" id="L165">        var baseline = row.baseline();</span>
+<span class="fc" id="L166">        var candidate = row.candidate();</span>
+<span class="fc" id="L167">        var baselineCorrectness = correctness(baseline.correctness());</span>
+<span class="fc" id="L168">        var candidateCorrectness = correctness(candidate.correctness());</span>
+<span class="pc bpc" id="L169" title="1 of 4 branches missed.">        boolean refuted = candidate.reached() &amp;&amp; candidateCorrectness == EvolutionCorrectnessStatus.REFUTED;</span>
+<span class="fc" id="L170">        return new EvolutionValidationCaseEvidence(row.caseId(), row.familyId(),</span>
+<span class="fc" id="L171">            baseline.reached(), candidate.reached(), baselineCorrectness, candidateCorrectness,</span>
+<span class="fc" id="L172">            baseline.terminalReason(), candidate.terminalReason(), baseline.depth(), candidate.depth(),</span>
+<span class="fc" id="L173">            baseline.searchWork().exploredStates(), candidate.searchWork().exploredStates(),</span>
+<span class="fc" id="L174">            baseline.searchWork().generatedTransformations(), candidate.searchWork().generatedTransformations(),</span>
+<span class="pc bpc" id="L175" title="5 of 6 branches missed.">            !baseline.reached() &amp;&amp; candidate.reached() &amp;&amp; candidateCorrectness == EvolutionCorrectnessStatus.CONFIRMED,</span>
+<span class="pc bpc" id="L176" title="2 of 4 branches missed.">            baseline.reached() &amp;&amp; !candidate.reached(), refuted,</span>
+<span class="pc bpc" id="L177" title="2 of 6 branches missed.">            baseline.reached() &amp;&amp; baselineCorrectness == EvolutionCorrectnessStatus.CONFIRMED &amp;&amp; refuted);</span>
+    }
+
+    private static EvolutionCorrectnessStatus correctness(PathCorrectness status) {
+<span class="pc bpc" id="L181" title="2 of 4 branches missed.">        return switch (status) {</span>
+<span class="fc" id="L182">            case CONFIRMED -&gt; EvolutionCorrectnessStatus.CONFIRMED;</span>
+<span class="fc" id="L183">            case REFUTED -&gt; EvolutionCorrectnessStatus.REFUTED;</span>
+<span class="nc" id="L184">            case NOT_EVALUATED -&gt; EvolutionCorrectnessStatus.NOT_EVALUATED;</span>
+<span class="nc" id="L185">            case MISSING_ASSUMPTION, UNSUPPORTED -&gt; EvolutionCorrectnessStatus.INCONCLUSIVE;</span>
+        };
+    }
+
+    static long sum(long... values) {
+<span class="fc" id="L190">        long result = 0;</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        for (long value : values) {</span>
+<span class="fc" id="L192">            try { result = Math.addExact(result, value); }</span>
+<span class="pc" id="L193">            catch (ArithmeticException exception) { return Long.MAX_VALUE; }</span>
+        }
+<span class="fc" id="L195">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

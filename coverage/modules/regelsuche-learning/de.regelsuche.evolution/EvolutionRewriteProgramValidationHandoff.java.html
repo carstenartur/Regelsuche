@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramValidationHandoff.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramValidationHandoff.java</span></div><h1>EvolutionRewriteProgramValidationHandoff.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.EvolutionRewriteProgramValidationPlan.Configuration;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/** Immutable evidence input for later gates; this artifact grants no downstream authority. */
+public record EvolutionRewriteProgramValidationHandoff(String schema,
+    EvolutionRewriteProgramValidationSelection selection, Configuration selectedConfiguration,
+    String finalTestStatus, String proofStatus, String externalNoveltyStatus,
+    String promotionStatus, String publicEvidenceStatus, String contentHash) {
+    public static final String SCHEMA = &quot;regelsuche.evolution-rewrite-program-validation-handoff/v1&quot;;
+    private static final String NOT_EVALUATED = &quot;NOT_EVALUATED&quot;;
+
+<span class="fc" id="L16">    public EvolutionRewriteProgramValidationHandoff {</span>
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L18">            throw new IllegalArgumentException(&quot;unsupported program VALIDATION handoff&quot;);</span>
+        }
+<span class="fc" id="L20">        Objects.requireNonNull(selection, &quot;selection&quot;);</span>
+<span class="fc" id="L21">        Objects.requireNonNull(selectedConfiguration, &quot;selectedConfiguration&quot;);</span>
+<span class="pc bpc" id="L22" title="2 of 4 branches missed.">        if (!selection.hasSelection() || !selection.selectedConfigurationHash().equals(selectedConfiguration.contentHash())</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">                || !selection.plan().configurations().contains(selectedConfiguration)) {</span>
+<span class="nc" id="L24">            throw new IllegalArgumentException(&quot;handoff differs from the complete selected program configuration&quot;);</span>
+        }
+<span class="fc bfc" id="L26" title="All 2 branches covered.">        for (String status : List.of(finalTestStatus, proofStatus, externalNoveltyStatus,</span>
+                promotionStatus, publicEvidenceStatus)) {
+<span class="fc bfc" id="L28" title="All 2 branches covered.">            if (!NOT_EVALUATED.equals(status)) {</span>
+<span class="fc" id="L29">                throw new IllegalArgumentException(&quot;downstream gates must remain NOT_EVALUATED&quot;);</span>
+            }
+<span class="fc" id="L31">        }</span>
+<span class="fc" id="L32">        EvolutionProgramValidationJson.requireHash(contentHash, material(selection, selectedConfiguration));</span>
+<span class="fc" id="L33">    }</span>
+
+    static EvolutionRewriteProgramValidationHandoff create(EvolutionRewriteProgramValidationSelection selection) {
+<span class="fc" id="L36">        Configuration chosen = selection.plan().configurations().stream()</span>
+<span class="fc" id="L37">            .filter(item -&gt; item.contentHash().equals(selection.selectedConfigurationHash())).findFirst().orElseThrow();</span>
+<span class="fc" id="L38">        return new EvolutionRewriteProgramValidationHandoff(SCHEMA, selection, chosen,</span>
+            NOT_EVALUATED, NOT_EVALUATED, NOT_EVALUATED, NOT_EVALUATED, NOT_EVALUATED,
+<span class="fc" id="L40">            EvolutionProgramValidationJson.hash(material(selection, chosen)));</span>
+    }
+
+<span class="fc" id="L43">    public String toCanonicalJson() { return EvolutionProgramValidationJson.write(this); }</span>
+    public static EvolutionRewriteProgramValidationHandoff fromCanonicalJson(String json) {
+<span class="fc" id="L45">        return EvolutionProgramValidationJson.read(json, EvolutionRewriteProgramValidationHandoff.class);</span>
+    }
+
+    private static Map&lt;String, Object&gt; material(EvolutionRewriteProgramValidationSelection selection,
+        Configuration configuration) {
+<span class="fc" id="L50">        return EvolutionProgramValidationJson.material(SCHEMA, &quot;selection&quot;, selection,</span>
+            &quot;selectedConfiguration&quot;, configuration, &quot;finalTestStatus&quot;, NOT_EVALUATED,
+            &quot;proofStatus&quot;, NOT_EVALUATED, &quot;externalNoveltyStatus&quot;, NOT_EVALUATED,
+            &quot;promotionStatus&quot;, NOT_EVALUATED, &quot;publicEvidenceStatus&quot;, NOT_EVALUATED);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

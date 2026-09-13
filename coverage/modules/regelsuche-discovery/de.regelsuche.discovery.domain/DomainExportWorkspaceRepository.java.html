@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DomainExportWorkspaceRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">DomainExportWorkspaceRepository.java</span></div><h1>DomainExportWorkspaceRepository.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.util.*;
+
+/** Finite immutable storage of original export files and their supported view. */
+public final class DomainExportWorkspaceRepository {
+    public static final String UPLOAD_SCHEMA = &quot;regelsuche.domain-export-upload/v1&quot;;
+    public static final int MAX_UPLOAD_BYTES = 1_048_576;
+    public static final int MAX_EXPORTS = 256;
+<span class="fc" id="L14">    private static final Set&lt;String&gt; FILES = Set.of(&quot;domain.json&quot;, &quot;evidence.json&quot;, &quot;lifecycle-handoff.json&quot;, &quot;export-manifest.json&quot;);</span>
+    private final Path directory;
+
+<span class="fc" id="L17">    public DomainExportWorkspaceRepository(Path directory) {</span>
+<span class="fc" id="L18">        this.directory = Objects.requireNonNull(directory, &quot;directory&quot;).toAbsolutePath().normalize();</span>
+<span class="fc" id="L19">        rejectLinks(this.directory);</span>
+<span class="fc" id="L20">    }</span>
+
+    /** File names are fixed; upload contents never select a filesystem path. */
+    public DomainExportWorkspace importSnapshot(byte[] request) throws IOException {
+<span class="nc bnc" id="L24" title="All 2 branches missed.">        if (request.length &gt; MAX_UPLOAD_BYTES) throw new IllegalArgumentException(&quot;domain upload exceeds 1 MiB&quot;);</span>
+<span class="nc" id="L25">        JsonNode input = DomainExportWorkspace.read(request);</span>
+<span class="nc bnc" id="L26" title="All 6 branches missed.">        if (input.size() != 2 || !UPLOAD_SCHEMA.equals(input.path(&quot;schema&quot;).asText()) || !input.path(&quot;files&quot;).isObject()) {</span>
+<span class="nc" id="L27">            throw new IllegalArgumentException(&quot;unsupported domain export upload&quot;);</span>
+        }
+<span class="nc" id="L29">        Set&lt;String&gt; names = new HashSet&lt;&gt;(); input.path(&quot;files&quot;).fieldNames().forEachRemaining(names::add);</span>
+<span class="nc bnc" id="L30" title="All 2 branches missed.">        if (!FILES.equals(names)) throw new IllegalArgumentException(&quot;upload must contain the four original export files&quot;);</span>
+<span class="nc" id="L31">        Map&lt;String, byte[]&gt; bytes = new TreeMap&lt;&gt;();</span>
+<span class="nc" id="L32">        long total = 0;</span>
+<span class="nc bnc" id="L33" title="All 2 branches missed.">        for (String name : FILES) {</span>
+<span class="nc" id="L34">            JsonNode encoded = input.path(&quot;files&quot;).path(name);</span>
+<span class="nc bnc" id="L35" title="All 2 branches missed.">            if (!encoded.isTextual()) throw new IllegalArgumentException(&quot;export files must be base64 byte strings&quot;);</span>
+<span class="nc" id="L36">            byte[] decoded = Base64.getDecoder().decode(encoded.asText());</span>
+<span class="nc" id="L37">            total += decoded.length;</span>
+<span class="nc bnc" id="L38" title="All 2 branches missed.">            if (total &gt; DomainExportWorkspace.MAX_EXPORT_BYTES) throw new IllegalArgumentException(&quot;export files exceed 512 KiB&quot;);</span>
+<span class="nc" id="L39">            bytes.put(name, decoded);</span>
+<span class="nc" id="L40">        }</span>
+<span class="nc" id="L41">        Path staging = Files.createTempDirectory(&quot;regelsuche-domain-export-&quot;);</span>
+        try {
+<span class="nc bnc" id="L43" title="All 2 branches missed.">            for (var item : bytes.entrySet()) Files.write(staging.resolve(item.getKey()), item.getValue(), StandardOpenOption.CREATE_NEW);</span>
+<span class="nc" id="L44">            return retain(verifier().requireVerified(staging));</span>
+<span class="nc" id="L45">        } finally { deleteTree(staging); }</span>
+    }
+
+    public DomainExportWorkspace retain(DomainDiscoveryExportVerifier.VerifiedDomainExport snapshot) throws IOException {
+<span class="fc" id="L49">        DomainExportWorkspace workspace = DomainExportWorkspace.fromVerified(snapshot);</span>
+<span class="fc" id="L50">        synchronized (DomainExportWorkspaceRepository.class) {</span>
+<span class="fc" id="L51">            rejectLinks(directory); Files.createDirectories(directory); rejectLinks(directory);</span>
+<span class="fc" id="L52">            var existing = find(workspace.runId());</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">            if (existing.isPresent()) return requireSame(existing.get(), workspace);</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            if (entries().size() &gt;= MAX_EXPORTS) throw new IllegalStateException(&quot;domain export repository is full&quot;);</span>
+<span class="fc" id="L55">            Path staging = Files.createTempDirectory(directory, &quot;.pending-&quot;);</span>
+            try {
+<span class="fc" id="L57">                Path export = Files.createDirectory(staging.resolve(&quot;export&quot;));</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">                for (var role : DomainDiscoveryExport.ArtifactRole.values()) {</span>
+<span class="fc" id="L59">                    Files.write(export.resolve(role.fileName()), workspace.originalArtifactBytes(role), StandardOpenOption.CREATE_NEW);</span>
+                }
+<span class="fc" id="L61">                Files.write(export.resolve(DomainDiscoveryExport.MANIFEST_FILE_NAME), workspace.originalManifestBytes(), StandardOpenOption.CREATE_NEW);</span>
+<span class="fc" id="L62">                Files.writeString(staging.resolve(&quot;workspace.json&quot;), workspace.toCanonicalJson(), StandardCharsets.UTF_8, StandardOpenOption.CREATE_NEW);</span>
+<span class="fc" id="L63">                try { Files.move(staging, target(workspace.runId()), StandardCopyOption.ATOMIC_MOVE); }</span>
+<span class="nc" id="L64">                catch (FileAlreadyExistsException | DirectoryNotEmptyException exception) {</span>
+<span class="nc" id="L65">                    return requireSame(find(workspace.runId()).orElseThrow(), workspace);</span>
+<span class="fc" id="L66">                }</span>
+<span class="fc" id="L67">                return workspace;</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">            } finally { if (Files.exists(staging, LinkOption.NOFOLLOW_LINKS)) deleteTree(staging); }</span>
+        }
+    }
+
+    public Optional&lt;DomainExportWorkspace&gt; find(String runId) throws IOException {
+<span class="fc" id="L73">        Path target = target(runId);</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) return Optional.empty();</span>
+<span class="fc" id="L75">        rejectLinks(target);</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (!Files.isDirectory(target, LinkOption.NOFOLLOW_LINKS)) throw new IllegalArgumentException(&quot;invalid retained export directory&quot;);</span>
+<span class="fc" id="L77">        try (var contents = Files.list(target)) {</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">            if (!contents.limit(3).map(path -&gt; path.getFileName().toString()).collect(java.util.stream.Collectors.toSet()).equals(Set.of(&quot;export&quot;, &quot;workspace.json&quot;))) {</span>
+<span class="nc" id="L79">                throw new IllegalArgumentException(&quot;retained domain workspace membership changed&quot;);</span>
+            }
+        }
+<span class="fc" id="L82">        var workspace = DomainExportWorkspace.fromVerified(verifier().requireVerified(target.resolve(&quot;export&quot;)));</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (!runId.equals(workspace.runId())) throw new IllegalArgumentException(&quot;retained domain export belongs to another source identity&quot;);</span>
+<span class="fc" id="L84">        Path view = target.resolve(&quot;workspace.json&quot;);</span>
+<span class="fc" id="L85">        rejectLinks(view);</span>
+<span class="pc bpc" id="L86" title="2 of 4 branches missed.">        if (!Files.isRegularFile(view, LinkOption.NOFOLLOW_LINKS) || Files.size(view) &gt; MAX_UPLOAD_BYTES) {</span>
+<span class="nc" id="L87">            throw new IllegalArgumentException(&quot;invalid retained domain workspace file&quot;);</span>
+        }
+<span class="fc" id="L89">        try (var input = Files.newInputStream(view, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L90">            byte[] retained = input.readNBytes(MAX_UPLOAD_BYTES + 1);</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            if (!Arrays.equals(retained, workspace.toCanonicalJson().getBytes(StandardCharsets.UTF_8))) {</span>
+<span class="nc" id="L92">                throw new IllegalArgumentException(&quot;retained domain workspace differs from its original export&quot;);</span>
+            }
+        }
+<span class="fc" id="L95">        return Optional.of(workspace);</span>
+    }
+
+    public Page list(int offset, int limit) throws IOException {
+<span class="pc bpc" id="L99" title="3 of 6 branches missed.">        if (offset &lt; 0 || limit &lt; 1 || limit &gt; 25) throw new IllegalArgumentException(&quot;offset must be nonnegative and limit between 1 and 25&quot;);</span>
+<span class="fc" id="L100">        List&lt;Path&gt; entries = entries();</span>
+<span class="fc" id="L101">        List&lt;DomainExportWorkspace&gt; workspaces = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        for (Path entry : entries.stream().skip(offset).limit(limit).toList()) {</span>
+<span class="fc" id="L103">            workspaces.add(find(&quot;sha256:&quot; + entry.getFileName()).orElseThrow());</span>
+<span class="fc" id="L104">        }</span>
+<span class="fc" id="L105">        return new Page(offset, limit, entries.size(), workspaces);</span>
+    }
+
+    public record Page(int offset, int limit, int total, List&lt;DomainExportWorkspace&gt; exports) {
+<span class="fc" id="L109">        public Page { exports = List.copyOf(exports); }</span>
+    }
+
+    private List&lt;Path&gt; entries() throws IOException {
+<span class="fc" id="L113">        rejectLinks(directory);</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if (!Files.exists(directory, LinkOption.NOFOLLOW_LINKS)) return List.of();</span>
+<span class="fc" id="L115">        try (var stream = Files.list(directory)) {</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            List&lt;Path&gt; paths = stream.filter(path -&gt; !path.getFileName().toString().startsWith(&quot;.pending-&quot;))</span>
+<span class="fc" id="L117">                .limit(MAX_EXPORTS + 1L).toList();</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            if (paths.size() &gt; MAX_EXPORTS) throw new IllegalStateException(&quot;domain export repository limit exceeded&quot;);</span>
+<span class="fc" id="L119">            List&lt;Path&gt; retained = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            for (Path path : paths) {</span>
+<span class="pc bpc" id="L121" title="2 of 4 branches missed.">                if (!path.getFileName().toString().matches(&quot;[0-9a-f]{64}&quot;) || !Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="nc" id="L122">                    throw new IllegalArgumentException(&quot;invalid domain export repository entry&quot;);</span>
+                }
+<span class="fc" id="L124">                retained.add(path);</span>
+<span class="fc" id="L125">            }</span>
+<span class="fc" id="L126">            return retained.stream().sorted(Comparator.comparing(path -&gt; path.getFileName().toString())).toList();</span>
+        }
+    }
+
+    private Path target(String runId) {
+<span class="fc" id="L131">        DomainCanonical.requireSha256(runId, &quot;runId&quot;); rejectLinks(directory);</span>
+<span class="fc" id="L132">        return directory.resolve(runId.substring(7));</span>
+    }
+
+    private static DomainExportWorkspace requireSame(DomainExportWorkspace retained, DomainExportWorkspace supplied) {
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        if (!retained.toCanonicalJson().equals(supplied.toCanonicalJson())) {</span>
+<span class="nc" id="L137">            throw new SourceIdentityConflictException(&quot;the export identity already binds different original bytes&quot;);</span>
+        }
+<span class="nc" id="L139">        return retained;</span>
+    }
+
+    public static final class SourceIdentityConflictException extends IllegalStateException {
+        private static final long serialVersionUID = 1L;
+<span class="nc" id="L144">        public SourceIdentityConflictException(String message) { super(message); }</span>
+    }
+
+    private static DomainDiscoveryExportVerifier verifier() {
+<span class="fc" id="L148">        return new DomainDiscoveryExportVerifier(DomainExportWorkspace.MAX_EXPORT_BYTES, DomainExportWorkspace.MAX_EXPORT_BYTES);</span>
+    }
+
+    private static void rejectLinks(Path path) {
+<span class="fc" id="L152">        Path current = path.getRoot();</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        for (Path component : path) {</span>
+<span class="fc" id="L154">            current = current.resolve(component);</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">            if (Files.isSymbolicLink(current)) throw new IllegalArgumentException(&quot;symbolic domain export repository path&quot;);</span>
+<span class="fc" id="L156">        }</span>
+<span class="fc" id="L157">    }</span>
+
+    private static void deleteTree(Path root) throws IOException {
+<span class="nc" id="L160">        try (var paths = Files.walk(root)) {</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) Files.delete(path);</span>
+        }
+<span class="nc" id="L163">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

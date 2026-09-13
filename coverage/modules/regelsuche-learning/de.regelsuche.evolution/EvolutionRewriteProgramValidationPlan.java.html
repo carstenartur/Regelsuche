@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramValidationPlan.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramValidationPlan.java</span></div><h1>EvolutionRewriteProgramValidationPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutCommitment.Split;
+import de.regelsuche.evolution.EvolutionRewriteProgramTrainSuite.PrimitiveWorkBudget;
+import de.regelsuche.evolution.RetainedEvolutionRewriteProgramPopulationRun.RetainedCandidate;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Budget;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/** Complete terminal population × bounded configuration matrix frozen before reveal. */
+public record EvolutionRewriteProgramValidationPlan(
+    String schema,
+    String studyPlanHash,
+    String splitManifestHash,
+    String trainPopulationRunHash,
+    String retainedTrainRunHash,
+    EvolutionRewriteProgramHeldOutCommitment commitment,
+    List&lt;EvolutionSplitManifest.CaseReference&gt; cases,
+    List&lt;Configuration&gt; configurations,
+    String evaluatorProtocol,
+    String contentHash
+) {
+    public static final String SCHEMA = &quot;regelsuche.evolution-rewrite-program-validation-plan/v1&quot;;
+    public static final String NATIVE_PROTOCOL =
+        &quot;PAIRED_ORDINARY_PLUS_GENOME_VS_PLUS_PROGRAM_PRIMITIVE_WORK_EXACT_RATIONAL_V1&quot;;
+
+<span class="fc" id="L30">    public EvolutionRewriteProgramValidationPlan {</span>
+<span class="pc bpc" id="L31" title="2 of 4 branches missed.">        if (!SCHEMA.equals(schema) || !NATIVE_PROTOCOL.equals(evaluatorProtocol)) {</span>
+<span class="nc" id="L32">            throw new IllegalArgumentException(&quot;unsupported program VALIDATION protocol&quot;);</span>
+        }
+<span class="fc" id="L34">        EvolutionGenome.requireSha256(studyPlanHash, &quot;studyPlanHash&quot;);</span>
+<span class="fc" id="L35">        EvolutionGenome.requireSha256(splitManifestHash, &quot;splitManifestHash&quot;);</span>
+<span class="fc" id="L36">        EvolutionGenome.requireSha256(trainPopulationRunHash, &quot;trainPopulationRunHash&quot;);</span>
+<span class="fc" id="L37">        EvolutionGenome.requireSha256(retainedTrainRunHash, &quot;retainedTrainRunHash&quot;);</span>
+<span class="fc" id="L38">        Objects.requireNonNull(commitment, &quot;commitment&quot;);</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (commitment.split() != Split.VALIDATION) {</span>
+<span class="nc" id="L40">            throw new IllegalArgumentException(&quot;only committed VALIDATION may be evaluated&quot;);</span>
+        }
+<span class="fc" id="L42">        cases = List.copyOf(Objects.requireNonNull(cases, &quot;cases&quot;));</span>
+<span class="fc" id="L43">        if (!cases.stream().map(EvolutionSplitManifest.CaseReference::caseId).toList()</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">                .equals(commitment.cases().stream().map(</span>
+<span class="fc" id="L45">                    EvolutionRewriteProgramHeldOutCommitment.CaseCommitment::caseId).toList())) {</span>
+<span class="nc" id="L46">            throw new IllegalArgumentException(&quot;case order differs from VALIDATION commitment&quot;);</span>
+        }
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        for (int index = 0; index &lt; cases.size(); index++) {</span>
+<span class="fc" id="L49">            var reference = cases.get(index);</span>
+<span class="fc" id="L50">            var committed = commitment.cases().get(index);</span>
+<span class="fc" id="L51">            if (!EvolutionRewriteProgramHeldOutCommitment.familyCommitment(reference.familyId())</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">                    .equals(committed.familyCommitmentHash())</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">                    || !reference.inputHash().equals(committed.inputHash())</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">                    || !reference.hiddenTargetHash().equals(committed.targetHash())</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">                    || !reference.exactSignatureHash().equals(committed.exactSignatureHash())</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">                    || !reference.alphaSignatureHash().equals(committed.alphaSignatureHash())) {</span>
+<span class="fc" id="L57">                throw new IllegalArgumentException(&quot;case material differs from VALIDATION commitment&quot;);</span>
+            }
+        }
+<span class="fc" id="L60">        configurations = canonicalConfigurations(configurations);</span>
+<span class="fc" id="L61">        EvolutionProgramValidationJson.requireHash(contentHash, material(studyPlanHash,</span>
+            splitManifestHash, trainPopulationRunHash, retainedTrainRunHash, commitment, cases, configurations));
+<span class="fc" id="L63">    }</span>
+
+    public static EvolutionRewriteProgramValidationPlan create(
+        EvolutionRewriteProgramStudyPlan study,
+        EvolutionSplitManifest manifest,
+        ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun train,
+        EvolutionRewriteProgramHeldOutCommitment commitment,
+        List&lt;PrimitiveWorkBudget&gt; budgets
+    ) {
+<span class="fc" id="L72">        Objects.requireNonNull(study, &quot;study&quot;);</span>
+<span class="fc" id="L73">        Objects.requireNonNull(manifest, &quot;manifest&quot;);</span>
+<span class="fc" id="L74">        Objects.requireNonNull(train, &quot;train&quot;);</span>
+<span class="fc" id="L75">        Objects.requireNonNull(commitment, &quot;commitment&quot;).requireMatches(manifest);</span>
+<span class="fc" id="L76">        var run = train.retainedPopulation().populationRun();</span>
+<span class="fc" id="L77">        var protocol = EvolutionRewriteProgramEvaluationProtocol.informationParityExactRationalV1();</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (!study.studyId().equals(manifest.studyId())</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                || !study.splitManifestHash().equals(manifest.contentHash())</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">                || !study.contentHash().equals(run.studyPlanHash())</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">                || !study.trainEvaluationProtocolHash().equals(train.evaluationProtocolHash())</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">                || !protocol.contentHash().equals(train.evaluationProtocolHash())</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">                || !protocol.implementationClass().equals(train.evaluatorImplementationClass())</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">                || study.finalTestPolicy() != EvolutionRewriteProgramStudyPlan.FinalTestPolicy</span>
+                    .ONE_TIME_AFTER_FROZEN_VALIDATION_SELECTION) {
+<span class="nc" id="L86">            throw new IllegalArgumentException(&quot;combined TRAIN study, split or evaluator identity mismatch&quot;);</span>
+        }
+<span class="fc" id="L88">        Objects.requireNonNull(budgets, &quot;budgets&quot;);</span>
+<span class="pc bpc" id="L89" title="2 of 4 branches missed.">        if (budgets.isEmpty() || budgets.stream().distinct().count() != budgets.size()) {</span>
+<span class="nc" id="L90">            throw new IllegalArgumentException(&quot;VALIDATION requires unique bounded search configurations&quot;);</span>
+        }
+<span class="fc" id="L92">        if ((long) budgets.size() * train.retainedPopulation().finalCandidates().size()</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                &gt; study.budget().maxValidationEvaluations()) {</span>
+<span class="nc" id="L94">            throw new IllegalArgumentException(&quot;complete VALIDATION matrix exceeds frozen evaluation budget&quot;);</span>
+        }
+<span class="fc" id="L96">        List&lt;Configuration&gt; matrix = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        for (RetainedCandidate retained : train.retainedPopulation().finalCandidates()) {</span>
+<span class="fc" id="L98">            var candidate = retained.candidate();</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">            if (!candidate.genome().trainingScope().equals(manifest.trainingScope())) {</span>
+<span class="nc" id="L100">                throw new IllegalArgumentException(&quot;terminal candidate differs from frozen TRAIN scope&quot;);</span>
+            }
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            for (PrimitiveWorkBudget budget : budgets) {</span>
+<span class="fc" id="L103">                matrix.add(Configuration.create(retained, budget));</span>
+<span class="fc" id="L104">            }</span>
+<span class="fc" id="L105">        }</span>
+<span class="fc" id="L106">        List&lt;Configuration&gt; configurations = canonicalConfigurations(matrix);</span>
+<span class="fc" id="L107">        List&lt;EvolutionSplitManifest.CaseReference&gt; cases = manifest.validationCases().stream()</span>
+<span class="fc" id="L108">            .sorted(Comparator.comparing(EvolutionSplitManifest.CaseReference::caseId)).toList();</span>
+<span class="fc" id="L109">        return new EvolutionRewriteProgramValidationPlan(SCHEMA, study.contentHash(), manifest.contentHash(),</span>
+<span class="fc" id="L110">            run.contentHash(), train.contentHash(), commitment, cases, configurations, NATIVE_PROTOCOL,</span>
+<span class="fc" id="L111">            EvolutionProgramValidationJson.hash(material(study.contentHash(), manifest.contentHash(),</span>
+<span class="fc" id="L112">                run.contentHash(), train.contentHash(), commitment, cases, configurations)));</span>
+    }
+
+    /** Reconstruct against external TRAIN roots; a self-rehashed reduced matrix is insufficient. */
+    public void requireInputs(EvolutionRewriteProgramStudyPlan study, EvolutionSplitManifest manifest,
+        ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun train) {
+<span class="fc" id="L118">        var expected = create(study, manifest, train, commitment,</span>
+<span class="fc" id="L119">            configurations.stream().map(Configuration::budget).distinct().toList());</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (!equals(expected)) {</span>
+<span class="fc" id="L121">            throw new IllegalArgumentException(&quot;VALIDATION plan differs from complete terminal population&quot;);</span>
+        }
+<span class="fc" id="L123">    }</span>
+
+    public String runIdentity() {
+<span class="fc" id="L126">        return EvolutionProgramValidationJson.hash(EvolutionProgramValidationJson.material(</span>
+            &quot;regelsuche.evolution-rewrite-program-validation-attempt/v1&quot;,
+            &quot;studyPlanHash&quot;, studyPlanHash, &quot;splitManifestHash&quot;, splitManifestHash));
+    }
+
+<span class="fc" id="L131">    public String toCanonicalJson() { return EvolutionProgramValidationJson.write(this); }</span>
+    public static EvolutionRewriteProgramValidationPlan fromCanonicalJson(String json) {
+<span class="fc" id="L133">        return EvolutionProgramValidationJson.read(json, EvolutionRewriteProgramValidationPlan.class);</span>
+    }
+
+    private static List&lt;Configuration&gt; canonicalConfigurations(List&lt;Configuration&gt; values) {
+<span class="fc" id="L137">        var result = Objects.requireNonNull(values, &quot;configurations&quot;).stream()</span>
+<span class="fc" id="L138">            .sorted(Comparator.comparing(Configuration::contentHash)).toList();</span>
+<span class="pc bpc" id="L139" title="2 of 4 branches missed.">        if (result.isEmpty() || result.stream().map(Configuration::contentHash).distinct().count() != result.size()) {</span>
+<span class="nc" id="L140">            throw new IllegalArgumentException(&quot;VALIDATION requires a nonempty unique complete configuration matrix&quot;);</span>
+        }
+<span class="fc" id="L142">        return result;</span>
+    }
+
+    private static Map&lt;String, Object&gt; material(String study, String split, String run, String retained,
+        EvolutionRewriteProgramHeldOutCommitment commitment,
+        List&lt;EvolutionSplitManifest.CaseReference&gt; cases, List&lt;Configuration&gt; configurations) {
+<span class="fc" id="L148">        return EvolutionProgramValidationJson.material(SCHEMA, &quot;studyPlanHash&quot;, study, &quot;splitManifestHash&quot;, split,</span>
+            &quot;trainPopulationRunHash&quot;, run, &quot;retainedTrainRunHash&quot;, retained, &quot;commitment&quot;, commitment,
+            &quot;cases&quot;, cases, &quot;configurations&quot;, configurations, &quot;evaluatorProtocol&quot;, NATIVE_PROTOCOL);
+    }
+
+    public record Configuration(RetainedCandidate retainedCandidate, PrimitiveWorkBudget budget, String contentHash) {
+        private static final String CONFIGURATION_SCHEMA =
+            &quot;regelsuche.evolution-rewrite-program-validation-configuration/v1&quot;;
+
+<span class="fc" id="L157">        public Configuration {</span>
+<span class="fc" id="L158">            Objects.requireNonNull(retainedCandidate, &quot;retainedCandidate&quot;);</span>
+<span class="fc" id="L159">            Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">            if (budget.maxCandidatesPerState() &lt; retainedCandidate.candidate().genome().budget().maxCandidatesPerState()) {</span>
+<span class="nc" id="L161">                throw new IllegalArgumentException(&quot;candidate work budget hides visible genome/program sources&quot;);</span>
+            }
+<span class="fc" id="L163">            EvolutionProgramValidationJson.requireHash(contentHash, material(retainedCandidate, budget));</span>
+<span class="fc" id="L164">        }</span>
+
+        static Configuration create(RetainedCandidate candidate, PrimitiveWorkBudget budget) {
+<span class="fc" id="L167">            return new Configuration(candidate, budget, EvolutionProgramValidationJson.hash(material(candidate, budget)));</span>
+        }
+
+<span class="fc" id="L170">        public EvolutionRewriteProgramCandidate candidate() { return retainedCandidate.candidate(); }</span>
+
+        Budget effectiveBudget() {
+<span class="fc" id="L173">            var genomeBudget = candidate().genome().budget();</span>
+<span class="fc" id="L174">            return Budget.primitive(Math.min(budget.maxPrimitiveSteps(), genomeBudget.maxApplicationsPerPath()),</span>
+<span class="fc" id="L175">                budget.maxExploredStates(),</span>
+<span class="fc" id="L176">                Math.min(budget.maxCandidatesPerState(), genomeBudget.maxCandidatesPerState()),</span>
+<span class="fc" id="L177">                Math.min(budget.maxExpandingSteps(), genomeBudget.maxApplicationsPerPath()), budget.maxWorkUnits());</span>
+        }
+
+        private static Map&lt;String, Object&gt; material(RetainedCandidate candidate, PrimitiveWorkBudget budget) {
+<span class="fc" id="L181">            return EvolutionProgramValidationJson.material(CONFIGURATION_SCHEMA,</span>
+                &quot;retainedCandidate&quot;, candidate, &quot;budget&quot;, budget, &quot;evaluatorProtocol&quot;, NATIVE_PROTOCOL);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

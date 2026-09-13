@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileEvolutionRewriteProgramValidationAttemptStore.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">FileEvolutionRewriteProgramValidationAttemptStore.java</span></div><h1>FileEvolutionRewriteProgramValidationAttemptStore.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Objects;
+import java.util.Set;
+
+/** Private POSIX VALIDATION ledger, never reset by changing a candidate or budget. */
+public final class FileEvolutionRewriteProgramValidationAttemptStore {
+    private final Path root;
+
+<span class="fc" id="L22">    public FileEvolutionRewriteProgramValidationAttemptStore(Path root) {</span>
+<span class="fc" id="L23">        this.root = Objects.requireNonNull(root, &quot;root&quot;).toAbsolutePath().normalize();</span>
+<span class="fc" id="L24">    }</span>
+
+    public Reservation reserve(EvolutionRewriteProgramValidationPlan plan) throws IOException {
+<span class="fc" id="L27">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L28">        requireNoSymlinks(root);</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        if (!root.getFileSystem().supportedFileAttributeViews().contains(&quot;posix&quot;)) {</span>
+<span class="fc" id="L30">            throw new IOException(&quot;private VALIDATION custody requires a POSIX filesystem&quot;);</span>
+        }
+<span class="fc" id="L32">        Files.createDirectories(root, PosixFilePermissions.asFileAttribute(</span>
+<span class="fc" id="L33">            PosixFilePermissions.fromString(&quot;rwx------&quot;)));</span>
+<span class="fc" id="L34">        writeCreateNew(reservationPath(plan), plan.toCanonicalJson());</span>
+<span class="fc" id="L35">        return new Reservation(plan);</span>
+    }
+
+    public void writeSelection(EvolutionRewriteProgramValidationSelection selection) throws IOException {
+<span class="fc" id="L39">        Objects.requireNonNull(selection, &quot;selection&quot;);</span>
+<span class="fc" id="L40">        requireReservation(selection.plan());</span>
+<span class="fc" id="L41">        writeCreateNew(selectionPath(selection.plan()), selection.toCanonicalJson());</span>
+<span class="fc" id="L42">    }</span>
+
+    /** Reads both private retained records against the externally expected complete plan. */
+    public EvolutionRewriteProgramValidationSelection readSelection(EvolutionRewriteProgramValidationPlan expectedPlan)
+        throws IOException {
+<span class="fc" id="L47">        requireReservation(expectedPlan);</span>
+<span class="fc" id="L48">        return EvolutionRewriteProgramValidationSelection.fromCanonicalJson(</span>
+<span class="fc" id="L49">            readPrivate(selectionPath(expectedPlan)), expectedPlan);</span>
+    }
+
+    private void requireReservation(EvolutionRewriteProgramValidationPlan expectedPlan) throws IOException {
+<span class="fc" id="L53">        Objects.requireNonNull(expectedPlan, &quot;expectedPlan&quot;);</span>
+<span class="fc" id="L54">        requirePrivateDirectory();</span>
+<span class="fc" id="L55">        var persisted = EvolutionRewriteProgramValidationPlan.fromCanonicalJson(</span>
+<span class="fc" id="L56">            readPrivate(reservationPath(expectedPlan)));</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (!persisted.equals(expectedPlan)) {</span>
+<span class="fc" id="L58">            throw new IOException(&quot;durable VALIDATION reservation differs from externally expected complete plan&quot;);</span>
+        }
+<span class="fc" id="L60">    }</span>
+
+    public Path reservationPath(EvolutionRewriteProgramValidationPlan plan) {
+<span class="fc" id="L63">        return root.resolve(token(plan) + &quot;.validation-reservation.json&quot;);</span>
+    }
+
+    public Path selectionPath(EvolutionRewriteProgramValidationPlan plan) {
+<span class="fc" id="L67">        return root.resolve(token(plan) + &quot;.validation-selection.json&quot;);</span>
+    }
+
+    private static String token(EvolutionRewriteProgramValidationPlan plan) {
+<span class="fc" id="L71">        return plan.runIdentity().substring(&quot;sha256:&quot;.length());</span>
+    }
+
+    private void requirePrivateDirectory() throws IOException {
+<span class="fc" id="L75">        requireNoSymlinks(root);</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (!Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS)</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">                || !Files.getFileStore(root).supportsFileAttributeView(&quot;posix&quot;)) {</span>
+<span class="nc" id="L78">            throw new IOException(&quot;private VALIDATION custody requires a POSIX directory&quot;);</span>
+        }
+<span class="fc" id="L80">        var permissions = Files.getPosixFilePermissions(root, LinkOption.NOFOLLOW_LINKS);</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (permissions.contains(PosixFilePermission.GROUP_WRITE)</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">                || permissions.contains(PosixFilePermission.OTHERS_WRITE)) {</span>
+<span class="fc" id="L83">            throw new IOException(&quot;VALIDATION directory must not be writable by other users&quot;);</span>
+        }
+<span class="fc" id="L85">    }</span>
+
+    private void writeCreateNew(Path path, String text) throws IOException {
+<span class="fc" id="L88">        requirePrivateDirectory();</span>
+<span class="fc" id="L89">        ByteBuffer bytes = StandardCharsets.UTF_8.encode(text);</span>
+<span class="fc" id="L90">        try (FileChannel channel = FileChannel.open(path,</span>
+<span class="fc" id="L91">                Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE),</span>
+<span class="fc" id="L92">                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString(&quot;rw-------&quot;)))) {</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            while (bytes.hasRemaining()) { channel.write(bytes); }</span>
+<span class="fc" id="L94">            channel.force(true);</span>
+        }
+<span class="fc" id="L96">        forceDirectoryChain();</span>
+<span class="fc" id="L97">    }</span>
+
+    private void forceDirectoryChain() throws IOException {
+        // Include new directory links, not only the reservation entry in the leaf ledger directory.
+        // A failed force leaves the attempt consumed, but issues no reveal receipt or successful write.
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        for (Path directory = root; directory != null; directory = directory.getParent()) {</span>
+<span class="fc" id="L103">            try (FileChannel channel = FileChannel.open(directory, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L104">                channel.force(true);</span>
+<span class="fc" id="L105">            } catch (UnsupportedOperationException | IllegalArgumentException exception) {</span>
+<span class="fc" id="L106">                throw new IOException(&quot;VALIDATION ledger requires no-follow directory force support&quot;, exception);</span>
+<span class="fc" id="L107">            }</span>
+        }
+<span class="fc" id="L109">    }</span>
+
+    private static String readPrivate(Path path) throws IOException {
+<span class="fc" id="L112">        requireNoSymlinks(path);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                || !Files.getFileStore(path).supportsFileAttributeView(&quot;posix&quot;)</span>
+<span class="fc" id="L115">                || !Files.getPosixFilePermissions(path, LinkOption.NOFOLLOW_LINKS)</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">                    .equals(PosixFilePermissions.fromString(&quot;rw-------&quot;))) {</span>
+<span class="fc" id="L117">            throw new IOException(&quot;VALIDATION reservation requires a regular owner-only POSIX file&quot;);</span>
+        }
+<span class="fc" id="L119">        try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)) {</span>
+            // Replacement decoding could alias changed bytes to an otherwise valid hashed authority.
+<span class="fc" id="L121">            return StandardCharsets.UTF_8.newDecoder()</span>
+<span class="fc" id="L122">                .onMalformedInput(CodingErrorAction.REPORT)</span>
+<span class="fc" id="L123">                .onUnmappableCharacter(CodingErrorAction.REPORT)</span>
+<span class="fc" id="L124">                .decode(ByteBuffer.wrap(Channels.newInputStream(channel).readAllBytes())).toString();</span>
+        }
+    }
+
+    private static void requireNoSymlinks(Path path) throws IOException {
+<span class="fc" id="L129">        Path current = path.toAbsolutePath().getRoot();</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        for (Path component : path.toAbsolutePath()) {</span>
+<span class="fc" id="L131">            current = current.resolve(component);</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            if (Files.isSymbolicLink(current)) {</span>
+<span class="fc" id="L133">                throw new IOException(&quot;VALIDATION custody cannot use symbolic links&quot;);</span>
+            }
+<span class="fc" id="L135">        }</span>
+<span class="fc" id="L136">    }</span>
+
+    /** A receipt is issued only after private CREATE_NEW, file force and directory force succeed. */
+    public static final class Reservation {
+        private final EvolutionRewriteProgramValidationPlan plan;
+<span class="fc" id="L141">        private Reservation(EvolutionRewriteProgramValidationPlan plan) { this.plan = plan; }</span>
+<span class="fc" id="L142">        public EvolutionRewriteProgramValidationPlan plan() { return plan; }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

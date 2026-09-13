@@ -2,6 +2,10 @@
 
 import de.regelsuche.knowledge.RuleInventoryFingerprint;
 import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.MeasuredTransformationEngine;
+import de.regelsuche.transform.MeasuredTransformationEngines;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -23,6 +27,10 @@ import java.util.TreeSet;
  * replay binds sequence/choice/repeat/guard/prioritize/prune behaviour together
  * with primitive and theory work accounting.&lt;/p&gt;
  *
+ * &lt;p&gt;The additive selected-program methods consume opaque combined-study leaf
+ * authorities directly and retain the full selected search configuration in a
+ * bounded internal executor. They do not require another genome-only study.&lt;/p&gt;
+ *
  * &lt;p&gt;This contract establishes executable identity and deterministic replay. It
  * does not by itself claim that the learned strategy improves search quality or
  * that an observed primitive path is globally shortest.&lt;/p&gt;
@@ -40,14 +48,14 @@ public final class LearnedRewriteProgramAuthorizationService {
     private final EvolutionRewriteProgramCompiler compiler;
 
     public LearnedRewriteProgramAuthorizationService() {
-<span class="fc" id="L43">        this(new EvolutionRewriteProgramCompiler());</span>
-<span class="fc" id="L44">    }</span>
+<span class="fc" id="L51">        this(new EvolutionRewriteProgramCompiler());</span>
+<span class="fc" id="L52">    }</span>
 
     LearnedRewriteProgramAuthorizationService(
         EvolutionRewriteProgramCompiler compiler
-<span class="fc" id="L48">    ) {</span>
-<span class="fc" id="L49">        this.compiler = Objects.requireNonNull(compiler, &quot;compiler&quot;);</span>
-<span class="fc" id="L50">    }</span>
+<span class="fc" id="L56">    ) {</span>
+<span class="fc" id="L57">        this.compiler = Objects.requireNonNull(compiler, &quot;compiler&quot;);</span>
+<span class="fc" id="L58">    }</span>
 
     /**
      * Executes the canonical program with independently authorized leaf rules
@@ -61,17 +69,17 @@ public final class LearnedRewriteProgramAuthorizationService {
         String repositoryRevision,
         Instant asOf
     ) {
-<span class="fc" id="L64">        VerifiedLeaves leaves = verifyLeaves(</span>
+<span class="fc" id="L72">        VerifiedLeaves leaves = verifyLeaves(</span>
             candidate,
             leafAuthorizations,
             repositoryRevision,
             asOf);
-<span class="fc" id="L69">        EvolutionRewriteProgramCompiler.CompiledRewriteProgram compiled =</span>
-<span class="fc" id="L70">            compiler.compileAuthorized(</span>
-<span class="fc" id="L71">                candidate.genome(),</span>
-<span class="fc" id="L72">                candidate.plan(),</span>
-<span class="fc" id="L73">                leaves.rulesByGeneId());</span>
-<span class="fc" id="L74">        return LearnedRewriteProgramReplayEvidence.capture(</span>
+<span class="fc" id="L77">        EvolutionRewriteProgramCompiler.CompiledRewriteProgram compiled =</span>
+<span class="fc" id="L78">            compiler.compileAuthorized(</span>
+<span class="fc" id="L79">                candidate.genome(),</span>
+<span class="fc" id="L80">                candidate.plan(),</span>
+<span class="fc" id="L81">                leaves.rulesByGeneId());</span>
+<span class="fc" id="L82">        return LearnedRewriteProgramReplayEvidence.capture(</span>
             candidate,
             compiled,
             inputs);
@@ -92,27 +100,27 @@ public final class LearnedRewriteProgramAuthorizationService {
         String repositoryRevision,
         Instant asOf
     ) {
-<span class="fc" id="L95">        VerifiedProgram verified = verifyProgram(</span>
+<span class="fc" id="L103">        VerifiedProgram verified = verifyProgram(</span>
             candidate,
             leafAuthorizations,
             replayEvidence,
             repositoryRevision,
             asOf);
-<span class="fc" id="L101">        Instant validUntil = verified.leaves().validUntil();</span>
-<span class="fc" id="L102">        LearnedRewriteProgramAuthorizationReceipt receipt =</span>
-<span class="fc" id="L103">            LearnedRewriteProgramAuthorizationReceipt.create(</span>
+<span class="fc" id="L109">        Instant validUntil = verified.leaves().validUntil();</span>
+<span class="fc" id="L110">        LearnedRewriteProgramAuthorizationReceipt receipt =</span>
+<span class="fc" id="L111">            LearnedRewriteProgramAuthorizationReceipt.create(</span>
                 candidate,
                 repositoryRevision,
                 asOf,
                 validUntil,
                 replayEvidence,
-<span class="fc" id="L109">                verified.leaves().authorizationHashes(),</span>
-<span class="fc" id="L110">                verified.leaves().applicabilitySchemaHashes());</span>
-<span class="fc" id="L111">        return new Authorization(</span>
+<span class="fc" id="L117">                verified.leaves().authorizationHashes(),</span>
+<span class="fc" id="L118">                verified.leaves().applicabilitySchemaHashes());</span>
+<span class="fc" id="L119">        return new Authorization(</span>
             candidate,
-<span class="fc" id="L113">            verified.compiled(),</span>
+<span class="fc" id="L121">            verified.compiled(),</span>
             replayEvidence,
-<span class="fc" id="L115">            verified.leaves().authorizations(),</span>
+<span class="fc" id="L123">            verified.leaves().authorizations(),</span>
             receipt);
     }
 
@@ -135,23 +143,147 @@ public final class LearnedRewriteProgramAuthorizationService {
         String repositoryRevision,
         Instant asOf
     ) {
-<span class="fc" id="L138">        Objects.requireNonNull(receipt, &quot;receipt&quot;);</span>
-<span class="fc" id="L139">        receipt.requireUsableAt(</span>
-<span class="fc" id="L140">            receipt.authorizedAt(),</span>
+<span class="fc" id="L146">        Objects.requireNonNull(receipt, &quot;receipt&quot;);</span>
+<span class="fc" id="L147">        receipt.requireUsableAt(</span>
+<span class="fc" id="L148">            receipt.authorizedAt(),</span>
             repositoryRevision,
             candidate);
-<span class="fc" id="L143">        Authorization replayed = authorize(</span>
+<span class="fc" id="L151">        Authorization replayed = authorize(</span>
             candidate,
             leafAuthorizations,
             replayEvidence,
             repositoryRevision,
-<span class="fc" id="L148">            receipt.authorizedAt());</span>
-<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (!receipt.equals(replayed.receipt())) {</span>
-<span class="nc" id="L150">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L156">            receipt.authorizedAt());</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        if (!receipt.equals(replayed.receipt())) {</span>
+<span class="nc" id="L158">            throw new IllegalArgumentException(</span>
                 &quot;stored rewrite-program authorization differs from evidence replay&quot;);
         }
-<span class="fc" id="L153">        receipt.requireUsableAt(asOf, repositoryRevision, candidate);</span>
-<span class="fc" id="L154">        return replayed;</span>
+<span class="fc" id="L161">        receipt.requireUsableAt(asOf, repositoryRevision, candidate);</span>
+<span class="fc" id="L162">        return replayed;</span>
+    }
+
+    /** Captures real public-input replay using leaves verified from the same one-shot combined study. */
+    public LearnedSelectedProgramReplayEvidence evaluateSelectedReplay(EvolutionRewriteProgramFinalTestPlan plan,
+        List&lt;LearnedPatternRuleAuthorizationService.SelectedLeafAuthorization&gt; leafAuthorizations,
+        List&lt;LearnedSelectedProgramReplayEvidence.Input&gt; inputs, String repositoryRevision, Instant asOf) {
+<span class="fc" id="L169">        var selected = verifySelected(plan, leafAuthorizations, repositoryRevision, asOf);</span>
+<span class="fc" id="L170">        return LearnedSelectedProgramReplayEvidence.capture(plan, selected.bundle(), selected.leafHashes(),</span>
+<span class="fc" id="L171">            selected.compiled(), selected.engine(), inputs);</span>
+    }
+
+    /** Internal execution authority only; scientific, publication and release claims remain separate. */
+    public SelectedAuthorization authorizeSelected(EvolutionRewriteProgramFinalTestPlan plan,
+        List&lt;LearnedPatternRuleAuthorizationService.SelectedLeafAuthorization&gt; leafAuthorizations,
+        LearnedSelectedProgramReplayEvidence evidence, String repositoryRevision, Clock clock) {
+<span class="fc" id="L178">        Objects.requireNonNull(clock, &quot;clock&quot;);</span>
+<span class="fc" id="L179">        Instant startedAt = clock.instant();</span>
+<span class="fc" id="L180">        var selected = verifySelected(plan, leafAuthorizations, repositoryRevision, startedAt);</span>
+<span class="fc" id="L181">        Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="fc" id="L182">        var replay = LearnedSelectedProgramReplayEvidence.capture(plan, selected.bundle(), selected.leafHashes(),</span>
+<span class="fc" id="L183">            selected.compiled(), selected.engine(), evidence.inputs());</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        if (!replay.equals(evidence)) {</span>
+<span class="fc" id="L185">            throw new IllegalArgumentException(&quot;selected-program replay differs from actual authorized execution&quot;);</span>
+        }
+<span class="pc bpc" id="L187" title="1 of 6 branches missed.">        if (replay.cases().stream().anyMatch(item -&gt; !item.programReplay().complete() || !item.search().complete()</span>
+<span class="pc bpc" id="L188" title="2 of 4 branches missed.">                || (item.search().reached() &amp;&amp; item.search().correctness()</span>
+                    != EvolutionRewriteProgramTrainFitnessEvidence.PathCorrectness.CONFIRMED)
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">                || item.programReplay().candidates().stream().anyMatch(candidate -&gt;</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">                    !item.input().assumptions().containsAll(candidate.assumptions())))) {</span>
+<span class="fc" id="L192">            throw new IllegalArgumentException(&quot;selected-program replay retains incomplete or unqualified concrete outcomes&quot;);</span>
+        }
+<span class="fc" id="L194">        Instant authorizedAt = clock.instant();</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (authorizedAt.isBefore(startedAt)) { throw new IllegalArgumentException(&quot;authorization clock moved backwards during replay&quot;); }</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        for (var leaf : selected.leaves()) { leaf.requireUsableAt(plan, repositoryRevision, authorizedAt); }</span>
+<span class="fc" id="L197">        return new SelectedAuthorization(plan, selected, replay, repositoryRevision, clock, authorizedAt);</span>
+    }
+
+    private VerifiedSelected verifySelected(EvolutionRewriteProgramFinalTestPlan plan,
+        List&lt;LearnedPatternRuleAuthorizationService.SelectedLeafAuthorization&gt; authorizations, String revision, Instant asOf) {
+<span class="fc" id="L202">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L203">        Objects.requireNonNull(authorizations, &quot;authorizations&quot;);</span>
+<span class="fc" id="L204">        LearnedPatternAuthorizationJson.requireRevision(revision, &quot;repositoryRevision&quot;);</span>
+<span class="fc" id="L205">        var genome = plan.selectedConfiguration().candidate().genome();</span>
+<span class="fc" id="L206">        Set&lt;String&gt; executing = new TreeSet&lt;&gt;(genome.rewrites().stream().map(EvolutionGenome.RewriteGene::geneId).toList());</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        if (authorizations.size() != executing.size()) {</span>
+<span class="fc" id="L208">            throw new IllegalArgumentException(&quot;selected runtime requires exactly one authority for every executing genome gene&quot;);</span>
+        }
+<span class="fc" id="L210">        Map&lt;String, RewriteRule&gt; allRules = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L211">        Map&lt;String, String&gt; hashes = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L212">        LearnedSelectedProgramAuthorizationBundle bundle = null;</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        for (var leaf : authorizations) {</span>
+<span class="fc" id="L214">            Objects.requireNonNull(leaf, &quot;leaf&quot;).requireUsableAt(plan, revision, asOf);</span>
+<span class="pc bpc" id="L215" title="2 of 4 branches missed.">            if (!executing.contains(leaf.geneId()) || allRules.put(leaf.geneId(), leaf.promotion().rule()) != null) {</span>
+<span class="nc" id="L216">                throw new IllegalArgumentException(&quot;duplicate or foreign selected leaf authority&quot;);</span>
+            }
+<span class="pc bpc" id="L218" title="1 of 4 branches missed.">            if (bundle != null &amp;&amp; !bundle.equals(leaf.bundle())) {</span>
+<span class="nc" id="L219">                throw new IllegalArgumentException(&quot;selected leaves have different full evidence or validity bindings&quot;);</span>
+            }
+<span class="fc" id="L221">            bundle = leaf.bundle();</span>
+<span class="fc" id="L222">            hashes.put(leaf.geneId(), leaf.contentHash());</span>
+<span class="fc" id="L223">        }</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        if (!allRules.keySet().equals(executing)) { throw new IllegalArgumentException(&quot;selected leaf inventory differs from genome&quot;); }</span>
+<span class="fc" id="L225">        var candidate = plan.selectedConfiguration().candidate();</span>
+<span class="fc" id="L226">        Map&lt;String, RewriteRule&gt; referenced = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        for (String id : candidate.plan().referencedGeneIds()) { referenced.put(id, allRules.get(id)); }</span>
+<span class="fc" id="L228">        var compiled = compiler.compileAuthorized(genome, candidate.plan(), referenced);</span>
+<span class="fc" id="L229">        var budget = plan.selectedConfiguration().effectiveBudget();</span>
+<span class="fc" id="L230">        var ordinary = MeasuredTransformationEngines.counting(new AstRewriteTransformationEngine(</span>
+<span class="fc" id="L231">            AstRewriteTransformationEngine.defaultRules(), genome.budget().maxAstGrowthPerStep(), budget.maxCandidatesPerState()));</span>
+<span class="fc" id="L232">        var flat = MeasuredTransformationEngines.counting(new AstRewriteTransformationEngine(</span>
+<span class="fc" id="L233">            List.copyOf(allRules.values()), genome.budget().maxAstGrowthPerStep(), budget.maxCandidatesPerState()));</span>
+<span class="fc" id="L234">        return new VerifiedSelected(Objects.requireNonNull(bundle, &quot;bundle&quot;), Map.copyOf(hashes), compiled,</span>
+<span class="fc" id="L235">            MeasuredTransformationEngines.union(ordinary, flat, compiled.engine()), List.copyOf(authorizations));</span>
+    }
+
+<span class="fc" id="L238">    private record VerifiedSelected(LearnedSelectedProgramAuthorizationBundle bundle, Map&lt;String, String&gt; leafHashes,</span>
+        EvolutionRewriteProgramCompiler.CompiledRewriteProgram compiled, MeasuredTransformationEngine engine,
+        List&lt;LearnedPatternRuleAuthorizationService.SelectedLeafAuthorization&gt; leaves) { }
+
+    /** Opaque, bounded executor. It never exposes its compiled program, promoted rules or underlying engine. */
+    public static final class SelectedAuthorization {
+        private final EvolutionRewriteProgramFinalTestPlan plan;
+        private final VerifiedSelected verified;
+        private final LearnedSelectedProgramReplayEvidence replay;
+        private final String repositoryRevision;
+        private final Clock clock;
+        private final Instant authorizedAt;
+        private final String bindingHash;
+
+        private SelectedAuthorization(EvolutionRewriteProgramFinalTestPlan plan, VerifiedSelected verified,
+<span class="fc" id="L253">            LearnedSelectedProgramReplayEvidence replay, String revision, Clock clock, Instant authorizedAt) {</span>
+<span class="fc" id="L254">            this.plan = plan;</span>
+<span class="fc" id="L255">            this.verified = verified;</span>
+<span class="fc" id="L256">            this.replay = replay;</span>
+<span class="fc" id="L257">            this.repositoryRevision = revision;</span>
+<span class="fc" id="L258">            this.clock = clock;</span>
+<span class="fc" id="L259">            this.authorizedAt = authorizedAt;</span>
+<span class="fc" id="L260">            this.bindingHash = EvolutionProgramValidationJson.hash(EvolutionProgramValidationJson.material(</span>
+<span class="fc" id="L261">                &quot;regelsuche.learned-selected-program-internal-authorization/v1&quot;, &quot;finalPlanHash&quot;, plan.contentHash(),</span>
+<span class="fc" id="L262">                &quot;configurationHash&quot;, plan.selectedConfiguration().contentHash(), &quot;bundleHash&quot;, verified.bundle().contentHash(),</span>
+<span class="fc" id="L263">                &quot;leafAuthorizationHashes&quot;, verified.leafHashes(), &quot;replayHash&quot;, replay.contentHash(), &quot;scope&quot;, scope(),</span>
+<span class="fc" id="L264">                &quot;authorizedAt&quot;, authorizedAt, &quot;claimStatuses&quot;, claimStatuses()));</span>
+<span class="fc" id="L265">        }</span>
+
+        public EvolutionRewriteProgramValidationEvidence.Measurement execute(LearnedSelectedProgramReplayEvidence.Input input,
+            String expectedRepositoryRevision) {
+<span class="fc" id="L269">            Objects.requireNonNull(input, &quot;input&quot;);</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">            if (!repositoryRevision.equals(expectedRepositoryRevision)) {</span>
+<span class="fc" id="L271">                throw new IllegalArgumentException(&quot;selected runtime repository revision has changed&quot;);</span>
+            }
+<span class="fc" id="L273">            Instant asOf = clock.instant();</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">            if (asOf.isBefore(authorizedAt)) { throw new IllegalArgumentException(&quot;selected capability predates actual program authorization&quot;); }</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">            for (var leaf : verified.leaves()) { leaf.requireUsableAt(plan, expectedRepositoryRevision, asOf); }</span>
+<span class="fc" id="L276">            return new NativeEvolutionRewriteProgramValidationEvaluator().evaluateSide(verified.engine(), input.inputExpression(),</span>
+<span class="fc" id="L277">                input.targetExpression(), input.assumptions(), plan.selectedConfiguration().effectiveBudget());</span>
+        }
+
+<span class="fc" id="L280">        public String bindingHash() { return bindingHash; }</span>
+<span class="fc" id="L281">        public String scope() { return &quot;INTERNAL_EXECUTION_ONLY&quot;; }</span>
+<span class="nc" id="L282">        public LearnedSelectedProgramReplayEvidence replayEvidence() { return replay; }</span>
+        public Map&lt;String, String&gt; claimStatuses() {
+<span class="fc" id="L284">            return Map.of(&quot;projectNovelty&quot;, &quot;NOT_EVALUATED&quot;, &quot;externalNovelty&quot;, &quot;NOT_EVALUATED&quot;, &quot;publicEvidence&quot;, &quot;NOT_EVALUATED&quot;,</span>
+                &quot;publicPromotion&quot;, &quot;NOT_EVALUATED&quot;, &quot;release&quot;, &quot;NOT_EVALUATED&quot;);
+        }
     }
 
     private VerifiedProgram verifyProgram(
@@ -162,31 +294,31 @@ public final class LearnedRewriteProgramAuthorizationService {
         String repositoryRevision,
         Instant asOf
     ) {
-<span class="fc" id="L165">        Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
-<span class="fc" id="L166">        Objects.requireNonNull(replayEvidence, &quot;replayEvidence&quot;);</span>
-<span class="fc" id="L167">        replayEvidence.requireCandidate(candidate);</span>
-<span class="fc" id="L168">        VerifiedLeaves leaves = verifyLeaves(</span>
+<span class="fc" id="L297">        Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc" id="L298">        Objects.requireNonNull(replayEvidence, &quot;replayEvidence&quot;);</span>
+<span class="fc" id="L299">        replayEvidence.requireCandidate(candidate);</span>
+<span class="fc" id="L300">        VerifiedLeaves leaves = verifyLeaves(</span>
             candidate,
             leafAuthorizations,
             repositoryRevision,
             asOf);
-<span class="fc" id="L173">        EvolutionRewriteProgramCompiler.CompiledRewriteProgram compiled =</span>
-<span class="fc" id="L174">            compiler.compileAuthorized(</span>
-<span class="fc" id="L175">                candidate.genome(),</span>
-<span class="fc" id="L176">                candidate.plan(),</span>
-<span class="fc" id="L177">                leaves.rulesByGeneId());</span>
-<span class="fc" id="L178">        LearnedRewriteProgramReplayEvidence replay =</span>
-<span class="fc" id="L179">            LearnedRewriteProgramReplayEvidence.capture(</span>
+<span class="fc" id="L305">        EvolutionRewriteProgramCompiler.CompiledRewriteProgram compiled =</span>
+<span class="fc" id="L306">            compiler.compileAuthorized(</span>
+<span class="fc" id="L307">                candidate.genome(),</span>
+<span class="fc" id="L308">                candidate.plan(),</span>
+<span class="fc" id="L309">                leaves.rulesByGeneId());</span>
+<span class="fc" id="L310">        LearnedRewriteProgramReplayEvidence replay =</span>
+<span class="fc" id="L311">            LearnedRewriteProgramReplayEvidence.capture(</span>
                 candidate,
                 compiled,
-<span class="fc" id="L182">                replayEvidence.replayInputs());</span>
-<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (!replay.contentHash().equals(replayEvidence.contentHash())</span>
-<span class="pc bpc" id="L184" title="1 of 2 branches missed.">                || !replay.toCanonicalJson().equals(</span>
-<span class="fc" id="L185">                    replayEvidence.toCanonicalJson())) {</span>
-<span class="nc" id="L186">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L314">                replayEvidence.replayInputs());</span>
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        if (!replay.contentHash().equals(replayEvidence.contentHash())</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">                || !replay.toCanonicalJson().equals(</span>
+<span class="fc" id="L317">                    replayEvidence.toCanonicalJson())) {</span>
+<span class="nc" id="L318">            throw new IllegalArgumentException(</span>
                 &quot;rewrite-program evidence differs from deterministic replay&quot;);
         }
-<span class="fc" id="L189">        return new VerifiedProgram(compiled, leaves);</span>
+<span class="fc" id="L321">        return new VerifiedProgram(compiled, leaves);</span>
     }
 
     private static VerifiedLeaves verifyLeaves(
@@ -196,95 +328,95 @@ public final class LearnedRewriteProgramAuthorizationService {
         String repositoryRevision,
         Instant asOf
     ) {
-<span class="fc" id="L199">        Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
-<span class="fc" id="L200">        LearnedPatternAuthorizationJson.requireRevision(</span>
+<span class="fc" id="L331">        Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc" id="L332">        LearnedPatternAuthorizationJson.requireRevision(</span>
             repositoryRevision, &quot;repositoryRevision&quot;);
-<span class="fc" id="L202">        Objects.requireNonNull(asOf, &quot;asOf&quot;);</span>
-<span class="fc" id="L203">        Objects.requireNonNull(leafAuthorizations, &quot;leafAuthorizations&quot;);</span>
+<span class="fc" id="L334">        Objects.requireNonNull(asOf, &quot;asOf&quot;);</span>
+<span class="fc" id="L335">        Objects.requireNonNull(leafAuthorizations, &quot;leafAuthorizations&quot;);</span>
 
-<span class="fc" id="L205">        Set&lt;String&gt; referenced = new TreeSet&lt;&gt;(</span>
-<span class="fc" id="L206">            candidate.plan().referencedGeneIds());</span>
-<span class="pc bpc" id="L207" title="1 of 2 branches missed.">        if (referenced.isEmpty()) {</span>
-<span class="nc" id="L208">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L337">        Set&lt;String&gt; referenced = new TreeSet&lt;&gt;(</span>
+<span class="fc" id="L338">            candidate.plan().referencedGeneIds());</span>
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">        if (referenced.isEmpty()) {</span>
+<span class="nc" id="L340">            throw new IllegalArgumentException(</span>
                 &quot;learned rewrite program must reference at least one gene&quot;);
         }
-<span class="fc bfc" id="L211" title="All 2 branches covered.">        if (leafAuthorizations.size() != referenced.size()) {</span>
-<span class="fc" id="L212">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        if (leafAuthorizations.size() != referenced.size()) {</span>
+<span class="fc" id="L344">            throw new IllegalArgumentException(</span>
                 &quot;one leaf authorization is required for every referenced gene&quot;);
         }
 
-<span class="fc" id="L216">        TreeMap&lt;String, RewriteRule&gt; rules = new TreeMap&lt;&gt;();</span>
-<span class="fc" id="L217">        TreeMap&lt;String, String&gt; receiptHashes = new TreeMap&lt;&gt;();</span>
-<span class="fc" id="L218">        TreeMap&lt;String, String&gt; applicabilityHashes = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L348">        TreeMap&lt;String, RewriteRule&gt; rules = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L349">        TreeMap&lt;String, String&gt; receiptHashes = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L350">        TreeMap&lt;String, String&gt; applicabilityHashes = new TreeMap&lt;&gt;();</span>
         ArrayList&lt;LearnedPatternRuleAuthorizationService.Authorization&gt;
-<span class="fc" id="L220">            retained = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L221">        Instant validUntil = null;</span>
+<span class="fc" id="L352">            retained = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L353">        Instant validUntil = null;</span>
         for (LearnedPatternRuleAuthorizationService.Authorization authorization
-<span class="fc bfc" id="L223" title="All 2 branches covered.">                : leafAuthorizations) {</span>
-<span class="fc" id="L224">            LearnedPatternRuleAuthorizationService.Authorization checked =</span>
-<span class="fc" id="L225">                Objects.requireNonNull(authorization, &quot;leaf authorization&quot;);</span>
-<span class="fc" id="L226">            LearnedPatternAuthorizationReceipt receipt = checked.receipt();</span>
-<span class="fc" id="L227">            String geneId = receipt.geneId();</span>
-<span class="pc bpc" id="L228" title="1 of 2 branches missed.">            if (!referenced.contains(geneId)) {</span>
-<span class="nc" id="L229">                throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">                : leafAuthorizations) {</span>
+<span class="fc" id="L356">            LearnedPatternRuleAuthorizationService.Authorization checked =</span>
+<span class="fc" id="L357">                Objects.requireNonNull(authorization, &quot;leaf authorization&quot;);</span>
+<span class="fc" id="L358">            LearnedPatternAuthorizationReceipt receipt = checked.receipt();</span>
+<span class="fc" id="L359">            String geneId = receipt.geneId();</span>
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">            if (!referenced.contains(geneId)) {</span>
+<span class="nc" id="L361">                throw new IllegalArgumentException(</span>
                     &quot;leaf authorization is not referenced by program: &quot; + geneId);
             }
-<span class="pc bpc" id="L232" title="1 of 2 branches missed.">            if (!receipt.genomeHash().equals(candidate.genome().contentHash())) {</span>
-<span class="nc" id="L233">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">            if (!receipt.genomeHash().equals(candidate.genome().contentHash())) {</span>
+<span class="nc" id="L365">                throw new IllegalArgumentException(</span>
                     &quot;leaf authorization belongs to a different genome: &quot; + geneId);
             }
-<span class="fc" id="L236">            String promotedRuleHash =</span>
-<span class="fc" id="L237">                RuleInventoryFingerprint.ruleContentHash(</span>
-<span class="fc" id="L238">                    checked.promotion().rule());</span>
-<span class="fc" id="L239">            receipt.requireUsableAt(</span>
+<span class="fc" id="L368">            String promotedRuleHash =</span>
+<span class="fc" id="L369">                RuleInventoryFingerprint.ruleContentHash(</span>
+<span class="fc" id="L370">                    checked.promotion().rule());</span>
+<span class="fc" id="L371">            receipt.requireUsableAt(</span>
                 asOf,
                 repositoryRevision,
                 promotedRuleHash);
-<span class="fc" id="L243">            if (!checked.promotion().rule()</span>
-<span class="pc bpc" id="L244" title="1 of 2 branches missed.">                    .isEquivalencePreservingByConstruction()) {</span>
-<span class="nc" id="L245">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L375">            if (!checked.promotion().rule()</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">                    .isEquivalencePreservingByConstruction()) {</span>
+<span class="nc" id="L377">                throw new IllegalArgumentException(</span>
                     &quot;learned program leaf is not equivalence preserving: &quot; + geneId);
             }
-<span class="fc" id="L248">            String applicabilityHash =</span>
-<span class="fc" id="L249">                checked.promotion().applicabilitySchema().contentHash();</span>
-<span class="pc bpc" id="L250" title="1 of 2 branches missed.">            if (!receipt.applicabilitySchemaHash().equals(applicabilityHash)) {</span>
-<span class="nc" id="L251">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L380">            String applicabilityHash =</span>
+<span class="fc" id="L381">                checked.promotion().applicabilitySchema().contentHash();</span>
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">            if (!receipt.applicabilitySchemaHash().equals(applicabilityHash)) {</span>
+<span class="nc" id="L383">                throw new IllegalArgumentException(</span>
                     &quot;leaf applicability schema differs from its authorization receipt: &quot;
                         + geneId);
             }
-<span class="pc bpc" id="L255" title="1 of 2 branches missed.">            if (rules.put(geneId, checked.promotion().rule()) != null</span>
-<span class="pc bpc" id="L256" title="1 of 2 branches missed.">                    || receiptHashes.put(geneId, receipt.contentHash()) != null</span>
-<span class="pc bpc" id="L257" title="1 of 2 branches missed.">                    || applicabilityHashes.put(geneId, applicabilityHash) != null) {</span>
-<span class="nc" id="L258">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">            if (rules.put(geneId, checked.promotion().rule()) != null</span>
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">                    || receiptHashes.put(geneId, receipt.contentHash()) != null</span>
+<span class="pc bpc" id="L389" title="1 of 2 branches missed.">                    || applicabilityHashes.put(geneId, applicabilityHash) != null) {</span>
+<span class="nc" id="L390">                throw new IllegalArgumentException(</span>
                     &quot;duplicate leaf authorization for &quot; + geneId);
             }
-<span class="fc" id="L261">            retained.add(checked);</span>
+<span class="fc" id="L393">            retained.add(checked);</span>
             validUntil = validUntil == null
-<span class="pc bpc" id="L263" title="1 of 4 branches missed.">                || receipt.validUntil().isBefore(validUntil)</span>
-<span class="fc" id="L264">                    ? receipt.validUntil()</span>
-<span class="fc" id="L265">                    : validUntil;</span>
-<span class="fc" id="L266">        }</span>
-<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        if (!rules.keySet().equals(referenced)</span>
-<span class="pc bpc" id="L268" title="1 of 2 branches missed.">                || !applicabilityHashes.keySet().equals(referenced)) {</span>
-<span class="nc" id="L269">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L395" title="1 of 4 branches missed.">                || receipt.validUntil().isBefore(validUntil)</span>
+<span class="fc" id="L396">                    ? receipt.validUntil()</span>
+<span class="fc" id="L397">                    : validUntil;</span>
+<span class="fc" id="L398">        }</span>
+<span class="pc bpc" id="L399" title="1 of 2 branches missed.">        if (!rules.keySet().equals(referenced)</span>
+<span class="pc bpc" id="L400" title="1 of 2 branches missed.">                || !applicabilityHashes.keySet().equals(referenced)) {</span>
+<span class="nc" id="L401">            throw new IllegalArgumentException(</span>
                 &quot;leaf authorization set differs from referenced program genes&quot;);
         }
-<span class="fc" id="L272">        retained.sort(Comparator.comparing(value -&gt; value.receipt().geneId()));</span>
-<span class="fc" id="L273">        return new VerifiedLeaves(</span>
-<span class="fc" id="L274">            Map.copyOf(rules),</span>
-<span class="fc" id="L275">            Map.copyOf(receiptHashes),</span>
-<span class="fc" id="L276">            Map.copyOf(applicabilityHashes),</span>
-<span class="fc" id="L277">            List.copyOf(retained),</span>
-<span class="fc" id="L278">            Objects.requireNonNull(validUntil, &quot;validUntil&quot;));</span>
+<span class="fc" id="L404">        retained.sort(Comparator.comparing(value -&gt; value.receipt().geneId()));</span>
+<span class="fc" id="L405">        return new VerifiedLeaves(</span>
+<span class="fc" id="L406">            Map.copyOf(rules),</span>
+<span class="fc" id="L407">            Map.copyOf(receiptHashes),</span>
+<span class="fc" id="L408">            Map.copyOf(applicabilityHashes),</span>
+<span class="fc" id="L409">            List.copyOf(retained),</span>
+<span class="fc" id="L410">            Objects.requireNonNull(validUntil, &quot;validUntil&quot;));</span>
     }
 
-<span class="fc" id="L281">    private record VerifiedProgram(</span>
+<span class="fc" id="L413">    private record VerifiedProgram(</span>
         EvolutionRewriteProgramCompiler.CompiledRewriteProgram compiled,
         VerifiedLeaves leaves
     ) {
     }
 
-<span class="fc" id="L287">    private record VerifiedLeaves(</span>
+<span class="fc" id="L419">    private record VerifiedLeaves(</span>
         Map&lt;String, RewriteRule&gt; rulesByGeneId,
         Map&lt;String, String&gt; authorizationHashes,
         Map&lt;String, String&gt; applicabilitySchemaHashes,
@@ -302,53 +434,53 @@ public final class LearnedRewriteProgramAuthorizationService {
             leafAuthorizations,
         LearnedRewriteProgramAuthorizationReceipt receipt
     ) {
-<span class="fc" id="L305">        public Authorization {</span>
-<span class="fc" id="L306">            candidate = Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
-<span class="fc" id="L307">            compiledProgram = Objects.requireNonNull(</span>
+<span class="fc" id="L437">        public Authorization {</span>
+<span class="fc" id="L438">            candidate = Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc" id="L439">            compiledProgram = Objects.requireNonNull(</span>
                 compiledProgram, &quot;compiledProgram&quot;);
-<span class="fc" id="L309">            replayEvidence = Objects.requireNonNull(</span>
+<span class="fc" id="L441">            replayEvidence = Objects.requireNonNull(</span>
                 replayEvidence, &quot;replayEvidence&quot;);
-<span class="fc" id="L311">            leafAuthorizations = List.copyOf(Objects.requireNonNull(</span>
+<span class="fc" id="L443">            leafAuthorizations = List.copyOf(Objects.requireNonNull(</span>
                 leafAuthorizations, &quot;leafAuthorizations&quot;));
-<span class="fc" id="L313">            receipt = Objects.requireNonNull(receipt, &quot;receipt&quot;);</span>
-<span class="fc" id="L314">            replayEvidence.requireCandidate(candidate);</span>
-<span class="pc bpc" id="L315" title="1 of 2 branches missed.">            if (!receipt.candidateHash().equals(candidate.contentHash())</span>
-<span class="pc bpc" id="L316" title="1 of 2 branches missed.">                    || !receipt.replayEvidenceHash().equals(</span>
-<span class="fc" id="L317">                        replayEvidence.contentHash())</span>
-<span class="pc bpc" id="L318" title="1 of 2 branches missed.">                    || !APPLICABILITY_SEMANTICS.equals(</span>
-<span class="fc" id="L319">                        receipt.applicabilitySemantics())</span>
-<span class="pc bpc" id="L320" title="1 of 2 branches missed.">                    || !compiledProgram.genomeHash().equals(</span>
-<span class="fc" id="L321">                        candidate.genome().contentHash())</span>
-<span class="pc bpc" id="L322" title="1 of 2 branches missed.">                    || !compiledProgram.planHash().equals(</span>
-<span class="fc" id="L323">                        candidate.plan().contentHash())) {</span>
-<span class="nc" id="L324">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L445">            receipt = Objects.requireNonNull(receipt, &quot;receipt&quot;);</span>
+<span class="fc" id="L446">            replayEvidence.requireCandidate(candidate);</span>
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">            if (!receipt.candidateHash().equals(candidate.contentHash())</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">                    || !receipt.replayEvidenceHash().equals(</span>
+<span class="fc" id="L449">                        replayEvidence.contentHash())</span>
+<span class="pc bpc" id="L450" title="1 of 2 branches missed.">                    || !APPLICABILITY_SEMANTICS.equals(</span>
+<span class="fc" id="L451">                        receipt.applicabilitySemantics())</span>
+<span class="pc bpc" id="L452" title="1 of 2 branches missed.">                    || !compiledProgram.genomeHash().equals(</span>
+<span class="fc" id="L453">                        candidate.genome().contentHash())</span>
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">                    || !compiledProgram.planHash().equals(</span>
+<span class="fc" id="L455">                        candidate.plan().contentHash())) {</span>
+<span class="nc" id="L456">                throw new IllegalArgumentException(</span>
                     &quot;learned rewrite-program authorization products are inconsistent&quot;);
             }
-<span class="fc" id="L327">            Map&lt;String, String&gt; leaves = new TreeMap&lt;&gt;();</span>
-<span class="fc" id="L328">            Map&lt;String, String&gt; applicability = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L459">            Map&lt;String, String&gt; leaves = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L460">            Map&lt;String, String&gt; applicability = new TreeMap&lt;&gt;();</span>
             for (LearnedPatternRuleAuthorizationService.Authorization leaf
-<span class="fc bfc" id="L330" title="All 2 branches covered.">                    : leafAuthorizations) {</span>
-<span class="fc" id="L331">                String geneId = leaf.receipt().geneId();</span>
-<span class="pc bpc" id="L332" title="1 of 2 branches missed.">                if (leaves.put(</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">                    : leafAuthorizations) {</span>
+<span class="fc" id="L463">                String geneId = leaf.receipt().geneId();</span>
+<span class="pc bpc" id="L464" title="1 of 2 branches missed.">                if (leaves.put(</span>
                         geneId,
-<span class="fc" id="L334">                        leaf.receipt().contentHash()) != null</span>
-<span class="pc bpc" id="L335" title="1 of 2 branches missed.">                        || applicability.put(</span>
+<span class="fc" id="L466">                        leaf.receipt().contentHash()) != null</span>
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">                        || applicability.put(</span>
                             geneId,
-<span class="fc" id="L337">                            leaf.promotion().applicabilitySchema().contentHash())</span>
+<span class="fc" id="L469">                            leaf.promotion().applicabilitySchema().contentHash())</span>
                             != null) {
-<span class="nc" id="L339">                    throw new IllegalArgumentException(</span>
+<span class="nc" id="L471">                    throw new IllegalArgumentException(</span>
                         &quot;duplicate authorized leaf in program result&quot;);
                 }
-<span class="fc" id="L342">            }</span>
-<span class="pc bpc" id="L343" title="1 of 2 branches missed.">            if (!receipt.leafAuthorizationHashes().equals(leaves)</span>
-<span class="pc bpc" id="L344" title="1 of 2 branches missed.">                    || !receipt.leafApplicabilitySchemaHashes().equals(</span>
+<span class="fc" id="L474">            }</span>
+<span class="pc bpc" id="L475" title="1 of 2 branches missed.">            if (!receipt.leafAuthorizationHashes().equals(leaves)</span>
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">                    || !receipt.leafApplicabilitySchemaHashes().equals(</span>
                         applicability)
-<span class="fc" id="L346">                    || !Set.copyOf(compiledProgram.referencedGeneIds())</span>
-<span class="pc bpc" id="L347" title="1 of 2 branches missed.">                        .equals(leaves.keySet())) {</span>
-<span class="nc" id="L348">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L478">                    || !Set.copyOf(compiledProgram.referencedGeneIds())</span>
+<span class="pc bpc" id="L479" title="1 of 2 branches missed.">                        .equals(leaves.keySet())) {</span>
+<span class="nc" id="L480">                throw new IllegalArgumentException(</span>
                     &quot;compiled program, receipt and leaf authorities differ&quot;);
             }
-<span class="fc" id="L351">        }</span>
+<span class="fc" id="L483">        }</span>
 
         /**
          * Program-level applicability is the canonical control-flow semantics,
@@ -356,9 +488,9 @@ public final class LearnedRewriteProgramAuthorizationService {
          * the authorized program for the supplied expression.
          */
         public boolean isApplicable(String expression) {
-<span class="fc" id="L359">            LearnedPatternAuthorizationJson.requireText(expression, &quot;expression&quot;);</span>
-<span class="fc" id="L360">            return !compiledProgram.engine().execute(expression)</span>
-<span class="fc bfc" id="L361" title="All 2 branches covered.">                .candidates().isEmpty();</span>
+<span class="fc" id="L491">            LearnedPatternAuthorizationJson.requireText(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L492">            return !compiledProgram.engine().execute(expression)</span>
+<span class="fc bfc" id="L493" title="All 2 branches covered.">                .candidates().isEmpty();</span>
         }
     }
 }

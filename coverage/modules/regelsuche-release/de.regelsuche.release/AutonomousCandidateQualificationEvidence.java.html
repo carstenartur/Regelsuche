@@ -117,8 +117,8 @@ public record AutonomousCandidateQualificationEvidence(
             mandatorySkippedWorkCount, refutingHoldouts, counterexamplesFound,
             pairedHeldOutUtilityEvaluated, pairedUtilityPermille,
             correctnessRegressionCount, qualified);
-<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (!expectedHash.equals(contentHash)) {</span>
-<span class="nc" id="L121">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (!expectedHash.equals(contentHash)) {</span>
+<span class="fc" id="L121">            throw new IllegalArgumentException(</span>
                 &quot;candidate qualification hash does not match canonical fields&quot;);
         }
 <span class="fc" id="L124">    }</span>

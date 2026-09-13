@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReleaseReadinessBindings.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">ReleaseReadinessBindings.java</span></div><h1>ReleaseReadinessBindings.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import de.regelsuche.experiments.autopilot.AutonomousProductionCampaignRunner;
+import de.regelsuche.experiments.autopilot.AutonomousProductionCampaignRunner.ArtifactReference;
+import de.regelsuche.release.ReleaseReadinessMatrix.MatrixReport;
+import de.regelsuche.release.ReleaseReadinessMatrix.ProfileResult;
+import de.regelsuche.release.ReleaseReadinessMatrix.ProfileStatus;
+import de.regelsuche.release.ReleaseReadinessMatrix.RequirementCheck;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+
+/** Verifies direct retained release bindings; it never executes a campaign. */
+final class ReleaseReadinessBindings {
+    private ReleaseReadinessBindings() { }
+    static void verify(Map&lt;String, JsonNode&gt; documents, byte[] catalogBytes) {
+<span class="fc" id="L24">        JsonNode run = document(documents, &quot;release-readiness-run.json&quot;);</span>
+<span class="fc" id="L25">        JsonNode matrix = document(documents, &quot;release-readiness-report.json&quot;);</span>
+<span class="fc" id="L26">        JsonNode campaign = document(documents, &quot;campaign/production-campaign-manifest.json&quot;);</span>
+<span class="fc" id="L27">        JsonNode evidence = document(documents, &quot;evidence-summary.json&quot;);</span>
+<span class="fc" id="L28">        JsonNode hidden = document(documents, &quot;hidden-rule-release-evidence.json&quot;);</span>
+<span class="fc" id="L29">        JsonNode qualification = document(documents, &quot;qualification/candidate-qualification-evidence.json&quot;);</span>
+<span class="fc" id="L30">        JsonNode qualificationRun = document(documents, &quot;qualification/candidate-qualification-run.json&quot;);</span>
+<span class="fc" id="L31">        JsonNode catalog = document(documents, &quot;profiles.json&quot;);</span>
+
+        // The original domain constructors own normalization, accounting and canonical identity.
+<span class="fc" id="L34">        decode(evidence, AutonomousCampaignReleaseEvidence.class);</span>
+<span class="fc" id="L35">        decode(hidden, HiddenRuleBenchmarkReleaseEvidence.class);</span>
+<span class="fc" id="L36">        decode(qualification, AutonomousCandidateQualificationEvidence.class);</span>
+<span class="fc" id="L37">        require(text(campaign, &quot;schema&quot;).equals(AutonomousProductionCampaignRunner.SCHEMA), &quot;unsupported campaign schema&quot;);</span>
+<span class="fc" id="L38">        var artifacts = new ArrayList&lt;ArtifactReference&gt;();</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        for (JsonNode artifact : array(campaign, &quot;artifacts&quot;)) {</span>
+<span class="fc" id="L40">            artifacts.add(new ArtifactReference(text(artifact, &quot;artifactType&quot;), text(artifact, &quot;contentHash&quot;)));</span>
+<span class="fc" id="L41">        }</span>
+<span class="fc" id="L42">        require(text(campaign, &quot;contentHash&quot;).equals(AutonomousProductionCampaignRunner.manifestHash(</span>
+<span class="fc" id="L43">            text(campaign, &quot;briefHash&quot;), text(campaign, &quot;lifecycleRunHash&quot;), text(campaign, &quot;nextPlanHash&quot;),</span>
+<span class="fc" id="L44">            text(campaign, &quot;campaignRoundHash&quot;), text(campaign, &quot;feedbackReallocationHash&quot;),</span>
+<span class="fc" id="L45">            text(campaign, &quot;campaignResourceLedgerHash&quot;), artifacts, text(campaign, &quot;status&quot;))), &quot;campaign canonical identity differs&quot;);</span>
+<span class="fc" id="L46">        require(text(qualificationRun, &quot;schema&quot;).equals(AutonomousCandidateQualificationRunner.SCHEMA), &quot;unsupported qualification run schema&quot;);</span>
+<span class="fc" id="L47">        require(text(qualificationRun, &quot;contentHash&quot;).equals(AutonomousCandidateQualificationRunner.runHash(</span>
+<span class="fc" id="L48">            text(qualificationRun, &quot;campaignManifestHash&quot;), text(qualificationRun, &quot;suiteHash&quot;),</span>
+<span class="fc" id="L49">            text(qualificationRun, &quot;splitAuditHash&quot;), text(qualificationRun, &quot;evaluationHash&quot;),</span>
+<span class="fc" id="L50">            text(qualificationRun, &quot;utilityHash&quot;), text(qualificationRun, &quot;qualificationEvidenceHash&quot;))), &quot;qualification run canonical identity differs&quot;);</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        for (String field : List.of(&quot;seedFamilyCount&quot;, &quot;observationCount&quot;, &quot;candidateCount&quot;, &quot;rejectedClusterCount&quot;)) {</span>
+<span class="fc" id="L52">            same(campaign, field, evidence, field, &quot;campaign summary count differs: &quot; + field);</span>
+<span class="fc" id="L53">        }</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        require(bool(evidence, &quot;targetFree&quot;) != bool(campaign, &quot;targetProvided&quot;), &quot;campaign target-free summary differs&quot;);</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        for (String field : List.of(&quot;suiteHash&quot;, &quot;splitAuditHash&quot;, &quot;evaluationHash&quot;, &quot;utilityHash&quot;, &quot;qualified&quot;)) {</span>
+<span class="fc" id="L56">            same(qualificationRun, field, qualification, field, &quot;qualification run summary differs: &quot; + field);</span>
+<span class="fc" id="L57">        }</span>
+
+<span class="fc" id="L59">        require(text(run, &quot;schema&quot;).equals(ReleaseReadinessRunner.SCHEMA), &quot;unsupported release run schema&quot;);</span>
+<span class="fc" id="L60">        Map&lt;String, String&gt; expected = Map.of(&quot;campaignManifestHash&quot;, text(campaign, &quot;contentHash&quot;),</span>
+<span class="fc" id="L61">            &quot;profileCatalogHash&quot;, sha256(catalogBytes), &quot;evidenceHash&quot;, text(evidence, &quot;evidenceHash&quot;),</span>
+<span class="fc" id="L62">            &quot;hiddenRuleEvidenceHash&quot;, text(hidden, &quot;evidenceHash&quot;), &quot;qualificationEvidenceHash&quot;, text(qualification, &quot;contentHash&quot;),</span>
+<span class="fc" id="L63">            &quot;matrixHash&quot;, text(matrix, &quot;contentHash&quot;));</span>
+<span class="fc" id="L64">        expected.forEach((field, hash) -&gt; require(text(run, field).equals(hash), &quot;run &quot; + field + &quot; artifact binding differs&quot;));</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        for (JsonNode dependent : List.of(evidence, qualification, qualificationRun)) {</span>
+<span class="fc" id="L66">            same(dependent, &quot;campaignManifestHash&quot;, run, &quot;campaignManifestHash&quot;, &quot;dependent evidence belongs to another campaign&quot;);</span>
+<span class="fc" id="L67">        }</span>
+<span class="fc" id="L68">        same(qualificationRun, &quot;qualificationEvidenceHash&quot;, run, &quot;qualificationEvidenceHash&quot;, &quot;qualification run evidence binding differs&quot;);</span>
+<span class="fc" id="L69">        same(matrix, &quot;evidenceHash&quot;, run, &quot;evidenceHash&quot;, &quot;matrix campaign evidence binding differs&quot;);</span>
+<span class="fc" id="L70">        same(matrix, &quot;hiddenRuleEvidenceHash&quot;, run, &quot;hiddenRuleEvidenceHash&quot;, &quot;matrix hidden-rule evidence binding differs&quot;);</span>
+<span class="fc" id="L71">        same(run, &quot;autonomousCampaignStatus&quot;, matrix, &quot;autonomousCampaignStatus&quot;, &quot;run autonomy summary differs&quot;);</span>
+<span class="fc" id="L72">        same(run, &quot;autonomyClaimAuthorized&quot;, matrix, &quot;autonomyClaimAuthorized&quot;, &quot;run autonomy authority differs&quot;);</span>
+<span class="fc" id="L73">        verifyMatrix(matrix, catalog);</span>
+<span class="fc" id="L74">        require(text(run, &quot;contentHash&quot;).equals(ReleaseReadinessRunner.runHash(text(run, &quot;profileCatalogHash&quot;),</span>
+<span class="fc" id="L75">            text(run, &quot;evidenceHash&quot;), text(run, &quot;hiddenRuleEvidenceHash&quot;), text(run, &quot;qualificationEvidenceHash&quot;),</span>
+<span class="fc" id="L76">            text(run, &quot;matrixHash&quot;), text(run, &quot;campaignManifestHash&quot;))), &quot;run canonical content hash differs&quot;);</span>
+<span class="fc" id="L77">    }</span>
+
+    private static void verifyMatrix(JsonNode matrix, JsonNode catalog) {
+<span class="fc" id="L80">        var profiles = profiles(matrix);</span>
+<span class="fc" id="L81">        var declared = profiles(catalog);</span>
+<span class="fc" id="L82">        require(text(catalog, &quot;schema&quot;).equals(ReleaseEvidenceProfile.CATALOG_SCHEMA), &quot;unsupported profile catalog schema&quot;);</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        require(text(catalog, &quot;autonomyClaimProfile&quot;).equals(&quot;AUTONOMOUS_CAMPAIGN&quot;)</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            &amp;&amp; text(catalog, &quot;externalNoveltyProfile&quot;).equals(&quot;EXTERNAL_NOVELTY_REVIEW&quot;), &quot;catalog claim profile binding differs&quot;);</span>
+<span class="fc" id="L85">        var results = new ArrayList&lt;ProfileResult&gt;();</span>
+<span class="fc" id="L86">        profiles.forEach((name, profile) -&gt; {</span>
+<span class="fc" id="L87">            JsonNode declaration = declared.get(name);</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            require(bool(declaration, &quot;authorizesAutonomyClaim&quot;) == name.authorizesAutonomyClaim(), &quot;catalog profile authority differs&quot;);</span>
+<span class="fc" id="L89">            same(profile, &quot;claim&quot;, declaration, &quot;claim&quot;, &quot;matrix profile claim differs from catalog&quot;);</span>
+<span class="fc" id="L90">            var checks = new ArrayList&lt;RequirementCheck&gt;();</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            for (JsonNode check : array(profile, &quot;checks&quot;)) checks.add(decode(check, RequirementCheck.class));</span>
+<span class="fc" id="L92">            var blockers = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            for (JsonNode blocker : array(profile, &quot;blockers&quot;)) {</span>
+<span class="fc" id="L94">                require(blocker.isTextual(), &quot;profile blocker must be text&quot;);</span>
+<span class="fc" id="L95">                blockers.add(blocker.textValue());</span>
+<span class="fc" id="L96">            }</span>
+<span class="fc" id="L97">            results.add(new ProfileResult(name, ProfileStatus.valueOf(text(profile, &quot;status&quot;)),</span>
+<span class="fc" id="L98">                bool(profile, &quot;authorizesAutonomyClaim&quot;), checks, blockers));</span>
+<span class="fc" id="L99">        });</span>
+<span class="fc" id="L100">        new MatrixReport(text(matrix, &quot;schema&quot;), text(matrix, &quot;evidenceHash&quot;), text(matrix, &quot;hiddenRuleEvidenceHash&quot;),</span>
+<span class="fc" id="L101">            results, ProfileStatus.valueOf(text(matrix, &quot;autonomousCampaignStatus&quot;)), bool(matrix, &quot;autonomyClaimAuthorized&quot;),</span>
+<span class="fc" id="L102">            text(matrix, &quot;promotionStatus&quot;), text(matrix, &quot;publicEvidenceStatus&quot;), text(matrix, &quot;contentHash&quot;));</span>
+<span class="fc" id="L103">    }</span>
+
+    private static Map&lt;ReleaseEvidenceProfile, JsonNode&gt; profiles(JsonNode document) {
+<span class="fc" id="L106">        var result = new EnumMap&lt;ReleaseEvidenceProfile, JsonNode&gt;(ReleaseEvidenceProfile.class);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (JsonNode profile : array(document, &quot;profiles&quot;)) {</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            require(result.put(ReleaseEvidenceProfile.valueOf(text(profile, &quot;profile&quot;)), profile) == null, &quot;duplicate release profile&quot;);</span>
+<span class="fc" id="L109">        }</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        require(result.size() == ReleaseEvidenceProfile.values().length, &quot;missing release profile&quot;);</span>
+<span class="fc" id="L111">        return result;</span>
+    }
+
+    private static &lt;T&gt; T decode(JsonNode node, Class&lt;T&gt; type) {
+        try {
+<span class="fc" id="L116">            return new ObjectMapper().disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)</span>
+<span class="fc" id="L117">                .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES).treeToValue(node, type);</span>
+<span class="fc" id="L118">        } catch (com.fasterxml.jackson.core.JsonProcessingException error) {</span>
+<span class="fc" id="L119">            throw new IllegalArgumentException(&quot;retained &quot; + type.getSimpleName() + &quot; does not satisfy its original contract&quot;, error);</span>
+        }
+    }
+
+    static JsonNode document(Map&lt;String, JsonNode&gt; documents, String name) {
+<span class="fc" id="L124">        JsonNode result = documents.get(name);</span>
+<span class="pc bpc" id="L125" title="2 of 4 branches missed.">        require(result != null &amp;&amp; result.isObject(), &quot;missing object document: &quot; + name);</span>
+<span class="fc" id="L126">        return result;</span>
+    }
+
+    static JsonNode field(JsonNode object, String field) {
+<span class="fc" id="L130">        JsonNode result = object.get(field);</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        require(result != null, &quot;missing field: &quot; + field);</span>
+<span class="fc" id="L132">        return result;</span>
+    }
+    static String text(JsonNode object, String name) {
+<span class="fc" id="L135">        JsonNode value = field(object, name);</span>
+<span class="fc" id="L136">        require(value.isTextual(), &quot;text field required: &quot; + name);</span>
+<span class="fc" id="L137">        return value.textValue();</span>
+    }
+    static boolean bool(JsonNode object, String name) {
+<span class="fc" id="L140">        JsonNode value = field(object, name);</span>
+<span class="fc" id="L141">        require(value.isBoolean(), &quot;boolean field required: &quot; + name);</span>
+<span class="fc" id="L142">        return value.booleanValue();</span>
+    }
+    static JsonNode array(JsonNode object, String name) {
+<span class="fc" id="L145">        JsonNode value = field(object, name);</span>
+<span class="fc" id="L146">        require(value.isArray(), &quot;array field required: &quot; + name);</span>
+<span class="fc" id="L147">        return value;</span>
+    }
+    static void same(JsonNode first, String firstField, JsonNode second, String secondField, String message) {
+<span class="fc" id="L150">        require(field(first, firstField).equals(field(second, secondField)), message);</span>
+<span class="fc" id="L151">    }</span>
+    static void require(boolean valid, String message) {
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (!valid) throw new IllegalArgumentException(message);</span>
+<span class="fc" id="L154">    }</span>
+    static String sha256(byte[] bytes) {
+<span class="fc" id="L156">        try { return &quot;sha256:&quot; + HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes)); }</span>
+<span class="nc" id="L157">        catch (NoSuchAlgorithmException error) { throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, error); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

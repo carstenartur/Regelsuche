@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramFinalTestPlan.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramFinalTestPlan.java</span></div><h1>EvolutionRewriteProgramFinalTestPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutCommitment.Split;
+import de.regelsuche.evolution.EvolutionRewriteProgramValidationPlan.Configuration;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/** Exact selected genome, program and all work limits, frozen before FINAL TEST reveal. */
+public record EvolutionRewriteProgramFinalTestPlan(String schema,
+    EvolutionRewriteProgramValidationHandoff validationHandoff,
+    EvolutionRewriteProgramHeldOutCommitment commitment,
+    List&lt;EvolutionSplitManifest.CaseReference&gt; cases, String contentHash) {
+    public static final String SCHEMA = &quot;regelsuche.evolution-rewrite-program-final-test-plan/v1&quot;;
+
+<span class="fc" id="L17">    public EvolutionRewriteProgramFinalTestPlan {</span>
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) { throw new IllegalArgumentException(&quot;unsupported program FINAL TEST plan&quot;); }</span>
+<span class="fc" id="L19">        Objects.requireNonNull(validationHandoff, &quot;validationHandoff&quot;);</span>
+<span class="fc" id="L20">        Objects.requireNonNull(commitment, &quot;commitment&quot;);</span>
+<span class="fc" id="L21">        var validation = validationHandoff.selection().plan();</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        if (commitment.split() != Split.FINAL_TEST</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">                || !commitment.studyId().equals(validation.commitment().studyId())) {</span>
+<span class="nc" id="L24">            throw new IllegalArgumentException(&quot;FINAL TEST commitment differs from selected study&quot;);</span>
+        }
+<span class="fc" id="L26">        cases = List.copyOf(Objects.requireNonNull(cases, &quot;cases&quot;));</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (!cases.stream().map(EvolutionSplitManifest.CaseReference::caseId).toList().equals(</span>
+<span class="fc" id="L28">                commitment.cases().stream().map(EvolutionRewriteProgramHeldOutCommitment.CaseCommitment::caseId).toList())) {</span>
+<span class="nc" id="L29">            throw new IllegalArgumentException(&quot;FINAL TEST cases differ from committed order&quot;);</span>
+        }
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        for (int index = 0; index &lt; cases.size(); index++) {</span>
+<span class="fc" id="L32">            var reference = cases.get(index);</span>
+<span class="fc" id="L33">            var committed = commitment.cases().get(index);</span>
+<span class="fc" id="L34">            if (!EvolutionRewriteProgramHeldOutCommitment.familyCommitment(reference.familyId())</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">                    .equals(committed.familyCommitmentHash())</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">                    || !reference.inputHash().equals(committed.inputHash())</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">                    || !reference.hiddenTargetHash().equals(committed.targetHash())</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">                    || !reference.exactSignatureHash().equals(committed.exactSignatureHash())</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">                    || !reference.alphaSignatureHash().equals(committed.alphaSignatureHash())) {</span>
+<span class="nc" id="L40">                throw new IllegalArgumentException(&quot;FINAL TEST case material differs from commitment&quot;);</span>
+            }
+        }
+<span class="fc" id="L43">        EvolutionProgramValidationJson.requireHash(contentHash, material(validationHandoff, commitment, cases));</span>
+<span class="fc" id="L44">    }</span>
+
+    public static EvolutionRewriteProgramFinalTestPlan create(EvolutionRewriteProgramStudyPlan study,
+        EvolutionSplitManifest manifest, ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun train,
+        EvolutionRewriteProgramValidationHandoff handoff, EvolutionRewriteProgramHeldOutCommitment commitment) {
+<span class="fc" id="L49">        Objects.requireNonNull(handoff, &quot;handoff&quot;).selection().plan().requireInputs(study, manifest, train);</span>
+<span class="fc" id="L50">        Objects.requireNonNull(commitment, &quot;commitment&quot;).requireMatches(manifest);</span>
+<span class="fc" id="L51">        var cases = manifest.finalTestCases().stream()</span>
+<span class="fc" id="L52">            .sorted(Comparator.comparing(EvolutionSplitManifest.CaseReference::caseId)).toList();</span>
+<span class="fc" id="L53">        return new EvolutionRewriteProgramFinalTestPlan(SCHEMA, handoff, commitment, cases,</span>
+<span class="fc" id="L54">            EvolutionProgramValidationJson.hash(material(handoff, commitment, cases)));</span>
+    }
+
+    public void requireInputs(EvolutionRewriteProgramStudyPlan study, EvolutionSplitManifest manifest,
+        ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun train) {
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (!equals(create(study, manifest, train, validationHandoff, commitment))) {</span>
+<span class="nc" id="L60">            throw new IllegalArgumentException(&quot;FINAL TEST plan differs from frozen study and retained selection&quot;);</span>
+        }
+<span class="fc" id="L62">    }</span>
+
+<span class="fc" id="L64">    public Configuration selectedConfiguration() { return validationHandoff.selectedConfiguration(); }</span>
+
+    /** Deliberately identical to the genome-only ledger: an adapter change cannot buy another attempt. */
+    public String runIdentity() {
+<span class="fc" id="L68">        var validation = validationHandoff.selection().plan();</span>
+<span class="fc" id="L69">        return EvolutionFinalTestReservation.runIdentity(validation.studyPlanHash(), validation.splitManifestHash());</span>
+    }
+
+<span class="fc" id="L72">    public String toCanonicalJson() { return EvolutionProgramValidationJson.write(this); }</span>
+    public static EvolutionRewriteProgramFinalTestPlan fromCanonicalJson(String json) {
+<span class="nc" id="L74">        return EvolutionProgramValidationJson.read(json, EvolutionRewriteProgramFinalTestPlan.class);</span>
+    }
+
+    private static Map&lt;String, Object&gt; material(EvolutionRewriteProgramValidationHandoff handoff,
+        EvolutionRewriteProgramHeldOutCommitment commitment, List&lt;EvolutionSplitManifest.CaseReference&gt; cases) {
+<span class="fc" id="L79">        return EvolutionProgramValidationJson.material(SCHEMA, &quot;validationHandoff&quot;, handoff,</span>
+            &quot;commitment&quot;, commitment, &quot;cases&quot;, cases);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

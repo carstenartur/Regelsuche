@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NativeEvolutionRewriteProgramValidationEvaluator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">NativeEvolutionRewriteProgramValidationEvaluator.java</span></div><h1>NativeEvolutionRewriteProgramValidationEvaluator.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.equivalence.AssumptionAwareEquivalenceService;
+import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutRevealBundle.RevealCase;
+import de.regelsuche.evolution.EvolutionRewriteProgramTrainFitnessEvidence.PathCorrectness;
+import de.regelsuche.evolution.EvolutionRewriteProgramValidationEvidence.Measurement;
+import de.regelsuche.evolution.EvolutionRewriteProgramValidationEvidence.PairedCase;
+import de.regelsuche.evolution.EvolutionRewriteProgramValidationPlan.Configuration;
+import de.regelsuche.math.algorithms.equivalence.RationalFunctionNormalFormEquivalencePortAdapter;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.strategy.SearchExpansionSource;
+import de.regelsuche.search.strategy.SearchWorkMetrics;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Budget;
+import de.regelsuche.search.strategy.WorkBudgetBestFirstSearchStrategy.Result;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.MeasuredTransformationEngine;
+import de.regelsuche.transform.MeasuredTransformationEngines;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/** Current production compiler/search/audit adapters; no caller-supplied result acceptor. */
+final class NativeEvolutionRewriteProgramValidationEvaluator {
+    private final AssumptionAwareEquivalenceService equivalence;
+
+    NativeEvolutionRewriteProgramValidationEvaluator() {
+<span class="fc" id="L30">        this(new RationalFunctionNormalFormEquivalencePortAdapter());</span>
+<span class="fc" id="L31">    }</span>
+
+<span class="fc" id="L33">    NativeEvolutionRewriteProgramValidationEvaluator(AssumptionAwareEquivalenceService equivalence) {</span>
+<span class="fc" id="L34">        this.equivalence = Objects.requireNonNull(equivalence, &quot;equivalence&quot;);</span>
+<span class="fc" id="L35">    }</span>
+
+    List&lt;PairedCase&gt; evaluate(Configuration configuration, List&lt;RevealCase&gt; cases) {
+<span class="fc" id="L38">        var candidate = configuration.candidate();</span>
+<span class="fc" id="L39">        var genome = candidate.genome();</span>
+<span class="fc" id="L40">        Budget budget = configuration.effectiveBudget();</span>
+        MeasuredTransformationEngine baseline;
+        MeasuredTransformationEngine selected;
+        try {
+<span class="fc" id="L44">            var flat = new EvolutionGenomeCompiler().compile(genome);</span>
+<span class="fc" id="L45">            var program = new EvolutionRewriteProgramCompiler().compile(genome, candidate.plan());</span>
+<span class="fc" id="L46">            var ordinary = MeasuredTransformationEngines.counting(new AstRewriteTransformationEngine(</span>
+<span class="fc" id="L47">                AstRewriteTransformationEngine.defaultRules(), genome.budget().maxAstGrowthPerStep(),</span>
+<span class="fc" id="L48">                budget.maxCandidatesPerState()));</span>
+<span class="fc" id="L49">            var rules = MeasuredTransformationEngines.counting(new AstRewriteTransformationEngine(</span>
+<span class="fc" id="L50">                flat.rules(), genome.budget().maxAstGrowthPerStep(), budget.maxCandidatesPerState()));</span>
+<span class="fc" id="L51">            baseline = MeasuredTransformationEngines.union(ordinary, rules);</span>
+<span class="fc" id="L52">            selected = MeasuredTransformationEngines.union(ordinary, rules, program.engine());</span>
+<span class="nc" id="L53">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L54">            String reason = &quot;COMPILATION_FAILED:&quot; + exception.getClass().getSimpleName();</span>
+<span class="nc" id="L55">            return cases.stream().map(item -&gt; new PairedCase(item.caseId(), item.familyId(),</span>
+<span class="nc" id="L56">                Measurement.unavailable(reason), Measurement.unavailable(reason))).toList();</span>
+<span class="fc" id="L57">        }</span>
+<span class="fc" id="L58">        return cases.stream().map(item -&gt; new PairedCase(item.caseId(), item.familyId(),</span>
+<span class="fc" id="L59">            evaluateSide(baseline, item.inputExpression(), item.targetExpression(), item.assumptions(), budget),</span>
+<span class="fc" id="L60">            evaluateSide(selected, item.inputExpression(), item.targetExpression(), item.assumptions(), budget))).toList();</span>
+    }
+
+    Measurement evaluateSide(MeasuredTransformationEngine engine, String inputExpression, String targetExpression,
+        List&lt;String&gt; assumptions, Budget budget) {
+        Result result;
+        try {
+<span class="fc" id="L67">            result = new WorkBudgetBestFirstSearchStrategy().search(</span>
+                new WorkBudgetBestFirstSearchStrategy.Problem(inputExpression, targetExpression,
+                    new SearchExpansionSource.Measured(engine), new ExpressionScorer(),
+                    new ExpressionCanonicalizer(), budget));
+<span class="nc" id="L71">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L72">            return Measurement.unavailable(&quot;SEARCH_FAILED:&quot; + exception.getClass().getSimpleName());</span>
+<span class="fc" id="L73">        }</span>
+<span class="fc" id="L74">        var work = result.metrics();</span>
+<span class="fc" id="L75">        var searchWork = new SearchWorkMetrics(work.exploredStates(), work.expandedStates(),</span>
+<span class="fc" id="L76">            work.generatedTransformations(), work.enqueuedStates(), work.duplicatePrunes(),</span>
+<span class="fc" id="L77">            work.repeatedApplicationPrunes(), work.sameExpressionPrunes(), work.expansionBudgetPrunes(),</span>
+<span class="fc" id="L78">            work.primitiveBudgetPrunes(), work.candidateBudgetPrunes(), work.statesWithoutTransformations(),</span>
+<span class="fc" id="L79">            work.engineBatches());</span>
+<span class="fc" id="L80">        var reached = result.reachedState();</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        var path = reached == null ? List.&lt;String&gt;of() : reached.path();</span>
+<span class="fc" id="L82">        PathCorrectness correctness = PathCorrectness.NOT_EVALUATED;</span>
+<span class="fc" id="L83">        long auditCalls = 0;</span>
+<span class="fc" id="L84">        String failure = &quot;&quot;;</span>
+        try {
+<span class="fc bfc" id="L86" title="All 2 branches covered.">            if (result.reached()) {</span>
+<span class="fc" id="L87">                Set&lt;String&gt; declared = Set.copyOf(AssumptionSignature.ofExpressions(assumptions)</span>
+<span class="fc" id="L88">                    .normalizedAssumptions());</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                correctness = declared.containsAll(reached.assumptions())</span>
+<span class="fc" id="L90">                    ? PathCorrectness.CONFIRMED : PathCorrectness.MISSING_ASSUMPTION;</span>
+<span class="fc bfc" id="L91" title="All 4 branches covered.">                for (int index = 0; correctness == PathCorrectness.CONFIRMED &amp;&amp; index + 1 &lt; path.size(); index++) {</span>
+<span class="fc" id="L92">                    auditCalls++;</span>
+<span class="fc" id="L93">                    correctness = PathCorrectness.valueOf(equivalence.evaluate(</span>
+<span class="fc" id="L94">                        path.get(index), path.get(index + 1), assumptions).status().name());</span>
+                }
+            }
+<span class="fc" id="L97">        } catch (RuntimeException exception) {</span>
+<span class="fc" id="L98">            failure = &quot;AUDIT_FAILED:&quot; + exception.getClass().getSimpleName();</span>
+<span class="fc" id="L99">            correctness = PathCorrectness.NOT_EVALUATED;</span>
+<span class="fc" id="L100">        }</span>
+<span class="pc bpc" id="L101" title="1 of 4 branches missed.">        if (failure.isEmpty() &amp;&amp; (result.status() == WorkBudgetBestFirstSearchStrategy.Status.INCOMPLETE_EXPANSION</span>
+<span class="pc bpc" id="L102" title="2 of 4 branches missed.">                || result.expansions().stream().anyMatch(itemExpansion -&gt; !itemExpansion.execution().complete()))) {</span>
+<span class="nc" id="L103">            failure = &quot;INCOMPLETE_EXPANSION&quot;;</span>
+        }
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (failure.isEmpty() &amp;&amp; EvolutionRewriteProgramValidationEvidence.sum(</span>
+<span class="fc" id="L106">                searchWork.totalWorkUnits(), work.transformationWork().totalWorkUnits())</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                != work.chargedSearchWorkUnits()) {</span>
+<span class="nc" id="L108">            failure = &quot;UNREPRESENTED_SEARCH_WORK&quot;;</span>
+        }
+        // Preserve the entire v1 atomic batch charge, without treating a budget stop as complete evidence.
+<span class="fc bfc" id="L111" title="All 4 branches covered.">        if (failure.isEmpty() &amp;&amp; result.status() == WorkBudgetBestFirstSearchStrategy.Status.WORK_BUDGET) {</span>
+<span class="fc" id="L112">            failure = &quot;WORK_BUDGET&quot;;</span>
+        }
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        Long total = failure.isEmpty() ? Long.valueOf(EvolutionRewriteProgramValidationEvidence.sum(</span>
+<span class="fc" id="L115">            searchWork.totalWorkUnits(), work.transformationWork().totalWorkUnits(), auditCalls)) : null;</span>
+<span class="fc" id="L116">        return new Measurement(result.status().name(), result.reached(),</span>
+<span class="fc bfc" id="L117" title="All 6 branches covered.">            reached == null ? -1 : reached.edgeDepth(), reached == null ? 0 : reached.primitiveDepth(),</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            path, reached != null &amp;&amp; reached.programUsed(), correctness, searchWork,</span>
+<span class="fc" id="L119">            work.transformationWork(), auditCalls, total, failure);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

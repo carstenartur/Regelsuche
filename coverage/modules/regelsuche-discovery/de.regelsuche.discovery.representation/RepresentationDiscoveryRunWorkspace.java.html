@@ -595,8 +595,8 @@ public record RepresentationDiscoveryRunWorkspace(
             );
 <span class="fc" id="L596">        }</span>
 <span class="fc" id="L597">        rejectSymbolicRetainedComponents(absolute);</span>
-<span class="pc bpc" id="L598" title="1 of 2 branches missed.">        if (!Files.isDirectory(absolute, LinkOption.NOFOLLOW_LINKS)) {</span>
-<span class="nc" id="L599">            throw new IllegalStateException(</span>
+<span class="fc bfc" id="L598" title="All 2 branches covered.">        if (!Files.isDirectory(absolute, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L599">            throw new IllegalStateException(</span>
                 &quot;run repository path is not a real directory: &quot; + absolute);
         }
 <span class="fc" id="L602">        return absolute;</span>

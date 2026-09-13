@@ -109,8 +109,8 @@ public record HiddenRuleBenchmarkReleaseEvidence(
             benchmarkComplete,
             executableRediscoveryRetained);
 <span class="fc" id="L111">        requireSha256(evidenceHash, &quot;evidenceHash&quot;);</span>
-<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (!expectedHash.equals(evidenceHash)) {</span>
-<span class="nc" id="L113">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (!expectedHash.equals(evidenceHash)) {</span>
+<span class="fc" id="L113">            throw new IllegalArgumentException(</span>
                 &quot;hidden-rule release evidence hash does not match canonical fields&quot;);
         }
 <span class="fc" id="L116">    }</span>

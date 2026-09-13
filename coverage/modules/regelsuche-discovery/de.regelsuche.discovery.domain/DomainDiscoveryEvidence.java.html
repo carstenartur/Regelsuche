@@ -118,7 +118,7 @@ public final class DomainDiscoveryEvidence {
     }
 
     public DiscoveryBudget budget() {
-<span class="nc" id="L121">        return budget;</span>
+<span class="fc" id="L121">        return budget;</span>
     }
 
     public Outcome outcome() {
@@ -375,11 +375,11 @@ public final class DomainDiscoveryEvidence {
             }
 <span class="fc" id="L376">            DomainCanonical.requireSha256(stateHash, &quot;stateHash&quot;);</span>
 <span class="fc" id="L377">            DomainCanonical.requireText(canonicalState, &quot;canonicalState&quot;);</span>
-<span class="pc bpc" id="L378" title="1 of 2 branches missed.">            parentStateHash = parentStateHash == null ? &quot;&quot; : parentStateHash;</span>
+<span class="fc bfc" id="L378" title="All 2 branches covered.">            parentStateHash = parentStateHash == null ? &quot;&quot; : parentStateHash;</span>
 <span class="fc bfc" id="L379" title="All 2 branches covered.">            if (!parentStateHash.isEmpty()) {</span>
 <span class="fc" id="L380">                DomainCanonical.requireSha256(parentStateHash, &quot;parentStateHash&quot;);</span>
             }
-<span class="pc bpc" id="L382" title="1 of 2 branches missed.">            actionId = actionId == null ? &quot;&quot; : actionId;</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">            actionId = actionId == null ? &quot;&quot; : actionId;</span>
 <span class="fc bfc" id="L383" title="All 2 branches covered.">            if (!actionId.isEmpty()) {</span>
 <span class="fc" id="L384">                DomainCanonical.requireIdentifier(actionId, &quot;actionId&quot;);</span>
             }
@@ -446,7 +446,7 @@ public final class DomainDiscoveryEvidence {
 <span class="fc" id="L446">                : counterexampleWitness;</span>
 <span class="fc" id="L447">            Objects.requireNonNull(evaluationStatus, &quot;evaluationStatus&quot;);</span>
 <span class="pc bpc" id="L448" title="1 of 2 branches missed.">            evaluationSummary = evaluationSummary == null ? &quot;&quot; : evaluationSummary;</span>
-<span class="pc bpc" id="L449" title="1 of 2 branches missed.">            certificateHash = certificateHash == null ? &quot;&quot; : certificateHash;</span>
+<span class="fc bfc" id="L449" title="All 2 branches covered.">            certificateHash = certificateHash == null ? &quot;&quot; : certificateHash;</span>
 <span class="fc bfc" id="L450" title="All 2 branches covered.">            if (!certificateHash.isEmpty()) {</span>
 <span class="fc" id="L451">                DomainCanonical.requireSha256(certificateHash, &quot;certificateHash&quot;);</span>
             }

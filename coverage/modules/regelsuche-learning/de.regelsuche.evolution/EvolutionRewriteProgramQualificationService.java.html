@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramQualificationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramQualificationService.java</span></div><h1>EvolutionRewriteProgramQualificationService.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.EvolutionRewriteProgramQualificationAssessment.GateStatus;
+import de.regelsuche.evolution.EvolutionRewriteProgramQualificationAssessment.GeneAssessment;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/** Explicit downstream assessment using existing native gates; never a runtime authorization or promotion call. */
+<span class="fc" id="L13">public final class EvolutionRewriteProgramQualificationService {</span>
+    public EvolutionRewriteProgramQualificationAssessment assess(EvolutionRewriteProgramFinalTestPlan expectedPlan,
+        FileEvolutionRewriteProgramFinalTestAttemptStore store, String repositoryRevision) throws IOException {
+<span class="fc" id="L16">        LearnedPatternAuthorizationJson.requireRevision(repositoryRevision, &quot;repositoryRevision&quot;);</span>
+<span class="fc" id="L17">        var evaluation = Objects.requireNonNull(store, &quot;store&quot;).readEvaluation(expectedPlan);</span>
+<span class="fc" id="L18">        return EvolutionRewriteProgramQualificationAssessment.create(repositoryRevision, evaluation);</span>
+    }
+
+    /** Replay mathematics and anchor the handoff to the independently expected revision and durable final evidence. */
+    public EvolutionRewriteProgramQualificationAssessment verifyAssessment(String json,
+        EvolutionRewriteProgramFinalTestPlan expectedPlan, FileEvolutionRewriteProgramFinalTestAttemptStore store,
+        String repositoryRevision) throws IOException {
+<span class="fc" id="L25">        LearnedPatternAuthorizationJson.requireRevision(repositoryRevision, &quot;repositoryRevision&quot;);</span>
+<span class="fc" id="L26">        var finalTest = Objects.requireNonNull(store, &quot;store&quot;).readEvaluation(expectedPlan);</span>
+<span class="fc" id="L27">        var assessed = EvolutionRewriteProgramQualificationAssessment.fromCanonicalJson(json);</span>
+<span class="pc bpc" id="L28" title="1 of 4 branches missed.">        if (!assessed.repositoryRevision().equals(repositoryRevision) || !assessed.finalTest().equals(finalTest)) {</span>
+<span class="fc" id="L29">            throw new IllegalArgumentException(&quot;qualification handoff differs from expected revision or durable FINAL TEST evidence&quot;);</span>
+        }
+<span class="fc" id="L31">        return assessed;</span>
+    }
+
+    static NativeGates evaluateNative(EvolutionRewriteProgramFinalTestEvaluation evaluation, String revision) {
+<span class="fc" id="L35">        LearnedPatternAuthorizationJson.requireRevision(revision, &quot;repositoryRevision&quot;);</span>
+<span class="fc" id="L36">        var candidate = evaluation.plan().selectedConfiguration().candidate();</span>
+<span class="fc" id="L37">        var genome = candidate.genome();</span>
+<span class="fc" id="L38">        Set&lt;String&gt; programGenes = Set.copyOf(candidate.plan().referencedGeneIds());</span>
+<span class="fc" id="L39">        var genes = genome.rewrites().stream().sorted(Comparator.comparing(EvolutionGenome.RewriteGene::geneId)).toList();</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (!evaluation.qualificationEligible()) {</span>
+<span class="fc" id="L41">            return notEvaluated(null, genes, programGenes, &quot;FINAL_TEST_NOT_QUALIFIED&quot;);</span>
+        }
+<span class="fc" id="L43">        var preflight = new EvolutionGenomeValidator().validate(genome);</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (!preflight.accepted()) { return notEvaluated(preflight, genes, programGenes, &quot;PREFLIGHT_REJECTED&quot;); }</span>
+<span class="fc" id="L45">        var authorizer = new LearnedPatternRuleAuthorizationService();</span>
+<span class="fc" id="L46">        var verifier = new ExactPolynomialPatternIdentityVerifier();</span>
+<span class="fc" id="L47">        List&lt;GeneAssessment&gt; assessed = new ArrayList&lt;&gt;();</span>
+        // The native paired evaluator executes all flat genome sources, as well as the program's referenced sources.
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        for (var gene : genes) {</span>
+<span class="fc" id="L50">            boolean referenced = programGenes.contains(gene.geneId());</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">            if (!gene.assumptions().isEmpty()) {</span>
+<span class="nc" id="L52">                assessed.add(unevaluated(gene, referenced, &quot;CONDITIONAL_GENE_UNSUPPORTED&quot;));</span>
+<span class="nc" id="L53">                continue;</span>
+            }
+<span class="fc" id="L55">            ExactPolynomialPatternIdentityVerifier.Verification proof = null;</span>
+<span class="fc" id="L56">            LearnedPatternCounterexampleEvidence counterexample = null;</span>
+<span class="fc" id="L57">            GateStatus proofStatus = GateStatus.NOT_EVALUATED;</span>
+<span class="fc" id="L58">            GateStatus counterexampleStatus = GateStatus.NOT_EVALUATED;</span>
+<span class="fc" id="L59">            List&lt;String&gt; blockers = new ArrayList&lt;&gt;();</span>
+            try {
+<span class="fc" id="L61">                proof = verifier.verify(EvolutionGenomeCompiler.parsePattern(gene.sourcePattern()),</span>
+<span class="fc" id="L62">                    EvolutionGenomeCompiler.parsePattern(gene.targetPattern()));</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">                proofStatus = proof.proved() ? GateStatus.PASSED : GateStatus.REJECTED;</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">                if (!proof.proved()) { blockers.add(&quot;PROOF:&quot; + proof.detailCode()); }</span>
+<span class="nc" id="L65">            } catch (RuntimeException exception) {</span>
+<span class="nc" id="L66">                blockers.add(&quot;PROOF_FAILED:&quot; + exception.getClass().getSimpleName());</span>
+<span class="fc" id="L67">            }</span>
+            try {
+<span class="fc" id="L69">                counterexample = authorizer.evaluateCounterexamples(genome, gene.geneId(), revision);</span>
+                try {
+<span class="fc" id="L71">                    authorizer.requireQualifiedCounterexamples(genome, gene.geneId(), revision, counterexample);</span>
+<span class="fc" id="L72">                    counterexampleStatus = GateStatus.PASSED;</span>
+<span class="fc" id="L73">                } catch (IllegalArgumentException exception) {</span>
+<span class="fc" id="L74">                    counterexampleStatus = GateStatus.REJECTED;</span>
+<span class="fc" id="L75">                    blockers.add(&quot;COUNTEREXAMPLE_NOT_QUALIFIED:&quot; + counterexample.status());</span>
+<span class="fc" id="L76">                }</span>
+<span class="nc" id="L77">            } catch (RuntimeException exception) {</span>
+<span class="nc" id="L78">                blockers.add(&quot;COUNTEREXAMPLE_FAILED:&quot; + exception.getClass().getSimpleName());</span>
+<span class="fc" id="L79">            }</span>
+<span class="fc" id="L80">            assessed.add(new GeneAssessment(gene.geneId(), referenced, proof, counterexample, proofStatus,</span>
+<span class="fc" id="L81">                counterexampleStatus, blockers.stream().sorted().toList()));</span>
+<span class="fc" id="L82">        }</span>
+<span class="fc" id="L83">        var blockers = assessed.stream().flatMap(item -&gt; item.blockers().stream().map(value -&gt; item.geneId() + &quot;:&quot; + value))</span>
+<span class="fc" id="L84">            .sorted().toList();</span>
+<span class="fc" id="L85">        return new NativeGates(preflight, List.copyOf(assessed), GateStatus.PASSED,</span>
+<span class="fc" id="L86">            aggregate(assessed.stream().map(GeneAssessment::proofStatus).toList()),</span>
+<span class="fc" id="L87">            aggregate(assessed.stream().map(GeneAssessment::counterexampleStatus).toList()), blockers);</span>
+    }
+
+    private static NativeGates notEvaluated(EvolutionGenomeValidator.ValidationReport preflight,
+        List&lt;EvolutionGenome.RewriteGene&gt; genes, Set&lt;String&gt; programGenes, String reason) {
+<span class="fc" id="L92">        return new NativeGates(preflight, genes.stream().map(gene -&gt;</span>
+<span class="fc" id="L93">            unevaluated(gene, programGenes.contains(gene.geneId()), reason)).toList(),</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            preflight == null ? GateStatus.NOT_EVALUATED : GateStatus.REJECTED,</span>
+<span class="fc" id="L95">            GateStatus.NOT_EVALUATED, GateStatus.NOT_EVALUATED, List.of(reason));</span>
+    }
+
+    private static GeneAssessment unevaluated(EvolutionGenome.RewriteGene gene, boolean referenced, String reason) {
+<span class="fc" id="L99">        return new GeneAssessment(gene.geneId(), referenced, null, null,</span>
+<span class="fc" id="L100">            GateStatus.NOT_EVALUATED, GateStatus.NOT_EVALUATED, List.of(reason));</span>
+    }
+
+    private static GateStatus aggregate(List&lt;GateStatus&gt; statuses) {
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (statuses.contains(GateStatus.REJECTED)) { return GateStatus.REJECTED; }</span>
+<span class="pc bpc" id="L105" title="2 of 4 branches missed.">        if (statuses.isEmpty() || statuses.contains(GateStatus.NOT_EVALUATED)) { return GateStatus.NOT_EVALUATED; }</span>
+<span class="fc" id="L106">        return GateStatus.PASSED;</span>
+    }
+
+<span class="fc" id="L109">    record NativeGates(EvolutionGenomeValidator.ValidationReport preflight, List&lt;GeneAssessment&gt; genes,</span>
+        GateStatus preflightStatus, GateStatus proofStatus, GateStatus counterexampleStatus, List&lt;String&gt; blockers) { }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

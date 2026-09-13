@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LearnedSelectedProgramAuthorizationBundle.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">LearnedSelectedProgramAuthorizationBundle.java</span></div><h1>LearnedSelectedProgramAuthorizationBundle.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/** Temporal manifest around actual combined qualification evidence; contains no approval/PASS field. */
+public record LearnedSelectedProgramAuthorizationBundle(String schema, String finalPlanHash,
+    String selectedConfigurationHash, String finalTestEvaluationHash, String qualificationAssessmentHash,
+    String splitManifestHash, String repositoryRevision, Instant issuedAt, Instant expiresAt, String contentHash) {
+    public static final String SCHEMA = &quot;regelsuche.learned-selected-program-authorization-bundle/v1&quot;;
+
+<span class="fc" id="L14">    public LearnedSelectedProgramAuthorizationBundle {</span>
+<span class="pc bpc" id="L15" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) { throw new IllegalArgumentException(&quot;unsupported selected-program authorization bundle&quot;); }</span>
+<span class="fc bfc" id="L16" title="All 2 branches covered.">        for (String value : List.of(finalPlanHash, selectedConfigurationHash, finalTestEvaluationHash,</span>
+                qualificationAssessmentHash, splitManifestHash)) {
+<span class="fc" id="L18">            EvolutionGenome.requireSha256(value, &quot;selected evidence hash&quot;);</span>
+<span class="fc" id="L19">        }</span>
+<span class="fc" id="L20">        LearnedPatternAuthorizationJson.requireRevision(repositoryRevision, &quot;repositoryRevision&quot;);</span>
+<span class="fc" id="L21">        Objects.requireNonNull(issuedAt, &quot;issuedAt&quot;);</span>
+<span class="fc" id="L22">        Objects.requireNonNull(expiresAt, &quot;expiresAt&quot;);</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">        if (!issuedAt.isBefore(expiresAt)) { throw new IllegalArgumentException(&quot;authorization interval must be nonempty&quot;); }</span>
+<span class="fc" id="L24">        EvolutionProgramValidationJson.requireHash(contentHash, material(finalPlanHash, selectedConfigurationHash,</span>
+            finalTestEvaluationHash, qualificationAssessmentHash, splitManifestHash, repositoryRevision, issuedAt, expiresAt));
+<span class="fc" id="L26">    }</span>
+
+    public static LearnedSelectedProgramAuthorizationBundle create(EvolutionRewriteProgramQualificationAssessment assessment,
+        EvolutionSplitManifest split, Instant issuedAt, Instant expiresAt) {
+<span class="fc" id="L30">        var finalTest = Objects.requireNonNull(assessment, &quot;assessment&quot;).finalTest();</span>
+<span class="fc" id="L31">        var plan = finalTest.plan();</span>
+<span class="fc" id="L32">        if (!Objects.requireNonNull(split, &quot;split&quot;).contentHash()</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">                .equals(plan.validationHandoff().selection().plan().splitManifestHash())) {</span>
+<span class="nc" id="L34">            throw new IllegalArgumentException(&quot;authorization split differs from selected study&quot;);</span>
+        }
+<span class="fc" id="L36">        return new LearnedSelectedProgramAuthorizationBundle(SCHEMA, plan.contentHash(),</span>
+<span class="fc" id="L37">            plan.selectedConfiguration().contentHash(), finalTest.contentHash(), assessment.contentHash(), split.contentHash(),</span>
+<span class="fc" id="L38">            assessment.repositoryRevision(), issuedAt, expiresAt, EvolutionProgramValidationJson.hash(material(</span>
+<span class="fc" id="L39">                plan.contentHash(), plan.selectedConfiguration().contentHash(), finalTest.contentHash(), assessment.contentHash(),</span>
+<span class="fc" id="L40">                split.contentHash(), assessment.repositoryRevision(), issuedAt, expiresAt)));</span>
+    }
+
+    void requireEvidence(EvolutionRewriteProgramFinalTestPlan plan, EvolutionSplitManifest split,
+        EvolutionRewriteProgramQualificationAssessment assessment, String revision, Instant asOf) {
+<span class="fc" id="L45">        requireUsableAt(plan, revision, asOf);</span>
+<span class="pc bpc" id="L46" title="2 of 4 branches missed.">        if (!splitManifestHash.equals(split.contentHash()) || !assessment.finalTest().plan().equals(plan)</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">                || !qualificationAssessmentHash.equals(assessment.contentHash())</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">                || !finalTestEvaluationHash.equals(assessment.finalTest().contentHash())) {</span>
+<span class="nc" id="L49">            throw new IllegalArgumentException(&quot;authorization bundle differs from actual combined qualification evidence&quot;);</span>
+        }
+<span class="fc" id="L51">    }</span>
+
+    void requireUsableAt(EvolutionRewriteProgramFinalTestPlan plan, String revision, Instant asOf) {
+<span class="fc" id="L54">        Objects.requireNonNull(asOf, &quot;asOf&quot;);</span>
+<span class="pc bpc" id="L55" title="1 of 4 branches missed.">        if (asOf.isBefore(issuedAt) || !asOf.isBefore(expiresAt)</span>
+<span class="pc bpc" id="L56" title="1 of 4 branches missed.">                || !repositoryRevision.equals(revision) || !finalPlanHash.equals(plan.contentHash())</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">                || !selectedConfigurationHash.equals(plan.selectedConfiguration().contentHash())</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">                || !splitManifestHash.equals(plan.validationHandoff().selection().plan().splitManifestHash())) {</span>
+<span class="fc" id="L59">            throw new IllegalArgumentException(&quot;selected-program authority time, revision or complete selection differs&quot;);</span>
+        }
+<span class="fc" id="L61">    }</span>
+
+<span class="fc" id="L63">    public String toCanonicalJson() { return EvolutionProgramValidationJson.write(this); }</span>
+    public static LearnedSelectedProgramAuthorizationBundle fromCanonicalJson(String json) {
+<span class="fc" id="L65">        return EvolutionProgramValidationJson.read(json, LearnedSelectedProgramAuthorizationBundle.class);</span>
+    }
+
+    private static Map&lt;String, Object&gt; material(String plan, String configuration, String finalTest, String assessment,
+        String split, String revision, Instant issuedAt, Instant expiresAt) {
+<span class="fc" id="L70">        return EvolutionProgramValidationJson.material(SCHEMA, &quot;finalPlanHash&quot;, plan, &quot;selectedConfigurationHash&quot;, configuration,</span>
+            &quot;finalTestEvaluationHash&quot;, finalTest, &quot;qualificationAssessmentHash&quot;, assessment, &quot;splitManifestHash&quot;, split,
+            &quot;repositoryRevision&quot;, revision, &quot;issuedAt&quot;, issuedAt, &quot;expiresAt&quot;, expiresAt);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

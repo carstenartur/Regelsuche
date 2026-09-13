@@ -62,7 +62,7 @@ public record EvolutionValidationCaseEvidence(
 <span class="nc" id="L62">            throw new IllegalArgumentException(</span>
                 &quot;correctnessFailure differs from retained correctness evidence&quot;);
         }
-<span class="pc bpc" id="L65" title="1 of 8 branches missed.">        boolean expectedCorrectnessRegression = baselineReached</span>
+<span class="fc bfc" id="L65" title="All 8 branches covered.">        boolean expectedCorrectnessRegression = baselineReached</span>
             &amp;&amp; baselineCorrectness == EvolutionCorrectnessStatus.CONFIRMED
             &amp;&amp; candidateReached
             &amp;&amp; candidateCorrectness == EvolutionCorrectnessStatus.REFUTED;

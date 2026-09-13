@@ -198,7 +198,7 @@ public final class DomainDiscoveryExportVerifier {
                 manifest,
 <span class="fc" id="L199">                firstManifest.byteHash(),</span>
                 snapshots);
-<span class="fc" id="L201">            return new VerifiedDomainExport(manifest, verification, snapshots);</span>
+<span class="fc" id="L201">            return new VerifiedDomainExport(manifest, verification, firstManifest, snapshots);</span>
 <span class="fc" id="L202">        } catch (ExportVerificationException exception) {</span>
 <span class="fc" id="L203">            throw exception;</span>
 <span class="nc" id="L204">        } catch (IOException | RuntimeException exception) {</span>
@@ -801,62 +801,70 @@ public final class DomainDiscoveryExportVerifier {
     public static final class VerifiedDomainExport {
         private final DomainExportManifest manifest;
         private final Verification verification;
+        private final byte[] manifestBytes;
         private final EnumMap&lt;ArtifactRole, byte[]&gt; artifacts;
 
         private VerifiedDomainExport(
             DomainExportManifest manifest,
             Verification verification,
+            Snapshot manifestSnapshot,
             Map&lt;ArtifactRole, Snapshot&gt; snapshots
-<span class="fc" id="L810">        ) {</span>
-<span class="fc" id="L811">            this.manifest = Objects.requireNonNull(manifest, &quot;manifest&quot;);</span>
-<span class="fc" id="L812">            this.verification = Objects.requireNonNull(</span>
+<span class="fc" id="L812">        ) {</span>
+<span class="fc" id="L813">            this.manifest = Objects.requireNonNull(manifest, &quot;manifest&quot;);</span>
+<span class="fc" id="L814">            this.verification = Objects.requireNonNull(</span>
                 verification, &quot;verification&quot;);
-<span class="fc" id="L814">            this.artifacts = new EnumMap&lt;&gt;(ArtifactRole.class);</span>
-<span class="fc bfc" id="L815" title="All 2 branches covered.">            for (Map.Entry&lt;ArtifactRole, Snapshot&gt; entry : snapshots.entrySet()) {</span>
-<span class="fc" id="L816">                this.artifacts.put(entry.getKey(), entry.getValue().bytes());</span>
-<span class="fc" id="L817">            }</span>
-<span class="pc bpc" id="L818" title="1 of 2 branches missed.">            if (this.artifacts.size() != ArtifactRole.values().length</span>
-<span class="pc bpc" id="L819" title="1 of 2 branches missed.">                    || !verification.contentHash().matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
-<span class="nc" id="L820">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L816">            this.manifestBytes = manifestSnapshot.bytes();</span>
+<span class="fc" id="L817">            this.artifacts = new EnumMap&lt;&gt;(ArtifactRole.class);</span>
+<span class="fc bfc" id="L818" title="All 2 branches covered.">            for (Map.Entry&lt;ArtifactRole, Snapshot&gt; entry : snapshots.entrySet()) {</span>
+<span class="fc" id="L819">                this.artifacts.put(entry.getKey(), entry.getValue().bytes());</span>
+<span class="fc" id="L820">            }</span>
+<span class="pc bpc" id="L821" title="1 of 2 branches missed.">            if (this.artifacts.size() != ArtifactRole.values().length</span>
+<span class="pc bpc" id="L822" title="1 of 2 branches missed.">                    || !verification.contentHash().matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L823">                throw new IllegalArgumentException(</span>
                     &quot;verified domain export requires complete trusted snapshots&quot;);
             }
-<span class="fc" id="L823">        }</span>
+<span class="fc" id="L826">        }</span>
 
         public DomainExportManifest manifest() {
-<span class="fc" id="L826">            return manifest;</span>
+<span class="fc" id="L829">            return manifest;</span>
         }
 
         public Verification verification() {
-<span class="fc" id="L830">            return verification;</span>
+<span class="fc" id="L833">            return verification;</span>
+        }
+
+        /** Exact verified manifest bytes, including its original whitespace. */
+        public byte[] manifestBytes() {
+<span class="fc" id="L838">            return manifestBytes.clone();</span>
         }
 
         public byte[] artifactBytes(ArtifactRole role) {
-<span class="fc" id="L834">            byte[] bytes = artifacts.get(Objects.requireNonNull(role, &quot;role&quot;));</span>
-<span class="pc bpc" id="L835" title="1 of 2 branches missed.">            if (bytes == null) {</span>
-<span class="nc" id="L836">                throw new IllegalArgumentException(&quot;artifact role is not retained: &quot; + role);</span>
+<span class="fc" id="L842">            byte[] bytes = artifacts.get(Objects.requireNonNull(role, &quot;role&quot;));</span>
+<span class="pc bpc" id="L843" title="1 of 2 branches missed.">            if (bytes == null) {</span>
+<span class="nc" id="L844">                throw new IllegalArgumentException(&quot;artifact role is not retained: &quot; + role);</span>
             }
-<span class="fc" id="L838">            return bytes.clone();</span>
+<span class="fc" id="L846">            return bytes.clone();</span>
         }
     }
 
     private record Snapshot(byte[] bytes, String byteHash, long byteLength) {
-<span class="fc" id="L843">        private Snapshot {</span>
-<span class="pc bpc" id="L844" title="1 of 2 branches missed.">            bytes = bytes == null ? new byte[0] : bytes.clone();</span>
-<span class="fc" id="L845">            DomainCanonical.requireSha256(byteHash, &quot;byteHash&quot;);</span>
-<span class="pc bpc" id="L846" title="2 of 4 branches missed.">            if (bytes.length != byteLength || byteLength &lt; 1L) {</span>
-<span class="nc" id="L847">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L851">        private Snapshot {</span>
+<span class="pc bpc" id="L852" title="1 of 2 branches missed.">            bytes = bytes == null ? new byte[0] : bytes.clone();</span>
+<span class="fc" id="L853">            DomainCanonical.requireSha256(byteHash, &quot;byteHash&quot;);</span>
+<span class="pc bpc" id="L854" title="2 of 4 branches missed.">            if (bytes.length != byteLength || byteLength &lt; 1L) {</span>
+<span class="nc" id="L855">                throw new IllegalArgumentException(</span>
                     &quot;snapshot length must match retained bytes&quot;);
             }
-<span class="fc" id="L850">        }</span>
+<span class="fc" id="L858">        }</span>
 
         @Override
         public byte[] bytes() {
-<span class="fc" id="L854">            return bytes.clone();</span>
+<span class="fc" id="L862">            return bytes.clone();</span>
         }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = false)
-<span class="fc" id="L859">    public static final class ManifestDto {</span>
+<span class="fc" id="L867">    public static final class ManifestDto {</span>
         public String schema;
         public String campaignId;
         public String domainId;
@@ -870,7 +878,7 @@ public final class DomainDiscoveryExportVerifier {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = false)
-<span class="fc" id="L873">    public static final class ArtifactDto {</span>
+<span class="fc" id="L881">    public static final class ArtifactDto {</span>
         public String fileName;
         public String role;
         public String sourceContentHash;

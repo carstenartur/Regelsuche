@@ -171,14 +171,14 @@ public record LearnedPatternCounterexampleEvidence(
 <span class="fc" id="L171">        appendList(material, result.inferredAssumptions());</span>
 <span class="fc" id="L172">        appendList(material, result.attemptedSources());</span>
 <span class="fc" id="L173">        append(material, result.explanation());</span>
-<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (result.counterexample().isPresent()) {</span>
-<span class="nc" id="L175">            CounterexampleSearchService.Counterexample counterexample =</span>
-<span class="nc" id="L176">                result.counterexample().orElseThrow();</span>
-<span class="nc" id="L177">            append(material, &quot;COUNTEREXAMPLE&quot;);</span>
-<span class="nc" id="L178">            appendList(material, counterexample.assignments());</span>
-<span class="nc" id="L179">            append(material, counterexample.leftValue());</span>
-<span class="nc" id="L180">            append(material, counterexample.rightValue());</span>
-<span class="nc" id="L181">        } else {</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (result.counterexample().isPresent()) {</span>
+<span class="fc" id="L175">            CounterexampleSearchService.Counterexample counterexample =</span>
+<span class="fc" id="L176">                result.counterexample().orElseThrow();</span>
+<span class="fc" id="L177">            append(material, &quot;COUNTEREXAMPLE&quot;);</span>
+<span class="fc" id="L178">            appendList(material, counterexample.assignments());</span>
+<span class="fc" id="L179">            append(material, counterexample.leftValue());</span>
+<span class="fc" id="L180">            append(material, counterexample.rightValue());</span>
+<span class="fc" id="L181">        } else {</span>
 <span class="fc" id="L182">            append(material, &quot;NO_COUNTEREXAMPLE&quot;);</span>
         }
         for (CounterexampleSearchService.TypedAssumption assumption

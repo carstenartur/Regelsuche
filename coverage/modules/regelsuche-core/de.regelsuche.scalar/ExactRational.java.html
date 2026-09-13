@@ -182,8 +182,8 @@ public record ExactRational(
 <span class="fc bfc" id="L182" title="All 2 branches covered.">        if (other.isOne()) {</span>
 <span class="fc" id="L183">            return this;</span>
         }
-<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (other.isNegativeOne()) {</span>
-<span class="nc" id="L186">            return negate();</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        if (other.isNegativeOne()) {</span>
+<span class="fc" id="L186">            return negate();</span>
         }
 
 <span class="fc" id="L189">        BigInteger numeratorCancellation =</span>

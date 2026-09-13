@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReleaseReadinessEvidenceVerifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">ReleaseReadinessEvidenceVerifier.java</span></div><h1>ReleaseReadinessEvidenceVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import static de.regelsuche.release.ReleaseReadinessBindings.*;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/** Read-only verification of retained qualified release evidence; no generation or qualification. */
+public final class ReleaseReadinessEvidenceVerifier {
+<span class="fc" id="L14">    static final List&lt;String&gt; ROOT_FILES = List.of(&quot;profiles.json&quot;, &quot;evidence-summary.json&quot;, &quot;hidden-rule-release-evidence.json&quot;,</span>
+        &quot;release-readiness-report.json&quot;, &quot;release-readiness-run.json&quot;);
+<span class="fc" id="L16">    static final List&lt;String&gt; CAMPAIGN_FILES = List.of(&quot;production-campaign-manifest.json&quot;, &quot;campaign-resource-ledger.json&quot;,</span>
+        &quot;feedback-reallocation.json&quot;, &quot;proof-report.json&quot;, &quot;solver-obligation.json&quot;, &quot;solver-result.json&quot;, &quot;production-lifecycle-run.json&quot;);
+<span class="fc" id="L18">    static final List&lt;String&gt; QUALIFICATION_FILES = List.of(&quot;qualification-suite.json&quot;, &quot;qualification-split-audit.json&quot;,</span>
+        &quot;qualification-evaluation.json&quot;, &quot;qualification-utility.json&quot;, &quot;candidate-qualification-evidence.json&quot;, &quot;candidate-qualification-run.json&quot;);
+<span class="fc" id="L20">    static final Map&lt;String, String&gt; SCHEMAS = Map.ofEntries(</span>
+<span class="fc" id="L21">        Map.entry(&quot;profiles.json&quot;, &quot;regelsuche-release-evidence-profile-catalog-v1.schema.json&quot;),</span>
+<span class="fc" id="L22">        Map.entry(&quot;evidence-summary.json&quot;, &quot;regelsuche-autonomous-campaign-release-evidence-v1.schema.json&quot;),</span>
+<span class="fc" id="L23">        Map.entry(&quot;hidden-rule-release-evidence.json&quot;, &quot;regelsuche-hidden-rule-release-evidence-v1.schema.json&quot;),</span>
+<span class="fc" id="L24">        Map.entry(&quot;campaign/production-campaign-manifest.json&quot;, &quot;regelsuche-autonomous-production-campaign-v2.schema.json&quot;),</span>
+<span class="fc" id="L25">        Map.entry(&quot;qualification/qualification-suite.json&quot;, &quot;regelsuche-autonomous-candidate-qualification-suite-v1.schema.json&quot;),</span>
+<span class="fc" id="L26">        Map.entry(&quot;qualification/qualification-split-audit.json&quot;, &quot;regelsuche-autonomous-candidate-qualification-split-v1.schema.json&quot;),</span>
+<span class="fc" id="L27">        Map.entry(&quot;qualification/qualification-evaluation.json&quot;, &quot;regelsuche-open-target-conjecture-evaluation-v1.schema.json&quot;),</span>
+<span class="fc" id="L28">        Map.entry(&quot;qualification/qualification-utility.json&quot;, &quot;regelsuche-autonomous-candidate-qualified-utility-v1.schema.json&quot;),</span>
+<span class="fc" id="L29">        Map.entry(&quot;qualification/candidate-qualification-evidence.json&quot;, &quot;regelsuche-autonomous-candidate-qualification-v1.schema.json&quot;),</span>
+<span class="fc" id="L30">        Map.entry(&quot;qualification/candidate-qualification-run.json&quot;, &quot;regelsuche-autonomous-candidate-qualification-run-v1.schema.json&quot;),</span>
+<span class="fc" id="L31">        Map.entry(&quot;release-readiness-report.json&quot;, &quot;regelsuche-release-readiness-matrix-v1.schema.json&quot;),</span>
+<span class="fc" id="L32">        Map.entry(&quot;release-readiness-run.json&quot;, &quot;regelsuche-release-readiness-run-v1.schema.json&quot;),</span>
+<span class="fc" id="L33">        Map.entry(&quot;campaign/solver-obligation.json&quot;, &quot;regelsuche-solver-obligation-v1.schema.json&quot;),</span>
+<span class="fc" id="L34">        Map.entry(&quot;campaign/solver-result.json&quot;, &quot;regelsuche-solver-result-v1.schema.json&quot;),</span>
+<span class="fc" id="L35">        Map.entry(&quot;campaign/proof-report.json&quot;, &quot;regelsuche-open-target-conjecture-proof-v2.schema.json&quot;),</span>
+<span class="fc" id="L36">        Map.entry(&quot;campaign/production-lifecycle-run.json&quot;, &quot;regelsuche-autonomous-production-lifecycle-v3.schema.json&quot;));</span>
+
+    private ReleaseReadinessEvidenceVerifier() { }
+
+    public static void verify(Path root, Path schemaRoot) throws IOException {
+<span class="fc" id="L41">        try (var files = new OwnedReleaseEvidenceFiles(root); var schemas = new OwnedReleaseEvidenceFiles(schemaRoot)) {</span>
+<span class="fc" id="L42">            var documents = new LinkedHashMap&lt;String, JsonNode&gt;();</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            for (String relative : ROOT_FILES) load(files, documents, relative);</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">            for (String relative : CAMPAIGN_FILES) load(files, documents, &quot;campaign/&quot; + relative);</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">            for (String relative : QUALIFICATION_FILES) load(files, documents, &quot;qualification/&quot; + relative);</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            require(!files.present(Path.of(&quot;campaign/proof-obligation.json&quot;)), &quot;legacy proof-obligation.json must not be retained&quot;);</span>
+<span class="fc" id="L47">            var json = new ReleaseEvidenceJson();</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            for (var pair : SCHEMAS.entrySet()) json.validate(documents.get(pair.getKey()),</span>
+<span class="fc" id="L49">                ReleaseEvidenceJson.parse(schemas.readBytes(Path.of(pair.getValue())), pair.getValue()), pair.getKey());</span>
+<span class="fc" id="L50">            ReleaseReadinessBindings.verify(documents, files.readBytes(Path.of(&quot;profiles.json&quot;)));</span>
+<span class="fc" id="L51">            verifyQualifiedSemantics(documents);</span>
+        }
+<span class="fc" id="L53">    }</span>
+
+    private static void load(OwnedReleaseEvidenceFiles files, Map&lt;String, JsonNode&gt; documents, String relative) throws IOException {
+<span class="fc" id="L56">        byte[] bytes = files.readBytes(Path.of(relative));</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        require(bytes.length &gt; 0, &quot;empty file: &quot; + relative);</span>
+        // The existing gate requires both resource ledgers to be nonempty, without
+        // declaring a schema or content identity for their payloads in this verifier.
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (SCHEMAS.containsKey(relative)) documents.put(relative, ReleaseEvidenceJson.parse(bytes, relative));</span>
+<span class="fc" id="L61">    }</span>
+
+    private static void verifyQualifiedSemantics(Map&lt;String, JsonNode&gt; documents) {
+<span class="fc" id="L64">        JsonNode obligation = document(documents, &quot;campaign/solver-obligation.json&quot;);</span>
+<span class="fc" id="L65">        JsonNode result = document(documents, &quot;campaign/solver-result.json&quot;);</span>
+<span class="fc" id="L66">        JsonNode proof = document(documents, &quot;campaign/proof-report.json&quot;);</span>
+<span class="fc" id="L67">        JsonNode lifecycle = document(documents, &quot;campaign/production-lifecycle-run.json&quot;);</span>
+<span class="fc" id="L68">        same(result, &quot;obligationHash&quot;, obligation, &quot;contentHash&quot;, &quot;solver result obligation hash mismatch&quot;);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        for (JsonNode dependent : List.of(proof, lifecycle)) {</span>
+<span class="fc" id="L70">            same(dependent, &quot;solverObligationHash&quot;, obligation, &quot;contentHash&quot;, &quot;proof/lifecycle obligation hash mismatch&quot;);</span>
+<span class="fc" id="L71">            same(dependent, &quot;solverResultHash&quot;, result, &quot;contentHash&quot;, &quot;proof/lifecycle result hash mismatch&quot;);</span>
+<span class="fc" id="L72">        }</span>
+<span class="fc" id="L73">        require(text(result, &quot;status&quot;).equals(&quot;CONFIRMED&quot;), &quot;solver result is not CONFIRMED&quot;);</span>
+<span class="fc" id="L74">        require(text(result, &quot;translationStatus&quot;).equals(&quot;LOSSLESS&quot;), &quot;solver result translation is not LOSSLESS&quot;);</span>
+<span class="fc" id="L75">        JsonNode matrix = document(documents, &quot;release-readiness-report.json&quot;);</span>
+<span class="fc" id="L76">        JsonNode hidden = document(documents, &quot;hidden-rule-release-evidence.json&quot;);</span>
+<span class="fc" id="L77">        JsonNode run = document(documents, &quot;release-readiness-run.json&quot;);</span>
+<span class="fc" id="L78">        JsonNode qualification = document(documents, &quot;qualification/candidate-qualification-evidence.json&quot;);</span>
+<span class="fc" id="L79">        JsonNode split = document(documents, &quot;qualification/qualification-split-audit.json&quot;);</span>
+<span class="fc" id="L80">        JsonNode utility = document(documents, &quot;qualification/qualification-utility.json&quot;);</span>
+<span class="fc" id="L81">        Map&lt;String, String&gt; expectedProfiles = Map.of(&quot;HIDDEN_RULE_REDISCOVERY&quot;, &quot;READY&quot;, &quot;OPEN_TARGET_DISCOVERY&quot;, &quot;READY&quot;,</span>
+            &quot;AUTONOMOUS_CAMPAIGN&quot;, &quot;READY&quot;, &quot;EXTERNAL_NOVELTY_REVIEW&quot;, &quot;BLOCKED&quot;);
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (JsonNode profile : array(matrix, &quot;profiles&quot;)) {</span>
+<span class="fc" id="L84">            String expected = expectedProfiles.get(text(profile, &quot;profile&quot;));</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            if (expected != null) require(text(profile, &quot;status&quot;).equals(expected), &quot;release profile status drift&quot;);</span>
+<span class="fc" id="L86">        }</span>
+<span class="fc" id="L87">        counts(hidden, Map.of(&quot;cases&quot;, 20, &quot;families&quot;, 4, &quot;configuredNegativeHoldouts&quot;, 40,</span>
+<span class="fc" id="L88">            &quot;executedNegativeHoldouts&quot;, 38, &quot;skippedNegativeHoldouts&quot;, 2, &quot;falsePositiveHoldouts&quot;, 0));</span>
+<span class="fc" id="L89">        truths(hidden, &quot;hiddenReferenceIsolated&quot;, &quot;benchmarkComplete&quot;, &quot;executableRediscoveryRetained&quot;);</span>
+<span class="fc" id="L90">        truths(split, &quot;passed&quot;);</span>
+<span class="fc" id="L91">        counts(split, Map.of(&quot;heldOutFamilyOrClusterCount&quot;, 1));</span>
+<span class="pc bpc" id="L92" title="2 of 4 branches missed.">        require(array(split, &quot;upstreamCollisions&quot;).isEmpty() &amp;&amp; array(split, &quot;internalCollisions&quot;).isEmpty(), &quot;qualification split collisions&quot;);</span>
+<span class="fc" id="L93">        counts(qualification, Map.of(&quot;configuredPositiveHoldouts&quot;, 12, &quot;executedPositiveHoldouts&quot;, 12,</span>
+<span class="fc" id="L94">            &quot;configuredNegativeHoldouts&quot;, 12, &quot;executedNegativeHoldouts&quot;, 12, &quot;mandatorySkippedWorkCount&quot;, 0,</span>
+<span class="fc" id="L95">            &quot;refutingHoldouts&quot;, 0, &quot;counterexamplesFound&quot;, 0, &quot;correctnessRegressionCount&quot;, 0));</span>
+<span class="fc" id="L96">        truths(qualification, &quot;pairedHeldOutUtilityEvaluated&quot;, &quot;qualified&quot;);</span>
+<span class="fc" id="L97">        positive(qualification, &quot;pairedUtilityPermille&quot;);</span>
+<span class="fc" id="L98">        truths(utility, &quot;beneficial&quot;);</span>
+<span class="fc" id="L99">        positive(utility, &quot;materialGainCount&quot;);</span>
+<span class="fc" id="L100">        counts(utility, Map.of(&quot;correctnessRegressionCount&quot;, 0));</span>
+<span class="fc" id="L101">        same(matrix, &quot;hiddenRuleEvidenceHash&quot;, hidden, &quot;evidenceHash&quot;, &quot;matrix hidden-rule hash mismatch&quot;);</span>
+<span class="fc" id="L102">        require(text(run, &quot;hiddenRuleEvidenceStatus&quot;).equals(&quot;BOUND&quot;), &quot;hidden-rule evidence not bound&quot;);</span>
+<span class="fc" id="L103">        same(run, &quot;hiddenRuleEvidenceHash&quot;, hidden, &quot;evidenceHash&quot;, &quot;run hidden-rule hash mismatch&quot;);</span>
+<span class="fc" id="L104">        require(text(run, &quot;qualificationEvidenceStatus&quot;).equals(&quot;BOUND&quot;), &quot;qualification evidence not bound&quot;);</span>
+<span class="fc" id="L105">        same(run, &quot;qualificationEvidenceHash&quot;, qualification, &quot;contentHash&quot;, &quot;qualification evidence hash mismatch&quot;);</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        for (JsonNode source : List.of(run, matrix)) {</span>
+<span class="fc" id="L107">            require(text(source, &quot;autonomousCampaignStatus&quot;).equals(&quot;READY&quot;), &quot;autonomy status drift&quot;);</span>
+<span class="fc" id="L108">            truths(source, &quot;autonomyClaimAuthorized&quot;);</span>
+<span class="fc" id="L109">        }</span>
+<span class="fc" id="L110">        require(text(run, &quot;promotionStatus&quot;).equals(&quot;NOT_EVALUATED&quot;), &quot;promotion status drift&quot;);</span>
+<span class="fc" id="L111">        require(text(run, &quot;publicEvidenceStatus&quot;).equals(&quot;NOT_EVALUATED&quot;), &quot;public evidence status drift&quot;);</span>
+<span class="fc" id="L112">    }</span>
+
+    private static void counts(JsonNode document, Map&lt;String, Integer&gt; expected) {
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        expected.forEach((name, count) -&gt; require(field(document, name).isIntegralNumber()</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            &amp;&amp; field(document, name).bigIntegerValue().equals(java.math.BigInteger.valueOf(count)), &quot;count drift: &quot; + name));</span>
+<span class="fc" id="L117">    }</span>
+    private static void truths(JsonNode document, String... fields) {
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        for (String name : fields) require(bool(document, name), &quot;required evidence absent: &quot; + name);</span>
+<span class="fc" id="L120">    }</span>
+    private static void positive(JsonNode document, String name) {
+<span class="pc bpc" id="L122" title="2 of 4 branches missed.">        require(field(document, name).isNumber() &amp;&amp; field(document, name).decimalValue().signum() &gt; 0, &quot;positive value required: &quot; + name);</span>
+<span class="fc" id="L123">    }</span>
+
+    public static void main(String[] args) throws IOException {
+<span class="nc" id="L126">        Path root = Path.of(&quot;regelsuche-release/build/reports/release-readiness-qualified&quot;);</span>
+<span class="nc" id="L127">        Path schemas = Path.of(&quot;docs/schemas&quot;);</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        for (int i = 0; i &lt; args.length; i += 2) {</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">            if (i + 1 &gt;= args.length) throw new IllegalArgumentException(&quot;expected --root PATH or --schemas PATH&quot;);</span>
+<span class="nc bnc" id="L130" title="All 3 branches missed.">            switch (args[i]) {</span>
+<span class="nc" id="L131">                case &quot;--root&quot; -&gt; root = Path.of(args[i + 1]);</span>
+<span class="nc" id="L132">                case &quot;--schemas&quot; -&gt; schemas = Path.of(args[i + 1]);</span>
+<span class="nc" id="L133">                default -&gt; throw new IllegalArgumentException(&quot;unknown verifier option: &quot; + args[i]);</span>
+            }
+        }
+<span class="nc" id="L136">        verify(root, schemas);</span>
+<span class="nc" id="L137">        System.out.println(&quot;releaseReadinessRoot=&quot; + root);</span>
+<span class="nc" id="L138">        System.out.println(&quot;jsonSchemaValidator=&quot; + ReleaseEvidenceJson.VALIDATOR_VERSION);</span>
+<span class="nc" id="L139">        System.out.println(&quot;release-readiness-contract=valid&quot;);</span>
+<span class="nc" id="L140">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

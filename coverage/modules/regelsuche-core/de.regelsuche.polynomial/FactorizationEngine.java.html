@@ -2,9 +2,10 @@
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 
 /**
  * Backend-neutral factorization engine SPI.
@@ -20,20 +21,20 @@ public interface FactorizationEngine&lt;C&gt; {
 
     EngineResult&lt;C&gt; propose(FactorizationRequest&lt;C&gt; request);
 
-<span class="fc" id="L23">    enum Outcome {</span>
-<span class="fc" id="L24">        CANDIDATES,</span>
-<span class="fc" id="L25">        NO_CANDIDATE,</span>
-<span class="fc" id="L26">        UNSUPPORTED_DOMAIN,</span>
-<span class="fc" id="L27">        UNSUPPORTED_REQUEST,</span>
-<span class="fc" id="L28">        BUDGET_INCONCLUSIVE,</span>
-<span class="fc" id="L29">        TECHNICAL_FAILURE</span>
+<span class="fc" id="L24">    enum Outcome {</span>
+<span class="fc" id="L25">        CANDIDATES,</span>
+<span class="fc" id="L26">        NO_CANDIDATE,</span>
+<span class="fc" id="L27">        UNSUPPORTED_DOMAIN,</span>
+<span class="fc" id="L28">        UNSUPPORTED_REQUEST,</span>
+<span class="fc" id="L29">        BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L30">        TECHNICAL_FAILURE</span>
     }
 
     /** A retained claim made by the engine, not independent evidence. */
-<span class="fc" id="L33">    enum BackendClaim {</span>
-<span class="fc" id="L34">        NONE,</span>
-<span class="fc" id="L35">        COMPLETE_FACTORIZATION,</span>
-<span class="fc" id="L36">        IRREDUCIBLE</span>
+<span class="fc" id="L34">    enum BackendClaim {</span>
+<span class="fc" id="L35">        NONE,</span>
+<span class="fc" id="L36">        COMPLETE_FACTORIZATION,</span>
+<span class="fc" id="L37">        IRREDUCIBLE</span>
     }
 
     /**
@@ -51,89 +52,101 @@ public interface FactorizationEngine&lt;C&gt; {
         SparsePolynomial&lt;C&gt; unresolvedRemainder,
         String engineCertificateHash
     ) {
-<span class="fc" id="L54">        public Proposal {</span>
-<span class="fc" id="L55">            Objects.requireNonNull(</span>
+<span class="fc" id="L55">        public Proposal {</span>
+<span class="fc" id="L56">            Objects.requireNonNull(</span>
                 unresolvedRemainder,
                 &quot;unresolvedRemainder&quot;);
-<span class="fc" id="L58">            PolynomialRing&lt;C&gt; ring = unresolvedRemainder.ring();</span>
-<span class="fc" id="L59">            unit = ring.coefficientDomain().canonical(</span>
-<span class="fc" id="L60">                Objects.requireNonNull(unit, &quot;unit&quot;));</span>
-<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            if (ring.coefficientDomain().isZero(unit)</span>
-<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                    || unresolvedRemainder.isZero()</span>
-<span class="fc bfc" id="L63" title="All 2 branches covered.">                    || unresolvedRemainder.isConstant()</span>
-<span class="pc bpc" id="L64" title="1 of 4 branches missed.">                        &amp;&amp; !unresolvedRemainder.isOne()</span>
+<span class="fc" id="L59">            PolynomialRing&lt;C&gt; ring = unresolvedRemainder.ring();</span>
+<span class="fc" id="L60">            unit = ring.coefficientDomain().canonical(</span>
+<span class="fc" id="L61">                Objects.requireNonNull(unit, &quot;unit&quot;));</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            if (ring.coefficientDomain().isZero(unit)</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">                    || unresolvedRemainder.isZero()</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">                    || unresolvedRemainder.isConstant()</span>
+<span class="pc bpc" id="L65" title="1 of 4 branches missed.">                        &amp;&amp; !unresolvedRemainder.isOne()</span>
                     || engineCertificateHash == null
-<span class="pc bpc" id="L66" title="1 of 2 branches missed.">                    || !engineCertificateHash.matches(</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">                    || !engineCertificateHash.matches(</span>
                         &quot;sha256:[0-9a-f]{64}&quot;)) {
-<span class="fc" id="L68">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L69">                throw new IllegalArgumentException(</span>
                     &quot;factorization engine proposal is invalid&quot;);
             }
-<span class="fc" id="L71">            factors = canonicalFactors(</span>
+<span class="fc" id="L72">            factors = canonicalFactors(</span>
                 ring,
-<span class="fc" id="L73">                Objects.requireNonNull(factors, &quot;factors&quot;));</span>
-<span class="pc bpc" id="L74" title="1 of 2 branches missed.">            if (factors.isEmpty()</span>
-<span class="nc bnc" id="L75" title="All 2 branches missed.">                    &amp;&amp; (!unresolvedRemainder.isOne()</span>
-<span class="nc bnc" id="L76" title="All 2 branches missed.">                        || ring.coefficientDomain() != BigIntegerDomain.INSTANCE</span>
-<span class="nc bnc" id="L77" title="All 2 branches missed.">                            &amp;&amp; ring.coefficientDomain() != ExactRationalField.INSTANCE)) {</span>
-<span class="nc" id="L78">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L74">                Objects.requireNonNull(factors, &quot;factors&quot;));</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">            if (factors.isEmpty()</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                    &amp;&amp; (!unresolvedRemainder.isOne()</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                        || ring.coefficientDomain() != BigIntegerDomain.INSTANCE</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">                            &amp;&amp; ring.coefficientDomain() != ExactRationalField.INSTANCE)) {</span>
+<span class="nc" id="L79">                throw new IllegalArgumentException(</span>
                     &quot;empty factorization requires Z/Q scalar content and remainder one&quot;);
             }
-<span class="fc" id="L81">        }</span>
+<span class="fc" id="L82">        }</span>
 
         public String canonicalMaterial() {
-<span class="fc" id="L84">            StringBuilder result = new StringBuilder();</span>
-<span class="fc" id="L85">            append(</span>
+<span class="fc" id="L85">            StringBuilder result = new StringBuilder();</span>
+<span class="fc" id="L86">            append(</span>
                 result,
-<span class="fc" id="L87">                unresolvedRemainder.ring()</span>
-<span class="fc" id="L88">                    .coefficientDomain()</span>
-<span class="fc" id="L89">                    .canonicalText(unit));</span>
-<span class="fc bfc" id="L90" title="All 2 branches covered.">            for (PolynomialFactor&lt;C&gt; factor : factors) {</span>
-<span class="fc" id="L91">                append(</span>
+<span class="fc" id="L88">                unresolvedRemainder.ring()</span>
+<span class="fc" id="L89">                    .coefficientDomain()</span>
+<span class="fc" id="L90">                    .canonicalText(unit));</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            for (PolynomialFactor&lt;C&gt; factor : factors) {</span>
+<span class="fc" id="L92">                append(</span>
                     result,
-<span class="fc" id="L93">                    Integer.toString(factor.multiplicity()));</span>
-<span class="fc" id="L94">                append(</span>
+<span class="fc" id="L94">                    Integer.toString(factor.multiplicity()));</span>
+<span class="fc" id="L95">                append(</span>
                     result,
-<span class="fc" id="L96">                    factor.polynomial().canonicalMaterial());</span>
-<span class="fc" id="L97">            }</span>
-<span class="fc" id="L98">            append(</span>
+<span class="fc" id="L97">                    factor.polynomial().canonicalMaterial());</span>
+<span class="fc" id="L98">            }</span>
+<span class="fc" id="L99">            append(</span>
                 result,
-<span class="fc" id="L100">                unresolvedRemainder.canonicalMaterial());</span>
-<span class="fc" id="L101">            append(result, engineCertificateHash);</span>
-<span class="fc" id="L102">            return result.toString();</span>
+<span class="fc" id="L101">                unresolvedRemainder.canonicalMaterial());</span>
+<span class="fc" id="L102">            append(result, engineCertificateHash);</span>
+<span class="fc" id="L103">            return result.toString();</span>
         }
 
         private static &lt;C&gt; List&lt;PolynomialFactor&lt;C&gt;&gt; canonicalFactors(
             PolynomialRing&lt;C&gt; ring,
             List&lt;PolynomialFactor&lt;C&gt;&gt; factors
         ) {
-<span class="fc" id="L109">            List&lt;PolynomialFactor&lt;C&gt;&gt; ordered = new ArrayList&lt;&gt;(</span>
-<span class="fc" id="L110">                List.copyOf(factors));</span>
-<span class="pc bpc" id="L111" title="1 of 2 branches missed.">            if (ordered.stream().anyMatch(factor -&gt;</span>
-<span class="pc bpc" id="L112" title="1 of 2 branches missed.">                    factor == null</span>
-<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                        || !ring.equals(factor.polynomial().ring()))) {</span>
-<span class="nc" id="L114">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L110">            List&lt;PolynomialFactor&lt;C&gt;&gt; ordered = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L111">                List.copyOf(factors));</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">            if (ordered.stream().anyMatch(factor -&gt;</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                    factor == null</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                        || !ring.equals(factor.polynomial().ring()))) {</span>
+<span class="nc" id="L115">                throw new IllegalArgumentException(</span>
                     &quot;factorization proposal ring mismatch&quot;);
             }
-<span class="fc" id="L117">            ordered.sort(Comparator</span>
-<span class="fc" id="L118">                .comparing((PolynomialFactor&lt;C&gt; factor) -&gt;</span>
-<span class="fc" id="L119">                    factor.polynomial().canonicalMaterial())</span>
-<span class="fc" id="L120">                .thenComparingInt(PolynomialFactor::multiplicity));</span>
-<span class="fc" id="L121">            List&lt;PolynomialFactor&lt;C&gt;&gt; merged = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L122" title="All 2 branches covered.">            for (PolynomialFactor&lt;C&gt; factor : ordered) {</span>
-<span class="fc bfc" id="L123" title="All 2 branches covered.">                if (!merged.isEmpty()</span>
-<span class="pc bpc" id="L124" title="1 of 2 branches missed.">                        &amp;&amp; merged.getLast().polynomial().equals(</span>
-<span class="fc" id="L125">                            factor.polynomial())) {</span>
-<span class="nc" id="L126">                    PolynomialFactor&lt;C&gt; previous = merged.removeLast();</span>
-<span class="nc" id="L127">                    merged.add(new PolynomialFactor&lt;&gt;(</span>
-<span class="nc" id="L128">                        factor.polynomial(),</span>
-<span class="nc" id="L129">                        Math.addExact(</span>
-<span class="nc" id="L130">                            previous.multiplicity(),</span>
-<span class="nc" id="L131">                            factor.multiplicity())));</span>
-<span class="nc" id="L132">                } else {</span>
-<span class="fc" id="L133">                    merged.add(factor);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            if (ordered.size() &lt; 2) {</span>
+<span class="fc" id="L119">                return List.copyOf(ordered);</span>
+            }
+            // Canonical text is potentially large; build it once per factor,
+            // not once per comparison. Keep ties and multiplicity ordering.
+<span class="fc" id="L123">            List&lt;Map.Entry&lt;String, PolynomialFactor&lt;C&gt;&gt;&gt; keyed =</span>
+<span class="fc" id="L124">                new ArrayList&lt;&gt;(ordered.size());</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            for (PolynomialFactor&lt;C&gt; factor : ordered) {</span>
+<span class="fc" id="L126">                keyed.add(Map.entry(</span>
+<span class="fc" id="L127">                    factor.polynomial().canonicalMaterial(), factor));</span>
+<span class="fc" id="L128">            }</span>
+<span class="fc" id="L129">            keyed.sort(Comparator</span>
+<span class="fc" id="L130">                .comparing((Map.Entry&lt;String, PolynomialFactor&lt;C&gt;&gt; entry) -&gt;</span>
+<span class="fc" id="L131">                    entry.getKey())</span>
+<span class="fc" id="L132">                .thenComparingInt(entry -&gt; entry.getValue().multiplicity()));</span>
+<span class="fc" id="L133">            List&lt;PolynomialFactor&lt;C&gt;&gt; merged = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            for (Map.Entry&lt;String, PolynomialFactor&lt;C&gt;&gt; entry : keyed) {</span>
+<span class="fc" id="L135">                PolynomialFactor&lt;C&gt; factor = entry.getValue();</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">                if (!merged.isEmpty()</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">                        &amp;&amp; merged.getLast().polynomial().equals(</span>
+<span class="fc" id="L138">                            factor.polynomial())) {</span>
+<span class="fc" id="L139">                    PolynomialFactor&lt;C&gt; previous = merged.removeLast();</span>
+<span class="fc" id="L140">                    merged.add(new PolynomialFactor&lt;&gt;(</span>
+<span class="fc" id="L141">                        factor.polynomial(),</span>
+<span class="fc" id="L142">                        Math.addExact(</span>
+<span class="fc" id="L143">                            previous.multiplicity(),</span>
+<span class="fc" id="L144">                            factor.multiplicity())));</span>
+<span class="fc" id="L145">                } else {</span>
+<span class="fc" id="L146">                    merged.add(factor);</span>
                 }
-<span class="fc" id="L135">            }</span>
-<span class="fc" id="L136">            return List.copyOf(merged);</span>
+<span class="fc" id="L148">            }</span>
+<span class="fc" id="L149">            return List.copyOf(merged);</span>
         }
     }
 
@@ -147,78 +160,77 @@ public interface FactorizationEngine&lt;C&gt; {
         BackendClaim backendClaim,
         String engineResultHash
     ) {
-<span class="fc" id="L150">        public EngineResult {</span>
-<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            if (engineId == null</span>
-<span class="pc bpc" id="L152" title="3 of 6 branches missed.">                    || engineId.isBlank()</span>
+<span class="fc" id="L163">        public EngineResult {</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">            if (engineId == null</span>
+<span class="pc bpc" id="L165" title="3 of 6 branches missed.">                    || engineId.isBlank()</span>
                     || outcome == null
                     || detailCode == null
-<span class="pc bpc" id="L155" title="4 of 8 branches missed.">                    || detailCode.isBlank()</span>
+<span class="pc bpc" id="L168" title="4 of 8 branches missed.">                    || detailCode.isBlank()</span>
                     || work == null
                     || backendClaim == null
                     || engineResultHash == null
-<span class="pc bpc" id="L159" title="1 of 2 branches missed.">                    || !engineResultHash.matches(</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">                    || !engineResultHash.matches(</span>
                         &quot;sha256:[0-9a-f]{64}&quot;)) {
-<span class="nc" id="L161">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L174">                throw new IllegalArgumentException(</span>
                     &quot;factorization engine result is invalid&quot;);
             }
-<span class="fc" id="L164">            proposals = canonicalProposals(</span>
-<span class="fc" id="L165">                Objects.requireNonNull(proposals, &quot;proposals&quot;));</span>
-<span class="fc bfc" id="L166" title="All 2 branches covered.">            if ((outcome == Outcome.CANDIDATES)</span>
-<span class="pc bpc" id="L167" title="1 of 4 branches missed.">                    != !proposals.isEmpty()) {</span>
-<span class="nc" id="L168">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L177">            proposals = canonicalProposals(</span>
+<span class="fc" id="L178">                Objects.requireNonNull(proposals, &quot;proposals&quot;));</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            if ((outcome == Outcome.CANDIDATES)</span>
+<span class="pc bpc" id="L180" title="1 of 4 branches missed.">                    != !proposals.isEmpty()) {</span>
+<span class="nc" id="L181">                throw new IllegalArgumentException(</span>
                     &quot;factorization engine outcome/proposal mismatch&quot;);
             }
-<span class="pc bpc" id="L171" title="1 of 4 branches missed.">            if (outcome == Outcome.CANDIDATES</span>
+<span class="pc bpc" id="L184" title="1 of 4 branches missed.">            if (outcome == Outcome.CANDIDATES</span>
                     &amp;&amp; backendClaim == BackendClaim.IRREDUCIBLE) {
-<span class="nc" id="L173">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L186">                throw new IllegalArgumentException(</span>
                     &quot;candidate result cannot claim irreducibility&quot;);
             }
-<span class="fc bfc" id="L176" title="All 2 branches covered.">            if (backendClaim == BackendClaim.COMPLETE_FACTORIZATION</span>
-<span class="fc bfc" id="L177" title="All 2 branches covered.">                    &amp;&amp; proposals.stream().anyMatch(proposal -&gt;</span>
-<span class="fc bfc" id="L178" title="All 2 branches covered.">                        !proposal.unresolvedRemainder().isOne())) {</span>
-<span class="fc" id="L179">                throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            if (backendClaim == BackendClaim.COMPLETE_FACTORIZATION</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">                    &amp;&amp; proposals.stream().anyMatch(proposal -&gt;</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">                        !proposal.unresolvedRemainder().isOne())) {</span>
+<span class="fc" id="L192">                throw new IllegalArgumentException(</span>
                     &quot;complete backend claim cannot retain an unresolved remainder&quot;);
             }
-<span class="pc bpc" id="L182" title="1 of 6 branches missed.">            if (outcome != Outcome.CANDIDATES</span>
+<span class="pc bpc" id="L195" title="1 of 6 branches missed.">            if (outcome != Outcome.CANDIDATES</span>
                     &amp;&amp; outcome != Outcome.NO_CANDIDATE
                     &amp;&amp; backendClaim != BackendClaim.NONE) {
-<span class="nc" id="L185">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L198">                throw new IllegalArgumentException(</span>
                     &quot;failed engine result cannot retain a mathematical claim&quot;);
             }
-<span class="pc bpc" id="L188" title="1 of 4 branches missed.">            if (outcome == Outcome.NO_CANDIDATE</span>
+<span class="pc bpc" id="L201" title="1 of 4 branches missed.">            if (outcome == Outcome.NO_CANDIDATE</span>
                     &amp;&amp; backendClaim
                         == BackendClaim.COMPLETE_FACTORIZATION) {
-<span class="nc" id="L191">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L204">                throw new IllegalArgumentException(</span>
                     &quot;empty engine result cannot claim complete factorization&quot;);
             }
-<span class="fc" id="L194">        }</span>
+<span class="fc" id="L207">        }</span>
 
         public String canonicalMaterial() {
-<span class="nc" id="L197">            StringBuilder result = new StringBuilder();</span>
-<span class="nc" id="L198">            append(result, engineId);</span>
-<span class="nc" id="L199">            append(result, outcome.name());</span>
-<span class="nc" id="L200">            append(result, detailCode);</span>
-<span class="nc" id="L201">            append(result, work.canonicalMaterial());</span>
-<span class="nc" id="L202">            append(result, backendClaim.name());</span>
-<span class="nc" id="L203">            proposals.forEach(proposal -&gt; append(</span>
+<span class="nc" id="L210">            StringBuilder result = new StringBuilder();</span>
+<span class="nc" id="L211">            append(result, engineId);</span>
+<span class="nc" id="L212">            append(result, outcome.name());</span>
+<span class="nc" id="L213">            append(result, detailCode);</span>
+<span class="nc" id="L214">            append(result, work.canonicalMaterial());</span>
+<span class="nc" id="L215">            append(result, backendClaim.name());</span>
+<span class="nc" id="L216">            proposals.forEach(proposal -&gt; append(</span>
                 result,
-<span class="nc" id="L205">                proposal.canonicalMaterial()));</span>
-<span class="nc" id="L206">            append(result, engineResultHash);</span>
-<span class="nc" id="L207">            return result.toString();</span>
+<span class="nc" id="L218">                proposal.canonicalMaterial()));</span>
+<span class="nc" id="L219">            append(result, engineResultHash);</span>
+<span class="nc" id="L220">            return result.toString();</span>
         }
 
         private static &lt;C&gt; List&lt;Proposal&lt;C&gt;&gt; canonicalProposals(
             List&lt;Proposal&lt;C&gt;&gt; proposals
         ) {
-<span class="fc" id="L213">            LinkedHashMap&lt;String, Proposal&lt;C&gt;&gt; unique =</span>
-                new LinkedHashMap&lt;&gt;();
-<span class="fc" id="L215">            proposals.stream()</span>
-<span class="fc" id="L216">                .sorted(Comparator.comparing(</span>
-                    Proposal::canonicalMaterial))
-<span class="fc" id="L218">                .forEach(proposal -&gt; unique.putIfAbsent(</span>
-<span class="fc" id="L219">                    proposal.canonicalMaterial(),</span>
-                    proposal));
-<span class="fc" id="L221">            return List.copyOf(unique.values());</span>
+            // Ordering and deduplication share the same materialized key.
+            // putIfAbsent retains the first input for equal keys, like the
+            // previous stable sort followed by insertion-order deduplication.
+<span class="fc" id="L229">            Map&lt;String, Proposal&lt;C&gt;&gt; unique = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">            for (Proposal&lt;C&gt; proposal : proposals) {</span>
+<span class="fc" id="L231">                unique.putIfAbsent(proposal.canonicalMaterial(), proposal);</span>
+<span class="fc" id="L232">            }</span>
+<span class="fc" id="L233">            return List.copyOf(unique.values());</span>
         }
     }
 
@@ -226,10 +238,10 @@ public interface FactorizationEngine&lt;C&gt; {
         StringBuilder target,
         String value
     ) {
-<span class="fc" id="L229">        target.append('|')</span>
-<span class="fc" id="L230">            .append(value.length())</span>
-<span class="fc" id="L231">            .append(':')</span>
-<span class="fc" id="L232">            .append(value);</span>
-<span class="fc" id="L233">    }</span>
+<span class="fc" id="L241">        target.append('|')</span>
+<span class="fc" id="L242">            .append(value.length())</span>
+<span class="fc" id="L243">            .append(':')</span>
+<span class="fc" id="L244">            .append(value);</span>
+<span class="fc" id="L245">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

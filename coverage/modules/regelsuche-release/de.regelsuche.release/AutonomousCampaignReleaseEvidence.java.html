@@ -64,8 +64,8 @@ public record AutonomousCampaignReleaseEvidence(
             hash, &quot;cleanRunManifestHashes&quot;));
 <span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (cleanRunManifestHashes.isEmpty()</span>
 <span class="pc bpc" id="L66" title="1 of 2 branches missed.">                || cleanRunCount != cleanRunManifestHashes.size()</span>
-<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                || !cleanRunManifestHashes.contains(campaignManifestHash)) {</span>
-<span class="nc" id="L68">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">                || !cleanRunManifestHashes.contains(campaignManifestHash)) {</span>
+<span class="fc" id="L68">            throw new IllegalArgumentException(</span>
                 &quot;clean runs must retain the campaign manifest and match their count&quot;);
         }
 <span class="fc" id="L71">        boolean calculatedIdentical = cleanRunManifestHashes.stream()</span>
@@ -145,8 +145,8 @@ public record AutonomousCampaignReleaseEvidence(
             hiddenRuleBenchmarkComplete,
             executableRediscoveryRetained,
             publicEvidenceReviewed);
-<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (!expectedHash.equals(evidenceHash)) {</span>
-<span class="nc" id="L149">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (!expectedHash.equals(evidenceHash)) {</span>
+<span class="fc" id="L149">            throw new IllegalArgumentException(</span>
                 &quot;release evidence hash does not match canonical fields&quot;);
         }
 <span class="fc" id="L152">    }</span>

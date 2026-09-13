@@ -39,71 +39,74 @@ final class RetainedRunActions {
 <span class="fc bfc" id="L39" title="All 2 branches covered.">                if (reference.status() != RepresentationDiscoveryArtifactReference.ArtifactStatus.AVAILABLE) {</span>
 <span class="fc" id="L40">                    error(exchange, 409, &quot;DOSSIER_UNAVAILABLE&quot;, reference.status() + &quot;: &quot; + reference.detail()); return;</span>
                 }
-<span class="pc bpc" id="L42" title="1 of 2 branches missed.">                if (!TargetFreeSymPyBridgeDiscoveryScenario.SCHEMA.equals(reference.artifactSchema())) {</span>
-<span class="nc" id="L43">                    error(exchange, 409, &quot;UNSUPPORTED_DOSSIER&quot;, reference.artifactSchema()); return;</span>
+<span class="fc" id="L42">                boolean nativeExecution = TargetFreeSearchExecution.SCHEMA.equals(reference.artifactSchema());</span>
+<span class="pc bpc" id="L43" title="1 of 4 branches missed.">                if (!nativeExecution &amp;&amp; !TargetFreeSymPyBridgeDiscoveryScenario.SCHEMA.equals(reference.artifactSchema())) {</span>
+<span class="nc" id="L44">                    error(exchange, 409, &quot;UNSUPPORTED_DOSSIER&quot;, reference.artifactSchema()); return;</span>
                 }
                 String body;
-<span class="fc" id="L46">                boolean importing = exchange.getRequestMethod().equals(&quot;POST&quot;);</span>
-<span class="fc bfc" id="L47" title="All 2 branches covered.">                if (importing) {</span>
-<span class="fc" id="L48">                    body = RetainedCandidateDossierRepository.retain(directory, run, requestBody);</span>
+<span class="fc" id="L47">                boolean importing = exchange.getRequestMethod().equals(&quot;POST&quot;);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">                if (importing) {</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">                    body = nativeExecution ? TargetFreeSearchArtifactStore.retain(directory, run, requestBody)</span>
+<span class="fc" id="L50">                        : RetainedCandidateDossierRepository.retain(directory, run, requestBody);</span>
                 } else {
-<span class="fc" id="L50">                    var retained = RetainedCandidateDossierRepository.read(directory, run);</span>
-<span class="fc bfc" id="L51" title="All 2 branches covered.">                    if (retained.isEmpty()) { error(exchange, 404, &quot;DOSSIER_NOT_RETAINED&quot;, &quot;import the artifact bound by this manifest&quot;); return; }</span>
-<span class="fc" id="L52">                    body = retained.get();</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">                    var retained = nativeExecution ? TargetFreeSearchArtifactStore.read(directory, run)</span>
+<span class="fc" id="L53">                        : RetainedCandidateDossierRepository.read(directory, run);</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">                    if (retained.isEmpty()) { error(exchange, 404, &quot;DOSSIER_NOT_RETAINED&quot;, &quot;import the artifact bound by this manifest&quot;); return; }</span>
+<span class="fc" id="L55">                    body = retained.get();</span>
                 }
-<span class="fc" id="L54">                exchange.getResponseHeaders().set(&quot;X-Regelsuche-Run-Id&quot;, run.runId());</span>
-<span class="fc" id="L55">                exchange.getResponseHeaders().set(&quot;ETag&quot;, &quot;\&quot;&quot; + reference.targetContentHash().substring(7) + &quot;\&quot;&quot;);</span>
-<span class="fc bfc" id="L56" title="All 2 branches covered.">                send(exchange, importing ? 201 : 200, body);</span>
+<span class="fc" id="L57">                exchange.getResponseHeaders().set(&quot;X-Regelsuche-Run-Id&quot;, run.runId());</span>
+<span class="fc" id="L58">                exchange.getResponseHeaders().set(&quot;ETag&quot;, &quot;\&quot;&quot; + reference.targetContentHash().substring(7) + &quot;\&quot;&quot;);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">                send(exchange, importing ? 201 : 200, body);</span>
             }
-<span class="fc" id="L58">        } catch (IllegalArgumentException exception) {</span>
-<span class="fc bfc" id="L59" title="All 2 branches covered.">            error(exchange, 400, path[1].equals(&quot;duplicate&quot;) ? &quot;INVALID_RUN_CHANGE&quot; : &quot;INVALID_DOSSIER&quot;, exception.getMessage());</span>
-<span class="fc" id="L60">        }</span>
-<span class="fc" id="L61">    }</span>
+<span class="fc" id="L61">        } catch (IllegalArgumentException exception) {</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            error(exchange, 400, path[1].equals(&quot;duplicate&quot;) ? &quot;INVALID_RUN_CHANGE&quot; : &quot;INVALID_DOSSIER&quot;, exception.getMessage());</span>
+<span class="fc" id="L63">        }</span>
+<span class="fc" id="L64">    }</span>
 
     private static void duplicate(HttpExchange exchange, Path directory, RepresentationDiscoveryRunWorkspace parent, byte[] requestBody) throws IOException {
         com.fasterxml.jackson.databind.JsonNode request;
-<span class="fc" id="L65">        try { request = JSON.readTree(requestBody); }</span>
-<span class="fc" id="L66">        catch (com.fasterxml.jackson.core.JacksonException exception) { throw new IllegalArgumentException(&quot;invalid seed change JSON&quot;, exception); }</span>
-<span class="pc bpc" id="L67" title="3 of 8 branches missed.">        if (request == null || !request.isObject() || request.size() != 1 || !request.has(&quot;deterministicSeed&quot;)) {</span>
-<span class="fc" id="L68">            throw new IllegalArgumentException(&quot;exactly one deterministicSeed parameter is required&quot;);</span>
+<span class="fc" id="L68">        try { request = JSON.readTree(requestBody); }</span>
+<span class="fc" id="L69">        catch (com.fasterxml.jackson.core.JacksonException exception) { throw new IllegalArgumentException(&quot;invalid seed change JSON&quot;, exception); }</span>
+<span class="pc bpc" id="L70" title="3 of 8 branches missed.">        if (request == null || !request.isObject() || request.size() != 1 || !request.has(&quot;deterministicSeed&quot;)) {</span>
+<span class="fc" id="L71">            throw new IllegalArgumentException(&quot;exactly one deterministicSeed parameter is required&quot;);</span>
         }
-<span class="fc" id="L70">        var value = request.get(&quot;deterministicSeed&quot;);</span>
-<span class="pc bpc" id="L71" title="4 of 6 branches missed.">        if ((!value.isTextual() &amp;&amp; !value.isIntegralNumber()) || !value.asText().matches(&quot;-?(0|[1-9][0-9]*)&quot;)) {</span>
-<span class="nc" id="L72">            throw new IllegalArgumentException(&quot;deterministicSeed must be an exact Java long&quot;);</span>
+<span class="fc" id="L73">        var value = request.get(&quot;deterministicSeed&quot;);</span>
+<span class="pc bpc" id="L74" title="4 of 6 branches missed.">        if ((!value.isTextual() &amp;&amp; !value.isIntegralNumber()) || !value.asText().matches(&quot;-?(0|[1-9][0-9]*)&quot;)) {</span>
+<span class="nc" id="L75">            throw new IllegalArgumentException(&quot;deterministicSeed must be an exact Java long&quot;);</span>
         }
-<span class="fc" id="L74">        long seed = Long.parseLong(value.asText());</span>
-<span class="fc" id="L75">        var plan = parent.plan();</span>
-<span class="fc" id="L76">        var changed = RepresentationDiscoveryRunPlan.create(plan.informationTrack(), plan.informationBoundaryHash(),</span>
-<span class="fc" id="L77">            plan.ruleInventoryHash(), plan.knowledgePackSelectionHash(), plan.knownStructureCatalogHash(), plan.searchStrategyId(),</span>
-<span class="fc" id="L78">            plan.searchProfileId(), plan.objectiveId(), plan.budgetHash(), seed, plan.backendIdentities());</span>
-<span class="fc" id="L79">        var duplicate = RepresentationDiscoveryRunWorkspace.duplicateWithOnePlanChange(parent, changed, parent.revisions());</span>
-<span class="fc" id="L80">        RepresentationDiscoveryRunWorkspace.retain(directory, duplicate);</span>
-<span class="fc" id="L81">        exchange.getResponseHeaders().set(&quot;Location&quot;, &quot;/api/discovery-runs/&quot; + duplicate.runId().substring(7));</span>
-<span class="fc" id="L82">        exchange.getResponseHeaders().set(&quot;ETag&quot;, &quot;\&quot;&quot; + duplicate.runId().substring(7) + &quot;\&quot;&quot;);</span>
-<span class="fc" id="L83">        send(exchange, 201, duplicate.toCanonicalJson());</span>
-<span class="fc" id="L84">    }</span>
+<span class="fc" id="L77">        long seed = Long.parseLong(value.asText());</span>
+<span class="fc" id="L78">        var plan = parent.plan();</span>
+<span class="fc" id="L79">        var changed = RepresentationDiscoveryRunPlan.create(plan.informationTrack(), plan.informationBoundaryHash(),</span>
+<span class="fc" id="L80">            plan.ruleInventoryHash(), plan.knowledgePackSelectionHash(), plan.knownStructureCatalogHash(), plan.searchStrategyId(),</span>
+<span class="fc" id="L81">            plan.searchProfileId(), plan.objectiveId(), plan.budgetHash(), seed, plan.backendIdentities());</span>
+<span class="fc" id="L82">        var duplicate = RepresentationDiscoveryRunWorkspace.duplicateWithOnePlanChange(parent, changed, parent.revisions());</span>
+<span class="fc" id="L83">        RepresentationDiscoveryRunWorkspace.retain(directory, duplicate);</span>
+<span class="fc" id="L84">        exchange.getResponseHeaders().set(&quot;Location&quot;, &quot;/api/discovery-runs/&quot; + duplicate.runId().substring(7));</span>
+<span class="fc" id="L85">        exchange.getResponseHeaders().set(&quot;ETag&quot;, &quot;\&quot;&quot; + duplicate.runId().substring(7) + &quot;\&quot;&quot;);</span>
+<span class="fc" id="L86">        send(exchange, 201, duplicate.toCanonicalJson());</span>
+<span class="fc" id="L87">    }</span>
 
     private static byte[] read(HttpExchange exchange, int maxBytes) throws IOException {
-<span class="fc" id="L87">        String contentType = exchange.getRequestHeaders().getFirst(&quot;Content-Type&quot;);</span>
-<span class="pc bpc" id="L88" title="2 of 4 branches missed.">        if (contentType == null || !contentType.toLowerCase(Locale.ROOT).split(&quot;;&quot;, 2)[0].trim().equals(&quot;application/json&quot;)) {</span>
-<span class="nc" id="L89">            throw new IllegalArgumentException(&quot;Content-Type must be application/json&quot;);</span>
+<span class="fc" id="L90">        String contentType = exchange.getRequestHeaders().getFirst(&quot;Content-Type&quot;);</span>
+<span class="pc bpc" id="L91" title="2 of 4 branches missed.">        if (contentType == null || !contentType.toLowerCase(Locale.ROOT).split(&quot;;&quot;, 2)[0].trim().equals(&quot;application/json&quot;)) {</span>
+<span class="nc" id="L92">            throw new IllegalArgumentException(&quot;Content-Type must be application/json&quot;);</span>
         }
-<span class="fc" id="L91">        try (var body = BoundedRequestBody.open(exchange, Math.min(maxBytes, RetainedCandidateDossierRepository.MAX_BYTES))) {</span>
-<span class="fc" id="L92">            return body.readAllBytes();</span>
+<span class="fc" id="L94">        try (var body = BoundedRequestBody.open(exchange, Math.min(maxBytes, RetainedCandidateDossierRepository.MAX_BYTES))) {</span>
+<span class="fc" id="L95">            return body.readAllBytes();</span>
         }
     }
 
     private static void error(HttpExchange exchange, int status, String code, String message) throws IOException {
-<span class="fc" id="L97">        send(exchange, status, new JsonWriter().beginObject().property(&quot;error&quot;, true).property(&quot;code&quot;, code)</span>
-<span class="pc bpc" id="L98" title="1 of 2 branches missed.">            .property(&quot;message&quot;, message == null ? code : message).endObject().toString());</span>
-<span class="fc" id="L99">    }</span>
+<span class="fc" id="L100">        send(exchange, status, new JsonWriter().beginObject().property(&quot;error&quot;, true).property(&quot;code&quot;, code)</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            .property(&quot;message&quot;, message == null ? code : message).endObject().toString());</span>
+<span class="fc" id="L102">    }</span>
 
     private static void send(HttpExchange exchange, int status, String json) throws IOException {
-<span class="fc" id="L102">        byte[] bytes = json.getBytes(StandardCharsets.UTF_8);</span>
-<span class="fc" id="L103">        exchange.getResponseHeaders().set(&quot;Content-Type&quot;, &quot;application/json; charset=utf-8&quot;);</span>
-<span class="fc" id="L104">        exchange.getResponseHeaders().set(&quot;Cache-Control&quot;, &quot;no-store&quot;);</span>
-<span class="fc" id="L105">        exchange.sendResponseHeaders(status, bytes.length);</span>
-<span class="fc" id="L106">        try (var body = exchange.getResponseBody()) { body.write(bytes); }</span>
-<span class="fc" id="L107">    }</span>
+<span class="fc" id="L105">        byte[] bytes = json.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L106">        exchange.getResponseHeaders().set(&quot;Content-Type&quot;, &quot;application/json; charset=utf-8&quot;);</span>
+<span class="fc" id="L107">        exchange.getResponseHeaders().set(&quot;Cache-Control&quot;, &quot;no-store&quot;);</span>
+<span class="fc" id="L108">        exchange.sendResponseHeaders(status, bytes.length);</span>
+<span class="fc" id="L109">        try (var body = exchange.getResponseBody()) { body.write(bytes); }</span>
+<span class="fc" id="L110">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
