@@ -101,6 +101,42 @@ class PolynomialTheoryUtilityObservedEvidenceIntegrityTest {
     }
 
     @Test
+    void rejectsWorkShiftedBetweenInterruptedNativeOccurrencesWithRecomputedIds() {
+        var input = PolynomialTheoryUtilityObservedResultContractTest.input(
+            "ON_DEMAND_VERIFIED_FACTORIZATION", "four-identical-occurrences", "CP03_1_OF_3");
+        var execution = PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter.executeObservedCase(
+            input, PolynomialTheoryUtilityObservedResultContractTest.formation(input.caseId()));
+        var result = execution.measured().result();
+        var observations = result.observations();
+        var occurrences = new ArrayList<>(observations.occurrences());
+        var first = occurrences.getFirst();
+        var last = occurrences.getLast();
+        assertEquals(TerminalStatus.BUDGET_INCONCLUSIVE, first.terminalStatus());
+        assertEquals(TerminalStatus.BUDGET_INCONCLUSIVE, last.terminalStatus());
+        assertTrue(first.rawWork().units("projection.study-path-navigation") > 0);
+        var shiftedWork = new PolynomialWorkLedger(java.util.Map.of("projection.study-path-navigation", 1L));
+        occurrences.set(0, copy(first,
+            PolynomialTheoryUtilityExecutionObservations.difference(first.rawWork(), shiftedWork), first.cacheEventIds()));
+        occurrences.set(occurrences.size() - 1, copy(last,
+            PolynomialTheoryUtilityExecutionObservations.plus(last.rawWork(), shiftedWork), last.cacheEventIds()));
+        var reboundObservations = PolynomialTheoryUtilityExecutionObservations.create(
+            observations.preparationWork(), occurrences);
+        assertEquals(observations.rawWork(), reboundObservations.rawWork());
+        assertNotEquals(observations.observationId(), reboundObservations.observationId());
+        var rebound = rebind(result, reboundObservations);
+        assertEquals(result.work(), rebound.work());
+        assertNotEquals(result.resultId(), rebound.resultId());
+        var measurements = execution.measured().measurements();
+        var measured = PolynomialTheoryUtilityMeasuredCandidate.create(rebound,
+            measurements.transitionTraces(), measurements.factorizationAttempts(), measurements.cacheEvents());
+        assertNotEquals(measurements.measurementId(), measured.measurements().measurementId());
+
+        assertThrows(IllegalArgumentException.class, () ->
+            new PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter.Execution(measured,
+                execution.rawWork(), execution.projection(), execution.occurrences(), execution.evidenceHash()));
+    }
+
+    @Test
     void rejectsAReplayOutcomeOrEntryReboundEvenWhenAllIdsAreRecomputed() {
         var measured = PolynomialTheoryUtilityObservedResultContractTest.interruptedReplay().measured();
         var result = measured.result();

@@ -391,9 +391,20 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
                         || retained.occurrences().size() != occurrences.size()) {
                     throw new IllegalArgumentException("native observed result differs from its raw execution");
                 }
+                var cumulative = retained.preparationWork();
+                long primitive = 0;
                 for (int index = 0; index < occurrences.size(); index++) {
                     var actual = occurrences.get(index);
                     var recorded = retained.occurrences().get(index);
+                    var before = PolynomialTheoryUtilityCanonicalWorkProjection.project(result.input(),
+                        PolynomialTheoryUtilityCanonicalWorkProjection.partition(primitive, cumulative)).work();
+                    cumulative = PolynomialTheoryUtilityExecutionObservations.plus(cumulative, recorded.rawWork());
+                    primitive = Math.addExact(primitive, recorded.primitiveWork());
+                    var after = PolynomialTheoryUtilityCanonicalWorkProjection.project(result.input(),
+                        PolynomialTheoryUtilityCanonicalWorkProjection.partition(primitive, cumulative)).work();
+                    if (!PolynomialTheoryUtilityExecutionObservations.difference(after, before).equals(actual.work())) {
+                        throw new IllegalArgumentException("native occurrence work differs from its consumed prefix");
+                    }
                     var pipeline = actual.pipeline();
                     if (!actual.path().equals(recorded.path())
                             || terminal(List.of(actual)) != recorded.terminalStatus()
