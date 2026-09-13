@@ -60,13 +60,13 @@ public final class MathDomainDemos {
     /** Run {@code d/dx x^3 -> 3 * x^2}. */
     public Result derivativePowerRule() {
         Expr input = parser.parseTerm("x^3");
-        Expr derivative = differentiator.differentiate(input, "x");
+        Differentiator.Result derivative = differentiator.differentiateWithAssumptions(input, "x");
         return new Result(
             "derivative-power",
             "Ableitung – Potenzregel",
             "d/dx " + ExpressionFormatter.format(input),
-            ExpressionFormatter.format(derivative),
-            List.of()
+            ExpressionFormatter.format(derivative.formula()),
+            derivative.assumptions()
         );
     }
 

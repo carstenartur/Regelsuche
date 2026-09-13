@@ -27,6 +27,15 @@ public class SymPyTransformationEngine implements TransformationEngine {
     }
 
     private List<Transformation> trySymPy(String expression) {
+        try {
+            return transformSymPyStrict(expression);
+        } catch (RuntimeException | LinkageError ignored) {
+            return List.of();
+        }
+    }
+
+    /** Direct backend execution for callers which must distinguish failure from no match. */
+    public List<Transformation> transformSymPyStrict(String expression) {
         String normalizedInput;
         try {
             normalizedInput = ExpressionFormatter.format(parser.parseTerm(expression));
@@ -53,8 +62,6 @@ public class SymPyTransformationEngine implements TransformationEngine {
                 }
             }
             return transformations;
-        } catch (RuntimeException | LinkageError ignored) {
-            return List.of();
         }
     }
 

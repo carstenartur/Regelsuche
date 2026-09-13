@@ -654,12 +654,88 @@
     });
 
     /* ─── Search form ─── */
+    let runtimeArtifact = null;
+    const runtimeWords = (value) => value.split(',').map((word) => word.trim()).filter(Boolean);
+    $('runtimeProfile').addEventListener('change', () => {
+        const form = $('searchForm');
+        const enabled = !!form.runtimeProfile.value;
+        $('runtimeOptions').hidden = !enabled;
+        form.profile.disabled = enabled;
+        form.goal.disabled = enabled;
+        form.type.disabled = enabled;
+        form.querySelectorAll('input[name="domain"]').forEach((input) => { input.disabled = enabled; });
+    });
+
+    function showRuntimeArtifact(text, replayed) {
+        const artifact = JSON.parse(text);
+        if (artifact.schema !== 'regelsuche.safe-runtime-artifact/v1') throw new Error('Unbekanntes Runtime-Ergebnis');
+        runtimeArtifact = text;
+        $('runtimeExport').disabled = false;
+        const evidence = artifact.evidence;
+        const request = evidence.request;
+        $('runtimeSummary').textContent = (replayed ? 'Gesamter Replay bestätigt. ' : '')
+            + 'Profil: ' + request.profile + '. Anfängliche Annahmen: '
+            + (evidence.retainedAssumptions.join(', ') || 'keine') + '. Ergebnis: ' + evidence.status;
+        $('runtimeCandidates').replaceChildren();
+        evidence.outcomes.forEach((outcome) => {
+            if (!outcome.candidate) return;
+            const item = document.createElement('li');
+            item.textContent = outcome.candidate.expression + ' · ' + request.profile + ' · '
+                + outcome.status + ' · Annahmen: ' + (outcome.candidate.retainedAssumptions.join(', ') || 'keine');
+            $('runtimeCandidates').append(item);
+        });
+        if (evidence.authority.typedArtifact) {
+            const typed = JSON.parse(evidence.authority.typedArtifact).evidence;
+            const item = document.createElement('li');
+            item.textContent = 'Typisierte Darstellung: ' + typed.status
+                + (typed.formation ? ' · Relation: ' + typed.formation.relation : '')
+                + (typed.solving && typed.solving.rref ? ' · Exaktes System: ' + typed.solving.rref.classification : '');
+            $('runtimeCandidates').append(item);
+        }
+    }
+
+    function clearRuntimeArtifact() {
+        runtimeArtifact = null;
+        $('runtimeExport').disabled = true;
+        $('runtimeSummary').textContent = '';
+        $('runtimeCandidates').replaceChildren();
+    }
+
+    $('runtimeExport').addEventListener('click', () => {
+        if (!runtimeArtifact) return;
+        const url = URL.createObjectURL(new Blob([runtimeArtifact], { type: 'application/json' }));
+        const link = document.createElement('a');
+        link.href = url; link.download = 'regelsuche-runtime.json'; link.click();
+        URL.revokeObjectURL(url);
+    });
+
+    $('runtimeImport').addEventListener('change', async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        clearRuntimeArtifact();
+        setStatus('Runtime-Replay läuft …');
+        try {
+            if (file.size > 4 * 1024 * 1024) throw new Error('Datei ist größer als 4 MiB');
+            const artifact = JSON.parse(await file.text());
+            const response = await fetch('/api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ runtimeArtifact: artifact }) });
+            const text = await response.text();
+            $('searchOutput').textContent = text;
+            if (!response.ok) throw new Error(text);
+            showRuntimeArtifact(text, true);
+            setStatus('Runtime-Replay bestätigt.', 'ok');
+        } catch (error) {
+            setStatus('Prüfung fehlgeschlagen: ' + error.message, 'error');
+        }
+        event.target.value = '';
+    });
+
     $('searchForm').addEventListener('submit', async (event) => {
         event.preventDefault();
         markSearchStarted();
         const form = event.target;
         const domains = Array.from(form.querySelectorAll('input[name="domain"]:checked')).map((c) => c.value);
-        const payload = {
+        let payload = {
             expression: form.expression.value,
             type: form.type.value,
             profile: form.profile.value,
@@ -668,6 +744,19 @@
         if (form.goal && form.goal.value) {
             payload.goal = form.goal.value;
         }
+        const runtimeSelected = !!form.runtimeProfile.value;
+        if (runtimeSelected) {
+            const request = { schema: 'regelsuche.safe-runtime-request/v1', profile: form.runtimeProfile.value,
+                assumptions: form.runtimeAssumptions.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
+                ruleIds: runtimeWords(form.runtimeRuleIds.value), preparationRuleIds: runtimeWords(form.runtimePreparationRuleIds.value),
+                maxWorkUnits: Number(form.runtimeWork.value), includeSymPy: form.runtimeSymPy.checked };
+            if (form.runtimeShape.value === 'SYSTEM') {
+                request.representation = { schema: 'regelsuche.matrix-preparation-request/v1',
+                    equations: form.expression.value, unknowns: runtimeWords(form.runtimeUnknowns.value) };
+            } else { request.source = form.expression.value; }
+            payload = { runtimeRequest: request };
+        }
+        clearRuntimeArtifact();
         setStatus('Suche läuft …');
         $('searchOutput').textContent = '';
         try {
@@ -679,6 +768,7 @@
             const text = await response.text();
             $('searchOutput').textContent = text;
             if (response.ok) {
+                if (runtimeSelected) showRuntimeArtifact(text, false);
                 setStatus('Fertig. ' + text.length + ' Bytes Antwort.', 'ok');
                 // Refresh paths/candidates in the background.
                 loadPaths().catch(() => {});

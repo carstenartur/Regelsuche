@@ -32,8 +32,30 @@ public final class ExpressionDefinedness {
         Expr expression,
         AssumptionContext context
     ) {
+        return canElide(expression, context, false);
+    }
+
+    /**
+     * Retains sufficient real-domain conditions while allowing non-integer or
+     * symbolic powers on their strictly positive-base branch. This can exclude
+     * other real branches or boundary points; it is not a maximal-domain test.
+     * Calculus uses this explicit restriction for logarithmic differentiation.
+     * Ordinary simplification must keep using {@link #canElideWithoutDomainLoss}.
+     */
+    public static boolean canElideOnPositivePowerDomain(
+        Expr expression,
+        AssumptionContext context
+    ) {
+        return canElide(expression, context, true);
+    }
+
+    private static boolean canElide(
+        Expr expression,
+        AssumptionContext context,
+        boolean positivePowerDomain
+    ) {
         List<Assumption> requirements = new ArrayList<>();
-        if (!collectElisionRequirements(expression, requirements)) {
+        if (!collectElisionRequirements(expression, requirements, positivePowerDomain)) {
             return false;
         }
         if (requirements.isEmpty()) {
@@ -48,7 +70,8 @@ public final class ExpressionDefinedness {
 
     private static boolean collectElisionRequirements(
         Expr expression,
-        List<Assumption> requirements
+        List<Assumption> requirements,
+        boolean positivePowerDomain
     ) {
         if (expression instanceof NumberExpr
                 || expression instanceof VariableExpr) {
@@ -56,13 +79,13 @@ public final class ExpressionDefinedness {
         }
         if (expression instanceof FunctionExpr function) {
             return collectFunctionElisionRequirements(
-                function, requirements);
+                function, requirements, positivePowerDomain);
         }
         if (!(expression instanceof BinaryExpr binary)) {
             return false;
         }
-        if (!collectElisionRequirements(binary.left(), requirements)
-                || !collectElisionRequirements(binary.right(), requirements)) {
+        if (!collectElisionRequirements(binary.left(), requirements, positivePowerDomain)
+                || !collectElisionRequirements(binary.right(), requirements, positivePowerDomain)) {
             return false;
         }
         if (binary.operator() == BinaryOperator.DIV) {
@@ -71,17 +94,18 @@ public final class ExpressionDefinedness {
         }
         if (binary.operator() == BinaryOperator.POW) {
             return collectPowerElisionRequirements(
-                binary.left(), binary.right(), requirements);
+                binary.left(), binary.right(), requirements, positivePowerDomain);
         }
         return true;
     }
 
     private static boolean collectFunctionElisionRequirements(
         FunctionExpr function,
-        List<Assumption> requirements
+        List<Assumption> requirements,
+        boolean positivePowerDomain
     ) {
         for (Expr argument : function.arguments()) {
-            if (!collectElisionRequirements(argument, requirements)) {
+            if (!collectElisionRequirements(argument, requirements, positivePowerDomain)) {
                 return false;
             }
         }
@@ -112,11 +136,16 @@ public final class ExpressionDefinedness {
     private static boolean collectPowerElisionRequirements(
         Expr base,
         Expr exponent,
-        List<Assumption> requirements
+        List<Assumption> requirements,
+        boolean positivePowerDomain
     ) {
         ExactRational value = signedIntegerLiteralValue(exponent);
         if (value == null) {
-            return false;
+            if (!positivePowerDomain) {
+                return false;
+            }
+            requirements.add(Assumption.positive(ExpressionFormatter.format(base)));
+            return true;
         }
         return value.signum() > 0
             || requireNonZeroForElision(base, requirements);

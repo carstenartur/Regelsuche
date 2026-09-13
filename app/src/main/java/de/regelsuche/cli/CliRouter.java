@@ -210,6 +210,21 @@ public class CliRouter {
     }
 
     private int runTransform(String[] args) {
+        if (args.length > 0 && (args[0].equals("--runtime-request") || args[0].equals("--runtime-replay"))) {
+            if (args.length != 2) {
+                out.println("Usage: transform --runtime-request <request.json> | --runtime-replay <artifact.json>");
+                return 1;
+            }
+            try (var input = java.nio.file.Files.newInputStream(java.nio.file.Path.of(args[1]));
+                    var runtime = de.regelsuche.runtime.SafeRuntimeAdapter.open(PluginRuntimeConfig.defaults())) {
+                var json = new de.regelsuche.web.StreamingJsonRequestBody(4 * 1024 * 1024).readObject(input);
+                out.print(args[0].equals("--runtime-replay") ? runtime.replay(json) : runtime.analyze(json));
+                return 0;
+            } catch (java.io.IOException | IllegalArgumentException exception) {
+                out.println("Runtime request failed: " + exception.getMessage());
+                return 1;
+            }
+        }
         if (args.length == 0) {
             out.println("Usage: transform <expression>");
             return 1;

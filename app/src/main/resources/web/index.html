@@ -144,6 +144,28 @@
                     </select>
                 </label>
             </div>
+            <fieldset class="field" id="runtimeControls">
+                <legend>Expliziter Runtime-Vergleich</legend>
+                <label class="field"><span>Ausführung</span>
+                    <select name="runtimeProfile" id="runtimeProfile">
+                        <option value="" selected>Bisherige Suche</option>
+                        <option value="DIRECT_V1">DIRECT_V1 – ohne Vorbereitung</option>
+                        <option value="SAFE_PREPARATION_V4">SAFE_PREPARATION_V4 – opt-in</option>
+                    </select>
+                </label>
+                <p class="hint">SAFE bleibt eine ausdrückliche Auswahl. Beide Profile verwenden dasselbe ausgewählte Regel-Inventar und dieselben anfänglichen Annahmen.</p>
+                <div id="runtimeOptions" hidden>
+                    <label class="field"><span>Quelle</span><select name="runtimeShape">
+                        <option value="TERM">Skalarer Term</option><option value="SYSTEM">Lineares Gleichungssystem (Zeilen mit ; trennen)</option>
+                    </select></label>
+                    <label class="field"><span>Geordnete Unbekannte für Systeme</span><input name="runtimeUnknowns" value="x,y"></label>
+                    <label class="field"><span>Anfängliche Annahmen (eine pro Zeile)</span><textarea name="runtimeAssumptions" placeholder="b != 0&#10;d != 0"></textarea></label>
+                    <label class="field"><span>Regel-IDs (optional, durch Komma getrennt; leer = vollständiges Inventar)</span><input name="runtimeRuleIds"></label>
+                    <label class="field"><span>Vorbereitende Support-Regel-IDs (optional, durch Komma getrennt)</span><input name="runtimePreparationRuleIds"></label>
+                    <label class="field"><span>Logisches Arbeitsbudget</span><input name="runtimeWork" type="number" min="0" max="1000000" value="200000"></label>
+                    <label><input name="runtimeSymPy" type="checkbox" checked> SymPy direkt einbeziehen</label>
+                </div>
+            </fieldset>
             <fieldset class="field">
                 <legend>Regel-Domänen</legend>
                 <div class="domain-grid">
@@ -166,6 +188,12 @@
             </div>
         </form>
         <div id="searchStatus" class="status"></div>
+        <div id="runtimeSummary" role="status"></div>
+        <ul id="runtimeCandidates"></ul>
+        <div class="toolbar">
+            <button type="button" id="runtimeExport" disabled>Runtime-Ergebnis exportieren</button>
+            <label>Runtime-Ergebnis importieren und erneut prüfen <input type="file" id="runtimeImport" accept="application/json,.json"></label>
+        </div>
         <pre id="searchOutput" class="output"></pre>
     </section>
 

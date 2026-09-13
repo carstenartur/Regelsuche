@@ -401,7 +401,8 @@ public final class StreamingJsonRequestBody {
             }
         }
 
-        private Map<String, Object> readRemainingObject() throws IOException {
+        /** Reads a bounded nested contract object after its route has explicitly selected it. */
+        public Map<String, Object> readRemainingObject() throws IOException {
             Map<String, Object> values = new LinkedHashMap<>();
             while (nextField()) {
                 String name = fieldName();
