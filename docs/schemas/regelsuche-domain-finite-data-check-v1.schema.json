@@ -1,0 +1,354 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:regelsuche:domain-finite-data-check:v1",
+  "title": "Independent retained finite-data check (not a universal proof)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "checkerContract",
+    "status",
+    "complete",
+    "detail",
+    "retainedTermCount",
+    "observedCount",
+    "holdoutCount",
+    "counterexampleStatus",
+    "firstCounterexampleIndex",
+    "rows",
+    "work",
+    "claimBoundary",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.domain-finite-data-check/v1"
+    },
+    "checkerContract": {
+      "enum": [
+        "regelsuche.newton-binomial-finite-check/v1",
+        "regelsuche.recurrence-residual-finite-check/v1"
+      ]
+    },
+    "status": {
+      "enum": [
+        "CONFIRMED_FINITE_DATA",
+        "REFUTED_FINITE_DATA",
+        "INVALID_WITNESS",
+        "INCONCLUSIVE",
+        "UNSUPPORTED",
+        "TECHNICAL_FAILURE"
+      ]
+    },
+    "complete": {
+      "type": "boolean"
+    },
+    "detail": {
+      "type": "string"
+    },
+    "retainedTermCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "observedCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "holdoutCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "counterexampleStatus": {
+      "enum": [
+        "FOUND",
+        "NONE_FOUND",
+        "INCONCLUSIVE"
+      ]
+    },
+    "firstCounterexampleIndex": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "index",
+          "partition",
+          "kind",
+          "retained",
+          "computed",
+          "residual",
+          "witness",
+          "dataAgrees",
+          "witnessAgrees",
+          "windowStartInclusive",
+          "windowEndExclusive"
+        ],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "partition": {
+            "enum": [
+              "OBSERVED",
+              "HOLDOUT"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "NEWTON_TERM",
+              "SEED_IDENTITY",
+              "RECURRENCE_RESIDUAL"
+            ]
+          },
+          "retained": {
+            "type": "string"
+          },
+          "computed": {
+            "type": "string"
+          },
+          "residual": {
+            "type": "string"
+          },
+          "witness": {
+            "type": "string"
+          },
+          "dataAgrees": {
+            "type": "boolean"
+          },
+          "witnessAgrees": {
+            "type": "boolean"
+          },
+          "windowStartInclusive": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "windowEndExclusive": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "minItems": 0,
+      "maxItems": 256
+    },
+    "work": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "inputItems",
+        "termChecks",
+        "scalarOperations",
+        "maxScalarBits",
+        "refusedDimension",
+        "totalArithmeticWork",
+        "primitiveArithmeticWork",
+        "encodingAndHashWork"
+      ],
+      "properties": {
+        "contract": {
+          "const": "regelsuche.finite-check-admitted-dispatch-work/v1"
+        },
+        "inputItems": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "configured",
+            "executed",
+            "skipped",
+            "remaining"
+          ],
+          "properties": {
+            "configured": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "executed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "skipped": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "remaining": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "termChecks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "configured",
+            "executed",
+            "skipped",
+            "remaining"
+          ],
+          "properties": {
+            "configured": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "executed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "skipped": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "remaining": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "scalarOperations": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "configured",
+            "executed",
+            "skipped",
+            "remaining"
+          ],
+          "properties": {
+            "configured": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "executed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "skipped": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "remaining": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "maxScalarBits": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "refusedDimension": {
+          "enum": [
+            "NONE",
+            "TERM_CHECKS",
+            "SCALAR_OPERATIONS",
+            "SCALAR_BITS"
+          ]
+        },
+        "totalArithmeticWork": {
+          "const": "UNAVAILABLE"
+        },
+        "primitiveArithmeticWork": {
+          "const": "UNAVAILABLE"
+        },
+        "encodingAndHashWork": {
+          "const": "UNAVAILABLE"
+        }
+      }
+    },
+    "claimBoundary": {
+      "type": "string"
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "CONFIRMED_FINITE_DATA"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "complete": {
+            "const": true
+          },
+          "counterexampleStatus": {
+            "const": "NONE_FOUND"
+          },
+          "firstCounterexampleIndex": {
+            "type": "null"
+          },
+          "rows": {
+            "minItems": 1,
+            "items": {
+              "properties": {
+                "dataAgrees": {
+                  "const": true
+                },
+                "witnessAgrees": {
+                  "const": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "REFUTED_FINITE_DATA"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "complete": {
+            "const": true
+          },
+          "counterexampleStatus": {
+            "const": "FOUND"
+          },
+          "firstCounterexampleIndex": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  ]
+}

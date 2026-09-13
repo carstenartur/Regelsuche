@@ -206,6 +206,9 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 - [Plugin Artifact Index](plugin-artifact-index.md)
 - [Plugin Artifact Trust](plugin-artifact-trust.md)
 - [Plugin Trust Store Revisions](plugin-trust-store-revisions.md)
+- [Plugin Distribution Client](plugin-distribution-client.md) und
+  [Recoverable Checkpoint Transactions](plugin-checkpoint-transactions.md) —
+  explizite Paketoperationen mit externen PostgreSQL-Receipts.
 
 Nicht jede interne Registry ist ein öffentlicher Plugin-Endpunkt. Solver,
 Discovery-Promotion, Public Evidence und externe Verteilung behalten eigene

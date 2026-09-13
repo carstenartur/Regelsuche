@@ -132,6 +132,10 @@ Work-Ledger.
 | [`regelsuche-plugin-trust-store-v1`](schemas/regelsuche-plugin-trust-store-v1.schema.json) | Publisher-Keys und Widerrufe |
 | [`regelsuche-plugin-trust-store-revision-v1`](schemas/regelsuche-plugin-trust-store-revision-v1.schema.json) | Signierte monotone Trust-State-Revision |
 | [`regelsuche-plugin-trust-store-chain-checkpoint-v1`](schemas/regelsuche-plugin-trust-store-chain-checkpoint-v1.schema.json) | Lokaler Replay- und Fork-Schutz |
+| [`regelsuche-plugin-checkpoint-operation-v1`](schemas/regelsuche-plugin-checkpoint-operation-v1.schema.json) | Vollständiger externer Checkpoint-Vorgang mit Scope, Intent und erwartetem/neuem Paar |
+| [`regelsuche-plugin-distribution-operation-result-v1`](schemas/regelsuche-plugin-distribution-operation-result-v1.schema.json) | Bestätigter, abgewiesener oder unbekannter Vorgangsausgang, getrennt von lokaler Verfügbarkeit |
+| [`regelsuche-plugin-package-config-v1`](schemas/regelsuche-plugin-package-config-v1.schema.json) | Explizite begrenzte Package-/PostgreSQL-CLI-Konfiguration |
+| [`regelsuche-plugin-package-status-v1`](schemas/regelsuche-plugin-package-status-v1.schema.json) | Authority-geprüfter aktiver Package-Zustand |
 | [`regelsuche-plugin-artifact-verification-v1`](schemas/regelsuche-plugin-artifact-verification-v1.schema.json) | Artefakt- und Signaturprüfung |
 | [`regelsuche-plugin-artifact-gate-v1`](schemas/regelsuche-plugin-artifact-gate-v1.schema.json) | Fail-closed Ladeentscheidung |
 

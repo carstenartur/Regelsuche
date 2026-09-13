@@ -2,6 +2,7 @@ package de.regelsuche.docs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.docs.HiddenRulePilotEvaluator.HiddenReference;
@@ -22,9 +23,24 @@ class HiddenRulePilotCampaignTest {
         HiddenRulePilotCampaign.PilotReport report = HiddenRulePilotTestEvidence.report();
         String json = report.toJson();
         String runtimeJson = report.runtimeJson();
-        Path directory = Path.of("build", "reports", "hidden-rule-pilot");
+        String configuredDirectory = System.getProperty("regelsuche.hiddenRulePilot.outputDirectory");
+        boolean maven = Boolean.getBoolean("regelsuche.maven.reactor");
+        if (maven) assertNotNull(configuredDirectory, "Maven must declare its own hidden-rule output");
+        Path directory = configuredDirectory == null
+            ? Path.of("build", "reports", "hidden-rule-pilot") : Path.of(configuredDirectory);
         Path output = directory.resolve("report.json");
         Path runtimeOutput = directory.resolve("runtime.json");
+        if (maven) {
+            Path expected = Path.of(System.getProperty("regelsuche.repositoryRoot"))
+                .resolve("app/target/reports/hidden-rule-pilot/report.json");
+            assertEquals(expected.toAbsolutePath().normalize(), output.toAbsolutePath().normalize(),
+                "Maven's real producer must write its own target output, without overwriting Gradle evidence");
+            for (Path member : List.of(output, runtimeOutput)) {
+                for (Path current = member.toAbsolutePath(); current != null; current = current.getParent()) {
+                    assertFalse(Files.isSymbolicLink(current), "Maven output must not traverse a symbolic link");
+                }
+            }
+        }
         campaign.write(output, report);
         campaign.writeRuntime(runtimeOutput, report);
 

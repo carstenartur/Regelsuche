@@ -28,9 +28,10 @@ gesperrt werden sollen.
 
 Der Java-Client prüft reale HTTPS-Downloads und verwaltet atomare Generationen
 für Installation, Update, Entfernung und Rollback einer JAR-Dependency-Closure.
-Ein produktiv angebundener rollback-geschützter Authority-Provider, öffentliche
-Katalogdienste, Runtime-Aktivierung sowie Regel-/Knowledge-Pack-Installation
-bleiben außerhalb dieses Slices.
+Der additive [PostgreSQL-/CLI-Adapter](plugin-checkpoint-transactions.md) ergänzt
+Vorgangsbelege und explizite Recovery. Seine tatsächliche Containerqualifikation
+und externe Deployment-Grenze, öffentliche Katalogdienste, Runtime-Aktivierung
+sowie Regel-/Knowledge-Pack-Installation bleiben erforderlich.
 
 `IMPLEMENTED` bedeutet, dass der jeweilige Software- und Evidence-Vertrag im
 Checkout vorhanden und getestet ist. Es bedeutet nicht, dass bereits ein

@@ -195,6 +195,8 @@ jobs:
           name: maven-product-verification
           path: |
             build/reports/python-client/**
+            app/target/reports/hidden-rule-pilot/**
+            regelsuche-quality-aggregate/target/reports/release-readiness-qualified/**
             **/target/surefire-reports/**
             **/target/failsafe-reports/**
             **/target/discovery-artifacts/**

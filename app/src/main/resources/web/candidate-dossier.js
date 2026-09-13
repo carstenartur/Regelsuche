@@ -56,24 +56,62 @@
         text('p', 'Die Applikationsidentitäten sind eine sortierte Menge. Die folgende Reihenfolge stammt ausschließlich aus der gespeicherten Ausführung.', identity);
         const replay = section(detail, 'Replay-Ansicht der gespeicherten Schritte');
         replay.id = 'nativeExecutionReplay';
-        if (!selected.generations.length) text('p', 'Startzustand: keine Transformation im Pfad.', replay);
-        selected.generations.forEach((generation, index) => {
-            const step = section(replay, 'Schritt ' + (index + 1) + ' · ' + generation.ruleId);
-            step.dataset.generationSequence = String(generation.sequence);
-            table(step, [['Erzeugung im Lauf', generation.sequence], ['Quellwurzel', generation.sourceExpression],
+        function chooseReplay(step, role = 'PATH_REPLAY') {
+            select(candidate.stateId, String(step.edge.sequence), role, String(step.generation.sequence));
+            if (role === 'SEARCH_GRAPH') document.getElementById('candidateGraphEvidence')?.focus();
+            else document.querySelector('button[data-replay-generation="' + step.generation.sequence + '"]')?.focus();
+        }
+        function generationDetails(parent, generation) {
+            table(parent, [['Erzeugung im Lauf', generation.sequence], ['Quellwurzel', generation.sourceExpression],
                 ['Tatsächliche Quellposition', generation.occurrencePath.length ? generation.occurrencePath.join('.') : 'root'],
                 ['Quellvorkommen', generation.sourceOccurrenceExpression], ['Ersetztes Vorkommen', generation.transformedOccurrenceExpression],
                 ['Ergebniswurzel', generation.transformedExpression], ['Applikationsidentität', generation.applicationKey],
                 ['Ausführungswurzel des Schritts', generation.executionHash]]);
+        }
+        if (!selected.replaySteps.length) text('p', 'Startzustand: keine Transformation im Pfad.', replay);
+        else text('p', 'Schritt auswählen: Quellvorkommen und Graphkante gehören zum gespeicherten Pfad. Der Endkandidat bleibt ausgewählt.', replay);
+        const steps = text('div', undefined, replay); steps.className = 'native-replay-controls';
+        steps.setAttribute('aria-label', 'Gespeicherte Replay-Schritte');
+        selected.replaySteps.forEach(step => {
+            const button = text('button', 'Schritt ' + step.position + ' · ' + step.generation.ruleId, steps);
+            button.type = 'button'; button.dataset.replayGeneration = String(step.generation.sequence);
+            button.setAttribute('aria-current', selected.selectedReplay === step ? 'step' : 'false');
+            button.addEventListener('click', () => chooseReplay(step));
+        });
+        if (selected.selectedReplay) {
+            const step = selected.selectedReplay, generation = step.generation;
+            const context = section(replay, 'Ausgewählter Replay-Schritt · ' + step.position + ' von ' + selected.replaySteps.length);
+            context.id = 'nativeReplaySelection'; context.dataset.generationSequence = String(generation.sequence);
+            text('p', 'Ausgewählter Endkandidat: ' + state.expression, context);
+            const position = text('p', 'Tatsächliche Quellposition: ', context);
+            text('code', generation.occurrencePath.length ? generation.occurrencePath.join('.') : 'root', position).dataset.replayOccurrence = '';
+            const navigation = text('div', undefined, context); navigation.className = 'native-replay-controls';
+            for (const [id, label, adjacent] of [['nativeReplayPrevious', 'Vorheriger Schritt', selected.previousReplay],
+                ['nativeReplayNext', 'Nächster Schritt', selected.nextReplay]]) {
+                const button = text('button', label, navigation); button.type = 'button'; button.id = id; button.disabled = !adjacent;
+                if (adjacent) button.addEventListener('click', () => chooseReplay(adjacent));
+            }
+            const graphButton = text('button', 'Gespeicherte Graphkante öffnen', navigation);
+            graphButton.type = 'button'; graphButton.id = 'nativeReplayGraph';
+            graphButton.addEventListener('click', () => chooseReplay(step, 'SEARCH_GRAPH'));
+            generationDetails(context, generation);
+        }
+        const allSteps = text('details', undefined, replay);
+        text('summary', 'Vollständige gespeicherte Schrittabfolge', allSteps);
+        selected.replaySteps.forEach(step => {
+            const entry = section(allSteps, 'Schritt ' + step.position + ' · ' + step.generation.ruleId);
+            entry.dataset.generationSequence = String(step.generation.sequence);
+            generationDetails(entry, step.generation);
         });
         text('p', 'Diese Ansicht öffnet die gespeicherte Schrittabfolge. Sie führt keinen neuen Lauf und keine neue Beweisprüfung aus.', replay);
         const graph = section(detail, 'Gebundene Graphübergänge');
         text('p', 'Erzeugungen, Enqueues und tatsächlich besuchte Zustände bleiben getrennt. Die Kanten hier führen zu besuchten Zuständen.', graph);
-        selected.edges.forEach(transition => {
-            const button = text('button', 'Graphkante ' + transition.sequence, graph);
+        selected.replaySteps.forEach(step => {
+            const transition = step.edge;
+            const button = text('button', 'Graphkante ' + transition.sequence + ' · Schritt ' + step.position, graph);
             button.type = 'button'; button.dataset.dossierEdge = String(transition.sequence);
-            button.setAttribute('aria-current', String(edge === String(transition.sequence)));
-            button.addEventListener('click', () => { select(candidate.stateId, String(transition.sequence)); document.getElementById('candidateGraphEvidence')?.focus(); });
+            button.setAttribute('aria-current', String(selected.selectedEdge === transition));
+            button.addEventListener('click', () => chooseReplay(step, 'SEARCH_GRAPH'));
         });
         if (selected.selectedEdge) {
             const bound = section(graph, 'Exakte gespeicherte Graphkante'); bound.id = 'candidateGraphEvidence'; bound.tabIndex = -1;
@@ -81,6 +119,11 @@
             table(bound, [['Run-ID', run.runId], ...Object.entries(selected.selectedEdge), ['applicationKey', generation.applicationKey],
                 ['Quellposition', generation.occurrencePath.length ? generation.occurrencePath.join('.') : 'root'],
                 ['Ausführungswurzel', generation.executionHash]]);
+            const step = selected.replaySteps.find(item => item.edge === selected.selectedEdge);
+            if (step) {
+                const back = text('button', 'Replay-Schritt öffnen', bound); back.type = 'button'; back.id = 'nativeGraphReplay';
+                back.addEventListener('click', () => chooseReplay(step));
+            }
         }
         const trace = text('details', undefined, detail);
         text('summary', 'Vollständiger nativer Ereignistrace einschließlich verworfener Erzeugungen', trace);
@@ -223,7 +266,7 @@
                 ? (state.artifact.content.states.find(s => s.generationSequences.length)?.stateId || state.artifact.content.states[0].stateId)
                 : state.artifact.content.discoveredBridge.stateHash);
             let selected;
-            try { selected = api.selection(state.artifact, candidateId, active.edge || ''); }
+            try { selected = api.selection(state.artifact, candidateId, active.edge || '', active.generation || ''); }
             catch (error) { status.textContent = error.message; status.className = 'run-error'; return; }
             if (!active.candidate) { select(candidateId, '', active.role || 'CANDIDATE_DOSSIERS'); return; }
             const list = text('div', undefined, host); list.className = 'dossier-candidate-list'; list.setAttribute('aria-label', 'Gespeicherte Kandidaten');

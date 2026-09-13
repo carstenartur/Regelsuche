@@ -6,8 +6,9 @@ revision, authenticates trust state and the index, verifies downloaded artifacts
 and publisher provenance assertions, and installs a complete immutable generation.
 Updates, removal and retained rollback use the same external activation boundary.
 
-This is a client library in `de.regelsuche.plugin`, not a hosted catalog or a new
-CLI command. It does not load plugin classes, run package hooks, import rules,
+This is a client library in `de.regelsuche.plugin`. The additive
+[operation-aware PostgreSQL/CLI adapter](plugin-checkpoint-transactions.md) uses
+the same verification and generation preparation. It is not a hosted catalog. It does not load plugin classes, run package hooks, import rules,
 prove build reproducibility, provide cross-client transparency, or publish external
 examples. Rule packages and knowledge packs remain discoverable by the existing
 index/resolver but are rejected by this network installer. Existing index,
@@ -26,7 +27,9 @@ The operator supplies all of these independently of the downloaded payloads:
 - a `PluginCheckpointAuthority` backed by trusted state outside the rollback boundary
   of the local package directory.
 
-**There is no production checkpoint-authority implementation or permissive default.**
+**No production provider implements this legacy boolean-CAS interface, and there is no permissive default.**
+The additive PostgreSQL adapter uses an explicit operation-aware port with
+`OUTCOME_UNKNOWN` and recovery; it does not weaken this older contract.
 An ordinary JSON file, an atomic local-file rename, a signed local checkpoint,
 process memory, or a checksum stored beside the cache does not provide rollback
 protection. The interface is an explicit deployment dependency. If its protection
@@ -262,6 +265,6 @@ mvn -pl app -am -Dtest=PluginDistributionClientTest,PluginDistributionTransportT
 
 They are normal application tests and run in the existing Gradle `ciCheck` authority;
 there is no separate production npm or Python orchestrator. Issue #104 remains open
-for a real hosted/federated catalog, a deployed externally protected checkpoint
-provider, independent source-to-binary verification, runtime integration, separately
+for a real hosted/federated catalog, qualification and deployment of the externally
+protected checkpoint provider, substantiated source-to-binary provenance, runtime integration, separately
 published community examples and public service operations.

@@ -257,6 +257,9 @@ public class CliRouter {
 
     private int runPlugins(String[] args) {
         String sub = args.length == 0 ? "list" : args[0].toLowerCase(Locale.ROOT);
+        if (sub.equals("package")) {
+            return de.regelsuche.plugin.PluginPackageCommand.run(Arrays.copyOfRange(args, 1, args.length), out, System.getenv());
+        }
         CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, Math.min(1, args.length), args.length));
         Path pluginsDir = Paths.get(options.getOrDefault("dir", "plugins"));
         Path rulesDir = Paths.get(options.getOrDefault("rules", "rules"));

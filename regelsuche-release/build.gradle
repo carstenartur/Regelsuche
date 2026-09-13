@@ -68,8 +68,7 @@ tasks.withType(Test).configureEach {
     systemProperty 'regelsuche.repositoryRoot', rootProject.projectDir.absolutePath
 }
 
-// Read-only alternative retained beside the required Python gate pending independent review.
-// This task deliberately has no evidence-generation dependency.
+// This retained-root reader deliberately has no evidence-generation dependency.
 tasks.register('verifyRetainedReleaseReadinessJava', JavaExec) {
     group = 'verification'
     description = 'Validates existing qualified release evidence through the Java authority (Linux AMD64).'
@@ -147,6 +146,18 @@ tasks.register('runQualifiedReleaseReadinessWithHiddenRuleEvidence', JavaExec) {
         '--hidden-rule-report',
         hiddenRuleReport.get().asFile.absolutePath,
         '--qualify-candidate'
+}
+
+tasks.register('verifyQualifiedReleaseReadinessJava', JavaExec) {
+    group = 'verification'
+    description = 'Verifies the actual Gradle-produced qualified release evidence through the Java authority.'
+    // The consumer owns this edge; sibling dependencies of a root alias cannot order these actions.
+    dependsOn tasks.named('classes'), tasks.named('runQualifiedReleaseReadinessWithHiddenRuleEvidence')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.release.ReleaseReadinessEvidenceVerifier'
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
+    args '--root', layout.buildDirectory.dir('reports/release-readiness-qualified').get().asFile.absolutePath,
+        '--schemas', rootProject.layout.projectDirectory.dir('docs/schemas').asFile.absolutePath
 }
 
 tasks.register('verifyAutonomousCampaignRelease', JavaExec) {

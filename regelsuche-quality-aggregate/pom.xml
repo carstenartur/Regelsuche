@@ -59,10 +59,40 @@
       <artifactId>regelsuche-app</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>de.regelsuche</groupId>
+      <artifactId>regelsuche-release</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-clean-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>delete-stale-qualified-release-evidence</id>
+            <phase>initialize</phase>
+            <goals><goal>clean</goal></goals>
+            <configuration>
+              <excludeDefaultDirectories>true</excludeDefaultDirectories>
+              <filesets>
+                <fileset>
+                  <!-- Keep every output component inside the no-follow scan. -->
+                  <directory>${maven.multiModuleProjectDirectory}</directory>
+                  <includes>
+                    <include>regelsuche-quality-aggregate/target/reports/release-readiness-qualified</include>
+                    <include>regelsuche-quality-aggregate/target/reports/release-readiness-qualified/**</include>
+                  </includes>
+                  <followSymlinks>false</followSymlinks>
+                </fileset>
+              </filesets>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
@@ -75,6 +105,21 @@
           </systemPropertyVariables>
         </configuration>
         <executions>
+          <!-- This decision uses current App production and the existing Java
+               release authority; it is required by both verify lifecycles. -->
+          <execution>
+            <id>verify-qualified-release-readiness</id>
+            <phase>verify</phase>
+            <goals><goal>test</goal></goals>
+            <configuration>
+              <test>de.regelsuche.quality.aggregate.MavenQualifiedReleaseReadinessIT</test>
+              <skip>false</skip>
+              <skipTests>false</skipTests>
+              <failIfNoTests>true</failIfNoTests>
+              <failIfNoSpecifiedTests>true</failIfNoSpecifiedTests>
+              <argLine>@{argLine} --enable-native-access=ALL-UNNAMED</argLine>
+            </configuration>
+          </execution>
           <!-- This is a package-integrity gate, not a repeat of the test suite.
                The release workflow's -DskipTests package must still inspect
                the actual archives after the SNAPSHOT-to-release transition. -->

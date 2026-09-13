@@ -5,12 +5,91 @@ Issue #749 adds `de.regelsuche.release.ReleaseReadinessEvidenceVerifier` in
 the current release contract without executing a campaign, regenerating evidence,
 running a qualification study or publishing a release.
 
-The required Python verifier, its 26 controls, the root Gradle gate, Docker runner
-and CI entry points remain unchanged. The Java alternative must receive independent
-review and full build qualification before replacing that required path. This
-tranche does not complete issue #749's broader Maven-only build migration.
+The required release decision now uses this Java verifier. Its JUnit suite retains
+all 26 original Python controls and nine additional verifier controls. The root
+Gradle gates and both reproduction scripts call the same Java authority. Their
+Gradle and Docker producers remain in place; this tranche does not complete issue
+#749's broader Maven-only build migration.
 
-## Run the Java alternative
+## Maven production and verification parity
+
+The first lifecycle-integration step now also uses current Maven production:
+
+1. `HiddenRulePilotCampaignTest` writes the unchanged twenty-case report and its
+   separate runtime report below `app/target/reports/hidden-rule-pilot`.
+2. The final `regelsuche-quality-aggregate` module explicitly depends on App and
+   Release. Its required `verify-qualified-release-readiness` execution at
+   `verify` calls the existing `ReleaseReadinessRunner.runQualified` with that
+   actual App report. The existing pinned 1/2/4 campaign executions and
+   qualification work are unchanged.
+3. The runner writes to
+   `regelsuche-quality-aggregate/target/reports/release-readiness-qualified`.
+   The existing Java verifier validates that root against `docs/schemas` before
+   `mavenReleaseReadinessStatus=VALID` is printed.
+
+Both `mvn verify` and `mvn -Pfull verify` reach this same required execution.
+This is not an opt-in profile or an additional verification implementation.
+The execution retains the current 600-second Maven/JUnit time bound and explicitly
+enables native access. Missing native access or an unsupported platform fails.
+
+Module-local Maven `initialize` executions remove only the two named prior Maven
+evidence directories, without following symbolic links or cleaning other build
+outputs. Each fileset starts at the declared checkout root and includes only its
+exact output directory and descendants. This keeps module, `target` and `reports`
+components inside the non-following scan: putting the output itself at the fileset
+root would follow an already symbolic ancestor before the scanner could refuse
+it. The producer refuses missing Maven output configuration, an output path
+outside its exact `target` location, and symbolic-link traversal. The aggregate
+refuses missing/empty/nonregular current input, symbolic paths, and existing output
+before starting generation. In particular, `-DskipTests verify` cannot reuse an
+earlier success: initialization removes that input and the mandatory verifier
+fails because no current App report was produced. Neither component falls back
+to `build` output. These admission checks do not claim an atomic filesystem
+snapshot against concurrent mutation.
+
+The original Gradle producer paths and retained 48-file fixture are unchanged.
+Independent review accepted Maven-production parity before the Python release
+decision, its controls and its two identity/binding helpers were removed. The
+shared Python `release_readiness_files.py` remains owned by the separate
+quality-acceptance collector. Historical receipts retain their original bytes and
+describe their original source revisions, including the then-existing Python files.
+
+The finite parity controls run the actual App producer, qualified runner, existing
+Java verifier and package audit through Maven `verify`. Before retirement, the
+unchanged Python verifier and all 26 Python controls ran on that produced root. The
+qualified root is compared byte for byte with the original 48-file fixture;
+the separate runtime report is not treated as deterministic evidence. Actual
+Maven re-execution with skipped producers challenges freshness and checks that
+Gradle and unrelated Maven outputs survive. This provides no new performance,
+resource-ledger verification, execution authentication or Maven-only completion
+claim; the existing verifier limits below still apply.
+
+## Required Java decision and retained-root reading
+
+The root `verifyReleaseReadinessEvidence` task retains the repository test gate and
+delegates to `:regelsuche-release:verifyQualifiedReleaseReadinessJava`. This JavaExec
+consumer directly depends on the existing qualified producer, so verification
+cannot race generation as a sibling dependency. The producer's ordering after
+repository tests, hidden-rule input, JVM inputs and cache admission are unchanged.
+`testReleaseReadinessEvidence` delegates to the actual Release JUnit task.
+
+All four local/container decisions in the two reproduction scripts invoke
+`ReleaseReadinessEvidenceVerifier` through the explicitly built
+`regelsuche-release/build/install/regelsuche-release/lib/*` classpath. The standalone
+script adds `:regelsuche-release:installDist` to its existing producer invocation;
+the Gradle Docker task has the same explicit packaging dependency. The Gradle task
+supplies its Release-module Java-25 toolchain launcher as
+`REGELSUCHE_RELEASE_VERIFIER_JAVA`. A standalone caller sets `JAVA_HOME` or that
+explicit launcher variable. Both scripts inspect the selected JVM's specification
+version and require exactly 25; they do not select an arbitrary `java` from `PATH`.
+Each CLI call enables native access and passes the checkout schema directory.
+Missing libraries, an unsupported platform or a failed verification stop the
+script before it can report byte-identical reproduction. Docker production and
+the final byte comparison remain the shell owner's responsibility.
+
+Maven CI retains both new `target/reports` trees. The release workflow uploads them
+immediately after Maven verification, before a subsequent assembly lifecycle can
+clean those paths. These uploads retain evidence and make no independent decision.
 
 The following ordinary Maven tests use a frozen copy of the existing 48-file
 qualified evidence root; they need neither Python nor Docker:
@@ -30,8 +109,8 @@ The read-only Gradle adapter runs the same Java entry point against retained out
 ```
 
 This task depends on compiled classes and has no evidence-generation dependency.
-Absent evidence fails. It is an alternative task, not a replacement dependency of
-the required gate. Its integration still requires the repository's full CI review.
+Absent evidence fails. The required generated-evidence gate uses its separate
+consumer above, leaving this read-only entry point's behavior unchanged.
 The public Java API is `verify(Path root, Path schemaRoot)`; the CLI accepts
 `--root PATH --schemas PATH`. Success is printed only after every check and both
 owned roots have closed successfully. Exceptions produce a nonzero CLI exit.
@@ -75,13 +154,13 @@ Concurrent in-place writes during a first read are not prevented. Canonical hash
 and cross-file consistency do not authenticate a real execution: coherently
 fabricated and rehashed evidence remains outside this verifier's claim. No full
 descendant-artifact replay, mathematical replay or fresh qualification is claimed.
-As in the required Python reader, first reads accumulate through EOF without a
+As in the original Python reader, first reads accumulate through EOF without a
 fixed byte ceiling. This port does not add a new evidence-size admission threshold;
 large or continually growing regular files can exhaust the verifier's resources.
 
 ## Platform boundary
 
-The alternative requires JDK 25 on Linux AMD64, a little-endian 64-bit address ABI,
+The verifier requires JDK 25 on Linux AMD64, a little-endian 64-bit address ABI,
 libc `openat`, `statx`, `read`, `close`, and a kernel supporting descriptor-relative
 `statx(AT_EMPTY_PATH)`. Native access must be explicitly enabled with
 `--enable-native-access=ALL-UNNAMED`. The module's Maven/JUnit and Gradle adapters
@@ -158,11 +237,18 @@ directory replacement and a real subprocess without native access. Additional
 controls reject ZIP-filesystem roots/members, lossy native filename conversion
 against a qualified Unicode sibling, and external dynamic schema references while
 retaining valid local dynamic references. The unchanged
-Python controls also pass all 26 cases. The frozen ZIP retains exactly the original
+Python controls passed all 26 cases before their retirement. Twelve script-process
+controls exercise the actual Java CLI on retained positive and forged roots, exact
+Java-version admission, unsupported native platforms and missing distribution
+libraries. These controls package the current Maven/Gradle test classpath into a
+temporary `lib/*`; explicit Docker and Gradle process seams supply retained fixtures.
+They neither execute a new Docker reproduction nor substitute for the separate
+real `installDist` CLI checks. The frozen ZIP retains exactly the original
 48 files and has SHA-256
 `2a827ff0e80b0db0a5a40fc3622b1980c18a39573d3613ba3fa1b047b6ea651d`;
-the accompanying manifest records each original file's size and hash. No new
-qualified evidence was generated for this port.
+the accompanying manifest records each original file's size and hash. The
+read-only verifier port generated no new qualified evidence; the Maven parity
+step above subsequently reproduces that fixture with its actual producer.
 
 Primary references:
 
