@@ -141,7 +141,7 @@ final class DivisionEvidenceOptimizationChecks {
         require(first.factors().equals(expected), "factor ordering/merging");
         var equal = new FactorizationEngine.Proposal<>(ExactRational.ONE, input, one, HASH);
         var other = new FactorizationEngine.Proposal<>(ExactRational.NEGATIVE_ONE, input, one, HASH);
-        var proposals = List.of(other, first, equal, first);
+        var proposals = List.of(other, first, first, equal);
         var legacy = new java.util.LinkedHashMap<String, FactorizationEngine.Proposal<ExactRational>>();
         proposals.stream().sorted(Comparator.comparing(FactorizationEngine.Proposal::canonicalMaterial))
             .forEach(p -> legacy.putIfAbsent(p.canonicalMaterial(), p));
