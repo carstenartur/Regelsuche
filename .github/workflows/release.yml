@@ -468,7 +468,7 @@ jobs:
           if [[ -f config/sdk/public-api.json ]]; then
             SDK_REPOSITORY="${RUNNER_TEMP}/regelsuche-sdk-release-repository"
             mvn --batch-mode --no-transfer-progress -Psdk-release \
-              -pl regelsuche-discovery-sdk,regelsuche-plugin-api,regelsuche-bom -am \
+              -pl regelsuche-discovery-sdk,regelsuche-plugin-api,regelsuche-extension-api,regelsuche-extension-runtime,regelsuche-bom -am \
               -Dmaven.repo.local="$SDK_REPOSITORY" -DskipTests install
             python3 -B scripts/package-student-sdk.py \
               --repository "$SDK_REPOSITORY" --version "$VERSION" \

@@ -43,7 +43,8 @@ class StudentDiscoveryConsumerTest(unittest.TestCase):
         self.output = self.root / verifier.OUTPUT_RELATIVE
         self.write(self.repository / "keep.txt", "published artifacts")
         self.write(self.source / "keep.txt", "maintained consumer")
-        for name in ("hello-rule-java25", "finite-difference-domain-java25", "solver-adapter-java25", "number-theory-plan-java25"):
+        for name in ("hello-rule-java25", "finite-difference-domain-java25", "solver-adapter-java25", "number-theory-plan-java25",
+                     "extension-runtime-java25"):
             self.write(self.root / "examples/external-consumers" / name / "keep.txt", "maintained consumer")
         self.write(self.root / verifier.GENERATOR_RELATIVE, "# fixture generator\n")
         self.write(self.root / "release.properties", "version=0.4.0-SNAPSHOT\n")
@@ -134,18 +135,11 @@ class StudentDiscoveryConsumerTest(unittest.TestCase):
 
     def test_internal_generator_uses_fixed_child_and_separate_caches(self):
         # This verifies orchestration, not the result of a real Java build.
-        first = "provider=example-geometric-sequence-provider outcome=CONFIRMED multiplier=2"
-        second = f"provider={verifier.GENERATED_PROVIDER} outcome=CONFIRMED multiplier=2"
         with patch.object(sys, "argv", self.argv()), \
                 patch.object(verifier, "artifact_files", return_value={}), \
                 patch.object(verifier, "verify_pinned_consumer", return_value={}), \
-                patch.object(verifier, "execute_consumer", side_effect=[
-                    (first, "external dependencies", []),
-                    (second, "generated dependencies", []),
-                    ("rule=hello-add-zero replay=VERIFIED", "plugin dependencies", []),
-                    ("outcome=CONFIRMED sdk.provider.artifactSha256", "domain dependencies", []),
-                    ("outcome=CONFIRMED outcome=REFUTED sdk.provider.artifactSha256", "solver dependencies", []),
-                    ("provider=primachsenraum-number-theory-provider bases=[2, 3] 2047 falsePrimes=0 falseCompositeDecisions=0", "number theory dependencies", [])]) as consumers, \
+                patch.object(verifier, "execute_consumer",
+                             side_effect=self.consumer_results()) as consumers, \
                 patch.object(verifier, "verify_generated_project_shape", return_value={}), \
                 patch.object(verifier, "run", side_effect=[
                     "generated", "java.specification.version = 25\n"]) as commands, \
@@ -155,17 +149,82 @@ class StudentDiscoveryConsumerTest(unittest.TestCase):
         self.assertEqual([sys.executable, str(self.root / verifier.GENERATOR_RELATIVE)], command[:2])
         self.assertEqual(str(self.output / "generated-starter"), command[command.index("--output") + 1])
         self.assertEqual(self.root, commands.call_args_list[0].args[1])
-        self.assertEqual(6, consumers.call_count)
+        self.assertEqual(7, consumers.call_count)
         first_call, second_call = [call.args for call in consumers.call_args_list[:2]]
         caches = [call.args[4] for call in consumers.call_args_list]
-        self.assertEqual(6, len(set(caches)))
+        self.assertEqual(7, len(set(caches)))
         self.assertEqual(self.output / "isolated-gradle-user-home", first_call[4])
         self.assertEqual(self.output / "generated-gradle-user-home", second_call[4])
         wrapper = "gradlew.bat" if os.name == "nt" else "gradlew"
         self.assertEqual(str(self.output / "generated-starter" / wrapper), second_call[0])
         report = json.loads((self.output / "consumer-report.json").read_text())
         self.assertEqual("success", report["result"])
+        self.assertEqual({
+            "hello-rule-java25": "success",
+            "finite-difference-domain-java25": "success",
+            "solver-adapter-java25": "success",
+            "number-theory-plan-java25": "success",
+            "extension-runtime-java25": "success",
+        }, report["progressiveConsumers"])
+        extension_call = consumers.call_args_list[-1].args
+        self.assertEqual(self.output / "extension-runtime-java25", extension_call[1])
+        self.assertEqual(self.output / "extension-runtime-java25-gradle-cache", extension_call[4])
+        self.assertEqual("maintained consumer",
+                         (extension_call[1] / "keep.txt").read_text())
+        self.assertEqual(self.consumer_results()[-1][0],
+                         (self.output / "extension-runtime-java25.log").read_text())
         self.assert_inputs_survive()
+
+    @staticmethod
+    def consumer_results():
+        # Independent expected outputs of all seven consumers; no Java work is simulated
+        # as evidence. This list only lets the real orchestration code reach each check.
+        return [
+            ("provider=example-geometric-sequence-provider outcome=CONFIRMED multiplier=2",
+             "external dependencies", []),
+            (f"provider={verifier.GENERATED_PROVIDER} outcome=CONFIRMED multiplier=2",
+             "generated dependencies", []),
+            ("rule=hello-add-zero replay=VERIFIED", "plugin dependencies", []),
+            ("outcome=CONFIRMED sdk.provider.artifactSha256", "domain dependencies", []),
+            ("outcome=CONFIRMED outcome=REFUTED sdk.provider.artifactSha256", "solver dependencies", []),
+            ("provider=primachsenraum-number-theory-provider bases=[2, 3] 2047 falsePrimes=0 falseCompositeDecisions=0",
+             "number theory dependencies", []),
+            ("extension=hello origin=greeting-plugin catalog=sha256:" + "a" * 64,
+             "extension dependencies", []),
+        ]
+
+    def assert_extension_rejected(self, result, message):
+        results = self.consumer_results()
+        results[-1] = result
+        # A stale successful campaign must not survive a failed re-qualification.
+        self.write(self.output / "consumer-report.json", '{"result":"success"}')
+        with patch.object(sys, "argv", self.argv()), \
+                patch.object(verifier, "artifact_files", return_value={}), \
+                patch.object(verifier, "verify_pinned_consumer", return_value={}), \
+                patch.object(verifier, "execute_consumer", side_effect=results) as consumers, \
+                patch.object(verifier, "verify_generated_project_shape", return_value={}), \
+                patch.object(verifier, "run", return_value="generated"), \
+                redirect_stdout(io.StringIO()), \
+                self.assertRaisesRegex(RuntimeError, message):
+            verifier.main()
+        self.assertEqual(7, consumers.call_count)
+        self.assertFalse((self.output / "consumer-report.json").exists())
+        self.assertFalse((self.output / "consumer-report.md").exists())
+        self.assert_inputs_survive()
+
+    def test_incomplete_extension_output_prevents_success_report(self):
+        execution, dependencies, rejected = self.consumer_results()[-1]
+        for marker in ("extension=hello", "origin=greeting-plugin", "catalog=sha256:"):
+            with self.subTest(missing=marker):
+                self.assert_extension_rejected(
+                    (execution.replace(marker, ""), dependencies, rejected),
+                    "extension-runtime-java25 output is incomplete")
+
+    def test_extension_runtime_dependency_failure_prevents_success_report(self):
+        execution, _, _ = self.consumer_results()[-1]
+        self.assert_extension_rejected(
+            (execution, "spring-context", ["spring-context"]),
+            "extension-runtime-java25 has forbidden runtime dependencies")
 
 
 if __name__ == "__main__":

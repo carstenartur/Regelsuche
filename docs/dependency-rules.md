@@ -19,6 +19,8 @@ flowchart TD
     app --> mathSympy
 
     discoverySdk --> discovery
+    extensionRuntime --> extensionApi
+    extensionApi --> core
 
     release --> autopilot
     autopilot --> experiments
@@ -69,6 +71,23 @@ rein testbezogenen Build-Eintrag.
   Prozessadapter bleiben außerhalb.
 - `:regelsuche-validation` definiert fachliche Validation-Verträge auf Basis
   des Core.
+
+### Generische Erweiterungen
+
+`:regelsuche-extension-api` darf direkt ausschließlich von `:regelsuche-core`
+abhängen; aktuell benötigt es daraus die API-Lifecycle-Annotationen.
+`:regelsuche-extension-runtime` darf direkt ausschließlich von
+`:regelsuche-extension-api` abhängen. Beide Module bleiben unabhängig von
+Search, Discovery, `app`, Web und Persistenz. Diese direkten Projektkanten
+werden in `ArchitectureBoundariesTest` geprüft.
+
+Externe Beiträge gelangen über die generischen Extension Points in einen
+unveränderlichen Katalog. Die konkrete Anwendung verdrahtet diesen Katalog erst
+in einer späteren Migrationsstufe; die neue Runtime darf das alte Pluginmodell
+nicht als versteckte Abhängigkeit übernehmen. Ihre Artefaktzulassung schützt
+die dokumentierte Ladegrenze für vertrauenswürdige In-process-Erweiterungen,
+ist aber keine Sandbox. Details stehen unter
+[Generische Erweiterungen](generic-extensions.md).
 
 ### Mathematische Algorithmen und Adapter
 

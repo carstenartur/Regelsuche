@@ -15,6 +15,12 @@ public interface RewriteRule {
 
     int estimatedCostDelta();
 
+    /**
+     * Whether a matching application preserves equivalence under all conditions
+     * returned by {@link #assumptions(Expr)}. Callers must retain or discharge
+     * those concrete conditions; callers without an assumption channel must
+     * reject applications that introduce any conditions.
+     */
     boolean isEquivalencePreservingByConstruction();
 
     boolean matches(Expr subtree);

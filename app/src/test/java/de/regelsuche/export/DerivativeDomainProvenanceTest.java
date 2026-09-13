@@ -30,13 +30,14 @@ class DerivativeDomainProvenanceTest {
     private static final ExpressionScorer SCORER = new ExpressionScorer();
 
     @ParameterizedTest
-    @CsvSource({"ln,1 / x", "log,1 / (x * ln(10))"})
-    void calculusDomainsSurviveRealSearchGraphExportAndFreshReplay(String function, String target) {
-        String source = "diff(" + function + "(x), x)";
+    @CsvSource({"ln(x),1 / x,x > 0", "log(x),1 / (x * ln(10)),x > 0",
+        "x^-2,(-2) * x ^ (-3),x != 0"})
+    void calculusDomainsSurviveRealSearchGraphExportAndFreshReplay(String body, String target, String guard) {
+        String source = "diff(" + body + ", x)";
         var search = new WorkBudgetBestFirstSearchStrategy().search(problem(source, target));
         assertTrue(search.reached());
         var reached = search.reachedState();
-        assertEquals(List.of("x > 0"), reached.assumptions());
+        assertEquals(List.of(guard), reached.assumptions());
         var actual = reached.transformations().getFirst();
         var execution = RecordedExecution.capture(source, reached.transformations());
         var before = SCORER.score(source);
@@ -44,7 +45,7 @@ class DerivativeDomainProvenanceTest {
         var step = new TransformationStep(0, source, target, actual.rule(), actual.kind(),
             before.weightedTotal(), after.weightedTotal(), actual.equivalencePreservingByConstruction(),
             actual.rule(), actual.assumptions(), execution);
-        var path = new DiscoveredTransformation("derivative-" + function, source, target, List.of(step),
+        var path = new DiscoveredTransformation("derivative-" + body, source, target, List.of(step),
             before, after, before.improvementTo(after), CandidateProofStatus.OBSERVED, Instant.EPOCH,
             new ExpressionCanonicalizer().stableHash(target));
 
@@ -57,16 +58,16 @@ class DerivativeDomainProvenanceTest {
             actual.mayIncreaseComplexity(), actual.estimatedCostDelta(),
             actual.equivalencePreservingByConstruction(), CandidateProofStatus.OBSERVED, null, execution));
         var graph = new SearchGraphAssembler().assemble(store.snapshot(), List.of());
-        assertEquals(List.of("x > 0"), graph.edges().getFirst().assumptions());
+        assertEquals(List.of(guard), graph.edges().getFirst().assumptions());
 
         String json = new DefaultTransformationExportService().exportJson(store.discoveredTransformations(), List.of());
         var imported = new DefaultTransformationImportService().importJson(json).transformations().getFirst();
-        assertEquals(List.of("x > 0"), imported.steps().getFirst().assumptions());
-        assertEquals(List.of("x > 0"), TransformationStepDto.from(imported.steps().getFirst()).assumptions());
+        assertEquals(List.of(guard), imported.steps().getFirst().assumptions());
+        assertEquals(List.of(guard), TransformationStepDto.from(imported.steps().getFirst()).assumptions());
         var replayView = PathReplayDto.from(imported, new ExplanationService());
-        assertEquals(List.of("x > 0"), replayView.steps().getFirst().execution().assumptions());
+        assertEquals(List.of(guard), replayView.steps().getFirst().execution().assumptions());
         var replay = RecordedPathReplay.verify(imported, () -> problem(source, target));
-        assertEquals(List.of("x > 0"), replay.reachedState().assumptions());
+        assertEquals(List.of(guard), replay.reachedState().assumptions());
 
         assertThrows(IllegalArgumentException.class, () -> new TransformationStep(0, source, target,
             actual.rule(), actual.kind(), before.weightedTotal(), after.weightedTotal(),

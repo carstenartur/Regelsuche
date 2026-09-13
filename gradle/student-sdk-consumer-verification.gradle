@@ -10,6 +10,8 @@ def sdkModules = [
     'regelsuche-discovery',
     'regelsuche-discovery-sdk',
     'regelsuche-plugin-api',
+    'regelsuche-extension-api',
+    'regelsuche-extension-runtime',
     'regelsuche-bom'
 ]
 def publicationTaskPaths = sdkModules.collect {
@@ -45,6 +47,8 @@ def verifySdkStarter = tasks.register('verifyStudentDiscoveryStarter', Exec) {
         'scripts/verify-student-java-sdk-consumer.py',
         'scripts/test_student_discovery_starter.py',
         'scripts/test_student_discovery_consumer.py',
+        'scripts/test_student_extension_verification.py',
+        'scripts/verify-sdk-api-compatibility.py',
         'scripts/package-student-sdk.py',
         'scripts/student_sdk_source.py',
         'scripts/test_student_sdk_package.py'

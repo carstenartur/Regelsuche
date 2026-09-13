@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import de.regelsuche.ast.Expr;
+import de.regelsuche.calculus.CalculusDerivativeRules;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.PatternExpr;
@@ -12,6 +13,8 @@ import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class EqualitySaturationSoundnessTest {
     private final ExpressionParser parser = new ExpressionParser();
@@ -38,6 +41,16 @@ class EqualitySaturationSoundnessTest {
         var rule = new PatternRewriteRule("not-an-equality", new PatternExpr.Placeholder("a"),
             new PatternExpr.LiteralNumber(de.regelsuche.scalar.ExactRational.ZERO), RewriteKind.NORMALIZE, false, 0, false);
         assertUnchanged("x", rule);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ln(x)", "log(x)", "x^-2"})
+    void guardedDerivativesCannotMergeAnUnconditionalEqualityClass(String body) {
+        Expr derivative = parser.parseTerm("diff(" + body + ", x)");
+        var rule = CalculusDerivativeRules.rules().stream()
+            .filter(candidate -> candidate.matches(derivative)).findFirst().orElseThrow();
+
+        assertUnchanged("diff(" + body + ", x)", rule);
     }
 
     @Test

@@ -9,10 +9,11 @@ BOM `de.regelsuche:regelsuche-bom` richtet sie aus.
 |---|---|
 | Java | 25 |
 | Discovery-SPI | `DiscoveryApi.VERSION = 1` |
-| Plugin-SPI | `apiVersion() = 1` |
+| Bisherige Plugin-SPI | `apiVersion() = 1` (noch nicht migrierter Anwendungspfad) |
+| Generische Extension-/Plugin-SPI | `ExtensionApi.VERSION = 2` |
 | Core-Kompatibilität für Plugins | `1.0.0` |
 | Produktversion | `release.properties`, im Release konkret im Manifest |
-| Stabile SDK-Pakete | `de.regelsuche.api`, exakt `de.regelsuche.sdk.discovery` |
+| Stabile SDK-Pakete | `de.regelsuche.api`, exakt `de.regelsuche.sdk.discovery`, `de.regelsuche.extension`, `de.regelsuche.extension.runtime` |
 | Stabile Plugin-Klassen | die explizite Klassenliste in `public-api.json`, ausschließlich aus `regelsuche-plugin-api` |
 | Experimentell | `de.regelsuche.sdk.discovery.python`, `de.regelsuche.sdk.discovery.cli` |
 
@@ -29,6 +30,17 @@ Entfernung verlangt eine neue API-Revision und mindestens eine vollständige
 Produkt-Minor-Version Vorlauf mit `@Deprecated` sowie einem Migrationsleitfaden.
 Die Produktnummer ist unabhängig davon; ein Snapshot ist kein veröffentlichtes
 Release und kein Nachweis menschlicher Bedienbarkeit.
+
+Die generische Extension-API liegt in `regelsuche-extension-api`, die kopflose
+Laufzeit in `regelsuche-extension-runtime`. Diese Revision-2-Pakete existierten in
+0.4.0 noch nicht: Der API-Checker prüft ihre vollständige öffentliche Typenliste
+(einschließlich `ExtensionOrigin.OriginKind`) jeweils im zugehörigen Binär-JAR.
+Fehlende Typen, vertauschte Module, Dubletten und Sources-/Javadoc-JARs als Ersatz
+werden abgewiesen. Sie werden nicht gegen nichtexistierende 0.4.0-Typen verglichen.
+Die generische SPI und die bisherige Plugin-SPI sind während der beschlossenen
+stufenweisen Migration getrennte Verträge, keine dauerhafte Kompatibilitätszusage
+zwischen beiden Modellen. Details und die explizite Freigabe von Host-Typen für
+externe Plugins stehen in [Generic extensions](generic-extensions.md).
 
 ## API-Diff und Migration von 0.4.0
 

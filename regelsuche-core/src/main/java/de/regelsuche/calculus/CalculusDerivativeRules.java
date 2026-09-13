@@ -26,8 +26,8 @@ import java.util.List;
  * <ul>
  *   <li>{@code diff(f + g, x) -> diff(f, x) + diff(g, x)} (and {@code -})</li>
  *   <li>{@code diff(f * g, x) -> diff(f, x)*g + f*diff(g, x)} (product rule)</li>
- *   <li>{@code diff(x^n, x) -> n * x^(n-1)} for {@link NumberExpr}
- *       exponents (power rule, the textbook example)</li>
+ *   <li>{@code diff(x^n, x) -> n * x^(n-1)} for numeric literal exponents,
+ *       including the parser's signed-literal shape (power rule)</li>
  *   <li>{@code diff(c, x) -> 0} for constants</li>
  *   <li>{@code diff(x, x) -> 1} for the variable itself</li>
  *   <li>{@code diff(sin(x), x) -> cos(x)}, {@code diff(cos(x), x) -> -sin(x)}
@@ -223,7 +223,7 @@ public final class CalculusDerivativeRules {
 
     /**
      * Power rule for the textbook case {@code diff(x^n, x) -> n * x^(n-1)}
-     * where {@code n} is a literal number and the base is exactly the
+     * where {@code n} is a signed literal number and the base is exactly the
      * derivation variable. This is the rule the
      * {@code derivativePowerRuleWorks} test pins.
      */
@@ -242,15 +242,17 @@ public final class CalculusDerivativeRules {
             }
             return power.left() instanceof VariableExpr base
                 && base.name().equals(m.variable().name())
-                && power.right() instanceof NumberExpr;
+                && literalExponent(power.right()) != null;
         }
 
         @Override
         public Expr apply(Expr subtree) {
             DiffMatch m = matchDiff(subtree);
             BinaryExpr power = (BinaryExpr) m.body();
-            NumberExpr exponent = (NumberExpr) power.right();
-            ExactRational n = exponent.value();
+            ExactRational n = literalExponent(power.right());
+            if (n == null) {
+                throw new IllegalArgumentException("Power rule requires a numeric literal exponent");
+            }
             if (n.equalsInteger(1)) {
                 return new NumberExpr(1);
             }
@@ -259,6 +261,21 @@ public final class CalculusDerivativeRules {
                 BinaryOperator.MUL,
                 new BinaryExpr(power.left(), BinaryOperator.POW, new NumberExpr(n.subtract(ExactRational.ONE)))
             );
+        }
+
+        private static ExactRational literalExponent(Expr expression) {
+            if (expression instanceof NumberExpr number) {
+                return number.value();
+            }
+            // Unary minus is represented by the parser as 0 - literal.
+            if (expression instanceof BinaryExpr binary
+                    && binary.operator() == BinaryOperator.SUB
+                    && binary.left() instanceof NumberExpr zero
+                    && zero.value().equalsInteger(0)
+                    && binary.right() instanceof NumberExpr magnitude) {
+                return magnitude.value().negate();
+            }
+            return null;
         }
     }
 

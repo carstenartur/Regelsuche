@@ -1,14 +1,18 @@
 package de.regelsuche.calculus;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.assumption.Assumption;
 import de.regelsuche.assumption.AssumptionEvaluatorPortfolio;
 import de.regelsuche.assumption.AssumptionTruthValue;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.RewriteRule;
 import java.util.List;
@@ -68,6 +72,38 @@ class DerivativeDomainTest {
     void zeroPowerRetainsItsExcludedZero() {
         assertEquals(List.of(Assumption.nonZero("x")),
             rule("calculus_diff_power_rule").assumptions(derivative("x^0")));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {-1, -2, -3})
+    void parsedNegativeIntegerPowersReachTheRuleWithTheirOriginalDomain(int exponent) {
+        RewriteRule rule = rule("calculus_diff_power_rule");
+        Expr source = derivative("x^" + exponent);
+
+        assertTrue(rule.matches(source));
+        assertEquals(List.of(Assumption.nonZero("x")), rule.assumptions(source));
+        assertEquals(new BinaryExpr(new NumberExpr(exponent), BinaryOperator.MUL,
+            new BinaryExpr(parser.parseTerm("x"), BinaryOperator.POW, new NumberExpr(exponent - 1))),
+            rule.apply(source));
+    }
+
+    @Test
+    void parsedNegativeFractionalPowerKeepsItsStrongerPositiveDomain() {
+        RewriteRule rule = rule("calculus_diff_power_rule");
+        Expr source = derivative("x^-0.5");
+
+        assertTrue(rule.matches(source));
+        assertEquals(List.of(Assumption.positive("x")), rule.assumptions(source));
+        assertEquals(new BinaryExpr(new NumberExpr(ExactRational.parse("-0.5")), BinaryOperator.MUL,
+            new BinaryExpr(parser.parseTerm("x"), BinaryOperator.POW,
+                new NumberExpr(ExactRational.parse("-1.5")))),
+            rule.apply(source));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"x^(1 - 2)", "x^y", "y^-2"})
+    void literalPowerDispatchDoesNotExpandIntoOtherExponentOrBaseCases(String body) {
+        assertFalse(rule("calculus_diff_power_rule").matches(derivative(body)));
     }
 
     @Test
