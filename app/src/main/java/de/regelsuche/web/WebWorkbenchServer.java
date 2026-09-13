@@ -790,6 +790,21 @@ public class WebWorkbenchServer {
             return;
         }
         WorkbenchRequestBodies.SearchRequest body = requestBodies.readSearch(exchange);
+        if (body.runtimeRequest() != null || body.runtimeArtifact() != null) {
+            if (body.otherFields() || (body.runtimeRequest() != null && body.runtimeArtifact() != null)) {
+                sendStatus(exchange, 400, "supply only runtimeRequest or runtimeArtifact");
+                return;
+            }
+            boolean replay = body.runtimeArtifact() != null;
+            try (var runtime = de.regelsuche.runtime.SafeRuntimeAdapter.open(pluginRuntimeConfig)) {
+                String result = replay ? runtime.replay(body.runtimeArtifact()) : runtime.analyze(body.runtimeRequest());
+                if (replay) exchange.getResponseHeaders().set("X-Runtime-Replay", "VERIFIED");
+                sendJson(exchange, 200, result);
+            } catch (IllegalArgumentException exception) {
+                sendStatus(exchange, replay ? 409 : 400, exception.getMessage());
+            }
+            return;
+        }
         String expression = body.expression();
         String typeName = body.type().toUpperCase(Locale.ROOT);
         String profileName = body.profile().toUpperCase(Locale.ROOT);
