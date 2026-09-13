@@ -107,6 +107,10 @@ final class NativeEvolutionRewriteProgramValidationEvaluator {
                 != work.chargedSearchWorkUnits()) {
             failure = "UNREPRESENTED_SEARCH_WORK";
         }
+        // Preserve the entire v1 atomic batch charge, without treating a budget stop as complete evidence.
+        if (failure.isEmpty() && result.status() == WorkBudgetBestFirstSearchStrategy.Status.WORK_BUDGET) {
+            failure = "WORK_BUDGET";
+        }
         Long total = failure.isEmpty() ? Long.valueOf(EvolutionRewriteProgramValidationEvidence.sum(
             searchWork.totalWorkUnits(), work.transformationWork().totalWorkUnits(), auditCalls)) : null;
         return new Measurement(result.status().name(), result.reached(),

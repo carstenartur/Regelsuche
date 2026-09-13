@@ -92,6 +92,12 @@ authoritative directory and its backups; this is not a distributed ledger, delet
 boundary or a guarantee against storage hardware that ignores force. The selection and final paths
 are private study material.
 
+Both combined-program stores decode retained reservation and result files with strict UTF-8 before
+JSON import and full expected-plan/hash checks. Malformed bytes raise `IOException`; they cannot be
+silently replaced with U+FFFD and alias a legitimate Unicode value in the retained program's
+`Prune.reason`. Valid U+FFFD and other Unicode remain supported. This tightens the file-read boundary
+without changing canonical serialization, hashes, lineage or the one-time attempt identity.
+
 The adapter uses the same current native compiler, measured ordinary-plus-genome baseline,
 ordinary-plus-genome-plus-program candidate and exact rational path audit as the combined VALIDATION
 adapter. It evaluates one unchanged selected configuration. Every committed final case retains both

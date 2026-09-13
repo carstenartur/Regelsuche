@@ -348,10 +348,13 @@ class EvolutionRewriteProgramValidationRunnerTest {
         for (var candidate : selection.candidates()) {
             for (var row : candidate.cases()) {
                 for (var measurement : List.of(row.baseline(), row.candidate())) {
-                    assertTrue(measurement.complete());
+                    assertFalse(measurement.complete());
                     assertFalse(measurement.reached());
                     assertEquals("WORK_BUDGET", measurement.terminalReason());
-                    assertTrue(measurement.totalWorkUnits() > budget.maxWorkUnits(),
+                    assertEquals("WORK_BUDGET", measurement.failure());
+                    assertNull(measurement.totalWorkUnits());
+                    assertTrue(EvolutionRewriteProgramValidationEvidence.sum(measurement.searchWork().totalWorkUnits(),
+                        measurement.transformationWork().totalWorkUnits()) > budget.maxWorkUnits(),
                         "v1 stops after charging the entire observed transformation batch");
                 }
             }

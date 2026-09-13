@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -116,7 +117,11 @@ public final class FileEvolutionRewriteProgramValidationAttemptStore {
             throw new IOException("VALIDATION reservation requires a regular owner-only POSIX file");
         }
         try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)) {
-            return new String(Channels.newInputStream(channel).readAllBytes(), StandardCharsets.UTF_8);
+            // Replacement decoding could alias changed bytes to an otherwise valid hashed authority.
+            return StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(Channels.newInputStream(channel).readAllBytes())).toString();
         }
     }
 

@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 
 /** Temporary public synthetic studies only; no resource or private study loader is used. */
 final class ProgramFinalTestFixtures {
@@ -32,6 +33,11 @@ final class ProgramFinalTestFixtures {
 
     static Fixture create(Path root, String studyId, boolean refutedGene, int selectedPrimitiveSteps,
         List<Integer> sourceRepeatLimits) throws IOException {
+        return create(root, studyId, refutedGene, selectedPrimitiveSteps, sourceRepeatLimits, UnaryOperator.identity());
+    }
+
+    static Fixture create(Path root, String studyId, boolean refutedGene, int selectedPrimitiveSteps,
+        List<Integer> sourceRepeatLimits, UnaryOperator<EvolutionRewriteProgramPlan.Node> sourceWrapper) throws IOException {
         if (!studyId.startsWith("synthetic_")) { throw new IllegalArgumentException("synthetic studies only"); }
         var validation = EvolutionRewriteProgramHeldOutRevealBundle.create(studyId, Split.VALIDATION,
             List.of(caseValue("validation_one", "validation_family_one", "a*1", "a"),
@@ -57,7 +63,8 @@ final class ProgramFinalTestFixtures {
                 : new EvolutionRewriteProgramPlan.Repeat(limit == 2 ? "synthetic_repeat" : "synthetic_repeat_" + limit,
                     new EvolutionRewriteProgramPlan.Source(limit == 2 ? "synthetic_repeated_source" : "synthetic_repeated_source_" + limit,
                         List.of("add_zero")), 1, limit);
-            return EvolutionRewriteProgramCandidate.create(genome, EvolutionRewriteProgramPlan.create(genome, source, 12, 12));
+            return EvolutionRewriteProgramCandidate.create(genome,
+                EvolutionRewriteProgramPlan.create(genome, sourceWrapper.apply(source), 12, 12));
         }).toList();
         var work = new EvolutionRewriteProgramTrainSuite.PrimitiveWorkBudget(4, 128, 80, 4, 30_000);
         var suite = EvolutionRewriteProgramTrainSuite.create("synthetic_final_bridge_train",

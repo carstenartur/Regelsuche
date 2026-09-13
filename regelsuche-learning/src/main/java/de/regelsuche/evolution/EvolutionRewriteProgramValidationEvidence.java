@@ -30,7 +30,7 @@ public final class EvolutionRewriteProgramValidationEvidence {
             } else {
                 Status status = Status.valueOf(terminalReason);
                 if (reached != (status == Status.REACHED || status == Status.ROOT_ALREADY_TARGET)
-                        || (status == Status.INCOMPLETE_EXPANSION && failure.isEmpty())) {
+                        || ((status == Status.INCOMPLETE_EXPANSION || status == Status.WORK_BUDGET) && failure.isEmpty())) {
                     throw new IllegalArgumentException("terminal status contradicts search completeness or reachability");
                 }
             }
@@ -70,9 +70,7 @@ public final class EvolutionRewriteProgramValidationEvidence {
                     || searchWork.exploredStates() > budget.maxExploredStates()) {
                 throw new IllegalArgumentException("complete measurement exceeds the bound path or state allowance");
             }
-            // v1 may charge an entire batch before stopping with WORK_BUDGET; preserve that observation.
-            if (!Status.WORK_BUDGET.name().equals(terminalReason)
-                    && sum(searchWork.totalWorkUnits(), transformationWork.totalWorkUnits())
+            if (sum(searchWork.totalWorkUnits(), transformationWork.totalWorkUnits())
                         > budget.mechanicalSearchWorkBudget()) {
                 throw new IllegalArgumentException("complete terminal outcome contradicts its bound search work allowance");
             }
