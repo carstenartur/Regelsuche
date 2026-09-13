@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExternalPolynomialComparisonWorker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ExternalPolynomialComparisonWorker.java</span></div><h1>ExternalPolynomialComparisonWorker.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.moves.*;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.lang.management.ManagementFactory;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+
+/** Source-only external pilot adapter; never reads corpus files, labels or targets. */
+<span class="fc" id="L25">public final class ExternalPolynomialComparisonWorker {</span>
+<span class="fc" id="L26">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L27">        .enable(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L28">        .enable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+<span class="fc" id="L29">    private static final Set&lt;String&gt; PROFILES = Set.of(&quot;BASE&quot;, &quot;LEARNED_NAIVE&quot;, &quot;LEARNED_RANKED&quot;, &quot;EXPERT&quot;);</span>
+    private LearnedSchedulingModel model;
+    private String frozen;
+
+    public Map&lt;String, Object&gt; initialize() {
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if (model != null) throw new IllegalStateException(&quot;already initialized&quot;);</span>
+<span class="fc" id="L35">        long start = System.nanoTime(), cpu = cpu();</span>
+<span class="fc" id="L36">        model = LearnedSchedulingModel.train();</span>
+<span class="fc" id="L37">        frozen = LearnedSchedulingArtifacts.modelJson(model);</span>
+<span class="fc" id="L38">        var result = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L39">        result.put(&quot;status&quot;, &quot;INITIALIZED&quot;); result.put(&quot;model&quot;, frozen);</span>
+<span class="fc" id="L40">        result.put(&quot;modelHash&quot;, SchematicProofPlan.hash(frozen));</span>
+<span class="fc" id="L41">        result.put(&quot;trainingWork&quot;, model.trainingWorkUnits());</span>
+<span class="fc" id="L42">        result.put(&quot;trainingWorkComponents&quot;, model.trainingWorkComponents());</span>
+<span class="fc" id="L43">        result.put(&quot;nativeWallNanos&quot;, System.nanoTime() - start); result.put(&quot;nativeCpuNanos&quot;, elapsedCpu(cpu));</span>
+<span class="fc" id="L44">        result.put(&quot;settings&quot;, Map.of(&quot;workBudget&quot;, 16384, &quot;primitiveDepth&quot;, 9, &quot;searchDepth&quot;, 9, &quot;maxStates&quot;, 256, &quot;complexityDebt&quot;, 24));</span>
+<span class="fc" id="L45">        return result;</span>
+    }
+
+    /** Select a verified anytime incumbent; internal overruns remain explicit, not capped away. */
+    public Map&lt;String, Object&gt; run(String profile, String source) {
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (model == null) throw new IllegalStateException(&quot;initialize before querying&quot;);</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (!PROFILES.contains(profile)) throw new IllegalArgumentException(&quot;unknown profile&quot;);</span>
+<span class="pc bpc" id="L52" title="3 of 6 branches missed.">        if (source == null || source.isBlank() || source.length() &gt; 2048) throw new IllegalArgumentException(&quot;invalid source&quot;);</span>
+<span class="fc" id="L53">        long start = System.nanoTime(), cpu = cpu();</span>
+<span class="fc" id="L54">        String input = LearnedSchedulingModel.format(source);</span>
+<span class="fc" id="L55">        var exact = new ExactPolynomialAnalysis();</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (model.knowledge().excludedIdentities().contains(exact.alphaIdentity(input)))</span>
+<span class="fc" id="L57">            throw new IllegalArgumentException(&quot;TRAIN overlap&quot;);</span>
+<span class="fc" id="L58">        var configuration = LearnedSchedulingProtocol.configurations().stream().filter(c -&gt; c.id().equals(profile)).findFirst().orElseThrow();</span>
+        // Empty goal has no syntactic target match; policies receive no manufactured expression or label.
+<span class="fc" id="L60">        var context = new MoveContext(&quot;&quot;, List.of(), MoveContext.Phase.FROZEN_EVALUATION);</span>
+<span class="fc" id="L61">        var verifier = new PrimitiveReplayMoveVerifier(model.knowledge().inventory());</span>
+<span class="fc" id="L62">        var search = new MoveSearch().search(new MoveSearch.Problem(input, context, model.providers(configuration),</span>
+<span class="fc" id="L63">            model.policy(configuration), verifier, state -&gt; cost(state.expression()), MoveSearch.Mode.FAST,</span>
+<span class="fc" id="L64">            configuration.scheduling(), new MoveSearch.Budget(9, 9, 0, 256, 16384, 24), model.stateValue(configuration)));</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (search.reached()) throw new IllegalStateException(&quot;source-only search invented a target hit&quot;);</span>
+<span class="fc" id="L66">        String output = input;</span>
+<span class="fc" id="L67">        MoveState selected = null;</span>
+<span class="fc" id="L68">        var parents = new HashMap&lt;MoveState, MoveSearch.Event&gt;();</span>
+<span class="pc bpc" id="L69" title="1 of 4 branches missed.">        for (var event : search.events()) if (event.decision() == MoveSearch.Decision.ENQUEUED) {</span>
+<span class="pc bpc" id="L70" title="2 of 4 branches missed.">            if (event.verification() == null || !event.verification().accepted()) throw new IllegalStateException(&quot;unverified admitted state&quot;);</span>
+<span class="fc" id="L71">            parents.putIfAbsent(event.target(), event);</span>
+<span class="fc" id="L72">            String candidate = event.target().expression();</span>
+<span class="pc bpc" id="L73" title="1 of 6 branches missed.">            if (cost(candidate) &lt; cost(output) || (cost(candidate) == cost(output) &amp;&amp; candidate.compareTo(output) &lt; 0)) {</span>
+<span class="fc" id="L74">                output = candidate; selected = event.target();</span>
+            }
+        }
+<span class="fc" id="L77">        var witness = new ArrayList&lt;MoveSearch.WitnessStep&gt;();</span>
+<span class="fc bfc" id="L78" title="All 4 branches covered.">        while (selected != null &amp;&amp; selected.searchDepth() &gt; 0) {</span>
+<span class="fc" id="L79">            var edge = parents.get(selected);</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">            if (edge == null) throw new IllegalStateException(&quot;incumbent has no retained primitive lineage&quot;);</span>
+<span class="fc" id="L81">            witness.add(new MoveSearch.WitnessStep(edge.source(), edge.target(), edge.move(), edge.verification()));</span>
+<span class="fc" id="L82">            selected = edge.source();</span>
+<span class="fc" id="L83">        }</span>
+<span class="fc" id="L84">        Collections.reverse(witness);</span>
+<span class="fc" id="L85">        long replayWork = 0;</span>
+<span class="fc" id="L86">        String current = input;</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (var step : witness) {</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            if (!current.equals(step.source().expression())) throw new IllegalStateException(&quot;broken selected witness&quot;);</span>
+<span class="fc" id="L89">            var replay = verifier.verify(step.source(), step.move(), context);</span>
+<span class="fc" id="L90">            replayWork = Math.addExact(replayWork, replay.work());</span>
+<span class="pc bpc" id="L91" title="2 of 4 branches missed.">            if (!replay.accepted() || !replay.equals(step.verification())) throw new IllegalStateException(&quot;selected replay mismatch&quot;);</span>
+<span class="fc" id="L92">            current = step.target().expression();</span>
+<span class="fc" id="L93">        }</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (!current.equals(output)) throw new IllegalStateException(&quot;selected witness endpoint mismatch&quot;);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (!frozen.equals(LearnedSchedulingArtifacts.modelJson(model))) throw new IllegalStateException(&quot;evaluation changed TRAIN model&quot;);</span>
+<span class="fc" id="L96">        var result = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L97">        result.put(&quot;status&quot;, &quot;CANDIDATE&quot;); result.put(&quot;profile&quot;, profile); result.put(&quot;input&quot;, input); result.put(&quot;output&quot;, output);</span>
+<span class="fc" id="L98">        result.put(&quot;target&quot;, &quot;&quot;); result.put(&quot;targetReached&quot;, false); result.put(&quot;modelHash&quot;, SchematicProofPlan.hash(frozen));</span>
+<span class="fc" id="L99">        result.put(&quot;inputCost&quot;, cost(input)); result.put(&quot;outputCost&quot;, cost(output)); result.put(&quot;witness&quot;, witness);</span>
+<span class="fc" id="L100">        result.put(&quot;search&quot;, LearnedSchedulingArtifacts.resultJson(search)); result.put(&quot;selectedReplayWork&quot;, replayWork);</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        result.put(&quot;internalWorkWithinBudget&quot;, search.metrics().totalWork() &lt;= 16384);</span>
+<span class="fc" id="L102">        result.put(&quot;nativeWallNanos&quot;, System.nanoTime() - start); result.put(&quot;nativeCpuNanos&quot;, elapsedCpu(cpu));</span>
+<span class="fc" id="L103">        return result;</span>
+    }
+
+    /** Mirrors the common judge's surface cost, including unary minus as parser-generated 0 - x. */
+<span class="fc" id="L107">    public static int cost(String source) { return cost(new ExpressionParser().parseTerm(source)); }</span>
+    private static int cost(Expr expression) {
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) return 1 + cost(binary.left()) + cost(binary.right());</span>
+<span class="fc bfc" id="L110" title="All 4 branches covered.">        if (expression instanceof NumberExpr || expression instanceof VariableExpr) return 0;</span>
+<span class="fc" id="L111">        throw new IllegalArgumentException(&quot;not polynomial syntax&quot;);</span>
+    }
+    private static long cpu() {
+<span class="fc" id="L114">        var bean = ManagementFactory.getOperatingSystemMXBean();</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        return bean instanceof com.sun.management.OperatingSystemMXBean operatingSystem ? operatingSystem.getProcessCpuTime() : -1;</span>
+    }
+<span class="pc bpc" id="L117" title="2 of 4 branches missed.">    private static Long elapsedCpu(long before) { long after = cpu(); return before &lt; 0 || after &lt; 0 ? null : after - before; }</span>
+
+    public static void main(String[] args) throws Exception {
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if (args.length != 0) throw new IllegalArgumentException(&quot;worker takes source-only requests on stdin, no corpus path&quot;);</span>
+<span class="nc" id="L121">        var worker = new ExternalPolynomialComparisonWorker();</span>
+<span class="nc" id="L122">        System.out.println(&quot;{\&quot;status\&quot;:\&quot;READY\&quot;,\&quot;java\&quot;:\&quot;&quot; + Runtime.version() + &quot;\&quot;}&quot;);</span>
+<span class="nc" id="L123">        try (var reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8))) {</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">            for (String line; (line = reader.readLine()) != null;) {</span>
+                try {
+<span class="nc" id="L126">                    JsonNode request = JSON.readTree(line);</span>
+<span class="nc bnc" id="L127" title="All 4 branches missed.">                    if (!request.isObject() || !request.path(&quot;op&quot;).isTextual()) throw new IllegalArgumentException(&quot;invalid request&quot;);</span>
+<span class="nc" id="L128">                    var fields = new java.util.HashSet&lt;String&gt;(); request.fieldNames().forEachRemaining(fields::add);</span>
+<span class="nc" id="L129">                    String op = request.get(&quot;op&quot;).textValue();</span>
+                    Object response;
+<span class="nc bnc" id="L131" title="All 4 branches missed.">                    if (op.equals(&quot;initialize&quot;) &amp;&amp; fields.equals(Set.of(&quot;op&quot;))) response = worker.initialize();</span>
+<span class="nc bnc" id="L132" title="All 4 branches missed.">                    else if (op.equals(&quot;run&quot;) &amp;&amp; fields.equals(Set.of(&quot;op&quot;, &quot;source&quot;, &quot;profile&quot;))</span>
+<span class="nc bnc" id="L133" title="All 4 branches missed.">                            &amp;&amp; request.get(&quot;source&quot;).isTextual() &amp;&amp; request.get(&quot;profile&quot;).isTextual())</span>
+<span class="nc" id="L134">                        response = worker.run(request.get(&quot;profile&quot;).textValue(), request.get(&quot;source&quot;).textValue());</span>
+<span class="nc" id="L135">                    else throw new IllegalArgumentException(&quot;unsupported fields or operation&quot;);</span>
+<span class="nc" id="L136">                    System.out.println(LearnedSchedulingArtifacts.json(response));</span>
+<span class="nc" id="L137">                } catch (RuntimeException | java.io.IOException failure) {</span>
+<span class="nc" id="L138">                    System.out.println(LearnedSchedulingArtifacts.json(Map.of(&quot;status&quot;, &quot;ERROR&quot;, &quot;error&quot;, failure.toString())));</span>
+<span class="nc" id="L139">                }</span>
+<span class="nc" id="L140">                System.out.flush();</span>
+            }
+        }
+<span class="nc" id="L143">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
