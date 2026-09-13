@@ -39,15 +39,18 @@ final class RetainedRunActions {
                 if (reference.status() != RepresentationDiscoveryArtifactReference.ArtifactStatus.AVAILABLE) {
                     error(exchange, 409, "DOSSIER_UNAVAILABLE", reference.status() + ": " + reference.detail()); return;
                 }
-                if (!TargetFreeSymPyBridgeDiscoveryScenario.SCHEMA.equals(reference.artifactSchema())) {
+                boolean nativeExecution = TargetFreeSearchExecution.SCHEMA.equals(reference.artifactSchema());
+                if (!nativeExecution && !TargetFreeSymPyBridgeDiscoveryScenario.SCHEMA.equals(reference.artifactSchema())) {
                     error(exchange, 409, "UNSUPPORTED_DOSSIER", reference.artifactSchema()); return;
                 }
                 String body;
                 boolean importing = exchange.getRequestMethod().equals("POST");
                 if (importing) {
-                    body = RetainedCandidateDossierRepository.retain(directory, run, requestBody);
+                    body = nativeExecution ? TargetFreeSearchArtifactStore.retain(directory, run, requestBody)
+                        : RetainedCandidateDossierRepository.retain(directory, run, requestBody);
                 } else {
-                    var retained = RetainedCandidateDossierRepository.read(directory, run);
+                    var retained = nativeExecution ? TargetFreeSearchArtifactStore.read(directory, run)
+                        : RetainedCandidateDossierRepository.read(directory, run);
                     if (retained.isEmpty()) { error(exchange, 404, "DOSSIER_NOT_RETAINED", "import the artifact bound by this manifest"); return; }
                     body = retained.get();
                 }

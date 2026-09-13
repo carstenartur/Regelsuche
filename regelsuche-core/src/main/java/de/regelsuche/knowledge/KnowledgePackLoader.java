@@ -12,6 +12,7 @@ import de.regelsuche.transform.PatternRewriteRule;
 import de.regelsuche.transform.RecognitionProfile;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.JarURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -43,8 +44,11 @@ public class KnowledgePackLoader {
                     packs.addAll(loadAll(Path.of(resource.toURI())));
                 } else if ("jar".equals(resource.getProtocol())) {
                     URI jarUri = resource.toURI();
+                    Path archive = Path.of(((JarURLConnection) resource.openConnection())
+                        .getJarFileURL().toURI());
+                    // Path-based ZIP file systems are owned by this load, not globally registered by URI.
                     try (FileSystem jarFs =
-                            FileSystems.newFileSystem(jarUri, Map.of())) {
+                            FileSystems.newFileSystem(archive, Map.of())) {
                         String spec = jarUri.getSchemeSpecificPart();
                         int bang = spec.lastIndexOf('!');
                         String entryPath = bang >= 0

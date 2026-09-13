@@ -373,6 +373,12 @@ public class WebWorkbenchServer {
     }
 
     private void handleDiscoveryDomains(HttpExchange exchange) throws IOException {
+        if (exchange.getRequestURI().getPath().startsWith(DomainExportWorkspaceActions.BASE)) {
+            DomainExportWorkspaceActions.handle(exchange,
+                representationRunDirectory.resolveSibling(representationRunDirectory.getFileName() + "-domain-exports"),
+                securityConfig.maxRequestBytes());
+            return;
+        }
         try {
             var workbench = DiscoveryDomainWorkbench.forHost(getClass().getClassLoader(),
                 System.getProperty("regelsuche.discovery.providers", ""));
@@ -3182,7 +3188,10 @@ public class WebWorkbenchServer {
             || path.equals("/run-workspace.js")
             || path.equals("/run-workspace.css")
             || path.equals("/rule-radar.js")
-            || path.equals("/rule-radar.css")) {
+            || path.equals("/rule-radar.css")
+            || path.equals("/discovery-domains.html")
+            || path.equals("/discovery-domains.js")
+            || path.equals("/discovery-domains.css")) {
             sendStaticResource(exchange, "/web" + path, mimeFor(path));
         } else {
             sendStatus(exchange, 404, "not found");

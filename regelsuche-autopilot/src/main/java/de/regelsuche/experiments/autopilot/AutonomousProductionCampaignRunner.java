@@ -43,17 +43,8 @@ public final class AutonomousProductionCampaignRunner {
             AutonomousCampaignResourceLedger.create(lifecycle);
         List<ArtifactReference> artifacts = artifactReferences(
             lifecycle, nextPlan, round, feedback, resourceLedger);
-        String contentHash = AutonomousResearchBriefV2.hash(
-            SCHEMA
-                + "\nbrief=" + brief.contentHash()
-                + "\nlifecycle=" + lifecycle.contentHash()
-                + "\nnextPlan=" + nextPlan.contentHash()
-                + "\nround=" + round.contentHash()
-                + "\nfeedback=" + feedback.contentHash()
-                + "\nresourceLedger=" + resourceLedger.contentHash()
-                + "\nartifacts=" + artifacts.stream()
-                    .map(ArtifactReference::canonicalMaterial).toList()
-                + "\nstatus=COMPLETED");
+        String contentHash = manifestHash(brief.contentHash(), lifecycle.contentHash(), nextPlan.contentHash(),
+            round.contentHash(), feedback.contentHash(), resourceLedger.contentHash(), artifacts, "COMPLETED");
         return new CampaignRun(
             SCHEMA,
             lifecycle,
@@ -161,6 +152,18 @@ public final class AutonomousProductionCampaignRunner {
 
     private static ArtifactReference ref(String type, String hash) {
         return new ArtifactReference(type, hash);
+    }
+
+    /** Existing v2 identity; summary counts remain separately bound, as in the original contract. */
+    public static String manifestHash(String briefHash, String lifecycleHash, String nextPlanHash,
+            String roundHash, String feedbackHash, String resourceLedgerHash,
+            List<ArtifactReference> artifacts, String status) {
+        return AutonomousResearchBriefV2.hash(SCHEMA + "\nbrief=" + briefHash + "\nlifecycle=" + lifecycleHash
+            + "\nnextPlan=" + nextPlanHash + "\nround=" + roundHash + "\nfeedback=" + feedbackHash
+            + "\nresourceLedger=" + resourceLedgerHash + "\nartifacts=" + artifacts.stream()
+                .sorted(Comparator.comparing(ArtifactReference::artifactType))
+                .map(ArtifactReference::canonicalMaterial).toList()
+            + "\nstatus=" + status);
     }
 
     public record ArtifactReference(String artifactType, String contentHash) {

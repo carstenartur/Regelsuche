@@ -15,10 +15,13 @@ import de.regelsuche.knowledge.KnowledgePackSelection;
 import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.moves.enumerate.TreePosition;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Objects;
+import java.util.function.Consumer;
 
 public class AstRewriteTransformationEngine implements TransformationEngine {
     private static final int DEFAULT_MAX_AST_SIZE_INCREASE = 12;
@@ -56,6 +59,20 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
 
     @Override
     public List<Transformation> transform(String expression) {
+        return transformObserved(expression, null);
+    }
+
+    /**
+     * Observes the concrete occurrence that generated each returned transformation.
+     * This is generation evidence; it says nothing about search acceptance. No
+     * occurrence is recovered from an application-key hash or equal subtree.
+     */
+    public List<Transformation> transformWithOccurrences(String expression,
+            Consumer<GeneratedTransformation> observer) {
+        return transformObserved(expression, Objects.requireNonNull(observer, "observer"));
+    }
+
+    private List<Transformation> transformObserved(String expression, Consumer<GeneratedTransformation> observer) {
         Expr root;
         try {
             root = parser.parse(new InputRequest(InputType.TERM, expression)).terms().getFirst();
@@ -66,7 +83,7 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
         String formattedInput = ExpressionFormatter.format(root);
         int originalSize = canonicalizer.astNodeCount(formattedInput);
         Set<Transformation> transformations = new LinkedHashSet<>();
-        for (RewriteResult result : rewriteEverywhere(root)) {
+        for (RewriteResult result : rewriteEverywhere(root, observer == null ? null : List.of())) {
             String formatted = ExpressionFormatter.format(result.expression());
             if (formatted.equals(formattedInput)) {
                 continue;
@@ -76,7 +93,7 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
                 continue;
             }
             RewriteRule rule = result.rule();
-            transformations.add(new Transformation(
+            Transformation transformation = new Transformation(
                 rule.id(),
                 formatted,
                 rule.kind(),
@@ -87,7 +104,12 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
                 result.assumptions().stream().map(Assumption::expression).toList(),
                 rule.descriptor().packId(),
                 rule.descriptor().license()
-            ));
+            );
+            if (transformations.add(transformation) && observer != null) {
+                observer.accept(new GeneratedTransformation(expression,
+                    new TreePosition(result.path(), result.sourceOccurrenceExpression()),
+                    result.sourceOccurrenceExpression(), result.transformedOccurrenceExpression(), transformation));
+            }
             if (transformations.size() >= maxCandidatesPerState) {
                 break;
             }
@@ -95,7 +117,7 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
         return new ArrayList<>(transformations);
     }
 
-    private List<RewriteResult> rewriteEverywhere(Expr subtree) {
+    private List<RewriteResult> rewriteEverywhere(Expr subtree, List<Integer> path) {
         List<RewriteResult> results = new ArrayList<>();
         String subtreeHash = canonicalizer.stableHash(ExpressionFormatter.format(subtree));
         for (RewriteRule rule : rules) {
@@ -106,45 +128,64 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
                         rule,
                         rewritten,
                         subtreeHash,
-                        rule.assumptions(subtree)));
+                        rule.assumptions(subtree), path,
+                        path == null ? null : ExpressionFormatter.format(subtree),
+                        path == null ? null : ExpressionFormatter.format(rewritten)));
                 }
             }
         }
 
         if (subtree instanceof BinaryExpr binaryExpr) {
-            for (RewriteResult leftRewrite : rewriteEverywhere(binaryExpr.left())) {
+            for (RewriteResult leftRewrite : rewriteEverywhere(binaryExpr.left(), child(path, 0))) {
                 results.add(new RewriteResult(
                     leftRewrite.rule(),
                     new BinaryExpr(leftRewrite.expression(), binaryExpr.operator(), binaryExpr.right()),
                     leftRewrite.sourceSubtreeHash(),
-                    leftRewrite.assumptions()
+                    leftRewrite.assumptions(), leftRewrite.path(),
+                    leftRewrite.sourceOccurrenceExpression(), leftRewrite.transformedOccurrenceExpression()
                 ));
             }
-            for (RewriteResult rightRewrite : rewriteEverywhere(binaryExpr.right())) {
+            for (RewriteResult rightRewrite : rewriteEverywhere(binaryExpr.right(), child(path, 1))) {
                 results.add(new RewriteResult(
                     rightRewrite.rule(),
                     new BinaryExpr(binaryExpr.left(), binaryExpr.operator(), rightRewrite.expression()),
                     rightRewrite.sourceSubtreeHash(),
-                    rightRewrite.assumptions()
+                    rightRewrite.assumptions(), rightRewrite.path(),
+                    rightRewrite.sourceOccurrenceExpression(), rightRewrite.transformedOccurrenceExpression()
                 ));
             }
         } else if (subtree instanceof FunctionExpr functionExpr) {
             List<Expr> arguments = functionExpr.arguments();
             for (int index = 0; index < arguments.size(); index++) {
                 final int position = index;
-                for (RewriteResult argRewrite : rewriteEverywhere(arguments.get(index))) {
+                for (RewriteResult argRewrite : rewriteEverywhere(arguments.get(index), child(path, index))) {
                     List<Expr> replaced = new ArrayList<>(arguments);
                     replaced.set(position, argRewrite.expression());
                     results.add(new RewriteResult(
                         argRewrite.rule(),
                         new FunctionExpr(functionExpr.name(), replaced),
                         argRewrite.sourceSubtreeHash(),
-                        argRewrite.assumptions()
+                        argRewrite.assumptions(), argRewrite.path(),
+                        argRewrite.sourceOccurrenceExpression(), argRewrite.transformedOccurrenceExpression()
                     ));
                 }
             }
         }
         return results;
+    }
+
+    private static List<Integer> child(List<Integer> path, int index) {
+        if (path == null) return null;
+        var child = new ArrayList<>(path); child.add(index); return List.copyOf(child);
+    }
+
+    public record GeneratedTransformation(String sourceExpression, TreePosition position,
+            String sourceOccurrenceExpression, String transformedOccurrenceExpression, Transformation transformation) {
+        public GeneratedTransformation {
+            Objects.requireNonNull(sourceExpression); Objects.requireNonNull(position);
+            Objects.requireNonNull(sourceOccurrenceExpression); Objects.requireNonNull(transformedOccurrenceExpression);
+            Objects.requireNonNull(transformation);
+        }
     }
 
     /**
@@ -250,7 +291,10 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
         RewriteRule rule,
         Expr expression,
         String sourceSubtreeHash,
-        List<Assumption> assumptions
+        List<Assumption> assumptions,
+        List<Integer> path,
+        String sourceOccurrenceExpression,
+        String transformedOccurrenceExpression
     ) {
         private RewriteResult {
             assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);

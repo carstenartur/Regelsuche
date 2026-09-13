@@ -4,3 +4,21 @@
 .sdk-domain-workbench select, .sdk-domain-workbench textarea, .sdk-domain-workbench input { max-width: 100%; }
 .sdk-domain-workbench textarea { min-height: 8rem; }
 .sdk-domain-workbench details { margin-top: 1rem; }
+.sdk-domain-workbench .card { margin-bottom: 1.25rem; min-width: 0; }
+.domain-export-list { list-style: none; padding: 0; }
+.domain-export-list li { margin: .5rem 0; }
+.domain-export-list button { width: 100%; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.domain-export-list button[aria-current="true"] { border: 2px solid currentColor; }
+.domain-export-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+#retainedDomainExportDetail, #retainedDomainReplay { overflow-wrap: anywhere; }
+#retainedDomainExportDetail table { width: 100%; border-collapse: collapse; table-layout: fixed; margin: .75rem 0 1rem; }
+#retainedDomainExportDetail th, #retainedDomainExportDetail td { padding: .45rem; border-bottom: 1px solid #8998aa66; text-align: left; vertical-align: top; }
+#retainedDomainExportDetail .domain-resource-table th:first-child { width: 34%; }
+#retainedDomainExportDetail dd { margin: .2rem 0 1rem; }
+#retainedDomainExportDetail dt { font-weight: 600; }
+#retainedDomainExportDetail .domain-original-files { display: flex; flex-wrap: wrap; gap: .8rem; }
+@media (max-width: 520px) {
+  .sdk-domain-workbench { padding: .75rem; }
+  #retainedDomainExportDetail th, #retainedDomainExportDetail td { padding: .3rem .15rem; font-size: .82rem; }
+  #retainedDomainExportDetail .domain-resource-table th:first-child { width: 38%; }
+}

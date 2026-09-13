@@ -32,7 +32,66 @@
     }
     const fact = value => value ? 'TRUE' : 'FALSE';
 
+    function renderNative(parent, run, artifact, selected, select, edge) {
+        const data = artifact.content, candidate = selected.candidate, state = selected.observation;
+        const detail = text('article', undefined, parent);
+        detail.id = 'candidateDossierDetail'; detail.dataset.candidateId = candidate.stateId;
+        text('h3', 'Nativer target-free Lauf · Kandidat und Ausführung', detail);
+        table(detail, [['Run-ID', run.runId], ['Suchartefakt', artifact.contentHash], ['Zustands-ID', candidate.stateId],
+            ['Quelle', run.input.displayText], ['Besuchter Ausdruck', state.expression], ['Tiefe', state.depth],
+            ['Nativer Ergebnisstatus', data.goalStatus], ['Restfrontier beim Suchende', data.events[data.events.length - 1].frontierSize],
+            ['Ausführungswurzel', candidate.executionHash], ['Annahmen', state.assumptions]]);
+        text('p', 'UNTARGETED ist der Status des nativen Runners. Daraus folgt keine vollständige Closure oder Zielerreichung.', detail);
+        const work = section(detail, 'Gespeicherte Arbeit und native Diagnose');
+        table(work, [['Engine-Aufrufe', data.work.engineCalls], ['Zurückgegebene Transformationskandidaten', data.work.generatedTransformations],
+            ['Primitive Rewrites dieser Erzeugungen', data.work.returnedCandidateWork.primitiveRewrites],
+            ['Exakte Theorie-Schritte dieser Erzeugungen', data.work.returnedCandidateWork.exactTheorySteps],
+            ['Exakte Theorie-Arbeit dieser Erzeugungen', data.work.returnedCandidateWork.exactTheoryWorkUnits],
+            ...Object.entries(data.metrics)]);
+        text('p', 'configuredWork/consumedWork des Run-Manifests zählen erzeugte Transformationskandidaten. Pfadpräfixe werden nicht nochmals summiert.', work);
+        text('p', data.recordingOverhead, work);
+        const identity = section(detail, 'Applikationsidentitäten und beobachtete Linie');
+        table(identity, [['Kanonische Applikationsidentitätsmenge', state.applicationKeys], ['Aufgezeichneter Ausdruckspfad', state.path],
+            ['Aufgezeichneter Regelpfad', state.appliedRuleIds], ['Guard-/Proof-Validierung', 'NOT_EVALUATED · Konstruktionsmetadaten sind kein formaler Beweis']]);
+        text('p', 'Die Applikationsidentitäten sind eine sortierte Menge. Die folgende Reihenfolge stammt ausschließlich aus der gespeicherten Ausführung.', identity);
+        const replay = section(detail, 'Replay-Ansicht der gespeicherten Schritte');
+        replay.id = 'nativeExecutionReplay';
+        if (!selected.generations.length) text('p', 'Startzustand: keine Transformation im Pfad.', replay);
+        selected.generations.forEach((generation, index) => {
+            const step = section(replay, 'Schritt ' + (index + 1) + ' · ' + generation.ruleId);
+            step.dataset.generationSequence = String(generation.sequence);
+            table(step, [['Erzeugung im Lauf', generation.sequence], ['Quellwurzel', generation.sourceExpression],
+                ['Tatsächliche Quellposition', generation.occurrencePath.length ? generation.occurrencePath.join('.') : 'root'],
+                ['Quellvorkommen', generation.sourceOccurrenceExpression], ['Ersetztes Vorkommen', generation.transformedOccurrenceExpression],
+                ['Ergebniswurzel', generation.transformedExpression], ['Applikationsidentität', generation.applicationKey],
+                ['Ausführungswurzel des Schritts', generation.executionHash]]);
+        });
+        text('p', 'Diese Ansicht öffnet die gespeicherte Schrittabfolge. Sie führt keinen neuen Lauf und keine neue Beweisprüfung aus.', replay);
+        const graph = section(detail, 'Gebundene Graphübergänge');
+        text('p', 'Erzeugungen, Enqueues und tatsächlich besuchte Zustände bleiben getrennt. Die Kanten hier führen zu besuchten Zuständen.', graph);
+        selected.edges.forEach(transition => {
+            const button = text('button', 'Graphkante ' + transition.sequence, graph);
+            button.type = 'button'; button.dataset.dossierEdge = String(transition.sequence);
+            button.setAttribute('aria-current', String(edge === String(transition.sequence)));
+            button.addEventListener('click', () => { select(candidate.stateId, String(transition.sequence)); document.getElementById('candidateGraphEvidence')?.focus(); });
+        });
+        if (selected.selectedEdge) {
+            const bound = section(graph, 'Exakte gespeicherte Graphkante'); bound.id = 'candidateGraphEvidence'; bound.tabIndex = -1;
+            const generation = data.generations[selected.selectedEdge.generationSequence];
+            table(bound, [['Run-ID', run.runId], ...Object.entries(selected.selectedEdge), ['applicationKey', generation.applicationKey],
+                ['Quellposition', generation.occurrencePath.length ? generation.occurrencePath.join('.') : 'root'],
+                ['Ausführungswurzel', generation.executionHash]]);
+        }
+        const trace = text('details', undefined, detail);
+        text('summary', 'Vollständiger nativer Ereignistrace einschließlich verworfener Erzeugungen', trace);
+        text('pre', JSON.stringify(data.events, null, 2), trace);
+        table(detail, [['Stufenbewertung nach #865', data.stageAssessment], ['Recognition / Ranking / Expert Review', 'NOT_EVALUATED'],
+            ...run.artifacts.filter(a => ['PROOF_OBLIGATIONS', 'RULE_RADAR'].includes(a.role)).map(a => [a.role, a.status])]);
+        text('p', data.claimBoundary, detail);
+    }
+
     function renderDossier(parent, run, artifact, selected, select, edge) {
+        if (selected.native) { renderNative(parent, run, artifact, selected, select, edge); return; }
         const data = artifact.content, candidate = selected.candidate, bridge = selected.bridge;
         const detail = text('article', undefined, parent);
         detail.id = 'candidateDossierDetail'; detail.dataset.candidateId = candidate.stateHash;
@@ -138,7 +197,7 @@
             host.replaceChildren();
             const reference = active.workspace.artifacts.find(a => a.role === 'CANDIDATE_DOSSIERS');
             text('h3', 'Discovery-Kandidaten', host);
-            if (reference.status !== 'AVAILABLE' || reference.artifactSchema !== api.schema) {
+            if (reference.status !== 'AVAILABLE' || !api.supports(reference.artifactSchema)) {
                 text('p', 'Kandidatendossier: ' + reference.status + ' · ' + (reference.detail || 'Nicht unterstütztes Schema: ' + reference.artifactSchema), host);
                 return;
             }
@@ -159,13 +218,19 @@
                 return;
             }
             status.textContent = 'Gespeicherter Beleg geöffnet · ' + state.runId;
-            const candidateId = active.candidate || state.artifact.content.discoveredBridge.stateHash;
+            const native = state.artifact.content.schema === api.nativeSchema;
+            const candidateId = active.candidate || (native
+                ? (state.artifact.content.states.find(s => s.generationSequences.length)?.stateId || state.artifact.content.states[0].stateId)
+                : state.artifact.content.discoveredBridge.stateHash);
             let selected;
             try { selected = api.selection(state.artifact, candidateId, active.edge || ''); }
             catch (error) { status.textContent = error.message; status.className = 'run-error'; return; }
             if (!active.candidate) { select(candidateId, '', active.role || 'CANDIDATE_DOSSIERS'); return; }
             const list = text('div', undefined, host); list.className = 'dossier-candidate-list'; list.setAttribute('aria-label', 'Gespeicherte Kandidaten');
-            state.artifact.content.search.states.filter(s => s.depth > 0).forEach(candidate => {
+            const candidates = native ? state.artifact.content.states.filter(s => s.generationSequences.length).map(s => ({stateHash: s.stateId,
+                expression: window.RegelsucheRunWorkspace.parseExactJson(s.canonicalStateJson).expression}))
+                : state.artifact.content.search.states.filter(s => s.depth > 0);
+            candidates.forEach(candidate => {
                 const button = text('button', candidate.expression, list);
                 button.type = 'button'; button.dataset.candidateId = candidate.stateHash;
                 button.setAttribute('aria-pressed', String(candidate.stateHash === candidateId));
@@ -183,7 +248,7 @@
                 const changed = workspace !== state.workspace;
                 workspace = state.workspace;
                 const reference = workspace.artifacts.find(a => a.role === 'CANDIDATE_DOSSIERS');
-                if (changed && reference.status === 'AVAILABLE' && reference.artifactSchema === api.schema) store.open(workspace);
+                if (changed && reference.status === 'AVAILABLE' && api.supports(reference.artifactSchema)) store.open(workspace);
                 else paint();
             }
         });

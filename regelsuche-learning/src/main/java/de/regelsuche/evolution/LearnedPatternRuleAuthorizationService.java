@@ -116,6 +116,18 @@ public final class LearnedPatternRuleAuthorizationService {
     }
 
     /**
+     * Replays the existing fixed counterexample gate for additive evidence consumers.
+     * Passing this gate alone does not authorize a learned rule or program.
+     */
+    public void requireQualifiedCounterexamples(EvolutionGenome genome, String geneId,
+        String repositoryRevision, LearnedPatternCounterexampleEvidence evidence) {
+        Objects.requireNonNull(genome, "genome");
+        LearnedPatternAuthorizationJson.requireRevision(repositoryRevision, "repositoryRevision");
+        verifyCounterexample(genome, gene(genome, geneId), repositoryRevision,
+            Objects.requireNonNull(evidence, "evidence"));
+    }
+
+    /**
      * Reconstructs and cross-verifies the complete qualification bundle and
      * creates a new authorization receipt at the supplied deterministic time.
      *
@@ -269,6 +281,74 @@ public final class LearnedPatternRuleAuthorizationService {
             repositoryRevision,
             replayed.receipt().promotedRuleHash());
         return replayed;
+    }
+
+    /**
+     * Consumes the real combined study directly, without a second genome-only FINAL TEST.
+     * The existing split, counterexample and exact promotion algorithms retain their policies.
+     */
+    public SelectedLeafAuthorization authorizeSelected(EvolutionRewriteProgramFinalTestPlan expectedPlan,
+        FileEvolutionRewriteProgramFinalTestAttemptStore store, String assessmentJson, EvolutionSplitManifest split,
+        LearnedSelectedProgramAuthorizationBundle bundle, String geneId, String repositoryRevision, Instant asOf)
+        throws IOException {
+        Objects.requireNonNull(bundle, "bundle").requireUsableAt(expectedPlan, repositoryRevision, asOf);
+        var assessment = new EvolutionRewriteProgramQualificationService().verifyAssessment(
+            assessmentJson, expectedPlan, store, repositoryRevision);
+        bundle.requireEvidence(expectedPlan, Objects.requireNonNull(split, "split"), assessment, repositoryRevision, asOf);
+        if (!assessment.nativeGatesPassed()) {
+            throw new IllegalArgumentException("selected combined study has not passed its actual native qualification gates");
+        }
+        var genome = expectedPlan.selectedConfiguration().candidate().genome();
+        verifySplit(genome, split);
+        var gene = gene(genome, geneId);
+        var counterexample = assessment.genes().stream().filter(item -> item.geneId().equals(geneId))
+            .findFirst().orElseThrow().counterexample();
+        verifyCounterexample(genome, gene, repositoryRevision, counterexample);
+        var promoted = promoter.promote(genome, geneId, new LearnedPatternRulePromoter.PromotionEvidence(
+            expectedPlan.validationHandoff().selection().contentHash(), counterexample.contentHash(),
+            assessment.finalTest().contentHash(), split.contentHash(), repositoryRevision));
+        return new SelectedLeafAuthorization(expectedPlan, bundle, assessment, geneId, promoted, asOf);
+    }
+
+    /** Opaque internal leaf authority. Executable rules are visible only to the existing program consumer. */
+    public static final class SelectedLeafAuthorization {
+        private final EvolutionRewriteProgramFinalTestPlan plan;
+        private final LearnedSelectedProgramAuthorizationBundle bundle;
+        private final EvolutionRewriteProgramQualificationAssessment assessment;
+        private final String geneId;
+        private final LearnedPatternRulePromoter.Promotion promotion;
+        private final Instant authorizedAt;
+        private final String contentHash;
+
+        private SelectedLeafAuthorization(EvolutionRewriteProgramFinalTestPlan plan,
+            LearnedSelectedProgramAuthorizationBundle bundle, EvolutionRewriteProgramQualificationAssessment assessment,
+            String geneId, LearnedPatternRulePromoter.Promotion promotion, Instant authorizedAt) {
+            this.plan = plan;
+            this.bundle = bundle;
+            this.assessment = assessment;
+            this.geneId = geneId;
+            this.promotion = promotion;
+            this.authorizedAt = authorizedAt;
+            this.contentHash = EvolutionProgramValidationJson.hash(EvolutionProgramValidationJson.material(
+                "regelsuche.learned-selected-program-leaf-authorization/v1", "finalPlanHash", plan.contentHash(),
+                "configurationHash", plan.selectedConfiguration().contentHash(), "bundleHash", bundle.contentHash(),
+                "assessmentHash", assessment.contentHash(), "geneId", geneId, "promotionReceipt", promotion.receipt(),
+                "authorizedAt", authorizedAt, "validUntil", bundle.expiresAt()));
+        }
+
+        public String contentHash() { return contentHash; }
+        public String geneId() { return geneId; }
+        public EvolutionRewriteProgramQualificationAssessment qualificationEvidence() { return assessment; }
+        public LearnedPatternRulePromoter.PromotionReceipt mathematicalPromotionReceipt() { return promotion.receipt(); }
+        LearnedPatternRulePromoter.Promotion promotion() { return promotion; }
+        LearnedSelectedProgramAuthorizationBundle bundle() { return bundle; }
+
+        void requireUsableAt(EvolutionRewriteProgramFinalTestPlan expectedPlan, String revision, Instant asOf) {
+            bundle.requireUsableAt(expectedPlan, revision, asOf);
+            if (!plan.equals(expectedPlan) || asOf.isBefore(authorizedAt)) {
+                throw new IllegalArgumentException("selected leaf differs from the study or predates actual authorization");
+            }
+        }
     }
 
     private static void verifySplit(

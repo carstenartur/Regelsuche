@@ -58,6 +58,8 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
   Ausdrucksbaum.
 - [Replay und Reports](replay-and-reports.md) — Rechenwege,
   Änderungsdarstellung und Reportartefakte.
+- [Nativer target-free Run-Workspace](native-target-free-workspace.md) —
+  tatsächliche Suchereignisse, Quellvorkommen und gespeicherte Graph-/Replay-Ansicht.
 - [Math-Domains](math-domains.md) — Gleichungen, Ungleichungen, Analysis und
   lineare Algebra.
 - [Glossar](glossary.md) — einheitliche Begriffe für Produkt, Forschung und
@@ -154,6 +156,7 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 - [Domänenneutraler Lifecycle-Handoff](domain-lifecycle-handoff.md)
 - [Generischer Domain-Discovery-Export](domain-discovery-export.md)
 - [Export-Verifikation](domain-discovery-export-verification.md)
+- [Gespeicherte Sequenz-Exporte in der Workbench](domain-export-workspaces.md)
 - [Domain-generic Qualification](domain-generic-qualification.md)
 - [Exakte lineare Rekurrenzen](linear-recurrence-discovery-domain.md)
 - [Solver-neutrale IR](solver-neutral-ir.md)

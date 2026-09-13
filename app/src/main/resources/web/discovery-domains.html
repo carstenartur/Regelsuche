@@ -11,7 +11,31 @@
   <h1>Eigene Discovery-Domänen</h1><p>Eine installierte Domäne auswählen, einen begrenzten Lauf starten und die Nachweise behalten.</p>
 </div></header>
 <main class="sdk-domain-workbench">
+  <section class="card" aria-labelledby="retainedDomainTitle">
+    <h2 id="retainedDomainTitle">Gespeicherte Sequenz-Exporte</h2>
+    <p>Die vier Originaldateien der eingebauten Domäne integer-sequence-finite-difference@v1 gemeinsam auswählen. Der Import prüft die Bindung an die Quelle; er führt keine Suche aus.</p>
+    <label class="field">Export importieren
+      <input id="importDomainExport" type="file" multiple accept=".json,application/json">
+    </label>
+    <p class="hint">domain.json, evidence.json, lifecycle-handoff.json und export-manifest.json · zusammen höchstens 512 KiB.</p>
+    <p id="retainedDomainExportStatus" role="status" aria-live="polite"></p>
+    <ul id="retainedDomainExportList" class="domain-export-list" aria-label="Gespeicherte Exporte"></ul>
+    <div class="domain-export-actions">
+      <button id="previousDomainExports" type="button" disabled>Vorherige</button>
+      <span id="domainExportPage"></span>
+      <button id="nextDomainExports" type="button" disabled>Weitere</button>
+      <button id="refreshDomainExports" type="button">Liste aktualisieren</button>
+    </div>
+  </section>
+  <section id="retainedDomainExportDetail" class="card" aria-label="Gespeicherter Sequenzlauf" hidden></section>
+  <section class="card" id="retainedDomainReplay" hidden>
+    <h2>Quelle erneut ausführen</h2>
+    <p>Replay verwendet dieselben Startdaten und Budgets. Es verursacht zusätzliche Arbeit; die gespeicherten Zähler bleiben unverändert.</p>
+    <button id="replayDomainExport" type="button" disabled>Vollständige Evidence reproduzieren</button>
+    <p id="retainedDomainReplayStatus" role="status" aria-live="polite"></p>
+  </section>
   <form id="domainForm" class="card">
+    <h2>Neue Suche mit einer installierten Domäne</h2>
     <label class="field">Domäne<select id="domainChoice" required></select></label>
     <p id="domainOrigin" class="hint"></p>
     <label class="field">Name des Laufs<input id="campaign" value="mein-discovery-lauf" required pattern="[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}"></label>

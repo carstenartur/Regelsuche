@@ -198,7 +198,7 @@ public final class DomainDiscoveryExportVerifier {
                 manifest,
                 firstManifest.byteHash(),
                 snapshots);
-            return new VerifiedDomainExport(manifest, verification, snapshots);
+            return new VerifiedDomainExport(manifest, verification, firstManifest, snapshots);
         } catch (ExportVerificationException exception) {
             throw exception;
         } catch (IOException | RuntimeException exception) {
@@ -801,16 +801,19 @@ public final class DomainDiscoveryExportVerifier {
     public static final class VerifiedDomainExport {
         private final DomainExportManifest manifest;
         private final Verification verification;
+        private final byte[] manifestBytes;
         private final EnumMap<ArtifactRole, byte[]> artifacts;
 
         private VerifiedDomainExport(
             DomainExportManifest manifest,
             Verification verification,
+            Snapshot manifestSnapshot,
             Map<ArtifactRole, Snapshot> snapshots
         ) {
             this.manifest = Objects.requireNonNull(manifest, "manifest");
             this.verification = Objects.requireNonNull(
                 verification, "verification");
+            this.manifestBytes = manifestSnapshot.bytes();
             this.artifacts = new EnumMap<>(ArtifactRole.class);
             for (Map.Entry<ArtifactRole, Snapshot> entry : snapshots.entrySet()) {
                 this.artifacts.put(entry.getKey(), entry.getValue().bytes());
@@ -828,6 +831,11 @@ public final class DomainDiscoveryExportVerifier {
 
         public Verification verification() {
             return verification;
+        }
+
+        /** Exact verified manifest bytes, including its original whitespace. */
+        public byte[] manifestBytes() {
+            return manifestBytes.clone();
         }
 
         public byte[] artifactBytes(ArtifactRole role) {

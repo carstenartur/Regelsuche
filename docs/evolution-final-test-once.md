@@ -42,6 +42,9 @@ forced where the platform supports directory channels.
 
 ## Local reproduction
 
+The combined-program library path is described below. The original genome-only v1 contracts,
+canonical algorithms and frozen artifacts retain their existing identities.
+
 The focused contract can be run from an ordinary checkout without GitHub Actions:
 
 ```bash
@@ -50,3 +53,122 @@ The focused contract can be run from an ordinary checkout without GitHub Actions
 ```
 
 The repository-wide release-equivalent verification remains `./gradlew --no-daemon ciCheck`.
+
+## Combined genome and RewriteProgram adapter
+
+`EvolutionRewriteProgramFinalTestPlan.create(study, manifest, retainedTrain, validationHandoff,
+finalCommitment)` binds the complete durable VALIDATION selection, selected genome, selected
+RewriteProgram, every search-work limit and the exact public FINAL TEST commitment/case surface.
+Its separate `evolution-rewrite-program-final-test-*/v1` artifact family never puts a program or
+combined configuration identity in an old genome-only field.
+
+`EvolutionRewriteProgramFinalTestRunner.executeOnce(...)` first reconstructs those external roots
+and verifies both the actual private VALIDATION reservation and its immutable selection. It then
+reserves the study, obtains a non-deserializable receipt, constructs the existing stage-specific
+reveal authorization, and only then invokes the lazy loader or reads the private reveal path.
+The loaded bundle must match the entire final commitment before the evaluator sees a case.
+
+`FileEvolutionRewriteProgramFinalTestAttemptStore` uses **the same** study-plan/split run identity
+and `<run>.reservation.json` filename as `FileEvolutionFinalTestAttemptStore`. All adapters and
+processes must share this authoritative directory. Changing the program, budget, suite or adapter
+does not create a second attempt. Exclusive creation and mandatory file/directory force precede the
+winning receipt. Only that store instance's execution-capable receipt can write the one immutable evaluation.
+The execution-capable `reserve(plan, validationStore)` overload verifies the private VALIDATION
+directory, its reserved plan and the exact persisted selection before exclusive FINAL creation.
+The low-level `reserve(plan)` overload only consumes the attempt: its receipt cannot authorize a
+reveal or write an evaluation. These capability distinctions are private runtime state, not new
+artifact fields or a different run identity.
+Restart, a process crash after reservation, reveal failure and result-write failure all consume the
+attempt; there is no resume/replacement operation. A reservation without a complete result remains
+consumed and unqualified.
+
+This additive store requires a POSIX filesystem, owner-only `0600` artifact files and a directory
+that other users cannot write. It creates new ledger directories as `0700`, rejects symbolic links
+throughout its paths and opens imported files with `NOFOLLOW_LINKS`. Unsupported custody or failed
+directory force fails closed. The force barrier includes the ledger directory and every ancestor
+through the filesystem root, so newly created ledger-directory links are also forced before a
+receipt is issued. Filesystems must support this entire barrier. Deployment must retain one protected
+authoritative directory and its backups; this is not a distributed ledger, deletion-proof operator
+boundary or a guarantee against storage hardware that ignores force. The selection and final paths
+are private study material.
+
+Both combined-program stores decode retained reservation and result files with strict UTF-8 before
+JSON import and full expected-plan/hash checks. Malformed bytes raise `IOException`; they cannot be
+silently replaced with U+FFFD and alias a legitimate Unicode value in the retained program's
+`Prune.reason`. Valid U+FFFD and other Unicode remain supported. This tightens the file-read boundary
+without changing canonical serialization, hashes, lineage or the one-time attempt identity.
+
+The adapter uses the same current native compiler, measured ordinary-plus-genome baseline,
+ordinary-plus-genome-plus-program candidate and exact rational path audit as the combined VALIDATION
+adapter. It evaluates one unchanged selected configuration. Every committed final case retains both
+sides, concrete paths, primitive depth, terminal outcome, mathematical audit, search/transformation
+work vectors and audit calls. Unknown work stays null; failure and incomplete rows remain present.
+Unknown observations cannot count as new solves, reachability losses or mathematical regressions.
+The final summary is independently recomputed from those rows. Imports bind path endpoints and
+complete audit coverage and use the same effective selected budget as execution. Historical
+`WORK_BUDGET` batch overruns remain representable without becoming a successful reached result.
+
+`readEvaluation(independentlyRetainedFinalPlan)` cross-checks the actual reservation and full
+expected identity. A content hash and internally consistent rows alone do not attest that an external
+execution happened; custody of the real execution ledger and the externally frozen roots remains
+necessary. No caller-supplied measured-output acceptor exists in the production runner.
+
+## Explicit downstream native assessment
+
+After actual final execution, a separate `EvolutionRewriteProgramQualificationService.assess(...)`
+call consumes that durable evidence. It does not reopen a reveal or rerun private final searches.
+It calls the existing genome preflight, exact polynomial identity verifier and the unchanged fixed
+counterexample gate from `LearnedPatternRuleAuthorizationService`. Every flat genome gene can execute
+in the paired evaluator, so all are checked; the assessment also marks exactly which genes the
+selected program references. Conditional genes remain unsupported by the existing assumption-free
+promotion policy. A failed or incomplete final evaluation leaves all unexecuted native gates
+`NOT_EVALUATED`.
+
+The immutable versioned assessment retains the full selected/final evidence, exact proof observations
+and counterexample artifacts, including their real fixed budgets and negative outcomes. Construction
+and import independently recompute the native gene mathematics and gate results. These bounded
+post-study mathematical checks are separate from retained final-search work. A fully rehashed false
+proof, missing gene or invented summary cannot become a passed native gate. Consumers use
+`verifyAssessment(json, expectedFinalPlan, authoritativeFinalStore, expectedRepositoryRevision)` to
+anchor an imported handoff to the actual durable final evidence and externally expected revision.
+
+For example, library code with already frozen roots can prepare the explicit calls:
+
+```java
+var finalPlan = EvolutionRewriteProgramFinalTestPlan.create(
+    study, splitManifest, retainedTrainRun, selectedValidation.handoff(), finalCommitment);
+var finalStore = new FileEvolutionRewriteProgramFinalTestAttemptStore(authoritativeFinalLedger);
+var finalEvidence = new EvolutionRewriteProgramFinalTestRunner().executeOnce(
+    finalPlan, study, splitManifest, retainedTrainRun, validationStore, privateFinalReveal, finalStore);
+var assessment = new EvolutionRewriteProgramQualificationService().assess(
+    finalPlan, finalStore, independentlyExpectedRepositoryRevision);
+```
+
+This is an API example, not authorization to execute a protected study. Both final execution and
+native assessment leave external novelty, production promotion and public-evidence status
+`NOT_EVALUATED`. A passed native assessment does not create a learned-rule receipt, register a
+program, authorize deployment or establish external novelty.
+
+## Remaining integration and study requirements
+
+The complete combined-program FINAL TEST adapter, native mathematical assessment and explicit
+[selected-program internal authorization adapter](evolution-selected-program-runtime-authorization.md)
+now exist as ordinary production library code. The separate authorization calls preserve the complete
+selected configuration through actual leaf proof/counterexample authority and native program replay.
+They consume the same durable combined final result; they neither require a second genome-only final
+attempt nor project combined identities into old genome-only authorization records. The assessment
+alone still creates no executable authority.
+
+Independent code review and full integrated CI remain required. Actual study claims additionally
+require the preregistered roots and private custody, later concrete authorization to execute the real
+held-out protocol, the one real resulting evidence set, and actual external-review/publication gates.
+Public synthetic controls do not prove held-out gains, independent preregistration timestamps,
+external novelty or production readiness; they do not close #220.
+
+The focused adapter/assessment controls use only temporary `synthetic_` studies and public formulas:
+
+```bash
+mvn -o -pl regelsuche-learning -am -Dmaven.compiler.useIncrementalCompilation=false \
+  -Dtest=EvolutionRewriteProgramFinalTestRunnerTest,EvolutionRewriteProgramQualificationServiceTest,EvolutionRewriteProgramFinalTestReviewTest,EvolutionRewriteProgramValidationRunnerTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+```
