@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CalculusDerivativeRules.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.calculus</a> &gt; <span class="el_source">CalculusDerivativeRules.java</span></div><h1>CalculusDerivativeRules.java</h1><pre class="source lang-java linenums">package de.regelsuche.calculus;
 
+import de.regelsuche.assumption.Assumption;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
@@ -25,8 +26,8 @@ import java.util.List;
  * &lt;ul&gt;
  *   &lt;li&gt;{@code diff(f + g, x) -&gt; diff(f, x) + diff(g, x)} (and {@code -})&lt;/li&gt;
  *   &lt;li&gt;{@code diff(f * g, x) -&gt; diff(f, x)*g + f*diff(g, x)} (product rule)&lt;/li&gt;
- *   &lt;li&gt;{@code diff(x^n, x) -&gt; n * x^(n-1)} for {@link NumberExpr}
- *       exponents (power rule, the textbook example)&lt;/li&gt;
+ *   &lt;li&gt;{@code diff(x^n, x) -&gt; n * x^(n-1)} for numeric literal exponents,
+ *       including the parser's signed-literal shape (power rule)&lt;/li&gt;
  *   &lt;li&gt;{@code diff(c, x) -&gt; 0} for constants&lt;/li&gt;
  *   &lt;li&gt;{@code diff(x, x) -&gt; 1} for the variable itself&lt;/li&gt;
  *   &lt;li&gt;{@code diff(sin(x), x) -&gt; cos(x)}, {@code diff(cos(x), x) -&gt; -sin(x)}
@@ -36,8 +37,17 @@ import java.util.List;
  *       {@code diff(ln(x), x) -&gt; 1/x}&lt;/li&gt;
  * &lt;/ul&gt;
  *
- * &lt;p&gt;The rules only fire when the derivation variable matches the symbol
- * being differentiated against — that keeps them sound without needing a
+ * &lt;p&gt;{@code diff(body, variable)} is a partial real function on the domain
+ * where {@code body} is differentiable in {@code variable}. Construction
+ * equivalence is conditional on every retained {@link Assumption}, including
+ * original logarithm/quotient domains and the strictly positive-base branch
+ * used for non-integer or symbolic powers. These are sufficient domains, not
+ * necessarily maximal ones. Symbolic sum/product splitting of unsupported
+ * operands explicitly requires their differentiability; definedness alone
+ * does not justify that step (for example, {@code abs(x) - abs(x)} at zero).&lt;/p&gt;
+ *
+ * &lt;p&gt;The standard-function rules only fire when the derivation variable
+ * matches the symbol being differentiated against, without adding a
  * full chain-rule rewrite (which would introduce free metavariables not
  * yet supported by {@code PatternRewriteRule}).&lt;/p&gt;
  */
@@ -50,24 +60,24 @@ public final class CalculusDerivativeRules {
     }
 
     public static List&lt;RewriteRule&gt; rules() {
-<span class="fc" id="L53">        return List.of(</span>
+<span class="fc" id="L63">        return List.of(</span>
             new DiffOfSum(),
             new DiffOfDifference(),
             new DiffOfProduct(),
             new DiffOfPowerConstant(),
             new DiffOfConstant(),
             new DiffOfVariable(),
-<span class="nc" id="L60">            new DiffOfStandardFunction(&quot;sin&quot;, (arg) -&gt; new FunctionExpr(&quot;cos&quot;, arg)),</span>
+<span class="fc" id="L70">            new DiffOfStandardFunction(&quot;sin&quot;, (arg) -&gt; new FunctionExpr(&quot;cos&quot;, arg)),</span>
             new DiffOfStandardFunction(&quot;cos&quot;, (arg) -&gt;
-<span class="nc" id="L62">                new BinaryExpr(new NumberExpr(0), BinaryOperator.SUB, new FunctionExpr(&quot;sin&quot;, arg))),</span>
-<span class="nc" id="L63">            new DiffOfStandardFunction(&quot;exp&quot;, (arg) -&gt; new FunctionExpr(&quot;exp&quot;, arg)),</span>
+<span class="nc" id="L72">                new BinaryExpr(new NumberExpr(0), BinaryOperator.SUB, new FunctionExpr(&quot;sin&quot;, arg))),</span>
+<span class="fc" id="L73">            new DiffOfStandardFunction(&quot;exp&quot;, (arg) -&gt; new FunctionExpr(&quot;exp&quot;, arg)),</span>
             new DiffOfStandardFunction(&quot;log&quot;, CalculusDerivativeRules::baseTenLogDerivative),
-<span class="fc" id="L65">            new DiffOfStandardFunction(&quot;ln&quot;, (arg) -&gt; new BinaryExpr(new NumberExpr(1), BinaryOperator.DIV, arg))</span>
+<span class="fc" id="L75">            new DiffOfStandardFunction(&quot;ln&quot;, (arg) -&gt; new BinaryExpr(new NumberExpr(1), BinaryOperator.DIV, arg))</span>
         );
     }
 
     private static Expr baseTenLogDerivative(Expr argument) {
-<span class="fc" id="L70">        return new BinaryExpr(</span>
+<span class="fc" id="L80">        return new BinaryExpr(</span>
             new NumberExpr(1),
             BinaryOperator.DIV,
             new BinaryExpr(
@@ -82,7 +92,7 @@ public final class CalculusDerivativeRules {
      * {@code diff(body, &lt;variable&gt;)}.
      */
     public static Expr derivative(Expr body, String variable) {
-<span class="fc" id="L85">        return new FunctionExpr(DIFF, List.of(body, new VariableExpr(variable)));</span>
+<span class="fc" id="L95">        return new FunctionExpr(DIFF, List.of(body, new VariableExpr(variable)));</span>
     }
 
     // ---------------------------------------------------------------- shared base
@@ -90,190 +100,222 @@ public final class CalculusDerivativeRules {
     private abstract static class DiffRuleBase implements RewriteRule {
         @Override
         public final RewriteKind kind() {
-<span class="nc" id="L93">            return RewriteKind.SIMPLIFY;</span>
+<span class="fc" id="L103">            return RewriteKind.SIMPLIFY;</span>
         }
 
         @Override
         public final boolean mayIncreaseComplexity() {
-<span class="nc" id="L98">            return true; // d/dx (f+g) expansion grows the AST</span>
+<span class="fc" id="L108">            return true; // d/dx (f+g) expansion grows the AST</span>
         }
 
         @Override
         public final int estimatedCostDelta() {
-<span class="nc" id="L103">            return -1;</span>
+<span class="fc" id="L113">            return -1;</span>
         }
 
         @Override
         public final boolean isEquivalencePreservingByConstruction() {
-<span class="nc" id="L108">            return true;</span>
+<span class="fc" id="L118">            return true; // conditional on all assumptions(source), never formula-only equivalence</span>
+        }
+
+        @Override
+        public final List&lt;Assumption&gt; assumptions(Expr subtree) {
+<span class="fc" id="L123">            DiffMatch match = matchDiff(subtree);</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            return match == null ? List.of()</span>
+<span class="fc" id="L125">                : DifferentiationDomain.assumptions(match.body(), match.variable().name());</span>
+        }
+
+        @Override
+        public final boolean mayEmitAssumptions() {
+<span class="fc" id="L130">            return true;</span>
         }
 
         /** Returns the body when {@code subtree} is {@code diff(body, var)}; otherwise null. */
         static DiffMatch matchDiff(Expr subtree) {
-<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (!(subtree instanceof FunctionExpr fn)</span>
-<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                || !DIFF.equals(fn.name())</span>
-<span class="pc bpc" id="L115" title="1 of 2 branches missed.">                || fn.arguments().size() != 2</span>
-<span class="pc bpc" id="L116" title="1 of 2 branches missed.">                || !(fn.arguments().get(1) instanceof VariableExpr variable)) {</span>
-<span class="nc" id="L117">                return null;</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (!(subtree instanceof FunctionExpr fn)</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">                || !DIFF.equals(fn.name())</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">                || fn.arguments().size() != 2</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">                || !(fn.arguments().get(1) instanceof VariableExpr variable)) {</span>
+<span class="fc" id="L139">                return null;</span>
             }
-<span class="fc" id="L119">            return new DiffMatch(fn.arguments().get(0), variable);</span>
+<span class="fc" id="L141">            return new DiffMatch(fn.arguments().get(0), variable);</span>
         }
     }
 
-<span class="fc" id="L123">    private record DiffMatch(Expr body, VariableExpr variable) {</span>
+<span class="fc" id="L145">    private record DiffMatch(Expr body, VariableExpr variable) {</span>
     }
 
     // ---------------------------------------------------------------- rules
 
     /** {@code diff(f + g, x) -&gt; diff(f, x) + diff(g, x)}. */
-<span class="fc" id="L129">    public static final class DiffOfSum extends DiffRuleBase {</span>
+<span class="fc" id="L151">    public static final class DiffOfSum extends DiffRuleBase {</span>
         @Override
         public String id() {
-<span class="fc" id="L132">            return &quot;calculus_diff_of_sum&quot;;</span>
+<span class="fc" id="L154">            return &quot;calculus_diff_of_sum&quot;;</span>
         }
 
         @Override
         public boolean matches(Expr subtree) {
-<span class="fc" id="L137">            DiffMatch m = matchDiff(subtree);</span>
-<span class="pc bpc" id="L138" title="3 of 6 branches missed.">            return m != null &amp;&amp; m.body() instanceof BinaryExpr b &amp;&amp; b.operator() == BinaryOperator.ADD;</span>
+<span class="fc" id="L159">            DiffMatch m = matchDiff(subtree);</span>
+<span class="fc bfc" id="L160" title="All 6 branches covered.">            return m != null &amp;&amp; m.body() instanceof BinaryExpr b &amp;&amp; b.operator() == BinaryOperator.ADD;</span>
         }
 
         @Override
         public Expr apply(Expr subtree) {
-<span class="fc" id="L143">            DiffMatch m = matchDiff(subtree);</span>
-<span class="fc" id="L144">            BinaryExpr body = (BinaryExpr) m.body();</span>
-<span class="fc" id="L145">            return new BinaryExpr(</span>
-<span class="fc" id="L146">                derivative(body.left(), m.variable().name()),</span>
+<span class="fc" id="L165">            DiffMatch m = matchDiff(subtree);</span>
+<span class="fc" id="L166">            BinaryExpr body = (BinaryExpr) m.body();</span>
+<span class="fc" id="L167">            return new BinaryExpr(</span>
+<span class="fc" id="L168">                derivative(body.left(), m.variable().name()),</span>
                 BinaryOperator.ADD,
-<span class="fc" id="L148">                derivative(body.right(), m.variable().name())</span>
+<span class="fc" id="L170">                derivative(body.right(), m.variable().name())</span>
             );
         }
     }
 
     /** {@code diff(f - g, x) -&gt; diff(f, x) - diff(g, x)}. */
-<span class="fc" id="L154">    public static final class DiffOfDifference extends DiffRuleBase {</span>
+<span class="fc" id="L176">    public static final class DiffOfDifference extends DiffRuleBase {</span>
         @Override
         public String id() {
-<span class="fc" id="L157">            return &quot;calculus_diff_of_difference&quot;;</span>
+<span class="fc" id="L179">            return &quot;calculus_diff_of_difference&quot;;</span>
         }
 
         @Override
         public boolean matches(Expr subtree) {
-<span class="nc" id="L162">            DiffMatch m = matchDiff(subtree);</span>
-<span class="nc bnc" id="L163" title="All 6 branches missed.">            return m != null &amp;&amp; m.body() instanceof BinaryExpr b &amp;&amp; b.operator() == BinaryOperator.SUB;</span>
+<span class="fc" id="L184">            DiffMatch m = matchDiff(subtree);</span>
+<span class="fc bfc" id="L185" title="All 6 branches covered.">            return m != null &amp;&amp; m.body() instanceof BinaryExpr b &amp;&amp; b.operator() == BinaryOperator.SUB;</span>
         }
 
         @Override
         public Expr apply(Expr subtree) {
-<span class="nc" id="L168">            DiffMatch m = matchDiff(subtree);</span>
-<span class="nc" id="L169">            BinaryExpr body = (BinaryExpr) m.body();</span>
-<span class="nc" id="L170">            return new BinaryExpr(</span>
-<span class="nc" id="L171">                derivative(body.left(), m.variable().name()),</span>
+<span class="nc" id="L190">            DiffMatch m = matchDiff(subtree);</span>
+<span class="nc" id="L191">            BinaryExpr body = (BinaryExpr) m.body();</span>
+<span class="nc" id="L192">            return new BinaryExpr(</span>
+<span class="nc" id="L193">                derivative(body.left(), m.variable().name()),</span>
                 BinaryOperator.SUB,
-<span class="nc" id="L173">                derivative(body.right(), m.variable().name())</span>
+<span class="nc" id="L195">                derivative(body.right(), m.variable().name())</span>
             );
         }
     }
 
     /** {@code diff(f * g, x) -&gt; diff(f, x)*g + f*diff(g, x)} — Leibniz product rule. */
-<span class="fc" id="L179">    public static final class DiffOfProduct extends DiffRuleBase {</span>
+<span class="fc" id="L201">    public static final class DiffOfProduct extends DiffRuleBase {</span>
         @Override
         public String id() {
-<span class="fc" id="L182">            return &quot;calculus_diff_of_product&quot;;</span>
+<span class="fc" id="L204">            return &quot;calculus_diff_of_product&quot;;</span>
         }
 
         @Override
         public boolean matches(Expr subtree) {
-<span class="nc" id="L187">            DiffMatch m = matchDiff(subtree);</span>
-<span class="nc bnc" id="L188" title="All 6 branches missed.">            return m != null &amp;&amp; m.body() instanceof BinaryExpr b &amp;&amp; b.operator() == BinaryOperator.MUL;</span>
+<span class="fc" id="L209">            DiffMatch m = matchDiff(subtree);</span>
+<span class="pc bpc" id="L210" title="1 of 6 branches missed.">            return m != null &amp;&amp; m.body() instanceof BinaryExpr b &amp;&amp; b.operator() == BinaryOperator.MUL;</span>
         }
 
         @Override
         public Expr apply(Expr subtree) {
-<span class="nc" id="L193">            DiffMatch m = matchDiff(subtree);</span>
-<span class="nc" id="L194">            BinaryExpr body = (BinaryExpr) m.body();</span>
-<span class="nc" id="L195">            String var = m.variable().name();</span>
-<span class="nc" id="L196">            Expr left = new BinaryExpr(derivative(body.left(), var), BinaryOperator.MUL, body.right());</span>
-<span class="nc" id="L197">            Expr right = new BinaryExpr(body.left(), BinaryOperator.MUL, derivative(body.right(), var));</span>
-<span class="nc" id="L198">            return new BinaryExpr(left, BinaryOperator.ADD, right);</span>
+<span class="nc" id="L215">            DiffMatch m = matchDiff(subtree);</span>
+<span class="nc" id="L216">            BinaryExpr body = (BinaryExpr) m.body();</span>
+<span class="nc" id="L217">            String var = m.variable().name();</span>
+<span class="nc" id="L218">            Expr left = new BinaryExpr(derivative(body.left(), var), BinaryOperator.MUL, body.right());</span>
+<span class="nc" id="L219">            Expr right = new BinaryExpr(body.left(), BinaryOperator.MUL, derivative(body.right(), var));</span>
+<span class="nc" id="L220">            return new BinaryExpr(left, BinaryOperator.ADD, right);</span>
         }
     }
 
     /**
      * Power rule for the textbook case {@code diff(x^n, x) -&gt; n * x^(n-1)}
-     * where {@code n} is a literal number and the base is exactly the
+     * where {@code n} is a signed literal number and the base is exactly the
      * derivation variable. This is the rule the
      * {@code derivativePowerRuleWorks} test pins.
      */
-<span class="fc" id="L208">    public static final class DiffOfPowerConstant extends DiffRuleBase {</span>
+<span class="fc" id="L230">    public static final class DiffOfPowerConstant extends DiffRuleBase {</span>
         @Override
         public String id() {
-<span class="fc" id="L211">            return &quot;calculus_diff_power_rule&quot;;</span>
+<span class="fc" id="L233">            return &quot;calculus_diff_power_rule&quot;;</span>
         }
 
         @Override
         public boolean matches(Expr subtree) {
-<span class="fc" id="L216">            DiffMatch m = matchDiff(subtree);</span>
-<span class="pc bpc" id="L217" title="2 of 4 branches missed.">            if (m == null || !(m.body() instanceof BinaryExpr power)</span>
-<span class="pc bpc" id="L218" title="1 of 2 branches missed.">                || power.operator() != BinaryOperator.POW) {</span>
-<span class="nc" id="L219">                return false;</span>
+<span class="fc" id="L238">            DiffMatch m = matchDiff(subtree);</span>
+<span class="fc bfc" id="L239" title="All 4 branches covered.">            if (m == null || !(m.body() instanceof BinaryExpr power)</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">                || power.operator() != BinaryOperator.POW) {</span>
+<span class="fc" id="L241">                return false;</span>
             }
-<span class="pc bpc" id="L221" title="1 of 2 branches missed.">            return power.left() instanceof VariableExpr base</span>
-<span class="pc bpc" id="L222" title="1 of 2 branches missed.">                &amp;&amp; base.name().equals(m.variable().name())</span>
-<span class="pc bpc" id="L223" title="1 of 2 branches missed.">                &amp;&amp; power.right() instanceof NumberExpr;</span>
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">            return power.left() instanceof VariableExpr base</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">                &amp;&amp; base.name().equals(m.variable().name())</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">                &amp;&amp; literalExponent(power.right()) != null;</span>
         }
 
         @Override
         public Expr apply(Expr subtree) {
-<span class="fc" id="L228">            DiffMatch m = matchDiff(subtree);</span>
-<span class="fc" id="L229">            BinaryExpr power = (BinaryExpr) m.body();</span>
-<span class="fc" id="L230">            NumberExpr exponent = (NumberExpr) power.right();</span>
-<span class="fc" id="L231">            ExactRational n = exponent.value();</span>
-<span class="fc" id="L232">            return new BinaryExpr(</span>
+<span class="fc" id="L250">            DiffMatch m = matchDiff(subtree);</span>
+<span class="fc" id="L251">            BinaryExpr power = (BinaryExpr) m.body();</span>
+<span class="fc" id="L252">            ExactRational n = literalExponent(power.right());</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">            if (n == null) {</span>
+<span class="nc" id="L254">                throw new IllegalArgumentException(&quot;Power rule requires a numeric literal exponent&quot;);</span>
+            }
+<span class="fc bfc" id="L256" title="All 2 branches covered.">            if (n.equalsInteger(1)) {</span>
+<span class="fc" id="L257">                return new NumberExpr(1);</span>
+            }
+<span class="fc" id="L259">            return new BinaryExpr(</span>
                 new NumberExpr(n),
                 BinaryOperator.MUL,
-<span class="fc" id="L235">                new BinaryExpr(power.left(), BinaryOperator.POW, new NumberExpr(n.subtract(ExactRational.ONE)))</span>
+<span class="fc" id="L262">                new BinaryExpr(power.left(), BinaryOperator.POW, new NumberExpr(n.subtract(ExactRational.ONE)))</span>
             );
+        }
+
+        private static ExactRational literalExponent(Expr expression) {
+<span class="fc bfc" id="L267" title="All 2 branches covered.">            if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L268">                return number.value();</span>
+            }
+            // Unary minus is represented by the parser as 0 - literal.
+<span class="fc bfc" id="L271" title="All 2 branches covered.">            if (expression instanceof BinaryExpr binary</span>
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">                    &amp;&amp; binary.operator() == BinaryOperator.SUB</span>
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">                    &amp;&amp; binary.left() instanceof NumberExpr zero</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">                    &amp;&amp; zero.value().equalsInteger(0)</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">                    &amp;&amp; binary.right() instanceof NumberExpr magnitude) {</span>
+<span class="fc" id="L276">                return magnitude.value().negate();</span>
+            }
+<span class="fc" id="L278">            return null;</span>
         }
     }
 
     /** {@code diff(c, x) -&gt; 0} when {@code c} is a {@link NumberExpr}. */
-<span class="fc" id="L241">    public static final class DiffOfConstant extends DiffRuleBase {</span>
+<span class="fc" id="L283">    public static final class DiffOfConstant extends DiffRuleBase {</span>
         @Override
         public String id() {
-<span class="fc" id="L244">            return &quot;calculus_diff_of_constant&quot;;</span>
+<span class="fc" id="L286">            return &quot;calculus_diff_of_constant&quot;;</span>
         }
 
         @Override
         public boolean matches(Expr subtree) {
-<span class="nc" id="L249">            DiffMatch m = matchDiff(subtree);</span>
-<span class="nc bnc" id="L250" title="All 4 branches missed.">            return m != null &amp;&amp; m.body() instanceof NumberExpr;</span>
+<span class="fc" id="L291">            DiffMatch m = matchDiff(subtree);</span>
+<span class="fc bfc" id="L292" title="All 4 branches covered.">            return m != null &amp;&amp; m.body() instanceof NumberExpr;</span>
         }
 
         @Override
         public Expr apply(Expr subtree) {
-<span class="nc" id="L255">            return new NumberExpr(0);</span>
+<span class="fc" id="L297">            return new NumberExpr(0);</span>
         }
     }
 
     /** {@code diff(x, x) -&gt; 1} (and {@code diff(y, x) -&gt; 0} for foreign symbols). */
-<span class="fc" id="L260">    public static final class DiffOfVariable extends DiffRuleBase {</span>
+<span class="fc" id="L302">    public static final class DiffOfVariable extends DiffRuleBase {</span>
         @Override
         public String id() {
-<span class="fc" id="L263">            return &quot;calculus_diff_of_variable&quot;;</span>
+<span class="fc" id="L305">            return &quot;calculus_diff_of_variable&quot;;</span>
         }
 
         @Override
         public boolean matches(Expr subtree) {
-<span class="nc" id="L268">            DiffMatch m = matchDiff(subtree);</span>
-<span class="nc bnc" id="L269" title="All 4 branches missed.">            return m != null &amp;&amp; m.body() instanceof VariableExpr;</span>
+<span class="fc" id="L310">            DiffMatch m = matchDiff(subtree);</span>
+<span class="fc bfc" id="L311" title="All 4 branches covered.">            return m != null &amp;&amp; m.body() instanceof VariableExpr;</span>
         }
 
         @Override
         public Expr apply(Expr subtree) {
-<span class="nc" id="L274">            DiffMatch m = matchDiff(subtree);</span>
-<span class="nc" id="L275">            VariableExpr v = (VariableExpr) m.body();</span>
-<span class="nc bnc" id="L276" title="All 2 branches missed.">            return new NumberExpr(v.name().equals(m.variable().name()) ? 1 : 0);</span>
+<span class="fc" id="L316">            DiffMatch m = matchDiff(subtree);</span>
+<span class="fc" id="L317">            VariableExpr v = (VariableExpr) m.body();</span>
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">            return new NumberExpr(v.name().equals(m.variable().name()) ? 1 : 0);</span>
         }
     }
 
@@ -286,33 +328,33 @@ public final class CalculusDerivativeRules {
         private final String functionName;
         private final java.util.function.Function&lt;Expr, Expr&gt; derivativeFactory;
 
-<span class="fc" id="L289">        DiffOfStandardFunction(String functionName, java.util.function.Function&lt;Expr, Expr&gt; derivativeFactory) {</span>
-<span class="fc" id="L290">            this.functionName = functionName;</span>
-<span class="fc" id="L291">            this.derivativeFactory = derivativeFactory;</span>
-<span class="fc" id="L292">        }</span>
+<span class="fc" id="L331">        DiffOfStandardFunction(String functionName, java.util.function.Function&lt;Expr, Expr&gt; derivativeFactory) {</span>
+<span class="fc" id="L332">            this.functionName = functionName;</span>
+<span class="fc" id="L333">            this.derivativeFactory = derivativeFactory;</span>
+<span class="fc" id="L334">        }</span>
 
         @Override
         public String id() {
-<span class="fc" id="L296">            return &quot;calculus_diff_of_&quot; + functionName;</span>
+<span class="fc" id="L338">            return &quot;calculus_diff_of_&quot; + functionName;</span>
         }
 
         @Override
         public boolean matches(Expr subtree) {
-<span class="fc" id="L301">            DiffMatch m = matchDiff(subtree);</span>
-<span class="pc bpc" id="L302" title="2 of 4 branches missed.">            if (m == null || !(m.body() instanceof FunctionExpr fn)) {</span>
-<span class="nc" id="L303">                return false;</span>
+<span class="fc" id="L343">            DiffMatch m = matchDiff(subtree);</span>
+<span class="fc bfc" id="L344" title="All 4 branches covered.">            if (m == null || !(m.body() instanceof FunctionExpr fn)) {</span>
+<span class="fc" id="L345">                return false;</span>
             }
-<span class="pc bpc" id="L305" title="1 of 2 branches missed.">            return functionName.equals(fn.name())</span>
-<span class="pc bpc" id="L306" title="1 of 2 branches missed.">                &amp;&amp; fn.arguments().size() == 1</span>
-<span class="pc bpc" id="L307" title="1 of 2 branches missed.">                &amp;&amp; fn.arguments().get(0) instanceof VariableExpr inner</span>
-<span class="pc bpc" id="L308" title="1 of 2 branches missed.">                &amp;&amp; inner.name().equals(m.variable().name());</span>
+<span class="fc bfc" id="L347" title="All 2 branches covered.">            return functionName.equals(fn.name())</span>
+<span class="pc bpc" id="L348" title="1 of 2 branches missed.">                &amp;&amp; fn.arguments().size() == 1</span>
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">                &amp;&amp; fn.arguments().get(0) instanceof VariableExpr inner</span>
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">                &amp;&amp; inner.name().equals(m.variable().name());</span>
         }
 
         @Override
         public Expr apply(Expr subtree) {
-<span class="fc" id="L313">            DiffMatch m = matchDiff(subtree);</span>
-<span class="fc" id="L314">            FunctionExpr fn = (FunctionExpr) m.body();</span>
-<span class="fc" id="L315">            return derivativeFactory.apply(fn.arguments().get(0));</span>
+<span class="fc" id="L355">            DiffMatch m = matchDiff(subtree);</span>
+<span class="fc" id="L356">            FunctionExpr fn = (FunctionExpr) m.body();</span>
+<span class="fc" id="L357">            return derivativeFactory.apply(fn.arguments().get(0));</span>
         }
     }
 }

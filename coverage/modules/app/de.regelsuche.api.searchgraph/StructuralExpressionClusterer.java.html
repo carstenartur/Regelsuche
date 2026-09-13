@@ -98,8 +98,8 @@ public final class StructuralExpressionClusterer {
 <span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (expr instanceof FunctionExpr fn) {</span>
 <span class="fc" id="L99">            StringBuilder sb = new StringBuilder(fn.name()).append('(');</span>
 <span class="fc bfc" id="L100" title="All 2 branches covered.">            for (int i = 0; i &lt; fn.arguments().size(); i++) {</span>
-<span class="pc bpc" id="L101" title="1 of 2 branches missed.">                if (i &gt; 0) {</span>
-<span class="nc" id="L102">                    sb.append(',');</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                if (i &gt; 0) {</span>
+<span class="fc" id="L102">                    sb.append(',');</span>
                 }
 <span class="fc" id="L104">                sb.append(render(fn.arguments().get(i)));</span>
             }

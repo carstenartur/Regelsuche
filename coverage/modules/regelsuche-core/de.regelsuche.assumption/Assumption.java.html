@@ -103,7 +103,7 @@ public record Assumption(Kind kind, String expression, List&lt;String&gt; symbol
     }
 
     public static Assumption customPredicate(String predicate, List&lt;String&gt; symbols) {
-<span class="nc" id="L106">        return new Assumption(Kind.CUSTOM_PREDICATE, predicate, symbols);</span>
+<span class="fc" id="L106">        return new Assumption(Kind.CUSTOM_PREDICATE, predicate, symbols);</span>
     }
 
     public static Assumption rational(String symbol) {
@@ -125,8 +125,8 @@ public record Assumption(Kind kind, String expression, List&lt;String&gt; symbol
 <span class="pc bpc" id="L125" title="2 of 4 branches missed.">            if (known == null || !sameSymbols(known)) {</span>
 <span class="nc" id="L126">                continue;</span>
             }
-<span class="pc bpc" id="L128" title="1 of 2 branches missed.">            if (known.expression().equals(expression())) {</span>
-<span class="nc" id="L129">                return AssumptionTruthValue.TRUE;</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (known.expression().equals(expression())) {</span>
+<span class="fc" id="L129">                return AssumptionTruthValue.TRUE;</span>
             }
 <span class="fc bfc" id="L131" title="All 2 branches covered.">            if (implies(known.kind(), kind)) {</span>
 <span class="fc" id="L132">                return AssumptionTruthValue.TRUE;</span>
@@ -143,26 +143,28 @@ public record Assumption(Kind kind, String expression, List&lt;String&gt; symbol
     }
 
     private static boolean implies(Kind known, Kind required) {
-<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (known == required) {</span>
-<span class="nc" id="L147">            return true;</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        if (known == required) {</span>
+            // Unlike numeric kinds, custom predicates carry their meaning in
+            // the expression. Exact identity was already checked by the caller.
+<span class="pc bpc" id="L149" title="1 of 4 branches missed.">            return required != Kind.CUSTOM_PREDICATE &amp;&amp; required != Kind.CUSTOM;</span>
         }
-<span class="pc bpc" id="L149" title="3 of 5 branches missed.">        return switch (required) {</span>
-<span class="nc bnc" id="L150" title="All 2 branches missed.">            case NON_ZERO -&gt; known == Kind.POSITIVE;</span>
-<span class="nc bnc" id="L151" title="All 2 branches missed.">            case INTEGER -&gt; known == Kind.NATURAL;</span>
-<span class="pc bpc" id="L152" title="1 of 4 branches missed.">            case RATIONAL -&gt; known == Kind.INTEGER || known == Kind.NATURAL;</span>
-<span class="pc bpc" id="L153" title="5 of 10 branches missed.">            case REAL -&gt; known == Kind.INTEGER || known == Kind.NATURAL</span>
+<span class="pc bpc" id="L151" title="3 of 5 branches missed.">        return switch (required) {</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">            case NON_ZERO -&gt; known == Kind.POSITIVE;</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">            case INTEGER -&gt; known == Kind.NATURAL;</span>
+<span class="pc bpc" id="L154" title="1 of 4 branches missed.">            case RATIONAL -&gt; known == Kind.INTEGER || known == Kind.NATURAL;</span>
+<span class="pc bpc" id="L155" title="5 of 10 branches missed.">            case REAL -&gt; known == Kind.INTEGER || known == Kind.NATURAL</span>
                 || known == Kind.RATIONAL || known == Kind.POSITIVE || known == Kind.NON_NEGATIVE;
-<span class="nc" id="L155">            default -&gt; false;</span>
+<span class="nc" id="L157">            default -&gt; false;</span>
         };
     }
 
     private static boolean contradicts(Kind known, Kind required) {
-<span class="fc" id="L160">        return false;</span>
+<span class="fc" id="L162">        return false;</span>
     }
 
     @Override
     public String toString() {
-<span class="fc" id="L165">        return kind + &quot;(&quot; + expression + &quot;)&quot;;</span>
+<span class="fc" id="L167">        return kind + &quot;(&quot; + expression + &quot;)&quot;;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

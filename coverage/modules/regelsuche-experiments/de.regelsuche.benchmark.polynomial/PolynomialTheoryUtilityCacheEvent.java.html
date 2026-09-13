@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityCacheEvent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityCacheEvent.java</span></div><h1>PolynomialTheoryUtilityCacheEvent.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
 
+import de.regelsuche.benchmark.polynomial.PolynomialTheoryUtilityCandidateResult.TerminalStatus;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -13,52 +14,73 @@ public record PolynomialTheoryUtilityCacheEvent(
     Kind kind,
     String cacheRevision,
     String entryId,
-    String evidenceHash
+    String evidenceHash,
+    TerminalStatus replayOutcome
 ) {
+    public PolynomialTheoryUtilityCacheEvent(String eventId, int eventIndex, String executionInputId,
+            String transitionId, Kind kind, String cacheRevision, String entryId, String evidenceHash) {
+<span class="fc" id="L22">        this(eventId, eventIndex, executionInputId, transitionId, kind, cacheRevision, entryId, evidenceHash, null);</span>
+<span class="fc" id="L23">    }</span>
+
+    public static PolynomialTheoryUtilityCacheEvent createReplayAttempt(int eventIndex, String executionInputId,
+            String transitionId, String cacheRevision, String entryId, String evidenceHash,
+            TerminalStatus outcome) {
+<span class="fc" id="L28">        Objects.requireNonNull(outcome, &quot;outcome&quot;);</span>
+<span class="fc" id="L29">        return new PolynomialTheoryUtilityCacheEvent(identity(eventIndex, executionInputId, transitionId,</span>
+            Kind.REPLAY, cacheRevision, entryId, evidenceHash, outcome), eventIndex, executionInputId,
+            transitionId, Kind.REPLAY, cacheRevision, entryId, evidenceHash, outcome);
+    }
+
     public static final String SCHEMA =
         &quot;regelsuche.polynomial-theory-utility-cache-event/v1&quot;;
+    public static final String ATTEMPT_SCHEMA =
+        &quot;regelsuche.polynomial-theory-utility-cache-event/v2&quot;;
     public static final String NO_TRANSITION = &quot;NONE&quot;;
-<span class="fc" id="L21">    private static final Pattern SHA_256 =</span>
-<span class="fc" id="L22">        Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+<span class="fc" id="L39">    private static final Pattern SHA_256 =</span>
+<span class="fc" id="L40">        Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
 
-<span class="fc" id="L24">    public PolynomialTheoryUtilityCacheEvent {</span>
-<span class="fc" id="L25">        eventId = requireHash(eventId, &quot;eventId&quot;);</span>
-<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (eventIndex &lt; 0) {</span>
-<span class="nc" id="L27">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L42">    public PolynomialTheoryUtilityCacheEvent {</span>
+<span class="fc" id="L43">        eventId = requireHash(eventId, &quot;eventId&quot;);</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (eventIndex &lt; 0) {</span>
+<span class="nc" id="L45">            throw new IllegalArgumentException(</span>
                 &quot;eventIndex must be non-negative&quot;
             );
         }
-<span class="fc" id="L31">        executionInputId = requireHash(</span>
+<span class="fc" id="L49">        executionInputId = requireHash(</span>
             executionInputId,
             &quot;executionInputId&quot;
         );
-<span class="fc" id="L35">        transitionId = requireOptionalHash(</span>
+<span class="fc" id="L53">        transitionId = requireOptionalHash(</span>
             transitionId,
             &quot;transitionId&quot;
         );
-<span class="fc" id="L39">        kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
-<span class="fc" id="L40">        cacheRevision = requireText(</span>
+<span class="fc" id="L57">        kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L58">        cacheRevision = requireText(</span>
             cacheRevision,
             &quot;cacheRevision&quot;
         );
-<span class="fc" id="L44">        entryId = requireHash(entryId, &quot;entryId&quot;);</span>
-<span class="fc" id="L45">        evidenceHash = requireHash(</span>
+<span class="fc" id="L62">        entryId = requireHash(entryId, &quot;entryId&quot;);</span>
+<span class="fc" id="L63">        evidenceHash = requireHash(</span>
             evidenceHash,
             &quot;evidenceHash&quot;
         );
-<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (!eventId.equals(identity(</span>
+<span class="pc bpc" id="L67" title="2 of 8 branches missed.">        if (replayOutcome != null &amp;&amp; (kind != Kind.REPLAY || replayOutcome == TerminalStatus.MIXED_OUTCOMES</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                || ((replayOutcome == TerminalStatus.VALIDATED_TRANSITION) == NO_TRANSITION.equals(transitionId)))) {</span>
+<span class="nc" id="L69">            throw new IllegalArgumentException(&quot;replay attempt outcome and accepted transition disagree&quot;);</span>
+        }
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (!eventId.equals(identity(</span>
                 eventIndex,
                 executionInputId,
                 transitionId,
                 kind,
                 cacheRevision,
                 entryId,
-                evidenceHash))) {
-<span class="fc" id="L57">            throw new IllegalArgumentException(</span>
+                evidenceHash, replayOutcome))) {
+<span class="fc" id="L79">            throw new IllegalArgumentException(</span>
                 &quot;cache event identity differs from its fields&quot;
             );
         }
-<span class="fc" id="L61">    }</span>
+<span class="fc" id="L83">    }</span>
 
     public static PolynomialTheoryUtilityCacheEvent create(
         int eventIndex,
@@ -69,8 +91,8 @@ public record PolynomialTheoryUtilityCacheEvent(
         String entryId,
         String evidenceHash
     ) {
-<span class="fc" id="L72">        return new PolynomialTheoryUtilityCacheEvent(</span>
-<span class="fc" id="L73">            identity(</span>
+<span class="fc" id="L94">        return new PolynomialTheoryUtilityCacheEvent(</span>
+<span class="fc" id="L95">            identity(</span>
                 eventIndex,
                 executionInputId,
                 transitionId,
@@ -90,16 +112,16 @@ public record PolynomialTheoryUtilityCacheEvent(
     }
 
     public String schema() {
-<span class="fc" id="L93">        return SCHEMA;</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        return replayOutcome == null ? SCHEMA : ATTEMPT_SCHEMA;</span>
     }
 
     public boolean lookup() {
-<span class="fc bfc" id="L97" title="All 4 branches covered.">        return kind == Kind.LOOKUP_HIT</span>
+<span class="fc bfc" id="L119" title="All 4 branches covered.">        return kind == Kind.LOOKUP_HIT</span>
             || kind == Kind.LOOKUP_MISS;
     }
 
     public boolean transitionBound() {
-<span class="fc bfc" id="L102" title="All 2 branches covered.">        return !NO_TRANSITION.equals(transitionId);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        return !NO_TRANSITION.equals(transitionId);</span>
     }
 
     public void validateAgainst(
@@ -107,81 +129,84 @@ public record PolynomialTheoryUtilityCacheEvent(
         PolynomialTheoryUtilityCandidateResult result,
         PolynomialTheoryUtilityExecutionProfile profile
     ) {
-<span class="fc" id="L110">        Objects.requireNonNull(result, &quot;result&quot;);</span>
-<span class="fc" id="L111">        Objects.requireNonNull(profile, &quot;profile&quot;);</span>
-<span class="fc" id="L112">        var frozenProfile = PolynomialTheoryUtilityExecutionInputs.profile(</span>
-<span class="fc" id="L113">            result.input().profileId()</span>
+<span class="fc" id="L132">        Objects.requireNonNull(result, &quot;result&quot;);</span>
+<span class="fc" id="L133">        Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="fc" id="L134">        var frozenProfile = PolynomialTheoryUtilityExecutionInputs.profile(</span>
+<span class="fc" id="L135">            result.input().profileId()</span>
         );
-<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (eventIndex != expectedIndex</span>
-<span class="pc bpc" id="L116" title="1 of 2 branches missed.">                || !profile.equals(frozenProfile)</span>
-<span class="fc bfc" id="L117" title="All 2 branches covered.">                || !executionInputId.equals(</span>
-<span class="fc" id="L118">                    result.input().inputId()</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (eventIndex != expectedIndex</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">                || !profile.equals(frozenProfile)</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">                || !executionInputId.equals(</span>
+<span class="fc" id="L140">                    result.input().inputId()</span>
                 )
-<span class="pc bpc" id="L120" title="1 of 2 branches missed.">                || !&quot;READ_WRITE&quot;.equals(profile.cacheMode())</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                || !&quot;READ_WRITE&quot;.equals(profile.cacheMode())</span>
                 || !PolynomialTheoryUtilityExecutionPlan.CACHE_REVISION
-<span class="fc bfc" id="L122" title="All 2 branches covered.">                    .equals(cacheRevision)) {</span>
-<span class="fc" id="L123">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">                    .equals(cacheRevision)) {</span>
+<span class="fc" id="L145">            throw new IllegalArgumentException(</span>
                 &quot;cache event differs from its result profile&quot;
             );
         }
-<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (!transitionBound()) {</span>
-<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (!lookup()) {</span>
-<span class="fc" id="L129">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L149" title="1 of 4 branches missed.">        if (replayOutcome != null &amp;&amp; result.observations() == null) {</span>
+<span class="nc" id="L150">            throw new IllegalArgumentException(&quot;replay attempt requires the observed result revision&quot;);</span>
+        }
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (!transitionBound()) {</span>
+<span class="fc bfc" id="L153" title="All 4 branches covered.">            if (!lookup() &amp;&amp; replayOutcome == null) {</span>
+<span class="fc" id="L154">                throw new IllegalArgumentException(</span>
                     &quot;cache mutation or replay lacks transition lineage&quot;
                 );
             }
-<span class="fc" id="L133">            return;</span>
+<span class="fc" id="L158">            return;</span>
         }
-<span class="fc" id="L135">        var transition = result.transitions().stream()</span>
-<span class="fc" id="L136">            .filter(value -&gt; transitionId.equals(value.transitionId()))</span>
-<span class="fc" id="L137">            .findFirst()</span>
-<span class="pc" id="L138">            .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+<span class="fc" id="L160">        var transition = result.transitions().stream()</span>
+<span class="fc" id="L161">            .filter(value -&gt; transitionId.equals(value.transitionId()))</span>
+<span class="fc" id="L162">            .findFirst()</span>
+<span class="pc" id="L163">            .orElseThrow(() -&gt; new IllegalArgumentException(</span>
                 &quot;cache event refers to another result transition&quot;
             ));
-<span class="fc" id="L141">        requireTransitionLineage(transition);</span>
-<span class="fc" id="L142">    }</span>
+<span class="fc" id="L166">        requireTransitionLineage(transition);</span>
+<span class="fc" id="L167">    }</span>
 
     private void requireTransitionLineage(
         PolynomialTheoryUtilityTransitionOutcome transition
     ) {
-<span class="pc bpc" id="L147" title="1 of 4 branches missed.">        switch (kind) {</span>
+<span class="pc bpc" id="L172" title="1 of 4 branches missed.">        switch (kind) {</span>
             case LOOKUP_HIT, REPLAY -&gt; {
-<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                if (transition.cacheDisposition()</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">                if (transition.cacheDisposition()</span>
                         != PolynomialTheoryUtilityTransitionOutcome
                             .CacheDisposition.CACHE_HIT_REPLAYED
-<span class="pc bpc" id="L152" title="1 of 2 branches missed.">                        || !entryId.equals(transition.cacheEntryId())) {</span>
-<span class="nc" id="L153">                    throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">                        || !entryId.equals(transition.cacheEntryId())) {</span>
+<span class="nc" id="L178">                    throw new IllegalArgumentException(</span>
                         &quot;cache hit/replay event differs from its transition&quot;
                     );
                 }
             }
             case LOOKUP_MISS, INSERTION -&gt; {
-<span class="fc bfc" id="L159" title="All 2 branches covered.">                if (transition.cacheDisposition()</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">                if (transition.cacheDisposition()</span>
                         != PolynomialTheoryUtilityTransitionOutcome
                             .CacheDisposition.CACHE_MISS_INSERTED
-<span class="pc bpc" id="L162" title="1 of 2 branches missed.">                        || !entryId.equals(transition.cacheEntryId())) {</span>
-<span class="fc" id="L163">                    throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">                        || !entryId.equals(transition.cacheEntryId())) {</span>
+<span class="fc" id="L188">                    throw new IllegalArgumentException(</span>
                         &quot;cache miss/insertion event differs from its transition&quot;
                     );
                 }
             }
             case EVICTION -&gt; {
-<span class="pc bpc" id="L169" title="1 of 2 branches missed.">                if (transition.cacheDisposition()</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">                if (transition.cacheDisposition()</span>
                         != PolynomialTheoryUtilityTransitionOutcome
                             .CacheDisposition.CACHE_MISS_INSERTED
-<span class="pc bpc" id="L172" title="1 of 2 branches missed.">                        || &quot;NONE&quot;.equals(</span>
-<span class="fc" id="L173">                            transition.evictedCacheEntryId()</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">                        || &quot;NONE&quot;.equals(</span>
+<span class="fc" id="L198">                            transition.evictedCacheEntryId()</span>
                         )
-<span class="pc bpc" id="L175" title="1 of 2 branches missed.">                        || !entryId.equals(</span>
-<span class="fc" id="L176">                            transition.evictedCacheEntryId()</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">                        || !entryId.equals(</span>
+<span class="fc" id="L201">                            transition.evictedCacheEntryId()</span>
                         )) {
-<span class="nc" id="L178">                    throw new IllegalArgumentException(</span>
+<span class="nc" id="L203">                    throw new IllegalArgumentException(</span>
                         &quot;cache eviction event differs from its transition&quot;
                     );
                 }
             }
         }
-<span class="fc" id="L184">    }</span>
+<span class="fc" id="L209">    }</span>
 
     private static String identity(
         int eventIndex,
@@ -192,74 +217,80 @@ public record PolynomialTheoryUtilityCacheEvent(
         String entryId,
         String evidenceHash
     ) {
-<span class="fc" id="L195">        StringBuilder material = new StringBuilder();</span>
-<span class="fc" id="L196">        append(material, SCHEMA);</span>
-<span class="fc" id="L197">        append(material, Integer.toString(eventIndex));</span>
-<span class="fc" id="L198">        append(</span>
+<span class="fc" id="L220">        return identity(eventIndex, executionInputId, transitionId, kind, cacheRevision, entryId, evidenceHash, null);</span>
+    }
+
+    private static String identity(int eventIndex, String executionInputId, String transitionId, Kind kind,
+            String cacheRevision, String entryId, String evidenceHash, TerminalStatus replayOutcome) {
+<span class="fc" id="L225">        StringBuilder material = new StringBuilder();</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        append(material, replayOutcome == null ? SCHEMA : ATTEMPT_SCHEMA);</span>
+<span class="fc" id="L227">        append(material, Integer.toString(eventIndex));</span>
+<span class="fc" id="L228">        append(</span>
             material,
-<span class="fc" id="L200">            requireHash(executionInputId, &quot;executionInputId&quot;)</span>
+<span class="fc" id="L230">            requireHash(executionInputId, &quot;executionInputId&quot;)</span>
         );
-<span class="fc" id="L202">        append(</span>
+<span class="fc" id="L232">        append(</span>
             material,
-<span class="fc" id="L204">            requireOptionalHash(transitionId, &quot;transitionId&quot;)</span>
+<span class="fc" id="L234">            requireOptionalHash(transitionId, &quot;transitionId&quot;)</span>
         );
-<span class="fc" id="L206">        append(</span>
+<span class="fc" id="L236">        append(</span>
             material,
-<span class="fc" id="L208">            Objects.requireNonNull(kind, &quot;kind&quot;).name()</span>
+<span class="fc" id="L238">            Objects.requireNonNull(kind, &quot;kind&quot;).name()</span>
         );
-<span class="fc" id="L210">        append(</span>
+<span class="fc" id="L240">        append(</span>
             material,
-<span class="fc" id="L212">            requireText(cacheRevision, &quot;cacheRevision&quot;)</span>
+<span class="fc" id="L242">            requireText(cacheRevision, &quot;cacheRevision&quot;)</span>
         );
-<span class="fc" id="L214">        append(material, requireHash(entryId, &quot;entryId&quot;));</span>
-<span class="fc" id="L215">        append(</span>
+<span class="fc" id="L244">        append(material, requireHash(entryId, &quot;entryId&quot;));</span>
+<span class="fc" id="L245">        append(</span>
             material,
-<span class="fc" id="L217">            requireHash(evidenceHash, &quot;evidenceHash&quot;)</span>
+<span class="fc" id="L247">            requireHash(evidenceHash, &quot;evidenceHash&quot;)</span>
         );
-<span class="fc" id="L219">        return hash(material.toString());</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        if (replayOutcome != null) append(material, replayOutcome.name());</span>
+<span class="fc" id="L250">        return hash(material.toString());</span>
     }
 
     private static String requireOptionalHash(String value, String name) {
-<span class="fc" id="L223">        String text = requireText(value, name);</span>
-<span class="fc bfc" id="L224" title="All 2 branches covered.">        return NO_TRANSITION.equals(text)</span>
-<span class="fc" id="L225">            ? text</span>
-<span class="fc" id="L226">            : requireHash(text, name);</span>
+<span class="fc" id="L254">        String text = requireText(value, name);</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        return NO_TRANSITION.equals(text)</span>
+<span class="fc" id="L256">            ? text</span>
+<span class="fc" id="L257">            : requireHash(text, name);</span>
     }
 
     private static String hash(String material) {
-<span class="fc" id="L230">        return PolynomialTheoryUtilityExecutionIdentity.sha256(</span>
-<span class="fc" id="L231">            material.getBytes(StandardCharsets.UTF_8)</span>
+<span class="fc" id="L261">        return PolynomialTheoryUtilityExecutionIdentity.sha256(</span>
+<span class="fc" id="L262">            material.getBytes(StandardCharsets.UTF_8)</span>
         );
     }
 
     private static String requireHash(String value, String name) {
-<span class="fc" id="L236">        String text = requireText(value, name);</span>
-<span class="pc bpc" id="L237" title="1 of 2 branches missed.">        if (!SHA_256.matcher(text).matches()) {</span>
-<span class="nc" id="L238">            throw new IllegalArgumentException(name + &quot; is not SHA-256&quot;);</span>
+<span class="fc" id="L267">        String text = requireText(value, name);</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">        if (!SHA_256.matcher(text).matches()) {</span>
+<span class="nc" id="L269">            throw new IllegalArgumentException(name + &quot; is not SHA-256&quot;);</span>
         }
-<span class="fc" id="L240">        return text;</span>
+<span class="fc" id="L271">        return text;</span>
     }
 
     private static String requireText(String value, String name) {
-<span class="fc" id="L244">        String text = Objects.requireNonNull(value, name);</span>
-<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        if (text.isBlank()) {</span>
-<span class="nc" id="L246">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L275">        String text = Objects.requireNonNull(value, name);</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">        if (text.isBlank()) {</span>
+<span class="nc" id="L277">            throw new IllegalArgumentException(</span>
                 name + &quot; must not be blank&quot;
             );
         }
-<span class="fc" id="L250">        return text;</span>
+<span class="fc" id="L281">        return text;</span>
     }
 
     private static void append(StringBuilder target, String value) {
-<span class="fc" id="L254">        target.append(value.length()).append(':').append(value);</span>
-<span class="fc" id="L255">    }</span>
+<span class="fc" id="L285">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L286">    }</span>
 
-<span class="fc" id="L257">    public enum Kind {</span>
-<span class="fc" id="L258">        LOOKUP_HIT,</span>
-<span class="fc" id="L259">        LOOKUP_MISS,</span>
-<span class="fc" id="L260">        INSERTION,</span>
-<span class="fc" id="L261">        EVICTION,</span>
-<span class="fc" id="L262">        REPLAY</span>
+<span class="fc" id="L288">    public enum Kind {</span>
+<span class="fc" id="L289">        LOOKUP_HIT,</span>
+<span class="fc" id="L290">        LOOKUP_MISS,</span>
+<span class="fc" id="L291">        INSERTION,</span>
+<span class="fc" id="L292">        EVICTION,</span>
+<span class="fc" id="L293">        REPLAY</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

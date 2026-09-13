@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityFactorizationAttempt.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityFactorizationAttempt.java</span></div><h1>PolynomialTheoryUtilityFactorizationAttempt.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
 
+import de.regelsuche.polynomial.ExactNestedFactorizationTransformationPipeline;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.List;
@@ -21,62 +23,74 @@ public record PolynomialTheoryUtilityFactorizationAttempt(
     String selectedCandidateId,
     String transitionId,
     String verifierOutcome,
-    String reportEvidenceHash
+    String reportEvidenceHash,
+    ObservedExecution observedExecution
 ) {
     public static final String SCHEMA =
         &quot;regelsuche.polynomial-theory-utility-factorization-attempt/v1&quot;;
+    public static final String OBSERVED_SCHEMA =
+        &quot;regelsuche.polynomial-theory-utility-factorization-attempt/v2&quot;;
     public static final String NO_SELECTION = &quot;NONE&quot;;
     public static final String NO_TRANSITION = &quot;NONE&quot;;
-<span class="fc" id="L30">    private static final Pattern SHA_256 =</span>
-<span class="fc" id="L31">        Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+<span class="fc" id="L35">    private static final Pattern SHA_256 =</span>
+<span class="fc" id="L36">        Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
 
-<span class="fc" id="L33">    public PolynomialTheoryUtilityFactorizationAttempt {</span>
-<span class="fc" id="L34">        attemptId = requireHash(attemptId, &quot;attemptId&quot;);</span>
-<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (attemptIndex &lt; 0) {</span>
-<span class="nc" id="L36">            throw new IllegalArgumentException(</span>
+    /** Historical constructor; its v1 identity and payload remain unchanged. */
+    public PolynomialTheoryUtilityFactorizationAttempt(String attemptId, int attemptIndex,
+            String executionInputId, String backendId, String requestId, String requestEvidenceHash,
+            List&lt;String&gt; candidateIds, String selectedCandidateId, String transitionId,
+            String verifierOutcome, String reportEvidenceHash) {
+<span class="fc" id="L43">        this(attemptId, attemptIndex, executionInputId, backendId, requestId, requestEvidenceHash,</span>
+            candidateIds, selectedCandidateId, transitionId, verifierOutcome, reportEvidenceHash, null);
+<span class="fc" id="L45">    }</span>
+
+<span class="fc" id="L47">    public PolynomialTheoryUtilityFactorizationAttempt {</span>
+<span class="fc" id="L48">        attemptId = requireHash(attemptId, &quot;attemptId&quot;);</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (attemptIndex &lt; 0) {</span>
+<span class="nc" id="L50">            throw new IllegalArgumentException(</span>
                 &quot;attemptIndex must be non-negative&quot;
             );
         }
-<span class="fc" id="L40">        executionInputId = requireHash(</span>
+<span class="fc" id="L54">        executionInputId = requireHash(</span>
             executionInputId,
             &quot;executionInputId&quot;
         );
-<span class="fc" id="L44">        backendId = requireText(backendId, &quot;backendId&quot;);</span>
-<span class="fc" id="L45">        requestId = requireHash(requestId, &quot;requestId&quot;);</span>
-<span class="fc" id="L46">        requestEvidenceHash = requireHash(</span>
+<span class="fc" id="L58">        backendId = requireText(backendId, &quot;backendId&quot;);</span>
+<span class="fc" id="L59">        requestId = requireHash(requestId, &quot;requestId&quot;);</span>
+<span class="fc" id="L60">        requestEvidenceHash = requireHash(</span>
             requestEvidenceHash,
             &quot;requestEvidenceHash&quot;
         );
-<span class="fc" id="L50">        candidateIds = immutableCandidateIds(candidateIds);</span>
-<span class="fc" id="L51">        selectedCandidateId = requireSelection(</span>
+<span class="fc" id="L64">        candidateIds = immutableCandidateIds(candidateIds);</span>
+<span class="fc" id="L65">        selectedCandidateId = requireSelection(</span>
             selectedCandidateId,
             candidateIds
         );
-<span class="fc" id="L55">        transitionId = requireOptionalHash(</span>
+<span class="fc" id="L69">        transitionId = requireOptionalHash(</span>
             transitionId,
             &quot;transitionId&quot;
         );
-<span class="fc" id="L59">        verifierOutcome = requireText(</span>
+<span class="fc" id="L73">        verifierOutcome = requireText(</span>
             verifierOutcome,
             &quot;verifierOutcome&quot;
         );
-<span class="fc" id="L63">        reportEvidenceHash = requireHash(</span>
+<span class="fc" id="L77">        reportEvidenceHash = requireHash(</span>
             reportEvidenceHash,
             &quot;reportEvidenceHash&quot;
         );
-<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (!NO_SELECTION.equals(selectedCandidateId)</span>
-<span class="fc bfc" id="L68" title="All 2 branches covered.">                &amp;&amp; !&quot;VERIFIED&quot;.equals(verifierOutcome)) {</span>
-<span class="fc" id="L69">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (!NO_SELECTION.equals(selectedCandidateId)</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">                &amp;&amp; !&quot;VERIFIED&quot;.equals(verifierOutcome)) {</span>
+<span class="fc" id="L83">            throw new IllegalArgumentException(</span>
                 &quot;selected candidate lacks a verified outcome&quot;
             );
         }
-<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (!NO_TRANSITION.equals(transitionId)</span>
-<span class="fc bfc" id="L74" title="All 2 branches covered.">                &amp;&amp; NO_SELECTION.equals(selectedCandidateId)) {</span>
-<span class="fc" id="L75">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (!NO_TRANSITION.equals(transitionId)</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">                &amp;&amp; NO_SELECTION.equals(selectedCandidateId)) {</span>
+<span class="fc" id="L89">            throw new IllegalArgumentException(</span>
                 &quot;transition lineage lacks a selected candidate&quot;
             );
         }
-<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (!attemptId.equals(identity(</span>
+<span class="fc" id="L93">        String metadataIdentity = identity(</span>
                 attemptIndex,
                 executionInputId,
                 backendId,
@@ -86,12 +100,17 @@ public record PolynomialTheoryUtilityFactorizationAttempt(
                 selectedCandidateId,
                 transitionId,
                 verifierOutcome,
-                reportEvidenceHash))) {
-<span class="fc" id="L90">            throw new IllegalArgumentException(</span>
+                reportEvidenceHash);
+<span class="fc bfc" id="L104" title="All 4 branches covered.">        if (observedExecution != null &amp;&amp; !metadataIdentity.equals(observedExecution</span>
+<span class="fc" id="L105">                .metadata(attemptIndex, executionInputId, transitionId).attemptId())) {</span>
+<span class="fc" id="L106">            throw new IllegalArgumentException(&quot;observed attempt metadata differs from its actual pipeline report&quot;);</span>
+        }
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (!attemptId.equals(observedIdentity(metadataIdentity, observedExecution))) {</span>
+<span class="fc" id="L109">            throw new IllegalArgumentException(</span>
                 &quot;factorization attempt identity differs from its fields&quot;
             );
         }
-<span class="fc" id="L94">    }</span>
+<span class="fc" id="L113">    }</span>
 
     public static PolynomialTheoryUtilityFactorizationAttempt create(
         int attemptIndex,
@@ -105,17 +124,17 @@ public record PolynomialTheoryUtilityFactorizationAttempt(
         String verifierOutcome,
         String reportEvidenceHash
     ) {
-<span class="fc" id="L108">        List&lt;String&gt; candidates = immutableCandidateIds(candidateIds);</span>
-<span class="fc" id="L109">        String selected = requireSelection(</span>
+<span class="fc" id="L127">        List&lt;String&gt; candidates = immutableCandidateIds(candidateIds);</span>
+<span class="fc" id="L128">        String selected = requireSelection(</span>
             selectedCandidateId,
             candidates
         );
-<span class="fc" id="L113">        String retainedTransition = requireOptionalHash(</span>
+<span class="fc" id="L132">        String retainedTransition = requireOptionalHash(</span>
             transitionId,
             &quot;transitionId&quot;
         );
-<span class="fc" id="L117">        return new PolynomialTheoryUtilityFactorizationAttempt(</span>
-<span class="fc" id="L118">            identity(</span>
+<span class="fc" id="L136">        return new PolynomialTheoryUtilityFactorizationAttempt(</span>
+<span class="fc" id="L137">            identity(</span>
                 attemptIndex,
                 executionInputId,
                 backendId,
@@ -140,20 +159,32 @@ public record PolynomialTheoryUtilityFactorizationAttempt(
         );
     }
 
+    /** Creates v2 evidence only from an issuer-owned, actually executed nested pipeline. */
+    public static PolynomialTheoryUtilityFactorizationAttempt createObserved(int attemptIndex,
+            String executionInputId, int occurrenceIndex,
+            ExactNestedFactorizationTransformationPipeline.Result pipeline, String transitionId) {
+<span class="fc" id="L166">        var execution = new ObservedExecution(occurrenceIndex, pipeline);</span>
+<span class="fc" id="L167">        var metadata = execution.metadata(attemptIndex, executionInputId, transitionId);</span>
+<span class="fc" id="L168">        return new PolynomialTheoryUtilityFactorizationAttempt(observedIdentity(metadata.attemptId(), execution),</span>
+<span class="fc" id="L169">            metadata.attemptIndex(), metadata.executionInputId(), metadata.backendId(), metadata.requestId(),</span>
+<span class="fc" id="L170">            metadata.requestEvidenceHash(), metadata.candidateIds(), metadata.selectedCandidateId(),</span>
+<span class="fc" id="L171">            metadata.transitionId(), metadata.verifierOutcome(), metadata.reportEvidenceHash(), execution);</span>
+    }
+
     public String schema() {
-<span class="fc" id="L144">        return SCHEMA;</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        return observedExecution == null ? SCHEMA : OBSERVED_SCHEMA;</span>
     }
 
     public int candidateCount() {
-<span class="fc" id="L148">        return candidateIds.size();</span>
+<span class="fc" id="L179">        return candidateIds.size();</span>
     }
 
     public boolean selectedCandidate() {
-<span class="fc bfc" id="L152" title="All 2 branches covered.">        return !NO_SELECTION.equals(selectedCandidateId);</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        return !NO_SELECTION.equals(selectedCandidateId);</span>
     }
 
     public boolean producedTransition() {
-<span class="fc bfc" id="L156" title="All 2 branches covered.">        return !NO_TRANSITION.equals(transitionId);</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        return !NO_TRANSITION.equals(transitionId);</span>
     }
 
     public void validateAgainst(
@@ -161,37 +192,123 @@ public record PolynomialTheoryUtilityFactorizationAttempt(
         PolynomialTheoryUtilityCandidateResult result,
         PolynomialTheoryUtilityExecutionProfile profile
     ) {
-<span class="fc" id="L164">        Objects.requireNonNull(result, &quot;result&quot;);</span>
-<span class="fc" id="L165">        Objects.requireNonNull(profile, &quot;profile&quot;);</span>
-<span class="fc" id="L166">        var frozenProfile = PolynomialTheoryUtilityExecutionInputs.profile(</span>
-<span class="fc" id="L167">            result.input().profileId()</span>
+<span class="fc" id="L195">        Objects.requireNonNull(result, &quot;result&quot;);</span>
+<span class="fc" id="L196">        Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="fc" id="L197">        var frozenProfile = PolynomialTheoryUtilityExecutionInputs.profile(</span>
+<span class="fc" id="L198">            result.input().profileId()</span>
         );
-<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (attemptIndex != expectedIndex</span>
-<span class="fc bfc" id="L170" title="All 2 branches covered.">                || !profile.equals(frozenProfile)</span>
-<span class="fc bfc" id="L171" title="All 2 branches covered.">                || !executionInputId.equals(</span>
-<span class="fc" id="L172">                    result.input().inputId()</span>
+<span class="pc bpc" id="L200" title="1 of 4 branches missed.">        if (result.observations() == null &amp;&amp; observedExecution != null) {</span>
+<span class="nc" id="L201">            throw new IllegalArgumentException(&quot;observed attempt requires an observed result&quot;);</span>
+        }
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (attemptIndex != expectedIndex</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">                || !profile.equals(frozenProfile)</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">                || !executionInputId.equals(</span>
+<span class="fc" id="L206">                    result.input().inputId()</span>
                 )
-<span class="pc bpc" id="L174" title="1 of 2 branches missed.">                || !backendId.equals(profile.engineId())</span>
-<span class="pc bpc" id="L175" title="1 of 2 branches missed.">                || &quot;DISABLED&quot;.equals(profile.factorizationMode())</span>
-<span class="pc bpc" id="L176" title="1 of 2 branches missed.">                || &quot;NONE&quot;.equals(profile.engineId())) {</span>
-<span class="fc" id="L177">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">                || !backendId.equals(profile.engineId())</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">                || &quot;DISABLED&quot;.equals(profile.factorizationMode())</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                || &quot;NONE&quot;.equals(profile.engineId())) {</span>
+<span class="fc" id="L211">            throw new IllegalArgumentException(</span>
                 &quot;factorization attempt differs from its result profile&quot;
             );
         }
-<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (producedTransition()) {</span>
-<span class="fc" id="L182">            var transition = result.transitions().stream()</span>
-<span class="fc" id="L183">                .filter(value -&gt; transitionId.equals(value.transitionId()))</span>
-<span class="fc" id="L184">                .findFirst()</span>
-<span class="pc" id="L185">                .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        if (producedTransition()) {</span>
+<span class="fc" id="L216">            var transition = result.transitions().stream()</span>
+<span class="fc" id="L217">                .filter(value -&gt; transitionId.equals(value.transitionId()))</span>
+<span class="fc" id="L218">                .findFirst()</span>
+<span class="pc" id="L219">                .orElseThrow(() -&gt; new IllegalArgumentException(</span>
                     &quot;factorization attempt refers to another result transition&quot;
                 ));
-<span class="pc bpc" id="L188" title="1 of 2 branches missed.">            if (!backendId.equals(transition.backendId())) {</span>
-<span class="nc" id="L189">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">            if (!backendId.equals(transition.backendId())) {</span>
+<span class="nc" id="L223">                throw new IllegalArgumentException(</span>
                     &quot;factorization attempt backend differs from its transition&quot;
                 );
             }
         }
-<span class="fc" id="L194">    }</span>
+<span class="fc" id="L228">    }</span>
+
+    private static String observedIdentity(String metadataIdentity, ObservedExecution execution) {
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        if (execution == null) return metadataIdentity;</span>
+<span class="fc" id="L232">        StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L233">        append(material, OBSERVED_SCHEMA);</span>
+<span class="fc" id="L234">        append(material, metadataIdentity);</span>
+<span class="fc" id="L235">        append(material, execution.canonicalMaterial());</span>
+<span class="fc" id="L236">        return hash(material.toString());</span>
+    }
+
+    /**
+     * Immutable issuer-owned binding. Callers cannot supply a replacement path,
+     * certificate or partial ledger: these are read from the actual pipeline.
+     */
+    public static final class ObservedExecution {
+        private final int occurrenceIndex;
+        private final ExactNestedFactorizationTransformationPipeline.Result pipeline;
+
+        private ObservedExecution(int occurrenceIndex,
+<span class="fc" id="L248">                ExactNestedFactorizationTransformationPipeline.Result pipeline) {</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">            if (occurrenceIndex &lt; 0) throw new IllegalArgumentException(&quot;occurrenceIndex must be non-negative&quot;);</span>
+<span class="fc" id="L250">            this.occurrenceIndex = occurrenceIndex;</span>
+<span class="fc" id="L251">            this.pipeline = Objects.requireNonNull(pipeline, &quot;pipeline&quot;);</span>
+<span class="pc bpc" id="L252" title="2 of 4 branches missed.">            if (pipeline.factorization().isEmpty() || !pipeline.factorization().orElseThrow().executed()) {</span>
+<span class="nc" id="L253">                throw new IllegalArgumentException(&quot;observed attempt requires an executed factorization pipeline&quot;);</span>
+            }
+<span class="fc" id="L255">        }</span>
+
+<span class="fc" id="L257">        public int occurrenceIndex() { return occurrenceIndex; }</span>
+<span class="fc" id="L258">        public List&lt;Integer&gt; path() { return pipeline.position().path(); }</span>
+<span class="fc" id="L259">        public String pipelineEvidenceHash() { return pipeline.certificateHash(); }</span>
+        public String sourceRootEvidenceHash() {
+<span class="fc" id="L261">            return pipeline.projection().orElseThrow().rootSourceHash().orElseThrow();</span>
+        }
+        public PolynomialWorkLedger rawWork() {
+<span class="fc" id="L264">            return pipeline.factorization().orElseThrow().totalWork();</span>
+        }
+
+        public String canonicalMaterial() {
+<span class="fc" id="L268">            StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L269">            append(material, Integer.toString(occurrenceIndex));</span>
+<span class="fc" id="L270">            append(material, Integer.toString(path().size()));</span>
+<span class="fc" id="L271">            path().forEach(value -&gt; append(material, Integer.toString(value)));</span>
+<span class="fc" id="L272">            append(material, pipelineEvidenceHash());</span>
+<span class="fc" id="L273">            append(material, sourceRootEvidenceHash());</span>
+<span class="fc" id="L274">            append(material, rawWork().canonicalMaterial());</span>
+<span class="fc" id="L275">            return material.toString();</span>
+        }
+
+        void validateAgainst(PolynomialTheoryUtilityCandidateResult result,
+                PolynomialTheoryUtilityExecutionObservations.Occurrence occurrence) {
+<span class="fc" id="L280">            String source = result.sourceRootExpression();</span>
+            // ExactParsedSubtermProjector frames one UTF-8 value before hashing.
+<span class="fc" id="L282">            String rootHash = hash(source.getBytes(StandardCharsets.UTF_8).length + &quot;:&quot; + source + &quot;\n&quot;);</span>
+<span class="fc bfc" id="L283" title="All 4 branches covered.">            if (occurrenceIndex != occurrence.occurrenceIndex() || !path().equals(occurrence.path())</span>
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">                    || !pipelineEvidenceHash().equals(occurrence.pipelineEvidenceHash())</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">                    || !sourceRootEvidenceHash().equals(rootHash)) {</span>
+<span class="fc" id="L286">                throw new IllegalArgumentException(&quot;observed attempt belongs to another source or occurrence pipeline&quot;);</span>
+            }
+<span class="fc" id="L288">        }</span>
+
+        private PolynomialTheoryUtilityFactorizationAttempt metadata(int index, String inputId, String transitionId) {
+<span class="fc" id="L291">            var factorization = pipeline.factorization().orElseThrow();</span>
+<span class="fc" id="L292">            var report = factorization.report().orElseThrow();</span>
+<span class="fc" id="L293">            String selected = pipeline.transformation().map(value -&gt; value.candidateCertificateHash())</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">                .filter(value -&gt; !value.isEmpty()).orElse(NO_SELECTION);</span>
+<span class="fc" id="L295">            return create(index, inputId, factorization.engineId(),</span>
+<span class="fc" id="L296">                hash(factorization.request().orElseThrow().canonicalMaterial()), factorization.certificateHash(),</span>
+<span class="fc" id="L297">                report.candidates().stream().map(value -&gt; value.verificationCertificateHash()).toList(), selected,</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">                transitionId, selected.equals(NO_SELECTION) ? report.status().name() : &quot;VERIFIED&quot;,</span>
+<span class="fc" id="L299">                report.verificationHash());</span>
+        }
+
+        @Override
+        public boolean equals(Object other) {
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">            return other instanceof ObservedExecution execution</span>
+                &amp;&amp; occurrenceIndex == execution.occurrenceIndex
+<span class="pc bpc" id="L306" title="2 of 4 branches missed.">                &amp;&amp; pipelineEvidenceHash().equals(execution.pipelineEvidenceHash());</span>
+        }
+
+        @Override
+<span class="nc" id="L310">        public int hashCode() { return Objects.hash(occurrenceIndex, pipelineEvidenceHash()); }</span>
+    }
 
     private static String identity(
         int attemptIndex,
@@ -205,116 +322,116 @@ public record PolynomialTheoryUtilityFactorizationAttempt(
         String verifierOutcome,
         String reportEvidenceHash
     ) {
-<span class="fc" id="L208">        StringBuilder material = new StringBuilder();</span>
-<span class="fc" id="L209">        append(material, SCHEMA);</span>
-<span class="fc" id="L210">        append(material, Integer.toString(attemptIndex));</span>
-<span class="fc" id="L211">        append(</span>
+<span class="fc" id="L325">        StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L326">        append(material, SCHEMA);</span>
+<span class="fc" id="L327">        append(material, Integer.toString(attemptIndex));</span>
+<span class="fc" id="L328">        append(</span>
             material,
-<span class="fc" id="L213">            requireHash(executionInputId, &quot;executionInputId&quot;)</span>
+<span class="fc" id="L330">            requireHash(executionInputId, &quot;executionInputId&quot;)</span>
         );
-<span class="fc" id="L215">        append(material, requireText(backendId, &quot;backendId&quot;));</span>
-<span class="fc" id="L216">        append(material, requireHash(requestId, &quot;requestId&quot;));</span>
-<span class="fc" id="L217">        append(</span>
+<span class="fc" id="L332">        append(material, requireText(backendId, &quot;backendId&quot;));</span>
+<span class="fc" id="L333">        append(material, requireHash(requestId, &quot;requestId&quot;));</span>
+<span class="fc" id="L334">        append(</span>
             material,
-<span class="fc" id="L219">            requireHash(</span>
+<span class="fc" id="L336">            requireHash(</span>
                 requestEvidenceHash,
                 &quot;requestEvidenceHash&quot;
             )
         );
-<span class="fc" id="L224">        append(material, Integer.toString(candidateIds.size()));</span>
-<span class="fc" id="L225">        candidateIds.forEach(value -&gt; append(</span>
+<span class="fc" id="L341">        append(material, Integer.toString(candidateIds.size()));</span>
+<span class="fc" id="L342">        candidateIds.forEach(value -&gt; append(</span>
             material,
-<span class="fc" id="L227">            requireHash(value, &quot;candidateId&quot;)</span>
+<span class="fc" id="L344">            requireHash(value, &quot;candidateId&quot;)</span>
         ));
-<span class="fc" id="L229">        append(</span>
+<span class="fc" id="L346">        append(</span>
             material,
-<span class="fc" id="L231">            requireSelection(selectedCandidateId, candidateIds)</span>
+<span class="fc" id="L348">            requireSelection(selectedCandidateId, candidateIds)</span>
         );
-<span class="fc" id="L233">        append(</span>
+<span class="fc" id="L350">        append(</span>
             material,
-<span class="fc" id="L235">            requireOptionalHash(transitionId, &quot;transitionId&quot;)</span>
+<span class="fc" id="L352">            requireOptionalHash(transitionId, &quot;transitionId&quot;)</span>
         );
-<span class="fc" id="L237">        append(</span>
+<span class="fc" id="L354">        append(</span>
             material,
-<span class="fc" id="L239">            requireText(verifierOutcome, &quot;verifierOutcome&quot;)</span>
+<span class="fc" id="L356">            requireText(verifierOutcome, &quot;verifierOutcome&quot;)</span>
         );
-<span class="fc" id="L241">        append(</span>
+<span class="fc" id="L358">        append(</span>
             material,
-<span class="fc" id="L243">            requireHash(reportEvidenceHash, &quot;reportEvidenceHash&quot;)</span>
+<span class="fc" id="L360">            requireHash(reportEvidenceHash, &quot;reportEvidenceHash&quot;)</span>
         );
-<span class="fc" id="L245">        return hash(material.toString());</span>
+<span class="fc" id="L362">        return hash(material.toString());</span>
     }
 
     private static List&lt;String&gt; immutableCandidateIds(
         List&lt;String&gt; values
     ) {
-<span class="fc" id="L251">        List&lt;String&gt; retained = List.copyOf(</span>
-<span class="fc" id="L252">            Objects.requireNonNull(values, &quot;candidateIds&quot;)</span>
+<span class="fc" id="L368">        List&lt;String&gt; retained = List.copyOf(</span>
+<span class="fc" id="L369">            Objects.requireNonNull(values, &quot;candidateIds&quot;)</span>
         );
-<span class="fc" id="L254">        Set&lt;String&gt; unique = new HashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L255" title="All 2 branches covered.">        for (String value : retained) {</span>
-<span class="fc" id="L256">            String candidateId = requireHash(value, &quot;candidateId&quot;);</span>
-<span class="fc bfc" id="L257" title="All 2 branches covered.">            if (!unique.add(candidateId)) {</span>
-<span class="fc" id="L258">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L371">        Set&lt;String&gt; unique = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">        for (String value : retained) {</span>
+<span class="fc" id="L373">            String candidateId = requireHash(value, &quot;candidateId&quot;);</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">            if (!unique.add(candidateId)) {</span>
+<span class="fc" id="L375">                throw new IllegalArgumentException(</span>
                     &quot;factorization report repeats a candidate identity&quot;
                 );
             }
-<span class="fc" id="L262">        }</span>
-<span class="fc" id="L263">        return retained;</span>
+<span class="fc" id="L379">        }</span>
+<span class="fc" id="L380">        return retained;</span>
     }
 
     private static String requireSelection(
         String selectedCandidateId,
         List&lt;String&gt; candidateIds
     ) {
-<span class="fc" id="L270">        String value = requireText(</span>
+<span class="fc" id="L387">        String value = requireText(</span>
             selectedCandidateId,
             &quot;selectedCandidateId&quot;
         );
-<span class="fc bfc" id="L274" title="All 2 branches covered.">        if (!NO_SELECTION.equals(value)) {</span>
-<span class="fc" id="L275">            value = requireHash(value, &quot;selectedCandidateId&quot;);</span>
-<span class="fc bfc" id="L276" title="All 2 branches covered.">            if (!candidateIds.contains(value)) {</span>
-<span class="fc" id="L277">                throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L391" title="All 2 branches covered.">        if (!NO_SELECTION.equals(value)) {</span>
+<span class="fc" id="L392">            value = requireHash(value, &quot;selectedCandidateId&quot;);</span>
+<span class="fc bfc" id="L393" title="All 2 branches covered.">            if (!candidateIds.contains(value)) {</span>
+<span class="fc" id="L394">                throw new IllegalArgumentException(</span>
                     &quot;selected candidate is absent from the report&quot;
                 );
             }
         }
-<span class="fc" id="L282">        return value;</span>
+<span class="fc" id="L399">        return value;</span>
     }
 
     private static String requireOptionalHash(String value, String name) {
-<span class="fc" id="L286">        String text = requireText(value, name);</span>
-<span class="fc bfc" id="L287" title="All 2 branches covered.">        return NO_TRANSITION.equals(text)</span>
-<span class="fc" id="L288">            ? text</span>
-<span class="fc" id="L289">            : requireHash(text, name);</span>
+<span class="fc" id="L403">        String text = requireText(value, name);</span>
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        return NO_TRANSITION.equals(text)</span>
+<span class="fc" id="L405">            ? text</span>
+<span class="fc" id="L406">            : requireHash(text, name);</span>
     }
 
     private static String hash(String material) {
-<span class="fc" id="L293">        return PolynomialTheoryUtilityExecutionIdentity.sha256(</span>
-<span class="fc" id="L294">            material.getBytes(StandardCharsets.UTF_8)</span>
+<span class="fc" id="L410">        return PolynomialTheoryUtilityExecutionIdentity.sha256(</span>
+<span class="fc" id="L411">            material.getBytes(StandardCharsets.UTF_8)</span>
         );
     }
 
     private static String requireHash(String value, String name) {
-<span class="fc" id="L299">        String text = requireText(value, name);</span>
-<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        if (!SHA_256.matcher(text).matches()) {</span>
-<span class="nc" id="L301">            throw new IllegalArgumentException(name + &quot; is not SHA-256&quot;);</span>
+<span class="fc" id="L416">        String text = requireText(value, name);</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">        if (!SHA_256.matcher(text).matches()) {</span>
+<span class="nc" id="L418">            throw new IllegalArgumentException(name + &quot; is not SHA-256&quot;);</span>
         }
-<span class="fc" id="L303">        return text;</span>
+<span class="fc" id="L420">        return text;</span>
     }
 
     private static String requireText(String value, String name) {
-<span class="fc" id="L307">        String text = Objects.requireNonNull(value, name);</span>
-<span class="pc bpc" id="L308" title="1 of 2 branches missed.">        if (text.isBlank()) {</span>
-<span class="nc" id="L309">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L424">        String text = Objects.requireNonNull(value, name);</span>
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">        if (text.isBlank()) {</span>
+<span class="nc" id="L426">            throw new IllegalArgumentException(</span>
                 name + &quot; must not be blank&quot;
             );
         }
-<span class="fc" id="L313">        return text;</span>
+<span class="fc" id="L430">        return text;</span>
     }
 
     private static void append(StringBuilder target, String value) {
-<span class="fc" id="L317">        target.append(value.length()).append(':').append(value);</span>
-<span class="fc" id="L318">    }</span>
+<span class="fc" id="L434">        target.append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L435">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

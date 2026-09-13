@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DifferentiationDomain.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.calculus</a> &gt; <span class="el_source">DifferentiationDomain.java</span></div><h1>DifferentiationDomain.java</h1><pre class="source lang-java linenums">package de.regelsuche.calculus;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.assumption.AssumptionContext;
+import de.regelsuche.assumption.ExpressionDefinedness;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.parse.ExpressionFormatter;
+import java.util.List;
+
+/** Sufficient, explicitly retained domains for the elementary derivative rules. */
+final class DifferentiationDomain {
+    private DifferentiationDomain() {
+    }
+
+    static List&lt;Assumption&gt; assumptions(Expr body, String variable) {
+<span class="fc" id="L21">        AssumptionContext context = new AssumptionContext();</span>
+<span class="fc" id="L22">        collect(body, variable, context);</span>
+<span class="fc" id="L23">        return context.snapshot();</span>
+    }
+
+    private static void collect(Expr body, String variable, AssumptionContext context) {
+<span class="fc" id="L27">        boolean domainRetained = ExpressionDefinedness.canElideOnPositivePowerDomain(body, context);</span>
+<span class="fc bfc" id="L28" title="All 4 branches covered.">        if (domainRetained &amp;&amp; elementary(body)) {</span>
+<span class="fc" id="L29">            return;</span>
+        }
+        // The sum/product may be differentiable even where an operand is not
+        // (abs(x) - abs(x) at zero). Splitting needs the stronger operand guards.
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        if (body instanceof BinaryExpr binary</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">                &amp;&amp; (binary.operator() == BinaryOperator.ADD</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">                    || binary.operator() == BinaryOperator.SUB</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">                    || binary.operator() == BinaryOperator.MUL)) {</span>
+<span class="fc" id="L37">            collect(binary.left(), variable, context);</span>
+<span class="fc" id="L38">            collect(binary.right(), variable, context);</span>
+<span class="fc" id="L39">            return;</span>
+        }
+<span class="fc" id="L41">        String expression = ExpressionFormatter.format(body);</span>
+<span class="fc" id="L42">        context.add(Assumption.customPredicate(</span>
+            &quot;differentiable(&quot; + expression + &quot;, &quot; + variable + &quot;)&quot;,
+<span class="fc" id="L44">            List.of(expression, variable)));</span>
+<span class="fc" id="L45">    }</span>
+
+    private static boolean elementary(Expr expression) {
+<span class="fc bfc" id="L48" title="All 4 branches covered.">        if (expression instanceof NumberExpr || expression instanceof VariableExpr) {</span>
+<span class="fc" id="L49">            return true;</span>
+        }
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L52" title="1 of 4 branches missed.">            return elementary(binary.left()) &amp;&amp; elementary(binary.right());</span>
+        }
+<span class="pc bpc" id="L54" title="2 of 4 branches missed.">        if (expression instanceof FunctionExpr function &amp;&amp; function.arguments().size() == 1) {</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            return switch (function.name()) {</span>
+<span class="fc" id="L56">                case &quot;sin&quot;, &quot;cos&quot;, &quot;exp&quot;, &quot;ln&quot;, &quot;log&quot; -&gt; elementary(function.argument());</span>
+<span class="fc" id="L57">                default -&gt; false;</span>
+            };
+        }
+<span class="nc" id="L60">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

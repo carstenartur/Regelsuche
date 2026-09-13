@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReferenceIndependentCandidateValidation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">ReferenceIndependentCandidateValidation.java</span></div><h1>ReferenceIndependentCandidateValidation.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireSha256;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireText;
+import static de.regelsuche.discovery.representation.TargetFreeHeldOutMatrixRunner.canonical;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.discovery.representation.TargetFreeIntrinsicCandidateValidator.IntrinsicValidation;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+
+/** Content-addressed validation companion; historical labels are not inputs. */
+public final class ReferenceIndependentCandidateValidation {
+    public static final String SCHEMA =
+        &quot;reference-independent-candidate-validation/v1&quot;;
+    public static final String EVIDENCE_SCOPE =
+        &quot;ALREADY_PUBLIC_ARCHIVED_MATRIX_NOT_FRESH_HELD_OUT&quot;;
+    public static final String ORACLE_REVISION =
+        &quot;regelsuche-numeric-samples-and-quadratic-coefficients/v1&quot;;
+    public static final String WORK_AUTHORITY =
+        &quot;ADMITTED_ORACLE_CALLS_AND_INPUT_CHARACTERS_NOT_INTERNAL_OPERATIONS&quot;;
+    public static final String CLAIM_BOUNDARY =
+        &quot;Companion validation of an already public frozen candidate matrix. &quot;
+            + &quot;The existing oracle uses deterministic numeric samples or &quot;
+            + &quot;normalized quadratic coefficients, not external SymPy. &quot;
+            + &quot;Its legacy SYMBOLICALLY_VERIFIED status does not establish &quot;
+            + &quot;formal proof, primitive replay, original-domain completeness, &quot;
+            + &quot;salience, downstream utility, fresh held-out performance or novelty.&quot;;
+<span class="fc" id="L36">    static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L37">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L38">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
+<span class="fc" id="L39">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)</span>
+<span class="fc" id="L40">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
+<span class="fc" id="L41">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
+<span class="fc" id="L42">        .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)</span>
+<span class="fc" id="L43">        .enable(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES)</span>
+<span class="fc" id="L44">        .build();</span>
+
+    private ReferenceIndependentCandidateValidation() {
+    }
+
+    /** Separate validation limits; never modifies formation work budgets. */
+    public record Budget(int maxOracleCalls, int maxInputCharacters, int timeoutMillis) {
+<span class="fc" id="L51">        public Budget {</span>
+<span class="pc bpc" id="L52" title="5 of 10 branches missed.">            if (maxOracleCalls &lt; 0 || maxInputCharacters &lt; 1</span>
+                    || maxInputCharacters &gt; 8192 || timeoutMillis &lt; 1
+                    || timeoutMillis &gt; 60_000) {
+<span class="nc" id="L55">                throw new IllegalArgumentException(&quot;invalid validation budget&quot;);</span>
+            }
+<span class="fc" id="L57">        }</span>
+    }
+
+    /** An unchanged v1 frozen lineage, including its aggregate declaration. */
+    public record Candidate(
+        String candidateHash, String expression, List&lt;String&gt; assumptions,
+        int depth, List&lt;String&gt; pathExpressions, List&lt;String&gt; pathRuleIds,
+        List&lt;String&gt; primitiveRuleIds, boolean equivalencePreserving,
+        boolean temporaryComplexityIncrease
+    ) {
+<span class="fc" id="L67">        public Candidate {</span>
+<span class="fc" id="L68">            CandidateEvidence checked = new CandidateEvidence(candidateHash,</span>
+                expression, assumptions, depth, pathExpressions, pathRuleIds,
+                primitiveRuleIds, equivalencePreserving, temporaryComplexityIncrease);
+<span class="fc" id="L71">            assumptions = checked.assumptions();</span>
+<span class="fc" id="L72">            pathExpressions = checked.pathExpressions();</span>
+<span class="fc" id="L73">            pathRuleIds = checked.pathRuleIds();</span>
+<span class="fc" id="L74">            primitiveRuleIds = checked.primitiveRuleIds();</span>
+<span class="fc" id="L75">        }</span>
+
+        static Candidate fromFrozen(CandidateEvidence value) {
+<span class="fc" id="L78">            return new Candidate(value.candidateHash(), value.expression(),</span>
+<span class="fc" id="L79">                value.assumptions(), value.depth(), value.pathExpressions(),</span>
+<span class="fc" id="L80">                value.pathRuleIds(), value.primitiveRuleIds(),</span>
+<span class="fc" id="L81">                value.equivalencePreserving(), value.temporaryComplexityIncrease());</span>
+        }
+    }
+
+    /** Work is charged before invocation; failed invocations retain their cost. */
+    public record Work(int candidateVisits, int oracleCalls, int completedOracleCalls,
+                       long inputCharacters) {
+<span class="fc" id="L88">        public Work {</span>
+<span class="pc bpc" id="L89" title="7 of 16 branches missed.">            if (candidateVisits &lt; 0 || oracleCalls &lt; 0 || completedOracleCalls &lt; 0</span>
+                    || completedOracleCalls &gt; oracleCalls || oracleCalls &gt; candidateVisits
+                    || inputCharacters &lt; 0 || (oracleCalls == 0 &amp;&amp; inputCharacters != 0)) {
+<span class="nc" id="L92">                throw new IllegalArgumentException(&quot;invalid validation work ledger&quot;);</span>
+            }
+<span class="fc" id="L94">        }</span>
+
+        static Work sum(List&lt;Work&gt; values) {
+<span class="fc" id="L97">            int visits = 0;</span>
+<span class="fc" id="L98">            int calls = 0;</span>
+<span class="fc" id="L99">            int completed = 0;</span>
+<span class="fc" id="L100">            long characters = 0;</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            for (Work value : values) {</span>
+<span class="fc" id="L102">                visits = Math.addExact(visits, value.candidateVisits());</span>
+<span class="fc" id="L103">                calls = Math.addExact(calls, value.oracleCalls());</span>
+<span class="fc" id="L104">                completed = Math.addExact(completed, value.completedOracleCalls());</span>
+<span class="fc" id="L105">                characters = Math.addExact(characters, value.inputCharacters());</span>
+<span class="fc" id="L106">            }</span>
+<span class="fc" id="L107">            return new Work(visits, calls, completed, characters);</span>
+        }
+    }
+
+    public record Outcome(
+        Candidate candidate, String inputHash, String occurrencePath,
+        String primitivePathHash, String primitiveReplayStatus,
+        String exactSourceEquality, IntrinsicValidation validation,
+        String terminalReason, String evidenceStrength, String formalProofStatus,
+        String evidenceHash, Work work
+    ) {
+<span class="fc" id="L118">        public Outcome {</span>
+<span class="fc" id="L119">            Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc" id="L120">            requireSha256(inputHash, &quot;inputHash&quot;);</span>
+<span class="fc" id="L121">            requireSha256(primitivePathHash, &quot;primitivePathHash&quot;);</span>
+<span class="fc" id="L122">            Objects.requireNonNull(validation, &quot;validation&quot;);</span>
+<span class="fc" id="L123">            requireText(terminalReason, &quot;terminalReason&quot;);</span>
+<span class="fc" id="L124">            requireText(evidenceStrength, &quot;evidenceStrength&quot;);</span>
+<span class="fc" id="L125">            Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">            if (!&quot;$&quot;.equals(occurrencePath)</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">                    || !&quot;FROZEN_LINEAGE_NOT_REPLAYED&quot;.equals(primitiveReplayStatus)</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">                    || !&quot;NOT_ESTABLISHED&quot;.equals(formalProofStatus)</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">                    || work.candidateVisits() != 1</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">                    || !hash(validation).equals(evidenceHash)</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">                    || !pathHash(candidate).equals(primitivePathHash)) {</span>
+<span class="nc" id="L132">                throw new IllegalArgumentException(&quot;invalid candidate validation evidence&quot;);</span>
+            }
+<span class="fc" id="L134">        }</span>
+    }
+
+    public record Row(
+        int sequence, String configurationId, String sourceExpression,
+        String sourceHash, String candidateBatchHash, String candidateSetHash,
+        String candidateFreezeReceiptHash, String formationWorkHash,
+        List&lt;Outcome&gt; outcomes, Work work
+    ) {
+<span class="fc" id="L143">        public Row {</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">            if (sequence &lt; 1) {</span>
+<span class="nc" id="L145">                throw new IllegalArgumentException(&quot;invalid validation row sequence&quot;);</span>
+            }
+<span class="fc" id="L147">            requireText(sourceExpression, &quot;sourceExpression&quot;);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            for (String value : List.of(configurationId, sourceHash,</span>
+                    candidateBatchHash, candidateSetHash,
+                    candidateFreezeReceiptHash, formationWorkHash)) {
+<span class="fc" id="L151">                requireSha256(value, &quot;row binding&quot;);</span>
+<span class="fc" id="L152">            }</span>
+<span class="fc" id="L153">            outcomes = List.copyOf(outcomes);</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">            if (!hash(sourceExpression).equals(sourceHash)</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">                    || !Work.sum(outcomes.stream().map(Outcome::work).toList()).equals(work)) {</span>
+<span class="nc" id="L156">                throw new IllegalArgumentException(&quot;validation row work or source mismatch&quot;);</span>
+            }
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            for (Outcome outcome : outcomes) {</span>
+<span class="fc" id="L159">                if (!inputHash(configurationId, sourceExpression, outcome.candidate())</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">                        .equals(outcome.inputHash())) {</span>
+<span class="nc" id="L161">                    throw new IllegalArgumentException(&quot;candidate input binding mismatch&quot;);</span>
+                }
+<span class="fc" id="L163">            }</span>
+<span class="fc" id="L164">        }</span>
+    }
+
+    public record Summary(int rows, int candidates, int oracleCalls,
+                          int completedOracleCalls, long inputCharacters,
+                          Map&lt;String, Integer&gt; terminalReasons) {
+<span class="fc" id="L170">        public Summary {</span>
+<span class="fc" id="L171">            terminalReasons = Map.copyOf(terminalReasons);</span>
+<span class="fc" id="L172">        }</span>
+
+        static Summary derive(List&lt;Row&gt; rows) {
+<span class="fc" id="L175">            Work work = Work.sum(rows.stream().map(Row::work).toList());</span>
+<span class="fc" id="L176">            Map&lt;String, Integer&gt; reasons = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L177">            rows.stream().flatMap(row -&gt; row.outcomes().stream())</span>
+<span class="fc" id="L178">                .forEach(value -&gt; reasons.merge(value.terminalReason(), 1, Math::addExact));</span>
+<span class="fc" id="L179">            return new Summary(rows.size(), work.candidateVisits(), work.oracleCalls(),</span>
+<span class="fc" id="L180">                work.completedOracleCalls(), work.inputCharacters(), reasons);</span>
+        }
+    }
+
+    public record Content(
+        String schema, String evidenceScope, String repositoryRevision,
+        String formationRepositoryRevision, String planHash,
+        String candidateFreezeHash, String oracleRevision,
+        String workAuthority, Budget budget, List&lt;Row&gt; rows,
+        Summary summary, String claimBoundary
+    ) {
+<span class="fc" id="L191">        public Content {</span>
+<span class="pc bpc" id="L192" title="2 of 4 branches missed.">            if (!SCHEMA.equals(schema) || !EVIDENCE_SCOPE.equals(evidenceScope)</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">                    || !repositoryRevision.matches(&quot;[0-9a-f]{40}&quot;)</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">                    || !formationRepositoryRevision.matches(&quot;[0-9a-f]{40}&quot;)</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">                    || !ORACLE_REVISION.equals(oracleRevision)</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">                    || !WORK_AUTHORITY.equals(workAuthority)</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">                    || !CLAIM_BOUNDARY.equals(claimBoundary)) {</span>
+<span class="nc" id="L198">                throw new IllegalArgumentException(&quot;invalid companion authority&quot;);</span>
+            }
+<span class="fc" id="L200">            requireSha256(planHash, &quot;planHash&quot;);</span>
+<span class="fc" id="L201">            requireSha256(candidateFreezeHash, &quot;candidateFreezeHash&quot;);</span>
+<span class="fc" id="L202">            Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L203">            rows = List.copyOf(rows);</span>
+<span class="pc bpc" id="L204" title="2 of 4 branches missed.">            if (rows.size() != 144 || !Summary.derive(rows).equals(summary)</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">                    || summary.oracleCalls() &gt; budget.maxOracleCalls()) {</span>
+<span class="nc" id="L206">                throw new IllegalArgumentException(&quot;companion matrix or budget does not balance&quot;);</span>
+            }
+<span class="fc bfc" id="L208" title="All 2 branches covered.">            for (int index = 0; index &lt; rows.size(); index++) {</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">                if (rows.get(index).sequence() != index + 1) {</span>
+<span class="nc" id="L210">                    throw new IllegalArgumentException(&quot;companion row sequence mismatch&quot;);</span>
+                }
+            }
+<span class="fc" id="L213">        }</span>
+    }
+
+    public record Artifact(Content content, String contentHash) {
+<span class="fc" id="L217">        public Artifact {</span>
+<span class="fc" id="L218">            Objects.requireNonNull(content, &quot;content&quot;);</span>
+<span class="fc" id="L219">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">            if (!hash(content).equals(contentHash)) {</span>
+<span class="nc" id="L221">                throw new IllegalArgumentException(&quot;companion content hash mismatch&quot;);</span>
+            }
+<span class="fc" id="L223">        }</span>
+
+        static Artifact create(Content content) {
+<span class="fc" id="L226">            return new Artifact(content, hash(content));</span>
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L230">            return canonical(this);</span>
+        }
+
+        public static Artifact fromCanonicalJson(String source) {
+            try {
+<span class="fc" id="L235">                Artifact value = JSON.readValue(source, Artifact.class);</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">                if (!value.toCanonicalJson().equals(source)) {</span>
+<span class="nc" id="L237">                    throw new IllegalArgumentException(&quot;companion JSON is not canonical&quot;);</span>
+                }
+<span class="fc" id="L239">                return value;</span>
+<span class="nc" id="L240">            } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L241">                throw new IllegalArgumentException(&quot;invalid companion JSON&quot;, exception);</span>
+            }
+        }
+    }
+
+    static String hash(Object value) {
+<span class="fc" id="L247">        return KnownStructureCatalog.sha256(canonical(value));</span>
+    }
+
+    static String inputHash(String configurationId, String source, Candidate candidate) {
+<span class="fc" id="L251">        return hash(List.of(SCHEMA + &quot;/input&quot;, configurationId, source, &quot;$&quot;, candidate));</span>
+    }
+
+    static String pathHash(Candidate candidate) {
+<span class="fc" id="L255">        return hash(List.of(SCHEMA + &quot;/primitive-path&quot;, candidate.pathExpressions(),</span>
+<span class="fc" id="L256">            candidate.pathRuleIds(), candidate.primitiveRuleIds()));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

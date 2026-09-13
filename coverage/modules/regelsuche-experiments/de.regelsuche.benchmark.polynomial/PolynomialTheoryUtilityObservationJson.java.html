@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityObservationJson.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityObservationJson.java</span></div><h1>PolynomialTheoryUtilityObservationJson.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+
+/** Lossless raw evidence encoding used only by the observed freeze revision. */
+final class PolynomialTheoryUtilityObservationJson {
+    private PolynomialTheoryUtilityObservationJson() { }
+
+    static void append(JsonWriter json, PolynomialTheoryUtilityCandidateResult result) {
+<span class="fc" id="L11">        var observations = result.observations();</span>
+<span class="fc" id="L12">        var raw = observations.rawWork();</span>
+<span class="fc" id="L13">        var projection = PolynomialTheoryUtilityCanonicalWorkProjection.project(result.input(), raw);</span>
+<span class="fc" id="L14">        json.object(&quot;observations&quot;, value -&gt; {</span>
+<span class="fc" id="L15">            value.property(&quot;schema&quot;, PolynomialTheoryUtilityExecutionObservations.SCHEMA);</span>
+<span class="fc" id="L16">            value.property(&quot;observationId&quot;, observations.observationId());</span>
+<span class="fc" id="L17">            value.object(&quot;rawWork&quot;, work -&gt; {</span>
+<span class="fc" id="L18">                work.property(&quot;projectionRevision&quot;, projection.projectionRevision());</span>
+<span class="fc" id="L19">                work.property(&quot;projectionId&quot;, projection.projectionId());</span>
+<span class="fc" id="L20">                work.property(&quot;rawWorkHash&quot;, projection.rawWorkHash());</span>
+<span class="fc" id="L21">                work.property(&quot;primitiveWork&quot;, raw.primitiveWork());</span>
+<span class="fc" id="L22">                ledger(work, &quot;totalMechanicalWork&quot;, raw.totalMechanicalWork());</span>
+<span class="fc" id="L23">                ledger(work, &quot;matchingWork&quot;, raw.matchingWork());</span>
+<span class="fc" id="L24">                ledger(work, &quot;sourceValidationWork&quot;, raw.sourceValidationWork());</span>
+<span class="fc" id="L25">                ledger(work, &quot;factorizationWork&quot;, raw.factorizationWork());</span>
+<span class="fc" id="L26">                ledger(work, &quot;verificationWork&quot;, raw.verificationWork());</span>
+<span class="fc" id="L27">                ledger(work, &quot;renderingWork&quot;, raw.renderingWork());</span>
+<span class="fc" id="L28">                ledger(work, &quot;reparseWork&quot;, raw.reparseWork());</span>
+<span class="fc" id="L29">                ledger(work, &quot;reconstructionWork&quot;, raw.reconstructionWork());</span>
+<span class="fc" id="L30">                ledger(work, &quot;occurrenceReplacementWork&quot;, raw.occurrenceReplacementWork());</span>
+<span class="fc" id="L31">                ledger(work, &quot;cacheLookupWork&quot;, raw.cacheLookupWork());</span>
+<span class="fc" id="L32">                ledger(work, &quot;cacheInsertionWork&quot;, raw.cacheInsertionWork());</span>
+<span class="fc" id="L33">                ledger(work, &quot;cacheEvictionWork&quot;, raw.cacheEvictionWork());</span>
+<span class="fc" id="L34">                ledger(work, &quot;cacheReplayWork&quot;, raw.cacheReplayWork());</span>
+<span class="fc" id="L35">                ledger(work, &quot;evidenceConstructionWork&quot;, raw.evidenceConstructionWork());</span>
+<span class="fc" id="L36">            });</span>
+<span class="fc" id="L37">            ledger(value, &quot;preparationWork&quot;, observations.preparationWork());</span>
+<span class="fc" id="L38">            value.array(&quot;occurrences&quot;, occurrences -&gt; observations.occurrences().forEach(occurrence -&gt;</span>
+<span class="fc" id="L39">                occurrences.objectValue(item -&gt; {</span>
+<span class="fc" id="L40">                    item.property(&quot;occurrenceIndex&quot;, occurrence.occurrenceIndex());</span>
+<span class="fc" id="L41">                    item.array(&quot;path&quot;, path -&gt; occurrence.path().forEach(path::numberValue));</span>
+<span class="fc" id="L42">                    item.property(&quot;terminalStatus&quot;, occurrence.terminalStatus().name());</span>
+<span class="fc" id="L43">                    item.property(&quot;detailCode&quot;, occurrence.detailCode());</span>
+<span class="fc" id="L44">                    item.property(&quot;pipelineEvidenceHash&quot;, occurrence.pipelineEvidenceHash());</span>
+<span class="fc" id="L45">                    item.property(&quot;transitionId&quot;, occurrence.transitionId());</span>
+<span class="fc" id="L46">                    item.property(&quot;primitiveWork&quot;, occurrence.primitiveWork());</span>
+<span class="fc" id="L47">                    ledger(item, &quot;rawWork&quot;, occurrence.rawWork());</span>
+<span class="fc" id="L48">                    item.stringArray(&quot;factorizationAttemptIds&quot;, occurrence.factorizationAttemptIds());</span>
+<span class="fc" id="L49">                    item.stringArray(&quot;cacheEventIds&quot;, occurrence.cacheEventIds());</span>
+<span class="fc" id="L50">                })</span>
+            ));
+<span class="fc" id="L52">        });</span>
+<span class="fc" id="L53">    }</span>
+
+    private static void ledger(JsonWriter json, String field, PolynomialWorkLedger ledger) {
+<span class="fc" id="L56">        json.object(field, value -&gt; ledger.stages().forEach(value::property));</span>
+<span class="fc" id="L57">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

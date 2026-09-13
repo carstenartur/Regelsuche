@@ -60,13 +60,13 @@ import java.util.Optional;
     /** Run {@code d/dx x^3 -&gt; 3 * x^2}. */
     public Result derivativePowerRule() {
 <span class="fc" id="L62">        Expr input = parser.parseTerm(&quot;x^3&quot;);</span>
-<span class="fc" id="L63">        Expr derivative = differentiator.differentiate(input, &quot;x&quot;);</span>
+<span class="fc" id="L63">        Differentiator.Result derivative = differentiator.differentiateWithAssumptions(input, &quot;x&quot;);</span>
 <span class="fc" id="L64">        return new Result(</span>
             &quot;derivative-power&quot;,
             &quot;Ableitung – Potenzregel&quot;,
 <span class="fc" id="L67">            &quot;d/dx &quot; + ExpressionFormatter.format(input),</span>
-<span class="fc" id="L68">            ExpressionFormatter.format(derivative),</span>
-<span class="fc" id="L69">            List.of()</span>
+<span class="fc" id="L68">            ExpressionFormatter.format(derivative.formula()),</span>
+<span class="fc" id="L69">            derivative.assumptions()</span>
         );
     }
 

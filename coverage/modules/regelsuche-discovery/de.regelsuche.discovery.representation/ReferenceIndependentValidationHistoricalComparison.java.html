@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReferenceIndependentValidationHistoricalComparison.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">ReferenceIndependentValidationHistoricalComparison.java</span></div><h1>ReferenceIndependentValidationHistoricalComparison.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireSha256;
+
+import de.regelsuche.discovery.representation.ReferenceIndependentCandidateValidation.Artifact;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/** Post-validation diagnostic join. Historical labels cannot enter the validation runner. */
+public final class ReferenceIndependentValidationHistoricalComparison {
+    private ReferenceIndependentValidationHistoricalComparison() {
+    }
+
+    /** The caller supplies historical authority independently of the untrusted artifact bytes. */
+    public static Comparison compare(Artifact validation, String historicalJson,
+                                     String expectedHistoricalQualificationHash) {
+<span class="fc" id="L22">        String expectedHash = requireSha256(</span>
+            expectedHistoricalQualificationHash, &quot;expectedHistoricalQualificationHash&quot;);
+<span class="fc" id="L24">        var historical = QualificationArtifact.fromCanonicalJson(historicalJson);</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (!historical.contentHash().equals(expectedHash)) {</span>
+<span class="fc" id="L26">            throw new IllegalArgumentException(&quot;historical comparison content hash differs from expected authority&quot;);</span>
+        }
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        if (!historical.content().candidateFreezeHash().equals(validation.content().candidateFreezeHash())) {</span>
+<span class="nc" id="L29">            throw new IllegalArgumentException(&quot;historical comparison refers to another candidate freeze&quot;);</span>
+        }
+<span class="fc" id="L31">        List&lt;RowComparison&gt; rows = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        for (int index = 0; index &lt; validation.content().rows().size(); index++) {</span>
+<span class="fc" id="L33">            var row = validation.content().rows().get(index);</span>
+<span class="fc" id="L34">            var labels = historical.content().rows().get(index);</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">            if (!row.configurationId().equals(labels.configurationId())</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">                    || !row.candidateBatchHash().equals(labels.candidateBatchHash())</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">                    || !row.candidateSetHash().equals(labels.candidateSetHash())</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">                    || !row.candidateFreezeReceiptHash().equals(labels.candidateFreezeReceiptHash())</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">                    || !row.formationWorkHash().equals(labels.workLedgerHash())) {</span>
+<span class="nc" id="L40">                throw new IllegalArgumentException(&quot;historical comparison row authority mismatch&quot;);</span>
+            }
+<span class="fc" id="L42">            Map&lt;String, CandidateQualification&gt; byHash = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            for (var label : labels.candidates()) {</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">                if (byHash.put(label.candidateHash(), label) != null) {</span>
+<span class="nc" id="L45">                    throw new IllegalArgumentException(&quot;duplicate historical candidate label&quot;);</span>
+                }
+<span class="fc" id="L47">            }</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">            if (byHash.size() != row.outcomes().size()) {</span>
+<span class="nc" id="L49">                throw new IllegalArgumentException(&quot;historical and validation candidate sets differ&quot;);</span>
+            }
+<span class="fc" id="L51">            int matched = 0;</span>
+<span class="fc" id="L52">            int agreements = 0;</span>
+<span class="fc" id="L53">            int formerlyNotRun = 0;</span>
+<span class="fc" id="L54">            Map&lt;String, Integer&gt; nonReferenceReasons = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            for (var outcome : row.outcomes()) {</span>
+<span class="fc" id="L56">                var label = byHash.remove(outcome.candidate().candidateHash());</span>
+<span class="pc bpc" id="L57" title="2 of 4 branches missed.">                if (label == null || !label.expression().equals(outcome.candidate().expression())</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">                        || !label.assumptions().equals(outcome.candidate().assumptions())) {</span>
+<span class="nc" id="L59">                    throw new IllegalArgumentException(&quot;historical candidate identity mismatch&quot;);</span>
+                }
+<span class="fc bfc" id="L61" title="All 2 branches covered.">                if (label.referenceMatched()) {</span>
+<span class="fc" id="L62">                    matched++;</span>
+                } else {
+<span class="fc" id="L64">                    nonReferenceReasons.merge(outcome.terminalReason(), 1, Math::addExact);</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                    if (outcome.validation().intrinsicallyVerified()) {</span>
+<span class="fc" id="L66">                        agreements++;</span>
+                    }
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                    if (label.oracleStatus().equals(&quot;NOT_RUN_REFERENCE_MISS&quot;)) {</span>
+<span class="fc" id="L69">                        formerlyNotRun++;</span>
+                    }
+                }
+<span class="fc" id="L72">            }</span>
+<span class="fc" id="L73">            rows.add(new RowComparison(row.sequence(), row.configurationId(), row.outcomes().size(),</span>
+<span class="fc" id="L74">                matched, row.outcomes().size() - matched, agreements, formerlyNotRun, nonReferenceReasons));</span>
+        }
+<span class="fc" id="L76">        return new Comparison(&quot;reference-independent-candidate-validation-historical-comparison/v1&quot;,</span>
+<span class="fc" id="L77">            validation.contentHash(), historical.contentHash(), validation.content().candidateFreezeHash(),</span>
+            ReferenceIndependentCandidateValidation.EVIDENCE_SCOPE,
+<span class="fc" id="L79">            rows.stream().mapToInt(RowComparison::candidates).sum(),</span>
+<span class="fc" id="L80">            rows.stream().mapToInt(RowComparison::referenceMatchedCandidates).sum(),</span>
+<span class="fc" id="L81">            rows.stream().mapToInt(RowComparison::nonReferenceCandidates).sum(),</span>
+<span class="fc" id="L82">            rows.stream().mapToInt(RowComparison::nonReferenceOracleAgreements).sum(),</span>
+<span class="fc" id="L83">            rows.stream().mapToInt(RowComparison::nonReferenceHistoricalOracleNotRun).sum(), rows,</span>
+            &quot;Historical correspondence is joined only after companion validation. Oracle agreement &quot;
+                + &quot;is bounded numeric/quadratic evidence, not salience, utility, formal proof or external novelty. &quot;
+                + &quot;Repeated lineages and checkpoints are not independent mathematical tasks.&quot;);
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (args.length != 4) {</span>
+<span class="nc" id="L91">            throw new IllegalArgumentException(&quot;usage: &lt;validation.json&gt; &lt;historical-qualification.json[.gz]&gt; &quot;</span>
+                + &quot;&lt;expected-historical-qualification-hash&gt; &lt;output.json&gt;&quot;);
+        }
+<span class="fc" id="L94">        var validation = Artifact.fromCanonicalJson(</span>
+<span class="fc" id="L95">            ReferenceIndependentCandidateValidationRunner.readArtifact(Path.of(args[0])));</span>
+<span class="fc" id="L96">        var comparison = compare(validation,</span>
+<span class="fc" id="L97">            ReferenceIndependentCandidateValidationRunner.readArtifact(Path.of(args[1])), args[2]);</span>
+<span class="fc" id="L98">        ReferenceIndependentCandidateValidationRunner.writeNewOrIdentical(Path.of(args[3]),</span>
+<span class="fc" id="L99">            TargetFreeHeldOutMatrixRunner.canonical(comparison));</span>
+<span class="fc" id="L100">    }</span>
+
+    public record RowComparison(int sequence, String configurationId, int candidates,
+                                int referenceMatchedCandidates, int nonReferenceCandidates,
+                                int nonReferenceOracleAgreements, int nonReferenceHistoricalOracleNotRun,
+                                Map&lt;String, Integer&gt; nonReferenceTerminalReasons) {
+<span class="fc" id="L106">        public RowComparison {</span>
+<span class="fc" id="L107">            nonReferenceTerminalReasons = Map.copyOf(nonReferenceTerminalReasons);</span>
+<span class="fc" id="L108">        }</span>
+    }
+
+    public record Comparison(String schema, String validationHash, String historicalQualificationHash,
+                             String candidateFreezeHash, String evidenceScope, int candidates,
+                             int referenceMatchedCandidates, int nonReferenceCandidates,
+                             int nonReferenceOracleAgreements, int nonReferenceHistoricalOracleNotRun,
+                             List&lt;RowComparison&gt; rows, String claimBoundary) {
+<span class="fc" id="L116">        public Comparison {</span>
+<span class="fc" id="L117">            rows = List.copyOf(rows);</span>
+<span class="fc" id="L118">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

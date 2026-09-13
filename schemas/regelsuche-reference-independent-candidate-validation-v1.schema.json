@@ -1,0 +1,466 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "reference-independent-candidate-validation/v1",
+  "title": "Reference-independent validation companion for a frozen public candidate matrix v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "content",
+    "contentHash"
+  ],
+  "properties": {
+    "content": {
+      "$ref": "#/$defs/content"
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "$defs": {
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxOracleCalls",
+        "maxInputCharacters",
+        "timeoutMillis"
+      ],
+      "properties": {
+        "maxOracleCalls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "maxInputCharacters": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8192
+        },
+        "timeoutMillis": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60000
+        }
+      }
+    },
+    "work": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateVisits",
+        "oracleCalls",
+        "completedOracleCalls",
+        "inputCharacters"
+      ],
+      "properties": {
+        "candidateVisits": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "oracleCalls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "completedOracleCalls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "inputCharacters": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateHash",
+        "expression",
+        "assumptions",
+        "depth",
+        "pathExpressions",
+        "pathRuleIds",
+        "primitiveRuleIds",
+        "equivalencePreserving",
+        "temporaryComplexityIncrease"
+      ],
+      "properties": {
+        "candidateHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "expression": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "pathExpressions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 2
+        },
+        "pathRuleIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "primitiveRuleIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "equivalencePreserving": {
+          "type": "boolean"
+        },
+        "temporaryComplexityIncrease": {
+          "type": "boolean"
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "oracleStatus",
+        "oracleEvidence",
+        "scope",
+        "assumptions"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "OBSERVED",
+            "SYMBOLICALLY_VERIFIED",
+            "REJECTED"
+          ]
+        },
+        "oracleStatus": {
+          "type": "string",
+          "pattern": "^(AGREE|DISAGREE|UNAVAILABLE|VALIDATOR_ERROR_[A-Za-z0-9_$]+|NOT_RUN_[A-Z_]+)$"
+        },
+        "oracleEvidence": {
+          "type": "string"
+        },
+        "scope": {
+          "enum": [
+            "UNCONDITIONAL",
+            "CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate",
+        "inputHash",
+        "occurrencePath",
+        "primitivePathHash",
+        "primitiveReplayStatus",
+        "exactSourceEquality",
+        "validation",
+        "terminalReason",
+        "evidenceStrength",
+        "formalProofStatus",
+        "evidenceHash",
+        "work"
+      ],
+      "properties": {
+        "candidate": {
+          "$ref": "#/$defs/candidate"
+        },
+        "inputHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "occurrencePath": {
+          "const": "$"
+        },
+        "primitivePathHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "primitiveReplayStatus": {
+          "const": "FROZEN_LINEAGE_NOT_REPLAYED"
+        },
+        "exactSourceEquality": {
+          "enum": [
+            "EXACT_SOURCE_BYTES_EQUAL",
+            "DIFFERENT_SOURCE_BYTES"
+          ]
+        },
+        "validation": {
+          "$ref": "#/$defs/validation"
+        },
+        "terminalReason": {
+          "enum": [
+            "NOT_EQUIVALENCE_PRESERVING",
+            "INPUT_BUDGET_EXCEEDED",
+            "ORACLE_BUDGET_EXHAUSTED",
+            "TIMEOUT",
+            "TECHNICAL_FAILURE",
+            "UNSUPPORTED",
+            "CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED",
+            "ORACLE_AGREE",
+            "REFUTED",
+            "UNRESOLVED"
+          ]
+        },
+        "evidenceStrength": {
+          "enum": [
+            "DETERMINISTIC_NUMERIC_SAMPLES",
+            "NORMALIZED_QUADRATIC_COEFFICIENTS",
+            "NO_CLASSIFIED_INDEPENDENT_EQUALITY_EVIDENCE"
+          ]
+        },
+        "formalProofStatus": {
+          "const": "NOT_ESTABLISHED"
+        },
+        "evidenceHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "work": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/work"
+            },
+            {
+              "properties": {
+                "candidateVisits": {
+                  "const": 1
+                },
+                "oracleCalls": {
+                  "maximum": 1
+                },
+                "completedOracleCalls": {
+                  "maximum": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "configurationId",
+        "sourceExpression",
+        "sourceHash",
+        "candidateBatchHash",
+        "candidateSetHash",
+        "candidateFreezeReceiptHash",
+        "formationWorkHash",
+        "outcomes",
+        "work"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 144
+        },
+        "configurationId": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "sourceExpression": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "candidateBatchHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "candidateSetHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "candidateFreezeReceiptHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "formationWorkHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "outcomes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/outcome"
+          }
+        },
+        "work": {
+          "$ref": "#/$defs/work"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rows",
+        "candidates",
+        "oracleCalls",
+        "completedOracleCalls",
+        "inputCharacters",
+        "terminalReasons"
+      ],
+      "properties": {
+        "rows": {
+          "const": 144
+        },
+        "candidates": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "oracleCalls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "completedOracleCalls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "inputCharacters": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "terminalReasons": {
+          "type": "object",
+          "propertyNames": {
+            "enum": [
+              "NOT_EQUIVALENCE_PRESERVING",
+              "INPUT_BUDGET_EXCEEDED",
+              "ORACLE_BUDGET_EXHAUSTED",
+              "TIMEOUT",
+              "TECHNICAL_FAILURE",
+              "UNSUPPORTED",
+              "CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED",
+              "ORACLE_AGREE",
+              "REFUTED",
+              "UNRESOLVED"
+            ]
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          }
+        }
+      }
+    },
+    "content": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "evidenceScope",
+        "repositoryRevision",
+        "formationRepositoryRevision",
+        "planHash",
+        "candidateFreezeHash",
+        "oracleRevision",
+        "workAuthority",
+        "budget",
+        "rows",
+        "summary",
+        "claimBoundary"
+      ],
+      "properties": {
+        "schema": {
+          "const": "reference-independent-candidate-validation/v1"
+        },
+        "evidenceScope": {
+          "const": "ALREADY_PUBLIC_ARCHIVED_MATRIX_NOT_FRESH_HELD_OUT"
+        },
+        "repositoryRevision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "formationRepositoryRevision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "planHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "candidateFreezeHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "oracleRevision": {
+          "const": "regelsuche-numeric-samples-and-quadratic-coefficients/v1"
+        },
+        "workAuthority": {
+          "const": "ADMITTED_ORACLE_CALLS_AND_INPUT_CHARACTERS_NOT_INTERNAL_OPERATIONS"
+        },
+        "budget": {
+          "$ref": "#/$defs/budget"
+        },
+        "rows": {
+          "type": "array",
+          "minItems": 144,
+          "maxItems": 144,
+          "items": {
+            "$ref": "#/$defs/row"
+          }
+        },
+        "summary": {
+          "$ref": "#/$defs/summary"
+        },
+        "claimBoundary": {
+          "const": "Companion validation of an already public frozen candidate matrix. The existing oracle uses deterministic numeric samples or normalized quadratic coefficients, not external SymPy. Its legacy SYMBOLICALLY_VERIFIED status does not establish formal proof, primitive replay, original-domain completeness, salience, downstream utility, fresh held-out performance or novelty."
+        }
+      }
+    }
+  }
+}

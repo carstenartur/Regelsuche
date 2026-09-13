@@ -10,51 +10,55 @@ import java.util.Map;
 /**
  * Expands expressions with an explicitly allow-listed set of recognition-safe
  * rules. Expansion is deterministic and bounded by profile depth and a hard
- * representative limit.
+ * representative limit. This expression-only API cannot retain assumptions,
+ * so only concrete applications with an empty assumption list are admitted.
  */
 public final class RecognitionTheory implements EquivalentExpressionProvider {
     private static final int MAX_REPRESENTATIVES = 64;
     private final Map&lt;String, RewriteRule&gt; rules;
 
-<span class="fc" id="L19">    public RecognitionTheory(List&lt;? extends RewriteRule&gt; rules) {</span>
-<span class="fc" id="L20">        Map&lt;String, RewriteRule&gt; byId = new LinkedHashMap&lt;&gt;();</span>
-<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        if (rules != null) {</span>
-<span class="pc bpc" id="L22" title="1 of 2 branches missed.">            rules.stream().filter(rule -&gt; rule != null)</span>
-<span class="fc" id="L23">                .sorted(java.util.Comparator.comparing(RewriteRule::id))</span>
-<span class="fc" id="L24">                .forEach(rule -&gt; byId.put(rule.id(), rule));</span>
+<span class="fc" id="L20">    public RecognitionTheory(List&lt;? extends RewriteRule&gt; rules) {</span>
+<span class="fc" id="L21">        Map&lt;String, RewriteRule&gt; byId = new LinkedHashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        if (rules != null) {</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">            rules.stream().filter(rule -&gt; rule != null)</span>
+<span class="fc" id="L24">                .sorted(java.util.Comparator.comparing(RewriteRule::id))</span>
+<span class="fc" id="L25">                .forEach(rule -&gt; byId.put(rule.id(), rule));</span>
         }
-<span class="fc" id="L26">        this.rules = Map.copyOf(byId);</span>
-<span class="fc" id="L27">    }</span>
+<span class="fc" id="L27">        this.rules = Map.copyOf(byId);</span>
+<span class="fc" id="L28">    }</span>
 
     @Override
     public List&lt;Expr&gt; representatives(Expr expression, RecognitionProfile profile) {
-<span class="fc" id="L31">        LinkedHashMap&lt;Expr, Integer&gt; seen = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L32">        ArrayDeque&lt;Expr&gt; queue = new ArrayDeque&lt;&gt;();</span>
-<span class="fc" id="L33">        seen.put(expression, 0);</span>
-<span class="fc" id="L34">        queue.add(expression);</span>
-<span class="fc" id="L35">        List&lt;String&gt; sortedRuleIds = profile.recognitionRuleIds().stream().sorted().toList();</span>
-<span class="pc bpc" id="L36" title="1 of 4 branches missed.">        while (!queue.isEmpty() &amp;&amp; seen.size() &lt; MAX_REPRESENTATIVES) {</span>
-<span class="fc" id="L37">            Expr current = queue.removeFirst();</span>
-<span class="fc" id="L38">            int depth = seen.get(current);</span>
-<span class="fc bfc" id="L39" title="All 2 branches covered.">            if (depth &gt;= profile.maxEquivalenceDepth()) {</span>
-<span class="fc" id="L40">                continue;</span>
+<span class="fc" id="L32">        LinkedHashMap&lt;Expr, Integer&gt; seen = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L33">        ArrayDeque&lt;Expr&gt; queue = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L34">        seen.put(expression, 0);</span>
+<span class="fc" id="L35">        queue.add(expression);</span>
+<span class="fc" id="L36">        List&lt;String&gt; sortedRuleIds = profile.recognitionRuleIds().stream().sorted().toList();</span>
+<span class="pc bpc" id="L37" title="1 of 4 branches missed.">        while (!queue.isEmpty() &amp;&amp; seen.size() &lt; MAX_REPRESENTATIVES) {</span>
+<span class="fc" id="L38">            Expr current = queue.removeFirst();</span>
+<span class="fc" id="L39">            int depth = seen.get(current);</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">            if (depth &gt;= profile.maxEquivalenceDepth()) {</span>
+<span class="fc" id="L41">                continue;</span>
             }
-<span class="fc bfc" id="L42" title="All 2 branches covered.">            for (String ruleId : sortedRuleIds) {</span>
-<span class="fc" id="L43">                RewriteRule rule = rules.get(ruleId);</span>
-<span class="pc bpc" id="L44" title="3 of 6 branches missed.">                if (rule == null || !rule.isEquivalencePreservingByConstruction() || !rule.matches(current)) {</span>
-<span class="nc" id="L45">                    continue;</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            for (String ruleId : sortedRuleIds) {</span>
+<span class="fc" id="L44">                RewriteRule rule = rules.get(ruleId);</span>
+<span class="pc bpc" id="L45" title="2 of 6 branches missed.">                if (rule == null || !rule.isEquivalencePreservingByConstruction() || !rule.matches(current)) {</span>
+<span class="fc" id="L46">                    continue;</span>
                 }
-<span class="fc" id="L47">                Expr next = rule.apply(current);</span>
-<span class="pc bpc" id="L48" title="1 of 2 branches missed.">                if (!seen.containsKey(next)) {</span>
-<span class="fc" id="L49">                    seen.put(next, depth + 1);</span>
-<span class="fc" id="L50">                    queue.addLast(next);</span>
-<span class="pc bpc" id="L51" title="1 of 2 branches missed.">                    if (seen.size() &gt;= MAX_REPRESENTATIVES) {</span>
-<span class="nc" id="L52">                        break;</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">                if (!rule.assumptions(current).isEmpty()) {</span>
+<span class="fc" id="L49">                    continue;</span>
+                }
+<span class="fc" id="L51">                Expr next = rule.apply(current);</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">                if (!seen.containsKey(next)) {</span>
+<span class="fc" id="L53">                    seen.put(next, depth + 1);</span>
+<span class="fc" id="L54">                    queue.addLast(next);</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">                    if (seen.size() &gt;= MAX_REPRESENTATIVES) {</span>
+<span class="nc" id="L56">                        break;</span>
                     }
                 }
-<span class="fc" id="L55">            }</span>
-<span class="fc" id="L56">        }</span>
-<span class="fc" id="L57">        return new ArrayList&lt;&gt;(seen.keySet());</span>
+<span class="fc" id="L59">            }</span>
+<span class="fc" id="L60">        }</span>
+<span class="fc" id="L61">        return new ArrayList&lt;&gt;(seen.keySet());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -15,6 +15,12 @@ public interface RewriteRule {
 
     int estimatedCostDelta();
 
+    /**
+     * Whether a matching application preserves equivalence under all conditions
+     * returned by {@link #assumptions(Expr)}. Callers must retain or discharge
+     * those concrete conditions; callers without an assumption channel must
+     * reject applications that introduce any conditions.
+     */
     boolean isEquivalencePreservingByConstruction();
 
     boolean matches(Expr subtree);
@@ -23,12 +29,12 @@ public interface RewriteRule {
 
     /** Symbolic side conditions introduced by this concrete application. */
     default List&lt;Assumption&gt; assumptions(Expr subtree) {
-<span class="fc" id="L26">        return List.of();</span>
+<span class="fc" id="L32">        return List.of();</span>
     }
 
     /** Static declaration that this rule can emit a side condition. */
     default boolean mayEmitAssumptions() {
-<span class="fc" id="L31">        return false;</span>
+<span class="fc" id="L37">        return false;</span>
     }
 
     /**
@@ -36,11 +42,11 @@ public interface RewriteRule {
      * caller may infer this contract from IDs, classes, examples or benchmarks.
      */
     default Optional&lt;RewriteApplicabilitySchema&gt; explicitApplicabilitySchema() {
-<span class="fc" id="L39">        return Optional.empty();</span>
+<span class="fc" id="L45">        return Optional.empty();</span>
     }
 
     default RuleDescriptor descriptor() {
-<span class="fc" id="L43">        return RuleDescriptor.core(id(), List.of());</span>
+<span class="fc" id="L49">        return RuleDescriptor.core(id(), List.of());</span>
     }
 
     /**
@@ -53,7 +59,7 @@ public interface RewriteRule {
         @Override
         default Optional&lt;RewriteApplicabilitySchema&gt;
                 explicitApplicabilitySchema() {
-<span class="fc" id="L56">            return Optional.of(applicabilitySchema());</span>
+<span class="fc" id="L62">            return Optional.of(applicabilitySchema());</span>
         }
 
         /** Builds the standard exact source-pattern contract for this rule. */
@@ -61,12 +67,12 @@ public interface RewriteRule {
             PatternExpr pattern,
             RequiredAssumptionTemplate... requiredAssumptions
         ) {
-<span class="fc" id="L64">            return new RewriteApplicabilitySchema(</span>
-<span class="fc" id="L65">                &quot;algorithmic-source/v1:&quot; + id(),</span>
+<span class="fc" id="L70">            return new RewriteApplicabilitySchema(</span>
+<span class="fc" id="L71">                &quot;algorithmic-source/v1:&quot; + id(),</span>
                 this,
                 pattern,
-<span class="fc" id="L68">                RecognitionProfile.exact(),</span>
-<span class="fc" id="L69">                List.of(requiredAssumptions));</span>
+<span class="fc" id="L74">                RecognitionProfile.exact(),</span>
+<span class="fc" id="L75">                List.of(requiredAssumptions));</span>
         }
     }
 }

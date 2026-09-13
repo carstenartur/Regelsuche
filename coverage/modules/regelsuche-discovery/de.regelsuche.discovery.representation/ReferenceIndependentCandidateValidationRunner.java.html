@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReferenceIndependentCandidateValidationRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">ReferenceIndependentCandidateValidationRunner.java</span></div><h1>ReferenceIndependentCandidateValidationRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation.ReferenceIndependentCandidateValidation.*;
+
+import de.regelsuche.discovery.representation.TargetFreeIntrinsicCandidateValidator.IntrinsicValidation;
+import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.OracleValidator;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
+
+/** Validates retained inputs; never forms candidates or opens qualification. */
+public final class ReferenceIndependentCandidateValidationRunner {
+    private ReferenceIndependentCandidateValidationRunner() {
+    }
+
+    public static Artifact run(String planJson, String freezeJson, String expectedFreezeHash,
+                               String repositoryRevision, Budget budget) {
+<span class="fc" id="L28">        try (var oracle = new ReferenceIndependentOracleSession(budget.timeoutMillis())) {</span>
+<span class="fc" id="L29">            return run(planJson, freezeJson, expectedFreezeHash, repositoryRevision, budget, oracle);</span>
+        }
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="pc bpc" id="L34" title="1 of 4 branches missed.">        if (args.length == 9 &amp;&amp; args[0].equals(&quot;run&quot;)) {</span>
+<span class="fc" id="L35">            Path plan = Path.of(args[1]);</span>
+<span class="fc" id="L36">            Path freeze = Path.of(args[2]);</span>
+<span class="fc" id="L37">            Path output = Path.of(args[8]);</span>
+<span class="pc bpc" id="L38" title="5 of 6 branches missed.">            if (Files.exists(output) &amp;&amp; (Files.isSameFile(output, plan) || Files.isSameFile(output, freeze))) {</span>
+<span class="nc" id="L39">                throw new IllegalArgumentException(&quot;output must not replace frozen input artifacts&quot;);</span>
+            }
+<span class="fc" id="L41">            String planJson = readArtifact(plan);</span>
+<span class="fc" id="L42">            String freezeJson = readArtifact(freeze);</span>
+<span class="fc" id="L43">            var budget = new Budget(Integer.parseInt(args[5]), Integer.parseInt(args[6]),</span>
+<span class="fc" id="L44">                Integer.parseInt(args[7]));</span>
+<span class="fc" id="L45">            var artifact = run(planJson, freezeJson, args[3], args[4], budget);</span>
+<span class="fc" id="L46">            ReferenceIndependentCandidateValidationVerifier.verifyBindings(</span>
+<span class="fc" id="L47">                planJson, freezeJson, args[3], artifact.toCanonicalJson());</span>
+<span class="fc" id="L48">            writeNewOrIdentical(output, artifact.toCanonicalJson());</span>
+<span class="fc" id="L49">            System.out.println(&quot;referenceIndependentValidationHash=&quot; + artifact.contentHash());</span>
+<span class="fc" id="L50">            System.out.println(&quot;referenceIndependentValidationRows=&quot; + artifact.content().summary().rows());</span>
+<span class="fc" id="L51">            System.out.println(&quot;referenceIndependentValidationCandidates=&quot; + artifact.content().summary().candidates());</span>
+<span class="pc bpc" id="L52" title="2 of 4 branches missed.">        } else if (args.length == 9 &amp;&amp; args[0].equals(&quot;verify&quot;)) {</span>
+<span class="fc" id="L53">            var budget = new Budget(Integer.parseInt(args[5]), Integer.parseInt(args[6]),</span>
+<span class="fc" id="L54">                Integer.parseInt(args[7]));</span>
+<span class="fc" id="L55">            var artifact = ReferenceIndependentCandidateValidationVerifier.verifyReplay(</span>
+<span class="fc" id="L56">                readArtifact(Path.of(args[1])), readArtifact(Path.of(args[2])),</span>
+<span class="fc" id="L57">                args[3], args[4], budget, readArtifact(Path.of(args[8])));</span>
+<span class="fc" id="L58">            System.out.println(&quot;referenceIndependentReplayVerifiedHash=&quot; + artifact.contentHash());</span>
+<span class="fc" id="L59">        } else {</span>
+<span class="nc" id="L60">            throw new IllegalArgumentException(&quot;usage: run &lt;plan.json[.gz]&gt; &lt;freeze.json[.gz]&gt; &quot;</span>
+                + &quot;&lt;freeze-hash&gt; &lt;implementation-commit&gt; &lt;max-oracle-calls&gt; &lt;max-input-characters&gt; &quot;
+                + &quot;&lt;timeout-ms&gt; &lt;output.json&gt; | verify &lt;plan&gt; &lt;freeze&gt; &lt;freeze-hash&gt; &quot;
+                + &quot;&lt;expected-implementation-commit&gt; &lt;expected-max-oracle-calls&gt; &quot;
+                + &quot;&lt;expected-max-input-characters&gt; &lt;expected-timeout-ms&gt; &lt;validation.json&gt;&quot;);
+        }
+<span class="fc" id="L66">    }</span>
+
+    static String readArtifact(Path path) throws IOException {
+<span class="fc" id="L69">        try (var raw = Files.newInputStream(path);</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">             var input = path.toString().endsWith(&quot;.gz&quot;) ? new GZIPInputStream(raw) : raw) {</span>
+<span class="fc" id="L71">            byte[] bytes = input.readNBytes(32 * 1024 * 1024 + 1);</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            if (bytes.length &gt; 32 * 1024 * 1024) {</span>
+<span class="nc" id="L73">                throw new IOException(&quot;artifact exceeds 32 MiB bounded input limit&quot;);</span>
+            }
+<span class="fc" id="L75">            return StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes)).toString();</span>
+        }
+    }
+
+    static void writeNewOrIdentical(Path output, String json) throws IOException {
+<span class="fc" id="L80">        Path target = output.toAbsolutePath().normalize();</span>
+<span class="fc" id="L81">        Files.createDirectories(target.getParent());</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (Files.exists(target)) {</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">            if (!Files.readString(target, StandardCharsets.UTF_8).equals(json)) {</span>
+<span class="nc" id="L84">                throw new IOException(&quot;refusing to replace different retained evidence&quot;);</span>
+            }
+<span class="nc" id="L86">            return;</span>
+        }
+<span class="fc" id="L88">        Files.writeString(target, json, StandardCharsets.UTF_8, StandardOpenOption.CREATE_NEW);</span>
+<span class="fc" id="L89">    }</span>
+
+    static Artifact run(String planJson, String freezeJson, String expectedFreezeHash,
+                        String repositoryRevision, Budget budget, OracleValidator oracle) {
+<span class="fc" id="L93">        Objects.requireNonNull(oracle, &quot;oracle&quot;);</span>
+<span class="fc" id="L94">        Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="pc bpc" id="L95" title="2 of 4 branches missed.">        if (repositoryRevision == null || !repositoryRevision.matches(&quot;[0-9a-f]{40}&quot;)) {</span>
+<span class="nc" id="L96">            throw new IllegalArgumentException(&quot;implementation revision must be a full Git commit&quot;);</span>
+        }
+<span class="fc" id="L98">        PlanArtifact plan = PlanArtifact.fromCanonicalJson(planJson);</span>
+<span class="fc" id="L99">        FreezeArtifact freeze = FreezeArtifact.fromCanonicalJson(freezeJson);</span>
+<span class="fc" id="L100">        requireInputs(plan, freeze, expectedFreezeHash);</span>
+<span class="fc" id="L101">        var cases = plan.content().cases().stream()</span>
+<span class="fc" id="L102">            .collect(Collectors.toUnmodifiableMap(CaseSpec::id, Function.identity()));</span>
+<span class="fc" id="L103">        List&lt;Row&gt; rows = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L104">        int usedCalls = 0;</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        for (FreezeRow frozen : freeze.content().rows()) {</span>
+<span class="fc" id="L106">            String source = cases.get(frozen.caseId()).sourceExpression();</span>
+<span class="fc" id="L107">            List&lt;Outcome&gt; outcomes = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            for (CandidateEvidence retained : frozen.candidates()) {</span>
+<span class="fc" id="L109">                Candidate candidate = Candidate.fromFrozen(retained);</span>
+<span class="fc" id="L110">                int characters = Math.addExact(source.length(), candidate.expression().length());</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">                String refusal = !candidate.equivalencePreserving()</span>
+<span class="nc" id="L112">                    ? &quot;NOT_EQUIVALENCE_PRESERVING&quot;</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                    : characters &gt; budget.maxInputCharacters() ? &quot;INPUT_BUDGET_EXCEEDED&quot;</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">                    : usedCalls &gt;= budget.maxOracleCalls() ? &quot;ORACLE_BUDGET_EXHAUSTED&quot; : &quot;&quot;;</span>
+                IntrinsicValidation validation;
+                Work work;
+<span class="fc bfc" id="L117" title="All 2 branches covered.">                if (!refusal.isEmpty()) {</span>
+<span class="fc" id="L118">                    validation = refused(candidate, refusal);</span>
+<span class="fc" id="L119">                    work = new Work(1, 0, 0, 0);</span>
+                } else {
+<span class="fc" id="L121">                    usedCalls++;</span>
+<span class="fc" id="L122">                    validation = TargetFreeIntrinsicCandidateValidator.validate(source,</span>
+<span class="fc" id="L123">                        candidate.expression(), candidate.assumptions(), true, oracle);</span>
+<span class="fc" id="L124">                    work = new Work(1, 1,</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">                        validation.oracleStatus().startsWith(&quot;VALIDATOR_ERROR_&quot;) ? 0 : 1,</span>
+                        characters);
+                }
+<span class="fc" id="L128">                outcomes.add(new Outcome(candidate,</span>
+<span class="fc" id="L129">                    inputHash(frozen.configurationId(), source, candidate), &quot;$&quot;,</span>
+<span class="fc" id="L130">                    pathHash(candidate), &quot;FROZEN_LINEAGE_NOT_REPLAYED&quot;,</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">                    source.equals(candidate.expression()) ? &quot;EXACT_SOURCE_BYTES_EQUAL&quot;</span>
+<span class="fc" id="L132">                        : &quot;DIFFERENT_SOURCE_BYTES&quot;,</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">                    validation, refusal.isEmpty() ? terminal(validation) : refusal,</span>
+<span class="fc" id="L134">                    strength(validation), &quot;NOT_ESTABLISHED&quot;, hash(validation), work));</span>
+<span class="fc" id="L135">            }</span>
+<span class="fc" id="L136">            rows.add(new Row(frozen.sequence(), frozen.configurationId(), source, hash(source),</span>
+<span class="fc" id="L137">                frozen.candidateBatchHash(), frozen.candidateSetHash(),</span>
+<span class="fc" id="L138">                frozen.candidateFreezeReceiptHash(), frozen.work().contentHash(),</span>
+<span class="fc" id="L139">                outcomes, Work.sum(outcomes.stream().map(Outcome::work).toList())));</span>
+<span class="fc" id="L140">        }</span>
+<span class="fc" id="L141">        return Artifact.create(new Content(SCHEMA, EVIDENCE_SCOPE, repositoryRevision,</span>
+<span class="fc" id="L142">            freeze.content().repositoryRevision(), plan.contentHash(), freeze.contentHash(),</span>
+<span class="fc" id="L143">            ORACLE_REVISION, WORK_AUTHORITY, budget, rows, Summary.derive(rows), CLAIM_BOUNDARY));</span>
+    }
+
+    static void requireInputs(PlanArtifact plan, FreezeArtifact freeze, String expectedFreezeHash) {
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (!freeze.contentHash().equals(expectedFreezeHash)</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                || !freeze.content().planHash().equals(plan.contentHash())</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                || !freeze.content().repositoryRevision().equals(plan.content().repositoryRevision())) {</span>
+<span class="fc" id="L150">            throw new IllegalArgumentException(&quot;candidate freeze is not the expected plan authority&quot;);</span>
+        }
+<span class="fc" id="L152">        var cases = plan.content().cases().stream()</span>
+<span class="fc" id="L153">            .collect(Collectors.toUnmodifiableMap(CaseSpec::id, Function.identity()));</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        for (int index = 0; index &lt; 144; index++) {</span>
+<span class="fc" id="L155">            var frozen = freeze.content().rows().get(index);</span>
+<span class="fc" id="L156">            var planned = plan.content().rows().get(index);</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">            if (!frozen.configurationId().equals(planned.configurationId())</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">                    || !frozen.caseId().equals(planned.caseId())</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">                    || !frozen.policyId().equals(planned.policyId())</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">                    || frozen.checkpoint() != planned.checkpoint()</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">                    || !cases.containsKey(frozen.caseId())) {</span>
+<span class="nc" id="L162">                throw new IllegalArgumentException(&quot;frozen row does not match plan&quot;);</span>
+            }
+<span class="fc" id="L164">            String source = cases.get(frozen.caseId()).sourceExpression();</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            for (CandidateEvidence candidate : frozen.candidates()) {</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">                if (!source.equals(candidate.pathExpressions().getFirst())</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                        || !candidate.expression().equals(candidate.pathExpressions().getLast())</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">                        || candidate.depth() != candidate.primitiveRuleIds().size()) {</span>
+<span class="nc" id="L169">                    throw new IllegalArgumentException(&quot;candidate lineage does not bind its source and result&quot;);</span>
+                }
+<span class="fc" id="L171">            }</span>
+        }
+<span class="fc" id="L173">    }</span>
+
+    static IntrinsicValidation refused(Candidate candidate, String reason) {
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        var scope = !candidate.equivalencePreserving()</span>
+<span class="nc" id="L177">            ? TargetFreeIntrinsicCandidateValidator.ValidationScope.NOT_APPLICABLE</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            : candidate.assumptions().isEmpty()</span>
+<span class="fc" id="L179">                ? TargetFreeIntrinsicCandidateValidator.ValidationScope.UNCONDITIONAL</span>
+<span class="fc" id="L180">                : TargetFreeIntrinsicCandidateValidator.ValidationScope.CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED;</span>
+<span class="fc" id="L181">        return new IntrinsicValidation(CandidateProofStatus.OBSERVED, &quot;NOT_RUN_&quot; + reason,</span>
+<span class="fc" id="L182">            &quot;Validation was not admitted: &quot; + reason, scope, candidate.assumptions());</span>
+    }
+
+    static String terminal(IntrinsicValidation value) {
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        if (value.oracleStatus().startsWith(&quot;VALIDATOR_ERROR_&quot;)) {</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            return value.oracleStatus().equals(&quot;VALIDATOR_ERROR_OracleTimeoutException&quot;)</span>
+<span class="fc" id="L188">                ? &quot;TIMEOUT&quot; : &quot;TECHNICAL_FAILURE&quot;;</span>
+        }
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        if (value.oracleStatus().equals(&quot;UNAVAILABLE&quot;)) {</span>
+<span class="fc" id="L191">            return &quot;UNSUPPORTED&quot;;</span>
+        }
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        if (value.conditionalValidityUnresolved()) {</span>
+<span class="nc" id="L194">            return &quot;CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED&quot;;</span>
+        }
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        return value.intrinsicallyVerified() ? &quot;ORACLE_AGREE&quot;</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">            : value.intrinsicallyRejected() ? &quot;REFUTED&quot; : &quot;UNRESOLVED&quot;;</span>
+    }
+
+    static String strength(IntrinsicValidation value) {
+<span class="pc bpc" id="L201" title="1 of 3 branches missed.">        return switch (value.oracleEvidence()) {</span>
+            case &quot;validated by deterministic numeric samples&quot;,
+<span class="fc" id="L203">                 &quot;not equivalent under deterministic numeric samples&quot; -&gt; &quot;DETERMINISTIC_NUMERIC_SAMPLES&quot;;</span>
+<span class="nc" id="L204">            case &quot;matching normalized quadratic coefficients&quot; -&gt; &quot;NORMALIZED_QUADRATIC_COEFFICIENTS&quot;;</span>
+<span class="fc" id="L205">            default -&gt; &quot;NO_CLASSIFIED_INDEPENDENT_EQUALITY_EVIDENCE&quot;;</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

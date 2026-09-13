@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginAwareAstRewriteTransformationEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginAwareAstRewriteTransformationEngine.java</span></div><h1>PluginAwareAstRewriteTransformationEngine.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
 
+import de.regelsuche.assumption.Assumption;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
@@ -20,33 +21,33 @@ public final class PluginAwareAstRewriteTransformationEngine implements Transfor
     private static final int DEFAULT_MAX_AST_SIZE_INCREASE = 12;
     private static final int DEFAULT_MAX_CANDIDATES_PER_STATE = 80;
 
-<span class="fc" id="L23">    private final ExpressionParser parser = new ExpressionParser();</span>
-<span class="fc" id="L24">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+<span class="fc" id="L24">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L25">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
     private final List&lt;RewriteRule&gt; rules;
     private final AstVisitorRegistry visitorRegistry;
     private final int maxAstSizeIncreasePerStep;
     private final int maxCandidatesPerState;
     private final List&lt;RuleDebugMetadata&gt; debugMetadata;
-<span class="fc" id="L30">    private List&lt;AstVisitorContext.VisitorDiagnostic&gt; lastVisitorDiagnostics = List.of();</span>
-<span class="fc" id="L31">    private boolean debugMode = false;</span>
+<span class="fc" id="L31">    private List&lt;AstVisitorContext.VisitorDiagnostic&gt; lastVisitorDiagnostics = List.of();</span>
+<span class="fc" id="L32">    private boolean debugMode = false;</span>
     private RuleDebugReport lastDebugReport;
 
     public PluginAwareAstRewriteTransformationEngine(List&lt;RewriteRule&gt; rules, AstVisitorRegistry visitorRegistry) {
-<span class="fc" id="L35">        this(rules, visitorRegistry, DEFAULT_MAX_AST_SIZE_INCREASE, DEFAULT_MAX_CANDIDATES_PER_STATE);</span>
-<span class="fc" id="L36">    }</span>
+<span class="fc" id="L36">        this(rules, visitorRegistry, DEFAULT_MAX_AST_SIZE_INCREASE, DEFAULT_MAX_CANDIDATES_PER_STATE);</span>
+<span class="fc" id="L37">    }</span>
 
     public PluginAwareAstRewriteTransformationEngine(
         List&lt;RewriteRule&gt; rules,
         AstVisitorRegistry visitorRegistry,
         int maxAstSizeIncreasePerStep,
         int maxCandidatesPerState
-<span class="fc" id="L43">    ) {</span>
-<span class="fc" id="L44">        this.rules = List.copyOf(rules);</span>
-<span class="fc" id="L45">        this.visitorRegistry = visitorRegistry;</span>
-<span class="fc" id="L46">        this.maxAstSizeIncreasePerStep = maxAstSizeIncreasePerStep;</span>
-<span class="fc" id="L47">        this.maxCandidatesPerState = maxCandidatesPerState;</span>
-<span class="fc" id="L48">        this.debugMetadata = List.of();</span>
-<span class="fc" id="L49">    }</span>
+<span class="fc" id="L44">    ) {</span>
+<span class="fc" id="L45">        this.rules = List.copyOf(rules);</span>
+<span class="fc" id="L46">        this.visitorRegistry = visitorRegistry;</span>
+<span class="fc" id="L47">        this.maxAstSizeIncreasePerStep = maxAstSizeIncreasePerStep;</span>
+<span class="fc" id="L48">        this.maxCandidatesPerState = maxCandidatesPerState;</span>
+<span class="fc" id="L49">        this.debugMetadata = List.of();</span>
+<span class="fc" id="L50">    }</span>
 
     PluginAwareAstRewriteTransformationEngine(
         List&lt;RewriteRule&gt; rules,
@@ -54,69 +55,69 @@ public final class PluginAwareAstRewriteTransformationEngine implements Transfor
         int maxAstSizeIncreasePerStep,
         int maxCandidatesPerState,
         List&lt;RuleDebugMetadata&gt; debugMetadata
-<span class="fc" id="L57">    ) {</span>
-<span class="fc" id="L58">        this.rules = List.copyOf(rules);</span>
-<span class="fc" id="L59">        this.visitorRegistry = visitorRegistry;</span>
-<span class="fc" id="L60">        this.maxAstSizeIncreasePerStep = maxAstSizeIncreasePerStep;</span>
-<span class="fc" id="L61">        this.maxCandidatesPerState = maxCandidatesPerState;</span>
-<span class="fc" id="L62">        this.debugMetadata = List.copyOf(debugMetadata);</span>
-<span class="fc" id="L63">    }</span>
+<span class="fc" id="L58">    ) {</span>
+<span class="fc" id="L59">        this.rules = List.copyOf(rules);</span>
+<span class="fc" id="L60">        this.visitorRegistry = visitorRegistry;</span>
+<span class="fc" id="L61">        this.maxAstSizeIncreasePerStep = maxAstSizeIncreasePerStep;</span>
+<span class="fc" id="L62">        this.maxCandidatesPerState = maxCandidatesPerState;</span>
+<span class="fc" id="L63">        this.debugMetadata = List.copyOf(debugMetadata);</span>
+<span class="fc" id="L64">    }</span>
 
     public List&lt;RewriteRule&gt; rules() {
-<span class="fc" id="L66">        return rules;</span>
+<span class="fc" id="L67">        return rules;</span>
     }
 
     public List&lt;AstVisitorContext.VisitorDiagnostic&gt; lastVisitorDiagnostics() {
-<span class="fc" id="L70">        return lastVisitorDiagnostics;</span>
+<span class="fc" id="L71">        return lastVisitorDiagnostics;</span>
     }
 
     public void enableDebugMode() {
-<span class="fc" id="L74">        this.debugMode = true;</span>
-<span class="fc" id="L75">    }</span>
+<span class="fc" id="L75">        this.debugMode = true;</span>
+<span class="fc" id="L76">    }</span>
 
     public void disableDebugMode() {
-<span class="nc" id="L78">        this.debugMode = false;</span>
-<span class="nc" id="L79">    }</span>
+<span class="nc" id="L79">        this.debugMode = false;</span>
+<span class="nc" id="L80">    }</span>
 
     public boolean isDebugMode() {
-<span class="nc" id="L82">        return debugMode;</span>
+<span class="nc" id="L83">        return debugMode;</span>
     }
 
     public RuleDebugReport lastDebugReport() {
-<span class="fc" id="L86">        return lastDebugReport;</span>
+<span class="fc" id="L87">        return lastDebugReport;</span>
     }
 
     @Override
     public List&lt;Transformation&gt; transform(String expression) {
         Expr root;
-<span class="fc" id="L92">        lastDebugReport = null;</span>
+<span class="fc" id="L93">        lastDebugReport = null;</span>
         try {
-<span class="fc" id="L94">            root = parser.parse(new InputRequest(InputType.TERM, expression)).terms().getFirst();</span>
-<span class="nc" id="L95">        } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L96">            return List.of();</span>
-<span class="fc" id="L97">        }</span>
-<span class="fc" id="L98">        AstVisitorContext context = new AstVisitorContext();</span>
-<span class="fc" id="L99">        visitorRegistry.execute(AstVisitorPhase.AFTER_PARSE, root, context);</span>
-<span class="fc" id="L100">        visitorRegistry.execute(AstVisitorPhase.BEFORE_NORMALIZATION, root, context);</span>
-<span class="fc" id="L101">        visitorRegistry.execute(AstVisitorPhase.AFTER_NORMALIZATION, root, context);</span>
-<span class="fc" id="L102">        visitorRegistry.execute(AstVisitorPhase.BEFORE_SEARCH, root, context);</span>
-<span class="fc" id="L103">        String formattedInput = ExpressionFormatter.format(root);</span>
-<span class="fc" id="L104">        int originalSize = canonicalizer.astNodeCount(formattedInput);</span>
-<span class="fc bfc" id="L105" title="All 2 branches covered.">        List&lt;RuleAttempt&gt; attempts = debugMode ? new ArrayList&lt;&gt;() : null;</span>
-<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (attempts != null) {</span>
-<span class="fc" id="L107">            appendRuntimeDebugAttempts(attempts);</span>
+<span class="fc" id="L95">            root = parser.parse(new InputRequest(InputType.TERM, expression)).terms().getFirst();</span>
+<span class="nc" id="L96">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L97">            return List.of();</span>
+<span class="fc" id="L98">        }</span>
+<span class="fc" id="L99">        AstVisitorContext context = new AstVisitorContext();</span>
+<span class="fc" id="L100">        visitorRegistry.execute(AstVisitorPhase.AFTER_PARSE, root, context);</span>
+<span class="fc" id="L101">        visitorRegistry.execute(AstVisitorPhase.BEFORE_NORMALIZATION, root, context);</span>
+<span class="fc" id="L102">        visitorRegistry.execute(AstVisitorPhase.AFTER_NORMALIZATION, root, context);</span>
+<span class="fc" id="L103">        visitorRegistry.execute(AstVisitorPhase.BEFORE_SEARCH, root, context);</span>
+<span class="fc" id="L104">        String formattedInput = ExpressionFormatter.format(root);</span>
+<span class="fc" id="L105">        int originalSize = canonicalizer.astNodeCount(formattedInput);</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        List&lt;RuleAttempt&gt; attempts = debugMode ? new ArrayList&lt;&gt;() : null;</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (attempts != null) {</span>
+<span class="fc" id="L108">            appendRuntimeDebugAttempts(attempts);</span>
         }
-<span class="fc" id="L109">        Set&lt;Transformation&gt; transformations = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (RewriteResult result : rewriteEverywhere(root, context, attempts)) {</span>
-<span class="fc" id="L111">            String formatted = ExpressionFormatter.format(result.expression());</span>
-<span class="pc bpc" id="L112" title="1 of 2 branches missed.">            if (formatted.equals(formattedInput)) {</span>
-<span class="nc" id="L113">                continue;</span>
+<span class="fc" id="L110">        Set&lt;Transformation&gt; transformations = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        for (RewriteResult result : rewriteEverywhere(root, context, attempts)) {</span>
+<span class="fc" id="L112">            String formatted = ExpressionFormatter.format(result.expression());</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (formatted.equals(formattedInput)) {</span>
+<span class="nc" id="L114">                continue;</span>
             }
-<span class="fc" id="L115">            int growth = canonicalizer.astNodeCount(formatted) - originalSize;</span>
-<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            if (growth &gt; maxAstSizeIncreasePerStep) {</span>
-<span class="nc bnc" id="L117" title="All 2 branches missed.">                if (attempts != null) {</span>
-<span class="nc" id="L118">                    attempts.add(new RuleAttempt(</span>
-<span class="nc" id="L119">                        result.rule().id(),</span>
+<span class="fc" id="L116">            int growth = canonicalizer.astNodeCount(formatted) - originalSize;</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">            if (growth &gt; maxAstSizeIncreasePerStep) {</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">                if (attempts != null) {</span>
+<span class="nc" id="L119">                    attempts.add(new RuleAttempt(</span>
+<span class="nc" id="L120">                        result.rule().id(),</span>
                         formatted,
                         &quot;SEARCH&quot;,
                         false,
@@ -125,10 +126,10 @@ public final class PluginAwareAstRewriteTransformationEngine implements Transfor
                 }
                 continue;
             }
-<span class="pc bpc" id="L128" title="1 of 2 branches missed.">            if (transformations.size() &gt;= maxCandidatesPerState) {</span>
-<span class="nc bnc" id="L129" title="All 2 branches missed.">                if (attempts != null) {</span>
-<span class="nc" id="L130">                    attempts.add(new RuleAttempt(</span>
-<span class="nc" id="L131">                        result.rule().id(),</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (transformations.size() &gt;= maxCandidatesPerState) {</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">                if (attempts != null) {</span>
+<span class="nc" id="L131">                    attempts.add(new RuleAttempt(</span>
+<span class="nc" id="L132">                        result.rule().id(),</span>
                         formatted,
                         &quot;SEARCH&quot;,
                         false,
@@ -137,26 +138,27 @@ public final class PluginAwareAstRewriteTransformationEngine implements Transfor
                 }
                 continue;
             }
-<span class="fc" id="L140">            RewriteRule rule = result.rule();</span>
-<span class="fc" id="L141">            context.setLastRuleId(rule.id());</span>
-<span class="fc" id="L142">            visitorRegistry.execute(AstVisitorPhase.AFTER_TRANSFORMATION, result.expression(), context);</span>
-<span class="fc" id="L143">            transformations.add(new Transformation(</span>
-<span class="fc" id="L144">                rule.id(),</span>
+<span class="fc" id="L141">            RewriteRule rule = result.rule();</span>
+<span class="fc" id="L142">            context.setLastRuleId(rule.id());</span>
+<span class="fc" id="L143">            visitorRegistry.execute(AstVisitorPhase.AFTER_TRANSFORMATION, result.expression(), context);</span>
+<span class="fc" id="L144">            transformations.add(new Transformation(</span>
+<span class="fc" id="L145">                rule.id(),</span>
                 formatted,
-<span class="fc" id="L146">                rule.kind(),</span>
-<span class="fc" id="L147">                rule.mayIncreaseComplexity(),</span>
-<span class="fc" id="L148">                rule.estimatedCostDelta(),</span>
-<span class="fc" id="L149">                rule.isEquivalencePreservingByConstruction(),</span>
-<span class="fc" id="L150">                rule.id() + &quot;:&quot; + result.sourceSubtreeHash()</span>
+<span class="fc" id="L147">                rule.kind(),</span>
+<span class="fc" id="L148">                rule.mayIncreaseComplexity(),</span>
+<span class="fc" id="L149">                rule.estimatedCostDelta(),</span>
+<span class="fc" id="L150">                rule.isEquivalencePreservingByConstruction(),</span>
+<span class="fc" id="L151">                rule.id() + &quot;:&quot; + result.sourceSubtreeHash(),</span>
+<span class="fc" id="L152">                result.assumptions().stream().map(Assumption::expression).toList()</span>
             ));
-<span class="fc" id="L152">        }</span>
-<span class="fc" id="L153">        visitorRegistry.execute(AstVisitorPhase.BEFORE_OUTPUT, root, context);</span>
-<span class="fc" id="L154">        visitorRegistry.execute(AstVisitorPhase.EXPLAIN_PATH, root, context);</span>
-<span class="fc" id="L155">        lastVisitorDiagnostics = context.diagnostics();</span>
-<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (attempts != null) {</span>
-<span class="fc" id="L157">            lastDebugReport = buildDebugReport(expression, attempts);</span>
+<span class="fc" id="L154">        }</span>
+<span class="fc" id="L155">        visitorRegistry.execute(AstVisitorPhase.BEFORE_OUTPUT, root, context);</span>
+<span class="fc" id="L156">        visitorRegistry.execute(AstVisitorPhase.EXPLAIN_PATH, root, context);</span>
+<span class="fc" id="L157">        lastVisitorDiagnostics = context.diagnostics();</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (attempts != null) {</span>
+<span class="fc" id="L159">            lastDebugReport = buildDebugReport(expression, attempts);</span>
         }
-<span class="fc" id="L159">        return new ArrayList&lt;&gt;(transformations);</span>
+<span class="fc" id="L161">        return new ArrayList&lt;&gt;(transformations);</span>
     }
 
     private List&lt;RewriteResult&gt; rewriteEverywhere(
@@ -164,46 +166,49 @@ public final class PluginAwareAstRewriteTransformationEngine implements Transfor
         AstVisitorContext visitorContext,
         List&lt;RuleAttempt&gt; attempts
     ) {
-<span class="fc" id="L167">        List&lt;RewriteResult&gt; results = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L168">        String subtreeHash = canonicalizer.stableHash(ExpressionFormatter.format(subtree));</span>
-<span class="fc bfc" id="L169" title="All 2 branches covered.">        for (RewriteRule rule : rules) {</span>
-<span class="fc" id="L170">            visitorRegistry.execute(AstVisitorPhase.DURING_SEARCH, subtree, visitorContext);</span>
-<span class="fc" id="L171">            Expr rewritten = applyRule(rule, subtree, visitorContext, attempts);</span>
-<span class="pc bpc" id="L172" title="1 of 4 branches missed.">            if (rewritten != null &amp;&amp; !rewritten.equals(subtree)) {</span>
-<span class="fc" id="L173">                results.add(new RewriteResult(rule, rewritten, subtreeHash));</span>
+<span class="fc" id="L169">        List&lt;RewriteResult&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L170">        String subtreeHash = canonicalizer.stableHash(ExpressionFormatter.format(subtree));</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        for (RewriteRule rule : rules) {</span>
+<span class="fc" id="L172">            visitorRegistry.execute(AstVisitorPhase.DURING_SEARCH, subtree, visitorContext);</span>
+<span class="fc" id="L173">            Expr rewritten = applyRule(rule, subtree, visitorContext, attempts);</span>
+<span class="pc bpc" id="L174" title="1 of 4 branches missed.">            if (rewritten != null &amp;&amp; !rewritten.equals(subtree)) {</span>
+<span class="fc" id="L175">                results.add(new RewriteResult(rule, rewritten, subtreeHash, rule.assumptions(subtree)));</span>
             }
-<span class="fc" id="L175">        }</span>
-<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (subtree instanceof BinaryExpr binaryExpr) {</span>
-<span class="fc bfc" id="L177" title="All 2 branches covered.">            for (RewriteResult leftRewrite : rewriteEverywhere(binaryExpr.left(), visitorContext, attempts)) {</span>
-<span class="fc" id="L178">                results.add(new RewriteResult(</span>
-<span class="fc" id="L179">                    leftRewrite.rule(),</span>
-<span class="fc" id="L180">                    new BinaryExpr(leftRewrite.expression(), binaryExpr.operator(), binaryExpr.right()),</span>
-<span class="fc" id="L181">                    leftRewrite.sourceSubtreeHash()</span>
+<span class="fc" id="L177">        }</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        if (subtree instanceof BinaryExpr binaryExpr) {</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            for (RewriteResult leftRewrite : rewriteEverywhere(binaryExpr.left(), visitorContext, attempts)) {</span>
+<span class="fc" id="L180">                results.add(new RewriteResult(</span>
+<span class="fc" id="L181">                    leftRewrite.rule(),</span>
+<span class="fc" id="L182">                    new BinaryExpr(leftRewrite.expression(), binaryExpr.operator(), binaryExpr.right()),</span>
+<span class="fc" id="L183">                    leftRewrite.sourceSubtreeHash(),</span>
+<span class="fc" id="L184">                    leftRewrite.assumptions()</span>
                 ));
-<span class="fc" id="L183">            }</span>
-<span class="fc bfc" id="L184" title="All 2 branches covered.">            for (RewriteResult rightRewrite : rewriteEverywhere(binaryExpr.right(), visitorContext, attempts)) {</span>
-<span class="fc" id="L185">                results.add(new RewriteResult(</span>
-<span class="fc" id="L186">                    rightRewrite.rule(),</span>
-<span class="fc" id="L187">                    new BinaryExpr(binaryExpr.left(), binaryExpr.operator(), rightRewrite.expression()),</span>
-<span class="fc" id="L188">                    rightRewrite.sourceSubtreeHash()</span>
+<span class="fc" id="L186">            }</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            for (RewriteResult rightRewrite : rewriteEverywhere(binaryExpr.right(), visitorContext, attempts)) {</span>
+<span class="fc" id="L188">                results.add(new RewriteResult(</span>
+<span class="fc" id="L189">                    rightRewrite.rule(),</span>
+<span class="fc" id="L190">                    new BinaryExpr(binaryExpr.left(), binaryExpr.operator(), rightRewrite.expression()),</span>
+<span class="fc" id="L191">                    rightRewrite.sourceSubtreeHash(),</span>
+<span class="fc" id="L192">                    rightRewrite.assumptions()</span>
                 ));
-<span class="fc" id="L190">            }</span>
-<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        } else if (subtree instanceof FunctionExpr functionExpr) {</span>
-<span class="nc" id="L192">            List&lt;Expr&gt; arguments = functionExpr.arguments();</span>
-<span class="nc bnc" id="L193" title="All 2 branches missed.">            for (int index = 0; index &lt; arguments.size(); index++) {</span>
-<span class="nc" id="L194">                final int position = index;</span>
-<span class="nc bnc" id="L195" title="All 2 branches missed.">                for (RewriteResult argRewrite : rewriteEverywhere(arguments.get(index), visitorContext, attempts)) {</span>
-<span class="nc" id="L196">                    List&lt;Expr&gt; replaced = new ArrayList&lt;&gt;(arguments);</span>
-<span class="nc" id="L197">                    replaced.set(position, argRewrite.expression());</span>
-<span class="nc" id="L198">                    results.add(new RewriteResult(</span>
-<span class="nc" id="L199">                        argRewrite.rule(),</span>
-<span class="nc" id="L200">                        new FunctionExpr(functionExpr.name(), replaced),</span>
-<span class="nc" id="L201">                        argRewrite.sourceSubtreeHash()</span>
+<span class="fc" id="L194">            }</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        } else if (subtree instanceof FunctionExpr functionExpr) {</span>
+<span class="fc" id="L196">            List&lt;Expr&gt; arguments = functionExpr.arguments();</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">            for (int index = 0; index &lt; arguments.size(); index++) {</span>
+<span class="fc" id="L198">                final int position = index;</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">                for (RewriteResult argRewrite : rewriteEverywhere(arguments.get(index), visitorContext, attempts)) {</span>
+<span class="fc" id="L200">                    List&lt;Expr&gt; replaced = new ArrayList&lt;&gt;(arguments);</span>
+<span class="fc" id="L201">                    replaced.set(position, argRewrite.expression());</span>
+<span class="fc" id="L202">                    results.add(new RewriteResult(</span>
+<span class="fc" id="L203">                        argRewrite.rule(),</span>
+<span class="fc" id="L204">                        new FunctionExpr(functionExpr.name(), replaced),</span>
+<span class="fc" id="L205">                        argRewrite.sourceSubtreeHash(),</span>
+<span class="fc" id="L206">                        argRewrite.assumptions()</span>
                     ));
-<span class="nc" id="L203">                }</span>
+<span class="fc" id="L208">                }</span>
             }
         }
-<span class="fc" id="L206">        return results;</span>
+<span class="fc" id="L211">        return results;</span>
     }
 
     private Expr applyRule(
@@ -212,101 +217,106 @@ public final class PluginAwareAstRewriteTransformationEngine implements Transfor
         AstVisitorContext visitorContext,
         List&lt;RuleAttempt&gt; attempts
     ) {
-<span class="fc bfc" id="L215" title="All 2 branches covered.">        String formattedSubtree = attempts == null ? null : ExpressionFormatter.format(subtree);</span>
-<span class="fc bfc" id="L216" title="All 2 branches covered.">        if (rule instanceof PatternTransformation transformation) {</span>
-<span class="fc" id="L217">            TransformationMatchContext matchContext = TransformationMatchContext.from(visitorContext, subtree);</span>
-<span class="fc bfc" id="L218" title="All 2 branches covered.">            if (!transformation.matches(subtree, matchContext)) {</span>
-<span class="fc bfc" id="L219" title="All 2 branches covered.">                if (attempts != null) {</span>
-<span class="fc" id="L220">                    attempts.add(new RuleAttempt(</span>
-<span class="fc" id="L221">                        rule.id(),</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        String formattedSubtree = attempts == null ? null : ExpressionFormatter.format(subtree);</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (rule instanceof PatternTransformation transformation) {</span>
+<span class="fc" id="L222">            TransformationMatchContext matchContext = TransformationMatchContext.from(visitorContext, subtree);</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">            if (!transformation.matches(subtree, matchContext)) {</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">                if (attempts != null) {</span>
+<span class="fc" id="L225">                    attempts.add(new RuleAttempt(</span>
+<span class="fc" id="L226">                        rule.id(),</span>
                         formattedSubtree,
-<span class="fc" id="L223">                        AstVisitorPhase.DURING_SEARCH.name(),</span>
+<span class="fc" id="L228">                        AstVisitorPhase.DURING_SEARCH.name(),</span>
                         false,
                         RuleRejectionReason.PATTERN_MISMATCH
                     ));
                 }
-<span class="fc" id="L228">                return null;</span>
+<span class="fc" id="L233">                return null;</span>
             }
-<span class="fc" id="L230">            Expr result = transformation.transform(subtree, TransformationContext.from(visitorContext, subtree));</span>
-<span class="fc bfc" id="L231" title="All 2 branches covered.">            if (attempts != null) {</span>
-<span class="fc" id="L232">                attempts.add(new RuleAttempt(</span>
-<span class="fc" id="L233">                    rule.id(),</span>
+<span class="fc" id="L235">            Expr result = transformation.transform(subtree, TransformationContext.from(visitorContext, subtree));</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">            if (attempts != null) {</span>
+<span class="fc" id="L237">                attempts.add(new RuleAttempt(</span>
+<span class="fc" id="L238">                    rule.id(),</span>
                     formattedSubtree,
-<span class="fc" id="L235">                    AstVisitorPhase.DURING_SEARCH.name(),</span>
+<span class="fc" id="L240">                    AstVisitorPhase.DURING_SEARCH.name(),</span>
                     true,
                     RuleRejectionReason.APPLIED
                 ));
             }
-<span class="fc" id="L240">            return result;</span>
+<span class="fc" id="L245">            return result;</span>
         }
-<span class="fc bfc" id="L242" title="All 2 branches covered.">        if (!rule.matches(subtree)) {</span>
-<span class="fc bfc" id="L243" title="All 2 branches covered.">            if (attempts != null) {</span>
-<span class="fc" id="L244">                attempts.add(new RuleAttempt(</span>
-<span class="fc" id="L245">                    rule.id(),</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        if (!rule.matches(subtree)) {</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            if (attempts != null) {</span>
+<span class="fc" id="L249">                attempts.add(new RuleAttempt(</span>
+<span class="fc" id="L250">                    rule.id(),</span>
                     formattedSubtree,
-<span class="fc" id="L247">                    AstVisitorPhase.DURING_SEARCH.name(),</span>
+<span class="fc" id="L252">                    AstVisitorPhase.DURING_SEARCH.name(),</span>
                     false,
                     RuleRejectionReason.PATTERN_MISMATCH
                 ));
             }
-<span class="fc" id="L252">            return null;</span>
+<span class="fc" id="L257">            return null;</span>
         }
-<span class="fc" id="L254">        Expr result = rule.apply(subtree);</span>
-<span class="fc bfc" id="L255" title="All 2 branches covered.">        if (attempts != null) {</span>
-<span class="fc" id="L256">            attempts.add(new RuleAttempt(</span>
-<span class="fc" id="L257">                rule.id(),</span>
+<span class="fc" id="L259">        Expr result = rule.apply(subtree);</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        if (attempts != null) {</span>
+<span class="fc" id="L261">            attempts.add(new RuleAttempt(</span>
+<span class="fc" id="L262">                rule.id(),</span>
                 formattedSubtree,
-<span class="fc" id="L259">                AstVisitorPhase.DURING_SEARCH.name(),</span>
+<span class="fc" id="L264">                AstVisitorPhase.DURING_SEARCH.name(),</span>
                 true,
                 RuleRejectionReason.APPLIED
             ));
         }
-<span class="fc" id="L264">        return result;</span>
+<span class="fc" id="L269">        return result;</span>
     }
 
     private RuleDebugReport buildDebugReport(String expression, List&lt;RuleAttempt&gt; attempts) {
-<span class="fc" id="L268">        int successful = (int) attempts.stream()</span>
-<span class="fc bfc" id="L269" title="All 2 branches covered.">            .filter(attempt -&gt; attempt.reason() == RuleRejectionReason.APPLIED)</span>
-<span class="fc" id="L270">            .count();</span>
-<span class="fc" id="L271">        int growthRejections = (int) attempts.stream()</span>
-<span class="pc bpc" id="L272" title="1 of 2 branches missed.">            .filter(attempt -&gt; attempt.reason() == RuleRejectionReason.GROWTH_LIMIT_EXCEEDED)</span>
-<span class="fc" id="L273">            .count();</span>
-<span class="fc" id="L274">        int candidateLimitRejections = (int) attempts.stream()</span>
-<span class="pc bpc" id="L275" title="1 of 2 branches missed.">            .filter(attempt -&gt; attempt.reason() == RuleRejectionReason.CANDIDATE_LIMIT_REACHED)</span>
-<span class="fc" id="L276">            .count();</span>
-<span class="fc" id="L277">        return new RuleDebugReport(</span>
+<span class="fc" id="L273">        int successful = (int) attempts.stream()</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">            .filter(attempt -&gt; attempt.reason() == RuleRejectionReason.APPLIED)</span>
+<span class="fc" id="L275">            .count();</span>
+<span class="fc" id="L276">        int growthRejections = (int) attempts.stream()</span>
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">            .filter(attempt -&gt; attempt.reason() == RuleRejectionReason.GROWTH_LIMIT_EXCEEDED)</span>
+<span class="fc" id="L278">            .count();</span>
+<span class="fc" id="L279">        int candidateLimitRejections = (int) attempts.stream()</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">            .filter(attempt -&gt; attempt.reason() == RuleRejectionReason.CANDIDATE_LIMIT_REACHED)</span>
+<span class="fc" id="L281">            .count();</span>
+<span class="fc" id="L282">        return new RuleDebugReport(</span>
             expression,
             attempts,
-<span class="fc" id="L280">            attempts.size(),</span>
+<span class="fc" id="L285">            attempts.size(),</span>
             successful,
             growthRejections,
             candidateLimitRejections,
-<span class="fc" id="L284">            countReason(attempts, RuleRejectionReason.DISABLED_BY_CONFIG),</span>
-<span class="fc" id="L285">            countReason(attempts, RuleRejectionReason.DISABLED_BY_PROFILE),</span>
-<span class="fc" id="L286">            countReason(attempts, RuleRejectionReason.CONDITION_FAILED),</span>
-<span class="fc" id="L287">            countReason(attempts, RuleRejectionReason.CYCLE_RISK),</span>
-<span class="fc" id="L288">            debugMetadata.stream().map(RuleDebugMetadata::diagnostic).toList()</span>
+<span class="fc" id="L289">            countReason(attempts, RuleRejectionReason.DISABLED_BY_CONFIG),</span>
+<span class="fc" id="L290">            countReason(attempts, RuleRejectionReason.DISABLED_BY_PROFILE),</span>
+<span class="fc" id="L291">            countReason(attempts, RuleRejectionReason.CONDITION_FAILED),</span>
+<span class="fc" id="L292">            countReason(attempts, RuleRejectionReason.CYCLE_RISK),</span>
+<span class="fc" id="L293">            debugMetadata.stream().map(RuleDebugMetadata::diagnostic).toList()</span>
         );
     }
 
     private int countReason(List&lt;RuleAttempt&gt; attempts, RuleRejectionReason reason) {
-<span class="fc bfc" id="L293" title="All 2 branches covered.">        return (int) attempts.stream().filter(attempt -&gt; attempt.reason() == reason).count();</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">        return (int) attempts.stream().filter(attempt -&gt; attempt.reason() == reason).count();</span>
     }
 
     private void appendRuntimeDebugAttempts(List&lt;RuleAttempt&gt; attempts) {
-<span class="fc bfc" id="L297" title="All 2 branches covered.">        for (RuleDebugMetadata metadata : debugMetadata) {</span>
-<span class="fc" id="L298">            attempts.add(new RuleAttempt(</span>
-<span class="fc" id="L299">                metadata.ruleId(),</span>
-<span class="fc" id="L300">                metadata.context(),</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">        for (RuleDebugMetadata metadata : debugMetadata) {</span>
+<span class="fc" id="L303">            attempts.add(new RuleAttempt(</span>
+<span class="fc" id="L304">                metadata.ruleId(),</span>
+<span class="fc" id="L305">                metadata.context(),</span>
                 &quot;RUNTIME&quot;,
                 false,
-<span class="fc" id="L303">                metadata.reason(),</span>
-<span class="fc" id="L304">                metadata.detail()</span>
+<span class="fc" id="L308">                metadata.reason(),</span>
+<span class="fc" id="L309">                metadata.detail()</span>
             ));
-<span class="fc" id="L306">        }</span>
-<span class="fc" id="L307">    }</span>
+<span class="fc" id="L311">        }</span>
+<span class="fc" id="L312">    }</span>
 
-<span class="fc" id="L309">    private record RewriteResult(RewriteRule rule, Expr expression, String sourceSubtreeHash) {</span>
+    private record RewriteResult(
+        RewriteRule rule, Expr expression, String sourceSubtreeHash, List&lt;Assumption&gt; assumptions
+    ) {
+<span class="fc" id="L317">        private RewriteResult {</span>
+<span class="fc" id="L318">            assumptions = List.copyOf(assumptions);</span>
+<span class="fc" id="L319">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

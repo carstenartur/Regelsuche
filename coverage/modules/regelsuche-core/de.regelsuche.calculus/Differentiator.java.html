@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Differentiator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.calculus</a> &gt; <span class="el_source">Differentiator.java</span></div><h1>Differentiator.java</h1><pre class="source lang-java linenums">package de.regelsuche.calculus;
 
+import de.regelsuche.assumption.Assumption;
 import de.regelsuche.assumption.ExpressionDefinedness;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryExpr;
@@ -34,35 +35,62 @@ import java.util.Objects;
  * is the responsibility of {@link de.regelsuche.transform.AstRewriteTransformationEngine}
  * or callers that want canonical output.&lt;/p&gt;
  */
-<span class="fc" id="L37">public final class Differentiator {</span>
+<span class="fc" id="L38">public final class Differentiator {</span>
 
+    /**
+     * Returns only a derivative formula for compatibility with AST consumers.
+     * Its syntactic real domain is not the domain of the original derivative:
+     * for example, {@code ln(x)} needs {@code x &gt; 0} even though {@code 1/x}
+     * also exists for negative x. Call {@link #differentiateWithAssumptions}
+     * when retaining, evaluating or exporting the derivative as a function.
+     */
     public Expr differentiate(Expr expr, String variable) {
-<span class="fc" id="L40">        Objects.requireNonNull(expr, &quot;expr&quot;);</span>
-<span class="fc" id="L41">        Objects.requireNonNull(variable, &quot;variable&quot;);</span>
-<span class="fc" id="L42">        return simplify(diff(expr, variable));</span>
+<span class="fc" id="L48">        Objects.requireNonNull(expr, &quot;expr&quot;);</span>
+<span class="fc" id="L49">        Objects.requireNonNull(variable, &quot;variable&quot;);</span>
+<span class="fc" id="L50">        return simplify(diff(expr, variable));</span>
+    }
+
+    /**
+     * Returns a formula with typed, sufficient conditions under which it equals
+     * the partial derivative of {@code expr}. All conditions must be retained.
+     * Non-integer and symbolic powers use the strictly positive-base branch;
+     * this deliberately need not describe every differentiable boundary point
+     * or every other real branch of the source expression.
+     */
+    public Result differentiateWithAssumptions(Expr expr, String variable) {
+<span class="fc" id="L61">        Expr formula = differentiate(expr, variable);</span>
+<span class="fc" id="L62">        return new Result(formula, DifferentiationDomain.assumptions(expr, variable));</span>
+    }
+
+    /** A derivative formula interpreted only under all retained assumptions. */
+    public record Result(Expr formula, List&lt;Assumption&gt; assumptions) {
+<span class="fc" id="L67">        public Result {</span>
+<span class="fc" id="L68">            Objects.requireNonNull(formula, &quot;formula&quot;);</span>
+<span class="fc" id="L69">            assumptions = List.copyOf(assumptions);</span>
+<span class="fc" id="L70">        }</span>
     }
 
     private Expr diff(Expr expr, String variable) {
-<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (expr instanceof NumberExpr) {</span>
-<span class="fc" id="L47">            return new NumberExpr(0);</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (expr instanceof NumberExpr) {</span>
+<span class="fc" id="L75">            return new NumberExpr(0);</span>
         }
-<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (expr instanceof VariableExpr varExpr) {</span>
-<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            return new NumberExpr(varExpr.name().equals(variable) ? 1 : 0);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (expr instanceof VariableExpr varExpr) {</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            return new NumberExpr(varExpr.name().equals(variable) ? 1 : 0);</span>
         }
-<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (expr instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L53">            Expr u = binary.left();</span>
-<span class="fc" id="L54">            Expr v = binary.right();</span>
-<span class="fc" id="L55">            Expr du = diff(u, variable);</span>
-<span class="fc" id="L56">            Expr dv = diff(v, variable);</span>
-<span class="pc bpc" id="L57" title="2 of 5 branches missed.">            return switch (binary.operator()) {</span>
-<span class="fc" id="L58">                case ADD -&gt; new BinaryExpr(du, BinaryOperator.ADD, dv);</span>
-<span class="nc" id="L59">                case SUB -&gt; new BinaryExpr(du, BinaryOperator.SUB, dv);</span>
-<span class="fc" id="L60">                case MUL -&gt; new BinaryExpr(</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (expr instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L81">            Expr u = binary.left();</span>
+<span class="fc" id="L82">            Expr v = binary.right();</span>
+<span class="fc" id="L83">            Expr du = diff(u, variable);</span>
+<span class="fc" id="L84">            Expr dv = diff(v, variable);</span>
+<span class="fc bfc" id="L85" title="All 5 branches covered.">            return switch (binary.operator()) {</span>
+<span class="fc" id="L86">                case ADD -&gt; new BinaryExpr(du, BinaryOperator.ADD, dv);</span>
+<span class="fc" id="L87">                case SUB -&gt; new BinaryExpr(du, BinaryOperator.SUB, dv);</span>
+<span class="fc" id="L88">                case MUL -&gt; new BinaryExpr(</span>
                     new BinaryExpr(du, BinaryOperator.MUL, v),
                     BinaryOperator.ADD,
                     new BinaryExpr(u, BinaryOperator.MUL, dv)
                 );
-<span class="nc" id="L65">                case DIV -&gt; new BinaryExpr(</span>
+<span class="fc" id="L93">                case DIV -&gt; new BinaryExpr(</span>
                     new BinaryExpr(
                         new BinaryExpr(du, BinaryOperator.MUL, v),
                         BinaryOperator.SUB,
@@ -71,68 +99,70 @@ import java.util.Objects;
                     BinaryOperator.DIV,
                     new BinaryExpr(v, BinaryOperator.POW, new NumberExpr(2))
                 );
-<span class="fc" id="L74">                case POW -&gt; powerRule(u, v, du, variable);</span>
+<span class="fc" id="L102">                case POW -&gt; powerRule(u, v, du, variable);</span>
             };
         }
-<span class="pc bpc" id="L77" title="2 of 4 branches missed.">        if (expr instanceof FunctionExpr fn &amp;&amp; fn.arguments().size() == 1) {</span>
-<span class="fc" id="L78">            Expr u = fn.arguments().get(0);</span>
-<span class="fc" id="L79">            Expr du = diff(u, variable);</span>
-<span class="pc bpc" id="L80" title="2 of 6 branches missed.">            Expr outer = switch (fn.name()) {</span>
-<span class="fc" id="L81">                case &quot;sin&quot; -&gt; new FunctionExpr(&quot;cos&quot;, u);</span>
-<span class="nc" id="L82">                case &quot;cos&quot; -&gt; new BinaryExpr(</span>
+<span class="pc bpc" id="L105" title="2 of 4 branches missed.">        if (expr instanceof FunctionExpr fn &amp;&amp; fn.arguments().size() == 1) {</span>
+<span class="fc" id="L106">            Expr u = fn.arguments().get(0);</span>
+<span class="fc" id="L107">            Expr du = diff(u, variable);</span>
+<span class="pc bpc" id="L108" title="1 of 6 branches missed.">            Expr outer = switch (fn.name()) {</span>
+<span class="fc" id="L109">                case &quot;sin&quot; -&gt; new FunctionExpr(&quot;cos&quot;, u);</span>
+<span class="nc" id="L110">                case &quot;cos&quot; -&gt; new BinaryExpr(</span>
                     new NumberExpr(0),
                     BinaryOperator.SUB,
                     new FunctionExpr(&quot;sin&quot;, u)
                 );
-<span class="fc" id="L87">                case &quot;exp&quot; -&gt; new FunctionExpr(&quot;exp&quot;, u);</span>
-<span class="fc" id="L88">                case &quot;ln&quot; -&gt; reciprocal(u);</span>
-<span class="fc" id="L89">                case &quot;log&quot; -&gt; reciprocal(new BinaryExpr(</span>
+<span class="fc" id="L115">                case &quot;exp&quot; -&gt; new FunctionExpr(&quot;exp&quot;, u);</span>
+<span class="fc" id="L116">                case &quot;ln&quot; -&gt; reciprocal(u);</span>
+<span class="fc" id="L117">                case &quot;log&quot; -&gt; reciprocal(new BinaryExpr(</span>
                     u,
                     BinaryOperator.MUL,
                     new FunctionExpr(&quot;ln&quot;, new NumberExpr(10))
                 ));
-<span class="nc" id="L94">                default -&gt; null;</span>
+<span class="fc" id="L122">                default -&gt; null;</span>
             };
-<span class="pc bpc" id="L96" title="1 of 2 branches missed.">            if (outer != null) {</span>
-<span class="fc" id="L97">                return new BinaryExpr(outer, BinaryOperator.MUL, du);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            if (outer != null) {</span>
+<span class="fc" id="L125">                return new BinaryExpr(outer, BinaryOperator.MUL, du);</span>
             }
         }
-<span class="nc" id="L100">        throw new UnsupportedOperationException(</span>
-<span class="nc" id="L101">            &quot;Differentiator has no rule for &quot; + expr.getClass().getSimpleName() + &quot;: &quot; + expr);</span>
+<span class="fc" id="L128">        throw new UnsupportedOperationException(</span>
+<span class="fc" id="L129">            &quot;Differentiator has no rule for &quot; + expr.getClass().getSimpleName() + &quot;: &quot; + expr);</span>
     }
 
     private static Expr reciprocal(Expr expression) {
-<span class="fc" id="L105">        return new BinaryExpr(new NumberExpr(1), BinaryOperator.DIV, expression);</span>
+<span class="fc" id="L133">        return new BinaryExpr(new NumberExpr(1), BinaryOperator.DIV, expression);</span>
     }
 
     private Expr powerRule(Expr base, Expr exponent, Expr baseDerivative, String variable) {
-<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (exponent instanceof NumberExpr n) {</span>
-<span class="fc" id="L110">            ExactRational power = n.value();</span>
-<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (power.equalsInteger(1)) {</span>
-<span class="fc" id="L112">                return baseDerivative;</span>
+        // The parser represents signed literals as 0 - n. Fold that exact
+        // arithmetic before choosing the logarithmic general-power formula.
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (simplify(exponent) instanceof NumberExpr n) {</span>
+<span class="fc" id="L140">            ExactRational power = n.value();</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            if (power.equalsInteger(1)) {</span>
+<span class="fc" id="L142">                return baseDerivative;</span>
             }
             // n * base^(n-1) * base'
-<span class="fc" id="L115">            Expr coefficient = new NumberExpr(power);</span>
-<span class="fc" id="L116">            Expr reducedPower = new BinaryExpr(</span>
+<span class="fc" id="L145">            Expr coefficient = new NumberExpr(power);</span>
+<span class="fc" id="L146">            Expr reducedPower = new BinaryExpr(</span>
                 base,
                 BinaryOperator.POW,
-<span class="fc" id="L119">                new NumberExpr(power.subtract(ExactRational.ONE))</span>
+<span class="fc" id="L149">                new NumberExpr(power.subtract(ExactRational.ONE))</span>
             );
-<span class="fc" id="L121">            Expr core = new BinaryExpr(coefficient, BinaryOperator.MUL, reducedPower);</span>
-<span class="fc" id="L122">            return new BinaryExpr(core, BinaryOperator.MUL, baseDerivative);</span>
+<span class="fc" id="L151">            Expr core = new BinaryExpr(coefficient, BinaryOperator.MUL, reducedPower);</span>
+<span class="fc" id="L152">            return new BinaryExpr(core, BinaryOperator.MUL, baseDerivative);</span>
         }
         // d/dx u^v = u^v * (v' * ln u + v * u'/u)
-<span class="nc" id="L125">        Expr dv = diff(exponent, variable);</span>
-<span class="nc" id="L126">        Expr lnBase = new FunctionExpr(&quot;ln&quot;, base);</span>
-<span class="nc" id="L127">        Expr first = new BinaryExpr(dv, BinaryOperator.MUL, lnBase);</span>
-<span class="nc" id="L128">        Expr second = new BinaryExpr(</span>
+<span class="fc" id="L155">        Expr dv = diff(exponent, variable);</span>
+<span class="fc" id="L156">        Expr lnBase = new FunctionExpr(&quot;ln&quot;, base);</span>
+<span class="fc" id="L157">        Expr first = new BinaryExpr(dv, BinaryOperator.MUL, lnBase);</span>
+<span class="fc" id="L158">        Expr second = new BinaryExpr(</span>
             exponent,
             BinaryOperator.MUL,
             new BinaryExpr(baseDerivative, BinaryOperator.DIV, base)
         );
-<span class="nc" id="L133">        Expr factor = new BinaryExpr(first, BinaryOperator.ADD, second);</span>
-<span class="nc" id="L134">        Expr power = new BinaryExpr(base, BinaryOperator.POW, exponent);</span>
-<span class="nc" id="L135">        return new BinaryExpr(power, BinaryOperator.MUL, factor);</span>
+<span class="fc" id="L163">        Expr factor = new BinaryExpr(first, BinaryOperator.ADD, second);</span>
+<span class="fc" id="L164">        Expr power = new BinaryExpr(base, BinaryOperator.POW, exponent);</span>
+<span class="fc" id="L165">        return new BinaryExpr(power, BinaryOperator.MUL, factor);</span>
     }
 
     /**
@@ -143,90 +173,90 @@ import java.util.Objects;
      * canonicalization and never silently introduces an assumption.
      */
     public static Expr simplify(Expr expr) {
-<span class="fc bfc" id="L146" title="All 2 branches covered.">        if (expr instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L147">            Expr left = simplify(binary.left());</span>
-<span class="fc" id="L148">            Expr right = simplify(binary.right());</span>
-<span class="fc" id="L149">            return foldBinary(left, binary.operator(), right);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (expr instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L177">            Expr left = simplify(binary.left());</span>
+<span class="fc" id="L178">            Expr right = simplify(binary.right());</span>
+<span class="fc" id="L179">            return foldBinary(left, binary.operator(), right);</span>
         }
-<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (expr instanceof FunctionExpr fn) {</span>
-<span class="fc" id="L152">            List&lt;Expr&gt; args = fn.arguments().stream().map(Differentiator::simplify).toList();</span>
-<span class="fc" id="L153">            return new FunctionExpr(fn.name(), args);</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (expr instanceof FunctionExpr fn) {</span>
+<span class="fc" id="L182">            List&lt;Expr&gt; args = fn.arguments().stream().map(Differentiator::simplify).toList();</span>
+<span class="fc" id="L183">            return new FunctionExpr(fn.name(), args);</span>
         }
-<span class="fc" id="L155">        return expr;</span>
+<span class="fc" id="L185">        return expr;</span>
     }
 
     private static Expr foldBinary(Expr left, BinaryOperator op, Expr right) {
-<span class="fc bfc" id="L159" title="All 5 branches covered.">        return switch (op) {</span>
-<span class="fc" id="L160">            case ADD -&gt; foldAddition(left, right);</span>
-<span class="fc" id="L161">            case SUB -&gt; foldSubtraction(left, right);</span>
-<span class="fc" id="L162">            case MUL -&gt; foldProduct(left, right);</span>
-<span class="fc" id="L163">            case DIV -&gt; foldDivision(left, right);</span>
-<span class="fc" id="L164">            case POW -&gt; foldPower(left, right);</span>
+<span class="fc bfc" id="L189" title="All 5 branches covered.">        return switch (op) {</span>
+<span class="fc" id="L190">            case ADD -&gt; foldAddition(left, right);</span>
+<span class="fc" id="L191">            case SUB -&gt; foldSubtraction(left, right);</span>
+<span class="fc" id="L192">            case MUL -&gt; foldProduct(left, right);</span>
+<span class="fc" id="L193">            case DIV -&gt; foldDivision(left, right);</span>
+<span class="fc" id="L194">            case POW -&gt; foldPower(left, right);</span>
         };
     }
 
     private static Expr foldAddition(Expr left, Expr right) {
-<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        if (isNumber(left, 0)) {</span>
-<span class="nc" id="L170">            return right;</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">        if (isNumber(left, 0)) {</span>
+<span class="nc" id="L200">            return right;</span>
         }
-<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (isNumber(right, 0)) {</span>
-<span class="fc" id="L173">            return left;</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (isNumber(right, 0)) {</span>
+<span class="fc" id="L203">            return left;</span>
         }
-<span class="pc bpc" id="L175" title="3 of 4 branches missed.">        if (left instanceof NumberExpr l &amp;&amp; right instanceof NumberExpr r) {</span>
-<span class="nc" id="L176">            return new NumberExpr(l.value().add(r.value()));</span>
+<span class="pc bpc" id="L205" title="3 of 4 branches missed.">        if (left instanceof NumberExpr l &amp;&amp; right instanceof NumberExpr r) {</span>
+<span class="nc" id="L206">            return new NumberExpr(l.value().add(r.value()));</span>
         }
-<span class="fc" id="L178">        return new BinaryExpr(left, BinaryOperator.ADD, right);</span>
+<span class="fc" id="L208">        return new BinaryExpr(left, BinaryOperator.ADD, right);</span>
     }
 
     private static Expr foldSubtraction(Expr left, Expr right) {
-<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        if (isNumber(right, 0)) {</span>
-<span class="nc" id="L183">            return left;</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (isNumber(right, 0)) {</span>
+<span class="fc" id="L213">            return left;</span>
         }
-<span class="pc bpc" id="L185" title="2 of 4 branches missed.">        if (left instanceof NumberExpr l &amp;&amp; right instanceof NumberExpr r) {</span>
-<span class="nc" id="L186">            return new NumberExpr(l.value().subtract(r.value()));</span>
+<span class="fc bfc" id="L215" title="All 4 branches covered.">        if (left instanceof NumberExpr l &amp;&amp; right instanceof NumberExpr r) {</span>
+<span class="fc" id="L216">            return new NumberExpr(l.value().subtract(r.value()));</span>
         }
-<span class="fc" id="L188">        return new BinaryExpr(left, BinaryOperator.SUB, right);</span>
+<span class="fc" id="L218">        return new BinaryExpr(left, BinaryOperator.SUB, right);</span>
     }
 
     private static Expr foldProduct(Expr left, Expr right) {
-<span class="fc bfc" id="L192" title="All 4 branches covered.">        if ((isNumber(left, 0) &amp;&amp; ExpressionDefinedness.isTotal(right))</span>
-<span class="pc bpc" id="L193" title="1 of 4 branches missed.">                || (isNumber(right, 0) &amp;&amp; ExpressionDefinedness.isTotal(left))) {</span>
-<span class="fc" id="L194">            return new NumberExpr(0);</span>
+<span class="fc bfc" id="L222" title="All 4 branches covered.">        if ((isNumber(left, 0) &amp;&amp; ExpressionDefinedness.isTotal(right))</span>
+<span class="fc bfc" id="L223" title="All 4 branches covered.">                || (isNumber(right, 0) &amp;&amp; ExpressionDefinedness.isTotal(left))) {</span>
+<span class="fc" id="L224">            return new NumberExpr(0);</span>
         }
-<span class="fc bfc" id="L196" title="All 2 branches covered.">        if (isNumber(left, 1)) {</span>
-<span class="fc" id="L197">            return right;</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        if (isNumber(left, 1)) {</span>
+<span class="fc" id="L227">            return right;</span>
         }
-<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (isNumber(right, 1)) {</span>
-<span class="fc" id="L200">            return left;</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        if (isNumber(right, 1)) {</span>
+<span class="fc" id="L230">            return left;</span>
         }
-<span class="pc bpc" id="L202" title="1 of 4 branches missed.">        if (left instanceof NumberExpr l &amp;&amp; right instanceof NumberExpr r) {</span>
-<span class="nc" id="L203">            return new NumberExpr(l.value().multiply(r.value()));</span>
+<span class="pc bpc" id="L232" title="1 of 4 branches missed.">        if (left instanceof NumberExpr l &amp;&amp; right instanceof NumberExpr r) {</span>
+<span class="nc" id="L233">            return new NumberExpr(l.value().multiply(r.value()));</span>
         }
-<span class="fc" id="L205">        return new BinaryExpr(left, BinaryOperator.MUL, right);</span>
+<span class="fc" id="L235">        return new BinaryExpr(left, BinaryOperator.MUL, right);</span>
     }
 
     private static Expr foldDivision(Expr left, Expr right) {
-<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (isNumber(right, 1)) {</span>
-<span class="nc" id="L210">            return left;</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        if (isNumber(right, 1)) {</span>
+<span class="nc" id="L240">            return left;</span>
         }
-<span class="fc" id="L212">        Expr division = new BinaryExpr(left, BinaryOperator.DIV, right);</span>
-<span class="fc bfc" id="L213" title="All 4 branches covered.">        return isNumber(left, 0) &amp;&amp; ExpressionDefinedness.isTotal(division) ? new NumberExpr(0) : division;</span>
+<span class="fc" id="L242">        Expr division = new BinaryExpr(left, BinaryOperator.DIV, right);</span>
+<span class="fc bfc" id="L243" title="All 4 branches covered.">        return isNumber(left, 0) &amp;&amp; ExpressionDefinedness.isTotal(division) ? new NumberExpr(0) : division;</span>
     }
 
     private static Expr foldPower(Expr left, Expr right) {
-<span class="fc bfc" id="L217" title="All 2 branches covered.">        if (isNumber(right, 1)) {</span>
-<span class="fc" id="L218">            return left;</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        if (isNumber(right, 1)) {</span>
+<span class="fc" id="L248">            return left;</span>
         }
-<span class="fc" id="L220">        Expr power = new BinaryExpr(left, BinaryOperator.POW, right);</span>
-<span class="fc bfc" id="L221" title="All 4 branches covered.">        if ((isNumber(right, 0) &amp;&amp; ExpressionDefinedness.isTotal(power))</span>
-<span class="fc bfc" id="L222" title="All 4 branches covered.">                || (isNumber(left, 1) &amp;&amp; ExpressionDefinedness.isTotal(right))) {</span>
-<span class="fc" id="L223">            return new NumberExpr(1);</span>
+<span class="fc" id="L250">        Expr power = new BinaryExpr(left, BinaryOperator.POW, right);</span>
+<span class="fc bfc" id="L251" title="All 4 branches covered.">        if ((isNumber(right, 0) &amp;&amp; ExpressionDefinedness.isTotal(power))</span>
+<span class="fc bfc" id="L252" title="All 4 branches covered.">                || (isNumber(left, 1) &amp;&amp; ExpressionDefinedness.isTotal(right))) {</span>
+<span class="fc" id="L253">            return new NumberExpr(1);</span>
         }
-<span class="fc" id="L225">        return power;</span>
+<span class="fc" id="L255">        return power;</span>
     }
 
     private static boolean isNumber(Expr expr, long value) {
-<span class="fc bfc" id="L229" title="All 4 branches covered.">        return expr instanceof NumberExpr number &amp;&amp; number.value().equalsInteger(value);</span>
+<span class="fc bfc" id="L259" title="All 4 branches covered.">        return expr instanceof NumberExpr number &amp;&amp; number.value().equalsInteger(value);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

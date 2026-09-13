@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReferenceIndependentOracleWorker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">ReferenceIndependentOracleWorker.java</span></div><h1>ReferenceIndependentOracleWorker.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation.ReferenceIndependentCandidateValidation.JSON;
+import static de.regelsuche.discovery.representation.ReferenceIndependentCandidateValidation.hash;
+
+import de.regelsuche.validation.OracleValidator.OracleValidation;
+import de.regelsuche.validation.SymPyOracleValidator;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+/** Isolated transport for the existing numeric/quadratic oracle, not external SymPy. */
+public final class ReferenceIndependentOracleWorker {
+    private ReferenceIndependentOracleWorker() {
+    }
+
+    public static void main(String[] args) throws Exception {
+<span class="nc" id="L19">        var oracle = new SymPyOracleValidator();</span>
+<span class="nc" id="L20">        var input = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));</span>
+<span class="nc" id="L21">        System.out.println(ReferenceIndependentOracleSession.READY);</span>
+        while (true) {
+            String line;
+            try {
+<span class="nc" id="L25">                line = ReferenceIndependentOracleSession.readBoundedLine(input);</span>
+<span class="nc" id="L26">            } catch (java.io.IOException exception) {</span>
+<span class="nc" id="L27">                return;</span>
+<span class="nc" id="L28">            }</span>
+<span class="nc" id="L29">            var request = JSON.readValue(line, ReferenceIndependentOracleSession.Request.class);</span>
+<span class="nc bnc" id="L30" title="All 4 branches missed.">            if (request.source() == null || request.candidate() == null</span>
+<span class="nc bnc" id="L31" title="All 2 branches missed.">                    || (long) request.source().length() + request.candidate().length() &gt; 8192</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">                    || !hash(List.of(request.source(), request.candidate())).equals(request.requestHash())) {</span>
+<span class="nc" id="L33">                throw new IllegalArgumentException(&quot;invalid bounded oracle request&quot;);</span>
+            }
+<span class="nc" id="L35">            OracleValidation validation = oracle.validateEquivalence(request.source(), request.candidate());</span>
+<span class="nc bnc" id="L36" title="All 2 branches missed.">            if (validation.evidence().equals(&quot;no equivalence evidence found&quot;)) {</span>
+                // The legacy boolean service uses false for unsupported as well as refuted.
+<span class="nc" id="L38">                validation = OracleValidation.unavailable(validation.evidence());</span>
+            }
+<span class="nc" id="L40">            System.out.println(JSON.writeValueAsString(new ReferenceIndependentOracleSession.Response(</span>
+<span class="nc" id="L41">                request.requestHash(), validation.status(), validation.evidence())));</span>
+<span class="nc" id="L42">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

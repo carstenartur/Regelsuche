@@ -14,11 +14,11 @@ public interface AssumptionAwareEquivalenceService {
         List&lt;String&gt; assumptions
     );
 
-<span class="nc" id="L17">    enum Status {</span>
-<span class="nc" id="L18">        CONFIRMED,</span>
-<span class="nc" id="L19">        REFUTED,</span>
-<span class="nc" id="L20">        MISSING_ASSUMPTION,</span>
-<span class="nc" id="L21">        UNSUPPORTED</span>
+<span class="fc" id="L17">    enum Status {</span>
+<span class="fc" id="L18">        CONFIRMED,</span>
+<span class="fc" id="L19">        REFUTED,</span>
+<span class="fc" id="L20">        MISSING_ASSUMPTION,</span>
+<span class="fc" id="L21">        UNSUPPORTED</span>
     }
 
     record Evaluation(
@@ -32,20 +32,20 @@ public interface AssumptionAwareEquivalenceService {
         List&lt;String&gt; unsupportedAssumptions,
         String detail
     ) {
-<span class="nc" id="L35">        public Evaluation {</span>
-<span class="nc" id="L36">            Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="nc bnc" id="L37" title="All 4 branches missed.">            if (equivalent != (status == Status.CONFIRMED)) {</span>
+<span class="fc" id="L35">        public Evaluation {</span>
+<span class="fc" id="L36">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L37" title="1 of 4 branches missed.">            if (equivalent != (status == Status.CONFIRMED)) {</span>
 <span class="nc" id="L38">                throw new IllegalArgumentException(</span>
                     &quot;equivalent must be true exactly for CONFIRMED&quot;);
             }
-<span class="nc bnc" id="L41" title="All 2 branches missed.">            leftNormalForm = leftNormalForm == null ? &quot;&quot; : leftNormalForm;</span>
-<span class="nc bnc" id="L42" title="All 2 branches missed.">            rightNormalForm = rightNormalForm == null ? &quot;&quot; : rightNormalForm;</span>
-<span class="nc" id="L43">            requiredAssumptions = immutable(requiredAssumptions, &quot;requiredAssumptions&quot;);</span>
-<span class="nc" id="L44">            providedAssumptions = immutable(providedAssumptions, &quot;providedAssumptions&quot;);</span>
-<span class="nc" id="L45">            missingAssumptions = immutable(missingAssumptions, &quot;missingAssumptions&quot;);</span>
-<span class="nc" id="L46">            unsupportedAssumptions = immutable(unsupportedAssumptions, &quot;unsupportedAssumptions&quot;);</span>
-<span class="nc bnc" id="L47" title="All 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
-<span class="nc" id="L48">        }</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">            leftNormalForm = leftNormalForm == null ? &quot;&quot; : leftNormalForm;</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">            rightNormalForm = rightNormalForm == null ? &quot;&quot; : rightNormalForm;</span>
+<span class="fc" id="L43">            requiredAssumptions = immutable(requiredAssumptions, &quot;requiredAssumptions&quot;);</span>
+<span class="fc" id="L44">            providedAssumptions = immutable(providedAssumptions, &quot;providedAssumptions&quot;);</span>
+<span class="fc" id="L45">            missingAssumptions = immutable(missingAssumptions, &quot;missingAssumptions&quot;);</span>
+<span class="fc" id="L46">            unsupportedAssumptions = immutable(unsupportedAssumptions, &quot;unsupportedAssumptions&quot;);</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="fc" id="L48">        }</span>
 
         public static Evaluation confirmed() {
 <span class="nc" id="L51">            return new Evaluation(Status.CONFIRMED, true, &quot;&quot;, &quot;&quot;,</span>
@@ -58,11 +58,11 @@ public interface AssumptionAwareEquivalenceService {
         }
 
         private static List&lt;String&gt; immutable(List&lt;String&gt; values, String name) {
-<span class="nc" id="L61">            Objects.requireNonNull(values, name);</span>
-<span class="nc bnc" id="L62" title="All 2 branches missed.">            if (values.stream().anyMatch(Objects::isNull)) {</span>
+<span class="fc" id="L61">            Objects.requireNonNull(values, name);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            if (values.stream().anyMatch(Objects::isNull)) {</span>
 <span class="nc" id="L63">                throw new IllegalArgumentException(name + &quot; must not contain null&quot;);</span>
             }
-<span class="nc" id="L65">            return List.copyOf(values);</span>
+<span class="fc" id="L65">            return List.copyOf(values);</span>
         }
     }
 }

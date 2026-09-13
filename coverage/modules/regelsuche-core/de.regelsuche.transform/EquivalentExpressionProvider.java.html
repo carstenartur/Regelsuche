@@ -6,14 +6,16 @@ import java.util.List;
 /**
  * Supplies a bounded deterministic set of expressions equivalent to an input.
  * Implementations may use an e-class, normalization cache or recognition-safe
- * learned rules, but must not claim completeness.
+ * learned rules, but must not claim completeness. Representatives must be
+ * equivalent without additional assumptions: this API has no assumption
+ * channel, so guarded rewrites cannot supply unconditional representatives.
  */
 @FunctionalInterface
 public interface EquivalentExpressionProvider {
     List&lt;Expr&gt; representatives(Expr expression, RecognitionProfile profile);
 
     static EquivalentExpressionProvider identity() {
-<span class="pc" id="L16">        return (expression, profile) -&gt; List.of(expression);</span>
+<span class="pc" id="L18">        return (expression, profile) -&gt; List.of(expression);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

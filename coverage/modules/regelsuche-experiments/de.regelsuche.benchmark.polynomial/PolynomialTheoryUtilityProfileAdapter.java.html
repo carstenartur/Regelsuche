@@ -243,6 +243,8 @@ public interface PolynomialTheoryUtilityProfileAdapter {
     final class CandidateBatch {
         public static final String SCHEMA =
             &quot;regelsuche.polynomial-theory-utility-candidate-batch/v2&quot;;
+        public static final String OBSERVED_SCHEMA =
+            &quot;regelsuche.polynomial-theory-utility-candidate-batch/v3&quot;;
         public static final String EVIDENCE_STATUS =
             &quot;TARGET_BLIND_RESULTS_COLLECTED_NOT_FROZEN&quot;;
 
@@ -253,144 +255,147 @@ public interface PolynomialTheoryUtilityProfileAdapter {
         private CandidateBatch(
             PolynomialTheoryUtilityExecutionInputArtifact inputs,
             List&lt;PolynomialTheoryUtilityCandidateResult&gt; results
-<span class="fc" id="L256">        ) {</span>
-<span class="fc" id="L257">            Objects.requireNonNull(inputs, &quot;inputs&quot;);</span>
-<span class="fc" id="L258">            this.results = List.copyOf(</span>
-<span class="fc" id="L259">                Objects.requireNonNull(results, &quot;results&quot;)</span>
+<span class="fc" id="L258">        ) {</span>
+<span class="fc" id="L259">            Objects.requireNonNull(inputs, &quot;inputs&quot;);</span>
+<span class="fc" id="L260">            this.results = List.copyOf(</span>
+<span class="fc" id="L261">                Objects.requireNonNull(results, &quot;results&quot;)</span>
             );
-<span class="pc bpc" id="L261" title="1 of 2 branches missed.">            if (this.results.size() != inputs.inputs().size()</span>
-<span class="pc bpc" id="L262" title="1 of 2 branches missed.">                    || this.results.size()</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">            if (this.results.size() != inputs.inputs().size()</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">                    || this.results.size()</span>
                         != PolynomialTheoryUtilityExecutionInputs
                             .EXPECTED_INPUT_COUNT) {
-<span class="nc" id="L265">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L267">                throw new IllegalArgumentException(</span>
                     &quot;candidate batch must contain one result per frozen input&quot;
                 );
             }
 
             var formationCases =
-<span class="fc" id="L271">                PolynomialTheoryUtilityCaseCorpus.load().cases();</span>
-<span class="fc" id="L272">            var identities = new HashSet&lt;String&gt;();</span>
-<span class="fc bfc" id="L273" title="All 2 branches covered.">            for (int index = 0; index &lt; this.results.size(); index++) {</span>
-<span class="fc" id="L274">                var result = Objects.requireNonNull(</span>
-<span class="fc" id="L275">                    this.results.get(index),</span>
+<span class="fc" id="L273">                PolynomialTheoryUtilityCaseCorpus.load().cases();</span>
+<span class="fc" id="L274">            var identities = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">            for (int index = 0; index &lt; this.results.size(); index++) {</span>
+<span class="fc" id="L276">                var result = Objects.requireNonNull(</span>
+<span class="fc" id="L277">                    this.results.get(index),</span>
                     &quot;result&quot;
                 );
-<span class="fc" id="L278">                var input = inputs.inputs().get(index);</span>
-<span class="fc" id="L279">                var formationCase = formationCases.get(</span>
-<span class="fc" id="L280">                    index % formationCases.size()</span>
+<span class="fc" id="L280">                var input = inputs.inputs().get(index);</span>
+<span class="fc" id="L281">                var formationCase = formationCases.get(</span>
+<span class="fc" id="L282">                    index % formationCases.size()</span>
                 );
-<span class="fc" id="L282">                result.validateAgainst(input, formationCase);</span>
-<span class="pc bpc" id="L283" title="1 of 2 branches missed.">                if (!identities.add(result.resultId())) {</span>
-<span class="nc" id="L284">                    throw new IllegalArgumentException(</span>
+<span class="fc" id="L284">                result.validateAgainst(input, formationCase);</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">                if (!result.schema().equals(this.results.getFirst().schema())) {</span>
+<span class="fc" id="L286">                    throw new IllegalArgumentException(&quot;candidate batch mixes historical and observed result revisions&quot;);</span>
+                }
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">                if (!identities.add(result.resultId())) {</span>
+<span class="nc" id="L289">                    throw new IllegalArgumentException(</span>
                         &quot;candidate result identities are not unique&quot;
                     );
                 }
             }
-<span class="fc" id="L289">            inputContentHash = inputs.contentHash();</span>
-<span class="fc" id="L290">            inputByteLength = inputs.byteLength();</span>
-<span class="fc" id="L291">        }</span>
+<span class="fc" id="L294">            inputContentHash = inputs.contentHash();</span>
+<span class="fc" id="L295">            inputByteLength = inputs.byteLength();</span>
+<span class="fc" id="L296">        }</span>
 
         static CandidateBatch create(
             PolynomialTheoryUtilityExecutionInputArtifact inputs,
             List&lt;PolynomialTheoryUtilityCandidateResult&gt; results
         ) {
-<span class="fc" id="L297">            return new CandidateBatch(inputs, results);</span>
+<span class="fc" id="L302">            return new CandidateBatch(inputs, results);</span>
         }
 
         public String schema() {
-<span class="fc" id="L301">            return SCHEMA;</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">            return results.getFirst().observations() == null ? SCHEMA : OBSERVED_SCHEMA;</span>
         }
 
         public String studyId() {
-<span class="nc" id="L305">            return PolynomialTheoryUtilityPreregistration.STUDY_ID;</span>
+<span class="nc" id="L310">            return PolynomialTheoryUtilityPreregistration.STUDY_ID;</span>
         }
 
         public String evidenceStatus() {
-<span class="fc" id="L309">            return EVIDENCE_STATUS;</span>
+<span class="fc" id="L314">            return EVIDENCE_STATUS;</span>
         }
 
         public String inputContentHash() {
-<span class="fc" id="L313">            return inputContentHash;</span>
+<span class="fc" id="L318">            return inputContentHash;</span>
         }
 
         public long inputByteLength() {
-<span class="fc" id="L317">            return inputByteLength;</span>
+<span class="fc" id="L322">            return inputByteLength;</span>
         }
 
         public List&lt;PolynomialTheoryUtilityCandidateResult&gt; results() {
-<span class="fc" id="L321">            return results;</span>
+<span class="fc" id="L326">            return results;</span>
         }
     }
 
     /** Executes the frozen run-major matrix without qualification access. */
-<span class="fc" id="L326">    final class TargetBlindRunner {</span>
+<span class="fc" id="L331">    final class TargetBlindRunner {</span>
         public CandidateBatch execute(
             PolynomialTheoryUtilityExecutionInputArtifact inputs,
             AdapterRegistry registry
         ) {
-<span class="fc" id="L331">            Objects.requireNonNull(inputs, &quot;inputs&quot;);</span>
-<span class="fc" id="L332">            Objects.requireNonNull(registry, &quot;registry&quot;);</span>
+<span class="fc" id="L336">            Objects.requireNonNull(inputs, &quot;inputs&quot;);</span>
+<span class="fc" id="L337">            Objects.requireNonNull(registry, &quot;registry&quot;);</span>
             List&lt;PolynomialTheoryUtilityCaseCorpus.FormationCase&gt; cases =
-<span class="fc" id="L334">                PolynomialTheoryUtilityCaseCorpus.load().cases();</span>
-<span class="fc" id="L335">            int runSize = cases.size();</span>
-<span class="fc" id="L336">            List&lt;PolynomialTheoryUtilityCandidateResult&gt; results =</span>
-<span class="fc" id="L337">                new ArrayList&lt;&gt;(inputs.inputs().size());</span>
-<span class="fc" id="L338">            Set&lt;String&gt; runIds = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L339">                PolynomialTheoryUtilityCaseCorpus.load().cases();</span>
+<span class="fc" id="L340">            int runSize = cases.size();</span>
+<span class="fc" id="L341">            List&lt;PolynomialTheoryUtilityCandidateResult&gt; results =</span>
+<span class="fc" id="L342">                new ArrayList&lt;&gt;(inputs.inputs().size());</span>
+<span class="fc" id="L343">            Set&lt;String&gt; runIds = new HashSet&lt;&gt;();</span>
 
-<span class="fc" id="L340">            for (int offset = 0;</span>
-<span class="fc bfc" id="L341" title="All 2 branches covered.">                    offset &lt; inputs.inputs().size();</span>
-<span class="fc" id="L342">                    offset += runSize) {</span>
-<span class="pc bpc" id="L343" title="1 of 2 branches missed.">                if (offset + runSize &gt; inputs.inputs().size()) {</span>
-<span class="nc" id="L344">                    throw new IllegalStateException(</span>
+<span class="fc" id="L345">            for (int offset = 0;</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">                    offset &lt; inputs.inputs().size();</span>
+<span class="fc" id="L347">                    offset += runSize) {</span>
+<span class="pc bpc" id="L348" title="1 of 2 branches missed.">                if (offset + runSize &gt; inputs.inputs().size()) {</span>
+<span class="nc" id="L349">                    throw new IllegalStateException(</span>
                         &quot;execution input artifact ends with a partial run&quot;
                     );
                 }
-<span class="fc" id="L348">                List&lt;PolynomialTheoryUtilityExecutionInput&gt; runInputs =</span>
-<span class="fc" id="L349">                    inputs.inputs().subList(offset, offset + runSize);</span>
-<span class="fc" id="L350">                var first = runInputs.getFirst();</span>
-<span class="fc" id="L351">                requireRunChunk(first, runInputs, cases);</span>
-<span class="pc bpc" id="L352" title="1 of 2 branches missed.">                if (!runIds.add(first.runId())) {</span>
-<span class="nc" id="L353">                    throw new IllegalStateException(</span>
+<span class="fc" id="L353">                List&lt;PolynomialTheoryUtilityExecutionInput&gt; runInputs =</span>
+<span class="fc" id="L354">                    inputs.inputs().subList(offset, offset + runSize);</span>
+<span class="fc" id="L355">                var first = runInputs.getFirst();</span>
+<span class="fc" id="L356">                requireRunChunk(first, runInputs, cases);</span>
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">                if (!runIds.add(first.runId())) {</span>
+<span class="nc" id="L358">                    throw new IllegalStateException(</span>
                         &quot;execution input artifact repeats a run identity&quot;
                     );
                 }
 
-<span class="fc" id="L358">                var adapter = registry.require(</span>
-<span class="fc" id="L359">                    first.profileId(),</span>
-<span class="fc" id="L360">                    first.adapterId()</span>
-                );
-<span class="fc" id="L362">                var descriptor = new RunDescriptor(</span>
-<span class="fc" id="L363">                    first.runId(),</span>
+<span class="fc" id="L363">                var adapter = registry.require(</span>
 <span class="fc" id="L364">                    first.profileId(),</span>
-<span class="fc" id="L365">                    first.checkpointId(),</span>
-<span class="fc" id="L366">                    first.adapterId(),</span>
+<span class="fc" id="L365">                    first.adapterId()</span>
+                );
+<span class="fc" id="L367">                var descriptor = new RunDescriptor(</span>
+<span class="fc" id="L368">                    first.runId(),</span>
+<span class="fc" id="L369">                    first.profileId(),</span>
+<span class="fc" id="L370">                    first.checkpointId(),</span>
+<span class="fc" id="L371">                    first.adapterId(),</span>
                     runSize
                 );
-<span class="fc" id="L369">                try (var run = Objects.requireNonNull(</span>
-<span class="fc" id="L370">                        adapter.openRun(descriptor),</span>
+<span class="fc" id="L374">                try (var run = Objects.requireNonNull(</span>
+<span class="fc" id="L375">                        adapter.openRun(descriptor),</span>
                         &quot;adapter run&quot;)) {
-<span class="fc bfc" id="L372" title="All 2 branches covered.">                    for (int index = 0; index &lt; runSize; index++) {</span>
-<span class="fc" id="L373">                        var input = runInputs.get(index);</span>
-<span class="fc" id="L374">                        var formationCase = cases.get(index);</span>
-<span class="fc" id="L375">                        var result = Objects.requireNonNull(</span>
-<span class="fc" id="L376">                            run.execute(input, formationCase),</span>
+<span class="fc bfc" id="L377" title="All 2 branches covered.">                    for (int index = 0; index &lt; runSize; index++) {</span>
+<span class="fc" id="L378">                        var input = runInputs.get(index);</span>
+<span class="fc" id="L379">                        var formationCase = cases.get(index);</span>
+<span class="fc" id="L380">                        var result = Objects.requireNonNull(</span>
+<span class="fc" id="L381">                            run.execute(input, formationCase),</span>
                             &quot;adapter result&quot;
                         );
-<span class="fc" id="L379">                        result.validateAgainst(input, formationCase);</span>
-<span class="fc" id="L380">                        results.add(result);</span>
+<span class="fc" id="L384">                        result.validateAgainst(input, formationCase);</span>
+<span class="fc" id="L385">                        results.add(result);</span>
                     }
                 }
             }
 
-<span class="fc" id="L385">            int expectedRuns =</span>
-<span class="fc" id="L386">                PolynomialTheoryUtilityExecutionPlan.PROFILES.size()</span>
-<span class="fc" id="L387">                    * PolynomialTheoryUtilityExecutionPlan.CHECKPOINTS.size();</span>
-<span class="pc bpc" id="L388" title="1 of 2 branches missed.">            if (runIds.size() != expectedRuns) {</span>
-<span class="nc" id="L389">                throw new IllegalStateException(</span>
+<span class="fc" id="L390">            int expectedRuns =</span>
+<span class="fc" id="L391">                PolynomialTheoryUtilityExecutionPlan.PROFILES.size()</span>
+<span class="fc" id="L392">                    * PolynomialTheoryUtilityExecutionPlan.CHECKPOINTS.size();</span>
+<span class="pc bpc" id="L393" title="1 of 2 branches missed.">            if (runIds.size() != expectedRuns) {</span>
+<span class="nc" id="L394">                throw new IllegalStateException(</span>
                     &quot;runner did not execute exactly the frozen runs&quot;
                 );
             }
-<span class="fc" id="L393">            return CandidateBatch.create(inputs, results);</span>
+<span class="fc" id="L398">            return CandidateBatch.create(inputs, results);</span>
         }
 
         private static void requireRunChunk(
@@ -398,27 +403,27 @@ public interface PolynomialTheoryUtilityProfileAdapter {
             List&lt;PolynomialTheoryUtilityExecutionInput&gt; runInputs,
             List&lt;PolynomialTheoryUtilityCaseCorpus.FormationCase&gt; cases
         ) {
-<span class="fc bfc" id="L401" title="All 2 branches covered.">            for (int index = 0; index &lt; runInputs.size(); index++) {</span>
-<span class="fc" id="L402">                var input = runInputs.get(index);</span>
-<span class="pc bpc" id="L403" title="1 of 2 branches missed.">                if (!first.runId().equals(input.runId())</span>
-<span class="pc bpc" id="L404" title="1 of 2 branches missed.">                        || !first.profileId().equals(input.profileId())</span>
-<span class="pc bpc" id="L405" title="1 of 2 branches missed.">                        || !first.checkpointId().equals(input.checkpointId())</span>
-<span class="pc bpc" id="L406" title="1 of 2 branches missed.">                        || !first.adapterId().equals(input.adapterId())</span>
-<span class="pc bpc" id="L407" title="1 of 2 branches missed.">                        || !input.caseId().equals(cases.get(index).caseId())) {</span>
-<span class="nc" id="L408">                    throw new IllegalStateException(</span>
+<span class="fc bfc" id="L406" title="All 2 branches covered.">            for (int index = 0; index &lt; runInputs.size(); index++) {</span>
+<span class="fc" id="L407">                var input = runInputs.get(index);</span>
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">                if (!first.runId().equals(input.runId())</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">                        || !first.profileId().equals(input.profileId())</span>
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">                        || !first.checkpointId().equals(input.checkpointId())</span>
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">                        || !first.adapterId().equals(input.adapterId())</span>
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">                        || !input.caseId().equals(cases.get(index).caseId())) {</span>
+<span class="nc" id="L413">                    throw new IllegalStateException(</span>
                         &quot;execution input differs from its frozen run position&quot;
                     );
                 }
             }
-<span class="fc" id="L413">        }</span>
+<span class="fc" id="L418">        }</span>
     }
 
     private static String requireText(String value, String name) {
-<span class="fc" id="L417">        String text = Objects.requireNonNull(value, name);</span>
-<span class="pc bpc" id="L418" title="1 of 2 branches missed.">        if (text.isBlank()) {</span>
-<span class="nc" id="L419">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+<span class="fc" id="L422">        String text = Objects.requireNonNull(value, name);</span>
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">        if (text.isBlank()) {</span>
+<span class="nc" id="L424">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
         }
-<span class="fc" id="L421">        return text;</span>
+<span class="fc" id="L426">        return text;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
