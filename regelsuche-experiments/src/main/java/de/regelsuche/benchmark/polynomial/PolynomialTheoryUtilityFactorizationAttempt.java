@@ -2,6 +2,7 @@ package de.regelsuche.benchmark.polynomial;
 
 import de.regelsuche.polynomial.ExactNestedFactorizationTransformationPipeline;
 import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.transform.MeasuredPolynomialDecompositionPipeline;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.List;
@@ -171,6 +172,18 @@ public record PolynomialTheoryUtilityFactorizationAttempt(
             metadata.transitionId(), metadata.verifierOutcome(), metadata.reportEvidenceHash(), execution);
     }
 
+    /** Same observed fields, issued by the separately measured specialized pipeline. */
+    public static PolynomialTheoryUtilityFactorizationAttempt createObserved(int attemptIndex,
+            String executionInputId, int occurrenceIndex,
+            MeasuredPolynomialDecompositionPipeline.Result pipeline, String transitionId) {
+        var execution = new ObservedExecution(occurrenceIndex, pipeline);
+        var metadata = execution.metadata(attemptIndex, executionInputId, transitionId);
+        return new PolynomialTheoryUtilityFactorizationAttempt(observedIdentity(metadata.attemptId(), execution),
+            metadata.attemptIndex(), metadata.executionInputId(), metadata.backendId(), metadata.requestId(),
+            metadata.requestEvidenceHash(), metadata.candidateIds(), metadata.selectedCandidateId(),
+            metadata.transitionId(), metadata.verifierOutcome(), metadata.reportEvidenceHash(), execution);
+    }
+
     public String schema() {
         return observedExecution == null ? SCHEMA : OBSERVED_SCHEMA;
     }
@@ -243,24 +256,38 @@ public record PolynomialTheoryUtilityFactorizationAttempt(
     public static final class ObservedExecution {
         private final int occurrenceIndex;
         private final ExactNestedFactorizationTransformationPipeline.Result pipeline;
+        private final MeasuredPolynomialDecompositionPipeline.Result specialized;
 
         private ObservedExecution(int occurrenceIndex,
                 ExactNestedFactorizationTransformationPipeline.Result pipeline) {
             if (occurrenceIndex < 0) throw new IllegalArgumentException("occurrenceIndex must be non-negative");
             this.occurrenceIndex = occurrenceIndex;
             this.pipeline = Objects.requireNonNull(pipeline, "pipeline");
+            this.specialized = null;
             if (pipeline.factorization().isEmpty() || !pipeline.factorization().orElseThrow().executed()) {
                 throw new IllegalArgumentException("observed attempt requires an executed factorization pipeline");
             }
         }
 
+        private ObservedExecution(int occurrenceIndex, MeasuredPolynomialDecompositionPipeline.Result pipeline) {
+            if (occurrenceIndex < 0) throw new IllegalArgumentException("occurrenceIndex must be non-negative");
+            this.occurrenceIndex = occurrenceIndex;
+            this.pipeline = null;
+            this.specialized = Objects.requireNonNull(pipeline, "pipeline");
+            if (pipeline.request().isEmpty() || pipeline.report().isEmpty()) {
+                throw new IllegalArgumentException("observed attempt requires an executed specialized factorization pipeline");
+            }
+        }
+
         public int occurrenceIndex() { return occurrenceIndex; }
-        public List<Integer> path() { return pipeline.position().path(); }
-        public String pipelineEvidenceHash() { return pipeline.certificateHash(); }
+        public List<Integer> path() { return specialized == null ? pipeline.position().path() : specialized.path(); }
+        public String pipelineEvidenceHash() { return specialized == null ? pipeline.certificateHash() : specialized.certificateHash(); }
         public String sourceRootEvidenceHash() {
+            if (specialized != null) return specialized.rootSourceHash().orElseThrow();
             return pipeline.projection().orElseThrow().rootSourceHash().orElseThrow();
         }
         public PolynomialWorkLedger rawWork() {
+            if (specialized != null) return specialized.rawWork();
             return pipeline.factorization().orElseThrow().totalWork();
         }
 
@@ -288,6 +315,14 @@ public record PolynomialTheoryUtilityFactorizationAttempt(
         }
 
         private PolynomialTheoryUtilityFactorizationAttempt metadata(int index, String inputId, String transitionId) {
+            if (specialized != null) {
+                var report = specialized.report().orElseThrow();
+                String selected = specialized.selectedCandidate().map(value -> value.factorization().verificationCertificateHash())
+                    .orElse(NO_SELECTION);
+                return create(index, inputId, specialized.engineId(), hash(specialized.request().orElseThrow().canonicalMaterial()),
+                    specialized.certificateHash(), report.candidates().stream().map(value -> value.verificationCertificateHash()).toList(),
+                    selected, transitionId, selected.equals(NO_SELECTION) ? report.status().name() : "VERIFIED", report.verificationHash());
+            }
             var factorization = pipeline.factorization().orElseThrow();
             var report = factorization.report().orElseThrow();
             String selected = pipeline.transformation().map(value -> value.candidateCertificateHash())

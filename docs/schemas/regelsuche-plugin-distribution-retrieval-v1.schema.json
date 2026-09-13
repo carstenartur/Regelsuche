@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.plugin-distribution-retrieval/v1",
+  "title": "Bounded client retrieval evidence",
+  "type": "object",
+  "required": [
+    "schema",
+    "networkAccessStatus"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.plugin-distribution-retrieval/v1"
+    },
+    "networkAccessStatus": {
+      "enum": [
+        "PERFORMED",
+        "NOT_PERFORMED"
+      ]
+    },
+    "sources": {
+      "type": "object",
+      "required": [
+        "trustStoreUri",
+        "trustRevisionUri",
+        "indexUri",
+        "indexSignatureUri",
+        "indexId",
+        "indexRevision",
+        "indexContentHash"
+      ],
+      "properties": {
+        "trustStoreUri": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "trustRevisionUri": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "indexUri": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "indexSignatureUri": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "indexId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "indexRevision": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "indexContentHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "resources": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "required": [
+          "uri",
+          "bytes",
+          "sha256"
+        ],
+        "properties": {
+          "uri": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483639
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "retainedGenerationHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "networkAccessStatus": {
+            "const": "PERFORMED"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "sources",
+          "resources"
+        ],
+        "not": {
+          "required": [
+            "retainedGenerationHash"
+          ]
+        }
+      },
+      "else": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "sources"
+              ]
+            },
+            {
+              "required": [
+                "resources"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

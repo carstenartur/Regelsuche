@@ -168,7 +168,7 @@ rückwirkend verbessern. Information-Parität und weitere Baselines bleiben in
 <!-- capability-status:start -->
 ## Maschinengebundener Capability-Status
 
-Die folgende Kurzmatrix wird aus den kanonischen Release-, Domain- und Trust-Verträgen erzeugt. Die vollständige Matrix mit Evidence-Roots steht in [`capability-status.md`](generated/capability-status.md).
+Die folgende Kurzmatrix wird aus den kanonischen Release-, Domain-, Trust- und Runtime-Verträgen erzeugt. Die vollständige Matrix mit Evidence-Roots steht in [`capability-status.md`](generated/capability-status.md).
 
 | Capability | Status |
 |---|---|
@@ -182,6 +182,7 @@ Die folgende Kurzmatrix wird aus den kanonischen Release-, Domain- und Trust-Ver
 | `PROMOTION` | `NOT_EVALUATED` |
 | `PUBLIC_EVIDENCE` | `NOT_EVALUATED` |
 | `PUBLIC_PLUGIN_DISTRIBUTION` | `BLOCKED` |
+| `SAFE_PREPARATION_PRODUCT` | `EXPERIMENTAL` |
 
 `QUALIFIED` autorisiert nur den jeweils benannten Claim. Externe mathematische Neuheit, formaler Beweis, Promotion und Public Evidence werden nicht aus einem anderen erfolgreichen Profil abgeleitet.
 <!-- capability-status:end -->

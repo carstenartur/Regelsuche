@@ -1,0 +1,36 @@
+{
+  "schema": "regelsuche.safe-runtime-local-history-retention/v1",
+  "purpose": "Retain the exact local source commit graph referenced by the public qualification documents when publishing through tree/commit APIs produces different commit IDs.",
+  "bundle": {
+    "path": "safe-runtime-public-local-history.bundle",
+    "bytes": 175109,
+    "sha256": "d565bf684d07825c7dd18e5e672b4aa78f642426e65b3109bdb71054e07fb48a",
+    "head": "fc55f6cffe5d69bd2e517d0e36bdb0d5f5de4812",
+    "prerequisites": [
+      "67ea97116db21ff4050b0ed33a34f5456b2581ea",
+      "5352e38857613d5b3884d43efdcd7dec5e92532d",
+      "85f6ce9301a7f3dcf3243937d5b463113c61846f"
+    ]
+  },
+  "sources": {
+    "casePreregistration": {
+      "commit": "887283d3e7ba420faf820875653ba36b301c15e9",
+      "tree": "e27c94a6a8637ab4f729832031f6dc180dc49cd9"
+    },
+    "firstCompleteImplementation": {
+      "commit": "7b5dbc417ba8a05461698471d7d4342ca8b7fc0c",
+      "tree": "91d3271a692333779bd9e49a164516fe940a6ab4"
+    },
+    "cleanReproduction": {
+      "commit": "e71cb7bc6a51aee64ddad6b8790acd15552ebf46",
+      "tree": "20e2ec1b97715d674337f6bc19dbe02ae3d75b4f"
+    },
+    "reviewedQualification": {
+      "commit": "fc55f6cffe5d69bd2e517d0e36bdb0d5f5de4812",
+      "tree": "32bf508e96e78754f9a45d95d4e4d4906e11766c"
+    }
+  },
+  "fixedManifestSha256": "3915a0630ee9f2a58a2f17a282a60a0a43bbf8d66e668a5d6cb0389964bf86d9",
+  "verification": "git bundle verify passed against the repository containing all prerequisite commits",
+  "claimBoundary": "Local Git object identities and ancestry, not an independent public timestamp, externally signed preregistration, hosted experiment or final integrated CI qualification."
+}

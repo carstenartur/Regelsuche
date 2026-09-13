@@ -14,5 +14,17 @@ body.retained-run #demoHero, body.retained-run .tab-panel:not(#tab-runs):not(#ta
 #tab-runs .run-artifact { border: 1px solid #c5cedb; margin: .6rem 0; padding: .75rem; }
 #tab-runs .run-artifact[aria-current="true"] { border: 3px solid #466ca2; }
 #tab-runs .run-error { color: #8d2121; font-weight: 600; }
+#retainedRunStatus { overflow-wrap: anywhere; }
+#tab-runs .run-candidate-dossier { overflow-wrap: anywhere; min-width: 0; }
+#tab-runs .dossier-candidate-list { display: flex; flex-wrap: wrap; gap: .5rem; max-height: 14rem; overflow-y: auto; margin: 1rem 0; padding: .4rem; }
+#tab-runs .dossier-candidate-list button { white-space: normal; overflow-wrap: anywhere; max-width: 100%; text-align: left; }
+#tab-runs .dossier-candidate-list [aria-pressed="true"] { border: 3px solid #466ca2; font-weight: 700; }
+#tab-runs #candidateDossierDetail > section { margin: 1rem 0; padding: .8rem; border: 1px solid #c5cedb; }
+#tab-runs #candidateDossierDetail .dossier-recognition { border-left: 5px solid #7a7a7a; }
+#tab-runs #candidateDossierDetail .dossier-capability { border-left: 5px solid #466ca2; }
+#tab-runs [data-dossier-edge] { display: block; margin: .5rem 0; max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
+#tab-runs #duplicateRetainedRun { margin: 1rem 0; padding: 1rem; border: 1px solid #c5cedb; overflow-wrap: anywhere; }
+#tab-runs #duplicateRunSeed, #tab-runs #importCandidateDossier { max-width: 100%; box-sizing: border-box; }
+#tab-runs input:focus-visible, #candidateGraphEvidence:focus { outline: 3px solid #955a00; outline-offset: 3px; }
 #tab-runs button:focus-visible, #tab-runs a:focus-visible, .retained-run-banner button:focus-visible { outline: 3px solid #955a00; outline-offset: 3px; }
 @media (max-width: 760px) { .run-layout { grid-template-columns: minmax(0, 1fr); } .run-controls .actions { display: grid; } .run-controls input { width: 100%; box-sizing: border-box; } }

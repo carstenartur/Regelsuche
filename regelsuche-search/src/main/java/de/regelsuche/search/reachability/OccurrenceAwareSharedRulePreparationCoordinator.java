@@ -115,6 +115,26 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
         String sourceExpression,
         AssumptionSignature initialAssumptions
     ) {
+        return analyze(sourceExpression, initialAssumptions, true);
+    }
+
+    /**
+     * Evaluates only concrete direct occurrences. Principals without a direct
+     * occurrence remain unsupported; this path performs no native preparation
+     * and constructs no v2 delegate.
+     */
+    public Evaluation analyzeDirect(
+        String sourceExpression,
+        AssumptionSignature initialAssumptions
+    ) {
+        return analyze(sourceExpression, initialAssumptions, false);
+    }
+
+    private Evaluation analyze(
+        String sourceExpression,
+        AssumptionSignature initialAssumptions,
+        boolean prepareUnresolved
+    ) {
         String source = normalize(sourceExpression);
         AssumptionSignature assumptions = normalized(initialAssumptions);
         Expr root = parser.parseTerm(source);
@@ -153,9 +173,11 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
 
         // V2 setup is repeated for this subset. Charge its input-sized construction
         // separately instead of silently treating it as precomputed/free work.
-        long delegateSetupUnits = delegateSetupUnits(unresolved.size(), preparationRules.size());
+        long delegateSetupUnits = prepareUnresolved
+            ? delegateSetupUnits(unresolved.size(), preparationRules.size())
+            : 0;
         Optional<SharedUnifiedRulePreparationCoordinator.Evaluation> delegated = Optional.empty();
-        if (!unresolved.isEmpty()) {
+        if (prepareUnresolved && !unresolved.isEmpty()) {
             try {
                 delegated = Optional.of(new SharedUnifiedRulePreparationCoordinator(
                     unresolved, preparationRules, repositoryRevision, bridgeBudget)
@@ -169,6 +191,10 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
                         schema, "UNIFIED_V3_DELEGATE_TECHNICAL_FAILURE"));
                 }
             }
+        }
+        if (!prepareUnresolved) {
+            unresolved.forEach(schema -> outcomes.put(
+                schema.ruleId(), directOccurrenceUnavailable(schema)));
         }
         delegated.ifPresent(evaluation -> evaluation.outcomes().forEach(
             outcome -> outcomes.put(outcome.ruleId(), outcome)));
@@ -210,7 +236,9 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
             aggregateWork,
             occurrenceWork,
             occurrenceEvidence,
-            unresolved.stream().map(RewriteApplicabilitySchema::ruleId).toList(),
+            prepareUnresolved
+                ? unresolved.stream().map(RewriteApplicabilitySchema::ruleId).toList()
+                : List.of(),
             delegated.map(
                 SharedUnifiedRulePreparationCoordinator.Evaluation::sharedExecutionWork));
     }
@@ -221,6 +249,18 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
      * Verification work is separate from the retained analyze-work ledger.
      */
     public Verification verify(Evaluation evaluation) {
+        return verify(evaluation, true);
+    }
+
+    /** Recomputes and concretely replays a direct-only evaluation. */
+    public Verification verifyDirect(Evaluation evaluation) {
+        return verify(evaluation, false);
+    }
+
+    private Verification verify(
+        Evaluation evaluation,
+        boolean prepareUnresolved
+    ) {
         if (evaluation == null) {
             return new Verification(false, "EVALUATION_MISSING");
         }
@@ -240,7 +280,11 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
         }
         final Evaluation recomputed;
         try {
-            recomputed = analyze(evaluation.sourceExpression(), evaluation.sourceAssumptions());
+            recomputed = prepareUnresolved
+                ? analyze(
+                    evaluation.sourceExpression(), evaluation.sourceAssumptions())
+                : analyzeDirect(
+                    evaluation.sourceExpression(), evaluation.sourceAssumptions());
         } catch (RuntimeException exception) {
             return new Verification(false, "EVALUATION_RECOMPUTATION_TECHNICAL_FAILURE");
         }
@@ -556,6 +600,22 @@ public final class OccurrenceAwareSharedRulePreparationCoordinator {
             PatternTargetedLocalBridgeSearch.Work.empty(),
             Set.of(),
             detailCode,
+            "");
+    }
+
+    private RulePreparationCoordinator.Outcome directOccurrenceUnavailable(
+        RewriteApplicabilitySchema schema
+    ) {
+        return new RulePreparationCoordinator.Outcome(
+            schema.ruleId(),
+            verifyAdmittedSchemaHash(schema),
+            PatternTargetedLocalBridgeSearch.Status.UNSUPPORTED,
+            Optional.empty(),
+            false,
+            PatternTargetedLocalBridgeSearch.AnalysisSnapshot.unavailable(),
+            PatternTargetedLocalBridgeSearch.Work.empty(),
+            Set.of(),
+            "DIRECT_NO_MATCH",
             "");
     }
 

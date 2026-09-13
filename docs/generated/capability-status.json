@@ -187,6 +187,27 @@
       ]
     },
     {
+      "capability": "SAFE_PREPARATION_PRODUCT",
+      "status": "EXPERIMENTAL",
+      "claim": "Shared opt-in DIRECT_V1/SAFE_PREPARATION_V4 runtime with bounded public contract qualification; broader inventory and default qualification remain open.",
+      "evidenceRoots": [
+        "sha256:3915a0630ee9f2a58a2f17a282a60a0a43bbf8d66e668a5d6cb0389964bf86d9",
+        "sha256:81a39ac2491a03dface8d19e6b05b2d1882e54348136ded748168d4099db9858",
+        "sha256:9a065a30e1dedce06f7fa5e907d956f34e662f3a0d6cf1943f41112148dd2813",
+        "sha256:9fd4307edbb64575ff75317f1340594d9a780c3226ca1ad69b2bbd0ecadf7b35",
+        "sha256:d00f99bdda32a1cc32c62a5314252b98021b2632a73b57c62bbc25a3466a80e2"
+      ],
+      "blockers": [
+        "FULL_VISIBLE_INVENTORY_NOT_QUALIFIED"
+      ],
+      "notes": [
+        "The frozen manifest declares 14 public source-side cases; it does not authorize a general default.",
+        "Actual measured counts, raw CLI/Workbench exports and independent replay are retained in build/reports/safe-runtime-product-qualification/run/qualification.json.",
+        "Complete clean-checkout/container reproduction is a separate mandatory ciCheck gate; source hashes alone do not establish that it passed.",
+        "Historical V2 qualification, protected FINAL TEST, arbitrary learned-rule promotion and global completeness are not reinterpreted."
+      ]
+    },
+    {
       "capability": "SEARCH_REPRODUCIBILITY",
       "status": "QUALIFIED",
       "claim": "reproducible target-free search under pinned inputs",
@@ -200,5 +221,5 @@
       ]
     }
   ],
-  "contentHash": "sha256:1985ba6843f05a99998d714f18c6d7a6c15219efccea4f41b4820816d54da11a"
+  "contentHash": "sha256:3ded4df46e97bcbea70ee54ce09434f23f555e36d4a471741e0441419901fd5f"
 }

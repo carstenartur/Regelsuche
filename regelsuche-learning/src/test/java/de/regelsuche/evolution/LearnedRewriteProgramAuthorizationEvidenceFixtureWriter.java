@@ -20,10 +20,10 @@ import java.util.List;
 
 /** Writes one deterministic learned-program authorization evidence bundle. */
 public final class LearnedRewriteProgramAuthorizationEvidenceFixtureWriter {
-    private static final String REVISION =
+    static final String REVISION =
         "0123456789abcdef0123456789abcdef01234567";
-    private static final Instant ISSUED = Instant.parse("2026-09-01T00:00:00Z");
-    private static final Instant AUTHORIZED = Instant.parse("2026-09-10T00:00:00Z");
+    static final Instant ISSUED = Instant.parse("2026-09-01T00:00:00Z");
+    static final Instant AUTHORIZED = Instant.parse("2026-09-10T00:00:00Z");
     private static final Instant EXPIRES = Instant.parse("2026-10-01T00:00:00Z");
 
     private LearnedRewriteProgramAuthorizationEvidenceFixtureWriter() {
@@ -34,6 +34,19 @@ public final class LearnedRewriteProgramAuthorizationEvidenceFixtureWriter {
             throw new IllegalArgumentException("usage: <output-directory>");
         }
         Path output = Path.of(args[0]).toAbsolutePath().normalize();
+        ExportedAuthorization exported = export(output, EXPIRES, false);
+
+        System.out.println("learnedRewriteProgramAuthorizationFixture=" + output);
+        System.out.println(
+            "learnedRewriteProgramAuthorizationReceipt="
+                + exported.programAuthorization().receipt().contentHash());
+    }
+
+    static ExportedAuthorization export(
+        Path output,
+        Instant expires,
+        boolean includeLeafGenomes
+    ) throws IOException {
         reset(output);
 
         EvolutionSplitManifest split = split();
@@ -46,14 +59,18 @@ public final class LearnedRewriteProgramAuthorizationEvidenceFixtureWriter {
             split,
             validation,
             finalTest,
-            "mul-one");
+            "mul-one",
+            expires,
+            includeLeafGenomes);
         LeafAuthorization add = authorizeLeaf(
             output.resolve("leaf-add-zero"),
             genome,
             split,
             validation,
             finalTest,
-            "add-zero");
+            "add-zero",
+            expires,
+            includeLeafGenomes);
 
         EvolutionRewriteProgramPlan plan = plan(genome);
         EvolutionRewriteProgramCandidate candidate =
@@ -91,10 +108,11 @@ public final class LearnedRewriteProgramAuthorizationEvidenceFixtureWriter {
             output.resolve("leaf-add-zero-authorization-receipt.json"),
             add.authorization().receipt().toCanonicalJson());
 
-        System.out.println("learnedRewriteProgramAuthorizationFixture=" + output);
-        System.out.println(
-            "learnedRewriteProgramAuthorizationReceipt="
-                + authorization.receipt().contentHash());
+        return new ExportedAuthorization(
+            authorization,
+            List.of(
+                multiply.authorization().promotion().rule().id(),
+                add.authorization().promotion().rule().id()));
     }
 
     private static LeafAuthorization authorizeLeaf(
@@ -103,9 +121,14 @@ public final class LearnedRewriteProgramAuthorizationEvidenceFixtureWriter {
         EvolutionSplitManifest split,
         EvolutionValidationSelection validation,
         EvolutionFinalTestEvaluation finalTest,
-        String geneId
+        String geneId,
+        Instant expires,
+        boolean includeGenome
     ) throws IOException {
         Files.createDirectories(output);
+        if (includeGenome) {
+            write(output.resolve("genome.json"), genome.toCanonicalJson());
+        }
         LearnedPatternRuleAuthorizationService service =
             new LearnedPatternRuleAuthorizationService();
         LearnedPatternCounterexampleEvidence counterexample =
@@ -116,7 +139,7 @@ public final class LearnedRewriteProgramAuthorizationEvidenceFixtureWriter {
                 geneId,
                 REVISION,
                 ISSUED,
-                EXPIRES,
+                expires,
                 split,
                 validation,
                 finalTest,
@@ -357,5 +380,15 @@ public final class LearnedRewriteProgramAuthorizationEvidenceFixtureWriter {
     private record LeafAuthorization(
         LearnedPatternRuleAuthorizationService.Authorization authorization
     ) {
+    }
+
+    record ExportedAuthorization(
+        LearnedRewriteProgramAuthorizationService.Authorization
+            programAuthorization,
+        List<String> promotedRuleIds
+    ) {
+        ExportedAuthorization {
+            promotedRuleIds = List.copyOf(promotedRuleIds);
+        }
     }
 }

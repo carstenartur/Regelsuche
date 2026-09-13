@@ -1,0 +1,610 @@
+{
+  "schema": "regelsuche.safe-runtime-public-cases/v1",
+  "configurationId": "direct-v1-vs-safe-preparation-v4-actual-runtime-v1",
+  "fixtureId": "public-normalization-authority-contract-v1",
+  "profiles": [
+    "DIRECT_V1",
+    "SAFE_PREPARATION_V4"
+  ],
+  "criteria": {
+    "minimumGains": 1,
+    "requirePairedInventory": true,
+    "requireExactSurfaceAndFreshReplayParity": true,
+    "requireNoCommonCandidateOrAssumptionLoss": true,
+    "gainExcludedStatuses": [
+      "TECHNICAL_FAILURE",
+      "BUDGET_INCONCLUSIVE",
+      "UNSUPPORTED"
+    ],
+    "gainRequiresZeroRefusedReservation": true,
+    "defaultDecisionForIncompleteCoverage": "KEEP_OPT_IN_BOUNDED_PUBLIC_COVERAGE",
+    "defaultMutationAllowed": false,
+    "claimBoundary": "FIXED_PUBLIC_CONTRACT_CASES_ONLY; no protected FINAL TEST or empirically learned production-model claim"
+  },
+  "cases": [
+    {
+      "id": "direct-add-zero",
+      "kind": "CAPABILITY",
+      "gainEligible": false,
+      "commonRequest": {
+        "schema": "regelsuche.safe-runtime-request/v1",
+        "assumptions": [],
+        "ruleIds": [
+          "ast_add_zero_right"
+        ],
+        "preparationRuleIds": [],
+        "includeSymPy": false,
+        "maxWorkUnits": 200000,
+        "maxPrimitiveRewrites": 4,
+        "maxTheoryWorkUnits": 200000,
+        "preparationBudget": {
+          "maxDepth": 2,
+          "maxVisitedStates": 128,
+          "maxGeneratedTransitions": 512,
+          "maxPrimitiveSteps": 4,
+          "maxExpressionNodes": 256,
+          "maxSuccessorsPerState": 32,
+          "maxMatchResults": 32,
+          "maxMatchSteps": 4096,
+          "maxPatternBranches": 1024
+        },
+        "source": "x+0"
+      },
+      "expected": {
+        "principalId": "ast_add_zero_right",
+        "directPresent": true,
+        "safePresent": true,
+        "retainedAssumptions": [],
+        "statuses": {
+          "DIRECT_V1": "SUCCESS",
+          "SAFE_PREPARATION_V4": "SUCCESS"
+        }
+      }
+    },
+    {
+      "id": "native-square-preparation",
+      "kind": "CAPABILITY",
+      "gainEligible": true,
+      "commonRequest": {
+        "schema": "regelsuche.safe-runtime-request/v1",
+        "assumptions": [],
+        "ruleIds": [
+          "ast_square_difference_factor"
+        ],
+        "preparationRuleIds": [],
+        "includeSymPy": false,
+        "maxWorkUnits": 200000,
+        "maxPrimitiveRewrites": 4,
+        "maxTheoryWorkUnits": 200000,
+        "preparationBudget": {
+          "maxDepth": 2,
+          "maxVisitedStates": 128,
+          "maxGeneratedTransitions": 512,
+          "maxPrimitiveSteps": 4,
+          "maxExpressionNodes": 256,
+          "maxSuccessorsPerState": 32,
+          "maxMatchResults": 32,
+          "maxMatchSteps": 4096,
+          "maxPatternBranches": 1024
+        },
+        "source": "4*x^2-y^2"
+      },
+      "expected": {
+        "principalId": "ast_square_difference_factor",
+        "directPresent": false,
+        "safePresent": true,
+        "retainedAssumptions": [],
+        "safePrimitiveRuleIds": [
+          "prepare_exact_monomial_square_structure",
+          "ast_square_difference_factor"
+        ],
+        "statuses": {
+          "DIRECT_V1": "NO_MATCH",
+          "SAFE_PREPARATION_V4": "SUCCESS"
+        }
+      }
+    },
+    {
+      "id": "nested-direct-guarded",
+      "kind": "CAPABILITY",
+      "gainEligible": false,
+      "commonRequest": {
+        "schema": "regelsuche.safe-runtime-request/v1",
+        "assumptions": [
+          "b != 0",
+          "d != 0"
+        ],
+        "ruleIds": [
+          "rational_multiply_fractions"
+        ],
+        "preparationRuleIds": [],
+        "includeSymPy": false,
+        "maxWorkUnits": 200000,
+        "maxPrimitiveRewrites": 4,
+        "maxTheoryWorkUnits": 200000,
+        "preparationBudget": {
+          "maxDepth": 2,
+          "maxVisitedStates": 128,
+          "maxGeneratedTransitions": 512,
+          "maxPrimitiveSteps": 4,
+          "maxExpressionNodes": 256,
+          "maxSuccessorsPerState": 32,
+          "maxMatchResults": 32,
+          "maxMatchSteps": 4096,
+          "maxPatternBranches": 1024
+        },
+        "source": "1+(a/b)*(c/d)"
+      },
+      "expected": {
+        "principalId": "rational_multiply_fractions",
+        "directPresent": true,
+        "safePresent": true,
+        "retainedAssumptions": [
+          "b != 0",
+          "d != 0"
+        ]
+      }
+    },
+    {
+      "id": "nested-direct-missing-guard",
+      "kind": "GUARD_CONTROL",
+      "gainEligible": false,
+      "commonRequest": {
+        "schema": "regelsuche.safe-runtime-request/v1",
+        "assumptions": [
+          "b != 0"
+        ],
+        "ruleIds": [
+          "rational_multiply_fractions"
+        ],
+        "preparationRuleIds": [],
+        "includeSymPy": false,
+        "maxWorkUnits": 200000,
+        "maxPrimitiveRewrites": 4,
+        "maxTheoryWorkUnits": 200000,
+        "preparationBudget": {
+          "maxDepth": 2,
+          "maxVisitedStates": 128,
+          "maxGeneratedTransitions": 512,
+          "maxPrimitiveSteps": 4,
+          "maxExpressionNodes": 256,
+          "maxSuccessorsPerState": 32,
+          "maxMatchResults": 32,
+          "maxMatchSteps": 4096,
+          "maxPatternBranches": 1024
+        },
+        "source": "1+(a/b)*(c/d)"
+      },
+      "expected": {
+        "principalId": "rational_multiply_fractions",
+        "directPresent": false,
+        "safePresent": false,
+        "retainedAssumptions": [
+          "b != 0"
+        ]
+      }
+    },
+    {
+      "id": "nested-prepared-guarded",
+      "kind": "CAPABILITY",
+      "gainEligible": true,
+      "commonRequest": {
+        "schema": "regelsuche.safe-runtime-request/v1",
+        "assumptions": [
+          "b != 0",
+          "d != 0"
+        ],
+        "ruleIds": [
+          "rational_multiply_fractions",
+          "ast_add_zero_right"
+        ],
+        "preparationRuleIds": [
+          "ast_add_zero_right"
+        ],
+        "includeSymPy": false,
+        "maxWorkUnits": 200000,
+        "maxPrimitiveRewrites": 4,
+        "maxTheoryWorkUnits": 200000,
+        "preparationBudget": {
+          "maxDepth": 2,
+          "maxVisitedStates": 128,
+          "maxGeneratedTransitions": 512,
+          "maxPrimitiveSteps": 4,
+          "maxExpressionNodes": 256,
+          "maxSuccessorsPerState": 32,
+          "maxMatchResults": 32,
+          "maxMatchSteps": 4096,
+          "maxPatternBranches": 1024
+        },
+        "source": "1+((a/b)+0)*(c/d)"
+      },
+      "expected": {
+        "principalId": "rational_multiply_fractions",
+        "directPresent": false,
+        "safePresent": true,
+        "retainedAssumptions": [
+          "b != 0",
+          "d != 0"
+        ],
+        "safePrimitiveRuleIds": [
+          "ast_add_zero_right",
+          "rational_multiply_fractions"
+        ]
+      }
+    },
+    {
+      "id": "nested-prepared-missing-guard",
+      "kind": "GUARD_CONTROL",
+      "gainEligible": false,
+      "commonRequest": {
+        "schema": "regelsuche.safe-runtime-request/v1",
+        "assumptions": [
+          "b != 0"
+        ],
+        "ruleIds": [
+          "rational_multiply_fractions",
+          "ast_add_zero_right"
+        ],
+        "preparationRuleIds": [
+          "ast_add_zero_right"
+        ],
+        "includeSymPy": false,
+        "maxWorkUnits": 200000,
+        "maxPrimitiveRewrites": 4,
+        "maxTheoryWorkUnits": 200000,
+        "preparationBudget": {
+          "maxDepth": 2,
+          "maxVisitedStates": 128,
+          "maxGeneratedTransitions": 512,
+          "maxPrimitiveSteps": 4,
+          "maxExpressionNodes": 256,
+          "maxSuccessorsPerState": 32,
+          "maxMatchResults": 32,
+          "maxMatchSteps": 4096,
+          "maxPatternBranches": 1024
+        },
+        "source": "1+((a/b)+0)*(c/d)"
+      },
+      "expected": {
+        "principalId": "rational_multiply_fractions",
+        "directPresent": false,
+        "safePresent": false,
+        "retainedAssumptions": [
+          "b != 0"
+        ]
+      }
+    },
+    {
+      "id": "nested-prepared-extra-assumption",
+      "kind": "ASSUMPTION_CONTROL",
+      "gainEligible": false,
+      "commonRequest": {
+        "schema": "regelsuche.safe-runtime-request/v1",
+        "assumptions": [
+          "b != 0",
+          "d != 0",
+          "u != 0"
+        ],
+        "ruleIds": [
+          "rational_multiply_fractions",
+          "ast_add_zero_right"
+        ],
+        "preparationRuleIds": [
+          "ast_add_zero_right"
+        ],
+        "includeSymPy": false,
+        "maxWorkUnits": 200000,
+        "maxPrimitiveRewrites": 4,
+        "maxTheoryWorkUnits": 200000,
+        "preparationBudget": {
+          "maxDepth": 2,
+          "maxVisitedStates": 128,
+          "maxGeneratedTransitions": 512,
+          "maxPrimitiveSteps": 4,
+          "maxExpressionNodes": 256,
+          "maxSuccessorsPerState": 32,
+          "maxMatchResults": 32,
+          "maxMatchSteps": 4096,
+          "maxPatternBranches": 1024
+        },
+        "source": "1+((a/b)+0)*(c/d)"
+      },
+      "expected": {
+        "principalId": "rational_multiply_fractions",
+        "directPresent": false,
+        "safePresent": true,
+        "retainedAssumptions": [
+          "b != 0",
+          "d != 0",
+          "u != 0"
+        ],
+        "safePrimitiveRuleIds": [
+          "ast_add_zero_right",
+          "rational_multiply_fractions"
+        ]
+      }
+    },
+    {
+      "id": "typed-system-replay",
+      "kind": "TYPED_CONTRACT",
+      "gainEligible": false,
+      "commonRequest": {
+        "schema": "regelsuche.safe-runtime-request/v1",
+        "assumptions": [],
+        "ruleIds": [
+          "ast_add_zero_right"
+        ],
+        "preparationRuleIds": [],
+        "includeSymPy": false,
+        "maxWorkUnits": 200000,
+        "maxPrimitiveRewrites": 4,
+        "maxTheoryWorkUnits": 200000,
+        "preparationBudget": {
+          "maxDepth": 2,
+          "maxVisitedStates": 128,
+          "maxGeneratedTransitions": 512,
+          "maxPrimitiveSteps": 4,
+          "maxExpressionNodes": 256,
+          "maxSuccessorsPerState": 32,
+          "maxMatchResults": 32,
+          "maxMatchSteps": 4096,
+          "maxPatternBranches": 1024
+        },
+        "representation": {
+          "schema": "regelsuche.matrix-preparation-request/v1",
+          "equations": "2*(x+y)+3*(x-y)=5; (x+y)+4*(x-y)=6",
+          "unknowns": [
+            "x",
+            "y"
+          ]
+        }
+      },
+      "expected": {
+        "statuses": {
+          "DIRECT_V1": "SUCCESS",
+          "SAFE_PREPARATION_V4": "SUCCESS"
+        },
+        "relation": "SOLUTION_SET_EQUIVALENCE",
+        "safeClassification": "UNIQUE",
+        "safeSolution": [
+          "9/10",
+          "-1/2"
+        ]
+      }
+    },
+    {
+      "id": "plugin-visitor-context",
+      "kind": "PLUGIN_CONTRACT",
+      "gainEligible": false,
+      "commonRequest": {
+        "schema": "regelsuche.safe-runtime-request/v1",
+        "assumptions": [],
+        "ruleIds": [
+          "qualification_context_add_zero"
+        ],
+        "preparationRuleIds": [],
+        "includeSymPy": false,
+        "maxWorkUnits": 200000,
+        "maxPrimitiveRewrites": 4,
+        "maxTheoryWorkUnits": 200000,
+        "preparationBudget": {
+          "maxDepth": 2,
+          "maxVisitedStates": 128,
+          "maxGeneratedTransitions": 512,
+          "maxPrimitiveSteps": 4,
+          "maxExpressionNodes": 256,
+          "maxSuccessorsPerState": 32,
+          "maxMatchResults": 32,
+          "maxMatchSteps": 4096,
+          "maxPatternBranches": 1024
+        },
+        "source": "x+0"
+      },
+      "expected": {
+        "principalId": "qualification_context_add_zero",
+        "directPresent": true,
+        "safePresent": true,
+        "retainedAssumptions": [],
+        "statuses": {
+          "DIRECT_V1": "SUCCESS",
+          "SAFE_PREPARATION_V4": "SUCCESS"
+        }
+      }
+    },
+    {
+      "id": "learned-pattern-contract",
+      "kind": "LEARNED_CONTRACT",
+      "gainEligible": false,
+      "commonRequest": {
+        "schema": "regelsuche.safe-runtime-request/v1",
+        "assumptions": [],
+        "ruleIds": [
+          "learned.promoted.e6da03293d04583e.mul-one"
+        ],
+        "preparationRuleIds": [],
+        "includeSymPy": false,
+        "maxWorkUnits": 200000,
+        "maxPrimitiveRewrites": 4,
+        "maxTheoryWorkUnits": 200000,
+        "preparationBudget": {
+          "maxDepth": 2,
+          "maxVisitedStates": 128,
+          "maxGeneratedTransitions": 512,
+          "maxPrimitiveSteps": 4,
+          "maxExpressionNodes": 256,
+          "maxSuccessorsPerState": 32,
+          "maxMatchResults": 32,
+          "maxMatchSteps": 4096,
+          "maxPatternBranches": 1024
+        },
+        "source": "x*1"
+      },
+      "expected": {
+        "principalId": "learned.promoted.e6da03293d04583e.mul-one",
+        "directPresent": true,
+        "safePresent": true,
+        "retainedAssumptions": [],
+        "statuses": {
+          "DIRECT_V1": "SUCCESS",
+          "SAFE_PREPARATION_V4": "SUCCESS"
+        }
+      }
+    },
+    {
+      "id": "learned-program-contract",
+      "kind": "LEARNED_CONTRACT",
+      "gainEligible": false,
+      "commonRequest": {
+        "schema": "regelsuche.safe-runtime-request/v1",
+        "assumptions": [],
+        "ruleIds": [
+          "qualification-normalization-program"
+        ],
+        "preparationRuleIds": [],
+        "includeSymPy": false,
+        "maxWorkUnits": 200000,
+        "maxPrimitiveRewrites": 4,
+        "maxTheoryWorkUnits": 200000,
+        "preparationBudget": {
+          "maxDepth": 2,
+          "maxVisitedStates": 128,
+          "maxGeneratedTransitions": 512,
+          "maxPrimitiveSteps": 4,
+          "maxExpressionNodes": 256,
+          "maxSuccessorsPerState": 32,
+          "maxMatchResults": 32,
+          "maxMatchSteps": 4096,
+          "maxPatternBranches": 1024
+        },
+        "source": "(x*1)+0"
+      },
+      "expected": {
+        "principalId": "qualification-normalization-program",
+        "directPresent": true,
+        "safePresent": true,
+        "retainedAssumptions": [],
+        "statuses": {
+          "DIRECT_V1": "SUCCESS",
+          "SAFE_PREPARATION_V4": "SUCCESS"
+        }
+      }
+    },
+    {
+      "id": "technical-failure-control",
+      "kind": "EXPECTED_FAILURE_CONTROL",
+      "gainEligible": false,
+      "commonRequest": {
+        "schema": "regelsuche.safe-runtime-request/v1",
+        "assumptions": [],
+        "ruleIds": [
+          "qualification_technical_failure"
+        ],
+        "preparationRuleIds": [],
+        "includeSymPy": false,
+        "maxWorkUnits": 200000,
+        "maxPrimitiveRewrites": 4,
+        "maxTheoryWorkUnits": 200000,
+        "preparationBudget": {
+          "maxDepth": 2,
+          "maxVisitedStates": 128,
+          "maxGeneratedTransitions": 512,
+          "maxPrimitiveSteps": 4,
+          "maxExpressionNodes": 256,
+          "maxSuccessorsPerState": 32,
+          "maxMatchResults": 32,
+          "maxMatchSteps": 4096,
+          "maxPatternBranches": 1024
+        },
+        "source": "z"
+      },
+      "expected": {
+        "principalId": "qualification_technical_failure",
+        "directPresent": false,
+        "safePresent": false,
+        "retainedAssumptions": [],
+        "statuses": {
+          "DIRECT_V1": "TECHNICAL_FAILURE",
+          "SAFE_PREPARATION_V4": "TECHNICAL_FAILURE"
+        }
+      }
+    },
+    {
+      "id": "unsupported-control",
+      "kind": "UNSUPPORTED_CONTROL",
+      "gainEligible": false,
+      "commonRequest": {
+        "schema": "regelsuche.safe-runtime-request/v1",
+        "assumptions": [],
+        "ruleIds": [
+          "ast_double_term"
+        ],
+        "preparationRuleIds": [],
+        "includeSymPy": false,
+        "maxWorkUnits": 200000,
+        "maxPrimitiveRewrites": 4,
+        "maxTheoryWorkUnits": 200000,
+        "preparationBudget": {
+          "maxDepth": 2,
+          "maxVisitedStates": 128,
+          "maxGeneratedTransitions": 512,
+          "maxPrimitiveSteps": 4,
+          "maxExpressionNodes": 256,
+          "maxSuccessorsPerState": 32,
+          "maxMatchResults": 32,
+          "maxMatchSteps": 4096,
+          "maxPatternBranches": 1024
+        },
+        "source": "z"
+      },
+      "expected": {
+        "principalId": "ast_double_term",
+        "directPresent": false,
+        "safePresent": false,
+        "retainedAssumptions": [],
+        "statuses": {
+          "DIRECT_V1": "NO_MATCH",
+          "SAFE_PREPARATION_V4": "UNSUPPORTED"
+        }
+      }
+    },
+    {
+      "id": "budget-inconclusive-control",
+      "kind": "EXPECTED_FAILURE_CONTROL",
+      "gainEligible": false,
+      "commonRequest": {
+        "schema": "regelsuche.safe-runtime-request/v1",
+        "assumptions": [],
+        "ruleIds": [
+          "ast_double_term"
+        ],
+        "preparationRuleIds": [],
+        "includeSymPy": false,
+        "maxWorkUnits": 0,
+        "maxPrimitiveRewrites": 4,
+        "maxTheoryWorkUnits": 200000,
+        "preparationBudget": {
+          "maxDepth": 2,
+          "maxVisitedStates": 128,
+          "maxGeneratedTransitions": 512,
+          "maxPrimitiveSteps": 4,
+          "maxExpressionNodes": 256,
+          "maxSuccessorsPerState": 32,
+          "maxMatchResults": 32,
+          "maxMatchSteps": 4096,
+          "maxPatternBranches": 1024
+        },
+        "source": "z"
+      },
+      "expected": {
+        "principalId": "ast_double_term",
+        "directPresent": false,
+        "safePresent": false,
+        "retainedAssumptions": [],
+        "statuses": {
+          "DIRECT_V1": "BUDGET_INCONCLUSIVE",
+          "SAFE_PREPARATION_V4": "BUDGET_INCONCLUSIVE"
+        }
+      }
+    }
+  ]
+}

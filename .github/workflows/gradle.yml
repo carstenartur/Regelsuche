@@ -252,12 +252,30 @@ jobs:
         with:
           name: sympy-runtime-verification
           path: build/authority-evidence/sympy/regelsuche-math-sympy/build
+      - name: Download isolated JMH acceptance evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: jmh-verification
+          path: .
       - name: Verify complete cross-authority coverage
         run: >-
           python3 -B scripts/verify-cross-authority-coverage.py
           --root "$PWD"
           --isolated-report
           build/authority-evidence/sympy/regelsuche-math-sympy/build/reports/jacoco/test/jacocoTestReport.xml
+      - name: Collect complete checkout-owned quality acceptance evidence
+        id: acceptance_evidence
+        run: >-
+          python3 -B scripts/collect-quality-acceptance-evidence.py
+          --root "$PWD" --require-complete
+      - name: Retain quality acceptance index and bound source files
+        if: ${{ always() && !cancelled() && steps.acceptance_evidence.outcome != 'skipped' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: quality-acceptance-evidence
+          path: build/reports/quality/acceptance-evidence/**
+          include-hidden-files: true
+          if-no-files-found: error
       - name: Retain converged coverage evidence
         if: >-
           ${{ always() && !cancelled() && needs.gradle-verification.result == 'success' && needs.jmh-verification.result == 'success' && needs.sympy-runtime-verification.result == 'success' && (github.event_name == 'create' || needs.maven-product-verification.result == 'success') }}

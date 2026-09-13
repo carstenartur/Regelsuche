@@ -5,11 +5,16 @@ import de.regelsuche.polynomial.PolynomialWorkSink;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Shared non-resettable work budget for exact polynomial algorithm stages. */
+/**
+ * Shared non-resettable work budget for exact polynomial algorithm stages.
+ * Mutable bookkeeping is confined to one execution thread; published ledgers
+ * are immutable snapshots and may be retained independently of this budget.
+ */
 final class PolynomialWorkBudget implements PolynomialWorkSink {
     private final long limit;
     private final Map<String, Long> stages = new LinkedHashMap<>();
     private long total;
+    private PolynomialWorkLedger snapshot;
 
     PolynomialWorkBudget(long limit) {
         if (limit < 1) {
@@ -37,10 +42,19 @@ final class PolynomialWorkBudget implements PolynomialWorkSink {
         }
         total += units;
         stages.merge(stage, units, Math::addExact);
+        snapshot = null;
+    }
+
+    /** Current charged work, without allocating an immutable evidence snapshot. */
+    long totalWorkUnits() {
+        return total;
     }
 
     PolynomialWorkLedger ledger() {
-        return new PolynomialWorkLedger(stages);
+        if (snapshot == null) {
+            snapshot = new PolynomialWorkLedger(stages);
+        }
+        return snapshot;
     }
 
     static final class LimitReached extends RuntimeException {

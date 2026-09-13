@@ -141,6 +141,7 @@ dürfen weder fehlen noch doppelt auftauchen oder in Vorarbeit verschwinden.
 
 `PolynomialTheoryUtilityFactorizationAttempt.createObserved` erzeugt dafür
 Attempt v2 aus dem tatsächlichen, vom Kern ausgestellten Nested-Pipeline-
+Resultat oder dem separat gemessenen, issuergebundenen Spezial-Pipeline-
 Resultat. Die Bindung hält Auftretensindex, Pfad, Originalsource-Nachweis,
 Pipeline-Zertifikat und das vollständige Rohledger der ausgeführten
 Faktorisierung fest. Backend, Request, Kandidaten und Report müssen genau
@@ -213,30 +214,37 @@ Aufrufe, Arbeitsprojektion oder Receipts. Die explizite Deklaration ersetzt
 keine Prüfung der tatsächlichen Ergebnisse. Eine automatisch auf historische
 Resultate zurückfallende Ausführung gibt es in diesem Einstieg nicht.
 
-## Verbleibendes produktives Adapterinventar
+## Produktives Adapterinventar und verbleibende Ausführungssperre
 
-Die fünf eingefrorenen Profile entsprechen noch keinem vollständigen Satz
-produktiver Studienadapter. Die Produktkomposition
+Vier der fünf eingefrorenen Profile besitzen jetzt produktive beobachtete
+Studienadapter. Die Produktkomposition
 `PolynomialSearchIntegration` ist von der Studienmessung zu unterscheiden:
 
 | Eingefrorenes Profil | Beobachteter Studienpfad | Noch nötige Arbeit |
 | --- | --- | --- |
 | `NO_FACTORIZATION` | `NoFactorizationAdapter.observed()` | Keine zusätzliche mathematische Messgrundlage für diesen Nullarbeits-Kontrollpfad. |
 | `ON_DEMAND_VERIFIED_FACTORIZATION` | `PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter.observed(...)` | Vollständige Studienausführung und Reproduktion bleiben separat. |
-| `VERIFIED_DERIVED_MACRO_CACHE` | Kein produktiver Studienadapter | Gemessene Retention mit Vorab-Arbeitszulassung sowie Auftreten-/Zeilen-übergreifende Eintrags- und FIFO-Lineage des tatsächlichen Run-Caches. Lookup und Replay besitzen bereits eigene Roharbeitsnachweise. |
-| `SPECIALIZED_BINARY_QUARTIC_CONTROL` | Kein produktiver Studienadapter | Additive Messgrenze für semantische Extraktion, Spezialzerlegung und Rendering einschließlich erfolgloser Ausgänge und Originalanforderung. Der vorhandene Spezialbericht enthält nur die Verifier-Arbeit. |
+| `VERIFIED_DERIVED_MACRO_CACHE` | `PolynomialTheoryUtilityDerivedCacheAdapter` | Gemessene native Misses und echte Store-Replays; konservative Retention-Zulassung kann weiterhin eine Einfügung verhindern. |
+| `SPECIALIZED_BINARY_QUARTIC_CONTROL` | `PolynomialTheoryUtilitySpecializedAdapter` | Separat gemessene semantische Extraktion, ursprüngliche Spezialzerlegung, Rendering und Auftretenserzeugung unter derselben Zeilenautorität. |
 | `OPTIONAL_EXTERNAL_VERIFIED_FACTORIZATION` | Kein produktiver Studienadapter | Ausdrücklich gebundene externe Engine und deren tatsächliche Arbeit, Fehlerausgänge und Nachweise in derselben Zeilenautorität; kein Ersatz durch den nativen Adapter. |
 
-Die Roharbeit dieser fehlenden Pfade darf nicht aus Ergebnisstrings geschätzt
-oder aus dem nativen Profil übernommen werden. Insbesondere bietet die
-vorhandene Cache-Retention noch keine vollständig gemessene Studiengrenze.
-Eine Produkt-Kostenschätzung für Cache-Einträge ist kein nachträglicher
-Roharbeitsnachweis. Diese Messfundamente benötigen eigene additive Verträge.
+Die Details der beiden zusätzlichen Adapter und ihrer Kontrollen stehen in
+[polynomial-theory-utility-active-adapters.md](polynomial-theory-utility-active-adapters.md).
+Die Roharbeit des externen Pfads darf nicht aus Ergebnisstrings geschätzt
+oder aus dem nativen Profil übernommen werden. Die vorhandene externe API
+zählt unter anderem einen Aufruf; daraus entsteht kein vollständiger Nachweis
+der internen symbolischen Arbeit.
 
 `CandidateMeasurementBatch` bindet die Ergebnisse und Messungen jeder Zeile,
 prüft jedoch noch keine vollständige Insert-/Hit-/Evict-Geschichte über einen
-Run hinweg. Der revisionsstrenge Einstieg ergänzt diese fehlende
-Cache-Autorität nicht und ist keine vollständige produktive Adapterfactory.
+Run hinweg. Der produktive Cache-Run ergänzt diese Prüfung mit
+`PolynomialTheoryUtilityCacheRunHistory`: Treffer benötigen eine frühere
+Einfügung im selben Run, erfolgreiche Replays dieselbe primitive Ableitung
+und Verdrängungen den ältesten Eintrag der eingefrorenen FIFO-Kapazität.
+`PolynomialTheoryUtilityProfileRegistry` führt alle fünf eingefrorenen Profile
+mit vier verfügbaren Adaptern auf. `requireRunnableAdapters()` verweigert
+den vollständigen Start vor dem Öffnen eines Runs mit
+`EXTERNAL_CANONICAL_INTERNAL_WORK_UNAVAILABLE`.
 Die Runner-Kontrolle verwendet ausdrücklich synthetische Nullarbeitsadapter
 für die übrigen Profile und führt einen echten nativen Formationsfall innerhalb
 seines Mess-Runs aus; sie prüft nur Reihenfolge, Revision und Messbindung.
@@ -247,7 +255,7 @@ Utility. Historische APIs und der bekannte historische Receipt bleiben
 unverändert kontrolliert.
 
 Diese technische Vertragskorrektur schließt #748 nicht. Die vollständigen
-aktiven Profiladapter, alle 600 Zeilen unter der neuen Messrevision und die
+externen Arbeitsnachweise, alle 600 Zeilen unter der neuen Messrevision und die
 vorgeschriebenen Reproduktionen stehen weiterhin aus. Erst danach darf die
 vorgeschriebene Qualifikation folgen. Die vorliegende Änderung öffnet keine
 Qualifikationsdaten, ändert keine Schwellen oder Budgets und begründet keine

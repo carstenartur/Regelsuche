@@ -484,7 +484,10 @@ public class WebWorkbenchServer {
     ) throws IOException {
         try {
             String suffix = representationRunSuffix(exchange);
-            if (!suffix.isEmpty()) {
+            if (suffix.contains("/")) {
+                RetainedRunActions.handle(exchange, representationRunDirectory,
+                    suffix, securityConfig.maxRequestBytes());
+            } else if (!suffix.isEmpty()) {
                 loadRepresentationRun(exchange, suffix);
             } else if ("GET".equals(exchange.getRequestMethod())) {
                 listRepresentationRuns(exchange);
@@ -693,10 +696,8 @@ public class WebWorkbenchServer {
         if (suffix.startsWith("/")) {
             suffix = suffix.substring(1);
         }
-        if (suffix.contains("/")) {
-            throw new IllegalArgumentException(
-                "nested discovery-run paths are not supported"
-            );
+        if (suffix.endsWith("/")) {
+            suffix = suffix.substring(0, suffix.length() - 1);
         }
         return suffix;
     }
@@ -790,6 +791,28 @@ public class WebWorkbenchServer {
             return;
         }
         WorkbenchRequestBodies.SearchRequest body = requestBodies.readSearch(exchange);
+        if (body.runtimeRequest() != null || body.runtimeArtifact() != null) {
+            if (body.otherFields() || (body.runtimeRequest() != null && body.runtimeArtifact() != null)) {
+                sendStatus(exchange, 400, "supply only runtimeRequest or runtimeArtifact");
+                return;
+            }
+            boolean replay = body.runtimeArtifact() != null;
+            try (var runtime = de.regelsuche.runtime.SafeRuntimeAdapter.open(pluginRuntimeConfig)) {
+                String result = replay ? runtime.replay(body.runtimeArtifact()) : runtime.analyze(body.runtimeRequest());
+                de.regelsuche.runtime.RuntimeArtifactLimits.requireReplayable(result, securityConfig.maxRequestBytes());
+                if (replay) exchange.getResponseHeaders().set("X-Runtime-Replay", "VERIFIED");
+                sendJson(exchange, 200, result);
+            } catch (de.regelsuche.runtime.RuntimeArtifactLimits.ArtifactTooLargeException exception) {
+                exchange.getResponseHeaders().set("Cache-Control", "no-store");
+                sendJson(exchange, 413, new JsonWriter().beginObject().property("error", true)
+                    .property("code", "RUNTIME_ARTIFACT_TOO_LARGE").property("message", exception.getMessage())
+                    .property("limitBytes", exception.limitBytes()).property("actualBytes", exception.actualBytes())
+                    .endObject().toString());
+            } catch (IllegalArgumentException exception) {
+                sendStatus(exchange, replay ? 409 : 400, exception.getMessage());
+            }
+            return;
+        }
         String expression = body.expression();
         String typeName = body.type().toUpperCase(Locale.ROOT);
         String profileName = body.profile().toUpperCase(Locale.ROOT);
@@ -3154,6 +3177,8 @@ public class WebWorkbenchServer {
             || path.equals("/app.js")
             || path.equals("/style.css")
             || path.equals("/run-workspace-state.js")
+            || path.equals("/candidate-dossier-state.js")
+            || path.equals("/candidate-dossier.js")
             || path.equals("/run-workspace.js")
             || path.equals("/run-workspace.css")
             || path.equals("/rule-radar.js")

@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.plugin-artifact-provenance/v1",
+  "title": "Publisher-signed artifact source/build assertion",
+  "type": "object",
+  "required": [
+    "schema",
+    "artifactIdentityHash",
+    "artifactSha256",
+    "provenanceUri",
+    "sourceUri",
+    "sourceRevision",
+    "sourceSha256",
+    "buildRecipeSha256",
+    "publisherId",
+    "keyId",
+    "algorithm",
+    "signatureBase64"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.plugin-artifact-provenance/v1"
+    },
+    "artifactIdentityHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "artifactSha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "provenanceUri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "sourceUri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "sourceRevision": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "sourceSha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "buildRecipeSha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "publisherId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "keyId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "algorithm": {
+      "const": "Ed25519"
+    },
+    "signatureBase64": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]{86}==$"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Authenticates a publisher assertion bound to an index entry; does not independently verify a reproducible build."
+}

@@ -185,11 +185,14 @@ Schemas:
 ## Verbleibender Umfang von #104
 
 Dieser Vertrag authentisiert Trust-State-Revisionen, führt aber selbst keinen
-Netzwerkzugriff aus. Weiterhin offen bleiben insbesondere:
+Netzwerkzugriff aus. Der separate [Java-Distributionsclient](plugin-distribution-client.md)
+bindet diese Prüfung an echte HTTPS-Abfragen und atomare JAR-Generationen;
+rollback-geschützte Speicherung bleibt eine explizite externe Authority-Pflicht.
+Weiterhin offen bleiben insbesondere:
 
 - gehosteter oder föderierter Transport signierter Index- und Trust-State-Revisionen;
-- exakte Downloads der im Index gebundenen Artefaktbytes;
-- Installation, Update, Entfernung und Rollback;
+- ein produktiv angebundener rollback-geschützter Checkpoint-Provider;
+- Runtime-Integration sowie Regel-/Knowledge-Pack-Installation;
 - Source-to-binary-Provenance-Attestierungen;
 - separat baubare Community-Beispielprojekte und Publishing-Dokumentation;
 - ein optionales Transparenzprotokoll gegen Equivocation zwischen verschiedenen

@@ -1,0 +1,43 @@
+{
+  "checkoutCommit": "5041f9d88047b3eb4171c8bfc4017c30355f6a52",
+  "tree": "536dabef711c38a8f435dd75df4c332583abd929",
+  "cleanBefore": true,
+  "sourceFileSha256": {
+    "ai-knowledge/complexity-baseline.json": "4e849da270eb40f15934c9a6ad5493aeb3e5c40efc86bedfdeb4c80687af0f24",
+    "ai-knowledge/capabilities.seed.yaml": "16d64630109485ca14a5c1566d64084f3b932d7edf52bf70facd4274de0b8d0b",
+    "ai-knowledge/claims.seed.yaml": "013935ebad67ff3868602be8c68b73dba723610ad5ba728113f87e114f3dc108",
+    "ai-knowledge/claims.json": "cce03fad40abaa23770707154b2cab60afe37f1b0cbc8fb4d8865a886480b0c1",
+    "gradle.properties": "2d0c622ff20ce78d0432c004df2dba7af170bdb50f5ce68faffdc5bcd1f1b285",
+    "settings.gradle": "6cba76fe53a076ce6ae2ca44f85a7e60fc27c2c11f491bfe79b33fd31272812b",
+    "ai-knowledge-verification/build.gradle": "2aaf02538386418eeb3a5de354942514ba697cedd5cd658edf0cd44e2cdbfdd5",
+    "gradle/ai-knowledge-verification.gradle": "f1df0d336d519f10a0bf35129e1b80cd8cbbad5d0d3939e0fffd2cd5d7ee91b8",
+    "config/quality/complexity-hotspots.json": "8e9e8b549bc388f4638ec62de498a240ccb92e83108e848d75e7fcf94a02fbc2",
+    "config/ai-knowledge-capability-coverage.json": "9c1705776a062b5784cd9bad1cdc847878338f1ce32ac1fc66e7769ed98adbed",
+    "scripts/verify-ai-knowledge-artifacts.py": "845708cb45420565d5636539b00b60034162db762132bf781b6d3f9b4a7b3f7b",
+    "scripts/test_ai_knowledge_coverage.py": "ec21b3b2050f528c221e118c5e87948847e9de32384ee5eb6b382eea2210bca4",
+    "scripts/verify-complexity-hotspots.py": "d792435d075d8102bbe5504af83f84d6c660a20b1234e8516f8a5d5ac3775bfa"
+  },
+  "cleanAfter": true,
+  "exitCode": 0,
+  "generatedReportSha256": {
+    "benchmark.json": "c8e7b5ca71c7cd7d47dfa04240f6ce3472b2498a7ed0384f04a0042084a938e1",
+    "capabilities.json": "46693eb84ad2af3b3261ee431084d078ba4229d018a9ae6ee5cec5741d9d4256",
+    "check.json": "7c16a6e8073a9f1670de79fc88cc4b58b955f2eb2863ab219777fb6a1b6aed58",
+    "claims.json": "b522704dafe348f98c21888d4c4668461ad9ae678f92be3b899cc9813055a8e3",
+    "classes.json": "086a020f0de9fa25b954b3d8d2088559b1f6126eca823dfbe9c01290c1d7ed70",
+    "complexity.json": "2f1315e9335e87306975421a84726d5b9d51d6ed7c5c5dd02e840a0689cda40d",
+    "dependencies.json": "ac2e55909754aff24e41edbe4d713b1ec8fa5f54e424a2d3e98ec12554b1f056",
+    "docs.json": "6aaecfa21d65038cf12f9fa8aa70b56c662ec9e9f7baa295e1921e83edab5978",
+    "evidence.json": "407f3bb57a2bb63390603ddabcb0f468ffdaca70716dff00e0cdf1e992b0949e",
+    "index.json": "b7ac473e270ebd964fe2eb3440f500dab3bbeff29fa124c4e1ab500ddf6ac9bb",
+    "metrics-snapshot.json": "c0336da54cdaec31497aaf47214fafed518beaccde32699811116ba76ffa8881",
+    "modules.json": "3be7ba463ff29983a90f863ed103ed2d0a6cd50f484c7d3530686e83fcd8011d",
+    "optimization.json": "5f659939d08535498064be8b6fac2551aa5460e4d01498fbc9160eb67d5dc1d5",
+    "tests.json": "31bc3888ca8c113511da35b19c5917064a45549d1f3748e4708269c4524071b8",
+    "trend.json": "a01aa67a818330d1289ad1d47382317ac3f17c4922408963e11b4273f6645447"
+  },
+  "commandLogSha256": "53c1fbddfb36927edca378ab81d187901ecfa6b90c510fc923de9ce48847411f",
+  "command": "source ../runtime/env.sh\nAI_KNOWLEDGE_EXTRACTOR_ENABLED=true ../runtime/gradle-9.7.1/bin/gradle --offline --no-daemon --no-configuration-cache --max-workers=2 -PuseLocalAiKnowledgeExtractor=true -PaiKnowledgeExtractorCheckout=../ai-knowledge-extractor -Porg.gradle.java.installations.paths=/workspace/scratch/a1f484c28baf/runtime/jdk-25.0.4.1+1,/workspace/scratch/a1f484c28baf/runtime/jdk-17.0.20.1+1 aiKnowledgeCheck",
+  "extractorCommit": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+  "extractorCheckoutCleanBeforeAndAfter": true
+}

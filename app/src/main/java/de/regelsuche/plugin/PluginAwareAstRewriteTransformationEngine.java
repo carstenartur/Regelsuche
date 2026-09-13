@@ -89,6 +89,15 @@ public final class PluginAwareAstRewriteTransformationEngine implements Transfor
 
     @Override
     public List<Transformation> transform(String expression) {
+        return transform(expression, false);
+    }
+
+    /** Same context-aware executor with concrete side conditions and descriptor metadata retained. */
+    public List<Transformation> transformForRuntime(String expression) {
+        return transform(expression, true);
+    }
+
+    private List<Transformation> transform(String expression, boolean retainMetadata) {
         Expr root;
         lastDebugReport = null;
         try {
@@ -141,7 +150,11 @@ public final class PluginAwareAstRewriteTransformationEngine implements Transfor
             RewriteRule rule = result.rule();
             context.setLastRuleId(rule.id());
             visitorRegistry.execute(AstVisitorPhase.AFTER_TRANSFORMATION, result.expression(), context);
-            transformations.add(new Transformation(
+            transformations.add(retainMetadata ? new Transformation(
+                rule.id(), formatted, rule.kind(), rule.mayIncreaseComplexity(), rule.estimatedCostDelta(),
+                rule.isEquivalencePreservingByConstruction(), rule.id() + ":" + result.sourceSubtreeHash(),
+                result.assumptions().stream().map(Assumption::expression).toList(),
+                rule.descriptor().packId(), rule.descriptor().license()) : new Transformation(
                 rule.id(),
                 formatted,
                 rule.kind(),

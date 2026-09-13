@@ -5,7 +5,7 @@
 
 - Policy: `EVIDENCE_DERIVED_FAIL_CLOSED`
 - Repository revision mode: `WORKTREE`
-- Status content hash: `sha256:1985ba6843f05a99998d714f18c6d7a6c15219efccea4f41b4820816d54da11a`
+- Status content hash: `sha256:3ded4df46e97bcbea70ee54ce09434f23f555e36d4a471741e0441419901fd5f`
 - Release run: `sha256:e549f6ada671c13fc38f84377a07638244d6ff037142d46a4955929e6b8c4326`
 - Domain-generic run: `sha256:7ed14645710b106744376191f8a6426a6ed53bcb813f68a92c92810d799f3282`
 
@@ -23,11 +23,13 @@
 | `PROMOTION` | `NOT_EVALUATED` | Promotion of the retained production candidate into active reusable knowledge. |
 | `PUBLIC_EVIDENCE` | `NOT_EVALUATED` | Publication-authorized public evidence for the retained production candidate. |
 | `PUBLIC_PLUGIN_DISTRIBUTION` | `BLOCKED` | Hosted discovery, authenticated transport, download, installation, update, removal and rollback of published extensions. |
+| `SAFE_PREPARATION_PRODUCT` | `EXPERIMENTAL` | Shared opt-in DIRECT_V1/SAFE_PREPARATION_V4 runtime with bounded public contract qualification; broader inventory and default qualification remain open. |
 | `SEARCH_REPRODUCIBILITY` | `QUALIFIED` | reproducible target-free search under pinned inputs |
 
 ## Interpretation
 
 - `IMPLEMENTED` means that the named software contracts, schemas and checkout-local validators are present and hash-bound; it is not a qualification of a wider service.
 - `QUALIFIED` means that the named evidence profile is ready for exactly its recorded claim.
+- `EXPERIMENTAL` retains an explicit opt-in boundary even when a separate bounded public contract comparison is green.
 - `BLOCKED` and `NOT_EVALUATED` remain visible and must not be paraphrased as success.
 - Project novelty, external novelty, symbolic validation, formal proof, promotion and Public Evidence remain distinct.

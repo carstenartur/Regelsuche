@@ -160,41 +160,54 @@ not change which tasks, assertions or artifact contracts are executed.
 The committed `ai-knowledge/complexity-baseline.json` advances only to an
 independently qualified predecessor. It is not generated from the branch under
 test. For the stacked issue integration, the accepted predecessor is `main`
-`e673c6c89bca00f68ca47b8df2a7d20203089b29`, tree
-`3a271c01bac233259e47a46c78f6f49274804eb7`.
+`5041f9d88047b3eb4171c8bfc4017c30355f6a52`, tree
+`536dabef711c38a8f435dd75df4c332583abd929`, after the actual merge of PR #998.
 
-PR #997 head `067619282e4ac4778900c893170283e2a9e57260` has exactly that tree.
-[CI run 34737310998](https://github.com/carstenartur/Regelsuche/actions/runs/34737310998)
+PR #998 head `d57fc92d97c5535cbd19cbaa37b1b5b1c02f943d` and the qualified local
+commit `34aba8461edb39d4c983d5d087a1820081aada87` have exactly that tree.
+[CI run 34739558945](https://github.com/carstenartur/Regelsuche/actions/runs/34739558945)
 passed Gradle, Maven/product/Docker, isolated JMH, external polynomial comparison,
 isolated SymPy and the converged `ciCheck`. The retained
-`repository-verification` artifact is `10311229494`, API-reported ZIP SHA-256
-`2352c426bf8101becb4f7f21a8cf98f36b705fbaf15090c25e593db087cf44ea`.
+`repository-verification` artifact is `10312069326`, API-reported ZIP SHA-256
+`d6a27a818f34422dffdc4314cc921858225ac54e1f0c6641032acff869833bdb`.
 The source PR merge state, qualification statuses and artifact metadata were
 independently rechecked through the GitHub API; the ZIP was not downloaded or
-hashed for this update. The separate report-publication job was skipped.
+hashed for this update. Four manual JMH study jobs and report publication were
+skipped; no frozen study was rerun.
 
-The baseline values come exclusively from a fresh, clean local reproduction of
-that identical predecessor tree at local commit
-`1dad1683e9b08c6fb2626d687b978f2f0456ef70`. The complete `aiKnowledgeCheck` passed
-with the pinned 0.1.10 extractor, including artifact validation, all eight
+The baseline values come exclusively from a fresh local reproduction directly on
+accepted main `5041f9d88047b3eb4171c8bfc4017c30355f6a52`, with source and extractor
+checkouts independently checked clean before and after the run. The complete
+`aiKnowledgeCheck` passed in 15 seconds with the pinned 0.1.10 extractor,
+including artifact validation, all eight
 coverage controls and all 16 method-hotspot checks. Its generated snapshot measured:
 
-- `estimatedContextTokens = 575305`
-- `conceptRadius = 87`
-- `dependencyRadius = 271`
-- legacy diagnostic `aiCognitiveDebt = 644.440294117647`
-- normalized `aiContextDebt = 16.72`
+- `estimatedContextTokens = 582555`
+- `conceptRadius = 88`
+- `dependencyRadius = 273`
+- legacy diagnostic `aiCognitiveDebt = 652.9491176470588`
+- normalized `aiContextDebt = 16.59`
 - `contextDebtModelVersion = context-footprint-v3`
 
 The active baseline is a byte-for-byte copy of the retained
-[predecessor snapshot](../ai-knowledge/baseline-history/e673c6c89b-metrics-snapshot.json),
-SHA-256 `4e849da270eb40f15934c9a6ad5493aeb3e5c40efc86bedfdeb4c80687af0f24`.
-The [provenance record](../ai-knowledge/baseline-history/2026-09-13-maine673-provenance.json)
+[predecessor snapshot](../ai-knowledge/baseline-history/5041f9d880-metrics-snapshot.json),
+SHA-256 `c0336da54cdaec31497aaf47214fafed518beaccde32699811116ba76ffa8881`.
+The [provenance record](../ai-knowledge/baseline-history/2026-09-13-main5041-provenance.json)
 binds the source/tree, complete CI job IDs, extractor commit, command, source and
-report hashes, and unchanged policy. The source qualification receipt, generated
-predecessor check, trend and local command log are retained alongside it. The
-update independently checked these retained bytes and source identities; it did
-not run another Gradle build. All earlier baseline history remains unchanged.
+report hashes, and unchanged policy. The source qualification and fresh execution
+receipts, generated predecessor check, trend and full local command log are
+retained alongside it. The baseline changed only after this clean measurement
+passed. All earlier baseline history remains unchanged.
+
+The later rejected runtime diagnostic measured 593755 estimated tokens against
+the former 575305 baseline: its 18450 increase exceeded the unchanged 15000
+allowance. Its [original rejected trend](../ai-knowledge/baseline-history/2026-09-13-e145-context-rejected-trend.json),
+snapshot, check and command log remain unchanged. The coordinating agent's
+working context associates this run with `e14542a9a29a47f82b6f630992e949e7bdcd66a2`,
+but no separate cleanliness receipt or exact complete shell invocation was
+retained. The provenance therefore records `UNVERIFIED_WORKING_TREE_ASSOCIATION`:
+that commit/tree is context, not an independently established source binding.
+The rejected output neither supplies a baseline nor qualifies a later candidate.
 
 An earlier runtime WIP measured 586895 estimated tokens against the former 569510
 baseline: its 17385 increase exceeded the unchanged 15000 allowance. Its
@@ -205,10 +218,11 @@ these outputs do not qualify any current commit. No integration or runtime
 candidate value is used as a baseline.
 
 The accepted predecessor was measured with its own committed capability selectors,
-coverage policy and quality settings. These match the baseline-update parent
-`ce8939510d500b0cc09ea2d87ea754c58fcd45ad` byte for byte and remain unchanged.
+coverage policy and quality settings. These remain unchanged by this update.
 The pinned estimator still uses the same inventory weights; independently
-recounting the local predecessor reports gives 575305 estimated tokens.
+recounting the local predecessor reports gives 582555 estimated tokens. The
+accepted predecessor itself passed against the former 575305 baseline with an
+increase of 7250 tokens; no failed candidate establishes its own comparison point.
 
 Version 0.1.10 writes the model id into trend snapshots, so
 `maxCognitiveDebtIncrease` compares normalized debt when baseline and current model
@@ -260,6 +274,17 @@ and [original provenance](../ai-knowledge/baseline-history/2026-09-13-main85f6-p
 remain unchanged, including the 569510-token baseline, report hashes and original
 comparison limits.
 
+The subsequent accepted predecessor was `main`
+`e673c6c89bca00f68ca47b8df2a7d20203089b29`, tree
+`3a271c01bac233259e47a46c78f6f49274804eb7`, identical to PR #997 head
+`067619282e4ac4778900c893170283e2a9e57260`. Its six authorities passed
+[CI run 34737310998](https://github.com/carstenartur/Regelsuche/actions/runs/34737310998).
+The [575305-token snapshot](../ai-knowledge/baseline-history/e673c6c89b-metrics-snapshot.json),
+SHA-256 `4e849da270eb40f15934c9a6ad5493aeb3e5c40efc86bedfdeb4c80687af0f24`,
+and [original provenance](../ai-knowledge/baseline-history/2026-09-13-maine673-provenance.json)
+remain unchanged with their source qualification, reports, command log and
+original evidence boundaries.
+
 The original integration measurement at
 `f2da31bf6652bbfaffd9541b7deb79ecc6327499` remains
 [rejected evidence](../ai-knowledge/baseline-history/f2da31bf66-rejected-trend.json):
@@ -270,4 +295,4 @@ selector expansion also affected normalized debt, so that historical comparison
 was not a controlled comparison of source changes alone. None of these rejected
 integration values established a baseline. All older measurements retain their
 original source and qualification identities; the active successor is the
-independently accepted `e673c6c89b...` snapshot above.
+independently accepted `5041f9d880...` snapshot above.

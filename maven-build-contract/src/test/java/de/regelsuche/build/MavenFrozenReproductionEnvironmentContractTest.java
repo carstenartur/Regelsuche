@@ -40,8 +40,10 @@ class MavenFrozenReproductionEnvironmentContractTest {
     private static final String V1_IMAGE = "eclipse-temurin:25.0.3_9-jdk-noble@sha256:"
         + "3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617";
     private static final Set<String> FROZEN_DOCKERFILES = Set.of(
-        "Dockerfile.target-free-held-out-reproduction", "reproduction/Dockerfile.reproduction");
-    // Exact v1 bytes retained at 8afeda1a538c6726b0f6b8a6c8014dfcced0fbe2.
+        "Dockerfile.target-free-held-out-reproduction", "reproduction/Dockerfile.reproduction",
+        "Dockerfile.safe-runtime-qualification");
+    // Original five v1 identities retained at 8afeda1a538c6726b0f6b8a6c8014dfcced0fbe2.
+    // Additive public runtime definition/schema retained at fc55f6cffe5d69bd2e517d0e36bdb0d5f5de4812.
     // Future environments add a new version; they never replace these identities.
     private static final Map<String, String> V1_SHA256 = Map.of(
         "Dockerfile.target-free-held-out-reproduction",
@@ -53,7 +55,11 @@ class MavenFrozenReproductionEnvironmentContractTest {
         "docs/schemas/regelsuche-independent-reproduction-receipt-v1.schema.json",
         "074943b4dfc5882ff88aec976b2f0018231904d8d9f5256611aa18510de976ea",
         "docs/schemas/regelsuche-target-free-held-out-container-reproduction-v1.schema.json",
-        "a7ab72ae66ee96b5f4d98ea71bc0e7bb9b7e20b1a615b107f7157ca0338dcc9a");
+        "a7ab72ae66ee96b5f4d98ea71bc0e7bb9b7e20b1a615b107f7157ca0338dcc9a",
+        "Dockerfile.safe-runtime-qualification",
+        "8313e4e8ccf6f9f59cb4db22a7d7f5b7e44a38ff8292c8718c6c0a52c626b1e7",
+        "docs/schemas/regelsuche-safe-runtime-product-qualification-v1.schema.json",
+        "d00f99bdda32a1cc32c62a5314252b98021b2632a73b57c62bbc25a3466a80e2");
 
     @Test
     void repositorySeparatesRoutineImagesFromFrozenV1Evidence() throws IOException {
@@ -65,8 +71,9 @@ class MavenFrozenReproductionEnvironmentContractTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"Dockerfile.target-free-held-out-reproduction", "reproduction/Dockerfile.reproduction"})
-    void removingEitherFrozenExclusionFailsClosed(String removed, @TempDir Path temporary)
+    @ValueSource(strings = {"Dockerfile.target-free-held-out-reproduction", "reproduction/Dockerfile.reproduction",
+        "Dockerfile.safe-runtime-qualification"})
+    void removingAnyFrozenExclusionFailsClosed(String removed, @TempDir Path temporary)
             throws IOException {
         fixture(temporary);
         ObjectNode config = config(temporary);
@@ -78,7 +85,8 @@ class MavenFrozenReproductionEnvironmentContractTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"Dockerfile.target-free-held-out-reproduction", "reproduction/Dockerfile.reproduction"})
+    @ValueSource(strings = {"Dockerfile.target-free-held-out-reproduction", "reproduction/Dockerfile.reproduction",
+        "Dockerfile.safe-runtime-qualification"})
     void partialImageAndPolicyUpdateCannotRedefineV1(String changed, @TempDir Path temporary)
             throws IOException {
         fixture(temporary);
@@ -89,7 +97,7 @@ class MavenFrozenReproductionEnvironmentContractTest {
     }
 
     @Test
-    void updatingBothImagesTogetherStillCannotRedefineV1(@TempDir Path temporary)
+    void updatingAllFrozenImagesTogetherStillCannotRedefineV1(@TempDir Path temporary)
             throws IOException {
         fixture(temporary);
         for (String path : FROZEN_DOCKERFILES) {
@@ -101,7 +109,7 @@ class MavenFrozenReproductionEnvironmentContractTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"independent-reproduction-artifact", "independent-reproduction-receipt",
-        "target-free-held-out-container-reproduction"})
+        "target-free-held-out-container-reproduction", "safe-runtime-product-qualification"})
     void evenSemanticallyIdenticalV1SchemaEditsInvalidateTheFrozenBytes(
             String schema, @TempDir Path temporary) throws IOException {
         fixture(temporary);

@@ -38,6 +38,25 @@ Ein Klick startet nicht nur eine isolierte Berechnung. Die Workbench führt den 
 
 Mit **Suche starten** beginnt der Lauf. Der Statusbereich zeigt, ob die Eingabe verarbeitet wird, ein Ergebnis vorliegt oder eine Korrektur erforderlich ist.
 
+### Expliziter Runtime-Vergleich
+
+Unter **Expliziter Runtime-Vergleich** kann bewusst `DIRECT_V1` oder
+`SAFE_PREPARATION_V4` gewählt werden. Die zusätzlichen Felder enthalten die
+Annahmen, ausgewählten Regel-IDs, ausdrücklich erlaubten Vorbereitungsregeln
+und Arbeitsbudgets. Das Ergebnis zeigt Profil und erhaltene Annahmen.
+Der JSON-Export kann wieder importiert und durch frisches Replay geprüft werden;
+dies setzt dieselbe ausgelieferte Implementierung und dieselben Regelautoritäten
+voraus. Gleichungssysteme und Matrixrepräsentationen behalten ihre eigene Relation.
+
+SAFE bleibt opt-in. Der öffentliche Vergleich prüft 14 festgelegte Fälle und
+zeigt zwei zusätzliche Hauptregeln ohne Verlust gemeinsamer DIRECT-Kandidaten.
+Er deckt acht von 69 sichtbaren Regeln ab und benötigt mehr logische Arbeit als
+DIRECT. Ein technischer Fehler, eine nicht unterstützte Anwendung oder ein
+unvollständiger Budgetlauf ist kein zusätzlicher SAFE-Erfolg. Die
+[Produktqualifikation](safe-runtime-product-qualification.md) beschreibt die
+genauen Grenzen; [Runtime-Ein- und Ausgabe](shared-safe-runtime.md) enthält die
+technische Referenz.
+
 ### Pfade
 
 Der Tab **Pfade** zeigt die gefundenen Rechenwege. Über **Aktualisieren** wird der aktuelle Stand geladen; die Auswahl **Schulbuch**, **LaTeX** oder **Schritte** bestimmt die Darstellung. Ein Klick auf einen Pfad öffnet eine Detail-Erklärung.

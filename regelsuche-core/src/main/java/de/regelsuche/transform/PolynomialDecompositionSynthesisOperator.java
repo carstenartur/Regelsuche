@@ -1,10 +1,14 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.moves.enumerate.TreePosition;
+import de.regelsuche.parse.ExactParsedTerm;
 import de.regelsuche.polynomial.BinaryQuarticFactorizationEngine;
 import de.regelsuche.polynomial.FactorizationRequest;
 import de.regelsuche.polynomial.FactorizationVerifier;
 import de.regelsuche.polynomial.Monomial;
 import de.regelsuche.polynomial.PolynomialFactor;
+import de.regelsuche.polynomial.PolynomialWorkAuthority;
+import de.regelsuche.polynomial.PolynomialWorkSink;
 import de.regelsuche.polynomial.SparsePolynomial;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -156,18 +160,45 @@ public final class PolynomialDecompositionSynthesisOperator
             candidates);
     }
 
+    /** Measures one exact source occurrence using the original integer-quartic engine. */
+    public MeasuredPolynomialDecompositionPipeline.Result factorExpression(
+        ExactParsedTerm root,
+        TreePosition position,
+        PolynomialWorkAuthority authority
+    ) {
+        return new MeasuredPolynomialDecompositionPipeline(
+            this, semanticView, engine, DEFAULT_STRUCTURAL_LIMITS, maxCandidates, maxWorkUnits)
+            .factor(root, position, authority);
+    }
+
     private ExpressionFactorizationReport.RenderedFactorization render(
         FactorizationVerifier.VerifiedCandidate<BigInteger> candidate,
         PolynomialSemanticView.PolynomialView view,
         FactorizationVerifier.Report<BigInteger> report
     ) {
+        return render(candidate, view, report, PolynomialWorkSink.none());
+    }
+
+    ExpressionFactorizationReport.RenderedFactorization render(
+        FactorizationVerifier.VerifiedCandidate<BigInteger> candidate,
+        PolynomialSemanticView.PolynomialView view,
+        FactorizationVerifier.Report<BigInteger> report,
+        PolynomialWorkSink work
+    ) {
+        work.consume("render.candidate-visits", 1);
         List<String> multiplicands = new ArrayList<>();
         if (!candidate.unit().equals(BigInteger.ONE)) {
+            work.consume("render.integer-conversions", 1);
             multiplicands.add(candidate.unit().toString());
         }
         for (PolynomialFactor<BigInteger> factor : candidate.factors()) {
+            work.consume("render.factor-visits", 1);
             String rendered = parenthesize(
-                renderPolynomial(factor.polynomial(), view));
+                renderPolynomial(factor.polynomial(), view, work), work);
+            if (factor.multiplicity() != 1) {
+                work.consume("render.code-units", rendered.length() + 3L
+                    + Integer.toString(factor.multiplicity()).length());
+            }
             multiplicands.add(factor.multiplicity() == 1
                 ? rendered
                 : rendered + " ^ " + factor.multiplicity());
@@ -175,13 +206,19 @@ public final class PolynomialDecompositionSynthesisOperator
         if (!candidate.unresolvedRemainder().isOne()) {
             multiplicands.add(parenthesize(renderPolynomial(
                 candidate.unresolvedRemainder(),
-                view)));
+                view, work), work));
         }
         if (multiplicands.isEmpty()) {
             throw new IllegalStateException(
                 "factorization candidate rendered no expression");
         }
+        work.consume("render.code-units", joinedLength(multiplicands));
         String transformed = String.join(" * ", multiplicands);
+        work.consume("render.application-key-code-units", RULE_ID.length() + METHOD_ID.length()
+            + (long) candidate.engineCertificateHash().length()
+            + candidate.verificationCertificateHash().length() + report.verificationHash().length()
+            + "|method=|engineCertificate=|verificationCertificate=|report=|work=".length()
+            + Long.toString(report.work().totalWorkUnits()).length());
         String applicationKey = RULE_ID
             + "|method=" + METHOD_ID
             + "|engineCertificate="
@@ -198,7 +235,8 @@ public final class PolynomialDecompositionSynthesisOperator
 
     private String renderPolynomial(
         SparsePolynomial<BigInteger> polynomial,
-        PolynomialSemanticView.PolynomialView view
+        PolynomialSemanticView.PolynomialView view,
+        PolynomialWorkSink work
     ) {
         if (!polynomial.ring().equals(view.polynomial().ring())) {
             throw new IllegalArgumentException(
@@ -207,11 +245,14 @@ public final class PolynomialDecompositionSynthesisOperator
         StringBuilder result = new StringBuilder();
         for (Map.Entry<Monomial, BigInteger> term
                 : polynomial.terms().entrySet()) {
+            work.consume("render.polynomial-term-visits", 1);
             BigInteger coefficient = term.getValue();
             String unsigned = renderUnsignedTerm(
                 coefficient.abs(),
                 term.getKey(),
-                view);
+                view, work);
+            work.consume("render.code-units", unsigned.length()
+                + (result.isEmpty() ? coefficient.signum() < 0 ? 1L : 0L : 3L));
             if (result.isEmpty()) {
                 if (coefficient.signum() < 0) {
                     result.append('-');
@@ -234,23 +275,29 @@ public final class PolynomialDecompositionSynthesisOperator
     private String renderUnsignedTerm(
         BigInteger coefficient,
         Monomial monomial,
-        PolynomialSemanticView.PolynomialView view
+        PolynomialSemanticView.PolynomialView view,
+        PolynomialWorkSink work
     ) {
-        String renderedMonomial = renderMonomial(monomial, view);
+        String renderedMonomial = renderMonomial(monomial, view, work);
         if ("1".equals(renderedMonomial)) {
+            work.consume("render.integer-conversions", 1);
             return coefficient.toString();
         }
-        return coefficient.equals(BigInteger.ONE)
-            ? renderedMonomial
-            : coefficient + " * " + renderedMonomial;
+        if (coefficient.equals(BigInteger.ONE)) return renderedMonomial;
+        work.consume("render.integer-conversions", 1);
+        String scalar = coefficient.toString();
+        work.consume("render.code-units", scalar.length() + (long) renderedMonomial.length() + 3);
+        return scalar + " * " + renderedMonomial;
     }
 
     private String renderMonomial(
         Monomial monomial,
-        PolynomialSemanticView.PolynomialView view
+        PolynomialSemanticView.PolynomialView view,
+        PolynomialWorkSink work
     ) {
         List<String> factors = new ArrayList<>();
         for (int index = 0; index < monomial.arity(); index++) {
+            work.consume("render.monomial-exponent-visits", 1);
             int exponent = monomial.exponent(index);
             if (exponent == 0) {
                 continue;
@@ -259,17 +306,26 @@ public final class PolynomialDecompositionSynthesisOperator
             if (atom.structuralUnit()) {
                 continue;
             }
-            String factor = parenthesize(atom.display());
+            String factor = parenthesize(atom.display(), work);
+            if (exponent != 1) {
+                work.consume("render.code-units", factor.length() + 3L + Integer.toString(exponent).length());
+            }
             factors.add(exponent == 1
                 ? factor
                 : factor + " ^ " + exponent);
         }
+        work.consume("render.code-units", factors.isEmpty() ? 1L : joinedLength(factors));
         return factors.isEmpty()
             ? "1"
             : String.join(" * ", factors);
     }
 
-    private static String parenthesize(String expression) {
+    private static long joinedLength(List<String> values) {
+        return values.stream().mapToLong(String::length).sum() + 3L * (values.size() - 1);
+    }
+
+    private static String parenthesize(String expression, PolynomialWorkSink work) {
+        work.consume("render.code-units", expression.length() + 2L);
         return "(" + expression + ")";
     }
 

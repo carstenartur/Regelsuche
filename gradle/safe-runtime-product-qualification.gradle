@@ -1,0 +1,315 @@
+/*
+ * Public DIRECT_V1 / SAFE_PREPARATION_V4 product qualification and strict
+ * clean-checkout/container reproduction. Authorization is exported from the
+ * existing static contract fixture before any product observation is made.
+ */
+
+def qualificationRepository = rootProject.layout.projectDirectory
+def qualificationReports = rootProject.layout.buildDirectory.dir(
+    'reports/safe-runtime-product-qualification')
+def qualificationInputs = qualificationReports.map { it.dir('inputs') }
+def qualificationLeafViews = qualificationReports.map { it.dir('leaf-verifier-views') }
+def qualificationRun = qualificationReports.map { it.dir('run') }
+def qualificationReproduction = qualificationReports.map { it.dir('reproduction') }
+def qualificationManifest = qualificationRepository.file(
+    'config/qualification/safe-runtime-public-v1.json')
+def qualificationSchema = qualificationRepository.file(
+    'docs/schemas/regelsuche-safe-runtime-product-qualification-v1.schema.json')
+def qualificationRunner = qualificationRepository.file(
+    'scripts/safe_runtime_qualification/run.py')
+def qualificationVerifier = qualificationRepository.file(
+    'scripts/safe_runtime_qualification/verify.py')
+def qualificationReproducer = qualificationRepository.file(
+    'scripts/safe_runtime_qualification/reproduce.py')
+def qualificationForgeryCheck = qualificationRepository.file(
+    'scripts/safe_runtime_qualification/check_forged_report.py')
+def patternVerifier = qualificationRepository.file(
+    'scripts/verify-learned-pattern-authorization.py')
+def programVerifier = qualificationRepository.file(
+    'scripts/verify-learned-rewrite-program-authorization.py')
+def authorizationSchemas = qualificationRepository.dir('docs/schemas')
+def qualificationAppHome = project(':app').layout.buildDirectory.dir('install/app')
+def qualificationPython = rootProject.layout.buildDirectory.dir(
+    'verification-venv').map { directory ->
+        def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+            .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+        new File(directory.asFile, executable)
+    }
+
+def configuredQualificationRevision = providers
+    .gradleProperty('regelsucheRepositoryRevision')
+    .orElse(providers.environmentVariable('REGELSUCHE_AUTHORITY_GITHUB_SHA'))
+    .orElse(providers.environmentVariable('GITHUB_SHA'))
+def qualificationRevision = providers.provider {
+    def revision = configuredQualificationRevision.orNull
+    if (revision == null) {
+        revision = providers.exec {
+            workingDir qualificationRepository.asFile
+            commandLine 'git', 'rev-parse', 'HEAD^{commit}'
+        }.standardOutput.asText.get()
+    }
+    revision = revision.trim()
+    if (!(revision ==~ /[0-9a-f]{40}/)) {
+        throw new GradleException(
+            'SAFE runtime qualification revision must be a lowercase '
+                + '40-character Git commit SHA')
+    }
+    revision
+}
+
+project(':regelsuche-learning') { learning ->
+    learning.plugins.withId('java-library') {
+        learning.tasks.register(
+            'exportSafeRuntimeProductQualificationInputs', JavaExec) {
+            group = 'verification'
+            description = 'Exports the fixed valid and expired public learned-authority inputs.'
+            dependsOn learning.tasks.named('testClasses')
+            classpath = learning.extensions.getByName('sourceSets')
+                .getByName('test').runtimeClasspath
+            mainClass =
+                'de.regelsuche.evolution.LearnedRuntimeProductFixtureWriter'
+            argumentProviders.add({
+                [qualificationInputs.get().asFile.absolutePath]
+            } as CommandLineArgumentProvider)
+            outputs.dir qualificationInputs
+            outputs.upToDateWhen { false }
+        }
+    }
+}
+
+def inputVerifierTasks = []
+['valid', 'expired'].each { window ->
+    ['mul-one', 'add-zero'].each { leaf ->
+        def suffix = window.capitalize() + leaf.split('-')
+            .collect { it.capitalize() }.join('')
+        def sourceRoot = qualificationInputs.map {
+            it.dir("${window}/leaf-${leaf}")
+        }
+        def filteredRoot = qualificationLeafViews.map {
+            it.dir("${window}/leaf-${leaf}")
+        }
+        def stage = tasks.register(
+            "stageSafeRuntimeProductQualification${suffix}Leaf", Sync) {
+            dependsOn ':regelsuche-learning:exportSafeRuntimeProductQualificationInputs'
+            from sourceRoot
+            into filteredRoot
+            exclude 'genome.json'
+            doLast {
+                def source = sourceRoot.get().asFile
+                def filtered = filteredRoot.get().asFile
+                def sourceFiles = source.listFiles()
+                    .findAll { it.isFile() && it.name != 'genome.json' }
+                    .sort { it.name }
+                def filteredFiles = filtered.listFiles()
+                    .findAll { it.isFile() }
+                    .sort { it.name }
+                if (sourceFiles.collect { it.name }
+                        != filteredFiles.collect { it.name }) {
+                    throw new GradleException(
+                        "Filtered ${window} ${leaf} authority file set differs")
+                }
+                sourceFiles.eachWithIndex { sourceFile, index ->
+                    if (!java.util.Arrays.equals(
+                            sourceFile.bytes, filteredFiles[index].bytes)) {
+                        throw new GradleException(
+                            "Filtered ${window} ${leaf} authority changed bytes: "
+                                + sourceFile.name)
+                    }
+                }
+            }
+        }
+        def verify = tasks.register(
+            "verifySafeRuntimeProductQualification${suffix}Leaf", Exec) {
+            group = 'verification'
+            description = "Independently verifies the ${window} ${leaf} retained authorization."
+            dependsOn 'prepareVerificationEnvironment', stage
+            workingDir qualificationRepository
+            inputs.file patternVerifier
+            inputs.dir filteredRoot
+            inputs.dir authorizationSchemas
+            outputs.upToDateWhen { false }
+            doFirst {
+                commandLine qualificationPython.get().absolutePath,
+                    '-B', patternVerifier.asFile.absolutePath,
+                    '--root', filteredRoot.get().asFile.absolutePath,
+                    '--schemas', authorizationSchemas.asFile.absolutePath
+            }
+        }
+        inputVerifierTasks.add(verify)
+    }
+
+    def suffix = window.capitalize()
+    def programRoot = qualificationInputs.map { it.dir(window) }
+    def verifyProgram = tasks.register(
+        "verifySafeRuntimeProductQualification${suffix}Program", Exec) {
+        group = 'verification'
+        description = "Independently verifies the ${window} retained RewriteProgram authorization."
+        dependsOn 'prepareVerificationEnvironment',
+            ':regelsuche-learning:exportSafeRuntimeProductQualificationInputs'
+        workingDir qualificationRepository
+        inputs.file programVerifier
+        inputs.dir programRoot
+        inputs.dir authorizationSchemas
+        outputs.upToDateWhen { false }
+        doFirst {
+            commandLine qualificationPython.get().absolutePath,
+                '-B', programVerifier.asFile.absolutePath,
+                '--root', programRoot.get().asFile.absolutePath,
+                '--schemas', authorizationSchemas.asFile.absolutePath
+        }
+    }
+    inputVerifierTasks.add(verifyProgram)
+}
+
+def verifyQualificationInputs = tasks.register(
+    'verifySafeRuntimeProductQualificationInputs') {
+    group = 'verification'
+    description = 'Verifies every valid and expired public leaf/program authority before measurement.'
+    dependsOn inputVerifierTasks
+}
+
+def testQualificationScripts = tasks.register(
+    'testSafeRuntimeProductQualificationScripts', Exec) {
+    group = 'verification'
+    description = 'Runs the pure public qualification protocol, artifact and reproduction tests.'
+    dependsOn 'prepareVerificationEnvironment'
+    workingDir qualificationRepository
+    inputs.files fileTree(
+        qualificationRepository.dir('scripts/safe_runtime_qualification')) {
+            include '*.py'
+            include 'testdata/**'
+        }
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine qualificationPython.get().absolutePath,
+            '-B', '-m', 'unittest', 'discover',
+            '-s', 'scripts/safe_runtime_qualification',
+            '-p', 'test_*.py',
+            '-v'
+    }
+}
+
+def runQualification = tasks.register(
+    'runSafeRuntimeProductQualification', Exec) {
+    group = 'verification'
+    description = 'Runs the fixed public corpus through the installed CLI and HTTP application.'
+    dependsOn 'prepareVerificationEnvironment', verifyQualificationInputs,
+        ':app:installDist'
+    workingDir qualificationRepository
+    inputs.files qualificationRunner,
+        qualificationRepository.file('scripts/safe_runtime_qualification/protocol.py'),
+        qualificationRepository.file('scripts/safe_runtime_qualification/runtime.py'),
+        qualificationManifest,
+        qualificationRepository.file('reproduction/safe-runtime/QualificationPlugin.java')
+    inputs.dir qualificationInputs
+    inputs.dir qualificationAppHome
+    inputs.property 'repositoryRevision', qualificationRevision
+    outputs.dir qualificationRun
+    outputs.upToDateWhen { false }
+    doFirst {
+        delete qualificationRun
+        qualificationRun.get().asFile.mkdirs()
+        commandLine qualificationPython.get().absolutePath,
+            '-B', qualificationRunner.asFile.absolutePath,
+            '--app-home', qualificationAppHome.get().asFile.absolutePath,
+            '--inputs', qualificationInputs.get().asFile.absolutePath,
+            '--manifest', qualificationManifest.asFile.absolutePath,
+            '--revision', qualificationRevision.get(),
+            '--output', qualificationRun.get().asFile.absolutePath
+    }
+}
+
+def verifyQualification = tasks.register(
+    'verifySafeRuntimeProductQualification', Exec) {
+    group = 'verification'
+    description = 'Independently verifies the raw public runtime qualification artifacts.'
+    dependsOn 'prepareVerificationEnvironment', runQualification,
+        testQualificationScripts
+    workingDir qualificationRepository
+    inputs.files qualificationVerifier,
+        qualificationRepository.file('scripts/safe_runtime_qualification/protocol.py'),
+        qualificationRepository.file('scripts/safe_runtime_qualification/runtime.py'),
+        qualificationManifest,
+        qualificationSchema
+    inputs.dir qualificationRun
+    inputs.dir qualificationInputs
+    inputs.dir qualificationAppHome
+    inputs.property 'repositoryRevision', qualificationRevision
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine qualificationPython.get().absolutePath,
+            '-B', qualificationVerifier.asFile.absolutePath,
+            '--root', qualificationRun.get().asFile.absolutePath,
+            '--manifest', qualificationManifest.asFile.absolutePath,
+            '--schema', qualificationSchema.asFile.absolutePath,
+            '--app-home', qualificationAppHome.get().asFile.absolutePath,
+            '--inputs', qualificationInputs.get().asFile.absolutePath,
+            '--revision', qualificationRevision.get()
+    }
+}
+
+def reproduceQualification = tasks.register(
+    'reproduceSafeRuntimeProductQualification', Exec) {
+    group = 'verification'
+    description = 'Requires two clean-checkout builds and a digest-pinned offline container to reproduce exact bytes.'
+    dependsOn 'prepareVerificationEnvironment'
+    mustRunAfter tasks.named('check')
+    workingDir qualificationRepository
+    inputs.files qualificationReproducer,
+        qualificationRunner,
+        qualificationVerifier,
+        qualificationRepository.file('scripts/safe_runtime_qualification/protocol.py'),
+        qualificationRepository.file('scripts/safe_runtime_qualification/runtime.py'),
+        qualificationRepository.file('Dockerfile.safe-runtime-qualification'),
+        qualificationManifest,
+        qualificationSchema,
+        qualificationRepository.file('reproduction/safe-runtime/QualificationPlugin.java'),
+        qualificationRepository.file('gradle/wrapper/gradle-wrapper.properties')
+    inputs.property 'repositoryRevision', qualificationRevision
+    outputs.dir qualificationReproduction
+    outputs.upToDateWhen { false }
+    doFirst {
+        delete qualificationReproduction
+        commandLine qualificationPython.get().absolutePath,
+            '-B', qualificationReproducer.asFile.absolutePath,
+            '--repository-root', qualificationRepository.asFile.absolutePath,
+            '--revision', qualificationRevision.get(),
+            '--output', qualificationReproduction.get().asFile.absolutePath
+    }
+}
+
+def checkForgedQualification = tasks.register(
+    'checkForgedSafeRuntimeProductQualification', Exec) {
+    group = 'verification'
+    description = 'Requires actual fresh product execution to reject a self-consistent forged report.'
+    dependsOn 'prepareVerificationEnvironment', verifyQualification
+    workingDir qualificationRepository
+    inputs.files qualificationForgeryCheck,
+        qualificationVerifier,
+        qualificationRepository.file('scripts/safe_runtime_qualification/protocol.py'),
+        qualificationRepository.file('scripts/safe_runtime_qualification/runtime.py'),
+        qualificationManifest,
+        qualificationSchema
+    inputs.dir qualificationRun
+    inputs.dir qualificationInputs
+    inputs.dir qualificationAppHome
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine qualificationPython.get().absolutePath,
+            '-B', qualificationForgeryCheck.asFile.absolutePath,
+            '--root', qualificationRun.get().asFile.absolutePath,
+            '--manifest', qualificationManifest.asFile.absolutePath,
+            '--schema', qualificationSchema.asFile.absolutePath,
+            '--app-home', qualificationAppHome.get().asFile.absolutePath,
+            '--inputs', qualificationInputs.get().asFile.absolutePath,
+            '--revision', qualificationRevision.get()
+    }
+}
+
+tasks.named('check') {
+    dependsOn checkForgedQualification
+}
+tasks.matching { candidate -> candidate.name in ['fullCheck', 'ciCheck'] }
+    .configureEach {
+        dependsOn reproduceQualification
+    }

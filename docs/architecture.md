@@ -234,7 +234,24 @@ Formation und konkreten Principal-Replay. Relationstypen und Nachweise bleiben
 getrennt erhalten. Die [Matrix- und Operatorvorbereitung](matrix-operator-preparation.md)
 nutzt denselben Ablauf für begrenzte Quell- und Katalogvorschläge; die Workbench
 zeigt und reproduziert deren vollständige Evidenz. Weitere Vorbereitungsfamilien
-von #745 bleiben eigenständige Integrationsarbeit.
+bleiben außerhalb der festgelegten öffentlichen Produktqualifikation.
+
+CLI und Workbench konsumieren inzwischen denselben
+[`SafeRuntimeAdapter`](shared-safe-runtime.md). `DIRECT_V1` verwendet die
+eingefrorene V3-Direktautorität; `SAFE_PREPARATION_V4` ergänzt die explizite
+V4-Autorität für verschachtelte Vorbereitung mit lokal gebundenen Guards.
+Beide exportieren das vollständige sichtbare Inventar, dieselben angeforderten
+Annahmen und Budgets, primitive/theoretische Ausführung und gelernte Receipts.
+Typisierte Kandidaten behalten ihre Relation und konkrete nachgelagerte Prüfung.
+
+Die additive [öffentliche Produktqualifikation](safe-runtime-product-qualification.md)
+steuert die tatsächlich installierte CLI und `/api/search` mit 14 vorab
+festgelegten Quellfällen. Ein unabhängiger Verifier rekonstruiert die Entscheidung
+und führt jeden Export erneut durch beide Produktpfade aus. Zwei saubere
+Checkout-Builds und ein gepinnter Offline-Container müssen die vollständigen
+kanonischen Bytes einschließlich Klassenidentität reproduzieren. Das frühere
+V2-Experiment bleibt eine eigene historische Autorität. Der begrenzte grüne
+DIRECT-/V4-Vergleich begründet weiterhin ein opt-in Profil.
 
 ## Domänenbewusste Polynomdarstellung und Faktorisierung
 

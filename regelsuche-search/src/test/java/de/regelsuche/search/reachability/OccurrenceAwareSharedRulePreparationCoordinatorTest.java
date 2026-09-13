@@ -9,8 +9,10 @@ import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.rules.LogarithmicRules;
 import de.regelsuche.rules.RationalRules;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.PerfectSquareStructurePreparationSolver;
 import de.regelsuche.transform.RecognitionProfile;
 import de.regelsuche.transform.RequiredAssumptionTemplate;
 import de.regelsuche.transform.RewriteApplicabilitySchema;
@@ -22,6 +24,32 @@ import org.junit.jupiter.api.Test;
 class OccurrenceAwareSharedRulePreparationCoordinatorTest {
     private static final String REVISION =
         "0123456789abcdef0123456789abcdef01234567";
+
+    @Test
+    void directOnlyDoesNotRunNativeExactPreparationOrDelegateToV2() {
+        PatternRewriteRule rule = builtInPattern(
+            PerfectSquareStructurePreparationSolver.PRINCIPAL_RULE_ID);
+        var coordinator = coordinator(
+            RewriteApplicabilitySchema.fromPatternRule(rule), budget());
+
+        var safe = coordinator.analyze("4*x^2-y^2", assumptions());
+        var direct = coordinator.analyzeDirect("4*x^2-y^2", assumptions());
+
+        assertTrue(safe.outcome(rule.id()).orElseThrow().prepared());
+        assertEquals("EXACT_REGISTRY_PREPARATION_REPLAYED",
+            safe.outcome(rule.id()).orElseThrow().detailCode());
+        var directOutcome = direct.outcome(rule.id()).orElseThrow();
+        assertFalse(directOutcome.positive());
+        assertEquals("DIRECT_NO_MATCH", directOutcome.detailCode());
+        assertTrue(direct.candidates().isEmpty());
+        assertTrue(direct.directOccurrenceEvidence().isEmpty());
+        assertTrue(direct.delegatedV2PrincipalIds().isEmpty());
+        assertTrue(direct.delegatedSharedExecutionWork().isEmpty());
+        assertEquals(0, direct.occurrenceWork().delegateSetupUnits());
+        assertEquals(0, direct.aggregateWork().generatedTransitions());
+        assertTrue(coordinator.verify(safe).valid());
+        assertTrue(coordinator.verifyDirect(direct).valid());
+    }
 
     @Test
     void rootGuardedDirectMatchRemainsAcceptedAndReplayable() {
@@ -51,20 +79,24 @@ class OccurrenceAwareSharedRulePreparationCoordinatorTest {
         var coordinator = coordinator(rule.applicabilitySchema(), budget());
         var assumptions = assumptions("b != 0", "d != 0");
 
-        var evaluation = coordinator.analyze(
+        var safe = coordinator.analyze("1 + (a/b)*(c/d)", assumptions);
+        var direct = coordinator.analyzeDirect(
             "1 + (a/b)*(c/d)", assumptions);
-        var outcome = evaluation.outcome(rule.id()).orElseThrow();
-        var evidence = evaluation.directOccurrence(rule.id()).orElseThrow();
+        for (var evaluation : List.of(safe, direct)) {
+            var outcome = evaluation.outcome(rule.id()).orElseThrow();
+            var evidence = evaluation.directOccurrence(rule.id()).orElseThrow();
 
-        assertTrue(outcome.direct());
-        assertEquals("$R", evidence.occurrencePath());
-        assertEquals("a / b * (c / d)", evidence.sourceSubtree());
-        assertEquals(List.of("b != 0", "d != 0"),
-            evidence.requiredAssumptions());
-        assertEquals(outcome.candidate().orElseThrow().applicationKey(),
-            evidence.applicationKey());
-        assertTrue(evidence.occurrenceHash().matches("sha256:[0-9a-f]{64}"));
-        assertTrue(coordinator.verify(evaluation).valid());
+            assertTrue(outcome.direct());
+            assertEquals("$R", evidence.occurrencePath());
+            assertEquals("a / b * (c / d)", evidence.sourceSubtree());
+            assertEquals(List.of("b != 0", "d != 0"),
+                evidence.requiredAssumptions());
+            assertEquals(outcome.candidate().orElseThrow().applicationKey(),
+                evidence.applicationKey());
+            assertTrue(evidence.occurrenceHash().matches("sha256:[0-9a-f]{64}"));
+        }
+        assertTrue(coordinator.verify(safe).valid());
+        assertTrue(coordinator.verifyDirect(direct).valid());
     }
 
     @Test
@@ -73,18 +105,23 @@ class OccurrenceAwareSharedRulePreparationCoordinatorTest {
             new RationalRules.MultiplyFractionsRule();
         var coordinator = coordinator(rule.applicabilitySchema(), budget());
 
-        var evaluation = coordinator.analyze(
+        var safe = coordinator.analyze(
             "1 + (a/b)*(c/d)", assumptions("b != 0"));
-        var outcome = evaluation.outcome(rule.id()).orElseThrow();
-        var evidence = evaluation.directOccurrence(rule.id()).orElseThrow();
+        var direct = coordinator.analyzeDirect(
+            "1 + (a/b)*(c/d)", assumptions("b != 0"));
+        for (var evaluation : List.of(safe, direct)) {
+            var outcome = evaluation.outcome(rule.id()).orElseThrow();
+            var evidence = evaluation.directOccurrence(rule.id()).orElseThrow();
 
-        assertFalse(outcome.positive());
-        assertEquals(PatternTargetedLocalBridgeSearch.Status.UNSUPPORTED,
-            outcome.status());
-        assertEquals("REQUIRED_ASSUMPTION_UNKNOWN", outcome.detailCode());
-        assertEquals("$R", evidence.occurrencePath());
-        assertEquals(0, evaluation.occurrenceWork().directCandidates());
-        assertTrue(coordinator.verify(evaluation).valid());
+            assertFalse(outcome.positive());
+            assertEquals(PatternTargetedLocalBridgeSearch.Status.UNSUPPORTED,
+                outcome.status());
+            assertEquals("REQUIRED_ASSUMPTION_UNKNOWN", outcome.detailCode());
+            assertEquals("$R", evidence.occurrencePath());
+            assertEquals(0, evaluation.occurrenceWork().directCandidates());
+        }
+        assertTrue(coordinator.verify(safe).valid());
+        assertTrue(coordinator.verifyDirect(direct).valid());
     }
 
     @Test
@@ -279,6 +316,14 @@ class OccurrenceAwareSharedRulePreparationCoordinatorTest {
 
     private static AssumptionSignature assumptions(String... values) {
         return AssumptionSignature.ofExpressions(List.of(values));
+    }
+
+    private static PatternRewriteRule builtInPattern(String id) {
+        return (PatternRewriteRule) AstRewriteTransformationEngine
+            .allBuiltInRules().stream()
+            .filter(rule -> id.equals(rule.id()))
+            .findFirst()
+            .orElseThrow();
     }
 
     private static PatternRewriteRule patternRule(
