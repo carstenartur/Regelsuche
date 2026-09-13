@@ -180,13 +180,30 @@ def verifyDomainGenericQualificationEvidence = tasks.register('verifyDomainGener
     }
 }
 
+def testReleaseReadinessEvidence = tasks.register('testReleaseReadinessEvidence', Exec) {
+    group = 'verification'
+    description = 'Rejects tampered root and matrix bindings using private copies of generated evidence.'
+    dependsOn prepareVerificationEnvironment,
+        ':regelsuche-release:runQualifiedReleaseReadinessWithHiddenRuleEvidence'
+    workingDir rootDir
+    inputs.files('scripts/test-release-readiness-evidence.py',
+        'scripts/verify-release-readiness-evidence.py', 'scripts/release_readiness_bindings.py')
+    inputs.dir('docs/schemas')
+    doFirst {
+        commandLine verificationPythonFile.get().absolutePath, '-B',
+            'scripts/test-release-readiness-evidence.py',
+            '--root', 'regelsuche-release/build/reports/release-readiness-qualified'
+    }
+}
+
 def verifyReleaseReadinessEvidence = tasks.register('verifyReleaseReadinessEvidence', Exec) {
     group = 'verification'
     description = 'Generates and verifies qualified release-readiness evidence.'
-    dependsOn prepareVerificationEnvironment, repositoryTest,
+    dependsOn prepareVerificationEnvironment, repositoryTest, testReleaseReadinessEvidence,
         ':regelsuche-release:runQualifiedReleaseReadinessWithHiddenRuleEvidence'
     workingDir rootDir
-    inputs.file('scripts/verify-release-readiness-evidence.py')
+    inputs.files('scripts/verify-release-readiness-evidence.py',
+        'scripts/release_readiness_bindings.py')
     doFirst {
         commandLine verificationPythonFile.get().absolutePath,
             'scripts/verify-release-readiness-evidence.py',

@@ -106,8 +106,24 @@ tasks.register('runQualifiedReleaseReadinessWithHiddenRuleEvidence', JavaExec) {
     dependsOn ':app:test'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = application.mainClass
-    args layout.buildDirectory.dir('reports/release-readiness-qualified')
-        .get().asFile.absolutePath,
+    def reportDirectory = layout.buildDirectory.dir('reports/release-readiness-qualified')
+    // Reuse only unchanged local generation; the independent verifier still runs.
+    inputs.file(hiddenRuleReport).withPropertyName('hiddenRuleReport')
+        .withPathSensitivity(PathSensitivity.NONE)
+    inputs.property('javaRuntimeVersion', javaLauncher.map { it.metadata.javaRuntimeVersion })
+    def inheritedJvmOptions = ['JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS']
+        .collectEntries { variable ->
+            [(variable): providers.environmentVariable(variable).orElse('')]
+        }
+    inheritedJvmOptions.each { variable, value ->
+        inputs.property(variable, value)
+    }
+    outputs.dir(reportDirectory).withPropertyName('qualifiedReleaseEvidence')
+    // Opaque inherited options can load untracked agents or @argfiles.
+    outputs.upToDateWhen {
+        !debugOptions.enabled.get() && inheritedJvmOptions.values().every { it.get().isEmpty() }
+    }
+    args reportDirectory.get().asFile.absolutePath,
         '--hidden-rule-report',
         hiddenRuleReport.get().asFile.absolutePath,
         '--qualify-candidate'

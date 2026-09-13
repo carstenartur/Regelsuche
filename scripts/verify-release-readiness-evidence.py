@@ -9,6 +9,11 @@ import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
+# The verifier is also invoked without -B by the existing Gradle Exec task.
+# Loading its checkout-local binding helper must not dirty a clean checkout.
+sys.dont_write_bytecode = True
+from release_readiness_bindings import verify_root_bindings
+
 try:
     from jsonschema import Draft202012Validator
 except ImportError as error:
@@ -106,9 +111,23 @@ def require(condition: bool, message: str) -> None:
 
 def load(path: Path) -> dict:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
+        value = json.loads(
+            path.read_text(encoding="utf-8"),
+            object_pairs_hook=unique_object,
+            parse_constant=lambda constant: fail("invalid JSON numeric constant: " + constant),
+        )
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
         fail(f"cannot read {path}: {error}")
+    require(isinstance(value, dict), f"JSON root must be an object: {path}")
+    return value
+
+
+def unique_object(pairs: list[tuple[str, object]]) -> dict:
+    result = {}
+    for key, value in pairs:
+        require(key not in result, "duplicate JSON field: " + key)
+        result[key] = value
+    return result
 
 
 def require_nonempty(path: Path) -> None:
@@ -144,6 +163,8 @@ def validate(root: Path) -> None:
         artifact = load(artifact_path)
         Draft202012Validator.check_schema(schema)
         Draft202012Validator(schema).validate(artifact)
+
+    verify_root_bindings(root, load, require)
 
     obligation = load(root / "campaign/solver-obligation.json")
     result = load(root / "campaign/solver-result.json")
