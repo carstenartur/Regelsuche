@@ -138,6 +138,61 @@ class DomainExportWorkspaceHttpTest {
         assertEquals(imported.body(), request("GET", path(), null).body());
     }
 
+    @Test void validatesBothExistingDomainsAndDownloadsASeparateBoundReceipt() throws Exception {
+        for (boolean recurrence : new boolean[]{false,true}) {
+            if (recurrence) {
+                var domain = new LinearRecurrenceSequenceDomain();
+                evidence = new DomainDiscoveryRunner().run("retained-recurrence",domain,
+                    DiscoverySeed.create("recurrence-source",domain.domainId(),"observed=2,3,5,8,13,21;holdout=34,55,89;maximumOrder=3","HTTP public control"),
+                    new DiscoveryBudget(4,16,32,8,8,32)).evidence();
+                Path source = temporary.resolve("recurrence");
+                runId = new DomainDiscoveryExport().write(source,evidence).contentHash();
+                for (String name : files.keySet()) files.put(name,Base64.getEncoder().encodeToString(Files.readAllBytes(source.resolve(name))));
+            }
+            var imported = request("POST","",upload());
+            assertEquals(201,imported.statusCode(),imported.body());
+            String workspaceHash = json.readTree(imported.body()).path("contentHash").asText();
+            var response = request("POST",path()+"/validate",replayRequest(workspaceHash,evidence.contentHash()));
+            assertEquals(200,response.statusCode(),response.body());
+            var receipt = json.readTree(response.body());
+            assertEquals(DomainDownstreamValidation.SCHEMA,receipt.path("schema").asText());
+            assertEquals("CONFIRMED_FINITE_DATA",receipt.path("status").asText());
+            assertEquals(workspaceHash,receipt.path("source").path("workspaceHash").asText());
+            assertEquals(evidence.contentHash(),receipt.path("source").path("evidenceHash").asText());
+            assertEquals("NOT_PRODUCED",receipt.path("universalProofStatus").asText());
+            assertEquals("NOT_EVALUATED",receipt.path("publicEvidenceStatus").asText());
+            assertTrue(response.headers().firstValue("Content-Disposition").orElseThrow().contains(receipt.path("contentHash").asText().substring(7)));
+            assertEquals("\""+receipt.path("contentHash").asText().substring(7)+"\"",response.headers().firstValue("ETag").orElseThrow());
+            assertEquals(runId,response.headers().firstValue("X-Regelsuche-Run-Id").orElseThrow());
+            assertEquals(response.body(),request("POST",path()+"/validate",replayRequest(workspaceHash,evidence.contentHash())).body());
+            assertEquals(imported.body(),request("GET",path(),null).body());
+            for (var file : files.entrySet()) assertArrayEquals(Base64.getDecoder().decode(file.getValue()),
+                request("GET",path()+"/files/"+file.getKey(),null).body().getBytes(StandardCharsets.UTF_8));
+            try (var retained = Files.list(temporary.resolve("runs-domain-exports").resolve(runId.substring(7)))) {
+                assertEquals(Set.of("export","workspace.json"),retained.map(p -> p.getFileName().toString()).collect(java.util.stream.Collectors.toSet()));
+            }
+        }
+    }
+
+    @Test void validationRequiresExactRequestBindingsAndThePostMethod() throws Exception {
+        var imported = request("POST","",upload());
+        assertEquals(201,imported.statusCode(),imported.body());
+        String hash = json.readTree(imported.body()).path("contentHash").asText();
+        for (var hashes : List.of(List.of("sha256:"+"f".repeat(64),evidence.contentHash()),List.of(hash,"sha256:"+"f".repeat(64)))) {
+            var mismatch = request("POST",path()+"/validate",replayRequest(hashes.getFirst(),hashes.getLast()));
+            assertEquals(409,mismatch.statusCode(),mismatch.body());
+            assertEquals("SOURCE_BINDING_MISMATCH",json.readTree(mismatch.body()).path("code").asText());
+        }
+        for (String body : List.of("{","{}","{\"expectedWorkspaceHash\":null,\"expectedEvidenceHash\":null}",
+                replayRequest(hash,evidence.contentHash()).replace("}",",\"candidate\":\"invented\"}"),
+                "{\"expectedWorkspaceHash\":\"x\",\"expectedWorkspaceHash\":\"y\",\"expectedEvidenceHash\":\"z\"}")) {
+            assertEquals(400,request("POST",path()+"/validate",body).statusCode());
+        }
+        assertEquals(405,request("GET",path()+"/validate",null).statusCode());
+        assertEquals(413,request("POST",path()+"/validate",replayRequest(hash,evidence.contentHash())+" ".repeat(4096)).statusCode());
+        assertEquals(imported.body(),request("GET",path(),null).body());
+    }
+
     private String path() { return "/" + runId.substring(7); }
     private String upload() throws Exception { return json.writeValueAsString(Map.of("schema", "regelsuche.domain-export-upload/v1", "files", files)); }
     private String replayRequest(String workspaceHash, String evidenceHash) throws Exception {

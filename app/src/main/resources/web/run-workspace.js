@@ -42,15 +42,16 @@
         async (workspace, raw) => responseReply(await fetch(dossierUrl(workspace), {
             method: 'POST', headers: {'Content-Type': 'application/json'}, body: raw
         })));
-    function link(digest, role = '', candidate = '', edge = '') {
+    function link(digest, role = '', candidate = '', edge = '', generation = '') {
         const query = new URLSearchParams({run: digest});
         if (role) query.set('artifact', role);
         if (candidate) query.set('candidate', candidate);
         if (edge) query.set('edge', edge);
+        if (generation !== '') query.set('generation', generation);
         return '#' + query.toString();
     }
     function setLink(state) {
-        const target = link(state.digest, state.role, state.candidate, state.edge);
+        const target = link(state.digest, state.role, state.candidate, state.edge, state.generation);
         if (location.hash !== target) history.replaceState(null, '', target);
         $('retainedRunPermalink').href = target;
     }
@@ -86,7 +87,7 @@
         setLink(state);
         const dossierPanel = element('section', undefined, detail);
         dossierPanel.className = 'run-candidate-dossier';
-        dossier.render(dossierPanel, state, (candidate, edge, role) => store.selectCandidate(candidate, edge, role));
+        dossier.render(dossierPanel, state, (candidate, edge, role, generation) => store.selectCandidate(candidate, edge, role, generation));
         element('h3', 'Run-Konfiguration', detail);
         table(detail, [['Run-ID', run.runId], ['Quelle', input.displayText], ['Domäne', input.domainId],
             ['Annahmen', input.assumptions.length ? input.assumptions.join('\n') : 'Keine deklariert'],
@@ -266,7 +267,7 @@
             if (store.state().status !== 'EMPTY') store.clear();
             return;
         }
-        activateRun(); store.open(query.get('run'), query.get('artifact') || '', query.get('candidate') || '', query.get('edge') || '');
+        activateRun(); store.open(query.get('run'), query.get('artifact') || '', query.get('candidate') || '', query.get('edge') || '', query.get('generation') || '');
     }
     window.addEventListener('hashchange', restore);
     restore();

@@ -31,16 +31,30 @@ public final class PluginDistributionClient {
     private final PluginTrustStore roots;
     private final String rootHash;
     private final PluginCheckpointAuthority authority;
+    private final StateReader stateReader;
     private final PluginDistributionTransport transport;
     private final Limits limits;
     private final PluginInstallationStore store;
 
     public PluginDistributionClient(Path directory, String trustDomain, PluginTrustStore pinnedRoots,
             PluginCheckpointAuthority authority, PluginDistributionTransport transport, Limits limits) throws IOException {
+        this(directory, trustDomain, pinnedRoots, Objects.requireNonNull(authority, "authority"), authority::read,
+            transport, limits);
+    }
+
+    PluginDistributionClient(Path directory, String trustDomain, PluginTrustStore pinnedRoots,
+            StateReader stateReader, PluginDistributionTransport transport, Limits limits) throws IOException {
+        this(directory, trustDomain, pinnedRoots, null, stateReader, transport, limits);
+    }
+
+    private PluginDistributionClient(Path directory, String trustDomain, PluginTrustStore pinnedRoots,
+            PluginCheckpointAuthority authority, StateReader stateReader,
+            PluginDistributionTransport transport, Limits limits) throws IOException {
         this.trustDomain = PluginSignatureManifest.requireIdentifier(trustDomain, "trustDomain");
         this.roots = Objects.requireNonNull(pinnedRoots, "pinnedRoots");
         this.rootHash = PluginDistributionJson.hash(roots.toCanonicalJson());
-        this.authority = Objects.requireNonNull(authority, "external checkpoint authority is required");
+        this.authority = authority;
+        this.stateReader = Objects.requireNonNull(stateReader, "external checkpoint reader");
         this.transport = Objects.requireNonNull(transport, "transport");
         this.limits = Objects.requireNonNull(limits, "limits");
         this.store = new PluginInstallationStore(Objects.requireNonNull(directory, "directory"), limits);
@@ -51,6 +65,10 @@ public final class PluginDistributionClient {
      * successor trust revision (genesis for a new authority), never a replay.
      */
     public PluginInstallationEvidence install(Sources sources, ResolutionRequest request) throws IOException {
+        return activate(prepareInstall(sources, request));
+    }
+
+    Prepared prepareInstall(Sources sources, ResolutionRequest request) throws IOException {
         Objects.requireNonNull(sources, "sources");
         Objects.requireNonNull(request, "request");
         AcceptedState previous = accepted();
@@ -90,13 +108,17 @@ public final class PluginDistributionClient {
                 .toCanonicalJson());
             put(files, "retrieval.json", budget.evidence(sources));
             String operation = current == null || current.evidence().artifacts().isEmpty() ? "INSTALL" : "UPDATE";
-            return commit(previous, operation, "", verifiedTrust.checkpoint(), trust,
+            return prepare(previous, operation, "", verifiedTrust.checkpoint(), trust,
                 verifiedIndex.index(), admission, files);
         }
     }
 
     /** Removes the whole managed closure while retaining its history and current trust checkpoint. */
     public PluginInstallationEvidence remove() throws IOException {
+        return activate(prepareRemove());
+    }
+
+    Prepared prepareRemove() throws IOException {
         AcceptedState previous = accepted();
         Snapshot current = requireInstalled(active(previous));
         try (var work = store.work()) {
@@ -104,7 +126,7 @@ public final class PluginDistributionClient {
             Map<String, byte[]> files = retainedTrustFiles(current);
             put(files, "retrieval.json", PluginDistributionJson.canonical(Map.of(
                 "schema", "regelsuche.plugin-distribution-retrieval/v1", "networkAccessStatus", "NOT_PERFORMED")));
-            return commit(previous, "REMOVE", "", previous.checkpoint(), trust, null,
+            return prepare(previous, "REMOVE", "", previous.checkpoint(), trust, null,
                 new Admission(null, List.of()), files);
         }
     }
@@ -114,6 +136,10 @@ public final class PluginDistributionClient {
      * and provenance are rechecked using CURRENT trust; trust is never rolled back.
      */
     public PluginInstallationEvidence rollback(String installationHash) throws IOException {
+        return activate(prepareRollback(installationHash));
+    }
+
+    Prepared prepareRollback(String installationHash) throws IOException {
         PluginSignatureManifest.requireSha256(installationHash, "installationHash");
         AcceptedState previous = accepted();
         Snapshot current = active(previous);
@@ -128,7 +154,7 @@ public final class PluginDistributionClient {
                 "schema", "regelsuche.plugin-distribution-retrieval/v1",
                 "networkAccessStatus", "NOT_PERFORMED", "retainedGenerationHash", installationHash)));
             if (target.evidence().artifacts().isEmpty()) {
-                return commit(previous, "ROLLBACK", installationHash, previous.checkpoint(), trust, null,
+                return prepare(previous, "ROLLBACK", installationHash, previous.checkpoint(), trust, null,
                     new Admission(null, List.of()), files);
             }
             byte[] indexBytes = required(target.files(), "index.json");
@@ -145,7 +171,7 @@ public final class PluginDistributionClient {
                 throw new SecurityException("retained resolution no longer reproduces the package closure");
             }
             files.put("index.sig.json", signatureBytes);
-            return commit(previous, "ROLLBACK", installationHash, previous.checkpoint(), trust,
+            return prepare(previous, "ROLLBACK", installationHash, previous.checkpoint(), trust,
                 index.index(), admission, files);
         }
     }
@@ -219,7 +245,7 @@ public final class PluginDistributionClient {
         return new Admission(resolution, artifacts);
     }
 
-    private PluginInstallationEvidence commit(AcceptedState previous, String operation, String rollbackSource,
+    private Prepared prepare(AcceptedState previous, String operation, String rollbackSource,
             PluginTrustStoreRevisionVerifier.ChainCheckpoint checkpoint, PluginTrustStore trust,
             PluginArtifactIndex index, Admission admission, Map<String, byte[]> files) throws IOException {
         long total = 0;
@@ -247,14 +273,27 @@ public final class PluginDistributionClient {
             throw new SecurityException("retained generation exceeds the total installation byte limit");
         }
         store.persist(evidence, files);
-        if (!authority.compareAndSet(previous, new AcceptedState(evidence.contentHash(), checkpoint))) {
+        return new Prepared(previous, evidence);
+    }
+
+    private PluginInstallationEvidence activate(Prepared prepared) throws IOException {
+        if (authority == null) throw new IllegalStateException("operation-aware client requires transaction activation");
+        var evidence = prepared.evidence();
+        if (!authority.compareAndSet(prepared.expected(), new AcceptedState(evidence.contentHash(), evidence.checkpoint()))) {
             throw new SecurityException("installation authority rejected a stale or concurrent transition");
         }
         return evidence;
     }
 
+    @FunctionalInterface interface StateReader { AcceptedState read() throws IOException; }
+    record Prepared(AcceptedState expected, PluginInstallationEvidence evidence) { }
+
+    PluginInstallationEvidence retainedEvidence(AcceptedState accepted) throws IOException {
+        return active(accepted).evidence();
+    }
+
     private AcceptedState accepted() throws IOException {
-        AcceptedState accepted = Objects.requireNonNull(authority.read(), "authority cannot return null/genesis on failure");
+        AcceptedState accepted = Objects.requireNonNull(stateReader.read(), "authority cannot return null/genesis on failure");
         if (accepted.checkpoint() != null && !trustDomain.equals(accepted.checkpoint().trustDomainId())) {
             throw new SecurityException("authority belongs to another trust domain");
         }

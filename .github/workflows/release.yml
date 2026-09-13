@@ -384,6 +384,19 @@ jobs:
           set -euo pipefail
           mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify
 
+      - name: Retain Maven release-readiness evidence
+        if: >-
+          always() && !cancelled()
+          && steps.release-state.outputs.publication_required == 'true'
+          && steps.release-state.outputs.skip_tests != 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: maven-release-readiness-verification
+          path: |
+            app/target/reports/hidden-rule-pilot/**
+            regelsuche-quality-aggregate/target/reports/release-readiness-qualified/**
+          if-no-files-found: warn
+
       - name: Run emergency assembly-only verification
         if: >-
           steps.release-state.outputs.publication_required == 'true'
