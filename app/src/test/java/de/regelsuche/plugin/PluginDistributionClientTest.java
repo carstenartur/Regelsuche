@@ -14,6 +14,8 @@ import java.util.zip.ZipEntry;
 import java.util.jar.JarOutputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class PluginDistributionClientTest {
     @TempDir Path directory;
@@ -403,6 +405,51 @@ class PluginDistributionClientTest {
                 "\"operation\":\"REMOVE\""));
             assertThrows(SecurityException.class, client::active);
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"WHITESPACE", "PROPERTY_ORDER", "EXTRA_LF"})
+    void nonCanonicalManifestBytesCannotReuseAnImmutableGeneration(String mutation) throws Exception {
+        try (var fixture = new PluginDistributionFixtures(); var transport = transport(fixture)) {
+            var publication = publish(fixture, "1.0.0", jar("first"), 1, "", fixture.publishers);
+            var authority = new TestAuthority();
+            var client = client(fixture, transport, authority);
+            var installed = client.install(publication.sources(), request("1.0.0"));
+            var accepted = authority.read();
+            var store = new PluginInstallationStore(directory.resolve("packages"),
+                new PluginDistributionClient.Limits(65536, 65536, 1024 * 1024, 16, 64));
+            var original = store.load(installed.contentHash());
+            String canonical = installed.toCanonicalJson();
+            byte[] changed = nonCanonicalManifest(canonical, mutation).getBytes(StandardCharsets.UTF_8);
+            assertFalse(java.util.Arrays.equals(canonical.getBytes(StandardCharsets.UTF_8), changed));
+            assertEquals(installed, PluginInstallationEvidence.read(changed),
+                "the mutation changes only stored bytes, including no semantic hash or signed fields");
+            Path manifest = generation(installed).resolve("installation.json");
+            Files.write(manifest, changed);
+
+            assertThrows(SecurityException.class, client::active, mutation);
+            assertThrows(SecurityException.class, () -> client(fixture, transport, authority).active(), mutation);
+            assertThrows(SecurityException.class, () -> store.persist(installed, original.files()), mutation);
+            assertEquals(accepted, authority.read());
+            assertArrayEquals(changed, Files.readAllBytes(manifest), "a load must not silently normalize retained bytes");
+        }
+    }
+
+    private static String nonCanonicalManifest(String canonical, String mutation) throws Exception {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var json = mapper.readTree(canonical);
+        return switch (mutation) {
+            case "WHITESPACE" -> mapper.writerWithDefaultPrettyPrinter().writeValueAsString(json) + "\n";
+            case "PROPERTY_ORDER" -> {
+                var reversed = mapper.createObjectNode();
+                for (var entry : json.properties().stream().toList().reversed()) {
+                    reversed.set(entry.getKey(), entry.getValue());
+                }
+                yield mapper.writeValueAsString(reversed) + "\n";
+            }
+            case "EXTRA_LF" -> canonical + "\n";
+            default -> throw new IllegalArgumentException("unknown public test mutation");
+        };
     }
 
     private static byte[] corruptSignature(byte[] original) {

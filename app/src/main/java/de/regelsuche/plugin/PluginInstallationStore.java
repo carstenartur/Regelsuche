@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -11,6 +12,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -52,6 +54,9 @@ final class PluginInstallationStore {
         if (!hash.equals(evidence.contentHash()) || evidence.artifacts().size() > limits.maximumArtifacts()
                 || evidence.files().size() > 9L + 4L * limits.maximumArtifacts()) {
             throw new SecurityException("installation generation identity or size mismatch");
+        }
+        if (!Arrays.equals(installationBytes, evidence.toCanonicalJson().getBytes(StandardCharsets.UTF_8))) {
+            throw new SecurityException("retained installation evidence is not canonical");
         }
         Map<String, byte[]> files = new LinkedHashMap<>();
         long remaining = limits.totalBytes() - installationBytes.length;

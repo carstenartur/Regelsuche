@@ -175,6 +175,8 @@ names, compact Jackson JSON, UTF-8 and one terminal LF. Array order is retained;
 artifacts use dependency-first resolution order. The installation content hash is
 SHA-256 of this serialization after removing its top-level `contentHash` field,
 including the terminal LF. Each retained file hash covers its exact stored bytes.
+Reload requires `installation.json` to match that exact canonical byte encoding;
+semantically equivalent whitespace or object-property reordering is rejected.
 Existing embedded contract files keep their original canonical encodings.
 
 `regelsuche.plugin-artifact-provenance/v1` is a new, strict Ed25519 envelope. Its
