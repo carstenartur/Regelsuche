@@ -9,8 +9,15 @@ import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
+# The verifier is also invoked without -B by the existing Gradle Exec task.
+# Loading its checkout-local binding helper must not dirty a clean checkout.
+sys.dont_write_bytecode = True
+from release_readiness_bindings import verify_root_bindings
+from release_readiness_files import EvidenceFiles
+
 try:
     from jsonschema import Draft202012Validator
+    from jsonschema.exceptions import ValidationError
 except ImportError as error:
     raise SystemExit(
         "jsonschema is required; run scripts/run-release-readiness-verification.sh"
@@ -44,6 +51,22 @@ QUALIFICATION_FILES = (
     "candidate-qualification-run.json",
 )
 SCHEMA_PAIRS = (
+    (
+        "regelsuche-release-evidence-profile-catalog-v1.schema.json",
+        "profiles.json",
+    ),
+    (
+        "regelsuche-autonomous-campaign-release-evidence-v1.schema.json",
+        "evidence-summary.json",
+    ),
+    (
+        "regelsuche-hidden-rule-release-evidence-v1.schema.json",
+        "hidden-rule-release-evidence.json",
+    ),
+    (
+        "regelsuche-autonomous-production-campaign-v2.schema.json",
+        "campaign/production-campaign-manifest.json",
+    ),
     (
         "regelsuche-autonomous-candidate-qualification-suite-v1.schema.json",
         "qualification/qualification-suite.json",
@@ -104,16 +127,25 @@ def require(condition: bool, message: str) -> None:
         fail(message)
 
 
-def load(path: Path) -> dict:
+def parse_document(payload: bytes, label: str) -> dict:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        fail(f"cannot read {path}: {error}")
+        value = json.loads(
+            payload.decode("utf-8"),
+            object_pairs_hook=unique_object,
+            parse_constant=lambda constant: fail("invalid JSON numeric constant: " + constant),
+        )
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        fail(f"cannot read {label}: {error}")
+    require(isinstance(value, dict), f"JSON root must be an object: {label}")
+    return value
 
 
-def require_nonempty(path: Path) -> None:
-    require(path.is_file(), f"missing file: {path}")
-    require(path.stat().st_size > 0, f"empty file: {path}")
+def unique_object(pairs: list[tuple[str, object]]) -> dict:
+    result = {}
+    for key, value in pairs:
+        require(key not in result, "duplicate JSON field: " + key)
+        result[key] = value
+    return result
 
 
 def validate(root: Path) -> None:
@@ -125,6 +157,27 @@ def validate(root: Path) -> None:
         installed == EXPECTED_JSONSCHEMA_VERSION,
         f"jsonschema version drift: expected {EXPECTED_JSONSCHEMA_VERSION}, found {installed}",
     )
+    try:
+        with EvidenceFiles(root) as files, EvidenceFiles(SCHEMAS) as schemas:
+            validate_owned(files, schemas)
+    except (OSError, ValueError, ValidationError) as error:
+        fail(str(error))
+    print(f"releaseReadinessRoot={root}")
+    print(f"jsonschema={installed}")
+    print("release-readiness-contract=valid")
+
+
+def validate_owned(files: EvidenceFiles, schemas: EvidenceFiles) -> None:
+    root = files.root
+
+    def read_bytes(path):
+        return files.read_bytes(path.relative_to(root))
+
+    def load(path):
+        return parse_document(read_bytes(path), str(path))
+
+    def require_nonempty(path):
+        require(bool(read_bytes(path)), f"empty file: {path}")
 
     for relative in ROOT_FILES:
         require_nonempty(root / relative)
@@ -133,17 +186,18 @@ def validate(root: Path) -> None:
     for relative in QUALIFICATION_FILES:
         require_nonempty(root / "qualification" / relative)
     require(
-        not (root / "campaign/proof-obligation.json").exists(),
+        not files.present("campaign/proof-obligation.json"),
         "legacy proof-obligation.json must not be retained",
     )
 
     for schema_name, artifact_relative in SCHEMA_PAIRS:
-        schema_path = SCHEMAS / schema_name
         artifact_path = root / artifact_relative
-        schema = load(schema_path)
+        schema = parse_document(schemas.read_bytes(schema_name), schema_name)
         artifact = load(artifact_path)
         Draft202012Validator.check_schema(schema)
         Draft202012Validator(schema).validate(artifact)
+
+    verify_root_bindings(root, load, require, read_bytes)
 
     obligation = load(root / "campaign/solver-obligation.json")
     result = load(root / "campaign/solver-result.json")
@@ -267,11 +321,6 @@ def validate(root: Path) -> None:
     require(run.get("autonomyClaimAuthorized") is True, "run autonomy claim not authorized")
     require(run.get("promotionStatus") == "NOT_EVALUATED", "promotion status drift")
     require(run.get("publicEvidenceStatus") == "NOT_EVALUATED", "public evidence status drift")
-
-    print(f"releaseReadinessRoot={root}")
-    print(f"jsonschema={installed}")
-    print("release-readiness-contract=valid")
-
 
 def main() -> int:
     parser = argparse.ArgumentParser()

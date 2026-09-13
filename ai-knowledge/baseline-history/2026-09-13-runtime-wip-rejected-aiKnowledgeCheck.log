@@ -1,0 +1,34 @@
+Picked up JAVA_TOOL_OPTIONS: -Djava.net.preferIPv4Stack=true -Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=40375 -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=40375 -Dhttp.nonProxyHosts=localhost|127.* -Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.7.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :ai-knowledge-extractor:core:compileJava UP-TO-DATE
+> Task :ai-knowledge-extractor:gradle-plugin:compileJava UP-TO-DATE
+> Task :ai-knowledge-extractor:gradle-plugin:pluginDescriptors UP-TO-DATE
+> Task :ai-knowledge-extractor:gradle-plugin:processResources UP-TO-DATE
+> Task :ai-knowledge-extractor:gradle-plugin:classes UP-TO-DATE
+> Task :ai-knowledge-extractor:gradle-plugin:jar UP-TO-DATE
+> Task :ai-knowledge-extractor:core:processResources UP-TO-DATE
+> Task :ai-knowledge-extractor:core:classes UP-TO-DATE
+> Task :ai-knowledge-extractor:core:jar UP-TO-DATE
+> Task :ai-knowledge-verification:aiKnowledgeCheck FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':ai-knowledge-verification:aiKnowledgeCheck' (registered by plugin 'org.aiknowledge.extractor').
+> AI knowledge task failed
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.7.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 14s
+8 actionable tasks: 1 executed, 7 up-to-date

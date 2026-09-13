@@ -1,0 +1,102 @@
+{
+  "schema": "regelsuche.quality.release-evidence-integrity-review/v1",
+  "reviewedSourceBase": "049d8e7b8b5e8d93f8ee0bc7069a84b829b7632f",
+  "reviewThreads": [
+    "PRRT_kwDOSiJVMM6h2beP",
+    "PRRT_kwDOSiJVMM6h2bec"
+  ],
+  "originalGeneratorReceipt": "docs/evidence/release-evidence-task-reuse-v1.json",
+  "retainedFixtureArtifactCount": 48,
+  "retainedFixtureArtifactSetSha256": "785db731f8ca6d61893bc7088ed372ffddde53e4a310febe97f69be6e91e79a9",
+  "everyRetainedFixtureFileMatchesOriginalReceipt": true,
+  "initialReproductions": [
+    {
+      "control": "pristine",
+      "outcome": "ACCEPTED"
+    },
+    {
+      "control": "summary-candidate-count",
+      "outcome": "ACCEPTED"
+    },
+    {
+      "control": "manifest-candidate-count",
+      "outcome": "ACCEPTED"
+    },
+    {
+      "control": "hidden-counter",
+      "outcome": "ACCEPTED"
+    },
+    {
+      "control": "qualification-utility",
+      "outcome": "REJECTED: 1001 is greater than the maximum of 1000\n\nFailed validating 'maximum' in schema['properties']['pairedUtilityPermille']:\n    {'type': 'integer', 'minimum': 0, 'maximum': 1000}\n\nOn instance['pairedUtilityPermille']:\n    1001"
+    },
+    {
+      "control": "symlink-leaf",
+      "outcome": "ACCEPTED"
+    },
+    {
+      "control": "symlink-root",
+      "outcome": "ACCEPTED"
+    },
+    {
+      "control": "symlink-parent",
+      "outcome": "ACCEPTED"
+    },
+    {
+      "control": "qualification-utility-in-range-999",
+      "outcome": "ACCEPTED",
+      "authority": "original 049d8e7; focused regression test failed before the fix"
+    },
+    {
+      "control": "qualification-run-suite-hash",
+      "outcome": "ACCEPTED",
+      "authority": "original 049d8e7; focused regression test failed before the fix"
+    },
+    {
+      "control": "three-direct-dependency-schemas-replaced",
+      "outcome": "ACCEPTED",
+      "authority": "original 049d8e7; all three focused subtests failed before the fix"
+    }
+  ],
+  "verification": {
+    "pythonVersion": "3.12.14",
+    "jsonschemaVersion": "4.25.1",
+    "platform": "Linux x86_64",
+    "focusedCommand": "python -B scripts/test-release-readiness-evidence.py --root <retained-original-48-file-output>",
+    "tests": 26,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "initialRegressionFailureCount": 12,
+    "validStandaloneVerifierExitCode": 0,
+    "javaStringOracle": "JDK 25.0.4.1+1; UTF-16 ordering, String.isBlank, List.toString and UTF-8 surrogate replacement",
+    "codeFileSha256": {
+      "build.gradle": "4846a4b84e0c8760780e5cb148c88dcdf7d68021eae829e2b0b67589c67a8f69",
+      "scripts/release_readiness_files.py": "ec8e4f66ca8ed759050a8049659ededbd6fd9867a26a036bbd5a5337f3ddd4be",
+      "scripts/release_readiness_identities.py": "a1cfb87c42bf21b83441fe6f7b7bbec1ed8276ea221a0162933c18406d235291",
+      "scripts/release_readiness_bindings.py": "c5925a89943263c42d6d39cc33486e4b40a4519c253abaf0122fc7f363674515",
+      "scripts/verify-release-readiness-evidence.py": "d04f9040b42fcbf03d5e285e079d38d147bf8f96c24e98b0c1e8070c7e91a882",
+      "scripts/test-release-readiness-evidence.py": "fef0770e2788c51852992ac0294c12a95b2a2e0fb7fd725a50ef2fbaff83f4a9"
+    },
+    "logSha256": {
+      "release-final-tests.log": "8504a52cfcca1a6b90f0b8c2a5b09377de9567dc097302f5ff4cba0f4ef6f228",
+      "release-red.log": "b3ac53bf529022ff284fd602e2f0bfebf3cd66df53f53f8afce78fb16ef1afe7",
+      "release-final-cli.log": "28ec9e3d3b89abc1ab6c051155856cffe3d3127c45140b6aa23fa92d700f585b"
+    }
+  },
+  "identityScope": {
+    "directDependencies": [
+      "campaign manifest v2",
+      "campaign release evidence v1",
+      "hidden-rule release evidence v1",
+      "candidate qualification evidence v1",
+      "candidate qualification run v1"
+    ],
+    "catalog": "Existing schema and original byte hash",
+    "campaignSummaryCounts": "Not covered by the unchanged campaign v2 hash; compared with the independently hashed release summary",
+    "rootAndMatrix": "Existing v1 identities and cross-file bindings remain checked"
+  },
+  "platformBoundary": "Requires POSIX directory-relative open/stat and O_NOFOLLOW; tested on Linux. Missing capabilities return UNSUPPORTED_PLATFORM, never a successful or skipped qualification. Other platforms are unqualified.",
+  "claimBoundary": "Canonical identities, schemas and stated cross-file bindings only. No full descendant-artifact or mathematical replay; coherently fabricated and rehashed evidence is not authenticated as a real execution.",
+  "generatorBoundary": "Generator task inputs, outputs and Java producers unchanged. The prior twelve controls remain generator-only timing/invalidation evidence; no new generation timing or independent Docker/checkout reproduction is claimed."
+}

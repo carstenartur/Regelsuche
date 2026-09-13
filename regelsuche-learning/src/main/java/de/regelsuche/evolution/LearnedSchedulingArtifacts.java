@@ -121,6 +121,7 @@ public final class LearnedSchedulingArtifacts {
     public static String resultJson(MoveSearch.Result result) { return json(resultPayload(result)); }
     private static Map<String, Object> resultPayload(MoveSearch.Result result) {
         var payload = new TreeMap<String, Object>(); payload.put("outcome", result.outcome()); payload.put("reached", result.reached());
+        if (result.incrementalExecution() != null) payload.put("incrementalExecution", result.incrementalExecution());
         payload.put("completeBoundedRelation", result.completeBoundedRelation()); payload.put("witness", result.witness()); payload.put("events", result.events());
         payload.put("reachedStates", result.reachedStates()); payload.put("deadEndStates", result.deadEndStates()); payload.put("metrics", result.metrics());
         payload.put("totalWork", result.metrics().totalWork()); payload.put("effectiveBranchingFactor", result.metrics().effectiveBranchingFactor());

@@ -13,7 +13,7 @@ import java.util.function.ToDoubleFunction;
 /** A frontier of states AND suspended expansions. Old mechanical v1/v2 replay remains unchanged. */
 public final class MoveSearch {
     public enum Mode { FAST, COMPLETE_BOUNDED_REFERENCE }
-    public enum Scheduling { EAGER_CONTROL, STAGED }
+    public enum Scheduling { EAGER_CONTROL, STAGED, INCREMENTAL_NATIVE_ORDER }
     public enum Outcome { TARGET_REACHED, BOUNDED_EXHAUSTED, INCONCLUSIVE, WORK_EXHAUSTED, STATE_LIMIT }
     public enum Decision { ENQUEUED, DUPLICATE, PATH_BOUND, ASSUMPTION_REJECTED, PROOF_REJECTED, COMPLEXITY_BOUND, WORK_LIMIT }
     public record Budget(int maxPrimitiveSteps, int maxSearchDepth, long maxTheoryWork, int maxStates, long totalWork, int maxComplexityDebt) {
@@ -38,6 +38,16 @@ public final class MoveSearch {
             java.util.Objects.requireNonNull(scheduling); java.util.Objects.requireNonNull(budget); java.util.Objects.requireNonNull(stateValue);
             if (source == null || source.isBlank() || context.phase() == MoveContext.Phase.PRODUCTION)
                 throw new IllegalArgumentException("experimental scheduling is not production-qualified (#745)");
+            validateScheduling(scheduling, providers, policy);
+        }
+    }
+
+    private static void validateScheduling(Scheduling scheduling, List<MoveProvider> providers, MovePriorityPolicy policy) {
+        if (scheduling == Scheduling.INCREMENTAL_NATIVE_ORDER) {
+            if (policy != MovePriorityPolicy.INVENTORY_ORDER || providers.stream().anyMatch(provider -> !(provider instanceof IncrementalMoveProvider)))
+                throw new IllegalArgumentException("incremental native ordering requires native providers and INVENTORY_ORDER");
+        } else if (providers.stream().anyMatch(provider -> provider instanceof IncrementalMoveProvider)) {
+            throw new IllegalArgumentException("incremental providers require INCREMENTAL_NATIVE_ORDER scheduling");
         }
     }
     /** The full attempted target identity is retained even when admission rejects it. */
@@ -54,7 +64,14 @@ public final class MoveSearch {
         public double effectiveBranchingFactor() { return expandedStates == 0 ? 0 : (double) (consumedSuccessors - discardedSuccessors) / expandedStates; }
     }
     public record Result(Outcome outcome, List<WitnessStep> witness, List<Event> events, Set<MoveState> reachedStates, List<MoveState> deadEndStates,
-            Metrics metrics, boolean completeBoundedRelation, Map<MoveState, StateValue.Assessment> stateAssessments) {
+            Metrics metrics, boolean completeBoundedRelation, Map<MoveState, StateValue.Assessment> stateAssessments,
+            IncrementalMoveExecution incrementalExecution) {
+        /** Historical constructor and exports retain their original work contract. */
+        public Result(Outcome outcome, List<WitnessStep> witness, List<Event> events, Set<MoveState> reachedStates,
+                List<MoveState> deadEndStates, Metrics metrics, boolean completeBoundedRelation,
+                Map<MoveState, StateValue.Assessment> stateAssessments) {
+            this(outcome, witness, events, reachedStates, deadEndStates, metrics, completeBoundedRelation, stateAssessments, null);
+        }
         public Result { witness = List.copyOf(witness); events = List.copyOf(events); reachedStates = Set.copyOf(reachedStates); deadEndStates = List.copyOf(deadEndStates); stateAssessments = Map.copyOf(stateAssessments); }
         public boolean reached() { return outcome == Outcome.TARGET_REACHED; }
     }
@@ -110,41 +127,81 @@ public final class MoveSearch {
         var outcome = Outcome.BOUNDED_EXHAUSTED;
         List<WitnessStep> witness = List.of();
         int hit = -1, primitiveHit = -1;
-        while (!frontier.isEmpty()) {
-            if (ledger.total() >= budget.totalWork()) { outcome = Outcome.WORK_EXHAUSTED; complete = false; break; }
-            var node = frontier.remove().node(); ledger.search++;
-            if (node.picker == null) {
-                if (ledger.explored >= budget.maxStates()) { outcome = Outcome.STATE_LIMIT; complete = false; break; }
-                ledger.explored++; reached.add(node.state);
-                if (node.state.expression().equals(problem.context().goal())) {
-                    outcome = Outcome.TARGET_REACHED; witness = node.path;
-                    hit = node.state.searchDepth(); primitiveHit = node.state.primitiveDepth(); complete = false; break;
+        var opened = new ArrayList<Node>();
+        try {
+            while (!frontier.isEmpty()) {
+                if (ledger.total() >= budget.totalWork()) { outcome = Outcome.WORK_EXHAUSTED; complete = false; break; }
+                var node = frontier.remove().node(); ledger.search++;
+                if (node.picker == null) {
+                    if (ledger.explored >= budget.maxStates()) { outcome = Outcome.STATE_LIMIT; complete = false; break; }
+                    ledger.explored++; reached.add(node.state);
+                    if (node.state.expression().equals(problem.context().goal())) {
+                        outcome = Outcome.TARGET_REACHED; witness = node.path;
+                        hit = node.state.searchDepth(); primitiveHit = node.state.primitiveDepth(); complete = false; break;
+                    }
+                    if (node.state.searchDepth() == budget.maxSearchDepth()) continue;
+                    ledger.expanded++;
+                    node.picker = picker(problem, node.state);
+                    retainIncremental(node, opened);
                 }
-                if (node.state.searchDepth() == budget.maxSearchDepth()) continue;
-                ledger.expanded++;
-                node.picker = problem.scheduling() == Scheduling.STAGED
-                    ? new StagedMovePicker(problem.providers(), problem.policy(), node.state, problem.context())
-                    : new EagerMovePicker(problem.providers(), problem.policy(), node.state, problem.context());
+                var expansion = expand(problem, node, ledger, events, visited, frontier, serial, assessments);
+                if (expansion == Expansion.WORK_LIMIT) { outcome = Outcome.WORK_EXHAUSTED; complete = false; break; }
+                if (expansion == Expansion.REJECTED_PROOF) complete = false;
+                if (expansion == Expansion.EXHAUSTED) {
+                    complete &= node.picker.complete();
+                    if (node.enqueued == 0 && node.picker.complete()) { ledger.deadEnds++; deadEnds.add(node.state);  }
+                }
             }
-            var expansion = expand(problem, node, ledger, events, visited, frontier, serial, assessments);
-            if (expansion == Expansion.WORK_LIMIT) { outcome = Outcome.WORK_EXHAUSTED; complete = false; break; }
-            if (expansion == Expansion.REJECTED_PROOF) complete = false;
-            if (expansion == Expansion.EXHAUSTED) {
-                complete &= node.picker.complete();
-                if (node.enqueued == 0 && node.picker.complete()) { ledger.deadEnds++; deadEnds.add(node.state);  }
-            }
+        } finally {
+            closeIncremental(opened, ledger);
+        }
+        if (cleanupOverrun(problem, ledger)) {
+            outcome = Outcome.WORK_EXHAUSTED; complete = false;
+            witness = List.of(); hit = -1; primitiveHit = -1;
         }
         if (outcome == Outcome.BOUNDED_EXHAUSTED && !complete) outcome = Outcome.INCONCLUSIVE;
         return new Result(outcome, witness, events, reached, deadEnds, new Metrics(ledger.generated, ledger.consumed, ledger.discarded,
             ledger.generated - ledger.consumed, ledger.duplicates, ledger.deadEnds, ledger.explored, ledger.expanded,
-            ledger.primitive, ledger.search, ledger.verification, hit, primitiveHit, ledger.matches), complete, assessments);
+            ledger.primitive, ledger.search, ledger.verification, hit, primitiveHit, ledger.matches), complete, assessments,
+            incrementalExecution(problem, opened));
+    }
+
+    private static MovePicker picker(Problem problem, MoveState state) {
+        return switch (problem.scheduling()) {
+            case STAGED -> new StagedMovePicker(problem.providers(), problem.policy(), state, problem.context());
+            case EAGER_CONTROL -> new EagerMovePicker(problem.providers(), problem.policy(), state, problem.context());
+            case INCREMENTAL_NATIVE_ORDER -> new IncrementalMovePicker(problem.providers(), state, problem.context());
+        };
+    }
+    private static void retainIncremental(Node node, List<Node> opened) {
+        if (node.picker instanceof IncrementalMovePicker) opened.add(node);
+    }
+    private static void closeIncremental(List<Node> opened, Ledger ledger) {
+        for (var node : opened) if (node.picker instanceof IncrementalMovePicker incremental) {
+            incremental.close(); ledger.collect(node);
+        }
+    }
+    private static boolean cleanupOverrun(Problem problem, Ledger ledger) {
+        return problem.scheduling() == Scheduling.INCREMENTAL_NATIVE_ORDER && ledger.total() > problem.budget().totalWork();
+    }
+    private static IncrementalMoveExecution incrementalExecution(Problem problem, List<Node> opened) {
+        if (problem.scheduling() != Scheduling.INCREMENTAL_NATIVE_ORDER) return null;
+        var providers = problem.providers().stream().map(provider -> {
+            var incremental = (IncrementalMoveProvider) provider;
+            return new IncrementalMoveExecution.Provider(provider.descriptor(), incremental.definition());
+        }).toList();
+        return new IncrementalMoveExecution(IncrementalMoveExecution.WORK_REVISION, IncrementalMoveExecution.ORDER_REVISION,
+            providers, opened.stream().map(node -> ((IncrementalMovePicker) node.picker).receipt()).toList());
     }
     private enum Expansion { MORE, EXHAUSTED, REJECTED_PROOF, WORK_LIMIT }
     private static Expansion expand(Problem problem, Node node, Ledger ledger, List<Event> events,
             Set<Identity> visited, PriorityQueue<Ticket> frontier, long[] serial, Map<MoveState, StateValue.Assessment> assessments) {
-        var next = node.picker.next(); ledger.collect(node); node.pulls++;
+        var next = node.picker instanceof IncrementalMovePicker incremental
+            ? incremental.next(Math.max(0, problem.budget().totalWork() - ledger.total())) : node.picker.next();
+        ledger.collect(node); node.pulls++;
         // Atomic providers report actual overrun; such runs cannot claim a budget-respecting success.
         if (ledger.total() > problem.budget().totalWork()) return Expansion.WORK_LIMIT;
+        if (node.picker instanceof IncrementalMovePicker incremental && incremental.workExhausted()) return Expansion.WORK_LIMIT;
         if (next.isEmpty()) return Expansion.EXHAUSTED;
         var move = next.orElseThrow(); ledger.consumed++; ledger.search++;
         var admission = admit(problem, node, move, visited, ledger);

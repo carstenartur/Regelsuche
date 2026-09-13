@@ -26,13 +26,21 @@ import java.util.Objects;
  */
 public final class PolynomialTheoryUtilityMeasuredExecution {
     /**
-     * Run extension for adapters that produce non-empty mathematical evidence.
+     * Run extension for adapters that retain execution-time measurements.
      */
     public interface MeasuredRun extends Run {
         PolynomialTheoryUtilityMeasuredCandidate executeMeasured(
             PolynomialTheoryUtilityExecutionInput input,
             PolynomialTheoryUtilityCaseCorpus.FormationCase formationCase
         );
+
+        /** Executes one row and requires result v3 and measurements v2. */
+        default PolynomialTheoryUtilityMeasuredCandidate executeObserved(
+            PolynomialTheoryUtilityExecutionInput input,
+            PolynomialTheoryUtilityCaseCorpus.FormationCase formationCase
+        ) {
+            return requireObserved(executeMeasured(input, formationCase));
+        }
 
         @Override
         default PolynomialTheoryUtilityCandidateResult execute(
@@ -50,16 +58,50 @@ public final class PolynomialTheoryUtilityMeasuredExecution {
         PolynomialTheoryUtilityExecutionInputArtifact inputs,
         List<PolynomialTheoryUtilityProfileAdapter> adapters
     ) {
+        return execute(inputs, adapters, false);
+    }
+
+    /**
+     * Executes the frozen inventory only with explicitly observed adapters.
+     *
+     * <p>Every adapter must declare result v3 before any run is opened. Each
+     * run must supply measurements explicitly, and every actual row must use
+     * result v3 and measurements v2. This boundary neither supplies missing
+     * profile implementations nor establishes a run-wide cache history.</p>
+     */
+    public PolynomialTheoryUtilityCandidateMeasurementBatch executeObserved(
+        PolynomialTheoryUtilityExecutionInputArtifact inputs,
+        List<PolynomialTheoryUtilityProfileAdapter> adapters
+    ) {
+        return execute(inputs, adapters, true);
+    }
+
+    private PolynomialTheoryUtilityCandidateMeasurementBatch execute(
+        PolynomialTheoryUtilityExecutionInputArtifact inputs,
+        List<PolynomialTheoryUtilityProfileAdapter> adapters,
+        boolean observed
+    ) {
         Objects.requireNonNull(inputs, "inputs");
         List<PolynomialTheoryUtilityProfileAdapter> supplied = List.copyOf(
             Objects.requireNonNull(adapters, "adapters")
         );
+        if (observed) {
+            new AdapterRegistry(supplied);
+            for (var adapter : supplied) {
+                if (!PolynomialTheoryUtilityCandidateResult.OBSERVED_SCHEMA
+                        .equals(adapter.resultSchema())) {
+                    throw new IllegalArgumentException(
+                        "observed execution requires a declared result v3 adapter: "
+                            + adapter.profileId());
+                }
+            }
+        }
         Map<String, PolynomialTheoryUtilityCandidateMeasurements> captured =
             new LinkedHashMap<>();
         List<PolynomialTheoryUtilityProfileAdapter> decorated =
             new ArrayList<>(supplied.size());
         supplied.forEach(adapter -> decorated.add(
-            new CapturingAdapter(adapter, captured)
+            new CapturingAdapter(adapter, captured, observed)
         ));
 
         CandidateBatch results = new TargetBlindRunner().execute(
@@ -79,6 +121,19 @@ public final class PolynomialTheoryUtilityMeasuredExecution {
             results,
             measurements
         );
+    }
+
+    private static PolynomialTheoryUtilityMeasuredCandidate requireObserved(
+            PolynomialTheoryUtilityMeasuredCandidate candidate) {
+        Objects.requireNonNull(candidate, "measured adapter result");
+        if (!PolynomialTheoryUtilityCandidateResult.OBSERVED_SCHEMA
+                    .equals(candidate.result().schema())
+                || !PolynomialTheoryUtilityCandidateMeasurements.OBSERVED_SCHEMA
+                    .equals(candidate.measurements().schema())) {
+            throw new IllegalArgumentException(
+                "observed execution requires result v3 and measurements v2");
+        }
+        return candidate;
     }
 
     private static PolynomialTheoryUtilityCandidateMeasurements
@@ -102,6 +157,7 @@ public final class PolynomialTheoryUtilityMeasuredExecution {
     private static final class CapturingAdapter
             implements PolynomialTheoryUtilityProfileAdapter {
         private final PolynomialTheoryUtilityProfileAdapter delegate;
+        private final boolean observed;
         private final Map<
             String,
             PolynomialTheoryUtilityCandidateMeasurements
@@ -109,10 +165,12 @@ public final class PolynomialTheoryUtilityMeasuredExecution {
 
         private CapturingAdapter(
             PolynomialTheoryUtilityProfileAdapter delegate,
-            Map<String, PolynomialTheoryUtilityCandidateMeasurements> captured
+            Map<String, PolynomialTheoryUtilityCandidateMeasurements> captured,
+            boolean observed
         ) {
             this.delegate = Objects.requireNonNull(delegate, "delegate");
             this.captured = Objects.requireNonNull(captured, "captured");
+            this.observed = observed;
         }
 
         @Override
@@ -126,19 +184,26 @@ public final class PolynomialTheoryUtilityMeasuredExecution {
         }
 
         @Override
+        public String resultSchema() {
+            return delegate.resultSchema();
+        }
+
+        @Override
         public Run openRun(RunDescriptor descriptor) {
             return new CapturingRun(
                 Objects.requireNonNull(
                     delegate.openRun(descriptor),
                     "delegate run"
                 ),
-                captured
+                captured,
+                observed
             );
         }
     }
 
     private static final class CapturingRun implements Run {
         private final Run delegate;
+        private final boolean observed;
         private final Map<
             String,
             PolynomialTheoryUtilityCandidateMeasurements
@@ -146,10 +211,12 @@ public final class PolynomialTheoryUtilityMeasuredExecution {
 
         private CapturingRun(
             Run delegate,
-            Map<String, PolynomialTheoryUtilityCandidateMeasurements> captured
+            Map<String, PolynomialTheoryUtilityCandidateMeasurements> captured,
+            boolean observed
         ) {
             this.delegate = Objects.requireNonNull(delegate, "delegate");
             this.captured = Objects.requireNonNull(captured, "captured");
+            this.observed = observed;
         }
 
         @Override
@@ -157,6 +224,10 @@ public final class PolynomialTheoryUtilityMeasuredExecution {
             PolynomialTheoryUtilityExecutionInput input,
             PolynomialTheoryUtilityCaseCorpus.FormationCase formationCase
         ) {
+            if (observed && !(delegate instanceof MeasuredRun)) {
+                throw new IllegalArgumentException(
+                    "observed execution requires an explicit measured run");
+            }
             PolynomialTheoryUtilityMeasuredCandidate measured =
                 delegate instanceof MeasuredRun measuredRun
                     ? Objects.requireNonNull(
@@ -170,6 +241,7 @@ public final class PolynomialTheoryUtilityMeasuredExecution {
                                 "adapter result"
                             )
                         );
+            if (observed) requireObserved(measured);
             var result = measured.result();
             var previous = captured.putIfAbsent(
                 result.resultId(),

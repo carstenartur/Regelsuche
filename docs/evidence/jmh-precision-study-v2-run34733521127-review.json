@@ -1,0 +1,590 @@
+{
+  "schema": "regelsuche.quality.jmh-precision-study-log-review/v1",
+  "runId": 34733521127,
+  "runAttempt": 1,
+  "measuredRevision": "acee3ee3cb808956687ba3fef954a281533fb0ac",
+  "policySha256": "cd296629d75a37e1a4266550093e8a81573a4450e79be1dadebd72e24233693f",
+  "evidenceSource": "canonical report printed by completed CI analysis job 103664335181",
+  "originalArtifactBytesVerifiedLocally": false,
+  "originalArtifactReadResult": "HTTP_403",
+  "collectionStatus": "COMPLETE",
+  "measurementRows": 609,
+  "selectedProtocol": null,
+  "adoptionStatus": "DEFERRED_ORIGINAL_RAW_ARTIFACT_REPLAY_AND_VERSIONED_PRODUCTION_AUTHORITY",
+  "jobs": [
+    {
+      "jobId": 103660665978,
+      "name": "JMH precision study v2 replica 1",
+      "startedAt": "2026-09-13T02:38:01Z",
+      "completedAt": "2026-09-13T03:11:14Z",
+      "elapsedSeconds": 1993
+    },
+    {
+      "jobId": 103660665979,
+      "name": "JMH precision study v2 replica 3",
+      "startedAt": "2026-09-13T02:38:03Z",
+      "completedAt": "2026-09-13T03:11:11Z",
+      "elapsedSeconds": 1988
+    },
+    {
+      "jobId": 103660666037,
+      "name": "JMH precision study v2 replica 2",
+      "startedAt": "2026-09-13T02:38:00Z",
+      "completedAt": "2026-09-13T03:10:19Z",
+      "elapsedSeconds": 1939
+    },
+    {
+      "jobId": 103664335181,
+      "name": "Retained JMH precision study v2 analysis",
+      "startedAt": "2026-09-13T03:11:17Z",
+      "completedAt": "2026-09-13T03:11:32Z",
+      "elapsedSeconds": 15
+    }
+  ],
+  "totalObservedStudyJobSeconds": 5935,
+  "protocols": [
+    {
+      "protocol": "baseline",
+      "benchmarkCount": 87,
+      "failedCount": 0,
+      "inconclusiveCount": 0,
+      "lowPrecisionCount": 20,
+      "medianRelativeError": 0.19941388369146437,
+      "p90RelativeError": 2.7952013600696968,
+      "status": "PASSED",
+      "medianWallclockSeconds": 155.30406704100005,
+      "medianWallclockRatioToControl": 1,
+      "eligibleForReview": false,
+      "semanticWorkParity": true,
+      "adoptionChecks": {
+        "allCandidateRatchetsPassed": true,
+        "boundedMedianCost": true,
+        "candidate": false,
+        "lowerMedianRelativeError": false,
+        "lowerP90RelativeError": false,
+        "materialLowPrecisionReduction": false,
+        "noFamilyLowPrecisionIncrease": true,
+        "positiveControlLowPrecisionCount": true,
+        "semanticWorkParity": true,
+        "sharedRunnerEvidence": true
+      },
+      "families": {
+        "CORE": {
+          "benchmarkCount": 30,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 5,
+          "medianRelativeError": 0.20468551469329288,
+          "p90RelativeError": 1.0610632065271601,
+          "status": "PASSED"
+        },
+        "END_TO_END_SEARCH": {
+          "benchmarkCount": 12,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 8,
+          "medianRelativeError": 4.193974670824921,
+          "p90RelativeError": 8.013760901275706,
+          "status": "PASSED"
+        },
+        "REWRITE_PROGRAM": {
+          "benchmarkCount": 45,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 7,
+          "medianRelativeError": 0.12120920440882357,
+          "p90RelativeError": 2.4395595149249956,
+          "status": "PASSED"
+        }
+      }
+    },
+    {
+      "protocol": "more-measurements",
+      "benchmarkCount": 87,
+      "failedCount": 0,
+      "inconclusiveCount": 0,
+      "lowPrecisionCount": 0,
+      "medianRelativeError": 0.022086882735743732,
+      "p90RelativeError": 0.2414440036498107,
+      "status": "PASSED",
+      "medianWallclockSeconds": 300.720304134,
+      "medianWallclockRatioToControl": 1.9363324468161562,
+      "eligibleForReview": true,
+      "semanticWorkParity": true,
+      "adoptionChecks": {
+        "allCandidateRatchetsPassed": true,
+        "boundedMedianCost": true,
+        "candidate": true,
+        "lowerMedianRelativeError": true,
+        "lowerP90RelativeError": true,
+        "materialLowPrecisionReduction": true,
+        "noFamilyLowPrecisionIncrease": true,
+        "positiveControlLowPrecisionCount": true,
+        "semanticWorkParity": true,
+        "sharedRunnerEvidence": true
+      },
+      "families": {
+        "CORE": {
+          "benchmarkCount": 30,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 0,
+          "medianRelativeError": 0.020892310629190204,
+          "p90RelativeError": 0.06568632554838535,
+          "status": "PASSED"
+        },
+        "END_TO_END_SEARCH": {
+          "benchmarkCount": 12,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 0,
+          "medianRelativeError": 0.4021930192651424,
+          "p90RelativeError": 0.6547049633495086,
+          "status": "PASSED"
+        },
+        "REWRITE_PROGRAM": {
+          "benchmarkCount": 45,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 0,
+          "medianRelativeError": 0.012073462605710811,
+          "p90RelativeError": 0.19061244133809596,
+          "status": "PASSED"
+        }
+      }
+    },
+    {
+      "protocol": "more-warmup",
+      "benchmarkCount": 87,
+      "failedCount": 0,
+      "inconclusiveCount": 0,
+      "lowPrecisionCount": 0,
+      "medianRelativeError": 0.08009585232741175,
+      "p90RelativeError": 0.2016627693530078,
+      "status": "PASSED",
+      "medianWallclockSeconds": 271.577465696,
+      "medianWallclockRatioToControl": 1.7486822519870258,
+      "eligibleForReview": true,
+      "semanticWorkParity": true,
+      "adoptionChecks": {
+        "allCandidateRatchetsPassed": true,
+        "boundedMedianCost": true,
+        "candidate": true,
+        "lowerMedianRelativeError": true,
+        "lowerP90RelativeError": true,
+        "materialLowPrecisionReduction": true,
+        "noFamilyLowPrecisionIncrease": true,
+        "positiveControlLowPrecisionCount": true,
+        "semanticWorkParity": true,
+        "sharedRunnerEvidence": true
+      },
+      "families": {
+        "CORE": {
+          "benchmarkCount": 30,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 0,
+          "medianRelativeError": 0.08541756178722387,
+          "p90RelativeError": 0.23836966006264038,
+          "status": "PASSED"
+        },
+        "END_TO_END_SEARCH": {
+          "benchmarkCount": 12,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 0,
+          "medianRelativeError": 0.11494892102063006,
+          "p90RelativeError": 0.2101175075986352,
+          "status": "PASSED"
+        },
+        "REWRITE_PROGRAM": {
+          "benchmarkCount": 45,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 0,
+          "medianRelativeError": 0.07547197322635214,
+          "p90RelativeError": 0.14300878689292154,
+          "status": "PASSED"
+        }
+      }
+    },
+    {
+      "protocol": "more-forks",
+      "benchmarkCount": 87,
+      "failedCount": 0,
+      "inconclusiveCount": 0,
+      "lowPrecisionCount": 2,
+      "medianRelativeError": 0.07761155467020771,
+      "p90RelativeError": 0.5078936015053608,
+      "status": "PASSED",
+      "medianWallclockSeconds": 310.0113320350001,
+      "medianWallclockRatioToControl": 1.9961572027161245,
+      "eligibleForReview": true,
+      "semanticWorkParity": true,
+      "adoptionChecks": {
+        "allCandidateRatchetsPassed": true,
+        "boundedMedianCost": true,
+        "candidate": true,
+        "lowerMedianRelativeError": true,
+        "lowerP90RelativeError": true,
+        "materialLowPrecisionReduction": true,
+        "noFamilyLowPrecisionIncrease": true,
+        "positiveControlLowPrecisionCount": true,
+        "semanticWorkParity": true,
+        "sharedRunnerEvidence": true
+      },
+      "families": {
+        "CORE": {
+          "benchmarkCount": 30,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 0,
+          "medianRelativeError": 0.06606989449279924,
+          "p90RelativeError": 0.1234429892144264,
+          "status": "PASSED"
+        },
+        "END_TO_END_SEARCH": {
+          "benchmarkCount": 12,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 2,
+          "medianRelativeError": 0.7493003336418665,
+          "p90RelativeError": 1.0066722105234656,
+          "status": "PASSED"
+        },
+        "REWRITE_PROGRAM": {
+          "benchmarkCount": 45,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 0,
+          "medianRelativeError": 0.05416181945257824,
+          "p90RelativeError": 0.29152881161990163,
+          "status": "PASSED"
+        }
+      }
+    },
+    {
+      "protocol": "longer-measurements",
+      "benchmarkCount": 87,
+      "failedCount": 0,
+      "inconclusiveCount": 0,
+      "lowPrecisionCount": 11,
+      "medianRelativeError": 0.1010654088725063,
+      "p90RelativeError": 1.359397636876746,
+      "status": "PASSED",
+      "medianWallclockSeconds": 242.04732433700008,
+      "medianWallclockRatioToControl": 1.5585382208509706,
+      "eligibleForReview": false,
+      "semanticWorkParity": true,
+      "adoptionChecks": {
+        "allCandidateRatchetsPassed": true,
+        "boundedMedianCost": true,
+        "candidate": true,
+        "lowerMedianRelativeError": true,
+        "lowerP90RelativeError": true,
+        "materialLowPrecisionReduction": false,
+        "noFamilyLowPrecisionIncrease": true,
+        "positiveControlLowPrecisionCount": true,
+        "semanticWorkParity": true,
+        "sharedRunnerEvidence": true
+      },
+      "families": {
+        "CORE": {
+          "benchmarkCount": 30,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 0,
+          "medianRelativeError": 0.10954718177844175,
+          "p90RelativeError": 0.5268443295100445,
+          "status": "PASSED"
+        },
+        "END_TO_END_SEARCH": {
+          "benchmarkCount": 12,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 8,
+          "medianRelativeError": 2.7272810929944393,
+          "p90RelativeError": 4.2256347910690755,
+          "status": "PASSED"
+        },
+        "REWRITE_PROGRAM": {
+          "benchmarkCount": 45,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 3,
+          "medianRelativeError": 0.0907735209184391,
+          "p90RelativeError": 0.6770977795836012,
+          "status": "PASSED"
+        }
+      }
+    },
+    {
+      "protocol": "family-contract",
+      "benchmarkCount": 87,
+      "failedCount": 0,
+      "inconclusiveCount": 0,
+      "lowPrecisionCount": 2,
+      "medianRelativeError": 0.024664341321431874,
+      "p90RelativeError": 0.30387253588747154,
+      "status": "PASSED",
+      "medianWallclockSeconds": 462.94898204200007,
+      "medianWallclockRatioToControl": 2.9809198874346428,
+      "eligibleForReview": true,
+      "semanticWorkParity": true,
+      "adoptionChecks": {
+        "allCandidateRatchetsPassed": true,
+        "boundedMedianCost": true,
+        "candidate": true,
+        "lowerMedianRelativeError": true,
+        "lowerP90RelativeError": true,
+        "materialLowPrecisionReduction": true,
+        "noFamilyLowPrecisionIncrease": true,
+        "positiveControlLowPrecisionCount": true,
+        "semanticWorkParity": true,
+        "sharedRunnerEvidence": true
+      },
+      "families": {
+        "CORE": {
+          "benchmarkCount": 30,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 2,
+          "medianRelativeError": 0.1499496730869271,
+          "p90RelativeError": 0.891132457459525,
+          "status": "PASSED"
+        },
+        "END_TO_END_SEARCH": {
+          "benchmarkCount": 12,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 0,
+          "medianRelativeError": 0.014798633756462384,
+          "p90RelativeError": 0.03452351366922601,
+          "status": "PASSED"
+        },
+        "REWRITE_PROGRAM": {
+          "benchmarkCount": 45,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 0,
+          "medianRelativeError": 0.014379211075976521,
+          "p90RelativeError": 0.04696564485230345,
+          "status": "PASSED"
+        }
+      }
+    },
+    {
+      "protocol": "gc-profile",
+      "benchmarkCount": 87,
+      "failedCount": 0,
+      "inconclusiveCount": 0,
+      "lowPrecisionCount": 18,
+      "medianRelativeError": 0.1532607411941434,
+      "p90RelativeError": 5.171145380751474,
+      "status": "PASSED",
+      "medianWallclockSeconds": 155.767172688,
+      "medianWallclockRatioToControl": 1.0029819286501858,
+      "eligibleForReview": false,
+      "semanticWorkParity": true,
+      "adoptionChecks": {
+        "allCandidateRatchetsPassed": true,
+        "boundedMedianCost": true,
+        "candidate": true,
+        "lowerMedianRelativeError": true,
+        "lowerP90RelativeError": false,
+        "materialLowPrecisionReduction": false,
+        "noFamilyLowPrecisionIncrease": false,
+        "positiveControlLowPrecisionCount": true,
+        "semanticWorkParity": true,
+        "sharedRunnerEvidence": true
+      },
+      "families": {
+        "CORE": {
+          "benchmarkCount": 30,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 3,
+          "medianRelativeError": 0.1147915073334964,
+          "p90RelativeError": 0.7217886383572251,
+          "status": "PASSED"
+        },
+        "END_TO_END_SEARCH": {
+          "benchmarkCount": 12,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 9,
+          "medianRelativeError": 5.475148144719748,
+          "p90RelativeError": 8.446680574488783,
+          "status": "PASSED"
+        },
+        "REWRITE_PROGRAM": {
+          "benchmarkCount": 45,
+          "failedCount": 0,
+          "inconclusiveCount": 0,
+          "lowPrecisionCount": 6,
+          "medianRelativeError": 0.10289328769089588,
+          "p90RelativeError": 2.4717910744531353,
+          "status": "PASSED"
+        }
+      }
+    }
+  ],
+  "descriptiveRankingReview": [
+    {
+      "disjointReportedIntervalsBoth": 0,
+      "inversions": 3,
+      "protocol": "more-measurements",
+      "replicate": 1
+    },
+    {
+      "disjointReportedIntervalsBoth": 0,
+      "inversions": 5,
+      "protocol": "more-measurements",
+      "replicate": 2
+    },
+    {
+      "disjointReportedIntervalsBoth": 0,
+      "inversions": 0,
+      "protocol": "more-measurements",
+      "replicate": 3
+    },
+    {
+      "disjointReportedIntervalsBoth": 0,
+      "inversions": 1,
+      "protocol": "more-warmup",
+      "replicate": 1
+    },
+    {
+      "disjointReportedIntervalsBoth": 0,
+      "inversions": 4,
+      "protocol": "more-warmup",
+      "replicate": 2
+    },
+    {
+      "disjointReportedIntervalsBoth": 0,
+      "inversions": 2,
+      "protocol": "more-warmup",
+      "replicate": 3
+    },
+    {
+      "disjointReportedIntervalsBoth": 0,
+      "inversions": 4,
+      "protocol": "more-forks",
+      "replicate": 1
+    },
+    {
+      "disjointReportedIntervalsBoth": 0,
+      "inversions": 3,
+      "protocol": "more-forks",
+      "replicate": 2
+    },
+    {
+      "disjointReportedIntervalsBoth": 0,
+      "inversions": 2,
+      "protocol": "more-forks",
+      "replicate": 3
+    },
+    {
+      "disjointReportedIntervalsBoth": 0,
+      "inversions": 4,
+      "protocol": "family-contract",
+      "replicate": 1
+    },
+    {
+      "disjointReportedIntervalsBoth": 0,
+      "inversions": 2,
+      "protocol": "family-contract",
+      "replicate": 2
+    },
+    {
+      "disjointReportedIntervalsBoth": 0,
+      "inversions": 3,
+      "protocol": "family-contract",
+      "replicate": 3
+    }
+  ],
+  "rankingInterpretation": "Every observed candidate/control order inversion has overlapping reported intervals in at least one of the two protocols. This descriptive check does not establish equivalence, significance, or comparison with historical work counters.",
+  "artifacts": [
+    {
+      "id": 10311070702,
+      "name": "jmh-precision-study-v2-replicate-3",
+      "bytes": 132165,
+      "digest": "sha256:953909909dbe551382751fa102a244aa0139e8aabfe849e25ae2b8176fd1b27b"
+    },
+    {
+      "id": 10311055831,
+      "name": "jmh-precision-study-v2-replicate-1",
+      "bytes": 132592,
+      "digest": "sha256:0bc0a6b7ae31bd8738a46b9adcf6c6e337e15f314b6be9eaa559555467b6b712"
+    },
+    {
+      "id": 10310935976,
+      "name": "jmh-precision-study-v2-analysis",
+      "bytes": 134749,
+      "digest": "sha256:cedcd4cd84d5ba9505a89b4e63a63a99234e1d5a5b4939e98d354f285f16fcf4"
+    },
+    {
+      "id": 10310378329,
+      "name": "jmh-precision-study-v2-replicate-2",
+      "bytes": 132407,
+      "digest": "sha256:6f96d2446e33153624bcb3f64c4911a16f01d27f7004afd24a39eaae8a89109a"
+    }
+  ],
+  "retainedReport": {
+    "path": "docs/evidence/jmh-precision-study-v2-run34733521127-report-from-ci-log.json.gz",
+    "origin": "CI log, timestamps and framing removed",
+    "uncompressedBytes": 1158321,
+    "uncompressedSha256": "1562fc0b81c98c220e2aac4ea20430f11c72acd2a309981e62de602e96c745a3",
+    "compressedBytes": 129855,
+    "compressedSha256": "1515bd7f646f8923326bd61d07330792d44cc1372da604b6fd08840831e5044d"
+  },
+  "independentArithmeticReview": {
+    "rowsChecked": 609,
+    "uniqueBenchmarkNames": 29,
+    "checks": [
+      "raw iteration means",
+      "scoreError/score",
+      "LOW_PRECISION boundary",
+      "point-estimate ratchet pass",
+      "per-protocol median and nearest-rank p90",
+      "complete repeated inventory"
+    ],
+    "protocols": [
+      {
+        "protocol": "baseline",
+        "rows": 87,
+        "lowPrecision": 20
+      },
+      {
+        "protocol": "more-measurements",
+        "rows": 87,
+        "lowPrecision": 0
+      },
+      {
+        "protocol": "more-warmup",
+        "rows": 87,
+        "lowPrecision": 0
+      },
+      {
+        "protocol": "more-forks",
+        "rows": 87,
+        "lowPrecision": 2
+      },
+      {
+        "protocol": "longer-measurements",
+        "rows": 87,
+        "lowPrecision": 11
+      },
+      {
+        "protocol": "family-contract",
+        "rows": 87,
+        "lowPrecision": 2
+      },
+      {
+        "protocol": "gc-profile",
+        "rows": 87,
+        "lowPrecision": 18
+      }
+    ]
+  }
+}

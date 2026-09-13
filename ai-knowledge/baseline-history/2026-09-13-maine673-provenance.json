@@ -1,0 +1,183 @@
+{
+  "schema": "regelsuche.ai-knowledge-baseline-provenance/v1",
+  "decision": "Advance the trend baseline only to independently fully qualified accepted main e673c6c89b; preserve all prior baseline history and the source-unbound rejected runtime WIP diagnostic.",
+  "acceptedSource": {
+    "mainCommit": "e673c6c89bca00f68ca47b8df2a7d20203089b29",
+    "publishedPullRequest": 997,
+    "publishedPullRequestHead": "067619282e4ac4778900c893170283e2a9e57260",
+    "tree": "3a271c01bac233259e47a46c78f6f49274804eb7"
+  },
+  "independentQualification": {
+    "runId": 34737310998,
+    "runNumber": 5576,
+    "url": "https://github.com/carstenartur/Regelsuche/actions/runs/34737310998",
+    "conclusion": "success",
+    "jobs": {
+      "gradle": 103670879190,
+      "mavenProductDocker": 103670879084,
+      "isolatedJmh": 103670879162,
+      "externalPolynomialComparison": 103670879170,
+      "isolatedSymPy": 103670879188,
+      "convergedCiCheck": 103673245409
+    },
+    "allListedJobConclusions": "success",
+    "repositoryVerificationArtifact": {
+      "id": 10311229494,
+      "sizeBytes": 320717542,
+      "apiReportedDigest": "sha256:2352c426bf8101becb4f7f21a8cf98f36b705fbaf15090c25e593db087cf44ea"
+    },
+    "retainedSourceQualification": "e673c6c89b-source-qualification.json",
+    "evidenceBoundary": "Source PR merge state, source-head CI status, all six authority jobs and artifact metadata were independently rechecked through the GitHub API. The separate report-publication job was skipped. The artifact ZIP was not downloaded or hashed for this update. Baseline values come exclusively from the clean local reproduction below."
+  },
+  "localReproduction": {
+    "checkoutCommit": "1dad1683e9b08c6fb2626d687b978f2f0456ef70",
+    "tree": "3a271c01bac233259e47a46c78f6f49274804eb7",
+    "cleanBeforeAndAfter": true,
+    "executionObservationBoundary": "The coordinating agent ran the command and checked a clean checkout before and after. The baseline-update agent independently rechecked the unchanged clean source tree, clean extractor, retained successful command log, generated report consistency and exact copied file hashes; it did not rerun Gradle.",
+    "extractorVersion": "0.1.10",
+    "extractorCommit": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+    "extractorCheckoutClean": true,
+    "gradleVersion": "9.7.1",
+    "runtimeJdk": "25.0.4.1+1",
+    "extractorCompilerJdk": "17.0.20.1+1",
+    "command": "source ../runtime/env.sh\nAI_KNOWLEDGE_EXTRACTOR_ENABLED=true ../runtime/gradle-9.7.1/bin/gradle --offline --no-daemon --no-configuration-cache --max-workers=2 -PuseLocalAiKnowledgeExtractor=true -PaiKnowledgeExtractorCheckout=../ai-knowledge-extractor -Porg.gradle.java.installations.paths=/workspace/scratch/a1f484c28baf/runtime/jdk-25.0.4.1+1,/workspace/scratch/a1f484c28baf/runtime/jdk-17.0.20.1+1 aiKnowledgeCheck",
+    "exitCode": 0,
+    "elapsedSeconds": 13,
+    "tasks": 12,
+    "executedTasks": 5,
+    "upToDateTasks": 7,
+    "coverageControlsPassed": 8,
+    "complexityHotspotsPassed": 16,
+    "sourceFileSha256": {
+      "ai-knowledge/complexity-baseline.json": "d9c1071f10b856f9e909174a0aa5562278958590f27d92a7f02764f5c74155f5",
+      "ai-knowledge/capabilities.seed.yaml": "16d64630109485ca14a5c1566d64084f3b932d7edf52bf70facd4274de0b8d0b",
+      "ai-knowledge/claims.seed.yaml": "013935ebad67ff3868602be8c68b73dba723610ad5ba728113f87e114f3dc108",
+      "ai-knowledge/claims.json": "cce03fad40abaa23770707154b2cab60afe37f1b0cbc8fb4d8865a886480b0c1",
+      "gradle.properties": "2d0c622ff20ce78d0432c004df2dba7af170bdb50f5ce68faffdc5bcd1f1b285",
+      "ai-knowledge-verification/build.gradle": "2aaf02538386418eeb3a5de354942514ba697cedd5cd658edf0cd44e2cdbfdd5",
+      "gradle/ai-knowledge-verification.gradle": "f1df0d336d519f10a0bf35129e1b80cd8cbbad5d0d3939e0fffd2cd5d7ee91b8",
+      "config/quality/complexity-hotspots.json": "8e9e8b549bc388f4638ec62de498a240ccb92e83108e848d75e7fcf94a02fbc2",
+      "settings.gradle": "6cba76fe53a076ce6ae2ca44f85a7e60fc27c2c11f491bfe79b33fd31272812b",
+      "config/ai-knowledge-capability-coverage.json": "9c1705776a062b5784cd9bad1cdc847878338f1ce32ac1fc66e7769ed98adbed",
+      "scripts/verify-ai-knowledge-artifacts.py": "845708cb45420565d5636539b00b60034162db762132bf781b6d3f9b4a7b3f7b",
+      "scripts/test_ai_knowledge_coverage.py": "ec21b3b2050f528c221e118c5e87948847e9de32384ee5eb6b382eea2210bca4",
+      "scripts/verify-complexity-hotspots.py": "d792435d075d8102bbe5504af83f84d6c660a20b1234e8516f8a5d5ac3775bfa"
+    },
+    "generatedReportSha256": {
+      "benchmark.json": "15eabc49353f3ebd36bb1ae215619bbb05fca0f3c95f31612f28f74108c2fa66",
+      "capabilities.json": "dc76ec180ad4ab3a9993c5cbb73be21ba1a0f30ccab33f1ed33eace8063a860d",
+      "check.json": "42eb481961e01b7c1d0700a03c10458e78659c0e9c1ebc1003ec5d81a2e0be43",
+      "claims.json": "b522704dafe348f98c21888d4c4668461ad9ae678f92be3b899cc9813055a8e3",
+      "classes.json": "81ecf5b0020a71a0fbe5c55c564b3cb7a77082196e12372b0a77f3fee8341bb5",
+      "complexity.json": "9536268f784a4f3c3c4494cbf4ef03ddaed0772a8edb4424abf3817a57fab024",
+      "dependencies.json": "88dfba142e7fd7a349bf4c99d46e8072bfc2413a3642a49172ed60865d7ca879",
+      "docs.json": "44b42bf9cabc966580b90da2768ee1816c78e9a156aa04e966a32af6122b00c6",
+      "evidence.json": "ea721326448bcb448f57de5655e6e287f9fd32e86dbb21bfb6aa22ab24bc6422",
+      "index.json": "b88aa5fb5d0a134969e8703dc42288304e6bdd0eeb032898ec09dbb6b89056dd",
+      "metrics-snapshot.json": "4e849da270eb40f15934c9a6ad5493aeb3e5c40efc86bedfdeb4c80687af0f24",
+      "modules.json": "40ca9ace78a077e84f14e2e67d1086f1768434ca0b49e270509ee50ae8b95682",
+      "optimization.json": "3a8eceed230e4b3d308f62e16a7296a57fd53381bfb4f6ef0201a07b8dd9ebf6",
+      "tests.json": "bdead78c1cdb2610597b8be2c9d99b715ef71594d8aabd7495a0d61d8528bed0",
+      "trend.json": "cb02b23c1b8a858af149332c9e6b9a1f4f6d70db8a9e822a3917a2c7ae5e3bd0"
+    },
+    "generatedReportRetentionBoundary": "The snapshot, check, trend and successful command log are retained below. Other generated report hashes identify the locally reproduced report set; the larger reports themselves are not copied into baseline history."
+  },
+  "previousBaseline": {
+    "sourceCommit": "85f6ce9301a7f3dcf3243937d5b463113c61846f",
+    "ciRunId": 34726058558,
+    "artifactId": 10308038746,
+    "retainedFile": "85f6ce9301-metrics-snapshot.json",
+    "sha256": "d9c1071f10b856f9e909174a0aa5562278958590f27d92a7f02764f5c74155f5",
+    "retainedProvenance": "2026-09-13-main85f6-provenance.json",
+    "preservation": "Exact bytes of the formerly active baseline already retained in history; every existing history file remains unchanged."
+  },
+  "newBaseline": {
+    "sourceCommit": "e673c6c89bca00f68ca47b8df2a7d20203089b29",
+    "retainedFile": "e673c6c89b-metrics-snapshot.json",
+    "sha256": "4e849da270eb40f15934c9a6ad5493aeb3e5c40efc86bedfdeb4c80687af0f24",
+    "derivation": "Exact generated metrics-snapshot.json bytes copied without numeric edits to ai-knowledge/complexity-baseline.json.",
+    "metrics": {
+      "schemaVersion": 1,
+      "estimatedContextTokens": 575305.0,
+      "conceptRadius": 87.0,
+      "dependencyRadius": 271.0,
+      "knowledgeDensity": 157.23529411764707,
+      "contextLocality": 0.0,
+      "compressionRatio": 0.020858501142872042,
+      "aiCognitiveComplexity": 710.805,
+      "aiCognitiveDebt": 644.440294117647,
+      "aiContextDebt": 16.72,
+      "contextDebtModelVersion": "context-footprint-v3"
+    }
+  },
+  "rejectedRuntimeWip": {
+    "sourceBindingStatus": "UNBOUND_WORKING_TREE",
+    "sourceCommit": null,
+    "sourceTree": null,
+    "observedOutputDirectory": "runtime-product-integration/build/ai-knowledge",
+    "sourceBindingBoundary": "These retained outputs came from an earlier runtime working tree. That checkout changed afterward, and no exact source/tree binding was retained for this run. The files are rejected diagnostics only, not evidence for any current commit or tree.",
+    "estimatedContextTokens": 586895,
+    "baselineEstimatedContextTokens": 569510,
+    "increase": 17385,
+    "threshold": 15000,
+    "trendViolationCount": 1,
+    "retainedSnapshot": "2026-09-13-runtime-wip-rejected-metrics-snapshot.json",
+    "retainedTrend": "2026-09-13-runtime-wip-rejected-trend.json",
+    "retainedCheck": "2026-09-13-runtime-wip-rejected-check.json",
+    "retainedLog": "2026-09-13-runtime-wip-rejected-aiKnowledgeCheck.log",
+    "usedAsBaseline": false
+  },
+  "comparisonBoundary": "The accepted predecessor was measured with its own committed capability selectors, coverage policy and quality settings, which match the baseline-update parent ce8939510 byte for byte. No integration/runtime candidate measurement is used as a baseline or qualified by this data update. The historical 85f6 provenance keeps its original selector-comparison limitations.",
+  "measuredPredecessorInventory": {
+    "classes": 1482,
+    "tests": 881,
+    "docs": 310,
+    "dependencies": 271,
+    "capabilities": 17
+  },
+  "unchangedPolicy": {
+    "maxCognitiveDebt": 21.7,
+    "maxCognitiveDebtIncrease": 10.0,
+    "maxContextTokenIncrease": 15000.0,
+    "maxConceptRadiusIncrease": 3.0,
+    "maxMethodCognitiveComplexity": 65,
+    "maxMethodCyclomaticComplexity": 35,
+    "maxAverageMethodCognitiveComplexity": 4.0,
+    "maxAverageMethodCyclomaticComplexity": 4.0,
+    "methodHotspotPolicySha256": "8e9e8b549bc388f4638ec62de498a240ccb92e83108e848d75e7fcf94a02fbc2",
+    "capabilitySeedSha256": "16d64630109485ca14a5c1566d64084f3b932d7edf52bf70facd4274de0b8d0b",
+    "coveragePolicySha256": "9c1705776a062b5784cd9bad1cdc847878338f1ce32ac1fc66e7769ed98adbed",
+    "consumerConfigurationSha256": "2aaf02538386418eeb3a5de354942514ba697cedd5cd658edf0cd44e2cdbfdd5",
+    "inventoryTokenWeights": {
+      "classes": 260,
+      "tests": 140,
+      "docs": 180,
+      "dependencies": 35,
+      "capabilities": 80
+    },
+    "extractorEstimatorSourceSha256": "7d7bc7cd0220a5424c287c1c019d3bf488c578b81f3a303633cbd85ee13bd700",
+    "assertion": "All thresholds, selectors, verification scripts, hotspot exceptions and the pinned extractor/estimator weights are unchanged by this baseline-only update."
+  },
+  "preservedHistoryFileSha256": {
+    "2026-09-13-main85f6-provenance.json": "ac74514cd9ada9d5209f03a5386203fcb904fd315ef9daffe516d53783588d44",
+    "85f6ce9301-aiKnowledgeCheck.log": "df5c16f3a7b33ff92e5c671079845ecf2a04c42667f51ba4f00f113b5f31330e",
+    "85f6ce9301-check.json": "d4f8affad1f85f4639fcbecaf378f385c407d32ce86a084fa0a257f222dd67ad",
+    "85f6ce9301-metrics-snapshot.json": "d9c1071f10b856f9e909174a0aa5562278958590f27d92a7f02764f5c74155f5",
+    "85f6ce9301-trend.json": "f670f28a368f2a264dcff89a66ddeaae165282f6b94dd40483d4053bb1fc2079",
+    "f19ee628-complexity-baseline.json": "aea907748449180b6b681f5003a435048cc912bed67482f729ca007eb2c2b096",
+    "f2da31bf66-rejected-aiKnowledgeCheck.log": "df02231e0f12035c0e60b7d6204351eadc2280ffeae9491af1c0a50397754ed7",
+    "f2da31bf66-rejected-check.json": "7e77a6fb46bc26a3128d7e2e96613ef2a06156c0d5ee46368e93b5549a38de87",
+    "f2da31bf66-rejected-trend.json": "a80000d436657157db757bf0c1ada27a31fb86fe112b824fdbbe572688a061a9"
+  },
+  "retainedFileSha256": {
+    "2026-09-13-runtime-wip-rejected-aiKnowledgeCheck.log": "7db5bbdc315f958aba1493e4dabb869c4f03388c1a939edcd7e49b16ec3120dd",
+    "2026-09-13-runtime-wip-rejected-check.json": "c0ef60dd1a54cc00152dd6cf09d860b727b7cdde86cd51eab19d390c484fe974",
+    "2026-09-13-runtime-wip-rejected-metrics-snapshot.json": "af349e942550e38b4bcd834407b943bb7d8565ea0ef59f7b1d108b3edbe4951f",
+    "2026-09-13-runtime-wip-rejected-trend.json": "29ba4745802b6b63dcd1bfb443a5f519229ba98df85dbd18d0b9fc8544f969b3",
+    "e673c6c89b-aiKnowledgeCheck.log": "21ab068ada93a4a87829e26414ceda1e72e8a289ba7fc3d00fd936151169653d",
+    "e673c6c89b-check.json": "42eb481961e01b7c1d0700a03c10458e78659c0e9c1ebc1003ec5d81a2e0be43",
+    "e673c6c89b-metrics-snapshot.json": "4e849da270eb40f15934c9a6ad5493aeb3e5c40efc86bedfdeb4c80687af0f24",
+    "e673c6c89b-source-qualification.json": "d9b0fee9243049e5de78e44b978bc62dc2566ae3dfe91280aafd49a6ae74c69e",
+    "e673c6c89b-trend.json": "cb02b23c1b8a858af149332c9e6b9a1f4f6d70db8a9e822a3917a2c7ae5e3bd0"
+  }
+}
