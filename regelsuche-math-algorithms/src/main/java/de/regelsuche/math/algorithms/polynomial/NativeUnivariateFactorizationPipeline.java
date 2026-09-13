@@ -117,15 +117,28 @@ final class NativeUnivariateFactorizationPipeline {
         SparsePolynomial<BigInteger> primitive =
             content.primitivePart();
         if (primitive.isConstant()) {
+            if (request.maxCandidates() < 1) {
+                return failure(
+                    request, policy, adapter,
+                    FactorizationEngine.Outcome.BUDGET_INCONCLUSIVE,
+                    "NATIVE_UNIVARIATE_CANDIDATE_BUDGET_EXHAUSTED",
+                    work.ledger(), certificates);
+            }
+            C unit = adapter.targetUnit(content.scalar());
+            PolynomialWorkLedger ledger = work.ledger();
+            String certificate = NativeEngineEvidence.proposalCertificate(
+                request, policy, adapter.engineId(), unit, List.of(),
+                ledger, certificates);
+            FactorizationEngine.Proposal<C> proposal =
+                new FactorizationEngine.Proposal<>(
+                    unit, List.of(), SparsePolynomial.one(request.source().ring()),
+                    certificate);
             return result(
-                request,
-                policy,
-                adapter,
-                FactorizationEngine.Outcome.NO_CANDIDATE,
-                "NATIVE_UNIVARIATE_CONSTANT_UNIT_ONLY",
-                work.ledger(),
-                List.of(),
-                FactorizationEngine.BackendClaim.NONE,
+                request, policy, adapter,
+                FactorizationEngine.Outcome.CANDIDATES,
+                "NATIVE_UNIVARIATE_CONSTANT_CONTENT_PROPOSAL",
+                ledger, List.of(proposal),
+                FactorizationEngine.BackendClaim.COMPLETE_FACTORIZATION,
                 certificates);
         }
 
@@ -363,7 +376,7 @@ final class NativeUnivariateFactorizationPipeline {
         PolynomialWorkBudget work
     ) {
         long remaining = request.maxWorkUnits()
-            - work.ledger().totalWorkUnits();
+            - work.totalWorkUnits();
         if (remaining < 1) {
             throw new PolynomialWorkBudget.LimitReached();
         }

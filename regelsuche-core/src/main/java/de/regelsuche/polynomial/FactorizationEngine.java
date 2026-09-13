@@ -36,7 +36,15 @@ public interface FactorizationEngine<C> {
         IRREDUCIBLE
     }
 
-    /** Canonical but not yet trusted exact decomposition proposal. */
+    /**
+     * Canonical but not yet trusted exact decomposition proposal.
+     *
+     * <p>A nonzero scalar content with no nonconstant factors is a valid
+     * decomposition over Z[x] or Q[x] only with remainder one. The verifier
+     * must still reconstruct the exact source; emptiness never certifies a
+     * nonconstant input. Integer scalar content is not an integer primality
+     * claim. Other coefficient domains retain the nonempty contract.</p>
+     */
     record Proposal<C>(
         C unit,
         List<PolynomialFactor<C>> factors,
@@ -63,9 +71,12 @@ public interface FactorizationEngine<C> {
             factors = canonicalFactors(
                 ring,
                 Objects.requireNonNull(factors, "factors"));
-            if (factors.isEmpty()) {
+            if (factors.isEmpty()
+                    && (!unresolvedRemainder.isOne()
+                        || ring.coefficientDomain() != BigIntegerDomain.INSTANCE
+                            && ring.coefficientDomain() != ExactRationalField.INSTANCE)) {
                 throw new IllegalArgumentException(
-                    "factorization proposal requires at least one factor");
+                    "empty factorization requires Z/Q scalar content and remainder one");
             }
         }
 

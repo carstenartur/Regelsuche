@@ -408,7 +408,7 @@ public final class SuitablePrimeSelection {
     }
 
     private static long total(PolynomialWorkBudget work) {
-        return work.ledger().totalWorkUnits();
+        return work.totalWorkUnits();
     }
 
     private static SuitablePrimeSelectionResult failure(

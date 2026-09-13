@@ -304,6 +304,36 @@ class NativeUnivariateFactorizationEngineTest {
             == FactorizationEngine.BackendClaim.IRREDUCIBLE);
     }
 
+    @Test
+    void runningTotalRetainsEveryStageAndBudgetBoundary() {
+        NativeFactorizationContractChecks.runningTotalRetainsEveryStageAndBudgetBoundary();
+    }
+
+    @Test
+    void rationalConstantsHaveVerifiedEmptyFactorizations() {
+        NativeFactorizationContractChecks.rationalConstantsHaveVerifiedEmptyFactorizations();
+    }
+
+    @Test
+    void integerConstantsRetainContentRatherThanClaimIntegerPrimality() {
+        NativeFactorizationContractChecks.integerConstantsRetainContentRatherThanClaimIntegerPrimality();
+    }
+
+    @Test
+    void unitOnlyProposalsRemainFailClosed() {
+        NativeFactorizationContractChecks.unitOnlyProposalsRemainFailClosed();
+    }
+
+    @Test
+    void constantBudgetsCannotBeBypassed() {
+        NativeFactorizationContractChecks.constantBudgetsCannotBeBypassed();
+    }
+
+    @Test
+    void explicitDegreeBudgetEnablesTheExistingAlgorithm() {
+        NativeFactorizationContractChecks.explicitDegreeBudgetEnablesTheExistingAlgorithm();
+    }
+
     private SparsePolynomial<BigInteger> integer(
         long... coefficients
     ) {
