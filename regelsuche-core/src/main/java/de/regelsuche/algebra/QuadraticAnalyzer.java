@@ -5,6 +5,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class QuadraticAnalyzer {
+    // Consume identifiers as whole tokens before looking for coefficient shorthand.
+    // A digit followed by a letter inside x2y or a scoped UUID is not a product.
+    private static final Pattern IMPLICIT_COEFFICIENT =
+        Pattern.compile("[a-zA-Z_][a-zA-Z0-9_]*|([0-9]+)(?=[a-zA-Z])");
     private static final Pattern SQUARE = Pattern.compile("^([a-zA-Z][a-zA-Z0-9_]*)\\^2$");
     private static final Pattern COEFFICIENT_SQUARE = Pattern.compile("^([+-]?\\d+)\\*([a-zA-Z][a-zA-Z0-9_]*)\\^2$");
     private static final Pattern LINEAR = Pattern.compile("^([+-]?\\d+)\\*([a-zA-Z][a-zA-Z0-9_]*)$");
@@ -132,10 +136,11 @@ public final class QuadraticAnalyzer {
     }
 
     public static String canonicalInput(String expression) {
-        return expression.replaceAll("\\s+", "")
+        String compact = expression.replaceAll("\\s+", "")
             .replace("**", "^")
-            .replace(")(", ")*(")
-            .replaceAll("(?<=[0-9])(?=[a-zA-Z])", "*")
+            .replace(")(", ")*(");
+        return IMPLICIT_COEFFICIENT.matcher(compact)
+            .replaceAll(match -> match.group(1) == null ? match.group() : match.group() + "*")
             .replaceAll("(?<=[a-zA-Z0-9_])(?=\\()", "*");
     }
 

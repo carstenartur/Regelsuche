@@ -8,6 +8,7 @@ import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.scoring.ExpressionScore;
+import de.regelsuche.scoring.ExpressionScorer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -162,14 +163,14 @@ public enum StructuralCostModel implements CostModel {
 
     /**
      * Sums or products with three or more operands whose canonical strings
-     * have nearly equal lengths get a small bonus. This is a textual
+     * have nearly equal identity-independent lengths get a small bonus. This is a textual
      * uniformity heuristic, not a polynomial coefficient symmetry test.
      */
     private static int commutativeBonus(List<String> operands) {
         if (operands.size() < 3) {
             return 0;
         }
-        List<Integer> lengths = operands.stream().map(String::length).toList();
+        List<Integer> lengths = operands.stream().map(ExpressionScorer::identityIndependentLength).toList();
         int min = Collections.min(lengths);
         int max = Collections.max(lengths);
         if (max - min <= 1) {
