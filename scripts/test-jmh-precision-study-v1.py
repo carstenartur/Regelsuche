@@ -241,11 +241,12 @@ class ProcessControls(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             log = Path(directory) / "timeout.log"
             receipt = process.execute([sys.executable, "-c",
-                                       "import time; print('before timeout', flush=True); time.sleep(10)"],
+                                       "import time; time.sleep(10)"],
                                       ROOT, log, .1)
             self.assertEqual("TIMEOUT", receipt["status"])
             self.assertLess(receipt["elapsedSeconds"], 3)
-            self.assertIn("before timeout", log.read_text())
+            # The whole-command budget may expire during interpreter startup.
+            # Completed stdout/stderr retention is checked by the nonzero case.
             self.assertIn("TIMEOUT", log.read_text())
 
     def test_reusing_a_process_log_is_rejected(self):
@@ -300,20 +301,50 @@ class ProcessControls(unittest.TestCase):
             self.assertIn("detached failure", log.read_text())
 
     def test_timeout_reaps_a_detached_term_ignoring_descendant(self):
-        process = self.process_module()
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)
             marker, pidfile, log = base / "writes", base / "child.pid", base / "detached.log"
-            child = ("import os,signal,time; from pathlib import Path; "
+            ready, receipt_file = base / "ready", base / "receipt.json"
+            # Deliberately start slower than the cleanup window. The child must
+            # install SIGTERM-ignore and acknowledge a flushed write first.
+            child = ("import os,signal,time; from pathlib import Path; time.sleep(.4); "
                      "signal.signal(signal.SIGTERM,signal.SIG_IGN); "
                      f"Path({str(pidfile)!r}).write_text(str(os.getpid())); "
                      f"stream=Path({str(marker)!r}).open('a'); "
+                     "stream.write('x'); stream.flush(); "
+                     f"Path({str(ready)!r}).write_text('ready'); "
                      "exec(\"while True:\\n stream.write('x'); stream.flush(); time.sleep(.03)\")")
             parent = ("import subprocess,sys,time; subprocess.Popen([sys.executable,'-c'," + repr(child) +
                       "],start_new_session=True); time.sleep(10)")
+            # A private test driver owns the real supervisor's process tree.
+            # Only this fixture supplies a readiness-relative deadline; the
+            # production execute() and supervisor remain byte-for-byte unchanged.
+            driver = f'''
+import json, sys, time
+from pathlib import Path
+sys.path.insert(0, {str(ROOT / 'scripts')!r})
+from jmh_precision_study_supervisor_v1 import supervise
+class ReadyRequest(dict):
+    def __getitem__(self, key):
+        if key == "deadline" and key not in self:
+            startup_deadline = time.monotonic() + 5
+            while not Path({str(ready)!r}).is_file():
+                if time.monotonic() >= startup_deadline:
+                    raise RuntimeError("child did not acknowledge its first flushed write")
+                time.sleep(.01)
+            self[key] = time.monotonic() + .2
+        return super().__getitem__(key)
+receipt = supervise(ReadyRequest(command={[sys.executable, '-c', parent]!r}, root={str(ROOT)!r}))
+Path({str(receipt_file)!r}).write_text(json.dumps(receipt))
+'''
             try:
-                receipt = process.execute([sys.executable, "-c", parent], ROOT, log, .2)
+                with log.open("xb") as stream:
+                    subprocess.run([sys.executable, "-B", "-c", driver], cwd=ROOT, stdout=stream,
+                                   stderr=subprocess.STDOUT, check=True, timeout=8)
+                receipt = json.loads(receipt_file.read_text())
+                self.assertTrue(ready.is_file(), "child never acknowledged its first flushed write")
                 retained = marker.read_bytes()
+                self.assertTrue(retained, "child must have written before the timeout window")
                 time.sleep(.2)
                 self.assertEqual(retained, marker.read_bytes(), "detached child survived the timeout receipt")
                 self.assertEqual("TIMEOUT", receipt["status"])
