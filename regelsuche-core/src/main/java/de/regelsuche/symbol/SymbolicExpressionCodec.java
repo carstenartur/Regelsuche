@@ -57,8 +57,10 @@ public final class SymbolicExpressionCodec {
             requireFields(root, Set.of("schema", "source", "bindings", "displayNames"));
             if (!SCHEMA.equals(text(root, "schema"))) throw new IllegalArgumentException("unsupported symbolic document schema");
             return SymbolicExpression.fromBindings(text(root, "source"), bindings(root.get("bindings")), labels(root.get("displayNames")));
-        } catch (JsonProcessingException | CharacterCodingException exception) {
+        } catch (CharacterCodingException exception) {
             throw new IllegalArgumentException("invalid UTF-8 symbolic JSON document", exception);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalArgumentException("invalid symbolic JSON document", exception);
         }
     }
 
