@@ -120,9 +120,9 @@ class PluginCheckpointPostgresTest {
     @Test void serverRejectsIdReuseAndDirectSqlTrustRegressionWithoutDependingOnJavaValidation() throws Exception {
         var op = operation("one", AcceptedState.empty(), 1);
         assertEquals(Outcome.COMMITTED, authority.submit(op).outcome());
-        var conflicting = operation("one", op.update(), 2);
-        assertThrows(SecurityException.class, () -> authority.submit(conflicting));
         var second = operation("two", op.update(), 2);
+        var conflicting = new Operation(scope, op.operationId(), second.intentHash(), second.expected(), second.update());
+        assertThrows(SecurityException.class, () -> authority.submit(conflicting));
         assertEquals(Outcome.COMMITTED, authority.submit(second).outcome());
         // Replace the complete checkpoint, including its valid native content hash, to isolate monotonicity.
         var proposed = operation("three", second.update(), 3);

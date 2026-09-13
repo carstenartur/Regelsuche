@@ -1,0 +1,24 @@
+{
+  "source": "5536e4cfbee560ce4e8290ec1d8697688c24a166",
+  "tree": "96b45c2525b3054f3b03cfecd7cc56a9ed673913",
+  "fullGate": "FAILED",
+  "baselineModified": false,
+  "currentTokens": 620050.0,
+  "actualAcceptedBaseline": 595135.0,
+  "violations": [
+    {
+      "metric": "estimatedContextTokens",
+      "increase": 24915.0,
+      "threshold": 15000.0,
+      "message": "Estimated context size increased beyond the configured threshold."
+    }
+  ],
+  "files": {
+    "trend.json": "00c27853ca5458c756b2cceae50ec42041a9d58b46c1cb86f71a254abd5be9f8",
+    "combined-current-learning-ai.log": "eb5a1ba9a678fc3c86e7849a340aee1e3fad7259ac3212f53297530b18aafcf6",
+    "complexity-baseline.json": "3d2b0f4ef3816c2a7b72faae36f8f266426a33d7a9b9f266f85dda7aa2cce885",
+    "complexity.json": "661a5f97e29eec67e3ae906c2765392f3f7d26c99f2fcdb61642c383904b8e82",
+    "metrics-snapshot.json": "43717c6d3af920839fb989f01e304266b16e5209df1fc9cb25cd6ad5ba67eb62"
+  },
+  "boundary": "This rejected candidate measurement is not a baseline. Recheck against a fresh independently measured accepted main only after PR1003 passes required CI and merges."
+}

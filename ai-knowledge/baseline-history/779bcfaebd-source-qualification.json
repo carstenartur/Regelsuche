@@ -1,0 +1,175 @@
+{
+  "schema": "regelsuche.ai-knowledge-source-qualification/v1",
+  "repository": "carstenartur/Regelsuche",
+  "independentlyRecheckedAtUtc": "2026-09-13T11:32:00.652Z",
+  "pullRequest": {
+    "number": 1003,
+    "url": "https://github.com/carstenartur/Regelsuche/pull/1003",
+    "state": "closed",
+    "merged": true,
+    "merged_at": "2026-09-13T11:29:43Z",
+    "head_sha": "d80fdf474e01c78089b84c4f0c275db5c980bf0c",
+    "merge_commit_sha": "779bcfaebd7eaa0656202169953f69392e3586b0"
+  },
+  "workflowRun": {
+    "id": 34752823179,
+    "run_number": 5604,
+    "head_sha": "d80fdf474e01c78089b84c4f0c275db5c980bf0c",
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/carstenartur/Regelsuche/actions/runs/34752823179",
+    "run_attempt": 1
+  },
+  "jobs": [
+    {
+      "id": 103712117904,
+      "name": "Checkout-local Gradle authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 34752823179
+    },
+    {
+      "id": 103712117998,
+      "name": "Isolated JMH authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 34752823179
+    },
+    {
+      "id": 103712118004,
+      "name": "External polynomial comparison",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 34752823179
+    },
+    {
+      "id": 103712118006,
+      "name": "Complete Maven product and Docker authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 34752823179
+    },
+    {
+      "id": 103712118007,
+      "name": "Isolated SymPy runtime authority",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 34752823179
+    },
+    {
+      "id": 103712118325,
+      "name": "JMH precision study v2 replica ${{ matrix.replicate }}",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 34752823179
+    },
+    {
+      "id": 103712118596,
+      "name": "JMH precision study replica ${{ matrix.replicate }}",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 34752823179
+    },
+    {
+      "id": 103712118789,
+      "name": "Retained JMH precision study analysis",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 34752823179
+    },
+    {
+      "id": 103712118811,
+      "name": "Retained JMH precision study v2 analysis",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 34752823179
+    },
+    {
+      "id": 103716522525,
+      "name": "Checkout-local ciCheck",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 34752823179
+    },
+    {
+      "id": 103716560522,
+      "name": "Publish generated reports",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 34752823179
+    }
+  ],
+  "repositoryVerificationArtifact": {
+    "archive_download_url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10317070497/zip",
+    "created_at": "2026-09-13T11:28:11Z",
+    "digest": "sha256:01470295f48810724517163bd3dc21f820651f7fa7858adf33c560b2a643a908",
+    "expired": false,
+    "expires_at": "2026-12-12T10:48:53Z",
+    "id": 10317070497,
+    "name": "repository-verification",
+    "size_in_bytes": 388866457,
+    "updated_at": "2026-09-13T11:28:11Z",
+    "url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10317070497",
+    "workflow_run": {
+      "head_branch": "codex/integrate-reviewed-program-workspaces",
+      "head_repository_id": 1243764016,
+      "head_sha": "d80fdf474e01c78089b84c4f0c275db5c980bf0c",
+      "id": 34752823179,
+      "repository_id": 1243764016
+    }
+  },
+  "acceptanceEvidenceArtifact": {
+    "archive_download_url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10316069127/zip",
+    "created_at": "2026-09-13T11:28:32Z",
+    "digest": "sha256:9b64fc934c1059ad0cee49ec7bc45181259dcb5e70b188dbb00cd73793879d0e",
+    "expired": false,
+    "expires_at": "2026-12-12T10:48:53Z",
+    "id": 10316069127,
+    "name": "quality-acceptance-evidence",
+    "size_in_bytes": 29160855,
+    "updated_at": "2026-09-13T11:28:32Z",
+    "url": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10316069127",
+    "workflow_run": {
+      "head_branch": "codex/integrate-reviewed-program-workspaces",
+      "head_repository_id": 1243764016,
+      "head_sha": "d80fdf474e01c78089b84c4f0c275db5c980bf0c",
+      "id": 34752823179,
+      "repository_id": 1243764016
+    }
+  },
+  "qualityAcceptanceEvidence": "COMPLETE",
+  "coverageStatus": "PASSED",
+  "safeReproductionHash": "sha256:07f08f2a1e4a0d711add0c9274f690c32c5f315597a206bf1ef802d70bccc821",
+  "codeScanningChecks": [
+    {
+      "id": 103712183009,
+      "name": "CodeQL",
+      "conclusion": "success"
+    },
+    {
+      "id": 103712117150,
+      "name": "Analyze (python)",
+      "conclusion": "success"
+    },
+    {
+      "id": 103712117133,
+      "name": "Analyze (javascript-typescript)",
+      "conclusion": "success"
+    },
+    {
+      "id": 103712117087,
+      "name": "Analyze (java-kotlin)",
+      "conclusion": "success"
+    },
+    {
+      "id": 103712117017,
+      "name": "Analyze (actions)",
+      "conclusion": "success"
+    }
+  ],
+  "localGitTreeEquality": {
+    "779bcfaebd7eaa0656202169953f69392e3586b0": "c6af6da4f1050bfceed96ecb7a967bc25e914ea6",
+    "d80fdf474e01c78089b84c4f0c275db5c980bf0c": "c6af6da4f1050bfceed96ecb7a967bc25e914ea6"
+  },
+  "evidenceBoundary": "Fresh API reads confirmed merged PR1003 and main; all six required jobs and all four actual CodeQL analyses plus overall CodeQL succeeded on d80. Actual decoded Gradle and collector logs report SAFE VERIFIED, cross-authority coverage PASSED, and qualityAcceptanceEvidence=COMPLETE with --require-complete. The CI collector checked matching transferred artifact digests; no local ZIP download or hash is claimed. Local checkout tree equality must also pass before separate fresh accepted-main measurement; no candidate supplies baseline metrics."
+}
