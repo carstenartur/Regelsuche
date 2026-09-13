@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginCheckpointAuthority.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginCheckpointAuthority.java</span></div><h1>PluginCheckpointAuthority.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import de.regelsuche.plugin.PluginTrustStoreRevisionVerifier.ChainCheckpoint;
+import java.io.IOException;
+
+/**
+ * Operator-provided authority OUTSIDE the rollback boundary of the package files.
+ * There is deliberately no filesystem or in-memory production implementation.
+ *
+ * &lt;p&gt;Implementations must durably and linearly compare-and-set the entire pair,
+ * never restore an older accepted value, authenticate their caller and scope the
+ * value to this installation and trust domain. A false result or exception MUST
+ * mean this call did not commit; a provider must reconcile ambiguous network
+ * outcomes before returning. Read failure must throw, never return genesis.
+ * Provider deadlines and administrative recovery are the operator's responsibility.
+ * These guarantees cannot be inferred or verified from an ordinary local file.&lt;/p&gt;
+ */
+public interface PluginCheckpointAuthority {
+    AcceptedState read() throws IOException;
+
+    boolean compareAndSet(AcceptedState expected, AcceptedState update) throws IOException;
+
+    /** The generation hash authenticates all local evidence, metadata and package bytes. */
+    record AcceptedState(String installationHash, ChainCheckpoint checkpoint) {
+<span class="fc" id="L25">        public AcceptedState {</span>
+<span class="pc bpc" id="L26" title="2 of 6 branches missed.">            if (installationHash == null || (installationHash.isEmpty() != (checkpoint == null))) {</span>
+<span class="nc" id="L27">                throw new IllegalArgumentException(&quot;genesis requires both an empty generation and no checkpoint&quot;);</span>
+            }
+<span class="fc bfc" id="L29" title="All 2 branches covered.">            if (!installationHash.isEmpty()) {</span>
+<span class="fc" id="L30">                PluginSignatureManifest.requireSha256(installationHash, &quot;installationHash&quot;);</span>
+            }
+<span class="fc" id="L32">        }</span>
+
+        public static AcceptedState empty() {
+<span class="fc" id="L35">            return new AcceptedState(&quot;&quot;, null);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

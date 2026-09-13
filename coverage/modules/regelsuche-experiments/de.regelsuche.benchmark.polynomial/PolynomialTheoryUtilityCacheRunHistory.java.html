@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityCacheRunHistory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityCacheRunHistory.java</span></div><h1>PolynomialTheoryUtilityCacheRunHistory.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/** Empty-at-start cache lineage validation across the measured rows of one run. */
+public final class PolynomialTheoryUtilityCacheRunHistory {
+    private final String runId;
+<span class="fc" id="L12">    private final LinkedHashMap&lt;String, Lineage&gt; entries = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L13">    private final Set&lt;String&gt; inputs = new HashSet&lt;&gt;();</span>
+
+<span class="fc" id="L15">    public PolynomialTheoryUtilityCacheRunHistory(String runId) {</span>
+<span class="fc" id="L16">        this.runId = Objects.requireNonNull(runId, &quot;runId&quot;);</span>
+<span class="fc" id="L17">    }</span>
+
+    /** Validates a complete measured row before advancing the retained prefix. */
+    public void accept(PolynomialTheoryUtilityMeasuredCandidate measured) {
+<span class="fc" id="L21">        Objects.requireNonNull(measured, &quot;measured&quot;);</span>
+<span class="fc" id="L22">        var result = measured.result();</span>
+<span class="pc bpc" id="L23" title="2 of 4 branches missed.">        if (!runId.equals(result.input().runId()) || !PolynomialTheoryUtilityDerivedCacheAdapter.PROFILE_ID.equals(result.input().profileId())</span>
+<span class="pc bpc" id="L24" title="2 of 4 branches missed.">                || result.observations() == null || inputs.contains(result.input().inputId())) {</span>
+<span class="nc" id="L25">            throw new IllegalArgumentException(&quot;cache history received another run, revision or duplicate row&quot;);</span>
+        }
+<span class="fc" id="L27">        var proposed = new LinkedHashMap&lt;&gt;(entries);</span>
+<span class="fc" id="L28">        var events = measured.measurements().cacheEvents();</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        for (var occurrence : result.observations().occurrences()) {</span>
+<span class="fc" id="L30">            applyOccurrence(measured, occurrence, events, proposed);</span>
+<span class="fc" id="L31">        }</span>
+<span class="fc" id="L32">        entries.clear();</span>
+<span class="fc" id="L33">        entries.putAll(proposed);</span>
+<span class="fc" id="L34">        inputs.add(result.input().inputId());</span>
+<span class="fc" id="L35">    }</span>
+
+    private static void applyOccurrence(PolynomialTheoryUtilityMeasuredCandidate measured,
+            PolynomialTheoryUtilityExecutionObservations.Occurrence occurrence,
+            List&lt;PolynomialTheoryUtilityCacheEvent&gt; events, LinkedHashMap&lt;String, Lineage&gt; proposed) {
+<span class="fc" id="L40">        var own = events.stream().filter(event -&gt; occurrence.cacheEventIds().contains(event.eventId())).toList();</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        if (own.isEmpty()) return;</span>
+<span class="fc" id="L42">        var lookup = own.getFirst();</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (lookup.kind() == PolynomialTheoryUtilityCacheEvent.Kind.LOOKUP_HIT) {</span>
+<span class="nc" id="L44">            validateReplay(measured, occurrence, lookup, proposed);</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        } else if (own.size() &gt; 1) {</span>
+<span class="nc" id="L46">            retainInsertion(measured, occurrence, own, proposed);</span>
+        }
+<span class="fc" id="L48">    }</span>
+
+    private static void validateReplay(PolynomialTheoryUtilityMeasuredCandidate measured,
+            PolynomialTheoryUtilityExecutionObservations.Occurrence occurrence,
+            PolynomialTheoryUtilityCacheEvent lookup, LinkedHashMap&lt;String, Lineage&gt; proposed) {
+<span class="fc" id="L53">        var original = proposed.get(lookup.entryId());</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (original == null) throw new IllegalArgumentException(&quot;cache hit lacks an earlier insertion in this run&quot;);</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        if (!occurrence.transitionId().equals(&quot;NONE&quot;)</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">                &amp;&amp; !original.equals(lineage(measured, occurrence.transitionId()))) {</span>
+<span class="nc" id="L57">            throw new IllegalArgumentException(&quot;cache replay differs from its retained primitive derivation&quot;);</span>
+        }
+<span class="nc" id="L59">    }</span>
+
+    private static void retainInsertion(PolynomialTheoryUtilityMeasuredCandidate measured,
+            PolynomialTheoryUtilityExecutionObservations.Occurrence occurrence,
+            List&lt;PolynomialTheoryUtilityCacheEvent&gt; own, LinkedHashMap&lt;String, Lineage&gt; proposed) {
+<span class="nc" id="L64">        var insertion = own.get(1);</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (insertion.kind() != PolynomialTheoryUtilityCacheEvent.Kind.INSERTION</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">                || proposed.containsKey(insertion.entryId())) {</span>
+<span class="nc" id="L67">            throw new IllegalArgumentException(&quot;cache insertion repeats a retained entry&quot;);</span>
+        }
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        if (proposed.size() == PolynomialTheoryUtilityExecutionPlan.CACHE_CAPACITY) {</span>
+<span class="nc" id="L70">            String oldest = proposed.keySet().iterator().next();</span>
+<span class="nc bnc" id="L71" title="All 4 branches missed.">            if (own.size() != 3 || own.get(2).kind() != PolynomialTheoryUtilityCacheEvent.Kind.EVICTION</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">                    || !own.get(2).entryId().equals(oldest)) {</span>
+<span class="nc" id="L73">                throw new IllegalArgumentException(&quot;cache eviction differs from FIFO insertion order&quot;);</span>
+            }
+<span class="nc" id="L75">            proposed.remove(oldest);</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        } else if (own.size() != 2) {</span>
+<span class="nc" id="L77">            throw new IllegalArgumentException(&quot;cache evicted before reaching the frozen capacity&quot;);</span>
+        }
+<span class="nc" id="L79">        proposed.put(insertion.entryId(), lineage(measured, occurrence.transitionId()));</span>
+<span class="nc" id="L80">    }</span>
+
+    private static Lineage lineage(PolynomialTheoryUtilityMeasuredCandidate measured, String transitionId) {
+<span class="nc" id="L83">        var trace = measured.measurements().transitionTraces().stream()</span>
+<span class="nc" id="L84">            .filter(value -&gt; value.transition().transitionId().equals(transitionId)).findFirst().orElseThrow();</span>
+<span class="nc" id="L85">        var transition = trace.transition();</span>
+<span class="nc" id="L86">        return new Lineage(transition.sourceOccurrenceExpression(), transition.transformedOccurrenceExpression(),</span>
+<span class="nc" id="L87">            transition.transformationId(), transition.backendId(), transition.sourceEvidenceHash(),</span>
+<span class="nc" id="L88">            trace.primitiveSteps().stream().map(value -&gt; List.of(value.ruleId(), value.evidenceHash())).toList(),</span>
+<span class="nc" id="L89">            trace.normalizedAssumptions());</span>
+    }
+
+<span class="nc" id="L92">    private record Lineage(String source, String replacement, String transformationId, String backendId,</span>
+            String sourceEvidenceHash, List&lt;List&lt;String&gt;&gt; primitiveSteps, List&lt;String&gt; assumptions) { }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,496 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SafeRuntimeAdapter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.runtime</a> &gt; <span class="el_source">SafeRuntimeAdapter.java</span></div><h1>SafeRuntimeAdapter.java</h1><pre class="source lang-java linenums">package de.regelsuche.runtime;
+
+import de.regelsuche.app.transform.SymPyTransformationEngine;
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.json.JsonReader;
+import de.regelsuche.knowledge.RuleInventoryFingerprint;
+import de.regelsuche.math.algorithms.linalg.MatrixPreparation;
+import de.regelsuche.math.algorithms.linalg.MatrixPreparationJson;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.plugin.PluginAwareAstRewriteTransformationEngine;
+import de.regelsuche.plugin.PluginRuntime;
+import de.regelsuche.plugin.PluginRuntimeConfig;
+import de.regelsuche.search.reachability.ContextualOccurrenceRulePreparationCoordinator;
+import de.regelsuche.search.reachability.OccurrenceAwareSharedRulePreparationCoordinator;
+import de.regelsuche.search.reachability.RulePreparationCoordinator;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.RecordedExecution;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import static de.regelsuche.runtime.RuntimeJson.*;
+
+/**
+ * One opt-in product policy, shared by CLI and Workbench. Imported observations
+ * never supply executors. Replay calls the current trusted inventory again.
+ */
+public final class SafeRuntimeAdapter implements AutoCloseable {
+    public static final String ADAPTER_ID = &quot;regelsuche.safe-product-runtime/v1&quot;;
+    public static final String ARTIFACT_SCHEMA = &quot;regelsuche.safe-runtime-artifact/v1&quot;;
+    public static final String WORK_ID = &quot;regelsuche.safe-product-logical-work/v1&quot;;
+
+    /** Original executor plus trusted authority identity; suitable for authorized programs too. */
+    public record DirectSource(String id, String authorityHash, TransformationEngine engine) {
+<span class="fc" id="L45">        public DirectSource {</span>
+<span class="pc bpc" id="L46" title="4 of 8 branches missed.">            if (id == null || id.isBlank() || authorityHash == null || authorityHash.isBlank()) {</span>
+<span class="nc" id="L47">                throw new IllegalArgumentException(&quot;direct source needs an authority identity&quot;);</span>
+            }
+<span class="fc" id="L49">            Objects.requireNonNull(engine, &quot;engine&quot;);</span>
+<span class="fc" id="L50">        }</span>
+    }
+
+    private final List&lt;RewriteRule&gt; rules;
+    private final List&lt;DirectSource&gt; sources;
+    private final String implementationHash;
+    private final Function&lt;List&lt;RewriteRule&gt;, TransformationEngine&gt; directRules;
+    private final Set&lt;String&gt; contextualRuleIds;
+    private final Runnable release;
+    private final LearnedRuntimeAuthority learnedAuthority;
+
+    /** Trusted in-process seam. Public request JSON has no corresponding executor constructor. */
+    public SafeRuntimeAdapter(List&lt;? extends RewriteRule&gt; rules, List&lt;DirectSource&gt; sources, String implementationHash) {
+<span class="fc" id="L63">        this(rules, sources, implementationHash, null);</span>
+<span class="fc" id="L64">    }</span>
+
+    public SafeRuntimeAdapter(List&lt;? extends RewriteRule&gt; rules, List&lt;DirectSource&gt; sources, String implementationHash,
+            LearnedRuntimeAuthority learnedAuthority) {
+<span class="pc" id="L68">        this(rules, sources, implementationHash, selected -&gt; new AstRewriteTransformationEngine(selected), Set.of(), () -&gt; { }, learnedAuthority);</span>
+<span class="fc" id="L69">    }</span>
+
+    private SafeRuntimeAdapter(List&lt;? extends RewriteRule&gt; rules, List&lt;DirectSource&gt; sources, String implementationHash,
+            Function&lt;List&lt;RewriteRule&gt;, TransformationEngine&gt; directRules, Set&lt;String&gt; contextualRuleIds,
+<span class="fc" id="L73">            Runnable release, LearnedRuntimeAuthority learnedAuthority) {</span>
+<span class="fc" id="L74">        this.rules = List.copyOf(rules);</span>
+<span class="fc" id="L75">        this.sources = List.copyOf(sources);</span>
+<span class="fc" id="L76">        RewriteApplicabilitySchema.coverage(this.rules); // includes duplicate-ID rejection</span>
+<span class="fc" id="L77">        var identifiers = new java.util.HashSet&lt;&gt;(this.rules.stream().map(RewriteRule::id).toList());</span>
+<span class="pc bpc" id="L78" title="1 of 4 branches missed.">        for (var source : sources) if (!identifiers.add(source.id())) throw new IllegalArgumentException(&quot;duplicate runtime source: &quot; + source.id());</span>
+<span class="pc bpc" id="L79" title="2 of 4 branches missed.">        if (implementationHash == null || !implementationHash.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L80">            throw new IllegalArgumentException(&quot;runtime implementation fingerprint is required&quot;);</span>
+        }
+<span class="fc" id="L82">        this.implementationHash = implementationHash;</span>
+<span class="fc" id="L83">        this.directRules = directRules;</span>
+<span class="fc" id="L84">        this.contextualRuleIds = Set.copyOf(contextualRuleIds);</span>
+<span class="fc" id="L85">        this.release = release;</span>
+<span class="fc" id="L86">        this.learnedAuthority = learnedAuthority;</span>
+<span class="fc" id="L87">    }</span>
+
+    public static SafeRuntimeAdapter open(PluginRuntimeConfig config) {
+<span class="fc" id="L90">        var runtime = new PluginRuntime(config);</span>
+        try {
+<span class="fc" id="L92">            var byId = new java.util.LinkedHashMap&lt;String, RewriteRule&gt;();</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            for (var rule : runtime.createTransformationEngine().rules()) {</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">                if (byId.put(rule.id(), rule) != null) throw new IllegalArgumentException(&quot;duplicate plugin/runtime rule: &quot; + rule.id());</span>
+<span class="fc" id="L95">            }</span>
+<span class="fc" id="L96">            var domains = new de.regelsuche.rules.RuleDomainRegistry();</span>
+<span class="fc bfc" id="L97" title="All 4 branches covered.">            for (var domain : domains.all()) for (var rule : domain.rules()) {</span>
+<span class="fc" id="L98">                var prior = byId.putIfAbsent(rule.id(), rule);</span>
+<span class="pc bpc" id="L99" title="1 of 4 branches missed.">                if (prior != null &amp;&amp; !RuleInventoryFingerprint.ruleContentHash(prior).equals(RuleInventoryFingerprint.ruleContentHash(rule))) {</span>
+<span class="nc" id="L100">                    throw new IllegalArgumentException(&quot;conflicting first-party/plugin rule: &quot; + rule.id());</span>
+                }
+<span class="fc" id="L102">            }</span>
+<span class="fc" id="L103">            var rules = List.copyOf(byId.values());</span>
+            // Plugin contributions execute with visitor state. An applicability schema
+            // alone does not authorize replacing that engine with a context-free one.
+<span class="fc" id="L106">            var contextualRuleIds = new java.util.HashSet&lt;String&gt;();</span>
+<span class="fc" id="L107">            runtime.ruleRegistry().enabledRules().forEach(rule -&gt; contextualRuleIds.add(rule.id()));</span>
+<span class="fc" id="L108">            runtime.transformationRegistry().enabledTransformations().forEach(rule -&gt; contextualRuleIds.add(rule.id()));</span>
+<span class="fc" id="L109">            runtime.macroTransformations().forEach(rule -&gt; contextualRuleIds.add(rule.id()));</span>
+<span class="fc" id="L110">            var code = new ArrayList&lt;Class&lt;?&gt;&gt;();</span>
+<span class="fc" id="L111">            code.addAll(List.of(SafeRuntimeAdapter.class, RewriteRule.class,</span>
+                OccurrenceAwareSharedRulePreparationCoordinator.class, MatrixPreparation.class,
+                de.regelsuche.egraph.EGraph.class, de.regelsuche.evolution.LearnedPatternRuleAuthorizationService.class,
+                de.regelsuche.plugin.PatternTransformation.class));
+<span class="fc" id="L115">            rules.forEach(rule -&gt; code.add(rule.getClass()));</span>
+            // The original direct executor also runs active visitor contributions,
+            // including plugins that contribute no rule classes of their own.
+<span class="fc" id="L118">            runtime.astVisitorRegistry().registrations().stream()</span>
+<span class="fc" id="L119">                .filter(registration -&gt; registration.enabled())</span>
+<span class="fc" id="L120">                .forEach(registration -&gt; code.add(registration.visitor().getClass()));</span>
+<span class="fc" id="L121">            String digest = RuntimeCodeIdentity.fingerprint(code.stream().map(RuntimeCodeIdentity::source).toList());</span>
+<span class="fc" id="L122">            return new SafeRuntimeAdapter(rules, List.of(new DirectSource(&quot;sympy&quot;, digest,</span>
+                new SymPyTransformationEngine()::transformSymPyStrict)), digest,
+<span class="fc" id="L124">                selected -&gt; new PluginAwareAstRewriteTransformationEngine(selected, runtime.astVisitorRegistry())::transformForRuntime,</span>
+<span class="fc" id="L125">                contextualRuleIds, runtime::close, LearnedRuntimeAuthority.fromConfiguredProperty());</span>
+<span class="nc" id="L126">        } catch (RuntimeException | LinkageError exception) {</span>
+<span class="nc" id="L127">            runtime.close();</span>
+<span class="nc" id="L128">            throw exception;</span>
+        }
+    }
+
+<span class="fc" id="L132">    public String analyze(Map&lt;String, ?&gt; request) { return analyze(SafeRuntimeRequest.read(request)); }</span>
+
+    public String analyze(SafeRuntimeRequest request) {
+<span class="fc" id="L135">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        var learned = learnedAuthority == null ? null : learnedAuthority.load();</span>
+<span class="fc" id="L137">        var rules = new ArrayList&lt;&gt;(this.rules);</span>
+<span class="fc" id="L138">        var sources = new ArrayList&lt;&gt;(this.sources);</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (learned != null) { rules.addAll(learned.rules()); sources.addAll(learned.sources()); }</span>
+<span class="fc" id="L140">        RewriteApplicabilitySchema.coverage(rules);</span>
+<span class="fc" id="L141">        var allIds = new java.util.HashSet&lt;&gt;(rules.stream().map(RewriteRule::id).toList());</span>
+<span class="pc bpc" id="L142" title="1 of 4 branches missed.">        for (var source : sources) if (!allIds.add(source.id())) throw new IllegalArgumentException(&quot;duplicate runtime source: &quot; + source.id());</span>
+<span class="fc" id="L143">        List&lt;String&gt; known = new ArrayList&lt;&gt;(rules.stream().map(RewriteRule::id).toList());</span>
+<span class="fc" id="L144">        known.addAll(sources.stream().map(DirectSource::id).toList());</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (!known.containsAll(request.ruleIds())) throw new IllegalArgumentException(&quot;unknown rule/source in runtime selection&quot;);</span>
+<span class="fc" id="L146">        List&lt;RewriteRule&gt; selected = rules.stream().filter(rule -&gt; selected(request, rule.id())).toList();</span>
+<span class="fc" id="L147">        var coverage = RewriteApplicabilitySchema.coverage(selected);</span>
+<span class="fc" id="L148">        var admitted = coverage.stream().filter(this::runtimePreparationEligible)</span>
+<span class="fc" id="L149">            .map(RewriteApplicabilitySchema.CoverageEntry::schema).toList();</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (!admitted.stream().map(RewriteApplicabilitySchema::ruleId).toList().containsAll(request.preparationRuleIds())) {</span>
+<span class="fc" id="L151">            throw new IllegalArgumentException(&quot;preparation rules must be selected and admitted by explicit schema coverage and runtime executor eligibility&quot;);</span>
+        }
+<span class="fc" id="L153">        var support = admitted.stream().filter(schema -&gt; request.preparationRuleIds().contains(schema.ruleId())).toList();</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        var principals = admitted.stream().filter(schema -&gt; !request.preparationRuleIds().contains(schema.ruleId())).toList();</span>
+<span class="fc" id="L155">        var preparationRules = support.stream().map(RewriteApplicabilitySchema::executor).toList();</span>
+<span class="fc" id="L156">        var visible = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        for (var entry : RewriteApplicabilitySchema.coverage(rules)) {</span>
+<span class="fc" id="L158">            visible.add(fields(&quot;id&quot;, entry.rule().id(), &quot;contentHash&quot;, RuleInventoryFingerprint.ruleContentHash(entry.rule()),</span>
+<span class="fc" id="L159">                &quot;selected&quot;, selected(request, entry.rule().id()), &quot;coverage&quot;, entry.status().name(),</span>
+<span class="fc" id="L160">                &quot;preparationSupport&quot;, request.preparationRuleIds().contains(entry.rule().id()),</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">                &quot;schemaHash&quot;, entry.schema() == null ? &quot;&quot; : entry.schema().contentHash(),</span>
+<span class="fc" id="L162">                &quot;exclusionReason&quot;, entry.exclusionReason(), &quot;runtimePreparationEligible&quot;, runtimePreparationEligible(entry),</span>
+<span class="fc" id="L163">                &quot;runtimeExclusionReason&quot;, runtimeExclusionReason(entry)));</span>
+<span class="fc" id="L164">        }</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (var source : sources) visible.add(fields(&quot;id&quot;, source.id(), &quot;contentHash&quot;, source.authorityHash(),</span>
+<span class="fc" id="L166">            &quot;selected&quot;, enabled(request, source), &quot;coverage&quot;, &quot;DIRECT_EXECUTOR_ONLY&quot;, &quot;schemaHash&quot;, &quot;&quot;,</span>
+<span class="fc" id="L167">            &quot;exclusionReason&quot;, &quot;direct source has no admitted preparation schema&quot;, &quot;runtimePreparationEligible&quot;, false,</span>
+            &quot;runtimeExclusionReason&quot;, &quot;DIRECT_EXECUTOR_HAS_NO_SCHEMA&quot;));
+<span class="fc" id="L169">        Map&lt;String, Object&gt; inventory = fields(&quot;visible&quot;, visible, &quot;visibleFingerprint&quot;, hash(canonical(fields(&quot;entries&quot;, visible))),</span>
+<span class="fc" id="L170">            &quot;selectedRuleFingerprint&quot;, RuleInventoryFingerprint.contentHash(selected));</span>
+<span class="fc" id="L171">        var work = new Work(request.maxWorkUnits());</span>
+        // Revalidation has already executed; never erase it when the remaining setup is refused.
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (learned != null) work.setup = learned.setupWorkUnits();</span>
+<span class="fc" id="L174">        var outcomes = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        Map&lt;String, Object&gt; authority = fields(&quot;coordinatorId&quot;, request.profile() == SafeRuntimeRequest.Profile.SAFE_PREPARATION_V4</span>
+<span class="fc" id="L176">                ? ContextualOccurrenceRulePreparationCoordinator.COORDINATOR_ID : OccurrenceAwareSharedRulePreparationCoordinator.COORDINATOR_ID,</span>
+            &quot;occurrenceBindingRevision&quot;, OccurrenceAwareSharedRulePreparationCoordinator.OCCURRENCE_BINDING_REVISION,
+            &quot;occurrenceWorkRevision&quot;, OccurrenceAwareSharedRulePreparationCoordinator.OCCURRENCE_WORK_REVISION);
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        if (learned != null) authority.put(&quot;learnedAuthorization&quot;, learned.identity());</span>
+<span class="fc" id="L180">        long setup = 1L + rules.size() + sources.size() + principals.size() * (1L + preparationRules.size()) + support.size();</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (!work.reserveSetup(setup)) {</span>
+<span class="fc" id="L182">            outcomes.add(outcome(&quot;runtime&quot;, &quot;BUDGET_INCONCLUSIVE&quot;, &quot;SETUP_BUDGET_EXHAUSTED&quot;));</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        } else if (request.representation() != null) {</span>
+<span class="fc" id="L184">            analyzeRepresentation(request, work, outcomes, authority);</span>
+        } else {
+<span class="fc" id="L186">            analyzeExpression(request, work, outcomes, authority, principals, preparationRules, support, coverage, sources);</span>
+        }
+<span class="fc" id="L188">        var evidence = fields(&quot;adapterId&quot;, ADAPTER_ID, &quot;request&quot;, request.observation(), &quot;inventory&quot;, inventory,</span>
+<span class="fc" id="L189">            &quot;implementation&quot;, fields(&quot;revision&quot;, RuntimeCodeIdentity.REVISION, &quot;contentHash&quot;, implementationHash,</span>
+                &quot;authorityRevisionKind&quot;, &quot;RUNTIME_CLASS_SHA256_PREFIX_160&quot;),
+<span class="fc" id="L191">            &quot;authority&quot;, authority, &quot;work&quot;, work.observation(), &quot;outcomes&quot;, outcomes,</span>
+<span class="fc" id="L192">            &quot;status&quot;, status(outcomes), &quot;retainedAssumptions&quot;, request.assumptions().normalizedAssumptions());</span>
+<span class="fc" id="L193">        return RuntimeArtifactLimits.requireReplayable(canonical(fields(&quot;schema&quot;, ARTIFACT_SCHEMA,</span>
+<span class="fc" id="L194">            &quot;contentHash&quot;, hash(canonical(evidence)), &quot;evidence&quot;, evidence)) + &quot;\n&quot;);</span>
+    }
+
+    private void analyzeExpression(SafeRuntimeRequest request, Work work, List&lt;Map&lt;String, Object&gt;&gt; outcomes,
+            Map&lt;String, Object&gt; authority, List&lt;RewriteApplicabilitySchema&gt; principals,
+            List&lt;RewriteRule&gt; preparationRules, List&lt;RewriteApplicabilitySchema&gt; support,
+            List&lt;RewriteApplicabilitySchema.CoverageEntry&gt; coverage, List&lt;DirectSource&gt; sources) {
+<span class="fc" id="L201">        Expr parsedSource = new ExpressionParser().parseTerm(request.source());</span>
+<span class="fc" id="L202">        int nodes = sourceNodeCount(parsedSource);</span>
+<span class="fc" id="L203">        String source = ExpressionFormatter.format(parsedSource);</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        if (nodes &gt; request.preparationBudget().maxExpressionNodes()) {</span>
+<span class="fc" id="L205">            outcomes.add(outcome(&quot;runtime&quot;, &quot;BUDGET_INCONCLUSIVE&quot;, &quot;SOURCE_NODE_BUDGET_EXHAUSTED&quot;));</span>
+<span class="fc" id="L206">            return;</span>
+        }
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        if (!principals.isEmpty()) {</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">            if (request.profile() == SafeRuntimeRequest.Profile.SAFE_PREPARATION_V4) {</span>
+<span class="fc" id="L210">                analyzeSuccessorPrincipals(request, source, principals, preparationRules, work, outcomes, authority);</span>
+            } else {
+<span class="fc" id="L212">                var coordinator = new OccurrenceAwareSharedRulePreparationCoordinator(principals, preparationRules,</span>
+<span class="fc" id="L213">                    implementationHash.substring(7, 47), request.preparationBudget());</span>
+<span class="fc" id="L214">                authority.put(&quot;principalInventoryFingerprint&quot;, coordinator.principalInventoryFingerprint());</span>
+<span class="fc" id="L215">                authority.put(&quot;preparationInventoryFingerprint&quot;, coordinator.preparationInventoryFingerprint());</span>
+<span class="fc" id="L216">                authority.put(&quot;exactRegistryFingerprint&quot;, coordinator.exactRegistryFingerprint());</span>
+<span class="fc" id="L217">                analyzePrincipals(request, source, nodes, coordinator, work, outcomes, authority, false);</span>
+            }
+        }
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (!support.isEmpty()) {</span>
+<span class="fc" id="L221">            var supportAuthority = fields(&quot;role&quot;, &quot;PREPARATION_SUPPORT_DIRECT_EXECUTION&quot;);</span>
+<span class="fc" id="L222">            analyzePrincipals(request, source, nodes, new OccurrenceAwareSharedRulePreparationCoordinator(</span>
+<span class="fc" id="L223">                support, List.of(), implementationHash.substring(7, 47), request.preparationBudget()),</span>
+                work, outcomes, supportAuthority, true);
+<span class="fc" id="L225">            authority.put(&quot;supportDirectEvaluation&quot;, supportAuthority);</span>
+        }
+<span class="fc bfc" id="L227" title="All 4 branches covered.">        for (var entry : coverage) if (!runtimePreparationEligible(entry)) {</span>
+<span class="fc" id="L228">            runDirect(request, source, nodes, entry.rule().id(), directRules.apply(List.of(entry.rule())),</span>
+<span class="fc" id="L229">                runtimeExclusionReason(entry), work, outcomes);</span>
+        }
+<span class="fc bfc" id="L231" title="All 4 branches covered.">        for (var direct : sources) if (enabled(request, direct)) {</span>
+<span class="fc" id="L232">            runDirect(request, source, nodes, direct.id(), direct.engine(), &quot;DIRECT_EXECUTOR_HAS_NO_SCHEMA&quot;, work, outcomes);</span>
+        }
+<span class="fc" id="L234">    }</span>
+
+    public String replay(Map&lt;String, ?&gt; artifact) {
+<span class="fc" id="L237">        RuntimeArtifactLimits.requireReplayable(canonical(artifact) + &quot;\n&quot;);</span>
+<span class="fc" id="L238">        only(artifact, &quot;schema&quot;, &quot;contentHash&quot;, &quot;evidence&quot;);</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        if (!ARTIFACT_SCHEMA.equals(artifact.get(&quot;schema&quot;))) throw new IllegalArgumentException(&quot;unsupported safe runtime artifact schema&quot;);</span>
+<span class="fc" id="L240">        var evidence = object(artifact.get(&quot;evidence&quot;));</span>
+<span class="fc" id="L241">        String actual = analyze(SafeRuntimeRequest.read(object(evidence.get(&quot;request&quot;))));</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        if (!new JsonReader(actual).readObject().equals(artifact)) {</span>
+<span class="fc" id="L243">            throw new IllegalArgumentException(&quot;runtime artifact differs from fresh trusted execution and replay&quot;);</span>
+        }
+<span class="fc" id="L245">        return actual;</span>
+    }
+
+    private void analyzePrincipals(SafeRuntimeRequest request, String source, int nodes,
+            OccurrenceAwareSharedRulePreparationCoordinator coordinator, Work work,
+            List&lt;Map&lt;String, Object&gt;&gt; outcomes, Map&lt;String, Object&gt; authority, boolean forceDirect) {
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        if (!work.canSpend(1)) { outcomes.add(outcome(&quot;runtime&quot;, &quot;BUDGET_INCONCLUSIVE&quot;, &quot;ANALYSIS_BUDGET_EXHAUSTED&quot;)); return; }</span>
+<span class="fc bfc" id="L252" title="All 4 branches covered.">        boolean direct = forceDirect || request.profile() == SafeRuntimeRequest.Profile.DIRECT_V1;</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">        var evaluation = direct ? coordinator.analyzeDirect(source, request.assumptions()) : coordinator.analyze(source, request.assumptions());</span>
+<span class="fc" id="L254">        long analyzed = analysisUnits(evaluation);</span>
+<span class="fc" id="L255">        work.analysis = Math.addExact(work.analysis, analyzed);</span>
+<span class="fc" id="L256">        retainV3Work(evaluation, authority);</span>
+        // Independent primitive replay traverses each direct rule over the full source.
+        // Reserve all possible match/apply/assumption calls, including no-op calls.
+<span class="fc" id="L259">        long replayReservation = evaluation.outcomes().stream().filter(RulePreparationCoordinator.Outcome::direct).count() * (1L + 3L * nodes);</span>
+<span class="fc" id="L260">        long verification = Math.addExact(analyzed, replayReservation);</span>
+<span class="fc" id="L261">        boolean verified = false;</span>
+<span class="fc" id="L262">        String verificationDetail = &quot;VERIFICATION_BUDGET_EXHAUSTED&quot;;</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        if (work.reserveVerification(verification)) {</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">            var result = direct ? coordinator.verifyDirect(evaluation) : coordinator.verify(evaluation);</span>
+<span class="fc" id="L265">            verified = result.valid();</span>
+<span class="fc" id="L266">            verificationDetail = result.detailCode();</span>
+        }
+<span class="fc" id="L268">        authority.put(&quot;independentReplayReservationUnits&quot;, replayReservation);</span>
+<span class="fc" id="L269">        authority.put(&quot;verified&quot;, verified);</span>
+<span class="fc" id="L270">        authority.put(&quot;verificationDetail&quot;, verificationDetail);</span>
+<span class="fc" id="L271">        retainPrincipalOutcomes(request, source, evaluation.outcomes(), verified, verificationDetail, work, outcomes);</span>
+<span class="fc" id="L272">    }</span>
+
+    private void analyzeSuccessorPrincipals(SafeRuntimeRequest request, String source,
+            List&lt;RewriteApplicabilitySchema&gt; principals, List&lt;RewriteRule&gt; preparationRules, Work work,
+            List&lt;Map&lt;String, Object&gt;&gt; outcomes, Map&lt;String, Object&gt; authority) {
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        if (!work.canSpend(1)) { outcomes.add(outcome(&quot;runtime&quot;, &quot;BUDGET_INCONCLUSIVE&quot;, &quot;ANALYSIS_BUDGET_EXHAUSTED&quot;)); return; }</span>
+<span class="fc" id="L278">        var contextualBudget = new ContextualOccurrenceRulePreparationCoordinator.ContextualBudget(</span>
+<span class="fc" id="L279">            Math.max(0, request.maxWorkUnits() - work.total()), request.preparationBudget().maxVisitedStates());</span>
+<span class="fc" id="L280">        var coordinator = new ContextualOccurrenceRulePreparationCoordinator(principals, preparationRules,</span>
+<span class="fc" id="L281">            implementationHash.substring(7, 47), request.preparationBudget(), contextualBudget);</span>
+<span class="fc" id="L282">        var evaluation = coordinator.analyze(source, request.assumptions());</span>
+<span class="fc" id="L283">        var base = evaluation.baseV3Evaluation();</span>
+<span class="fc" id="L284">        long analyzed = evaluation.work().analysisUnits();</span>
+<span class="fc" id="L285">        long verification = evaluation.work().verificationReservationUnits();</span>
+<span class="fc" id="L286">        work.analysis = Math.addExact(work.analysis, analyzed);</span>
+<span class="fc" id="L287">        authority.put(&quot;successorIdentityRevision&quot;, ContextualOccurrenceRulePreparationCoordinator.SUCCESSOR_IDENTITY_REVISION);</span>
+<span class="fc" id="L288">        authority.put(&quot;contextualBudget&quot;, contextualBudget);</span>
+<span class="fc" id="L289">        authority.put(&quot;principalInventoryFingerprint&quot;, base.principalInventoryFingerprint());</span>
+<span class="fc" id="L290">        authority.put(&quot;preparationInventoryFingerprint&quot;, base.preparationInventoryFingerprint());</span>
+<span class="fc" id="L291">        authority.put(&quot;exactRegistryFingerprint&quot;, base.exactRegistryFingerprint());</span>
+<span class="fc" id="L292">        authority.put(&quot;baseV3Evaluation&quot;, base);</span>
+<span class="fc" id="L293">        retainV3Work(base, authority);</span>
+<span class="fc" id="L294">        authority.put(&quot;contextualSuccessors&quot;, evaluation.successors());</span>
+<span class="fc" id="L295">        authority.put(&quot;contextualWork&quot;, fields(&quot;receipt&quot;, evaluation.work(), &quot;analysisUnits&quot;, analyzed,</span>
+<span class="fc" id="L296">            &quot;verificationReservationUnits&quot;, verification));</span>
+        // V4 owns every reconstruction and independent replay reservation.
+<span class="fc" id="L298">        authority.put(&quot;independentReplayReservationUnits&quot;, verification - analyzed);</span>
+<span class="fc" id="L299">        boolean verified = false;</span>
+<span class="fc" id="L300">        String verificationDetail = &quot;VERIFICATION_BUDGET_EXHAUSTED&quot;;</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">        if (work.reserveVerification(verification)) {</span>
+<span class="fc" id="L302">            var result = coordinator.verify(evaluation);</span>
+<span class="fc" id="L303">            verified = result.valid();</span>
+<span class="fc" id="L304">            verificationDetail = result.detailCode();</span>
+        }
+<span class="fc" id="L306">        authority.put(&quot;verified&quot;, verified);</span>
+<span class="fc" id="L307">        authority.put(&quot;verificationDetail&quot;, verificationDetail);</span>
+<span class="fc" id="L308">        retainPrincipalOutcomes(request, source, evaluation.outcomes(), verified, verificationDetail, work, outcomes);</span>
+<span class="fc" id="L309">    }</span>
+
+    private static void retainV3Work(OccurrenceAwareSharedRulePreparationCoordinator.Evaluation evaluation, Map&lt;String, Object&gt; authority) {
+<span class="fc" id="L312">        authority.put(&quot;occurrenceWork&quot;, evaluation.occurrenceWork());</span>
+<span class="fc" id="L313">        authority.put(&quot;aggregateWork&quot;, evaluation.aggregateWork());</span>
+<span class="fc" id="L314">        authority.put(&quot;directOccurrences&quot;, evaluation.directOccurrenceEvidence());</span>
+<span class="fc" id="L315">        authority.put(&quot;delegatedV2PrincipalIds&quot;, evaluation.delegatedV2PrincipalIds());</span>
+<span class="fc" id="L316">        authority.put(&quot;delegatedSharedExecutionWork&quot;, evaluation.delegatedSharedExecutionWork());</span>
+<span class="fc" id="L317">    }</span>
+
+    private static void retainPrincipalOutcomes(SafeRuntimeRequest request, String source,
+            List&lt;RulePreparationCoordinator.Outcome&gt; results, boolean verified, String verificationDetail,
+            Work work, List&lt;Map&lt;String, Object&gt;&gt; outcomes) {
+<span class="fc bfc" id="L322" title="All 2 branches covered.">        if (!verified) {</span>
+<span class="pc bpc" id="L323" title="1 of 2 branches missed.">            outcomes.add(outcome(&quot;runtime&quot;, work.exhausted() ? &quot;BUDGET_INCONCLUSIVE&quot; : &quot;TECHNICAL_FAILURE&quot;, verificationDetail));</span>
+        }
+<span class="fc bfc" id="L325" title="All 2 branches covered.">        for (var result : results) {</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">            String status = result.detailCode().equals(&quot;DIRECT_NO_MATCH&quot;) ? &quot;NO_MATCH&quot; : result.status().name();</span>
+<span class="fc" id="L327">            var retained = outcome(result.ruleId(), status, result.detailCode());</span>
+<span class="fc" id="L328">            retained.put(&quot;work&quot;, result.work());</span>
+<span class="fc" id="L329">            retained.put(&quot;reachedLimits&quot;, result.reachedLimits());</span>
+<span class="fc" id="L330">            retained.put(&quot;bridgeCertificateHash&quot;, result.bridgeCertificateHash());</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">            if (result.positive()) {</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">                if (!withinPathBudget(request, result.candidate().orElseThrow())) {</span>
+<span class="fc" id="L333">                    retained.put(&quot;status&quot;, &quot;BUDGET_INCONCLUSIVE&quot;); retained.put(&quot;detailCode&quot;, &quot;CANDIDATE_PATH_BUDGET_EXHAUSTED&quot;);</span>
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">                } else if (verified) retained.put(&quot;candidate&quot;, candidate(source, result.candidate().orElseThrow(), request.assumptions()));</span>
+<span class="nc bnc" id="L335" title="All 2 branches missed.">                else { retained.put(&quot;status&quot;, work.exhausted() ? &quot;BUDGET_INCONCLUSIVE&quot; : &quot;TECHNICAL_FAILURE&quot;); retained.put(&quot;detailCode&quot;, verificationDetail); }</span>
+            }
+<span class="fc" id="L337">            outcomes.add(retained);</span>
+<span class="fc" id="L338">        }</span>
+<span class="fc" id="L339">    }</span>
+
+    private static long analysisUnits(OccurrenceAwareSharedRulePreparationCoordinator.Evaluation evaluation) {
+<span class="fc" id="L342">        var aggregate = evaluation.aggregateWork();</span>
+<span class="fc" id="L343">        long units = evaluation.occurrenceWork().chargedUnits() + aggregate.expandedStates() + aggregate.generatedTransitions()</span>
+<span class="fc" id="L344">            + aggregate.discoveredStates() + aggregate.retainedTransitions() + aggregate.duplicateTransitions() + aggregate.analyzedCandidates();</span>
+<span class="fc" id="L345">        units += evaluation.candidates().stream().mapToLong(step -&gt; step.executionWork().canonicalWorkUnits()).sum();</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">        if (evaluation.delegatedSharedExecutionWork().isPresent()) {</span>
+<span class="fc" id="L347">            var shared = evaluation.delegatedSharedExecutionWork().orElseThrow();</span>
+<span class="fc" id="L348">            units += shared.sourceAnalysisWork().uniqueParsedExpressions() + shared.sourceAnalysisWork().uniqueAnalyses() + shared.guardRequests();</span>
+        }
+<span class="fc" id="L350">        return units;</span>
+    }
+
+    private static void runDirect(SafeRuntimeRequest request, String source, int nodes, String id,
+            TransformationEngine engine, String exclusion, Work work, List&lt;Map&lt;String, Object&gt;&gt; outcomes) {
+<span class="fc" id="L355">        long reservation = 1L + 3L * nodes;</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">        if (!work.reserveAnalysis(reservation)) { outcomes.add(outcome(id, &quot;BUDGET_INCONCLUSIVE&quot;, &quot;DIRECT_EXECUTION_BUDGET_EXHAUSTED&quot;)); return; }</span>
+        try {
+<span class="fc" id="L358">            var batch = directExecution(engine, source);</span>
+<span class="fc" id="L359">            var steps = batch.steps();</span>
+<span class="fc" id="L360">            long execution = batch.units();</span>
+<span class="fc" id="L361">            work.analysis = Math.addExact(work.analysis, execution);</span>
+<span class="fc bfc" id="L362" title="All 4 branches covered.">            if (steps.stream().anyMatch(step -&gt; !withinPathBudget(request, step))) {</span>
+<span class="fc" id="L363">                var rejected = outcome(id, &quot;BUDGET_INCONCLUSIVE&quot;, &quot;CANDIDATE_PATH_BUDGET_EXHAUSTED&quot;);</span>
+<span class="fc" id="L364">                rejected.put(&quot;directWork&quot;, batch.observation()); outcomes.add(rejected); return;</span>
+            }
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">            if (!work.reserveVerification(reservation + execution)) {</span>
+<span class="nc" id="L367">                outcomes.add(outcome(id, &quot;BUDGET_INCONCLUSIVE&quot;, &quot;DIRECT_REPLAY_BUDGET_EXHAUSTED&quot;)); return;</span>
+            }
+<span class="fc" id="L369">            var replayed = directExecution(engine, source);</span>
+<span class="fc" id="L370">            work.verification += Math.max(0, replayed.units() - execution);</span>
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">            if (!batch.equals(replayed)) { outcomes.add(outcome(id, &quot;TECHNICAL_FAILURE&quot;, &quot;DIRECT_REPLAY_MISMATCH&quot;)); return; }</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">            if (steps.isEmpty()) {</span>
+<span class="fc bfc" id="L373" title="All 2 branches covered.">                boolean unsupported = request.profile() != SafeRuntimeRequest.Profile.DIRECT_V1;</span>
+<span class="fc bfc" id="L374" title="All 4 branches covered.">                var result = outcome(id, unsupported ? &quot;UNSUPPORTED&quot; : &quot;NO_MATCH&quot;, unsupported ? exclusion : &quot;DIRECT_NO_MATCH&quot;);</span>
+<span class="fc" id="L375">                result.put(&quot;directWork&quot;, batch.observation()); outcomes.add(result);</span>
+            }
+<span class="fc bfc" id="L377" title="All 2 branches covered.">            for (var step : steps) {</span>
+<span class="fc" id="L378">                var result = outcome(id, &quot;DIRECT_MATCH_AVAILABLE&quot;, &quot;ORIGINAL_DIRECT_EXECUTOR_REPLAYED&quot;);</span>
+<span class="fc" id="L379">                result.put(&quot;directWork&quot;, batch.observation());</span>
+<span class="fc" id="L380">                result.put(&quot;candidate&quot;, candidate(source, step, request.assumptions()));</span>
+<span class="fc" id="L381">                outcomes.add(result);</span>
+<span class="fc" id="L382">            }</span>
+<span class="fc" id="L383">        } catch (RuntimeException | LinkageError exception) {</span>
+<span class="fc" id="L384">            outcomes.add(outcome(id, &quot;TECHNICAL_FAILURE&quot;, &quot;DIRECT_EXECUTOR_FAILURE:&quot; + exception.getClass().getName()));</span>
+<span class="fc" id="L385">        }</span>
+<span class="fc" id="L386">    }</span>
+
+<span class="fc" id="L388">    private record DirectExecution(List&lt;Transformation&gt; steps, Map&lt;String, Object&gt; observation, long units) { }</span>
+
+    private static DirectExecution directExecution(TransformationEngine engine, String source) {
+<span class="fc bfc" id="L391" title="All 2 branches covered.">        if (engine instanceof de.regelsuche.transform.MeasuredTransformationEngine measured) {</span>
+<span class="fc" id="L392">            var batch = measured.transformMeasured(source);</span>
+<span class="fc" id="L393">            long candidateUnits = batch.transformations().stream().mapToLong(step -&gt; step.executionWork().canonicalWorkUnits()).sum();</span>
+<span class="fc" id="L394">            return new DirectExecution(batch.transformations(), fields(&quot;kind&quot;, &quot;MEASURED_ORIGINAL_ENGINE&quot;, &quot;metrics&quot;, batch.workMetrics()),</span>
+<span class="fc" id="L395">                batch.workMetrics().totalWorkUnits() + Math.max(candidateUnits, batch.workMetrics().candidateWork().canonicalWorkUnits()));</span>
+        }
+<span class="fc bfc" id="L397" title="All 2 branches covered.">        var steps = List.copyOf(engine instanceof de.regelsuche.transform.WorkAwareTransformationEngine aware</span>
+<span class="fc" id="L398">            ? aware.verifiedTransformations(source) : engine.transform(source));</span>
+<span class="fc" id="L399">        long units = steps.stream().mapToLong(step -&gt; step.executionWork().canonicalWorkUnits()).sum();</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">        return new DirectExecution(steps, fields(&quot;kind&quot;, engine instanceof de.regelsuche.transform.WorkAwareTransformationEngine</span>
+<span class="fc" id="L401">            ? &quot;WORK_AWARE_ORIGINAL_ENGINE&quot; : &quot;ORIGINAL_ENGINE&quot;, &quot;candidateExecutionUnits&quot;, units), units);</span>
+    }
+
+    private static boolean withinPathBudget(SafeRuntimeRequest request, Transformation step) {
+<span class="fc bfc" id="L405" title="All 2 branches covered.">        return step.executionWork().primitiveRewrites() &lt;= request.maxPrimitiveRewrites()</span>
+<span class="fc bfc" id="L406" title="All 2 branches covered.">            &amp;&amp; step.executionWork().exactTheoryWorkUnits() &lt;= request.maxTheoryWorkUnits();</span>
+    }
+
+    private static void analyzeRepresentation(SafeRuntimeRequest request, Work work, List&lt;Map&lt;String, Object&gt;&gt; outcomes,
+            Map&lt;String, Object&gt; authority) {
+        // Construction and concrete audit each receive their own half of the remaining budget.
+<span class="fc" id="L412">        int allowance = (int) Math.max(0, (request.maxWorkUnits() - work.total()) / 2);</span>
+<span class="fc" id="L413">        var source = request.representation();</span>
+<span class="fc" id="L414">        var bounded = new MatrixPreparation.Request(source.equations(), source.unknowns(), source.profile(), allowance,</span>
+<span class="fc" id="L415">            source.catalog(), source.operatorExpressions(), source.eigenvalueParameter(), source.nonZeroVector(), source.matrixExpression(), source.rightHandSide());</span>
+        try {
+<span class="fc" id="L417">            var analysis = new MatrixPreparation().analyze(bounded);</span>
+<span class="fc" id="L418">            work.analysis += analysis.work().consumedWorkUnits();</span>
+<span class="fc" id="L419">            String typed = MatrixPreparationJson.toJson(analysis);</span>
+<span class="fc" id="L420">            work.verification += analysis.work().consumedWorkUnits();</span>
+<span class="fc" id="L421">            String replay = MatrixPreparationJson.replay(new JsonReader(typed).readObject());</span>
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">            if (!typed.equals(replay)) throw new IllegalArgumentException(&quot;typed concrete replay mismatch&quot;);</span>
+<span class="fc" id="L423">            authority.put(&quot;typedRelationAuthority&quot;, MatrixPreparation.SCHEMA);</span>
+<span class="fc" id="L424">            authority.put(&quot;typedArtifact&quot;, typed);</span>
+<span class="fc" id="L425">            outcomes.add(outcome(&quot;representation&quot;, analysis.status().name(), analysis.detailCode()));</span>
+<span class="nc" id="L426">        } catch (RuntimeException | LinkageError exception) {</span>
+<span class="nc" id="L427">            outcomes.add(outcome(&quot;representation&quot;, &quot;TECHNICAL_FAILURE&quot;, &quot;TYPED_EXECUTOR_FAILURE:&quot; + exception.getClass().getName()));</span>
+<span class="fc" id="L428">        }</span>
+<span class="fc" id="L429">    }</span>
+
+    private static Map&lt;String, Object&gt; candidate(String source, Transformation step, AssumptionSignature assumptions) {
+<span class="fc" id="L432">        var execution = RecordedExecution.capture(source, List.of(step));</span>
+<span class="fc" id="L433">        return fields(&quot;expression&quot;, step.transformedExpression(), &quot;rule&quot;, step.rule(),</span>
+<span class="fc" id="L434">            &quot;retainedAssumptions&quot;, AssumptionSignature.merge(assumptions, AssumptionSignature.ofExpressions(step.assumptions())).normalizedAssumptions(),</span>
+<span class="fc" id="L435">            &quot;primitiveRuleIds&quot;, step.primitiveRuleIds(), &quot;executionWork&quot;, step.executionWork(), &quot;execution&quot;, execution.toCanonicalJson());</span>
+    }
+
+    private static Map&lt;String, Object&gt; outcome(String id, String status, String detail) {
+<span class="fc" id="L439">        return fields(&quot;id&quot;, id, &quot;status&quot;, status, &quot;detailCode&quot;, detail);</span>
+    }
+    private boolean runtimePreparationEligible(RewriteApplicabilitySchema.CoverageEntry entry) {
+<span class="fc bfc" id="L442" title="All 4 branches covered.">        return entry.safeProfileEligible() &amp;&amp; !contextualRuleIds.contains(entry.rule().id());</span>
+    }
+    private String runtimeExclusionReason(RewriteApplicabilitySchema.CoverageEntry entry) {
+<span class="fc bfc" id="L445" title="All 2 branches covered.">        return contextualRuleIds.contains(entry.rule().id())</span>
+<span class="fc" id="L446">            ? &quot;PLUGIN_CONTEXT_REQUIRES_ORIGINAL_EXECUTOR&quot; : entry.exclusionReason();</span>
+    }
+    private static int sourceNodeCount(Expr source) {
+<span class="fc" id="L449">        var pending = new java.util.ArrayDeque&lt;Expr&gt;();</span>
+<span class="fc" id="L450">        pending.push(source);</span>
+<span class="fc" id="L451">        int nodes = 0;</span>
+<span class="fc bfc" id="L452" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L453">            Expr current = pending.pop();</span>
+<span class="fc" id="L454">            nodes++;</span>
+<span class="fc bfc" id="L455" title="All 2 branches covered.">            if (current instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L456">                pending.push(binary.left()); pending.push(binary.right());</span>
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">            } else if (current instanceof FunctionExpr function) {</span>
+<span class="nc" id="L458">                function.arguments().forEach(pending::push);</span>
+            }
+<span class="fc" id="L460">        }</span>
+<span class="fc" id="L461">        return nodes;</span>
+    }
+<span class="fc bfc" id="L463" title="All 4 branches covered.">    private static boolean selected(SafeRuntimeRequest request, String id) { return request.ruleIds().isEmpty() || request.ruleIds().contains(id); }</span>
+    private static boolean enabled(SafeRuntimeRequest request, DirectSource source) {
+<span class="pc bpc" id="L465" title="1 of 6 branches missed.">        return selected(request, source.id()) &amp;&amp; (!source.id().equals(&quot;sympy&quot;) || request.includeSymPy());</span>
+    }
+    private static String status(List&lt;Map&lt;String, Object&gt;&gt; outcomes) {
+<span class="fc bfc" id="L468" title="All 2 branches covered.">        if (outcomes.stream().anyMatch(value -&gt; value.get(&quot;status&quot;).equals(&quot;TECHNICAL_FAILURE&quot;))) return &quot;TECHNICAL_FAILURE&quot;;</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">        if (outcomes.stream().anyMatch(value -&gt; value.get(&quot;status&quot;).equals(&quot;BUDGET_INCONCLUSIVE&quot;))) return &quot;BUDGET_INCONCLUSIVE&quot;;</span>
+<span class="fc bfc" id="L470" title="All 6 branches covered.">        if (outcomes.stream().anyMatch(value -&gt; value.containsKey(&quot;candidate&quot;) || Set.of(&quot;REPRESENTED&quot;, &quot;DIRECT_REPRESENTATION_AVAILABLE&quot;).contains(value.get(&quot;status&quot;)))) return &quot;SUCCESS&quot;;</span>
+<span class="fc bfc" id="L471" title="All 2 branches covered.">        if (outcomes.stream().anyMatch(value -&gt; Set.of(&quot;UNSUPPORTED&quot;, &quot;DOMAIN_UNSUPPORTED&quot;, &quot;ASSUMPTION_REQUIRED&quot;, &quot;NONLINEAR&quot;).contains(value.get(&quot;status&quot;)))) return &quot;UNSUPPORTED&quot;;</span>
+<span class="fc" id="L472">        return &quot;NO_MATCH&quot;;</span>
+    }
+<span class="fc" id="L474">    @Override public void close() { release.run(); }</span>
+
+    private static final class Work {
+        final long maximum;
+        long setup;
+        long analysis;
+        long verification;
+        long refusedReservation;
+<span class="fc" id="L482">        Work(long maximum) { this.maximum = maximum; }</span>
+<span class="fc" id="L483">        long total() { return setup + analysis + verification; }</span>
+<span class="fc bfc" id="L484" title="All 2 branches covered.">        boolean canSpend(long units) { return units &lt;= maximum - total(); }</span>
+<span class="fc bfc" id="L485" title="All 2 branches covered.">        boolean reserveSetup(long units) { if (!reserve(units)) return false; setup += units; return true; }</span>
+<span class="fc bfc" id="L486" title="All 2 branches covered.">        boolean reserveAnalysis(long units) { if (!reserve(units)) return false; analysis += units; return true; }</span>
+<span class="fc bfc" id="L487" title="All 2 branches covered.">        boolean reserveVerification(long units) { if (!reserve(units)) return false; verification += units; return true; }</span>
+<span class="fc bfc" id="L488" title="All 2 branches covered.">        boolean reserve(long units) { if (canSpend(units)) return true; refusedReservation = Math.max(refusedReservation, units); return false; }</span>
+<span class="pc bpc" id="L489" title="1 of 4 branches missed.">        boolean exhausted() { return total() &gt; maximum || refusedReservation &gt; 0; }</span>
+<span class="fc" id="L490">        Map&lt;String, Object&gt; observation() { return fields(&quot;revision&quot;, WORK_ID, &quot;configuredWorkUnits&quot;, maximum,</span>
+<span class="fc" id="L491">            &quot;setupUnits&quot;, setup, &quot;analysisUnits&quot;, analysis, &quot;verificationUnits&quot;, verification, &quot;chargedUnits&quot;, total(),</span>
+<span class="fc" id="L492">            &quot;refusedReservationUnits&quot;, refusedReservation,</span>
+            &quot;convention&quot;, &quot;LOGICAL_BATCH_ACCOUNTING; bounded analysis can cross the retention budget; all spent work remains charged; independent direct replay uses a conservative node-call reservation&quot;); }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

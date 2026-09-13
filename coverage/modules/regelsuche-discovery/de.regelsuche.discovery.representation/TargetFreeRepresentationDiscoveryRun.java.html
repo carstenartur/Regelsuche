@@ -384,11 +384,22 @@ public final class TargetFreeRepresentationDiscoveryRun {
                 &quot;workspace canonical work ledger&quot;
             );
 <span class="fc" id="L386">            requireEqual(</span>
-<span class="fc" id="L387">                scenario.content().search().generatedTransitionCount(),</span>
-<span class="fc" id="L388">                Math.toIntExact(workspace.outcome().consumedWork()),</span>
+<span class="fc" id="L387">                budgetHash(scenario.content().search().budget()),</span>
+<span class="fc" id="L388">                workspace.plan().budgetHash(),</span>
+                &quot;workspace search budget&quot;
+            );
+<span class="fc" id="L391">            requireEqual(</span>
+<span class="fc" id="L392">                (long) scenario.content().search().budget()</span>
+<span class="fc" id="L393">                    .maxGeneratedTransitions(),</span>
+<span class="fc" id="L394">                workspace.outcome().configuredWork(),</span>
+                &quot;workspace configured work&quot;
+            );
+<span class="fc" id="L397">            requireEqual(</span>
+<span class="fc" id="L398">                scenario.content().search().generatedTransitionCount(),</span>
+<span class="fc" id="L399">                Math.toIntExact(workspace.outcome().consumedWork()),</span>
                 &quot;workspace consumed work&quot;
             );
-<span class="fc" id="L391">        }</span>
+<span class="fc" id="L402">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

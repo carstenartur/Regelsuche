@@ -1,0 +1,1252 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ContextualOccurrenceRulePreparationCoordinator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.reachability</a> &gt; <span class="el_source">ContextualOccurrenceRulePreparationCoordinator.java</span></div><h1>ContextualOccurrenceRulePreparationCoordinator.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.reachability;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.RecordedExecution;
+import de.regelsuche.transform.RewriteApplicabilitySchema;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationProvenance;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * V4 SAFE authority: unchanged V3 evidence plus bounded, occurrence-local
+ * preparation successors lifted into their original AST context.
+ */
+public final class ContextualOccurrenceRulePreparationCoordinator {
+    public static final String COORDINATOR_ID =
+        &quot;regelsuche.unified-safe-rule-preparation-coordinator/v4&quot;;
+    public static final String SUCCESSOR_IDENTITY_REVISION =
+        &quot;regelsuche.contextual-occurrence-successor/v1&quot;;
+    public static final String CONTEXTUAL_WORK_REVISION =
+        &quot;regelsuche.contextual-occurrence-work/v2&quot;;
+
+    private final List&lt;RewriteApplicabilitySchema&gt; principalSchemas;
+    private final List&lt;RewriteRule&gt; preparationRules;
+    private final Map&lt;String, RewriteApplicabilitySchema&gt; schemasById;
+    private final String repositoryRevision;
+    private final PatternTargetedLocalBridgeSearch.Budget bridgeBudget;
+    private final ContextualBudget contextualBudget;
+    private final OccurrenceAwareSharedRulePreparationCoordinator v3;
+<span class="fc" id="L47">    private final ExpressionParser parser = new ExpressionParser();</span>
+
+    public ContextualOccurrenceRulePreparationCoordinator(
+        List&lt;RewriteApplicabilitySchema&gt; principalSchemas,
+        List&lt;? extends RewriteRule&gt; preparationRules,
+        String repositoryRevision,
+        PatternTargetedLocalBridgeSearch.Budget bridgeBudget,
+        ContextualBudget contextualBudget
+<span class="fc" id="L55">    ) {</span>
+<span class="fc" id="L56">        this.v3 = new OccurrenceAwareSharedRulePreparationCoordinator(</span>
+            principalSchemas, preparationRules, repositoryRevision, bridgeBudget);
+<span class="fc" id="L58">        this.principalSchemas = v3.principalSchemas();</span>
+<span class="fc" id="L59">        this.preparationRules = List.copyOf(Objects.requireNonNull(</span>
+            preparationRules, &quot;preparationRules&quot;));
+<span class="fc" id="L61">        Map&lt;String, RewriteApplicabilitySchema&gt; indexed = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L62">        this.principalSchemas.forEach(schema -&gt; indexed.put(schema.ruleId(), schema));</span>
+<span class="fc" id="L63">        this.schemasById = Map.copyOf(indexed);</span>
+<span class="fc" id="L64">        this.repositoryRevision = requireRevision(repositoryRevision);</span>
+<span class="fc" id="L65">        this.bridgeBudget = Objects.requireNonNull(bridgeBudget, &quot;bridgeBudget&quot;);</span>
+<span class="fc" id="L66">        this.contextualBudget = Objects.requireNonNull(</span>
+            contextualBudget, &quot;contextualBudget&quot;);
+<span class="fc" id="L68">    }</span>
+
+    public Evaluation analyze(
+        String sourceExpression,
+        AssumptionSignature initialAssumptions
+    ) {
+<span class="fc" id="L74">        OccurrenceAwareSharedRulePreparationCoordinator.Evaluation base =</span>
+<span class="fc" id="L75">            v3.analyze(sourceExpression, initialAssumptions);</span>
+<span class="fc" id="L76">        String source = base.sourceExpression();</span>
+<span class="fc" id="L77">        Expr root = parser.parseTerm(source);</span>
+<span class="fc" id="L78">        ContextualAnalysis analysis = new ContextualAnalysis(base, root);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        for (Occurrence occurrence : contextualOccurrences(root, analysis)) {</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (stopBeforeNextBatch(analysis)) {</span>
+<span class="fc" id="L81">                break;</span>
+            }
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            if (!analyzeOccurrence(occurrence, analysis)) {</span>
+<span class="fc" id="L84">                break;</span>
+            }
+<span class="fc" id="L86">        }</span>
+<span class="fc" id="L87">        retainBudgetExhaustion(analysis);</span>
+<span class="fc" id="L88">        return contextualEvaluation(source, analysis);</span>
+    }
+
+    private List&lt;Occurrence&gt; contextualOccurrences(
+        Expr root,
+        ContextualAnalysis analysis
+    ) {
+<span class="fc bfc" id="L95" title="All 4 branches covered.">        if (analysis.unresolved.isEmpty() || analysis.limitReached) {</span>
+<span class="fc" id="L96">            return List.of();</span>
+        }
+<span class="fc" id="L98">        List&lt;Occurrence&gt; occurrences = occurrences(root);</span>
+<span class="fc" id="L99">        analysis.occurrenceNodes = occurrences.size() + 1L;</span>
+<span class="fc" id="L100">        analysis.analysisUnits = add(analysis.analysisUnits, analysis.occurrenceNodes);</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        analysis.limitReached = analysis.analysisUnits &gt;= contextualBudget.maxAnalysisUnits();</span>
+<span class="fc" id="L102">        return occurrences;</span>
+    }
+
+    private boolean stopBeforeNextBatch(ContextualAnalysis analysis) {
+<span class="pc bpc" id="L106" title="1 of 4 branches missed.">        if (analysis.unresolved.isEmpty() || analysis.limitReached</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                || analysis.batches &gt;= contextualBudget.maxOccurrenceBatches()) {</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">            if (!analysis.unresolved.isEmpty()) {</span>
+<span class="nc" id="L109">                analysis.limitReached = true;</span>
+            }
+<span class="fc" id="L111">            return true;</span>
+        }
+<span class="fc" id="L113">        return false;</span>
+    }
+
+    private boolean analyzeOccurrence(Occurrence occurrence, ContextualAnalysis analysis) {
+<span class="fc" id="L117">        analysis.batches++;</span>
+<span class="fc" id="L118">        long setupUnits = add(1,</span>
+<span class="fc" id="L119">            add(analysis.unresolved.size(), preparationRules.size()));</span>
+<span class="fc" id="L120">        analysis.batchUnits = add(analysis.batchUnits, setupUnits);</span>
+<span class="fc" id="L121">        analysis.analysisUnits = add(analysis.analysisUnits, setupUnits);</span>
+<span class="fc" id="L122">        long traversalReservation = failedTraversalReservation(</span>
+<span class="fc" id="L123">            occurrence.subtree(), analysis.unresolved.size());</span>
+<span class="fc" id="L124">        long analysisBeforeTraversal = analysis.analysisUnits;</span>
+<span class="fc" id="L125">        long batchBeforeTraversal = analysis.batchUnits;</span>
+<span class="fc" id="L126">        analysis.analysisUnits = add(analysis.analysisUnits, traversalReservation);</span>
+<span class="fc" id="L127">        analysis.batchUnits = add(analysis.batchUnits, traversalReservation);</span>
+        final SharedMultiPrincipalPreparationTraversal.Evaluation local;
+        try {
+<span class="fc" id="L130">            local = new SharedMultiPrincipalPreparationTraversal(</span>
+                    analysis.unresolved, preparationRules, bridgeBudget)
+<span class="fc" id="L132">                .analyze(ExpressionFormatter.format(occurrence.subtree()),</span>
+<span class="fc" id="L133">                    analysis.base.sourceAssumptions());</span>
+<span class="fc" id="L134">        } catch (RuntimeException exception) {</span>
+<span class="fc" id="L135">            analysis.failedBatchReservationUnits = add(</span>
+                analysis.failedBatchReservationUnits, traversalReservation);
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            for (RewriteApplicabilitySchema schema : analysis.unresolved) {</span>
+<span class="fc" id="L138">                analysis.outcomes.put(schema.ruleId(), negative(</span>
+                    schema,
+                    PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE,
+<span class="fc" id="L141">                    analysis.outcomes.get(schema.ruleId()).initialAnalysis(),</span>
+                    &quot;V4_CONTEXTUAL_TRAVERSAL_TECHNICAL_FAILURE&quot;));
+<span class="fc" id="L143">            }</span>
+<span class="fc" id="L144">            analysis.unresolved.clear();</span>
+<span class="fc" id="L145">            return false;</span>
+<span class="fc" id="L146">        }</span>
+<span class="fc" id="L147">        LocalWorkReceipt localWork = LocalWorkReceipt.from(local.work());</span>
+<span class="fc" id="L148">        analysis.batchUnits = add(batchBeforeTraversal, localWork.chargedUnits());</span>
+<span class="fc" id="L149">        analysis.analysisUnits = add(analysisBeforeTraversal, localWork.chargedUnits());</span>
+
+<span class="fc" id="L151">        SharedPreparationGuardFacts guardFacts = new SharedPreparationGuardFacts();</span>
+<span class="fc" id="L152">        SharedPreparedPrincipalReplay replay = new SharedPreparedPrincipalReplay(</span>
+            preparationRules, repositoryRevision, bridgeBudget, guardFacts);
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        for (RewriteApplicabilitySchema schema : List.copyOf(analysis.unresolved)) {</span>
+<span class="fc" id="L155">            authorizeLocalPrincipal(occurrence, schema, local, localWork, replay, analysis);</span>
+<span class="fc" id="L156">        }</span>
+<span class="fc" id="L157">        long guardUnits = guardFacts.work().requests();</span>
+<span class="fc" id="L158">        analysis.localAuthorizationUnits = add(analysis.localAuthorizationUnits, guardUnits);</span>
+<span class="fc" id="L159">        analysis.analysisUnits = add(analysis.analysisUnits, guardUnits);</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        if (analysis.analysisUnits &gt;= contextualBudget.maxAnalysisUnits()) {</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">            analysis.limitReached = !analysis.unresolved.isEmpty();</span>
+        }
+<span class="fc" id="L163">        return true;</span>
+    }
+
+    private void authorizeLocalPrincipal(
+        Occurrence occurrence,
+        RewriteApplicabilitySchema schema,
+        SharedMultiPrincipalPreparationTraversal.Evaluation local,
+        LocalWorkReceipt localWork,
+        SharedPreparedPrincipalReplay replay,
+        ContextualAnalysis analysis
+    ) {
+<span class="fc" id="L174">        SharedMultiPrincipalPreparationTraversal.PrincipalOutcome localResult =</span>
+<span class="fc" id="L175">            local.outcome(schema.ruleId()).orElseThrow();</span>
+        // V4 introduces only a real preparation successor. A local
+        // source match is not a second direct-occurrence selector.
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (localResult.status()</span>
+                == SharedMultiPrincipalPreparationTraversal.Status.MATCHED_AT_SOURCE) {
+<span class="nc" id="L180">            return;</span>
+        }
+<span class="fc" id="L182">        analysis.localAuthorizationUnits = add(analysis.localAuthorizationUnits, 1);</span>
+<span class="fc" id="L183">        analysis.analysisUnits = add(analysis.analysisUnits, 1);</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        if (localResult.status()</span>
+                == SharedMultiPrincipalPreparationTraversal.Status.PREPARED_MATCH) {
+<span class="fc" id="L186">            long principalReservation = engineReplayUnits(localResult.terminalExpression(), 0);</span>
+<span class="fc" id="L187">            analysis.localAuthorizationUnits = add(</span>
+                analysis.localAuthorizationUnits, principalReservation);
+<span class="fc" id="L189">            analysis.analysisUnits = add(analysis.analysisUnits, principalReservation);</span>
+        }
+        final RulePreparationCoordinator.Outcome authorized;
+        try {
+<span class="fc" id="L193">            authorized = replay.replay(schema, local, localResult);</span>
+<span class="nc" id="L194">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L195">            analysis.outcomes.put(schema.ruleId(), negative(</span>
+                schema,
+                PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE,
+<span class="nc" id="L198">                localResult.initialAnalysis(),</span>
+                &quot;V4_CONTEXTUAL_AUTHORIZATION_TECHNICAL_FAILURE&quot;));
+<span class="nc" id="L200">            analysis.unresolved.remove(schema);</span>
+<span class="nc" id="L201">            return;</span>
+<span class="fc" id="L202">        }</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (authorized.candidate().isPresent()) {</span>
+<span class="fc" id="L204">            long executionUnits = authorized.candidate().orElseThrow()</span>
+<span class="fc" id="L205">                .executionWork().canonicalWorkUnits();</span>
+<span class="fc" id="L206">            analysis.localAuthorizationUnits = add(analysis.localAuthorizationUnits, executionUnits);</span>
+<span class="fc" id="L207">            analysis.analysisUnits = add(analysis.analysisUnits, executionUnits);</span>
+        }
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        if (!authorized.prepared()) {</span>
+<span class="fc" id="L210">            retainUnpreparedPrincipal(schema, authorized, analysis);</span>
+<span class="fc" id="L211">            return;</span>
+        }
+<span class="fc" id="L213">        liftAuthorizedPrincipal(occurrence, schema, localResult, authorized, localWork, analysis);</span>
+<span class="fc" id="L214">    }</span>
+
+    private static void retainUnpreparedPrincipal(
+        RewriteApplicabilitySchema schema,
+        RulePreparationCoordinator.Outcome authorized,
+        ContextualAnalysis analysis
+    ) {
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (authorized.status() == PatternTargetedLocalBridgeSearch.Status.UNSUPPORTED</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">                || authorized.status() == PatternTargetedLocalBridgeSearch.Status.BUDGET_INCONCLUSIVE</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">                || authorized.status() == PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE) {</span>
+<span class="fc" id="L224">            retainNegative(analysis.outcomes, schema.ruleId(), authorized);</span>
+        }
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        if (authorized.status() == PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE) {</span>
+<span class="fc" id="L227">            analysis.unresolved.remove(schema);</span>
+        }
+<span class="fc" id="L229">    }</span>
+
+    private void liftAuthorizedPrincipal(
+        Occurrence occurrence,
+        RewriteApplicabilitySchema schema,
+        SharedMultiPrincipalPreparationTraversal.PrincipalOutcome localResult,
+        RulePreparationCoordinator.Outcome authorized,
+        LocalWorkReceipt localWork,
+        ContextualAnalysis analysis
+    ) {
+<span class="fc" id="L239">        long liftReservation = liftReservation(localResult);</span>
+<span class="fc" id="L240">        analysis.liftedReplayUnits = add(analysis.liftedReplayUnits, liftReservation);</span>
+<span class="fc" id="L241">        analysis.analysisUnits = add(analysis.analysisUnits, liftReservation);</span>
+        try {
+<span class="fc" id="L243">            LiftedSuccessor lifted = lift(</span>
+<span class="fc" id="L244">                analysis.root, analysis.base.sourceExpression(), occurrence, schema, localResult,</span>
+<span class="fc" id="L245">                authorized, localWork, analysis.base.sourceAssumptions());</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">            if (lifted.evidence().replayUnits() != liftReservation) {</span>
+<span class="nc" id="L247">                throw new IllegalStateException(&quot;contextual replay reservation mismatch&quot;);</span>
+            }
+<span class="fc" id="L249">            analysis.successors.add(lifted.evidence());</span>
+<span class="fc" id="L250">            analysis.outcomes.put(schema.ruleId(), lifted.outcome());</span>
+<span class="fc" id="L251">            analysis.unresolved.remove(schema);</span>
+<span class="nc" id="L252">        } catch (NonLiftableProvenance exception) {</span>
+<span class="nc" id="L253">            analysis.outcomes.put(schema.ruleId(), negative(</span>
+                schema,
+                PatternTargetedLocalBridgeSearch.Status.UNSUPPORTED,
+<span class="nc" id="L256">                localResult.initialAnalysis(),</span>
+                &quot;V4_NON_LIFTABLE_PROVENANCE&quot;));
+<span class="nc" id="L258">            analysis.unresolved.remove(schema);</span>
+<span class="fc" id="L259">        } catch (RuntimeException exception) {</span>
+<span class="fc" id="L260">            analysis.failedLiftReservationUnits = add(</span>
+                analysis.failedLiftReservationUnits, liftReservation);
+<span class="fc" id="L262">            analysis.outcomes.put(schema.ruleId(), negative(</span>
+                schema,
+                PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE,
+<span class="fc" id="L265">                localResult.initialAnalysis(),</span>
+                &quot;V4_CONTEXTUAL_REPLAY_TECHNICAL_FAILURE&quot;));
+<span class="fc" id="L267">            analysis.unresolved.remove(schema);</span>
+<span class="pc" id="L268">        }</span>
+<span class="fc" id="L269">    }</span>
+
+    private void retainBudgetExhaustion(ContextualAnalysis analysis) {
+<span class="pc bpc" id="L272" title="1 of 4 branches missed.">        if (analysis.limitReached || analysis.batches &gt;= contextualBudget.maxOccurrenceBatches()) {</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">            for (RewriteApplicabilitySchema schema : analysis.unresolved) {</span>
+<span class="fc" id="L274">                RulePreparationCoordinator.Outcome prior = analysis.outcomes.get(schema.ruleId());</span>
+<span class="fc" id="L275">                analysis.outcomes.put(schema.ruleId(), negative(</span>
+                    schema,
+                    PatternTargetedLocalBridgeSearch.Status.BUDGET_INCONCLUSIVE,
+<span class="fc" id="L278">                    prior.initialAnalysis(),</span>
+                    &quot;V4_GLOBAL_ANALYSIS_BUDGET_EXHAUSTED&quot;));
+<span class="fc" id="L280">            }</span>
+        }
+<span class="fc" id="L282">    }</span>
+
+    private Evaluation contextualEvaluation(String source, ContextualAnalysis analysis) {
+<span class="fc" id="L285">        List&lt;RulePreparationCoordinator.Outcome&gt; ordered = principalSchemas.stream()</span>
+<span class="fc" id="L286">            .map(schema -&gt; analysis.outcomes.get(schema.ruleId())).toList();</span>
+<span class="fc" id="L287">        long directReplayReservation = multiply(</span>
+<span class="fc" id="L288">            analysis.base.directOccurrenceEvidence().size(), add(1, multiply(3, nodeCount(analysis.root))));</span>
+<span class="fc" id="L289">        long contextualReplayReservation = analysis.successors.stream()</span>
+<span class="fc" id="L290">            .mapToLong(ContextualSuccessorEvidence::replayUnits).sum();</span>
+<span class="fc" id="L291">        long verificationReservation = add(</span>
+<span class="fc" id="L292">            analysis.analysisUnits, add(directReplayReservation, contextualReplayReservation));</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        ContextualWork work = new ContextualWork(</span>
+            CONTEXTUAL_WORK_REVISION,
+            analysis.baseUnits,
+            analysis.occurrenceNodes,
+            analysis.batches,
+            analysis.batchUnits,
+            analysis.failedBatchReservationUnits,
+            analysis.localAuthorizationUnits,
+            analysis.liftedReplayUnits,
+            analysis.failedLiftReservationUnits,
+            analysis.analysisUnits,
+            directReplayReservation,
+            contextualReplayReservation,
+            verificationReservation,
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">            analysis.limitReached || (analysis.batches &gt;= contextualBudget.maxOccurrenceBatches()</span>
+<span class="pc bnc" id="L308" title="All 2 branches missed.">                &amp;&amp; !analysis.unresolved.isEmpty()));</span>
+<span class="fc" id="L309">        return new Evaluation(</span>
+            COORDINATOR_ID,
+            SUCCESSOR_IDENTITY_REVISION,
+            repositoryRevision,
+<span class="fc" id="L313">            v3.principalInventoryFingerprint(),</span>
+<span class="fc" id="L314">            v3.preparationInventoryFingerprint(),</span>
+<span class="fc" id="L315">            v3.exactRegistryFingerprint(),</span>
+            bridgeBudget,
+            contextualBudget,
+            source,
+<span class="fc" id="L319">            analysis.base.sourceAssumptions(),</span>
+            analysis.base,
+            ordered,
+            analysis.successors,
+            work);
+    }
+
+    /** Per-analysis outcomes and work reservations; never shared between calls. */
+    private final class ContextualAnalysis {
+        private final OccurrenceAwareSharedRulePreparationCoordinator.Evaluation base;
+        private final Expr root;
+        private final long baseUnits;
+<span class="fc" id="L331">        private final Map&lt;String, RulePreparationCoordinator.Outcome&gt; outcomes = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L332">        private final List&lt;ContextualSuccessorEvidence&gt; successors = new ArrayList&lt;&gt;();</span>
+        private final List&lt;RewriteApplicabilitySchema&gt; unresolved;
+        private long analysisUnits;
+        private long occurrenceNodes;
+        private long batchUnits;
+        private long failedBatchReservationUnits;
+        private long localAuthorizationUnits;
+        private long liftedReplayUnits;
+        private long failedLiftReservationUnits;
+        private int batches;
+        private boolean limitReached;
+
+        private ContextualAnalysis(
+            OccurrenceAwareSharedRulePreparationCoordinator.Evaluation base,
+            Expr root
+<span class="fc" id="L347">        ) {</span>
+<span class="fc" id="L348">            this.base = base;</span>
+<span class="fc" id="L349">            this.root = root;</span>
+<span class="fc" id="L350">            this.baseUnits = baseAnalysisUnits(base);</span>
+<span class="fc" id="L351">            this.analysisUnits = baseUnits;</span>
+<span class="fc bfc" id="L352" title="All 2 branches covered.">            this.limitReached = baseUnits &gt;= contextualBudget.maxAnalysisUnits();</span>
+<span class="fc" id="L353">            base.outcomes().forEach(outcome -&gt; outcomes.put(outcome.ruleId(), outcome));</span>
+<span class="fc" id="L354">            this.unresolved = unresolved(outcomes);</span>
+<span class="fc" id="L355">        }</span>
+    }
+
+    public Verification verify(Evaluation evaluation) {
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">        if (evaluation == null) {</span>
+<span class="nc" id="L360">            return new Verification(false, &quot;EVALUATION_MISSING&quot;);</span>
+        }
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">        if (!COORDINATOR_ID.equals(evaluation.coordinatorId())</span>
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">                || !SUCCESSOR_IDENTITY_REVISION.equals(</span>
+<span class="fc" id="L364">                    evaluation.successorIdentityRevision())</span>
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">                || !repositoryRevision.equals(evaluation.repositoryRevision())</span>
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">                || !v3.principalInventoryFingerprint().equals(</span>
+<span class="fc" id="L367">                    evaluation.principalInventoryFingerprint())</span>
+<span class="pc bpc" id="L368" title="1 of 2 branches missed.">                || !v3.preparationInventoryFingerprint().equals(</span>
+<span class="fc" id="L369">                    evaluation.preparationInventoryFingerprint())</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">                || !v3.exactRegistryFingerprint().equals(</span>
+<span class="fc" id="L371">                    evaluation.exactRegistryFingerprint())</span>
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">                || !bridgeBudget.equals(evaluation.bridgeBudget())</span>
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">                || !contextualBudget.equals(evaluation.contextualBudget())) {</span>
+<span class="nc" id="L374">            return new Verification(false, &quot;COORDINATOR_CONFIGURATION_MISMATCH&quot;);</span>
+        }
+        final Evaluation recomputed;
+        try {
+<span class="fc" id="L378">            recomputed = analyze(</span>
+<span class="fc" id="L379">                evaluation.sourceExpression(), evaluation.sourceAssumptions());</span>
+<span class="nc" id="L380">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L381">            return new Verification(</span>
+                false, &quot;EVALUATION_RECOMPUTATION_TECHNICAL_FAILURE&quot;);
+<span class="fc" id="L383">        }</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">        if (!recomputed.equals(evaluation)) {</span>
+<span class="fc" id="L385">            return new Verification(false, &quot;EVALUATION_RECOMPUTATION_MISMATCH&quot;);</span>
+        }
+<span class="fc" id="L387">        OccurrenceAwareSharedRulePreparationCoordinator.Verification baseReplay =</span>
+<span class="fc" id="L388">            OccurrencePreparationReplay.verify(</span>
+<span class="fc" id="L389">                evaluation.baseV3Evaluation(), principalSchemas);</span>
+<span class="pc bpc" id="L390" title="1 of 2 branches missed.">        if (!baseReplay.valid()) {</span>
+<span class="nc" id="L391">            return new Verification(false, &quot;BASE_V3_&quot; + baseReplay.detailCode());</span>
+        }
+        try {
+<span class="fc" id="L394">            Expr root = parser.parseTerm(evaluation.sourceExpression());</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">            for (ContextualSuccessorEvidence evidence : evaluation.successors()) {</span>
+<span class="fc" id="L396">                RewriteApplicabilitySchema schema = schemasById.get(evidence.ruleId());</span>
+<span class="pc bpc" id="L397" title="2 of 4 branches missed.">                if (schema == null || !replayEvidence(</span>
+<span class="fc" id="L398">                        root, evaluation.sourceExpression(), evidence, schema,</span>
+<span class="fc" id="L399">                        evaluation.sourceAssumptions())) {</span>
+<span class="nc" id="L400">                    return new Verification(false, &quot;CONTEXTUAL_SUCCESSOR_REPLAY_MISMATCH&quot;);</span>
+                }
+<span class="fc" id="L402">            }</span>
+<span class="nc" id="L403">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L404">            return new Verification(</span>
+                false, &quot;CONTEXTUAL_SUCCESSOR_REPLAY_TECHNICAL_FAILURE&quot;);
+<span class="fc" id="L406">        }</span>
+<span class="fc" id="L407">        return new Verification(true, &quot;VERIFIED&quot;);</span>
+    }
+
+    private LiftedSuccessor lift(
+        Expr root,
+        String source,
+        Occurrence occurrence,
+        RewriteApplicabilitySchema schema,
+        SharedMultiPrincipalPreparationTraversal.PrincipalOutcome localResult,
+        RulePreparationCoordinator.Outcome authorized,
+        LocalWorkReceipt localWork,
+        AssumptionSignature sourceAssumptions
+    ) {
+<span class="fc" id="L420">        List&lt;ContextualStepEvidence&gt; retainedSteps = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L421">        localResult.preparationSteps().forEach(step -&gt; retainedSteps.add(</span>
+<span class="fc" id="L422">            ContextualStepEvidence.from(step)));</span>
+<span class="fc" id="L423">        Transformation principal = replayPrincipal(</span>
+<span class="fc" id="L424">            schema, localResult.terminalExpression());</span>
+<span class="fc" id="L425">        retainedSteps.add(ContextualStepEvidence.from(principal,</span>
+<span class="fc" id="L426">            localResult.terminalExpression()));</span>
+
+<span class="fc" id="L428">        ReplayResult lifted = replayAndLift(</span>
+<span class="fc" id="L429">            root, source, occurrence.path(), retainedSteps, schema,</span>
+            sourceAssumptions);
+<span class="fc" id="L431">        List&lt;Transformation&gt; liftedSteps = lifted.steps();</span>
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">        if (liftedSteps.stream().anyMatch(step -&gt;</span>
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">                !(step.provenance()</span>
+                    instanceof TransformationProvenance.PrimitiveRewriteSequence))) {
+<span class="nc" id="L435">            throw new NonLiftableProvenance();</span>
+        }
+<span class="fc" id="L437">        RecordedExecution execution = RecordedExecution.capture(source, liftedSteps);</span>
+<span class="fc" id="L438">        long replayUnits = add(lifted.replayUnits(), engineReplayUnits(</span>
+<span class="fc" id="L439">            localResult.terminalExpression(),</span>
+<span class="fc" id="L440">            principal.executionWork().canonicalWorkUnits()));</span>
+<span class="fc" id="L441">        String successorIdentity = successorIdentity(</span>
+            schema, source, sourceAssumptions, occurrence,
+<span class="fc" id="L443">            localResult, authorized.bridgeCertificateHash(), localWork,</span>
+            execution, retainedSteps);
+<span class="fc" id="L445">        AssumptionSignature resultAssumptions = AssumptionSignature.merge(</span>
+            sourceAssumptions,
+<span class="fc" id="L447">            AssumptionSignature.ofExpressions(execution.assumptions()));</span>
+<span class="fc" id="L448">        Transformation last = liftedSteps.getLast();</span>
+<span class="fc" id="L449">        Transformation candidate = new Transformation(</span>
+<span class="fc" id="L450">            schema.ruleId(),</span>
+<span class="fc" id="L451">            execution.transformedExpression(),</span>
+<span class="fc" id="L452">            last.kind(),</span>
+<span class="fc" id="L453">            last.mayIncreaseComplexity(),</span>
+<span class="fc" id="L454">            last.estimatedCostDelta(),</span>
+<span class="fc" id="L455">            last.equivalencePreservingByConstruction(),</span>
+            &quot;contextual-preparation:&quot; + successorIdentity,
+<span class="fc" id="L457">            resultAssumptions.normalizedAssumptions(),</span>
+<span class="fc" id="L458">            last.packId(),</span>
+<span class="fc" id="L459">            last.license(),</span>
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">            execution.work().primitiveRewrites() == 0</span>
+<span class="nc" id="L461">                ? List.of()</span>
+<span class="fc" id="L462">                : liftedSteps.stream()</span>
+<span class="fc" id="L463">                    .flatMap(step -&gt; step.primitiveRuleIds().stream()).toList(),</span>
+            new TransformationProvenance.Sequence(source, liftedSteps));
+<span class="fc" id="L465">        ContextualSuccessorEvidence evidence = new ContextualSuccessorEvidence(</span>
+            SUCCESSOR_IDENTITY_REVISION,
+            successorIdentity,
+<span class="fc" id="L468">            schema.ruleId(),</span>
+<span class="fc" id="L469">            schema.contentHash(),</span>
+<span class="fc" id="L470">            occurrence.path(),</span>
+<span class="fc" id="L471">            ExpressionFormatter.format(occurrence.subtree()),</span>
+<span class="fc" id="L472">            localResult.terminalExpression(),</span>
+<span class="fc" id="L473">            principal.transformedExpression(),</span>
+<span class="fc" id="L474">            execution.transformedExpression(),</span>
+            retainedSteps,
+<span class="fc" id="L476">            localResult.initialAnalysis(),</span>
+<span class="fc" id="L477">            localResult.terminalAnalysis(),</span>
+            localWork,
+<span class="fc" id="L479">            authorized.bridgeCertificateHash(),</span>
+<span class="fc" id="L480">            execution.toCanonicalJson(),</span>
+<span class="fc" id="L481">            execution.contentHash(),</span>
+            replayUnits);
+<span class="fc" id="L483">        RulePreparationCoordinator.Outcome outcome =</span>
+            new RulePreparationCoordinator.Outcome(
+<span class="fc" id="L485">                schema.ruleId(),</span>
+<span class="fc" id="L486">                schema.contentHash(),</span>
+                PatternTargetedLocalBridgeSearch.Status.PREPARED,
+<span class="fc" id="L488">                Optional.of(candidate),</span>
+                true,
+<span class="fc" id="L490">                localResult.initialAnalysis(),</span>
+<span class="fc" id="L491">                SharedPreparedPrincipalReplay.legacyWork(</span>
+                    new SharedMultiPrincipalPreparationTraversal.Work(
+<span class="fc" id="L493">                        localWork.expandedStates(), localWork.generatedTransitions(),</span>
+<span class="fc" id="L494">                        localWork.discoveredStates(), localWork.retainedTransitions(),</span>
+<span class="fc" id="L495">                        localWork.duplicateTransitions(),</span>
+<span class="fc" id="L496">                        localWork.principalAnalysisRequests(),</span>
+<span class="fc" id="L497">                        localWork.maxFrontierSize(),</span>
+<span class="fc" id="L498">                        Set.copyOf(localWork.reachedLimits()),</span>
+<span class="fc" id="L499">                        localWork.toPhysicalWork())),</span>
+<span class="fc" id="L500">                Set.copyOf(localWork.reachedLimits()),</span>
+                &quot;UNIFIED_V4_CONTEXTUAL_SUCCESSOR_REPLAYED&quot;,
+                successorIdentity);
+<span class="fc" id="L503">        return new LiftedSuccessor(outcome, evidence);</span>
+    }
+
+    private boolean replayEvidence(
+        Expr root,
+        String source,
+        ContextualSuccessorEvidence evidence,
+        RewriteApplicabilitySchema schema,
+        AssumptionSignature sourceAssumptions
+    ) {
+<span class="fc" id="L513">        Occurrence occurrence = new Occurrence(</span>
+<span class="fc" id="L514">            evidence.occurrencePath(), subtreeAt(root, evidence.occurrencePath()));</span>
+<span class="fc" id="L515">        if (!ExpressionFormatter.format(occurrence.subtree())</span>
+<span class="pc bpc" id="L516" title="1 of 2 branches missed.">                .equals(evidence.sourceSubtree())</span>
+<span class="pc bpc" id="L517" title="1 of 2 branches missed.">                || !schema.contentHash().equals(evidence.ruleFingerprint())</span>
+<span class="pc bpc" id="L518" title="1 of 2 branches missed.">                || evidence.localSteps().size() &lt; 2</span>
+<span class="fc" id="L519">                || !evidence.localSteps().getFirst().expressionBefore()</span>
+<span class="pc bpc" id="L520" title="1 of 2 branches missed.">                    .equals(evidence.sourceSubtree())</span>
+<span class="fc" id="L521">                || !evidence.localSteps().getLast().expressionBefore()</span>
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">                    .equals(evidence.terminalSubtree())</span>
+<span class="fc" id="L523">                || !evidence.localSteps().getLast().expressionAfter()</span>
+<span class="pc bpc" id="L524" title="1 of 2 branches missed.">                    .equals(evidence.resultSubtree())</span>
+<span class="fc" id="L525">                || !evidence.localSteps().getLast().ruleId()</span>
+<span class="pc bpc" id="L526" title="1 of 2 branches missed.">                    .equals(schema.ruleId())) {</span>
+<span class="nc" id="L527">            return false;</span>
+        }
+<span class="fc" id="L529">        AssumptionSignature terminalAssumptions = sourceAssumptions;</span>
+<span class="fc bfc" id="L530" title="All 2 branches covered.">        for (ContextualStepEvidence step : evidence.localSteps()</span>
+<span class="fc" id="L531">                .subList(0, evidence.localSteps().size() - 1)) {</span>
+<span class="fc" id="L532">            terminalAssumptions = AssumptionSignature.merge(</span>
+                terminalAssumptions,
+<span class="fc" id="L534">                AssumptionSignature.ofExpressions(step.emittedAssumptions()));</span>
+<span class="fc" id="L535">        }</span>
+<span class="fc" id="L536">        SharedPreparationGuardFacts.Fact guards =</span>
+<span class="fc" id="L537">            new SharedPreparationGuardFacts().evaluateSnapshot(</span>
+<span class="fc" id="L538">                schema, evidence.terminalAnalysis(), terminalAssumptions);</span>
+<span class="pc bpc" id="L539" title="1 of 2 branches missed.">        if (!guards.satisfied()) {</span>
+<span class="nc" id="L540">            return false;</span>
+        }
+<span class="fc" id="L542">        ReplayResult replay = replayAndLift(</span>
+<span class="fc" id="L543">            root, source, occurrence.path(), evidence.localSteps(), schema,</span>
+            sourceAssumptions);
+<span class="fc" id="L545">        List&lt;Transformation&gt; steps = replay.steps();</span>
+<span class="fc" id="L546">        RecordedExecution replayed = RecordedExecution.capture(source, steps);</span>
+<span class="pc bpc" id="L547" title="1 of 2 branches missed.">        if (!replayed.toCanonicalJson().equals(evidence.liftedExecutionJson())</span>
+<span class="pc bpc" id="L548" title="1 of 2 branches missed.">                || !replayed.contentHash().equals(evidence.liftedExecutionHash())) {</span>
+<span class="nc" id="L549">            return false;</span>
+        }
+<span class="fc" id="L551">        String identity = successorIdentity(</span>
+            schema, source, sourceAssumptions, occurrence,
+<span class="fc" id="L553">            evidence.initialAnalysis(), evidence.terminalAnalysis(),</span>
+<span class="fc" id="L554">            evidence.terminalSubtree(), evidence.resultSubtree(),</span>
+<span class="fc" id="L555">            evidence.localCertificateHash(), evidence.localWork(), replayed,</span>
+<span class="fc" id="L556">            evidence.localSteps());</span>
+<span class="fc" id="L557">        return identity.equals(evidence.successorIdentity());</span>
+    }
+
+    private ReplayResult replayAndLift(
+        Expr root,
+        String source,
+        String path,
+        List&lt;ContextualStepEvidence&gt; retained,
+        RewriteApplicabilitySchema principal,
+        AssumptionSignature sourceAssumptions
+    ) {
+<span class="fc" id="L568">        String local = ExpressionFormatter.format(subtreeAt(root, path));</span>
+<span class="fc" id="L569">        Expr currentRoot = root;</span>
+<span class="fc" id="L570">        List&lt;Transformation&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L571">        long replayUnits = 0;</span>
+<span class="fc bfc" id="L572" title="All 2 branches covered.">        for (ContextualStepEvidence step : retained) {</span>
+<span class="pc bpc" id="L573" title="1 of 2 branches missed.">            if (!local.equals(step.expressionBefore())) {</span>
+<span class="nc" id="L574">                throw new IllegalArgumentException(&quot;contextual path is disconnected&quot;);</span>
+            }
+<span class="fc bfc" id="L576" title="All 2 branches covered.">            RewriteRule selectedRule = step.ruleId().equals(principal.ruleId())</span>
+<span class="fc" id="L577">                ? principal.executor()</span>
+<span class="fc" id="L578">                : preparationRules.stream()</span>
+<span class="fc" id="L579">                    .filter(rule -&gt; step.ruleId().equals(rule.id()))</span>
+<span class="fc" id="L580">                    .findFirst().orElseThrow();</span>
+<span class="fc" id="L581">            List&lt;RewriteRule&gt; inventory = List.of(selectedRule);</span>
+<span class="fc" id="L582">            Transformation replayed = new AstRewriteTransformationEngine(</span>
+                    inventory, Integer.MAX_VALUE,
+<span class="fc" id="L584">                    Math.toIntExact(Math.min(Integer.MAX_VALUE,</span>
+<span class="fc" id="L585">                        nodeCount(parser.parseTerm(local)))))</span>
+<span class="fc" id="L586">                .transform(local).stream()</span>
+<span class="fc" id="L587">                .filter(value -&gt; step.ruleId().equals(value.rule()))</span>
+<span class="fc" id="L588">                .filter(value -&gt; step.expressionAfter().equals(</span>
+<span class="fc" id="L589">                    normalize(value.transformedExpression())))</span>
+<span class="fc" id="L590">                .filter(value -&gt; step.applicationKey().equals(value.applicationKey()))</span>
+<span class="fc" id="L591">                .filter(value -&gt; step.emittedAssumptions().equals(value.assumptions()))</span>
+<span class="fc" id="L592">                .filter(value -&gt; step.primitiveRuleIds().equals(value.primitiveRuleIds()))</span>
+<span class="fc" id="L593">                .findFirst().orElseThrow();</span>
+<span class="fc" id="L594">            replayUnits = add(replayUnits, engineReplayUnits(</span>
+<span class="fc" id="L595">                local, replayed.executionWork().canonicalWorkUnits()));</span>
+<span class="fc" id="L596">            replayUnits = add(replayUnits, 1);</span>
+<span class="pc bpc" id="L597" title="1 of 2 branches missed.">            if (!(replayed.provenance()</span>
+                    instanceof TransformationProvenance.PrimitiveRewriteSequence)) {
+<span class="nc" id="L599">                throw new NonLiftableProvenance();</span>
+            }
+<span class="fc" id="L601">            Expr nextRoot = replace(currentRoot, path,</span>
+<span class="fc" id="L602">                parser.parseTerm(replayed.transformedExpression()));</span>
+<span class="fc" id="L603">            String nextExpression = ExpressionFormatter.format(nextRoot);</span>
+<span class="fc" id="L604">            String liftedKey = &quot;contextual-lift:&quot; + sha256(</span>
+                SUCCESSOR_IDENTITY_REVISION + &quot;\u0000&quot; + source + &quot;\u0000&quot;
+                    + path + &quot;\u0000&quot; + local + &quot;\u0000&quot;
+<span class="fc" id="L607">                    + replayed.applicationKey() + &quot;\u0000&quot; + nextExpression);</span>
+<span class="fc bfc" id="L608" title="All 2 branches covered.">            List&lt;String&gt; retainedAssumptions = result.isEmpty()</span>
+<span class="fc" id="L609">                ? AssumptionSignature.merge(</span>
+                    sourceAssumptions,
+<span class="fc" id="L611">                    AssumptionSignature.ofExpressions(replayed.assumptions()))</span>
+<span class="fc" id="L612">                    .normalizedAssumptions()</span>
+<span class="fc" id="L613">                : replayed.assumptions();</span>
+<span class="fc" id="L614">            Transformation lifted = new Transformation(</span>
+<span class="fc" id="L615">                replayed.rule(), nextExpression, replayed.kind(),</span>
+<span class="fc" id="L616">                replayed.mayIncreaseComplexity(), replayed.estimatedCostDelta(),</span>
+<span class="fc" id="L617">                replayed.equivalencePreservingByConstruction(), liftedKey,</span>
+<span class="fc" id="L618">                retainedAssumptions, replayed.packId(), replayed.license(),</span>
+<span class="fc" id="L619">                replayed.primitiveRuleIds());</span>
+<span class="fc" id="L620">            result.add(lifted);</span>
+<span class="fc" id="L621">            currentRoot = nextRoot;</span>
+<span class="fc" id="L622">            local = normalize(replayed.transformedExpression());</span>
+<span class="fc" id="L623">        }</span>
+<span class="fc" id="L624">        return new ReplayResult(List.copyOf(result), replayUnits);</span>
+    }
+
+    private Transformation replayPrincipal(
+        RewriteApplicabilitySchema schema,
+        String terminalExpression
+    ) {
+<span class="fc" id="L631">        return new AstRewriteTransformationEngine(</span>
+<span class="fc" id="L632">                List.of(schema.executor()), Integer.MAX_VALUE, 1)</span>
+<span class="fc" id="L633">            .transform(terminalExpression).stream()</span>
+<span class="fc" id="L634">            .filter(value -&gt; schema.ruleId().equals(value.rule()))</span>
+<span class="fc" id="L635">            .findFirst().orElseThrow();</span>
+    }
+
+    private String successorIdentity(
+        RewriteApplicabilitySchema schema,
+        String source,
+        AssumptionSignature assumptions,
+        Occurrence occurrence,
+        SharedMultiPrincipalPreparationTraversal.PrincipalOutcome local,
+        String localCertificate,
+        LocalWorkReceipt localWork,
+        RecordedExecution execution,
+        List&lt;ContextualStepEvidence&gt; steps
+    ) {
+<span class="fc" id="L649">        return successorIdentity(schema, source, assumptions, occurrence,</span>
+<span class="fc" id="L650">            local.initialAnalysis(), local.terminalAnalysis(),</span>
+<span class="fc" id="L651">            local.terminalExpression(), steps.getLast().expressionAfter(),</span>
+            localCertificate, localWork, execution, steps);
+    }
+
+    private String successorIdentity(
+        RewriteApplicabilitySchema schema,
+        String source,
+        AssumptionSignature assumptions,
+        Occurrence occurrence,
+        PatternTargetedLocalBridgeSearch.AnalysisSnapshot initial,
+        PatternTargetedLocalBridgeSearch.AnalysisSnapshot terminal,
+        String terminalExpression,
+        String resultExpression,
+        String localCertificate,
+        LocalWorkReceipt localWork,
+        RecordedExecution execution,
+        List&lt;ContextualStepEvidence&gt; steps
+    ) {
+<span class="fc" id="L669">        StringBuilder value = new StringBuilder();</span>
+<span class="fc" id="L670">        append(value, SUCCESSOR_IDENTITY_REVISION);</span>
+<span class="fc" id="L671">        append(value, repositoryRevision);</span>
+<span class="fc" id="L672">        append(value, v3.principalInventoryFingerprint());</span>
+<span class="fc" id="L673">        append(value, v3.preparationInventoryFingerprint());</span>
+<span class="fc" id="L674">        append(value, v3.exactRegistryFingerprint());</span>
+<span class="fc" id="L675">        append(value, bridgeBudget.identity());</span>
+<span class="fc" id="L676">        append(value, contextualBudget.identity());</span>
+<span class="fc" id="L677">        append(value, schema.contentHash());</span>
+<span class="fc" id="L678">        append(value, source);</span>
+<span class="fc" id="L679">        append(value, assumptions.fingerprint());</span>
+<span class="fc" id="L680">        append(value, occurrence.path());</span>
+<span class="fc" id="L681">        append(value, ExpressionFormatter.format(occurrence.subtree()));</span>
+<span class="fc" id="L682">        append(value, initial.descriptor());</span>
+<span class="fc" id="L683">        append(value, terminal.descriptor());</span>
+<span class="fc" id="L684">        append(value, terminalExpression);</span>
+<span class="fc" id="L685">        append(value, resultExpression);</span>
+<span class="fc" id="L686">        append(value, localCertificate);</span>
+<span class="fc" id="L687">        append(value, localWork.identity());</span>
+<span class="fc" id="L688">        steps.forEach(step -&gt; append(value, step.identity()));</span>
+<span class="fc" id="L689">        append(value, execution.contentHash());</span>
+<span class="fc" id="L690">        append(value, Long.toString(execution.work().canonicalWorkUnits()));</span>
+<span class="fc" id="L691">        return sha256(value.toString());</span>
+    }
+
+    private List&lt;RewriteApplicabilitySchema&gt; unresolved(
+        Map&lt;String, RulePreparationCoordinator.Outcome&gt; outcomes
+    ) {
+<span class="fc" id="L697">        return principalSchemas.stream().filter(schema -&gt; {</span>
+<span class="fc" id="L698">            RulePreparationCoordinator.Outcome outcome = outcomes.get(schema.ruleId());</span>
+<span class="fc bfc" id="L699" title="All 2 branches covered.">            return !outcome.positive()</span>
+<span class="pc bpc" id="L700" title="1 of 2 branches missed.">                &amp;&amp; outcome.status()</span>
+                    != PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE;
+<span class="fc" id="L702">        }).collect(java.util.stream.Collectors.toCollection(ArrayList::new));</span>
+    }
+
+    private static void retainNegative(
+        Map&lt;String, RulePreparationCoordinator.Outcome&gt; outcomes,
+        String ruleId,
+        RulePreparationCoordinator.Outcome candidate
+    ) {
+<span class="fc" id="L710">        RulePreparationCoordinator.Outcome current = outcomes.get(ruleId);</span>
+<span class="pc bpc" id="L711" title="1 of 4 branches missed.">        boolean currentBudget = current != null &amp;&amp; current.status()</span>
+            == PatternTargetedLocalBridgeSearch.Status.BUDGET_INCONCLUSIVE;
+<span class="fc bfc" id="L713" title="All 2 branches covered.">        boolean candidateTechnical = candidate.status()</span>
+            == PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE;
+<span class="fc bfc" id="L715" title="All 2 branches covered.">        boolean candidateBudget = candidate.status()</span>
+            == PatternTargetedLocalBridgeSearch.Status.BUDGET_INCONCLUSIVE;
+<span class="fc bfc" id="L717" title="All 6 branches covered.">        if (candidateTechnical || candidateBudget || !currentBudget) {</span>
+<span class="fc" id="L718">            outcomes.put(ruleId, candidate);</span>
+        }
+<span class="fc" id="L720">    }</span>
+
+    private RulePreparationCoordinator.Outcome negative(
+        RewriteApplicabilitySchema schema,
+        PatternTargetedLocalBridgeSearch.Status status,
+        PatternTargetedLocalBridgeSearch.AnalysisSnapshot analysis,
+        String detail
+    ) {
+<span class="fc" id="L728">        return new RulePreparationCoordinator.Outcome(</span>
+<span class="fc" id="L729">            schema.ruleId(), schema.contentHash(), status, Optional.empty(), false,</span>
+<span class="fc" id="L730">            analysis, PatternTargetedLocalBridgeSearch.Work.empty(),</span>
+<span class="fc bfc" id="L731" title="All 2 branches covered.">            status == PatternTargetedLocalBridgeSearch.Status.BUDGET_INCONCLUSIVE</span>
+<span class="fc" id="L732">                ? Set.of(&quot;V4_GLOBAL_ANALYSIS&quot;) : Set.of(),</span>
+            detail, &quot;&quot;);
+    }
+
+    private List&lt;Occurrence&gt; occurrences(Expr root) {
+<span class="fc" id="L737">        List&lt;Occurrence&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L738">        collect(root, &quot;$&quot;, false, result);</span>
+<span class="fc" id="L739">        return List.copyOf(result);</span>
+    }
+
+    private void collect(
+        Expr expression,
+        String path,
+        boolean retain,
+        List&lt;Occurrence&gt; target
+    ) {
+<span class="fc bfc" id="L748" title="All 2 branches covered.">        if (retain) {</span>
+<span class="fc" id="L749">            target.add(new Occurrence(path, expression));</span>
+        }
+<span class="fc bfc" id="L751" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L752">            collect(binary.left(), path + &quot;L&quot;, true, target);</span>
+<span class="fc" id="L753">            collect(binary.right(), path + &quot;R&quot;, true, target);</span>
+<span class="pc bpc" id="L754" title="1 of 2 branches missed.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="nc bnc" id="L755" title="All 2 branches missed.">            for (int i = 0; i &lt; function.arguments().size(); i++) {</span>
+<span class="nc" id="L756">                collect(function.arguments().get(i), path + &quot;A&quot; + i, true, target);</span>
+            }
+        }
+<span class="fc" id="L759">    }</span>
+
+    private Expr subtreeAt(Expr root, String path) {
+<span class="pc bpc" id="L762" title="2 of 4 branches missed.">        if (path == null || !path.startsWith(&quot;$&quot;)) {</span>
+<span class="nc" id="L763">            throw new IllegalArgumentException(&quot;invalid occurrence path&quot;);</span>
+        }
+<span class="fc" id="L765">        Expr current = root;</span>
+<span class="fc" id="L766">        int offset = 1;</span>
+<span class="fc bfc" id="L767" title="All 2 branches covered.">        while (offset &lt; path.length()) {</span>
+<span class="fc" id="L768">            char marker = path.charAt(offset++);</span>
+<span class="pc bpc" id="L769" title="3 of 4 branches missed.">            if (marker == 'L' &amp;&amp; current instanceof BinaryExpr binary) {</span>
+<span class="nc" id="L770">                current = binary.left();</span>
+<span class="pc bpc" id="L771" title="2 of 4 branches missed.">            } else if (marker == 'R' &amp;&amp; current instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L772">                current = binary.right();</span>
+<span class="nc bnc" id="L773" title="All 4 branches missed.">            } else if (marker == 'A' &amp;&amp; current instanceof FunctionExpr function) {</span>
+<span class="nc" id="L774">                int start = offset;</span>
+<span class="nc bnc" id="L775" title="All 2 branches missed.">                while (offset &lt; path.length()</span>
+<span class="nc bnc" id="L776" title="All 2 branches missed.">                        &amp;&amp; Character.isDigit(path.charAt(offset))) {</span>
+<span class="nc" id="L777">                    offset++;</span>
+                }
+<span class="nc bnc" id="L779" title="All 2 branches missed.">                if (start == offset) {</span>
+<span class="nc" id="L780">                    throw new IllegalArgumentException(&quot;invalid argument path&quot;);</span>
+                }
+<span class="nc" id="L782">                current = function.arguments().get(</span>
+<span class="nc" id="L783">                    Integer.parseInt(path.substring(start, offset)));</span>
+<span class="nc" id="L784">            } else {</span>
+<span class="nc" id="L785">                throw new IllegalArgumentException(&quot;path does not select a subtree&quot;);</span>
+            }
+<span class="fc" id="L787">        }</span>
+<span class="fc" id="L788">        return current;</span>
+    }
+
+    private Expr replace(Expr root, String path, Expr replacement) {
+<span class="pc bpc" id="L792" title="1 of 2 branches missed.">        if (&quot;$&quot;.equals(path)) {</span>
+<span class="nc" id="L793">            return replacement;</span>
+        }
+<span class="fc" id="L795">        return replace(root, path, 1, replacement);</span>
+    }
+
+    private Expr replace(Expr current, String path, int offset, Expr replacement) {
+<span class="fc" id="L799">        char marker = path.charAt(offset++);</span>
+<span class="pc bpc" id="L800" title="3 of 4 branches missed.">        if (marker == 'L' &amp;&amp; current instanceof BinaryExpr binary) {</span>
+<span class="nc bnc" id="L801" title="All 2 branches missed.">            Expr left = offset == path.length()</span>
+<span class="nc" id="L802">                ? replacement</span>
+<span class="nc" id="L803">                : replace(binary.left(), path, offset, replacement);</span>
+<span class="nc" id="L804">            return new BinaryExpr(left,</span>
+<span class="nc" id="L805">                binary.operator(), binary.right());</span>
+        }
+<span class="pc bpc" id="L807" title="2 of 4 branches missed.">        if (marker == 'R' &amp;&amp; current instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L808" title="1 of 2 branches missed.">            Expr right = offset == path.length()</span>
+<span class="fc" id="L809">                ? replacement</span>
+<span class="pc" id="L810">                : replace(binary.right(), path, offset, replacement);</span>
+<span class="fc" id="L811">            return new BinaryExpr(binary.left(), binary.operator(), right);</span>
+        }
+<span class="nc bnc" id="L813" title="All 4 branches missed.">        if (marker == 'A' &amp;&amp; current instanceof FunctionExpr function) {</span>
+<span class="nc" id="L814">            int start = offset;</span>
+<span class="nc bnc" id="L815" title="All 2 branches missed.">            while (offset &lt; path.length()</span>
+<span class="nc bnc" id="L816" title="All 2 branches missed.">                    &amp;&amp; Character.isDigit(path.charAt(offset))) {</span>
+<span class="nc" id="L817">                offset++;</span>
+            }
+<span class="nc" id="L819">            int index = Integer.parseInt(path.substring(start, offset));</span>
+<span class="nc" id="L820">            List&lt;Expr&gt; arguments = new ArrayList&lt;&gt;(function.arguments());</span>
+<span class="nc bnc" id="L821" title="All 2 branches missed.">            arguments.set(index, offset == path.length()</span>
+<span class="nc" id="L822">                ? replacement</span>
+<span class="nc" id="L823">                : replace(arguments.get(index), path, offset, replacement));</span>
+<span class="nc" id="L824">            return new FunctionExpr(function.name(), arguments);</span>
+        }
+<span class="nc" id="L826">        throw new IllegalArgumentException(&quot;path does not select a subtree&quot;);</span>
+    }
+
+    private static long baseAnalysisUnits(
+        OccurrenceAwareSharedRulePreparationCoordinator.Evaluation evaluation
+    ) {
+<span class="fc" id="L832">        RulePreparationCoordinator.AggregateWork aggregate =</span>
+<span class="fc" id="L833">            evaluation.aggregateWork();</span>
+<span class="fc" id="L834">        long units = add(evaluation.occurrenceWork().chargedUnits(),</span>
+<span class="fc" id="L835">            add(aggregate.expandedStates(), add(aggregate.generatedTransitions(),</span>
+<span class="fc" id="L836">                add(aggregate.discoveredStates(), add(aggregate.retainedTransitions(),</span>
+<span class="fc" id="L837">                    add(aggregate.duplicateTransitions(), aggregate.analyzedCandidates()))))));</span>
+<span class="fc bfc" id="L838" title="All 2 branches covered.">        for (Transformation candidate : evaluation.candidates()) {</span>
+<span class="fc" id="L839">            units = add(units, candidate.executionWork().canonicalWorkUnits());</span>
+<span class="fc" id="L840">        }</span>
+<span class="fc bfc" id="L841" title="All 2 branches covered.">        if (evaluation.delegatedSharedExecutionWork().isPresent()) {</span>
+<span class="fc" id="L842">            SharedUnifiedRulePreparationCoordinator.SharedExecutionWork shared =</span>
+<span class="fc" id="L843">                evaluation.delegatedSharedExecutionWork().orElseThrow();</span>
+<span class="fc" id="L844">            units = add(units, add(shared.sourceAnalysisWork().uniqueParsedExpressions(),</span>
+<span class="fc" id="L845">                add(shared.sourceAnalysisWork().uniqueAnalyses(), shared.guardRequests())));</span>
+        }
+<span class="fc" id="L847">        return units;</span>
+    }
+
+    private static long nodeCount(Expr expression) {
+<span class="fc bfc" id="L851" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L852">            return add(1, add(nodeCount(binary.left()), nodeCount(binary.right())));</span>
+        }
+<span class="pc bpc" id="L854" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L855">            long result = 1;</span>
+<span class="nc bnc" id="L856" title="All 2 branches missed.">            for (Expr argument : function.arguments()) {</span>
+<span class="nc" id="L857">                result = add(result, nodeCount(argument));</span>
+<span class="nc" id="L858">            }</span>
+<span class="nc" id="L859">            return result;</span>
+        }
+<span class="fc" id="L861">        return 1;</span>
+    }
+
+    private long engineReplayUnits(String expression, long candidateUnits) {
+<span class="fc" id="L865">        return add(add(1, multiply(3, nodeCount(parser.parseTerm(expression)))),</span>
+            candidateUnits);
+    }
+
+    /**
+     * Reserved before a package-local traversal whose partial counters cannot
+     * be recovered if a rule throws. Successful traversals replace this with
+     * their exact retained receipt; failed traversals keep this bounded charge.
+     */
+    private long failedTraversalReservation(Expr subtree, int principals) {
+<span class="fc" id="L875">        long states = bridgeBudget.maxVisitedStates();</span>
+<span class="fc" id="L876">        long transitions = bridgeBudget.maxGeneratedTransitions();</span>
+        // An expansion observes its complete bounded engine batch before the
+        // traversal's global transition cut is applied. The +1 covers the
+        // transition that discovers that cut.
+<span class="fc" id="L880">        long transformationsPerState = add(</span>
+<span class="fc" id="L881">            Math.min(bridgeBudget.maxSuccessorsPerState(),</span>
+<span class="fc" id="L882">                bridgeBudget.maxGeneratedTransitions()), 1);</span>
+<span class="fc" id="L883">        long generatedTransformations = multiply(</span>
+            states, transformationsPerState);
+
+        // Complete LocalWorkReceipt upper bound:
+        //   principal ledger       N*(S+G)
+        //   physical analyses      N*(1+S+G)
+        //   state/request ledgers  5*S
+        //   transition ledgers     2*G
+        //   transform+parse        2*T
+<span class="fc" id="L892">        long principalAnalyses = multiply(principals,</span>
+<span class="fc" id="L893">            add(1, add(multiply(2, states), multiply(2, transitions))));</span>
+<span class="fc" id="L894">        long retainedLedger = add(multiply(5, states),</span>
+<span class="fc" id="L895">            add(multiply(2, transitions),</span>
+<span class="fc" id="L896">                multiply(2, generatedTransformations)));</span>
+        // Separate bounded engine-call reservation for the call that threw.
+<span class="fc" id="L898">        return add(engineReplayUnits(</span>
+<span class="fc" id="L899">            ExpressionFormatter.format(subtree), 0),</span>
+<span class="fc" id="L900">            add(principalAnalyses, retainedLedger));</span>
+    }
+
+    private long liftReservation(
+        SharedMultiPrincipalPreparationTraversal.PrincipalOutcome local
+    ) {
+<span class="fc" id="L906">        long units = engineReplayUnits(local.terminalExpression(), 1);</span>
+        for (PatternTargetedLocalBridgeSearch.Step step
+<span class="fc bfc" id="L908" title="All 2 branches covered.">                : local.preparationSteps()) {</span>
+<span class="fc" id="L909">            units = add(units, add(engineReplayUnits(</span>
+<span class="fc" id="L910">                step.expressionBefore(), step.primitiveRuleIds().size()), 1));</span>
+<span class="fc" id="L911">        }</span>
+<span class="fc" id="L912">        return add(units, add(engineReplayUnits(</span>
+<span class="fc" id="L913">            local.terminalExpression(), 1), 1));</span>
+    }
+
+    private String normalize(String expression) {
+<span class="fc" id="L917">        return ExpressionFormatter.format(parser.parseTerm(expression));</span>
+    }
+
+    private static String requireRevision(String value) {
+<span class="pc bpc" id="L921" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;[0-9a-f]{40}&quot;)) {</span>
+<span class="nc" id="L922">            throw new IllegalArgumentException(</span>
+                &quot;repositoryRevision must be a lowercase commit SHA&quot;);
+        }
+<span class="fc" id="L925">        return value;</span>
+    }
+
+    private static long add(long left, long right) {
+        try {
+<span class="fc" id="L930">            return Math.addExact(left, right);</span>
+<span class="nc" id="L931">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L932">            return Long.MAX_VALUE;</span>
+        }
+    }
+
+    private static long multiply(long left, long right) {
+        try {
+<span class="fc" id="L938">            return Math.multiplyExact(left, right);</span>
+<span class="nc" id="L939">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L940">            return Long.MAX_VALUE;</span>
+        }
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L945">        target.append(value.getBytes(StandardCharsets.UTF_8).length)</span>
+<span class="fc" id="L946">            .append(':').append(value);</span>
+<span class="fc" id="L947">    }</span>
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L951">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L952">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L953">                    .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L954">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L955">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    private record Occurrence(String path, Expr subtree) {
+<span class="fc" id="L960">        private Occurrence {</span>
+<span class="pc bpc" id="L961" title="2 of 4 branches missed.">            if (path == null || path.isBlank()) {</span>
+<span class="nc" id="L962">                throw new IllegalArgumentException(&quot;blank occurrence path&quot;);</span>
+            }
+<span class="fc" id="L964">            Objects.requireNonNull(subtree, &quot;subtree&quot;);</span>
+<span class="fc" id="L965">        }</span>
+    }
+
+<span class="fc" id="L968">    private record LiftedSuccessor(</span>
+        RulePreparationCoordinator.Outcome outcome,
+        ContextualSuccessorEvidence evidence
+    ) { }
+
+    private record ReplayResult(
+        List&lt;Transformation&gt; steps,
+        long replayUnits
+    ) {
+<span class="fc" id="L977">        private ReplayResult {</span>
+<span class="fc" id="L978">            steps = List.copyOf(steps);</span>
+<span class="pc bpc" id="L979" title="2 of 4 branches missed.">            if (steps.isEmpty() || replayUnits &lt; 1) {</span>
+<span class="nc" id="L980">                throw new IllegalArgumentException(&quot;invalid replay result&quot;);</span>
+            }
+<span class="fc" id="L982">        }</span>
+    }
+
+    private static final class NonLiftableProvenance
+        extends RuntimeException { }
+
+    public record ContextualBudget(
+        long maxAnalysisUnits,
+        int maxOccurrenceBatches
+    ) {
+<span class="fc" id="L992">        public ContextualBudget {</span>
+<span class="pc bpc" id="L993" title="2 of 4 branches missed.">            if (maxAnalysisUnits &lt; 0 || maxOccurrenceBatches &lt; 1) {</span>
+<span class="nc" id="L994">                throw new IllegalArgumentException(&quot;invalid contextual budget&quot;);</span>
+            }
+<span class="fc" id="L996">        }</span>
+
+        public String identity() {
+<span class="fc" id="L999">            return maxAnalysisUnits + &quot;:&quot; + maxOccurrenceBatches;</span>
+        }
+    }
+
+    public record ContextualStepEvidence(
+        String expressionBefore,
+        String expressionAfter,
+        String ruleId,
+        List&lt;String&gt; emittedAssumptions,
+        String applicationKey,
+        List&lt;String&gt; primitiveRuleIds
+    ) {
+<span class="fc" id="L1011">        public ContextualStepEvidence {</span>
+<span class="pc bpc" id="L1012" title="3 of 6 branches missed.">            if (expressionBefore == null || expressionBefore.isBlank()</span>
+<span class="pc bpc" id="L1013" title="2 of 4 branches missed.">                    || expressionAfter == null || expressionAfter.isBlank()</span>
+<span class="pc bpc" id="L1014" title="2 of 4 branches missed.">                    || ruleId == null || ruleId.isBlank()</span>
+<span class="pc bpc" id="L1015" title="1 of 2 branches missed.">                    || applicationKey == null || applicationKey.isBlank()) {</span>
+<span class="nc" id="L1016">                throw new IllegalArgumentException(&quot;invalid contextual step&quot;);</span>
+            }
+<span class="fc" id="L1018">            emittedAssumptions = List.copyOf(emittedAssumptions);</span>
+<span class="fc" id="L1019">            primitiveRuleIds = List.copyOf(primitiveRuleIds);</span>
+<span class="fc" id="L1020">        }</span>
+
+        private static ContextualStepEvidence from(
+            PatternTargetedLocalBridgeSearch.Step step
+        ) {
+<span class="fc" id="L1025">            return new ContextualStepEvidence(</span>
+<span class="fc" id="L1026">                step.expressionBefore(), step.expressionAfter(), step.ruleId(),</span>
+<span class="fc" id="L1027">                step.emittedAssumptions(), step.applicationKey(),</span>
+<span class="fc" id="L1028">                step.primitiveRuleIds());</span>
+        }
+
+        private static ContextualStepEvidence from(
+            Transformation step,
+            String source
+        ) {
+<span class="fc" id="L1035">            return new ContextualStepEvidence(</span>
+<span class="fc" id="L1036">                source, step.transformedExpression(), step.rule(),</span>
+<span class="fc" id="L1037">                step.assumptions(), step.applicationKey(), step.primitiveRuleIds());</span>
+        }
+
+        private String identity() {
+<span class="fc" id="L1041">            return expressionBefore + &quot;\u0000&quot; + expressionAfter + &quot;\u0000&quot;</span>
+                + ruleId + &quot;\u0000&quot; + emittedAssumptions + &quot;\u0000&quot;
+                + applicationKey + &quot;\u0000&quot; + primitiveRuleIds;
+        }
+    }
+
+    /** Public, JSON-safe projection of one package-local traversal receipt. */
+    public record LocalWorkReceipt(
+        int expandedStates,
+        int generatedTransitions,
+        int discoveredStates,
+        int retainedTransitions,
+        int duplicateTransitions,
+        long principalAnalysisRequests,
+        int maxFrontierSize,
+        List&lt;String&gt; reachedLimits,
+        long expansionRequests,
+        long uniqueExpansions,
+        long expansionCacheHits,
+        long generatedTransformations,
+        long parseRequests,
+        long uniqueParsedExpressions,
+        long parseCacheHits,
+        long analysisRequests,
+        long uniqueAnalyses,
+        long analysisCacheHits
+    ) {
+<span class="fc" id="L1068">        public LocalWorkReceipt {</span>
+<span class="fc" id="L1069">            reachedLimits = List.copyOf(reachedLimits);</span>
+<span class="fc" id="L1070">        }</span>
+
+        private static LocalWorkReceipt from(
+            SharedMultiPrincipalPreparationTraversal.Work work
+        ) {
+<span class="fc" id="L1075">            SharedPreparationTraversal.Work physical = work.physicalWork();</span>
+<span class="fc" id="L1076">            return new LocalWorkReceipt(</span>
+<span class="fc" id="L1077">                work.expandedStates(), work.generatedTransitions(),</span>
+<span class="fc" id="L1078">                work.discoveredStates(), work.retainedTransitions(),</span>
+<span class="fc" id="L1079">                work.duplicateTransitions(), work.principalAnalysisRequests(),</span>
+<span class="fc" id="L1080">                work.maxFrontierSize(), work.reachedLimits().stream().sorted().toList(),</span>
+<span class="fc" id="L1081">                physical.expansionRequests(), physical.uniqueExpansions(),</span>
+<span class="fc" id="L1082">                physical.expansionCacheHits(), physical.generatedTransformations(),</span>
+<span class="fc" id="L1083">                physical.parseRequests(), physical.uniqueParsedExpressions(),</span>
+<span class="fc" id="L1084">                physical.parseCacheHits(), physical.analysisRequests(),</span>
+<span class="fc" id="L1085">                physical.uniqueAnalyses(), physical.analysisCacheHits());</span>
+        }
+
+        private SharedPreparationTraversal.Work toPhysicalWork() {
+<span class="fc" id="L1089">            return new SharedPreparationTraversal.Work(</span>
+                expansionRequests, uniqueExpansions, expansionCacheHits,
+                generatedTransformations, parseRequests,
+                uniqueParsedExpressions, parseCacheHits, analysisRequests,
+                uniqueAnalyses, analysisCacheHits);
+        }
+
+        public long chargedUnits() {
+<span class="fc" id="L1097">            long total = expandedStates;</span>
+<span class="fc" id="L1098">            total = add(total, generatedTransitions);</span>
+<span class="fc" id="L1099">            total = add(total, discoveredStates);</span>
+<span class="fc" id="L1100">            total = add(total, retainedTransitions);</span>
+<span class="fc" id="L1101">            total = add(total, duplicateTransitions);</span>
+<span class="fc" id="L1102">            total = add(total, principalAnalysisRequests);</span>
+<span class="fc" id="L1103">            total = add(total, expansionRequests);</span>
+<span class="fc" id="L1104">            total = add(total, generatedTransformations);</span>
+<span class="fc" id="L1105">            total = add(total, parseRequests);</span>
+<span class="fc" id="L1106">            total = add(total, analysisRequests);</span>
+<span class="fc" id="L1107">            return total;</span>
+        }
+
+        private String identity() {
+<span class="fc" id="L1111">            return expandedStates + &quot;:&quot; + generatedTransitions + &quot;:&quot;</span>
+                + discoveredStates + &quot;:&quot; + retainedTransitions + &quot;:&quot;
+                + duplicateTransitions + &quot;:&quot; + principalAnalysisRequests + &quot;:&quot;
+                + maxFrontierSize + &quot;:&quot; + reachedLimits + &quot;:&quot;
+                + expansionRequests + &quot;:&quot; + uniqueExpansions + &quot;:&quot;
+                + expansionCacheHits + &quot;:&quot; + generatedTransformations + &quot;:&quot;
+                + parseRequests + &quot;:&quot; + uniqueParsedExpressions + &quot;:&quot;
+                + parseCacheHits + &quot;:&quot; + analysisRequests + &quot;:&quot;
+                + uniqueAnalyses + &quot;:&quot; + analysisCacheHits;
+        }
+    }
+
+    public record ContextualSuccessorEvidence(
+        String revision,
+        String successorIdentity,
+        String ruleId,
+        String ruleFingerprint,
+        String occurrencePath,
+        String sourceSubtree,
+        String terminalSubtree,
+        String resultSubtree,
+        String resultExpression,
+        List&lt;ContextualStepEvidence&gt; localSteps,
+        PatternTargetedLocalBridgeSearch.AnalysisSnapshot initialAnalysis,
+        PatternTargetedLocalBridgeSearch.AnalysisSnapshot terminalAnalysis,
+        LocalWorkReceipt localWork,
+        String localCertificateHash,
+        String liftedExecutionJson,
+        String liftedExecutionHash,
+        long replayUnits
+    ) {
+<span class="fc" id="L1142">        public ContextualSuccessorEvidence {</span>
+<span class="pc bpc" id="L1143" title="2 of 4 branches missed.">            if (!SUCCESSOR_IDENTITY_REVISION.equals(revision)</span>
+                    || successorIdentity == null
+<span class="pc bpc" id="L1145" title="2 of 4 branches missed.">                    || !successorIdentity.matches(&quot;sha256:[0-9a-f]{64}&quot;)</span>
+<span class="pc bpc" id="L1146" title="2 of 4 branches missed.">                    || ruleId == null || ruleId.isBlank()</span>
+                    || ruleFingerprint == null
+<span class="pc bpc" id="L1148" title="2 of 4 branches missed.">                    || !ruleFingerprint.matches(&quot;sha256:[0-9a-f]{64}&quot;)</span>
+<span class="pc bpc" id="L1149" title="2 of 4 branches missed.">                    || occurrencePath == null || occurrencePath.isBlank()</span>
+                    || localCertificateHash == null
+<span class="pc bpc" id="L1151" title="2 of 4 branches missed.">                    || !localCertificateHash.matches(&quot;sha256:[0-9a-f]{64}&quot;)</span>
+                    || liftedExecutionHash == null
+<span class="pc bpc" id="L1153" title="3 of 6 branches missed.">                    || !liftedExecutionHash.matches(&quot;sha256:[0-9a-f]{64}&quot;)</span>
+                    || replayUnits &lt; 1 || localSteps == null
+<span class="pc bpc" id="L1155" title="1 of 2 branches missed.">                    || localSteps.size() &lt; 2) {</span>
+<span class="nc" id="L1156">                throw new IllegalArgumentException(&quot;invalid contextual successor&quot;);</span>
+            }
+<span class="fc" id="L1158">            localSteps = List.copyOf(localSteps);</span>
+<span class="fc" id="L1159">            Objects.requireNonNull(initialAnalysis, &quot;initialAnalysis&quot;);</span>
+<span class="fc" id="L1160">            Objects.requireNonNull(terminalAnalysis, &quot;terminalAnalysis&quot;);</span>
+<span class="fc" id="L1161">            Objects.requireNonNull(localWork, &quot;localWork&quot;);</span>
+<span class="fc" id="L1162">            RecordedExecution execution = RecordedExecution.fromCanonicalJson(</span>
+                liftedExecutionJson);
+<span class="pc bpc" id="L1164" title="1 of 2 branches missed.">            if (!execution.contentHash().equals(liftedExecutionHash)</span>
+<span class="pc bpc" id="L1165" title="1 of 2 branches missed.">                    || !execution.transformedExpression().equals(resultExpression)) {</span>
+<span class="nc" id="L1166">                throw new IllegalArgumentException(</span>
+                    &quot;lifted execution identity is inconsistent&quot;);
+            }
+<span class="fc" id="L1169">        }</span>
+    }
+
+    /** Versioned logical accounting; these units are not CPU or wall time. */
+    public record ContextualWork(
+        String revision,
+        long baseAnalysisUnits,
+        long occurrenceNodes,
+        int occurrenceBatches,
+        long localBatchUnits,
+        long failedBatchReservationUnits,
+        long localAuthorizationUnits,
+        long liftedReplayUnits,
+        long failedLiftReservationUnits,
+        long analysisUnits,
+        long baseDirectReplayReservationUnits,
+        long contextualReplayReservationUnits,
+        long verificationReservationUnits,
+        boolean limitReached
+    ) {
+<span class="fc" id="L1189">        public ContextualWork {</span>
+<span class="pc bpc" id="L1190" title="13 of 26 branches missed.">            if (!CONTEXTUAL_WORK_REVISION.equals(revision)</span>
+                    || baseAnalysisUnits &lt; 0 || occurrenceNodes &lt; 0
+                    || occurrenceBatches &lt; 0 || localBatchUnits &lt; 0
+                    || failedBatchReservationUnits &lt; 0
+                    || localAuthorizationUnits &lt; 0 || liftedReplayUnits &lt; 0
+                    || failedLiftReservationUnits &lt; 0
+                    || analysisUnits &lt; baseAnalysisUnits
+                    || baseDirectReplayReservationUnits &lt; 0
+                    || contextualReplayReservationUnits &lt; 0
+                    || verificationReservationUnits &lt; analysisUnits) {
+<span class="nc" id="L1200">                throw new IllegalArgumentException(&quot;invalid contextual work ledger&quot;);</span>
+            }
+<span class="fc" id="L1202">        }</span>
+    }
+
+    public record Evaluation(
+        String coordinatorId,
+        String successorIdentityRevision,
+        String repositoryRevision,
+        String principalInventoryFingerprint,
+        String preparationInventoryFingerprint,
+        String exactRegistryFingerprint,
+        PatternTargetedLocalBridgeSearch.Budget bridgeBudget,
+        ContextualBudget contextualBudget,
+        String sourceExpression,
+        AssumptionSignature sourceAssumptions,
+        OccurrenceAwareSharedRulePreparationCoordinator.Evaluation baseV3Evaluation,
+        List&lt;RulePreparationCoordinator.Outcome&gt; outcomes,
+        List&lt;ContextualSuccessorEvidence&gt; successors,
+        ContextualWork work
+    ) {
+<span class="fc" id="L1221">        public Evaluation {</span>
+<span class="pc bpc" id="L1222" title="1 of 2 branches missed.">            if (!COORDINATOR_ID.equals(coordinatorId)</span>
+<span class="pc bpc" id="L1223" title="1 of 2 branches missed.">                    || !SUCCESSOR_IDENTITY_REVISION.equals(</span>
+                        successorIdentityRevision)) {
+<span class="nc" id="L1225">                throw new IllegalArgumentException(&quot;invalid v4 evaluation identity&quot;);</span>
+            }
+<span class="fc" id="L1227">            outcomes = List.copyOf(outcomes);</span>
+<span class="fc" id="L1228">            successors = List.copyOf(successors);</span>
+<span class="fc" id="L1229">            Objects.requireNonNull(baseV3Evaluation, &quot;baseV3Evaluation&quot;);</span>
+<span class="fc" id="L1230">            Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L1231">        }</span>
+
+        public Optional&lt;RulePreparationCoordinator.Outcome&gt; outcome(String ruleId) {
+<span class="fc" id="L1234">            return outcomes.stream().filter(value -&gt; value.ruleId().equals(ruleId))</span>
+<span class="fc" id="L1235">                .findFirst();</span>
+        }
+
+        public List&lt;Transformation&gt; candidates() {
+<span class="nc" id="L1239">            return outcomes.stream().flatMap(value -&gt; value.candidate().stream())</span>
+<span class="nc" id="L1240">                .toList();</span>
+        }
+    }
+
+    public record Verification(boolean valid, String detailCode) {
+<span class="fc" id="L1245">        public Verification {</span>
+<span class="pc bpc" id="L1246" title="2 of 4 branches missed.">            if (detailCode == null || detailCode.isBlank()) {</span>
+<span class="nc" id="L1247">                throw new IllegalArgumentException(&quot;blank verification detail&quot;);</span>
+            }
+<span class="fc" id="L1249">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

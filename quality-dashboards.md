@@ -34,21 +34,25 @@ public/dev/bench/badge.json
 public/dev/bench/index.html
 ```
 
-The performance page is intentionally a deterministic static report. Historical
-trend storage and regression decisions are not delegated to a GitHub Action.
-Such a policy can be added later as a checkout-owned comparison task with a
-versioned baseline.
+The performance page is a deterministic static report. The checkout also owns
+the content-bound v3 regression decision and the Java renderer for two retained
+JMH history snapshots and 29 SVG charts; see
+[performance history](performance-history.md). Neither history nor regression
+interpretation is delegated to a GitHub Action.
 
 ## Verification and publication boundary
 
-`.github/workflows/gradle.yml` contains two jobs in one workflow run:
+`.github/workflows/gradle.yml` separates expensive authorities within one workflow:
 
-1. `verification` provisions Java and external tools, invokes only
-   `./gradlew ciCheck`, and retains the resulting reports.
-2. `publish-pages` downloads those outputs, combines `docs/` and `public/`, and
+1. Gradle, isolated JMH, isolated SymPy runtime, complete Maven/Docker and the
+   external polynomial comparison execute their checkout-owned commands.
+2. Required `verification` rejects failed authorities, joins the coverage
+   inputs, reruns the unchanged coverage verifier, and collects the complete
+   [quality acceptance evidence](quality-acceptance-evidence.md).
+3. `publish-pages` downloads the retained outputs, combines `docs/` and `public/`, and
    deploys the static files through GitHub Pages.
 
-The second job has no test selection, assertions or benchmark interpretation.
+The publication job has no test selection, assertions or benchmark interpretation.
 It cannot turn a failed verification into a successful deployment. There is no
 additional benchmark workflow and no `gh-pages` branch write that creates a
 second Pages build run.

@@ -96,8 +96,8 @@ public final class BoundedRequestBody {
         public int read(byte[] buffer, int offset, int length)
                 throws IOException {
 <span class="fc" id="L98">            Objects.checkFromIndexSize(offset, length, buffer.length);</span>
-<span class="pc bpc" id="L99" title="1 of 2 branches missed.">            if (length == 0) {</span>
-<span class="nc" id="L100">                return 0;</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            if (length == 0) {</span>
+<span class="fc" id="L100">                return 0;</span>
             }
 <span class="fc bfc" id="L102" title="All 2 branches covered.">            if (eof) {</span>
 <span class="fc" id="L103">                return -1;</span>

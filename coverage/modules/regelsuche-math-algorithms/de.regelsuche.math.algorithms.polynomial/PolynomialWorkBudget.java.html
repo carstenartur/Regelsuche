@@ -5,45 +5,59 @@ import de.regelsuche.polynomial.PolynomialWorkSink;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Shared non-resettable work budget for exact polynomial algorithm stages. */
+/**
+ * Shared non-resettable work budget for exact polynomial algorithm stages.
+ * Mutable bookkeeping is confined to one execution thread; published ledgers
+ * are immutable snapshots and may be retained independently of this budget.
+ */
 final class PolynomialWorkBudget implements PolynomialWorkSink {
     private final long limit;
-<span class="fc" id="L11">    private final Map&lt;String, Long&gt; stages = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L15">    private final Map&lt;String, Long&gt; stages = new LinkedHashMap&lt;&gt;();</span>
     private long total;
+    private PolynomialWorkLedger snapshot;
 
-<span class="fc" id="L14">    PolynomialWorkBudget(long limit) {</span>
-<span class="pc bpc" id="L15" title="1 of 2 branches missed.">        if (limit &lt; 1) {</span>
-<span class="nc" id="L16">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L19">    PolynomialWorkBudget(long limit) {</span>
+<span class="pc bpc" id="L20" title="1 of 2 branches missed.">        if (limit &lt; 1) {</span>
+<span class="nc" id="L21">            throw new IllegalArgumentException(</span>
                 &quot;polynomial work budget must be positive&quot;);
         }
-<span class="fc" id="L19">        this.limit = limit;</span>
-<span class="fc" id="L20">    }</span>
+<span class="fc" id="L24">        this.limit = limit;</span>
+<span class="fc" id="L25">    }</span>
 
     long limit() {
-<span class="fc" id="L23">        return limit;</span>
+<span class="fc" id="L28">        return limit;</span>
     }
 
     @Override
     public void consume(String stage, long units) {
-<span class="pc bpc" id="L28" title="3 of 6 branches missed.">        if (stage == null || stage.isBlank() || units &lt; 0) {</span>
-<span class="nc" id="L29">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L33" title="1 of 6 branches missed.">        if (stage == null || stage.isBlank() || units &lt; 0) {</span>
+<span class="fc" id="L34">            throw new IllegalArgumentException(</span>
                 &quot;polynomial work entry is invalid&quot;);
         }
-<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if (units == 0) {</span>
-<span class="nc" id="L33">            return;</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (units == 0) {</span>
+<span class="fc" id="L38">            return;</span>
         }
-<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (total &gt; limit - units) {</span>
-<span class="fc" id="L36">            throw new LimitReached();</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (total &gt; limit - units) {</span>
+<span class="fc" id="L41">            throw new LimitReached();</span>
         }
-<span class="fc" id="L38">        total += units;</span>
-<span class="fc" id="L39">        stages.merge(stage, units, Math::addExact);</span>
-<span class="fc" id="L40">    }</span>
+<span class="fc" id="L43">        total += units;</span>
+<span class="fc" id="L44">        stages.merge(stage, units, Math::addExact);</span>
+<span class="fc" id="L45">        snapshot = null;</span>
+<span class="fc" id="L46">    }</span>
 
-    PolynomialWorkLedger ledger() {
-<span class="fc" id="L43">        return new PolynomialWorkLedger(stages);</span>
+    /** Current charged work, without allocating an immutable evidence snapshot. */
+    long totalWorkUnits() {
+<span class="fc" id="L50">        return total;</span>
     }
 
-<span class="fc" id="L46">    static final class LimitReached extends RuntimeException {</span>
+    PolynomialWorkLedger ledger() {
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (snapshot == null) {</span>
+<span class="fc" id="L55">            snapshot = new PolynomialWorkLedger(stages);</span>
+        }
+<span class="fc" id="L57">        return snapshot;</span>
+    }
+
+<span class="fc" id="L60">    static final class LimitReached extends RuntimeException {</span>
         private static final long serialVersionUID = 1L;
     }
 }

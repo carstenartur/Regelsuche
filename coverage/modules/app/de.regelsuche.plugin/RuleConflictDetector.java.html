@@ -33,8 +33,8 @@ public final class RuleConflictDetector {
 <span class="fc" id="L33">        Map&lt;String, List&lt;String&gt;&gt; bySignature = new LinkedHashMap&lt;&gt;();</span>
 <span class="fc bfc" id="L34" title="All 2 branches covered.">        for (ConflictCandidate item : items) {</span>
 <span class="fc" id="L35">            Optional&lt;PatternExpr&gt; source = sourcePattern(item.rule());</span>
-<span class="pc bpc" id="L36" title="1 of 2 branches missed.">            if (source.isEmpty()) {</span>
-<span class="nc" id="L37">                continue;</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">            if (source.isEmpty()) {</span>
+<span class="fc" id="L37">                continue;</span>
             }
 <span class="fc" id="L39">            String signature = canonicalSignature(source.get());</span>
 <span class="fc" id="L40">            bySignature.computeIfAbsent(signature, key -&gt; new ArrayList&lt;&gt;()).add(item.id());</span>
@@ -72,7 +72,7 @@ public final class RuleConflictDetector {
 <span class="fc bfc" id="L72" title="All 2 branches covered.">        for (ConflictCandidate item : items) {</span>
 <span class="fc" id="L73">            Optional&lt;PatternExpr&gt; source = sourcePattern(item.rule());</span>
 <span class="fc" id="L74">            Optional&lt;PatternExpr&gt; target = targetPattern(item.rule());</span>
-<span class="pc bpc" id="L75" title="2 of 4 branches missed.">            if (source.isEmpty() || target.isEmpty()) {</span>
+<span class="pc bpc" id="L75" title="1 of 4 branches missed.">            if (source.isEmpty() || target.isEmpty()) {</span>
 <span class="nc" id="L76">                continue;</span>
             }
 <span class="fc" id="L78">            String forward = pairSignature(source.get(), target.get());</span>
@@ -106,20 +106,20 @@ public final class RuleConflictDetector {
 <span class="fc bfc" id="L106" title="All 2 branches covered.">        if (rule instanceof PatternRewriteRule patternRule) {</span>
 <span class="fc" id="L107">            return Optional.of(patternRule.source());</span>
         }
-<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (rule instanceof PatternBasedTransformation transformation) {</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (rule instanceof PatternBasedTransformation transformation) {</span>
 <span class="fc" id="L110">            return Optional.of(transformation.source());</span>
         }
-<span class="nc" id="L112">        return Optional.empty();</span>
+<span class="fc" id="L112">        return Optional.empty();</span>
     }
 
     private static Optional&lt;PatternExpr&gt; targetPattern(RewriteRule rule) {
 <span class="fc bfc" id="L116" title="All 2 branches covered.">        if (rule instanceof PatternRewriteRule patternRule) {</span>
 <span class="fc" id="L117">            return Optional.of(patternRule.target());</span>
         }
-<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (rule instanceof PatternBasedTransformation transformation) {</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (rule instanceof PatternBasedTransformation transformation) {</span>
 <span class="fc" id="L120">            return Optional.of(transformation.target());</span>
         }
-<span class="nc" id="L122">        return Optional.empty();</span>
+<span class="fc" id="L122">        return Optional.empty();</span>
     }
 
     private static String pairSignature(PatternExpr first, PatternExpr second) {

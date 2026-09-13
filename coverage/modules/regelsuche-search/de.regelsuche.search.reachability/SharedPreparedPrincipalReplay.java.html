@@ -74,7 +74,7 @@ final class SharedPreparedPrincipalReplay {
 <span class="fc" id="L74">        PatternTargetedLocalBridgeSearch.Work sharedWork =</span>
 <span class="fc" id="L75">            legacyWork(sharedEvaluation.work());</span>
 <span class="fc" id="L76">        Set&lt;String&gt; limits = sharedEvaluation.work().reachedLimits();</span>
-<span class="pc bpc" id="L77" title="1 of 4 branches missed.">        return switch (sharedOutcome.status()) {</span>
+<span class="fc bfc" id="L77" title="All 4 branches covered.">        return switch (sharedOutcome.status()) {</span>
 <span class="fc" id="L78">            case PREPARED_MATCH -&gt; prepared(</span>
                 schema,
                 sharedEvaluation,
@@ -96,7 +96,7 @@ final class SharedPreparedPrincipalReplay {
                 sharedWork,
                 limits,
                 &quot;SHARED_FROZEN_CLOSURE_EXHAUSTED&quot;);
-<span class="nc" id="L99">            case BUDGET_INCONCLUSIVE -&gt; negative(</span>
+<span class="fc" id="L99">            case BUDGET_INCONCLUSIVE -&gt; negative(</span>
                 schema,
                 sharedOutcome,
                 PatternTargetedLocalBridgeSearch.Status.BUDGET_INCONCLUSIVE,
@@ -147,8 +147,8 @@ final class SharedPreparedPrincipalReplay {
 <span class="fc" id="L147">            replay = concreteReplay(</span>
 <span class="fc" id="L148">                schema.executor(),</span>
 <span class="fc" id="L149">                sharedOutcome.terminalExpression());</span>
-<span class="nc" id="L150">        } catch (RuntimeException exception) {</span>
-<span class="nc" id="L151">            return negative(</span>
+<span class="fc" id="L150">        } catch (RuntimeException exception) {</span>
+<span class="fc" id="L151">            return negative(</span>
                 schema,
                 sharedOutcome,
                 PatternTargetedLocalBridgeSearch.Status.TECHNICAL_FAILURE,

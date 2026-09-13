@@ -127,11 +127,11 @@ final class SharedMultiPrincipalPreparationTraversal {
     ) {
 <span class="fc" id="L128">        SharedPreparationTraversal.Expansion expansion =</span>
 <span class="fc" id="L129">            shared.expand(current.expression().expression());</span>
-<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (current.depth() &gt;= budget.maxDepth()) {</span>
-<span class="nc bnc" id="L131" title="All 2 branches missed.">            if (!expansion.transitions().isEmpty()) {</span>
-<span class="nc" id="L132">                work.reachedLimits.add(&quot;DEPTH&quot;);</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (current.depth() &gt;= budget.maxDepth()) {</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            if (!expansion.transitions().isEmpty()) {</span>
+<span class="fc" id="L132">                work.reachedLimits.add(&quot;DEPTH&quot;);</span>
             }
-<span class="nc" id="L134">            return;</span>
+<span class="fc" id="L134">            return;</span>
         }
 <span class="fc" id="L136">        work.expandedStates++;</span>
 <span class="fc" id="L137">        List&lt;Candidate&gt; local = new ArrayList&lt;&gt;();</span>
@@ -447,9 +447,9 @@ final class SharedMultiPrincipalPreparationTraversal {
 <span class="fc" id="L447">                terminal.state().assumptions(),</span>
 <span class="fc" id="L448">                terminal.path());</span>
         }
-<span class="pc bpc" id="L450" title="1 of 2 branches missed.">        Status status = reachedLimits.isEmpty()</span>
+<span class="fc bfc" id="L450" title="All 2 branches covered.">        Status status = reachedLimits.isEmpty()</span>
 <span class="fc" id="L451">            ? Status.NO_MATCH_IN_COMPLETE_FROZEN_CLOSURE</span>
-<span class="pc" id="L452">            : Status.BUDGET_INCONCLUSIVE;</span>
+<span class="fc" id="L452">            : Status.BUDGET_INCONCLUSIVE;</span>
 <span class="fc" id="L453">        return new PrincipalOutcome(</span>
 <span class="fc" id="L454">            state.principal.ruleId(),</span>
 <span class="fc" id="L455">            state.principal.contentHash(),</span>

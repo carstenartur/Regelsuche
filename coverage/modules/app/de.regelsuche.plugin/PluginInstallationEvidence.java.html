@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginInstallationEvidence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginInstallationEvidence.java</span></div><h1>PluginInstallationEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import de.regelsuche.plugin.PluginTrustStoreRevisionVerifier.ChainCheckpoint;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+
+/** Canonical retained package-state evidence. Only the external authority selects an active instance. */
+public record PluginInstallationEvidence(
+    String schema,
+    String operation,
+    String previousInstallationHash,
+    String rollbackSourceHash,
+    ChainCheckpoint checkpoint,
+    String rootTrustStoreHash,
+    String trustStoreHash,
+    String indexId,
+    String indexRevision,
+    String indexContentHash,
+    String resolutionContentHash,
+    List&lt;Artifact&gt; artifacts,
+    Map&lt;String, String&gt; files,
+    String contentHash
+) {
+    public static final String SCHEMA = &quot;regelsuche.plugin-installation/v1&quot;;
+
+<span class="fc" id="L32">    public PluginInstallationEvidence {</span>
+<span class="pc bpc" id="L33" title="2 of 4 branches missed.">        if (!SCHEMA.equals(schema) || !Set.of(&quot;INSTALL&quot;, &quot;UPDATE&quot;, &quot;REMOVE&quot;, &quot;ROLLBACK&quot;).contains(operation)) {</span>
+<span class="nc" id="L34">            throw new IllegalArgumentException(&quot;unsupported installation schema or operation&quot;);</span>
+        }
+<span class="fc" id="L36">        previousInstallationHash = optionalHash(previousInstallationHash);</span>
+<span class="fc" id="L37">        rollbackSourceHash = optionalHash(rollbackSourceHash);</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if (operation.equals(&quot;ROLLBACK&quot;) == rollbackSourceHash.isEmpty()) {</span>
+<span class="nc" id="L39">            throw new IllegalArgumentException(&quot;only rollback requires a retained source generation&quot;);</span>
+        }
+<span class="fc" id="L41">        Objects.requireNonNull(checkpoint, &quot;checkpoint&quot;);</span>
+<span class="fc" id="L42">        PluginSignatureManifest.requireSha256(rootTrustStoreHash, &quot;rootTrustStoreHash&quot;);</span>
+<span class="fc" id="L43">        PluginSignatureManifest.requireSha256(trustStoreHash, &quot;trustStoreHash&quot;);</span>
+<span class="fc" id="L44">        artifacts = List.copyOf(Objects.requireNonNull(artifacts, &quot;artifacts&quot;));</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (artifacts.isEmpty()) {</span>
+<span class="pc bpc" id="L46" title="3 of 6 branches missed.">            if (!&quot;&quot;.equals(indexId) || !&quot;&quot;.equals(indexRevision) || !&quot;&quot;.equals(indexContentHash)</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">                    || !&quot;&quot;.equals(resolutionContentHash)) {</span>
+<span class="nc" id="L48">                throw new IllegalArgumentException(&quot;empty installation cannot claim an index or resolution&quot;);</span>
+            }
+        } else {
+<span class="fc" id="L51">            PluginSignatureManifest.requireIdentifier(indexId, &quot;indexId&quot;);</span>
+<span class="fc" id="L52">            PluginSignatureManifest.requireIdentifier(indexRevision, &quot;indexRevision&quot;);</span>
+<span class="fc" id="L53">            PluginSignatureManifest.requireSha256(indexContentHash, &quot;indexContentHash&quot;);</span>
+<span class="fc" id="L54">            PluginSignatureManifest.requireSha256(resolutionContentHash, &quot;resolutionContentHash&quot;);</span>
+        }
+<span class="fc" id="L56">        files = Collections.unmodifiableMap(new TreeMap&lt;&gt;(Objects.requireNonNull(files, &quot;files&quot;)));</span>
+<span class="fc" id="L57">        files.forEach((path, hash) -&gt; {</span>
+<span class="fc" id="L58">            requirePath(path);</span>
+<span class="fc" id="L59">            PluginSignatureManifest.requireSha256(hash, &quot;file hash&quot;);</span>
+<span class="fc" id="L60">        });</span>
+<span class="fc" id="L61">        Set&lt;String&gt; identities = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L62">        Set&lt;String&gt; paths = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (Artifact artifact : artifacts) {</span>
+<span class="pc bpc" id="L64" title="2 of 4 branches missed.">            if (!identities.add(artifact.identityHash()) || !paths.add(artifact.path())</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                    || !artifact.artifactSha256().equals(files.get(artifact.path()))) {</span>
+<span class="nc" id="L66">                throw new IllegalArgumentException(&quot;installation artifacts must bind distinct retained files&quot;);</span>
+            }
+<span class="fc" id="L68">        }</span>
+<span class="fc" id="L69">        if (!PluginDistributionJson.hash(PluginDistributionJson.canonical(payload(operation,</span>
+                previousInstallationHash, rollbackSourceHash, checkpoint, rootTrustStoreHash, trustStoreHash,
+<span class="fc bfc" id="L71" title="All 2 branches covered.">                indexId, indexRevision, indexContentHash, resolutionContentHash, artifacts, files))).equals(contentHash)) {</span>
+<span class="fc" id="L72">            throw new IllegalArgumentException(&quot;installation evidence contentHash mismatch&quot;);</span>
+        }
+<span class="fc" id="L74">    }</span>
+
+    static PluginInstallationEvidence create(String operation, String previous, String rollbackSource,
+            ChainCheckpoint checkpoint, String rootHash, String trustHash, String indexId, String indexRevision,
+            String indexHash, String resolutionHash, List&lt;Artifact&gt; artifacts, Map&lt;String, String&gt; files) {
+<span class="fc" id="L79">        String hash = PluginDistributionJson.hash(PluginDistributionJson.canonical(payload(operation,</span>
+            previous, rollbackSource, checkpoint, rootHash, trustHash, indexId, indexRevision, indexHash,
+            resolutionHash, artifacts, new TreeMap&lt;&gt;(files))));
+<span class="fc" id="L82">        return new PluginInstallationEvidence(SCHEMA, operation, previous, rollbackSource, checkpoint,</span>
+            rootHash, trustHash, indexId, indexRevision, indexHash, resolutionHash, artifacts, files, hash);
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L87">        Map&lt;String, Object&gt; payload = payload(operation, previousInstallationHash, rollbackSourceHash,</span>
+            checkpoint, rootTrustStoreHash, trustStoreHash, indexId, indexRevision, indexContentHash,
+            resolutionContentHash, artifacts, files);
+<span class="fc" id="L90">        payload.put(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L91">        return PluginDistributionJson.canonical(payload);</span>
+    }
+
+    public static PluginInstallationEvidence read(byte[] bytes) {
+<span class="fc" id="L95">        return PluginDistributionJson.read(bytes, PluginInstallationEvidence.class);</span>
+    }
+
+    private static Map&lt;String, Object&gt; payload(String operation, String previous, String rollbackSource,
+            ChainCheckpoint checkpoint, String rootHash, String trustHash, String indexId, String indexRevision,
+            String indexHash, String resolutionHash, List&lt;Artifact&gt; artifacts, Map&lt;String, String&gt; files) {
+<span class="fc" id="L101">        Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L102">        payload.put(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L103">        payload.put(&quot;operation&quot;, operation);</span>
+<span class="fc" id="L104">        payload.put(&quot;previousInstallationHash&quot;, previous);</span>
+<span class="fc" id="L105">        payload.put(&quot;rollbackSourceHash&quot;, rollbackSource);</span>
+<span class="fc" id="L106">        payload.put(&quot;checkpoint&quot;, checkpoint);</span>
+<span class="fc" id="L107">        payload.put(&quot;rootTrustStoreHash&quot;, rootHash);</span>
+<span class="fc" id="L108">        payload.put(&quot;trustStoreHash&quot;, trustHash);</span>
+<span class="fc" id="L109">        payload.put(&quot;indexId&quot;, indexId);</span>
+<span class="fc" id="L110">        payload.put(&quot;indexRevision&quot;, indexRevision);</span>
+<span class="fc" id="L111">        payload.put(&quot;indexContentHash&quot;, indexHash);</span>
+<span class="fc" id="L112">        payload.put(&quot;resolutionContentHash&quot;, resolutionHash);</span>
+<span class="fc" id="L113">        payload.put(&quot;artifacts&quot;, artifacts);</span>
+<span class="fc" id="L114">        payload.put(&quot;files&quot;, files);</span>
+<span class="fc" id="L115">        return payload;</span>
+    }
+
+    static String requirePath(String path) {
+<span class="pc bpc" id="L119" title="2 of 4 branches missed.">        if (path == null || !path.matches(&quot;[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*&quot;)) {</span>
+<span class="nc" id="L120">            throw new IllegalArgumentException(&quot;installation requires portable relative paths&quot;);</span>
+        }
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        for (String part : path.split(&quot;/&quot;)) {</span>
+<span class="pc bpc" id="L123" title="2 of 4 branches missed.">            if (part.equals(&quot;.&quot;) || part.equals(&quot;..&quot;)) {</span>
+<span class="nc" id="L124">                throw new IllegalArgumentException(&quot;installation paths cannot traverse directories&quot;);</span>
+            }
+        }
+<span class="fc" id="L127">        return path;</span>
+    }
+
+    private static String optionalHash(String hash) {
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (hash == null) {</span>
+<span class="nc" id="L132">            throw new IllegalArgumentException(&quot;optional hash must be present&quot;);</span>
+        }
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        return hash.isEmpty() ? &quot;&quot; : PluginSignatureManifest.requireSha256(hash, &quot;hash&quot;);</span>
+    }
+
+    public record Artifact(String kind, String componentId, String version, String identityHash,
+        String artifactSha256, String publisherId, String path, String provenanceContentHash,
+        String verificationContentHash) {
+<span class="fc" id="L140">        public Artifact {</span>
+<span class="fc" id="L141">            PluginArtifactIndex.ArtifactKind.valueOf(kind);</span>
+<span class="fc" id="L142">            PluginSignatureManifest.requireIdentifier(componentId, &quot;componentId&quot;);</span>
+<span class="fc" id="L143">            PluginArtifactIndex.requireVersion(version, &quot;version&quot;);</span>
+<span class="fc" id="L144">            PluginSignatureManifest.requireSha256(identityHash, &quot;identityHash&quot;);</span>
+<span class="fc" id="L145">            PluginSignatureManifest.requireSha256(artifactSha256, &quot;artifactSha256&quot;);</span>
+<span class="fc" id="L146">            PluginSignatureManifest.requireIdentifier(publisherId, &quot;publisherId&quot;);</span>
+<span class="fc" id="L147">            requirePath(path);</span>
+<span class="fc" id="L148">            PluginSignatureManifest.requireSha256(provenanceContentHash, &quot;provenanceContentHash&quot;);</span>
+<span class="fc" id="L149">            PluginSignatureManifest.requireSha256(verificationContentHash, &quot;verificationContentHash&quot;);</span>
+<span class="fc" id="L150">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

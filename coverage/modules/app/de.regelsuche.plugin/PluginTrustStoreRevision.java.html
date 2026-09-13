@@ -83,8 +83,8 @@ public record PluginTrustStoreRevision(
             signatureBase64,
             false,
             &quot;&quot;));
-<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
-<span class="nc" id="L87">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L87">            throw new IllegalArgumentException(</span>
                 &quot;plugin trust-store revision contentHash mismatch&quot;);
         }
 <span class="fc" id="L90">    }</span>

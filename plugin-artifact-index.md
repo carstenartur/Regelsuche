@@ -180,13 +180,15 @@ und berechnet unabhängig:
 ## Offener Umfang von #104
 
 Dieser Slice stellt noch keinen öffentlichen Dienst und keinen Package Manager
-dar. Offen bleiben insbesondere:
+dar. Der separate [Java-Distributionsclient](plugin-distribution-client.md)
+implementiert inzwischen begrenzte HTTPS-Abfragen und einen JAR-Package-Lifecycle
+mit obligatorischer externer Checkpoint-Authority. Offen bleiben insbesondere:
 
 - gehosteter oder föderierter Transport signierter Indexrevisionen;
 - authentisierte Verteilung und Rotation von Curator-/Publisher-Keys;
 - authentisierter Revocation-Feed und optionales Transparenzprotokoll;
-- Download exakt der gebundenen Bytes mit Hashprüfung;
-- Installation, Update, Entfernung und Rollback;
+- ein produktiv angebundener rollback-geschützter Checkpoint-Provider;
+- Runtime-Integration sowie Regel-/Knowledge-Pack-Installation;
 - Source-to-binary-Provenance-Attestierungen;
 - eigenständig veröffentlichte Beispielprojekte und Community-Einreichungen.
 

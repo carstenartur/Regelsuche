@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginDistributionTransport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginDistributionTransport.java</span></div><h1>PluginDistributionTransport.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Flow;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
+import javax.net.ssl.SSLContext;
+
+/** Bounded, allowlisted retrieval. It never interprets a redirect or executes downloaded bytes. */
+public final class PluginDistributionTransport implements AutoCloseable {
+    private final Set&lt;String&gt; origins;
+    private final boolean allowLoopbackHttp;
+    private final Duration requestTimeout;
+    private final HttpClient client;
+
+    /**
+     * HTTPS uses the JVM trust roots unless explicit operator TLS roots are supplied.
+     * Plain HTTP is restricted to literal loopback addresses and an explicit opt-in;
+     * the package client still requires HTTPS URIs from the unchanged index contract.
+     */
+    public PluginDistributionTransport(Set&lt;URI&gt; origins, Duration connectTimeout,
+<span class="fc" id="L37">            Duration requestTimeout, boolean allowLoopbackHttp, SSLContext tlsContext) {</span>
+<span class="fc" id="L38">        this.allowLoopbackHttp = allowLoopbackHttp;</span>
+<span class="fc" id="L39">        positive(connectTimeout);</span>
+<span class="fc" id="L40">        positive(requestTimeout);</span>
+<span class="fc" id="L41">        this.requestTimeout = requestTimeout;</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (Objects.requireNonNull(origins, &quot;origins&quot;).isEmpty()) {</span>
+<span class="nc" id="L43">            throw new IllegalArgumentException(&quot;at least one allowed origin is required&quot;);</span>
+        }
+<span class="fc" id="L45">        this.origins = origins.stream().map(uri -&gt; {</span>
+<span class="pc bpc" id="L46" title="2 of 6 branches missed.">            if (!validUri(uri) || (uri.getRawPath() != null &amp;&amp; !uri.getRawPath().isEmpty()</span>
+<span class="pc bpc" id="L47" title="3 of 4 branches missed.">                    &amp;&amp; !uri.getRawPath().equals(&quot;/&quot;)) || uri.getRawQuery() != null) {</span>
+<span class="fc" id="L48">                throw new IllegalArgumentException(&quot;invalid allowed transport origin: &quot; + uri);</span>
+            }
+<span class="fc" id="L50">            return origin(uri);</span>
+<span class="fc" id="L51">        }).collect(Collectors.toUnmodifiableSet());</span>
+<span class="fc" id="L52">        var builder = HttpClient.newBuilder().connectTimeout(connectTimeout)</span>
+<span class="fc" id="L53">            .followRedirects(HttpClient.Redirect.NEVER);</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (tlsContext != null) {</span>
+<span class="fc" id="L55">            builder.sslContext(tlsContext);</span>
+        }
+<span class="fc" id="L57">        client = builder.build();</span>
+<span class="fc" id="L58">    }</span>
+
+    public byte[] download(URI uri, long maximumBytes) throws IOException {
+<span class="pc bpc" id="L61" title="2 of 4 branches missed.">        if (maximumBytes &lt; 1 || maximumBytes &gt; Integer.MAX_VALUE - 8) {</span>
+<span class="nc" id="L62">            throw new IllegalArgumentException(&quot;maximumBytes must be a positive bounded array size&quot;);</span>
+        }
+<span class="fc bfc" id="L64" title="All 4 branches covered.">        if (!validUri(uri) || !origins.contains(origin(uri))) {</span>
+<span class="fc" id="L65">            throw new SecurityException(&quot;transport URI is outside the allowed origins: &quot; + uri);</span>
+        }
+<span class="fc" id="L67">        HttpRequest request = HttpRequest.newBuilder(uri).timeout(requestTimeout)</span>
+<span class="fc" id="L68">            .header(&quot;Accept-Encoding&quot;, &quot;identity&quot;).GET().build();</span>
+<span class="fc" id="L69">        var future = client.sendAsync(request, response -&gt; {</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            String rejection = response.statusCode() != 200</span>
+<span class="fc" id="L71">                ? &quot;transport requires HTTP 200; received &quot; + response.statusCode() : null;</span>
+<span class="fc" id="L72">            if (response.headers().allValues(&quot;Content-Encoding&quot;).stream()</span>
+<span class="fc" id="L73">                    .flatMap(value -&gt; Arrays.stream(value.split(&quot;,&quot;, -1)))</span>
+<span class="fc bfc" id="L74" title="All 4 branches covered.">                    .anyMatch(value -&gt; !value.trim().equalsIgnoreCase(&quot;identity&quot;))) {</span>
+<span class="fc" id="L75">                rejection = &quot;encoded transport response is unsupported&quot;;</span>
+            }
+            try {
+<span class="fc bfc" id="L78" title="All 2 branches covered.">                if (response.headers().firstValueAsLong(&quot;Content-Length&quot;).orElse(0) &gt; maximumBytes) {</span>
+<span class="fc" id="L79">                    rejection = &quot;transport response exceeds byte limit&quot;;</span>
+                }
+<span class="nc" id="L81">            } catch (NumberFormatException malformed) {</span>
+<span class="nc" id="L82">                rejection = &quot;invalid transport content length&quot;;</span>
+<span class="fc" id="L83">            }</span>
+<span class="fc" id="L84">            return new BoundedBody((int) maximumBytes, rejection);</span>
+        });
+        try {
+            // HttpRequest.timeout alone must not be relied on to bound a streaming body.
+<span class="fc" id="L88">            return future.get(requestTimeout.toNanos(), TimeUnit.NANOSECONDS).body();</span>
+<span class="nc" id="L89">        } catch (InterruptedException interrupted) {</span>
+<span class="nc" id="L90">            future.cancel(true);</span>
+<span class="nc" id="L91">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L92">            throw new IOException(&quot;transport interrupted&quot;, interrupted);</span>
+<span class="fc" id="L93">        } catch (TimeoutException timeout) {</span>
+<span class="fc" id="L94">            future.cancel(true);</span>
+<span class="fc" id="L95">            throw new IOException(&quot;transport exceeded total response deadline&quot;, timeout);</span>
+<span class="fc" id="L96">        } catch (ExecutionException failure) {</span>
+<span class="fc" id="L97">            throw new IOException(&quot;transport request failed&quot;, failure.getCause());</span>
+        }
+    }
+
+    private boolean validUri(URI uri) {
+<span class="pc bpc" id="L102" title="2 of 6 branches missed.">        if (uri == null || uri.isOpaque() || uri.getHost() == null</span>
+<span class="fc bfc" id="L103" title="All 4 branches covered.">                || uri.getRawUserInfo() != null || uri.getRawFragment() != null</span>
+<span class="pc bpc" id="L104" title="2 of 4 branches missed.">                || uri.getPort() == 0 || uri.getPort() &gt; 65535) {</span>
+<span class="fc" id="L105">            return false;</span>
+        }
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (&quot;https&quot;.equalsIgnoreCase(uri.getScheme())) {</span>
+<span class="fc" id="L108">            return true;</span>
+        }
+<span class="pc bpc" id="L110" title="1 of 4 branches missed.">        return allowLoopbackHttp &amp;&amp; &quot;http&quot;.equalsIgnoreCase(uri.getScheme())</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            &amp;&amp; Set.of(&quot;127.0.0.1&quot;, &quot;[::1]&quot;).contains(uri.getHost());</span>
+    }
+
+    private static String origin(URI uri) {
+<span class="fc" id="L115">        String scheme = uri.getScheme().toLowerCase(java.util.Locale.ROOT);</span>
+<span class="fc" id="L116">        return scheme + &quot;://&quot; + uri.getHost().toLowerCase(java.util.Locale.ROOT)</span>
+<span class="pc bpc" id="L117" title="1 of 4 branches missed.">            + &quot;:&quot; + (uri.getPort() &lt; 0 ? (scheme.equals(&quot;https&quot;) ? 443 : 80) : uri.getPort());</span>
+    }
+
+    private static void positive(Duration duration) {
+<span class="pc bpc" id="L121" title="3 of 6 branches missed.">        if (duration == null || duration.isNegative() || duration.isZero()) {</span>
+<span class="nc" id="L122">            throw new IllegalArgumentException(&quot;transport deadlines must be positive&quot;);</span>
+        }
+<span class="fc" id="L124">        duration.toNanos();</span>
+<span class="fc" id="L125">    }</span>
+
+    @Override
+    public void close() {
+        // Immediate cancellation avoids waiting on hostile or stalled response bodies.
+<span class="fc" id="L130">        client.shutdownNow();</span>
+<span class="fc" id="L131">    }</span>
+
+    private static final class BoundedBody implements HttpResponse.BodySubscriber&lt;byte[]&gt; {
+        private final int maximumBytes;
+        private final String rejection;
+<span class="fc" id="L136">        private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();</span>
+<span class="fc" id="L137">        private final CompletableFuture&lt;byte[]&gt; result = new CompletableFuture&lt;&gt;();</span>
+        private Flow.Subscription subscription;
+
+<span class="fc" id="L140">        BoundedBody(int maximumBytes, String rejection) {</span>
+<span class="fc" id="L141">            this.maximumBytes = maximumBytes;</span>
+<span class="fc" id="L142">            this.rejection = rejection;</span>
+<span class="fc" id="L143">        }</span>
+
+        @Override
+        public CompletionStage&lt;byte[]&gt; getBody() {
+<span class="fc" id="L147">            return result;</span>
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+<span class="fc" id="L152">            this.subscription = subscription;</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            if (rejection != null) {</span>
+<span class="fc" id="L154">                subscription.cancel();</span>
+<span class="fc" id="L155">                result.completeExceptionally(new IOException(rejection));</span>
+            } else {
+<span class="fc" id="L157">                subscription.request(1);</span>
+            }
+<span class="fc" id="L159">        }</span>
+
+        @Override
+        public void onNext(List&lt;ByteBuffer&gt; buffers) {
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            for (ByteBuffer buffer : buffers) {</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">                if (buffer.remaining() &gt; maximumBytes - bytes.size()) {</span>
+<span class="fc" id="L165">                    subscription.cancel();</span>
+<span class="fc" id="L166">                    result.completeExceptionally(new IOException(&quot;transport response exceeds byte limit&quot;));</span>
+<span class="fc" id="L167">                    return;</span>
+                }
+<span class="fc" id="L169">                byte[] chunk = new byte[buffer.remaining()];</span>
+<span class="fc" id="L170">                buffer.get(chunk);</span>
+<span class="fc" id="L171">                bytes.writeBytes(chunk);</span>
+<span class="fc" id="L172">            }</span>
+<span class="fc" id="L173">            subscription.request(1);</span>
+<span class="fc" id="L174">        }</span>
+
+        @Override
+        public void onError(Throwable failure) {
+<span class="fc" id="L178">            result.completeExceptionally(failure);</span>
+<span class="fc" id="L179">        }</span>
+
+        @Override
+        public void onComplete() {
+<span class="fc" id="L183">            result.complete(bytes.toByteArray());</span>
+<span class="fc" id="L184">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

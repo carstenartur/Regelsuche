@@ -314,31 +314,35 @@ public final class IndependentCompletenessTrace {
 <span class="fc" id="L314">                validHash(candidateCertificateHash),</span>
                 &quot;candidate certificate hash is invalid&quot;);
 <span class="pc bpc" id="L316" title="1 of 2 branches missed.">            require(</span>
-                factorCount &gt;= 1,
-                &quot;candidate must declare at least one factor&quot;);
-<span class="fc" id="L319">            require(</span>
-<span class="pc bpc" id="L320" title="1 of 2 branches missed.">                factorAttempts.size() &lt;= factorCount,</span>
+                factorCount &gt;= 0,
+                &quot;candidate factor count must not be negative&quot;);
+<span class="pc bpc" id="L319" title="5 of 6 branches missed.">            require(</span>
+                factorCount != 0
+                    || remainderOne &amp;&amp; outcome == CandidateOutcome.CERTIFIED,
+                &quot;empty factorization requires a certified unit remainder&quot;);
+<span class="fc" id="L323">            require(</span>
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">                factorAttempts.size() &lt;= factorCount,</span>
                 &quot;candidate retains more attempts than factors&quot;);
-<span class="pc bpc" id="L322" title="1 of 2 branches missed.">            require(outcome != null, &quot;candidate outcome is required&quot;);</span>
-<span class="pc bpc" id="L323" title="1 of 2 branches missed.">            require(detailCode != null, &quot;candidate detail code is required&quot;);</span>
-<span class="fc" id="L324">            require(</span>
-<span class="pc bpc" id="L325" title="1 of 2 branches missed.">                !detailCode.isBlank(),</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">            require(outcome != null, &quot;candidate outcome is required&quot;);</span>
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">            require(detailCode != null, &quot;candidate detail code is required&quot;);</span>
+<span class="fc" id="L328">            require(</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">                !detailCode.isBlank(),</span>
                 &quot;candidate detail code must not be blank&quot;);
-<span class="pc bpc" id="L327" title="1 of 2 branches missed.">            require(</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">            require(</span>
                 workUnits &gt;= 1,
                 &quot;candidate attempt must account for dispatch work&quot;);
-<span class="fc" id="L330">            require(</span>
-<span class="fc" id="L331">                validHash(attemptHash),</span>
+<span class="fc" id="L334">            require(</span>
+<span class="fc" id="L335">                validHash(attemptHash),</span>
                 &quot;candidate attempt hash is invalid&quot;);
-<span class="fc" id="L333">            validateFactorSequence(factorAttempts);</span>
-<span class="fc" id="L334">            validateRemainder(remainderOne, outcome, factorAttempts);</span>
-<span class="fc" id="L335">            validateCertifiedCandidate(</span>
+<span class="fc" id="L337">            validateFactorSequence(factorAttempts);</span>
+<span class="fc" id="L338">            validateRemainder(remainderOne, outcome, factorAttempts);</span>
+<span class="fc" id="L339">            validateCertifiedCandidate(</span>
                 outcome,
                 factorCount,
                 factorAttempts);
-<span class="fc" id="L339">            validateCandidateWork(workUnits, factorAttempts);</span>
-<span class="fc" id="L340">            require(</span>
-<span class="fc" id="L341">                attemptHash.equals(candidateAttemptHash(</span>
+<span class="fc" id="L343">            validateCandidateWork(workUnits, factorAttempts);</span>
+<span class="fc" id="L344">            require(</span>
+<span class="fc" id="L345">                attemptHash.equals(candidateAttemptHash(</span>
                     candidateIndex,
                     candidateCertificateHash,
                     remainderOne,
@@ -348,31 +352,31 @@ public final class IndependentCompletenessTrace {
                     detailCode,
                     workUnits)),
                 &quot;completeness candidate attempt hash mismatch&quot;);
-<span class="fc" id="L351">        }</span>
+<span class="fc" id="L355">        }</span>
 
         public String canonicalMaterial() {
-<span class="fc" id="L354">            StringBuilder result = new StringBuilder();</span>
-<span class="fc" id="L355">            PolynomialEvidence.append(</span>
-                result,
-<span class="fc" id="L357">                Integer.toString(candidateIndex));</span>
-<span class="fc" id="L358">            PolynomialEvidence.append(result, candidateCertificateHash);</span>
+<span class="fc" id="L358">            StringBuilder result = new StringBuilder();</span>
 <span class="fc" id="L359">            PolynomialEvidence.append(</span>
                 result,
-<span class="fc" id="L361">                Boolean.toString(remainderOne));</span>
-<span class="fc" id="L362">            PolynomialEvidence.append(</span>
+<span class="fc" id="L361">                Integer.toString(candidateIndex));</span>
+<span class="fc" id="L362">            PolynomialEvidence.append(result, candidateCertificateHash);</span>
+<span class="fc" id="L363">            PolynomialEvidence.append(</span>
                 result,
-<span class="fc" id="L364">                Integer.toString(factorCount));</span>
-<span class="fc" id="L365">            PolynomialEvidence.append(</span>
+<span class="fc" id="L365">                Boolean.toString(remainderOne));</span>
+<span class="fc" id="L366">            PolynomialEvidence.append(</span>
                 result,
-<span class="fc" id="L367">                Integer.toString(factorAttempts.size()));</span>
-<span class="fc" id="L368">            factorAttempts.forEach(attempt -&gt; PolynomialEvidence.append(</span>
+<span class="fc" id="L368">                Integer.toString(factorCount));</span>
+<span class="fc" id="L369">            PolynomialEvidence.append(</span>
                 result,
-<span class="fc" id="L370">                attempt.canonicalMaterial()));</span>
-<span class="fc" id="L371">            PolynomialEvidence.append(result, outcome.name());</span>
-<span class="fc" id="L372">            PolynomialEvidence.append(result, detailCode);</span>
-<span class="fc" id="L373">            PolynomialEvidence.append(result, Long.toString(workUnits));</span>
-<span class="fc" id="L374">            PolynomialEvidence.append(result, attemptHash);</span>
-<span class="fc" id="L375">            return result.toString();</span>
+<span class="fc" id="L371">                Integer.toString(factorAttempts.size()));</span>
+<span class="fc" id="L372">            factorAttempts.forEach(attempt -&gt; PolynomialEvidence.append(</span>
+                result,
+<span class="fc" id="L374">                attempt.canonicalMaterial()));</span>
+<span class="fc" id="L375">            PolynomialEvidence.append(result, outcome.name());</span>
+<span class="fc" id="L376">            PolynomialEvidence.append(result, detailCode);</span>
+<span class="fc" id="L377">            PolynomialEvidence.append(result, Long.toString(workUnits));</span>
+<span class="fc" id="L378">            PolynomialEvidence.append(result, attemptHash);</span>
+<span class="fc" id="L379">            return result.toString();</span>
         }
     }
 
@@ -388,40 +392,40 @@ public final class IndependentCompletenessTrace {
         PolynomialWorkLedger work,
         String traceHash
     ) {
-<span class="fc" id="L391">        private State {</span>
-<span class="fc" id="L392">            candidateAttempts = List.copyOf(candidateAttempts);</span>
-<span class="fc" id="L393">            require(</span>
-<span class="fc" id="L394">                IndependentFactorizationCompleteness.METHOD_ID.equals(</span>
+<span class="fc" id="L395">        private State {</span>
+<span class="fc" id="L396">            candidateAttempts = List.copyOf(candidateAttempts);</span>
+<span class="fc" id="L397">            require(</span>
+<span class="fc" id="L398">                IndependentFactorizationCompleteness.METHOD_ID.equals(</span>
                     methodId),
                 &quot;independent completeness method is invalid&quot;);
-<span class="fc" id="L397">            require(validHash(requestHash), &quot;completeness request hash is invalid&quot;);</span>
-<span class="fc" id="L398">            require(validHash(sourceHash), &quot;completeness source hash is invalid&quot;);</span>
-<span class="pc bpc" id="L399" title="1 of 2 branches missed.">            require(outcome != null, &quot;completeness outcome is required&quot;);</span>
-<span class="pc bpc" id="L400" title="1 of 2 branches missed.">            require(detailCode != null, &quot;completeness detail code is required&quot;);</span>
-<span class="fc" id="L401">            require(</span>
-<span class="pc bpc" id="L402" title="1 of 2 branches missed.">                !detailCode.isBlank(),</span>
+<span class="fc" id="L401">            require(validHash(requestHash), &quot;completeness request hash is invalid&quot;);</span>
+<span class="fc" id="L402">            require(validHash(sourceHash), &quot;completeness source hash is invalid&quot;);</span>
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">            require(outcome != null, &quot;completeness outcome is required&quot;);</span>
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">            require(detailCode != null, &quot;completeness detail code is required&quot;);</span>
+<span class="fc" id="L405">            require(</span>
+<span class="pc bpc" id="L406" title="1 of 2 branches missed.">                !detailCode.isBlank(),</span>
                 &quot;completeness detail code must not be blank&quot;);
-<span class="pc bpc" id="L404" title="1 of 2 branches missed.">            require(</span>
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">            require(</span>
                 selectedCandidateIndex &gt;= -1,
                 &quot;selected candidate index is invalid&quot;);
-<span class="pc bpc" id="L407" title="1 of 2 branches missed.">            require(</span>
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">            require(</span>
                 selectedCandidateCertificateHash != null,
                 &quot;selected candidate hash is required&quot;);
-<span class="fc" id="L410">            require(</span>
-<span class="fc bfc" id="L411" title="All 2 branches covered.">                selectedCandidateCertificateHash.isEmpty()</span>
-<span class="pc bpc" id="L412" title="1 of 2 branches missed.">                    || validHash(selectedCandidateCertificateHash),</span>
+<span class="fc" id="L414">            require(</span>
+<span class="fc bfc" id="L415" title="All 2 branches covered.">                selectedCandidateCertificateHash.isEmpty()</span>
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">                    || validHash(selectedCandidateCertificateHash),</span>
                 &quot;selected candidate hash is invalid&quot;);
-<span class="pc bpc" id="L414" title="1 of 2 branches missed.">            require(work != null, &quot;completeness work is required&quot;);</span>
-<span class="fc" id="L415">            require(validHash(traceHash), &quot;completeness trace hash is invalid&quot;);</span>
-<span class="fc" id="L416">            validateCampaignAccounting(candidateAttempts, work);</span>
-<span class="fc" id="L417">            validateFactorBindings(requestHash, candidateAttempts);</span>
-<span class="fc" id="L418">            validateSelection(</span>
+<span class="pc bpc" id="L418" title="1 of 2 branches missed.">            require(work != null, &quot;completeness work is required&quot;);</span>
+<span class="fc" id="L419">            require(validHash(traceHash), &quot;completeness trace hash is invalid&quot;);</span>
+<span class="fc" id="L420">            validateCampaignAccounting(candidateAttempts, work);</span>
+<span class="fc" id="L421">            validateFactorBindings(requestHash, candidateAttempts);</span>
+<span class="fc" id="L422">            validateSelection(</span>
                 outcome,
                 candidateAttempts,
                 selectedCandidateIndex,
                 selectedCandidateCertificateHash);
-<span class="fc" id="L423">            require(</span>
-<span class="fc" id="L424">                traceHash.equals(IndependentCompletenessTrace.traceHash(</span>
+<span class="fc" id="L427">            require(</span>
+<span class="fc" id="L428">                traceHash.equals(IndependentCompletenessTrace.traceHash(</span>
                     methodId,
                     requestHash,
                     sourceHash,
@@ -432,7 +436,7 @@ public final class IndependentCompletenessTrace {
                     selectedCandidateCertificateHash,
                     work)),
                 &quot;independent completeness trace hash mismatch&quot;);
-<span class="fc" id="L435">        }</span>
+<span class="fc" id="L439">        }</span>
     }
 
     private static String factorAttemptHash(
@@ -441,17 +445,17 @@ public final class IndependentCompletenessTrace {
         String factorHash,
         FactorizationVerifier.IndependentIrreducibilityTrace trace
     ) {
-<span class="fc" id="L444">        StringBuilder material = new StringBuilder(</span>
+<span class="fc" id="L448">        StringBuilder material = new StringBuilder(</span>
             IndependentFactorizationCompleteness.METHOD_ID);
-<span class="fc" id="L446">        PolynomialEvidence.append(</span>
+<span class="fc" id="L450">        PolynomialEvidence.append(</span>
             material,
-<span class="fc" id="L448">            Integer.toString(factorIndex));</span>
-<span class="fc" id="L449">        PolynomialEvidence.append(</span>
+<span class="fc" id="L452">            Integer.toString(factorIndex));</span>
+<span class="fc" id="L453">        PolynomialEvidence.append(</span>
             material,
-<span class="fc" id="L451">            Integer.toString(multiplicity));</span>
-<span class="fc" id="L452">        PolynomialEvidence.append(material, factorHash);</span>
-<span class="fc" id="L453">        PolynomialEvidence.append(material, trace.canonicalMaterial());</span>
-<span class="fc" id="L454">        return PolynomialEvidence.sha256(material.toString());</span>
+<span class="fc" id="L455">            Integer.toString(multiplicity));</span>
+<span class="fc" id="L456">        PolynomialEvidence.append(material, factorHash);</span>
+<span class="fc" id="L457">        PolynomialEvidence.append(material, trace.canonicalMaterial());</span>
+<span class="fc" id="L458">        return PolynomialEvidence.sha256(material.toString());</span>
     }
 
     private static String candidateAttemptHash(
@@ -464,28 +468,28 @@ public final class IndependentCompletenessTrace {
         String detailCode,
         long workUnits
     ) {
-<span class="fc" id="L467">        StringBuilder material = new StringBuilder(</span>
+<span class="fc" id="L471">        StringBuilder material = new StringBuilder(</span>
             IndependentFactorizationCompleteness.METHOD_ID);
-<span class="fc" id="L469">        PolynomialEvidence.append(</span>
-            material,
-<span class="fc" id="L471">            Integer.toString(candidateIndex));</span>
-<span class="fc" id="L472">        PolynomialEvidence.append(material, candidateCertificateHash);</span>
 <span class="fc" id="L473">        PolynomialEvidence.append(</span>
             material,
-<span class="fc" id="L475">            Boolean.toString(remainderOne));</span>
-<span class="fc" id="L476">        PolynomialEvidence.append(</span>
+<span class="fc" id="L475">            Integer.toString(candidateIndex));</span>
+<span class="fc" id="L476">        PolynomialEvidence.append(material, candidateCertificateHash);</span>
+<span class="fc" id="L477">        PolynomialEvidence.append(</span>
             material,
-<span class="fc" id="L478">            Integer.toString(factorCount));</span>
-<span class="fc" id="L479">        PolynomialEvidence.append(</span>
+<span class="fc" id="L479">            Boolean.toString(remainderOne));</span>
+<span class="fc" id="L480">        PolynomialEvidence.append(</span>
             material,
-<span class="fc" id="L481">            Integer.toString(factorAttempts.size()));</span>
-<span class="fc" id="L482">        factorAttempts.forEach(attempt -&gt; PolynomialEvidence.append(</span>
+<span class="fc" id="L482">            Integer.toString(factorCount));</span>
+<span class="fc" id="L483">        PolynomialEvidence.append(</span>
             material,
-<span class="fc" id="L484">            attempt.canonicalMaterial()));</span>
-<span class="fc" id="L485">        PolynomialEvidence.append(material, outcome.name());</span>
-<span class="fc" id="L486">        PolynomialEvidence.append(material, detailCode);</span>
-<span class="fc" id="L487">        PolynomialEvidence.append(material, Long.toString(workUnits));</span>
-<span class="fc" id="L488">        return PolynomialEvidence.sha256(material.toString());</span>
+<span class="fc" id="L485">            Integer.toString(factorAttempts.size()));</span>
+<span class="fc" id="L486">        factorAttempts.forEach(attempt -&gt; PolynomialEvidence.append(</span>
+            material,
+<span class="fc" id="L488">            attempt.canonicalMaterial()));</span>
+<span class="fc" id="L489">        PolynomialEvidence.append(material, outcome.name());</span>
+<span class="fc" id="L490">        PolynomialEvidence.append(material, detailCode);</span>
+<span class="fc" id="L491">        PolynomialEvidence.append(material, Long.toString(workUnits));</span>
+<span class="fc" id="L492">        return PolynomialEvidence.sha256(material.toString());</span>
     }
 
     private static String traceHash(
@@ -499,135 +503,135 @@ public final class IndependentCompletenessTrace {
         String selectedCandidateCertificateHash,
         PolynomialWorkLedger work
     ) {
-<span class="fc" id="L502">        StringBuilder material = new StringBuilder(methodId);</span>
-<span class="fc" id="L503">        PolynomialEvidence.append(material, requestHash);</span>
-<span class="fc" id="L504">        PolynomialEvidence.append(material, sourceHash);</span>
-<span class="fc" id="L505">        PolynomialEvidence.append(material, outcome.name());</span>
-<span class="fc" id="L506">        PolynomialEvidence.append(material, detailCode);</span>
-<span class="fc" id="L507">        PolynomialEvidence.append(</span>
+<span class="fc" id="L506">        StringBuilder material = new StringBuilder(methodId);</span>
+<span class="fc" id="L507">        PolynomialEvidence.append(material, requestHash);</span>
+<span class="fc" id="L508">        PolynomialEvidence.append(material, sourceHash);</span>
+<span class="fc" id="L509">        PolynomialEvidence.append(material, outcome.name());</span>
+<span class="fc" id="L510">        PolynomialEvidence.append(material, detailCode);</span>
+<span class="fc" id="L511">        PolynomialEvidence.append(</span>
             material,
-<span class="fc" id="L509">            Integer.toString(candidateAttempts.size()));</span>
-<span class="fc" id="L510">        candidateAttempts.forEach(attempt -&gt; PolynomialEvidence.append(</span>
+<span class="fc" id="L513">            Integer.toString(candidateAttempts.size()));</span>
+<span class="fc" id="L514">        candidateAttempts.forEach(attempt -&gt; PolynomialEvidence.append(</span>
             material,
-<span class="fc" id="L512">            attempt.canonicalMaterial()));</span>
-<span class="fc" id="L513">        PolynomialEvidence.append(</span>
+<span class="fc" id="L516">            attempt.canonicalMaterial()));</span>
+<span class="fc" id="L517">        PolynomialEvidence.append(</span>
             material,
-<span class="fc" id="L515">            Integer.toString(selectedCandidateIndex));</span>
-<span class="fc" id="L516">        PolynomialEvidence.append(</span>
+<span class="fc" id="L519">            Integer.toString(selectedCandidateIndex));</span>
+<span class="fc" id="L520">        PolynomialEvidence.append(</span>
             material,
             selectedCandidateCertificateHash);
-<span class="fc" id="L519">        PolynomialEvidence.append(material, work.canonicalMaterial());</span>
-<span class="fc" id="L520">        return PolynomialEvidence.sha256(material.toString());</span>
+<span class="fc" id="L523">        PolynomialEvidence.append(material, work.canonicalMaterial());</span>
+<span class="fc" id="L524">        return PolynomialEvidence.sha256(material.toString());</span>
     }
 
     private static void validateFactorSequence(
         List&lt;FactorAttempt&gt; factorAttempts
     ) {
-<span class="fc bfc" id="L526" title="All 2 branches covered.">        for (int index = 0; index &lt; factorAttempts.size(); index++) {</span>
-<span class="fc" id="L527">            require(</span>
-<span class="pc bpc" id="L528" title="1 of 2 branches missed.">                factorAttempts.get(index).factorIndex() == index,</span>
+<span class="fc bfc" id="L530" title="All 2 branches covered.">        for (int index = 0; index &lt; factorAttempts.size(); index++) {</span>
+<span class="fc" id="L531">            require(</span>
+<span class="pc bpc" id="L532" title="1 of 2 branches missed.">                factorAttempts.get(index).factorIndex() == index,</span>
                 &quot;completeness factor attempts must be consecutive&quot;);
         }
-<span class="fc" id="L531">        require(</span>
-<span class="fc" id="L532">            factorAttempts.stream()</span>
-<span class="fc" id="L533">                .map(FactorAttempt::factorHash)</span>
-<span class="pc bpc" id="L534" title="1 of 2 branches missed.">                .distinct().count() == factorAttempts.size(),</span>
+<span class="fc" id="L535">        require(</span>
+<span class="fc" id="L536">            factorAttempts.stream()</span>
+<span class="fc" id="L537">                .map(FactorAttempt::factorHash)</span>
+<span class="pc bpc" id="L538" title="1 of 2 branches missed.">                .distinct().count() == factorAttempts.size(),</span>
             &quot;completeness factors must be distinct&quot;);
-<span class="fc" id="L536">    }</span>
+<span class="fc" id="L540">    }</span>
 
     private static void validateRemainder(
         boolean remainderOne,
         CandidateOutcome outcome,
         List&lt;FactorAttempt&gt; factorAttempts
     ) {
-<span class="fc bfc" id="L543" title="All 2 branches covered.">        if (remainderOne) {</span>
-<span class="pc bpc" id="L544" title="1 of 2 branches missed.">            require(</span>
+<span class="fc bfc" id="L547" title="All 2 branches covered.">        if (remainderOne) {</span>
+<span class="pc bpc" id="L548" title="1 of 2 branches missed.">            require(</span>
                 outcome != CandidateOutcome.REMAINDER_NOT_ONE,
                 &quot;unit remainder cannot have remainder-failure outcome&quot;);
-<span class="fc" id="L547">            return;</span>
+<span class="fc" id="L551">            return;</span>
         }
-<span class="pc bpc" id="L549" title="1 of 2 branches missed.">        require(</span>
+<span class="pc bpc" id="L553" title="1 of 2 branches missed.">        require(</span>
             outcome == CandidateOutcome.REMAINDER_NOT_ONE,
             &quot;nonunit remainder requires remainder-failure outcome&quot;);
-<span class="fc" id="L552">        require(</span>
-<span class="fc" id="L553">            factorAttempts.isEmpty(),</span>
+<span class="fc" id="L556">        require(</span>
+<span class="fc" id="L557">            factorAttempts.isEmpty(),</span>
             &quot;nonunit remainder must be rejected before factor checks&quot;);
-<span class="fc" id="L555">    }</span>
+<span class="fc" id="L559">    }</span>
 
     private static void validateCertifiedCandidate(
         CandidateOutcome outcome,
         int factorCount,
         List&lt;FactorAttempt&gt; factorAttempts
     ) {
-<span class="fc bfc" id="L562" title="All 2 branches covered.">        if (outcome == CandidateOutcome.REMAINDER_NOT_ONE) {</span>
-<span class="fc" id="L563">            return;</span>
+<span class="fc bfc" id="L566" title="All 2 branches covered.">        if (outcome == CandidateOutcome.REMAINDER_NOT_ONE) {</span>
+<span class="fc" id="L567">            return;</span>
         }
-<span class="fc" id="L565">        boolean everyRetainedFactorCertified = factorAttempts.stream()</span>
-<span class="fc" id="L566">            .allMatch(attempt -&gt;</span>
-<span class="fc" id="L567">                attempt.irreducibilityTrace().certified());</span>
-<span class="fc bfc" id="L568" title="All 2 branches covered.">        if (outcome == CandidateOutcome.CERTIFIED) {</span>
-<span class="fc" id="L569">            require(</span>
-<span class="pc bpc" id="L570" title="1 of 2 branches missed.">                factorAttempts.size() == factorCount,</span>
+<span class="fc" id="L569">        boolean everyRetainedFactorCertified = factorAttempts.stream()</span>
+<span class="fc" id="L570">            .allMatch(attempt -&gt;</span>
+<span class="fc" id="L571">                attempt.irreducibilityTrace().certified());</span>
+<span class="fc bfc" id="L572" title="All 2 branches covered.">        if (outcome == CandidateOutcome.CERTIFIED) {</span>
+<span class="fc" id="L573">            require(</span>
+<span class="pc bpc" id="L574" title="1 of 2 branches missed.">                factorAttempts.size() == factorCount,</span>
                 &quot;complete candidate requires every factor attempt&quot;);
-<span class="fc" id="L572">            require(</span>
+<span class="fc" id="L576">            require(</span>
                 everyRetainedFactorCertified,
                 &quot;complete candidate requires every factor certificate&quot;);
-<span class="fc" id="L575">            return;</span>
+<span class="fc" id="L579">            return;</span>
         }
-<span class="fc" id="L577">        require(</span>
-<span class="pc bpc" id="L578" title="2 of 4 branches missed.">            factorAttempts.size() &lt; factorCount</span>
+<span class="fc" id="L581">        require(</span>
+<span class="pc bpc" id="L582" title="2 of 4 branches missed.">            factorAttempts.size() &lt; factorCount</span>
                 || !everyRetainedFactorCertified,
             &quot;failed candidate must retain an incomplete factor campaign&quot;);
-<span class="fc" id="L581">    }</span>
+<span class="fc" id="L585">    }</span>
 
     private static void validateCandidateWork(
         long workUnits,
         List&lt;FactorAttempt&gt; factorAttempts
     ) {
-<span class="fc" id="L587">        long expected = 1;</span>
-<span class="fc bfc" id="L588" title="All 2 branches covered.">        for (FactorAttempt attempt : factorAttempts) {</span>
-<span class="fc" id="L589">            expected = Math.addExact(expected, 1);</span>
-<span class="fc" id="L590">            expected = Math.addExact(</span>
+<span class="fc" id="L591">        long expected = 1;</span>
+<span class="fc bfc" id="L592" title="All 2 branches covered.">        for (FactorAttempt attempt : factorAttempts) {</span>
+<span class="fc" id="L593">            expected = Math.addExact(expected, 1);</span>
+<span class="fc" id="L594">            expected = Math.addExact(</span>
                 expected,
-<span class="fc" id="L592">                attempt.irreducibilityTrace().work().totalWorkUnits());</span>
-<span class="fc" id="L593">        }</span>
-<span class="pc bpc" id="L594" title="1 of 2 branches missed.">        require(</span>
+<span class="fc" id="L596">                attempt.irreducibilityTrace().work().totalWorkUnits());</span>
+<span class="fc" id="L597">        }</span>
+<span class="pc bpc" id="L598" title="1 of 2 branches missed.">        require(</span>
             workUnits == expected,
             &quot;candidate attempt work does not match retained factor traces&quot;);
-<span class="fc" id="L597">    }</span>
+<span class="fc" id="L601">    }</span>
 
     private static void validateCampaignAccounting(
         List&lt;CandidateAttempt&gt; candidateAttempts,
         PolynomialWorkLedger work
     ) {
-<span class="fc" id="L603">        long retainedWork = 0;</span>
-<span class="fc" id="L604">        for (int index = 0;</span>
-<span class="fc bfc" id="L605" title="All 2 branches covered.">                index &lt; candidateAttempts.size();</span>
-<span class="fc" id="L606">                index++) {</span>
-<span class="fc" id="L607">            CandidateAttempt attempt = candidateAttempts.get(index);</span>
-<span class="fc" id="L608">            require(</span>
-<span class="pc bpc" id="L609" title="1 of 2 branches missed.">                attempt.candidateIndex() == index,</span>
+<span class="fc" id="L607">        long retainedWork = 0;</span>
+<span class="fc" id="L608">        for (int index = 0;</span>
+<span class="fc bfc" id="L609" title="All 2 branches covered.">                index &lt; candidateAttempts.size();</span>
+<span class="fc" id="L610">                index++) {</span>
+<span class="fc" id="L611">            CandidateAttempt attempt = candidateAttempts.get(index);</span>
+<span class="fc" id="L612">            require(</span>
+<span class="pc bpc" id="L613" title="1 of 2 branches missed.">                attempt.candidateIndex() == index,</span>
                 &quot;candidate attempts must be consecutive&quot;);
-<span class="fc" id="L611">            retainedWork = Math.addExact(</span>
+<span class="fc" id="L615">            retainedWork = Math.addExact(</span>
                 retainedWork,
-<span class="fc" id="L613">                attempt.workUnits());</span>
+<span class="fc" id="L617">                attempt.workUnits());</span>
         }
-<span class="fc" id="L615">        require(</span>
-<span class="pc bpc" id="L616" title="1 of 2 branches missed.">            retainedWork == work.totalWorkUnits(),</span>
+<span class="fc" id="L619">        require(</span>
+<span class="pc bpc" id="L620" title="1 of 2 branches missed.">            retainedWork == work.totalWorkUnits(),</span>
             &quot;candidate attempts must account for trace work&quot;);
-<span class="fc" id="L618">    }</span>
+<span class="fc" id="L622">    }</span>
 
     private static void validateFactorBindings(
         String requestHash,
         List&lt;CandidateAttempt&gt; candidateAttempts
     ) {
-<span class="fc" id="L624">        require(</span>
-<span class="fc" id="L625">            candidateAttempts.stream()</span>
-<span class="fc" id="L626">                .flatMap(attempt -&gt; attempt.factorAttempts().stream())</span>
-<span class="fc" id="L627">                .allMatch(attempt -&gt; attempt.irreducibilityTrace()</span>
-<span class="fc" id="L628">                    .requestHash().equals(requestHash)),</span>
+<span class="fc" id="L628">        require(</span>
+<span class="fc" id="L629">            candidateAttempts.stream()</span>
+<span class="fc" id="L630">                .flatMap(attempt -&gt; attempt.factorAttempts().stream())</span>
+<span class="fc" id="L631">                .allMatch(attempt -&gt; attempt.irreducibilityTrace()</span>
+<span class="fc" id="L632">                    .requestHash().equals(requestHash)),</span>
             &quot;factor traces must bind the completeness request&quot;);
-<span class="fc" id="L630">    }</span>
+<span class="fc" id="L634">    }</span>
 
     private static void validateSelection(
         Outcome outcome,
@@ -635,48 +639,48 @@ public final class IndependentCompletenessTrace {
         int selectedCandidateIndex,
         String selectedCandidateCertificateHash
     ) {
-<span class="fc bfc" id="L638" title="All 2 branches covered.">        if (outcome != Outcome.CERTIFIED) {</span>
-<span class="pc bpc" id="L639" title="1 of 2 branches missed.">            require(</span>
+<span class="fc bfc" id="L642" title="All 2 branches covered.">        if (outcome != Outcome.CERTIFIED) {</span>
+<span class="pc bpc" id="L643" title="1 of 2 branches missed.">            require(</span>
                 selectedCandidateIndex == -1,
                 &quot;inconclusive trace cannot select a candidate index&quot;);
-<span class="fc" id="L642">            require(</span>
-<span class="fc" id="L643">                selectedCandidateCertificateHash.isEmpty(),</span>
+<span class="fc" id="L646">            require(</span>
+<span class="fc" id="L647">                selectedCandidateCertificateHash.isEmpty(),</span>
                 &quot;inconclusive trace cannot select a candidate hash&quot;);
-<span class="fc" id="L645">            require(</span>
-<span class="fc" id="L646">                candidateAttempts.stream().noneMatch(attempt -&gt;</span>
-<span class="pc bpc" id="L647" title="1 of 2 branches missed.">                    attempt.outcome() == CandidateOutcome.CERTIFIED),</span>
+<span class="fc" id="L649">            require(</span>
+<span class="fc" id="L650">                candidateAttempts.stream().noneMatch(attempt -&gt;</span>
+<span class="pc bpc" id="L651" title="1 of 2 branches missed.">                    attempt.outcome() == CandidateOutcome.CERTIFIED),</span>
                 &quot;inconclusive trace cannot retain a certified candidate&quot;);
-<span class="fc" id="L649">            return;</span>
+<span class="fc" id="L653">            return;</span>
         }
-<span class="pc bpc" id="L651" title="1 of 2 branches missed.">        require(</span>
+<span class="pc bpc" id="L655" title="1 of 2 branches missed.">        require(</span>
             selectedCandidateIndex &gt;= 0,
             &quot;certified trace requires a selected candidate&quot;);
-<span class="fc" id="L654">        require(</span>
-<span class="pc bpc" id="L655" title="1 of 2 branches missed.">            selectedCandidateIndex &lt; candidateAttempts.size(),</span>
+<span class="fc" id="L658">        require(</span>
+<span class="pc bpc" id="L659" title="1 of 2 branches missed.">            selectedCandidateIndex &lt; candidateAttempts.size(),</span>
             &quot;selected candidate index exceeds retained attempts&quot;);
-<span class="fc" id="L657">        require(</span>
-<span class="pc bpc" id="L658" title="1 of 2 branches missed.">            selectedCandidateIndex == candidateAttempts.size() - 1,</span>
+<span class="fc" id="L661">        require(</span>
+<span class="pc bpc" id="L662" title="1 of 2 branches missed.">            selectedCandidateIndex == candidateAttempts.size() - 1,</span>
             &quot;campaign must stop at its first certified candidate&quot;);
-<span class="fc" id="L660">        CandidateAttempt selected =</span>
-<span class="fc" id="L661">            candidateAttempts.get(selectedCandidateIndex);</span>
-<span class="fc" id="L662">        require(</span>
-<span class="pc bpc" id="L663" title="1 of 2 branches missed.">            selected.outcome() == CandidateOutcome.CERTIFIED,</span>
+<span class="fc" id="L664">        CandidateAttempt selected =</span>
+<span class="fc" id="L665">            candidateAttempts.get(selectedCandidateIndex);</span>
+<span class="fc" id="L666">        require(</span>
+<span class="pc bpc" id="L667" title="1 of 2 branches missed.">            selected.outcome() == CandidateOutcome.CERTIFIED,</span>
             &quot;selected candidate must be certified&quot;);
-<span class="fc" id="L665">        require(</span>
-<span class="fc" id="L666">            selectedCandidateCertificateHash.equals(</span>
-<span class="fc" id="L667">                selected.candidateCertificateHash()),</span>
+<span class="fc" id="L669">        require(</span>
+<span class="fc" id="L670">            selectedCandidateCertificateHash.equals(</span>
+<span class="fc" id="L671">                selected.candidateCertificateHash()),</span>
             &quot;selected candidate hash mismatch&quot;);
-<span class="fc" id="L669">    }</span>
+<span class="fc" id="L673">    }</span>
 
     private static boolean validHash(String value) {
-<span class="pc bpc" id="L672" title="1 of 2 branches missed.">        return value != null</span>
-<span class="pc bpc" id="L673" title="1 of 2 branches missed.">            &amp;&amp; value.matches(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+<span class="pc bpc" id="L676" title="1 of 2 branches missed.">        return value != null</span>
+<span class="pc bpc" id="L677" title="1 of 2 branches missed.">            &amp;&amp; value.matches(&quot;sha256:[0-9a-f]{64}&quot;);</span>
     }
 
     private static void require(boolean condition, String message) {
-<span class="pc bpc" id="L677" title="1 of 2 branches missed.">        if (!condition) {</span>
-<span class="nc" id="L678">            throw new IllegalArgumentException(message);</span>
+<span class="pc bpc" id="L681" title="1 of 2 branches missed.">        if (!condition) {</span>
+<span class="nc" id="L682">            throw new IllegalArgumentException(message);</span>
         }
-<span class="fc" id="L680">    }</span>
+<span class="fc" id="L684">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

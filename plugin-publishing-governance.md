@@ -22,9 +22,15 @@ gesperrt werden sollen.
 | Signierte Indexrevisionen | `IMPLEMENTED` |
 | Signierte, replay-sichere Trust-State-Revisionen | `IMPLEMENTED` |
 | Gehosteter oder föderierter Katalogtransport | `BLOCKED` |
-| Clientseitiger Download- und Installationslebenszyklus | `BLOCKED` |
+| Clientseitiger Download- und Installationslebenszyklus | `PARTIAL` — [Java-JAR-Client](plugin-distribution-client.md), externe Checkpoint-Authority erforderlich |
 | Öffentliche End-to-End-Distribution | `BLOCKED` |
 | Unabhängig veröffentlichte Community-Beispielprojekte | `NOT_EVALUATED` |
+
+Der Java-Client prüft reale HTTPS-Downloads und verwaltet atomare Generationen
+für Installation, Update, Entfernung und Rollback einer JAR-Dependency-Closure.
+Ein produktiv angebundener rollback-geschützter Authority-Provider, öffentliche
+Katalogdienste, Runtime-Aktivierung sowie Regel-/Knowledge-Pack-Installation
+bleiben außerhalb dieses Slices.
 
 `IMPLEMENTED` bedeutet, dass der jeweilige Software- und Evidence-Vertrag im
 Checkout vorhanden und getestet ist. Es bedeutet nicht, dass bereits ein
@@ -370,8 +376,8 @@ Capabilities sowie ein reines Regel-/Knowledge-Pack-Beispiel benötigt.
 
 ## Lokale End-to-End-Prüfung
 
-Bis ein gehosteter Transport und atomarer Installationslebenszyklus verfügbar
-sind, muss eine lokale Testumgebung mindestens folgende Kette nachweisen:
+Zusätzlich zu den [HTTP/HTTPS- und Package-Lifecycle-Tests des Java-Clients](plugin-distribution-client.md)
+muss eine lokale Testumgebung mindestens folgende Runtime-Kette nachweisen:
 
 ```text
 reproduzierbarer Build

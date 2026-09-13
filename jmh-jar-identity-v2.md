@@ -2,8 +2,11 @@
 
 This is a separately versioned correction for the admission defect reproduced
 after the [retained study v1 failure](jmh-precision-study-v1-outcome.md). The new
-`scripts/jmh_precision_study_jar_v2.py` module is not connected to a study runner
-or workflow. It grants no further measurement launch. The historical v1 jar
+`scripts/jmh_precision_study_jar_v2.py` module was initially introduced without a
+study runner or workflow. The separately authorized [v2 study](jmh-precision-study-v2.md)
+now uses it; its [completed outcome](jmh-precision-study-v2-outcome.md) retains the
+measurements and the explicit no-selection decision. The identity module itself
+grants no further measurement launch. The historical v1 jar
 identity, study scripts, policy, thresholds and artifacts remain unchanged.
 
 The v1 identity rejects all duplicate file names. The actual Gradle-generated

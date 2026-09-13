@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuntimeJson.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.runtime</a> &gt; <span class="el_source">RuntimeJson.java</span></div><h1>RuntimeJson.java</h1><pre class="source lang-java linenums">package de.regelsuche.runtime;
+
+import de.regelsuche.json.JsonWriter;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeMap;
+
+/** Canonical observations only: this codec never constructs executable evidence. */
+final class RuntimeJson {
+    private RuntimeJson() { }
+
+    static Map&lt;String, Object&gt; fields(Object... pairs) {
+<span class="fc" id="L20">        Map&lt;String, Object&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        for (int i = 0; i &lt; pairs.length; i += 2) result.put((String) pairs[i], pairs[i + 1]);</span>
+<span class="fc" id="L22">        return result;</span>
+    }
+
+    static String canonical(Map&lt;String, ?&gt; values) {
+<span class="fc" id="L26">        var writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L27">        write(writer, values);</span>
+<span class="fc" id="L28">        return writer.endObject().toString();</span>
+    }
+
+    static String hash(String value) {
+        try {
+<span class="fc" id="L33">            return &quot;sha256:&quot; + HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L34">                .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L35">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L36">            throw new IllegalStateException(exception);</span>
+        }
+    }
+
+    static Map&lt;String, ?&gt; object(Object value) {
+<span class="pc bpc" id="L41" title="3 of 6 branches missed.">        if (!(value instanceof Map&lt;?, ?&gt; map) || map.keySet().stream().anyMatch(key -&gt; !(key instanceof String))) {</span>
+<span class="nc" id="L42">            throw new IllegalArgumentException(&quot;expected JSON object&quot;);</span>
+        }
+<span class="fc" id="L44">        @SuppressWarnings(&quot;unchecked&quot;) Map&lt;String, ?&gt; result = (Map&lt;String, ?&gt;) map;</span>
+<span class="fc" id="L45">        return result;</span>
+    }
+
+    static void only(Map&lt;String, ?&gt; value, String... keys) {
+<span class="fc" id="L49">        var allowed = Set.of(keys);</span>
+<span class="fc bfc" id="L50" title="All 4 branches covered.">        for (String key : value.keySet()) if (!allowed.contains(key)) {</span>
+<span class="fc" id="L51">            throw new IllegalArgumentException(&quot;unsupported runtime field: &quot; + key);</span>
+        }
+<span class="fc" id="L53">    }</span>
+
+    static String text(Map&lt;String, ?&gt; value, String key, String fallback) {
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (!value.containsKey(key)) return fallback;</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (!(value.get(key) instanceof String text)) throw new IllegalArgumentException(key + &quot; must be text&quot;);</span>
+<span class="fc" id="L58">        return text;</span>
+    }
+
+    static List&lt;String&gt; strings(Map&lt;String, ?&gt; value, String key) {
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (!value.containsKey(key)) return List.of();</span>
+<span class="pc bpc" id="L63" title="3 of 6 branches missed.">        if (!(value.get(key) instanceof List&lt;?&gt; list) || list.stream().anyMatch(item -&gt; !(item instanceof String))) {</span>
+<span class="nc" id="L64">            throw new IllegalArgumentException(key + &quot; must be a string array&quot;);</span>
+        }
+<span class="fc" id="L66">        return list.stream().map(String.class::cast).toList();</span>
+    }
+
+    static boolean bool(Map&lt;String, ?&gt; value, String key, boolean fallback) {
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if (!value.containsKey(key)) return fallback;</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        if (!(value.get(key) instanceof Boolean result)) throw new IllegalArgumentException(key + &quot; must be boolean&quot;);</span>
+<span class="fc" id="L72">        return result;</span>
+    }
+
+    static int integer(Map&lt;String, ?&gt; value, String key, int fallback, int min, int max) {
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (!value.containsKey(key)) return fallback;</span>
+<span class="fc" id="L77">        Object number = value.get(key);</span>
+<span class="pc bpc" id="L78" title="1 of 4 branches missed.">        if (!(number instanceof Integer || number instanceof Long)) throw new IllegalArgumentException(key + &quot; must be an integer&quot;);</span>
+<span class="fc" id="L79">        long result = ((Number) number).longValue();</span>
+<span class="pc bpc" id="L80" title="2 of 4 branches missed.">        if (result &lt; min || result &gt; max) throw new IllegalArgumentException(key + &quot; is outside &quot; + min + &quot;..&quot; + max);</span>
+<span class="fc" id="L81">        return (int) result;</span>
+    }
+
+    /** Used solely on checkout-owned work/analysis records, never on rule objects. */
+    static Map&lt;String, Object&gt; observation(Record record) {
+<span class="fc" id="L86">        var values = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (var component : record.getClass().getRecordComponents()) {</span>
+            try {
+<span class="fc" id="L89">                values.put(component.getName(), component.getAccessor().invoke(record));</span>
+<span class="nc" id="L90">            } catch (ReflectiveOperationException exception) {</span>
+<span class="nc" id="L91">                throw new IllegalStateException(&quot;cannot retain runtime receipt&quot;, exception);</span>
+<span class="fc" id="L92">            }</span>
+        }
+<span class="fc" id="L94">        return values;</span>
+    }
+
+    private static Object normalized(Object value) {
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (value instanceof Optional&lt;?&gt; optional) return normalized(optional.orElse(null));</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (value instanceof Record record) return observation(record);</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (value instanceof Enum&lt;?&gt; enumeration) return enumeration.name();</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (value instanceof Set&lt;?&gt; set) return set.stream().map(Object::toString).sorted().toList();</span>
+<span class="fc" id="L102">        return value;</span>
+    }
+
+    private static void write(JsonWriter writer, Map&lt;String, ?&gt; values) {
+<span class="fc" id="L106">        new TreeMap&lt;&gt;(values).forEach((key, raw) -&gt; {</span>
+<span class="fc" id="L107">            Object value = normalized(raw);</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            if (value == null) writer.nullProperty(key);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            else if (value instanceof String string) writer.property(key, string);</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            else if (value instanceof Boolean bool) writer.property(key, bool);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            else if (value instanceof Number number) writer.property(key, number.longValue());</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            else if (value instanceof Map&lt;?, ?&gt;) writer.object(key, child -&gt; write(child, object(value)));</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            else if (value instanceof List&lt;?&gt; list) writer.array(key, child -&gt; list.forEach(item -&gt; writeValue(child, item)));</span>
+<span class="nc" id="L114">            else throw new IllegalArgumentException(&quot;unsupported runtime observation: &quot; + value.getClass());</span>
+<span class="fc" id="L115">        });</span>
+<span class="fc" id="L116">    }</span>
+
+    private static void writeValue(JsonWriter writer, Object raw) {
+<span class="fc" id="L119">        Object value = normalized(raw);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (value instanceof String string) writer.value(string);</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        else if (value instanceof Map&lt;?, ?&gt;) writer.objectValue(child -&gt; write(child, object(value)));</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        else if (value instanceof List&lt;?&gt; list) writer.arrayValue(child -&gt; list.forEach(item -&gt; writeValue(child, item)));</span>
+<span class="nc" id="L123">        else throw new IllegalArgumentException(&quot;unsupported runtime array observation&quot;);</span>
+<span class="fc" id="L124">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

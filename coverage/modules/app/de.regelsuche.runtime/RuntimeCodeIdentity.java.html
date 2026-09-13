@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuntimeCodeIdentity.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.runtime</a> &gt; <span class="el_source">RuntimeCodeIdentity.java</span></div><h1>RuntimeCodeIdentity.java</h1><pre class="source lang-java linenums">package de.regelsuche.runtime;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Collection;
+import java.util.HexFormat;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.jar.JarFile;
+
+/** Binds delivered class bytes, independent of Git, absolute paths and JAR timestamps. */
+public final class RuntimeCodeIdentity {
+    public static final String REVISION = &quot;regelsuche.runtime-class-content/v1&quot;;
+    private RuntimeCodeIdentity() { }
+
+    public static String fingerprint(Collection&lt;Path&gt; codeSources) {
+        try {
+<span class="fc" id="L22">            Map&lt;String, byte[]&gt; classes = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">            for (Path source : codeSources.stream().distinct().toList()) {</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">                if (Files.isDirectory(source)) {</span>
+<span class="fc" id="L25">                    try (var files = Files.walk(source)) {</span>
+<span class="fc bfc" id="L26" title="All 4 branches covered.">                        for (Path file : files.filter(path -&gt; path.toString().endsWith(&quot;.class&quot;)</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">                                &amp;&amp; !path.getFileName().toString().equals(&quot;module-info.class&quot;)).sorted().toList()) {</span>
+<span class="fc" id="L28">                            put(classes, source.relativize(file).toString().replace('\\', '/'), Files.readAllBytes(file));</span>
+<span class="fc" id="L29">                        }</span>
+                    }
+                } else {
+<span class="fc" id="L32">                    try (var jar = new JarFile(source.toFile())) {</span>
+<span class="fc bfc" id="L33" title="All 4 branches covered.">                        for (var entry : jar.stream().filter(item -&gt; item.getName().endsWith(&quot;.class&quot;)</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">                                &amp;&amp; !item.getName().endsWith(&quot;module-info.class&quot;)).sorted(java.util.Comparator.comparing(java.util.jar.JarEntry::getName)).toList()) {</span>
+<span class="fc" id="L35">                            try (var stream = jar.getInputStream(entry)) { put(classes, entry.getName(), stream.readAllBytes()); }</span>
+<span class="fc" id="L36">                        }</span>
+                    }
+                }
+<span class="fc" id="L39">            }</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">            if (classes.isEmpty()) throw new IllegalArgumentException(&quot;runtime has no identifiable classes&quot;);</span>
+<span class="fc" id="L41">            var digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="fc" id="L42">            var classDigest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="fc" id="L43">            digest.update(REVISION.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">            for (var entry : classes.entrySet()) {</span>
+<span class="fc" id="L45">                digest.update(entry.getKey().getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L46">                digest.update((byte) 0);</span>
+                // digest(byte[]) resets the instance after each class; v1 bytes stay identical.
+<span class="fc" id="L48">                digest.update(classDigest.digest(entry.getValue()));</span>
+<span class="fc" id="L49">            }</span>
+<span class="fc" id="L50">            return &quot;sha256:&quot; + HexFormat.of().formatHex(digest.digest());</span>
+<span class="nc" id="L51">        } catch (IOException | NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L52">            throw new IllegalStateException(&quot;cannot bind delivered runtime code&quot;, exception);</span>
+        }
+    }
+
+    static Path source(Class&lt;?&gt; type) {
+        try {
+<span class="fc" id="L58">            return Path.of(type.getProtectionDomain().getCodeSource().getLocation().toURI());</span>
+<span class="nc" id="L59">        } catch (java.net.URISyntaxException | NullPointerException exception) {</span>
+<span class="nc" id="L60">            throw new IllegalStateException(&quot;runtime class has no identifiable code source: &quot; + type.getName(), exception);</span>
+        }
+    }
+
+    private static void put(Map&lt;String, byte[]&gt; classes, String name, byte[] bytes) {
+<span class="fc" id="L65">        byte[] prior = classes.putIfAbsent(name, bytes);</span>
+<span class="fc bfc" id="L66" title="All 4 branches covered.">        if (prior != null &amp;&amp; !java.util.Arrays.equals(prior, bytes)) {</span>
+<span class="fc" id="L67">            throw new IllegalArgumentException(&quot;ambiguous runtime class: &quot; + name);</span>
+        }
+<span class="fc" id="L69">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

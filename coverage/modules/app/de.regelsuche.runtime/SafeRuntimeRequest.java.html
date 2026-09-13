@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SafeRuntimeRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.runtime</a> &gt; <span class="el_source">SafeRuntimeRequest.java</span></div><h1>SafeRuntimeRequest.java</h1><pre class="source lang-java linenums">package de.regelsuche.runtime;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.math.algorithms.linalg.MatrixPreparation;
+import de.regelsuche.math.algorithms.linalg.MatrixPreparationJson;
+import de.regelsuche.search.reachability.PatternTargetedLocalBridgeSearch;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import static de.regelsuche.runtime.RuntimeJson.*;
+
+/** Source-side policy input. Targets, answers and executable rules have no fields here. */
+public record SafeRuntimeRequest(Profile profile, String source, AssumptionSignature assumptions,
+        List&lt;String&gt; ruleIds, List&lt;String&gt; preparationRuleIds, boolean includeSymPy, int maxWorkUnits,
+        int maxPrimitiveRewrites, int maxTheoryWorkUnits,
+        PatternTargetedLocalBridgeSearch.Budget preparationBudget, MatrixPreparation.Request representation) {
+    public static final String SCHEMA = &quot;regelsuche.safe-runtime-request/v1&quot;;
+    public static final int DEFAULT_WORK = 200_000;
+<span class="fc" id="L19">    public enum Profile { DIRECT_V1, SAFE_PREPARATION_V3, SAFE_PREPARATION_V4 }</span>
+
+<span class="fc" id="L21">    public SafeRuntimeRequest {</span>
+<span class="fc" id="L22">        Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">        source = source == null ? &quot;&quot; : source.trim();</span>
+<span class="pc bpc" id="L24" title="1 of 4 branches missed.">        if (source.isBlank() == (representation == null)) throw new IllegalArgumentException(&quot;supply source or representation&quot;);</span>
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        if (source.length() &gt; 65_536) throw new IllegalArgumentException(&quot;source is too large&quot;);</span>
+<span class="fc" id="L26">        assumptions = AssumptionSignature.ofExpressions(Objects.requireNonNull(assumptions, &quot;assumptions&quot;).normalizedAssumptions());</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (assumptions.normalizedAssumptions().size() &gt; 64) throw new IllegalArgumentException(&quot;too many assumptions&quot;);</span>
+<span class="fc" id="L28">        ruleIds = List.copyOf(ruleIds);</span>
+<span class="fc" id="L29">        preparationRuleIds = List.copyOf(preparationRuleIds);</span>
+<span class="pc bpc" id="L30" title="2 of 4 branches missed.">        if (ruleIds.size() &gt; 1024 || ruleIds.stream().anyMatch(String::isBlank)</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">                || ruleIds.stream().distinct().count() != ruleIds.size()) throw new IllegalArgumentException(&quot;invalid rule selection&quot;);</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if (preparationRuleIds.stream().anyMatch(String::isBlank)</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">                || preparationRuleIds.stream().distinct().count() != preparationRuleIds.size()) throw new IllegalArgumentException(&quot;invalid preparation selection&quot;);</span>
+<span class="pc bpc" id="L34" title="2 of 4 branches missed.">        if (maxWorkUnits &lt; 0 || maxWorkUnits &gt; 1_000_000) throw new IllegalArgumentException(&quot;runtime work budget outside 0..1000000&quot;);</span>
+<span class="pc bpc" id="L35" title="4 of 8 branches missed.">        if (maxPrimitiveRewrites &lt; 0 || maxPrimitiveRewrites &gt; 1024 || maxTheoryWorkUnits &lt; 0 || maxTheoryWorkUnits &gt; 1_000_000) {</span>
+<span class="nc" id="L36">            throw new IllegalArgumentException(&quot;invalid primitive/theory path budget&quot;);</span>
+        }
+<span class="fc" id="L38">        Objects.requireNonNull(preparationBudget, &quot;preparationBudget&quot;);</span>
+<span class="pc bpc" id="L39" title="1 of 4 branches missed.">        if (representation != null &amp;&amp; representation.profile() != representationProfile(profile)) {</span>
+<span class="nc" id="L40">            throw new IllegalArgumentException(&quot;typed representation profile differs from runtime profile&quot;);</span>
+        }
+<span class="fc" id="L42">    }</span>
+
+    public static SafeRuntimeRequest read(Map&lt;String, ?&gt; values) {
+<span class="fc" id="L45">        only(values, &quot;schema&quot;, &quot;profile&quot;, &quot;source&quot;, &quot;assumptions&quot;, &quot;ruleIds&quot;, &quot;preparationRuleIds&quot;, &quot;includeSymPy&quot;, &quot;maxWorkUnits&quot;, &quot;maxPrimitiveRewrites&quot;, &quot;maxTheoryWorkUnits&quot;, &quot;preparationBudget&quot;, &quot;representation&quot;);</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (!SCHEMA.equals(values.get(&quot;schema&quot;))) throw new IllegalArgumentException(&quot;unsupported safe runtime request schema&quot;);</span>
+        Profile profile;
+        try {
+<span class="fc" id="L49">            profile = Profile.valueOf(text(values, &quot;profile&quot;, &quot;&quot;)); // opt-in is mandatory</span>
+<span class="fc" id="L50">        } catch (IllegalArgumentException exception) {</span>
+<span class="fc" id="L51">            throw new IllegalArgumentException(</span>
+                &quot;profile must be one of DIRECT_V1, SAFE_PREPARATION_V3, SAFE_PREPARATION_V4&quot;, exception);
+<span class="fc" id="L53">        }</span>
+<span class="fc" id="L54">        int maximum = integer(values, &quot;maxWorkUnits&quot;, DEFAULT_WORK, 0, 1_000_000);</span>
+<span class="fc" id="L55">        MatrixPreparation.Request representation = null;</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (values.containsKey(&quot;representation&quot;)) {</span>
+<span class="fc" id="L57">            Map&lt;String, Object&gt; typed = new java.util.LinkedHashMap&lt;&gt;(object(values.get(&quot;representation&quot;)));</span>
+<span class="fc bfc" id="L58" title="All 4 branches covered.">            if (typed.containsKey(&quot;profile&quot;) &amp;&amp; !representationProfile(profile).name().equals(typed.get(&quot;profile&quot;))) {</span>
+<span class="fc" id="L59">                throw new IllegalArgumentException(&quot;typed representation profile differs from runtime profile&quot;);</span>
+            }
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            if (typed.containsKey(&quot;maxWorkUnits&quot;)) throw new IllegalArgumentException(&quot;the runtime owns typed work budgets&quot;);</span>
+<span class="fc" id="L62">            typed.put(&quot;profile&quot;, representationProfile(profile).name());</span>
+<span class="fc" id="L63">            typed.put(&quot;maxWorkUnits&quot;, maximum);</span>
+<span class="fc" id="L64">            representation = MatrixPreparationJson.readRequest(typed);</span>
+        }
+<span class="fc" id="L66">        return new SafeRuntimeRequest(profile, text(values, &quot;source&quot;, &quot;&quot;),</span>
+<span class="fc" id="L67">            AssumptionSignature.ofExpressions(strings(values, &quot;assumptions&quot;)), strings(values, &quot;ruleIds&quot;),</span>
+<span class="fc" id="L68">            strings(values, &quot;preparationRuleIds&quot;), bool(values, &quot;includeSymPy&quot;, true), maximum,</span>
+<span class="fc" id="L69">            integer(values, &quot;maxPrimitiveRewrites&quot;, 64, 0, 1024), integer(values, &quot;maxTheoryWorkUnits&quot;, DEFAULT_WORK, 0, 1_000_000),</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            readBudget(values.containsKey(&quot;preparationBudget&quot;) ? object(values.get(&quot;preparationBudget&quot;)) : Map.of()), representation);</span>
+    }
+
+    public Map&lt;String, Object&gt; observation() {
+<span class="fc" id="L74">        var result = fields(&quot;schema&quot;, SCHEMA, &quot;profile&quot;, profile.name(), &quot;assumptions&quot;, assumptions.normalizedAssumptions(),</span>
+<span class="fc" id="L75">            &quot;ruleIds&quot;, ruleIds, &quot;preparationRuleIds&quot;, preparationRuleIds, &quot;includeSymPy&quot;, includeSymPy, &quot;maxWorkUnits&quot;, maxWorkUnits,</span>
+<span class="fc" id="L76">            &quot;maxPrimitiveRewrites&quot;, maxPrimitiveRewrites, &quot;maxTheoryWorkUnits&quot;, maxTheoryWorkUnits,</span>
+<span class="fc" id="L77">            &quot;preparationBudget&quot;, RuntimeJson.observation(preparationBudget));</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (representation == null) result.put(&quot;source&quot;, source);</span>
+        else {
+<span class="fc" id="L80">            var typed = new java.util.LinkedHashMap&lt;&gt;(new de.regelsuche.json.JsonReader(</span>
+<span class="fc" id="L81">                MatrixPreparationJson.requestJson(representation)).readObject());</span>
+<span class="fc" id="L82">            typed.remove(&quot;maxWorkUnits&quot;);</span>
+<span class="fc" id="L83">            result.put(&quot;representation&quot;, typed);</span>
+        }
+<span class="fc" id="L85">        return result;</span>
+    }
+
+    static MatrixPreparation.Profile representationProfile(Profile profile) {
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        return profile == Profile.DIRECT_V1 ? MatrixPreparation.Profile.RECOGNITION_ONLY_V1</span>
+<span class="fc" id="L90">            : MatrixPreparation.Profile.SAFE_PREPARED_REPRESENTATION_V1;</span>
+    }
+
+    private static PatternTargetedLocalBridgeSearch.Budget readBudget(Map&lt;String, ?&gt; values) {
+<span class="fc" id="L94">        only(values, &quot;maxDepth&quot;, &quot;maxVisitedStates&quot;, &quot;maxGeneratedTransitions&quot;, &quot;maxPrimitiveSteps&quot;, &quot;maxExpressionNodes&quot;, &quot;maxSuccessorsPerState&quot;, &quot;maxMatchResults&quot;, &quot;maxMatchSteps&quot;, &quot;maxPatternBranches&quot;);</span>
+<span class="fc" id="L95">        return new PatternTargetedLocalBridgeSearch.Budget(</span>
+<span class="fc" id="L96">            integer(values, &quot;maxDepth&quot;, 2, 0, 8), integer(values, &quot;maxVisitedStates&quot;, 128, 1, 4096),</span>
+<span class="fc" id="L97">            integer(values, &quot;maxGeneratedTransitions&quot;, 512, 0, 16384), integer(values, &quot;maxPrimitiveSteps&quot;, 4, 0, 32),</span>
+<span class="fc" id="L98">            integer(values, &quot;maxExpressionNodes&quot;, 256, 1, 4096), integer(values, &quot;maxSuccessorsPerState&quot;, 32, 1, 512),</span>
+<span class="fc" id="L99">            integer(values, &quot;maxMatchResults&quot;, 32, 1, 512), integer(values, &quot;maxMatchSteps&quot;, 4096, 1, 65536),</span>
+<span class="fc" id="L100">            integer(values, &quot;maxPatternBranches&quot;, 1024, 1, 16384));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

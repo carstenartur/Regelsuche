@@ -260,16 +260,16 @@ public final class LearnedRewriteProgramAuthorizationService {
             }
 <span class="fc" id="L261">            retained.add(checked);</span>
             validUntil = validUntil == null
-<span class="pc bpc" id="L263" title="3 of 4 branches missed.">                || receipt.validUntil().isBefore(validUntil)</span>
+<span class="pc bpc" id="L263" title="1 of 4 branches missed.">                || receipt.validUntil().isBefore(validUntil)</span>
 <span class="fc" id="L264">                    ? receipt.validUntil()</span>
-<span class="pc" id="L265">                    : validUntil;</span>
+<span class="fc" id="L265">                    : validUntil;</span>
 <span class="fc" id="L266">        }</span>
 <span class="pc bpc" id="L267" title="1 of 2 branches missed.">        if (!rules.keySet().equals(referenced)</span>
 <span class="pc bpc" id="L268" title="1 of 2 branches missed.">                || !applicabilityHashes.keySet().equals(referenced)) {</span>
 <span class="nc" id="L269">            throw new IllegalArgumentException(</span>
                 &quot;leaf authorization set differs from referenced program genes&quot;);
         }
-<span class="pc" id="L272">        retained.sort(Comparator.comparing(value -&gt; value.receipt().geneId()));</span>
+<span class="fc" id="L272">        retained.sort(Comparator.comparing(value -&gt; value.receipt().geneId()));</span>
 <span class="fc" id="L273">        return new VerifiedLeaves(</span>
 <span class="fc" id="L274">            Map.copyOf(rules),</span>
 <span class="fc" id="L275">            Map.copyOf(receiptHashes),</span>

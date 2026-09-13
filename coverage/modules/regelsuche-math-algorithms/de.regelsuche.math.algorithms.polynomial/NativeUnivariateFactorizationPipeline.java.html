@@ -103,190 +103,203 @@ final class NativeUnivariateFactorizationPipeline {
 <span class="fc" id="L103">            policy.contentPolicy(),</span>
             work);
 <span class="fc" id="L105">        certificates.add(content.certificateHash());</span>
-<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (!content.completed()) {</span>
-<span class="nc" id="L107">            return failure(</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (!content.completed()) {</span>
+<span class="fc" id="L107">            return failure(</span>
                 request,
                 policy,
                 adapter,
-<span class="nc" id="L111">                map(content.status()),</span>
-<span class="nc" id="L112">                content.detailCode(),</span>
-<span class="nc" id="L113">                work.ledger(),</span>
+<span class="fc" id="L111">                map(content.status()),</span>
+<span class="fc" id="L112">                content.detailCode(),</span>
+<span class="fc" id="L113">                work.ledger(),</span>
                 certificates);
         }
 
 <span class="fc" id="L117">        SparsePolynomial&lt;BigInteger&gt; primitive =</span>
 <span class="fc" id="L118">            content.primitivePart();</span>
-<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (primitive.isConstant()) {</span>
-<span class="nc" id="L120">            return result(</span>
-                request,
-                policy,
-                adapter,
-                FactorizationEngine.Outcome.NO_CANDIDATE,
-                &quot;NATIVE_UNIVARIATE_CONSTANT_UNIT_ONLY&quot;,
-<span class="nc" id="L126">                work.ledger(),</span>
-<span class="nc" id="L127">                List.of(),</span>
-                FactorizationEngine.BackendClaim.NONE,
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (primitive.isConstant()) {</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            if (request.maxCandidates() &lt; 1) {</span>
+<span class="fc" id="L121">                return failure(</span>
+                    request, policy, adapter,
+                    FactorizationEngine.Outcome.BUDGET_INCONCLUSIVE,
+                    &quot;NATIVE_UNIVARIATE_CANDIDATE_BUDGET_EXHAUSTED&quot;,
+<span class="fc" id="L125">                    work.ledger(), certificates);</span>
+            }
+<span class="fc" id="L127">            C unit = adapter.targetUnit(content.scalar());</span>
+<span class="fc" id="L128">            PolynomialWorkLedger ledger = work.ledger();</span>
+<span class="fc" id="L129">            String certificate = NativeEngineEvidence.proposalCertificate(</span>
+<span class="fc" id="L130">                request, policy, adapter.engineId(), unit, List.of(),</span>
+                ledger, certificates);
+<span class="fc" id="L132">            FactorizationEngine.Proposal&lt;C&gt; proposal =</span>
+                new FactorizationEngine.Proposal&lt;&gt;(
+<span class="fc" id="L134">                    unit, List.of(), SparsePolynomial.one(request.source().ring()),</span>
+                    certificate);
+<span class="fc" id="L136">            return result(</span>
+                request, policy, adapter,
+                FactorizationEngine.Outcome.CANDIDATES,
+                &quot;NATIVE_UNIVARIATE_CONSTANT_CONTENT_PROPOSAL&quot;,
+<span class="fc" id="L140">                ledger, List.of(proposal),</span>
+                FactorizationEngine.BackendClaim.COMPLETE_FACTORIZATION,
                 certificates);
         }
 
-<span class="fc" id="L132">        FactorizationRequest.StructuralLimits internalLimits =</span>
-<span class="fc" id="L133">            internalLimits(</span>
-<span class="fc" id="L134">                request.structuralLimits(),</span>
+<span class="fc" id="L145">        FactorizationRequest.StructuralLimits internalLimits =</span>
+<span class="fc" id="L146">            internalLimits(</span>
+<span class="fc" id="L147">                request.structuralLimits(),</span>
                 primitive);
-<span class="fc" id="L136">        PolynomialRing&lt;ExactRational&gt; rationalRing =</span>
+<span class="fc" id="L149">        PolynomialRing&lt;ExactRational&gt; rationalRing =</span>
             new PolynomialRing&lt;&gt;(
                 ExactRationalField.INSTANCE,
-<span class="fc" id="L139">                request.source().ring().variables(),</span>
-<span class="fc" id="L140">                request.source().ring().monomialOrder());</span>
-<span class="fc" id="L141">        SparsePolynomial&lt;ExactRational&gt; rationalPrimitive =</span>
-<span class="fc" id="L142">            toRational(primitive, rationalRing, work);</span>
+<span class="fc" id="L152">                request.source().ring().variables(),</span>
+<span class="fc" id="L153">                request.source().ring().monomialOrder());</span>
+<span class="fc" id="L154">        SparsePolynomial&lt;ExactRational&gt; rationalPrimitive =</span>
+<span class="fc" id="L155">            toRational(primitive, rationalRing, work);</span>
 
-<span class="fc" id="L144">        SquareFreeDecomposition.Result&lt;ExactRational&gt; squareFree =</span>
-<span class="fc" id="L145">            SquareFreeDecomposition.decompose(</span>
+<span class="fc" id="L157">        SquareFreeDecomposition.Result&lt;ExactRational&gt; squareFree =</span>
+<span class="fc" id="L158">            SquareFreeDecomposition.decompose(</span>
                 rationalPrimitive,
                 internalLimits,
-<span class="fc" id="L148">                remainingWork(request, work));</span>
-<span class="fc" id="L149">        mergeWork(work, squareFree.work());</span>
-<span class="fc" id="L150">        certificates.add(squareFree.certificateHash());</span>
-<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if (!squareFree.completed()) {</span>
-<span class="nc" id="L152">            return failure(</span>
+<span class="fc" id="L161">                remainingWork(request, work));</span>
+<span class="fc" id="L162">        mergeWork(work, squareFree.work());</span>
+<span class="fc" id="L163">        certificates.add(squareFree.certificateHash());</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (!squareFree.completed()) {</span>
+<span class="nc" id="L165">            return failure(</span>
                 request,
                 policy,
                 adapter,
-<span class="nc" id="L156">                map(squareFree.status()),</span>
-<span class="nc" id="L157">                squareFree.detailCode(),</span>
-<span class="nc" id="L158">                work.ledger(),</span>
+<span class="nc" id="L169">                map(squareFree.status()),</span>
+<span class="nc" id="L170">                squareFree.detailCode(),</span>
+<span class="nc" id="L171">                work.ledger(),</span>
                 certificates);
         }
 
-<span class="fc" id="L162">        ExactRational unit = content.scalar()</span>
-<span class="fc" id="L163">            .multiply(squareFree.unit());</span>
-<span class="fc" id="L164">        ArrayList&lt;PolynomialFactor&lt;BigInteger&gt;&gt; integerFactors =</span>
+<span class="fc" id="L175">        ExactRational unit = content.scalar()</span>
+<span class="fc" id="L176">            .multiply(squareFree.unit());</span>
+<span class="fc" id="L177">        ArrayList&lt;PolynomialFactor&lt;BigInteger&gt;&gt; integerFactors =</span>
             new ArrayList&lt;&gt;();
-<span class="fc" id="L166">        int remainingCandidates = request.maxCandidates();</span>
+<span class="fc" id="L179">        int remainingCandidates = request.maxCandidates();</span>
 
         for (PolynomialFactor&lt;ExactRational&gt; layer :
-<span class="fc bfc" id="L169" title="All 2 branches covered.">                squareFree.factors()) {</span>
-<span class="fc" id="L170">            FactorizationRequest&lt;ExactRational&gt; layerRequest =</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">                squareFree.factors()) {</span>
+<span class="fc" id="L183">            FactorizationRequest&lt;ExactRational&gt; layerRequest =</span>
                 new FactorizationRequest&lt;&gt;(
-<span class="fc" id="L172">                    layer.polynomial(),</span>
+<span class="fc" id="L185">                    layer.polynomial(),</span>
                     FactorizationRequest.EvidenceRequirement
                         .VERIFIED_DECOMPOSITION,
                     internalLimits,
                     remainingCandidates,
-<span class="fc" id="L177">                    request.maxWorkUnits());</span>
-<span class="fc" id="L178">            UnivariateContentResult layerContent =</span>
-<span class="fc" id="L179">                UnivariateContentNormalization.normalizeRational(</span>
+<span class="fc" id="L190">                    request.maxWorkUnits());</span>
+<span class="fc" id="L191">            UnivariateContentResult layerContent =</span>
+<span class="fc" id="L192">                UnivariateContentNormalization.normalizeRational(</span>
                     layerRequest,
-<span class="fc" id="L181">                    policy.contentPolicy(),</span>
+<span class="fc" id="L194">                    policy.contentPolicy(),</span>
                     work);
-<span class="fc" id="L183">            certificates.add(layerContent.certificateHash());</span>
-<span class="pc bpc" id="L184" title="1 of 2 branches missed.">            if (!layerContent.completed()) {</span>
-<span class="nc" id="L185">                return failure(</span>
+<span class="fc" id="L196">            certificates.add(layerContent.certificateHash());</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            if (!layerContent.completed()) {</span>
+<span class="nc" id="L198">                return failure(</span>
                     request,
                     policy,
                     adapter,
-<span class="nc" id="L189">                    map(layerContent.status()),</span>
-<span class="nc" id="L190">                    layerContent.detailCode(),</span>
-<span class="nc" id="L191">                    work.ledger(),</span>
+<span class="nc" id="L202">                    map(layerContent.status()),</span>
+<span class="nc" id="L203">                    layerContent.detailCode(),</span>
+<span class="nc" id="L204">                    work.ledger(),</span>
                     certificates);
             }
 
-<span class="fc" id="L195">            unit = unit.multiply(</span>
-<span class="fc" id="L196">                layerContent.scalar().pow(</span>
-<span class="fc" id="L197">                    layer.multiplicity()));</span>
-<span class="fc" id="L198">            SparsePolynomial&lt;BigInteger&gt; layerPrimitive =</span>
-<span class="fc" id="L199">                layerContent.primitivePart();</span>
-<span class="fc" id="L200">            FactorizationRequest.StructuralLimits layerLimits =</span>
-<span class="fc" id="L201">                internalLimits(internalLimits, layerPrimitive);</span>
+<span class="fc" id="L208">            unit = unit.multiply(</span>
+<span class="fc" id="L209">                layerContent.scalar().pow(</span>
+<span class="fc" id="L210">                    layer.multiplicity()));</span>
+<span class="fc" id="L211">            SparsePolynomial&lt;BigInteger&gt; layerPrimitive =</span>
+<span class="fc" id="L212">                layerContent.primitivePart();</span>
+<span class="fc" id="L213">            FactorizationRequest.StructuralLimits layerLimits =</span>
+<span class="fc" id="L214">                internalLimits(internalLimits, layerPrimitive);</span>
 
-<span class="fc bfc" id="L203" title="All 2 branches covered.">            if (layerPrimitive.degree(0) &lt;= 1) {</span>
-<span class="fc" id="L204">                integerFactors.add(new PolynomialFactor&lt;&gt;(</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">            if (layerPrimitive.degree(0) &lt;= 1) {</span>
+<span class="fc" id="L217">                integerFactors.add(new PolynomialFactor&lt;&gt;(</span>
                     layerPrimitive,
-<span class="fc" id="L206">                    layer.multiplicity()));</span>
-<span class="fc" id="L207">                continue;</span>
+<span class="fc" id="L219">                    layer.multiplicity()));</span>
+<span class="fc" id="L220">                continue;</span>
             }
 
-<span class="fc" id="L210">            NativeSquareFreeLayerFactorization.Result layerResult =</span>
-<span class="fc" id="L211">                NativeSquareFreeLayerFactorization.factor(</span>
+<span class="fc" id="L223">            NativeSquareFreeLayerFactorization.Result layerResult =</span>
+<span class="fc" id="L224">                NativeSquareFreeLayerFactorization.factor(</span>
                     layerPrimitive,
                     layerLimits,
-<span class="fc" id="L214">                    request.maxWorkUnits(),</span>
+<span class="fc" id="L227">                    request.maxWorkUnits(),</span>
                     policy,
                     remainingCandidates,
                     work);
-<span class="fc" id="L218">            certificates.addAll(layerResult.certificates());</span>
-<span class="fc bfc" id="L219" title="All 2 branches covered.">            if (!layerResult.completed()) {</span>
-<span class="fc" id="L220">                return failure(</span>
+<span class="fc" id="L231">            certificates.addAll(layerResult.certificates());</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">            if (!layerResult.completed()) {</span>
+<span class="fc" id="L233">                return failure(</span>
                     request,
                     policy,
                     adapter,
-<span class="fc" id="L224">                    layerResult.outcome(),</span>
-<span class="fc" id="L225">                    layerResult.detailCode(),</span>
-<span class="fc" id="L226">                    work.ledger(),</span>
+<span class="fc" id="L237">                    layerResult.outcome(),</span>
+<span class="fc" id="L238">                    layerResult.detailCode(),</span>
+<span class="fc" id="L239">                    work.ledger(),</span>
                     certificates);
             }
-<span class="fc" id="L229">            remainingCandidates = Math.subtractExact(</span>
+<span class="fc" id="L242">            remainingCandidates = Math.subtractExact(</span>
                 remainingCandidates,
-<span class="fc" id="L231">                layerResult.candidatesUsed());</span>
+<span class="fc" id="L244">                layerResult.candidatesUsed());</span>
             for (SparsePolynomial&lt;BigInteger&gt; factor :
-<span class="fc bfc" id="L233" title="All 2 branches covered.">                    layerResult.factors()) {</span>
-<span class="fc" id="L234">                integerFactors.add(new PolynomialFactor&lt;&gt;(</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">                    layerResult.factors()) {</span>
+<span class="fc" id="L247">                integerFactors.add(new PolynomialFactor&lt;&gt;(</span>
                     factor,
-<span class="fc" id="L236">                    layer.multiplicity()));</span>
-<span class="fc" id="L237">            }</span>
-<span class="fc" id="L238">        }</span>
+<span class="fc" id="L249">                    layer.multiplicity()));</span>
+<span class="fc" id="L250">            }</span>
+<span class="fc" id="L251">        }</span>
 
-<span class="fc" id="L240">        C targetUnit = adapter.targetUnit(unit);</span>
-<span class="fc" id="L241">        List&lt;PolynomialFactor&lt;C&gt;&gt; targetFactors =</span>
-<span class="fc" id="L242">            integerFactors.stream()</span>
-<span class="fc" id="L243">                .map(factor -&gt; new PolynomialFactor&lt;&gt;(</span>
-<span class="fc" id="L244">                    adapter.targetFactor(</span>
-<span class="fc" id="L245">                        factor.polynomial(),</span>
-<span class="fc" id="L246">                        request.source().ring()),</span>
-<span class="fc" id="L247">                    factor.multiplicity()))</span>
-<span class="fc" id="L248">                .toList();</span>
+<span class="fc" id="L253">        C targetUnit = adapter.targetUnit(unit);</span>
+<span class="fc" id="L254">        List&lt;PolynomialFactor&lt;C&gt;&gt; targetFactors =</span>
+<span class="fc" id="L255">            integerFactors.stream()</span>
+<span class="fc" id="L256">                .map(factor -&gt; new PolynomialFactor&lt;&gt;(</span>
+<span class="fc" id="L257">                    adapter.targetFactor(</span>
+<span class="fc" id="L258">                        factor.polynomial(),</span>
+<span class="fc" id="L259">                        request.source().ring()),</span>
+<span class="fc" id="L260">                    factor.multiplicity()))</span>
+<span class="fc" id="L261">                .toList();</span>
 
-<span class="fc bfc" id="L250" title="All 2 branches covered.">        if (NativeEngineEvidence.trivialAssociate(</span>
-<span class="fc" id="L251">                request.source(),</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        if (NativeEngineEvidence.trivialAssociate(</span>
+<span class="fc" id="L264">                request.source(),</span>
                 targetUnit,
                 targetFactors,
                 work)) {
-<span class="fc" id="L255">            return result(</span>
+<span class="fc" id="L268">            return result(</span>
                 request,
                 policy,
                 adapter,
                 FactorizationEngine.Outcome.NO_CANDIDATE,
                 &quot;NATIVE_UNIVARIATE_IRREDUCIBILITY_CLAIM&quot;,
-<span class="fc" id="L261">                work.ledger(),</span>
-<span class="fc" id="L262">                List.of(),</span>
+<span class="fc" id="L274">                work.ledger(),</span>
+<span class="fc" id="L275">                List.of(),</span>
                 FactorizationEngine.BackendClaim.IRREDUCIBLE,
                 certificates);
         }
 
-<span class="fc" id="L267">        String proposalCertificate =</span>
-<span class="fc" id="L268">            NativeEngineEvidence.proposalCertificate(</span>
+<span class="fc" id="L280">        String proposalCertificate =</span>
+<span class="fc" id="L281">            NativeEngineEvidence.proposalCertificate(</span>
                 request,
                 policy,
-<span class="fc" id="L271">                adapter.engineId(),</span>
+<span class="fc" id="L284">                adapter.engineId(),</span>
                 targetUnit,
                 targetFactors,
-<span class="fc" id="L274">                work.ledger(),</span>
+<span class="fc" id="L287">                work.ledger(),</span>
                 certificates);
-<span class="fc" id="L276">        FactorizationEngine.Proposal&lt;C&gt; proposal =</span>
+<span class="fc" id="L289">        FactorizationEngine.Proposal&lt;C&gt; proposal =</span>
             new FactorizationEngine.Proposal&lt;&gt;(
                 targetUnit,
                 targetFactors,
-<span class="fc" id="L280">                SparsePolynomial.one(request.source().ring()),</span>
+<span class="fc" id="L293">                SparsePolynomial.one(request.source().ring()),</span>
                 proposalCertificate);
-<span class="fc" id="L282">        return result(</span>
+<span class="fc" id="L295">        return result(</span>
             request,
             policy,
             adapter,
             FactorizationEngine.Outcome.CANDIDATES,
             &quot;NATIVE_UNIVARIATE_COMPLETE_FACTORIZATION_PROPOSAL&quot;,
-<span class="fc" id="L288">            work.ledger(),</span>
-<span class="fc" id="L289">            List.of(proposal),</span>
+<span class="fc" id="L301">            work.ledger(),</span>
+<span class="fc" id="L302">            List.of(proposal),</span>
             FactorizationEngine.BackendClaim.COMPLETE_FACTORIZATION,
             certificates);
     }
@@ -297,103 +310,103 @@ final class NativeUnivariateFactorizationPipeline {
         NativeCoefficientAdapter&lt;C&gt; adapter,
         PolynomialWorkBudget work
     ) {
-<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        if (!adapter.domainId().equals(</span>
-<span class="fc" id="L301">                request.source().ring().coefficientDomain().id())) {</span>
-<span class="nc" id="L302">            return result(</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">        if (!adapter.domainId().equals(</span>
+<span class="fc" id="L314">                request.source().ring().coefficientDomain().id())) {</span>
+<span class="nc" id="L315">            return result(</span>
                 request,
                 policy,
                 adapter,
                 FactorizationEngine.Outcome.UNSUPPORTED_DOMAIN,
                 &quot;NATIVE_UNIVARIATE_COEFFICIENT_DOMAIN_MISMATCH&quot;,
-<span class="nc" id="L308">                work.ledger(),</span>
-<span class="nc" id="L309">                List.of(),</span>
+<span class="nc" id="L321">                work.ledger(),</span>
+<span class="nc" id="L322">                List.of(),</span>
                 FactorizationEngine.BackendClaim.NONE,
-<span class="nc" id="L311">                List.of());</span>
+<span class="nc" id="L324">                List.of());</span>
         }
-<span class="fc" id="L313">        String structuralViolation =</span>
-<span class="fc" id="L314">            request.structuralViolation().orElse(null);</span>
-<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        if (structuralViolation != null) {</span>
-<span class="nc" id="L316">            return result(</span>
+<span class="fc" id="L326">        String structuralViolation =</span>
+<span class="fc" id="L327">            request.structuralViolation().orElse(null);</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">        if (structuralViolation != null) {</span>
+<span class="fc" id="L329">            return result(</span>
                 request,
                 policy,
                 adapter,
                 FactorizationEngine.Outcome.BUDGET_INCONCLUSIVE,
                 structuralViolation,
-<span class="nc" id="L322">                work.ledger(),</span>
-<span class="nc" id="L323">                List.of(),</span>
+<span class="fc" id="L335">                work.ledger(),</span>
+<span class="fc" id="L336">                List.of(),</span>
                 FactorizationEngine.BackendClaim.NONE,
-<span class="nc" id="L325">                List.of());</span>
+<span class="fc" id="L338">                List.of());</span>
         }
-<span class="fc bfc" id="L327" title="All 2 branches covered.">        if (request.source().ring().variableCount() != 1) {</span>
-<span class="fc" id="L328">            return result(</span>
+<span class="fc bfc" id="L340" title="All 2 branches covered.">        if (request.source().ring().variableCount() != 1) {</span>
+<span class="fc" id="L341">            return result(</span>
                 request,
                 policy,
                 adapter,
                 FactorizationEngine.Outcome.UNSUPPORTED_REQUEST,
                 &quot;NATIVE_UNIVARIATE_REQUIRES_ONE_VARIABLE&quot;,
-<span class="fc" id="L334">                work.ledger(),</span>
-<span class="fc" id="L335">                List.of(),</span>
+<span class="fc" id="L347">                work.ledger(),</span>
+<span class="fc" id="L348">                List.of(),</span>
                 FactorizationEngine.BackendClaim.NONE,
-<span class="fc" id="L337">                List.of());</span>
+<span class="fc" id="L350">                List.of());</span>
         }
-<span class="fc" id="L339">        return null;</span>
+<span class="fc" id="L352">        return null;</span>
     }
 
     private static FactorizationRequest.StructuralLimits internalLimits(
         FactorizationRequest.StructuralLimits sourceLimits,
         SparsePolynomial&lt;?&gt; polynomial
     ) {
-<span class="fc" id="L346">        return new FactorizationRequest.StructuralLimits(</span>
-<span class="fc" id="L347">            Math.max(</span>
-<span class="fc" id="L348">                sourceLimits.maxVariables(),</span>
-<span class="fc" id="L349">                polynomial.ring().variableCount()),</span>
-<span class="fc" id="L350">            Math.max(</span>
-<span class="fc" id="L351">                sourceLimits.maxTotalDegree(),</span>
-<span class="fc" id="L352">                polynomial.totalDegree()),</span>
-<span class="fc" id="L353">            Math.max(</span>
-<span class="fc" id="L354">                sourceLimits.maxTerms(),</span>
-<span class="fc" id="L355">                polynomial.termCount()),</span>
-<span class="fc" id="L356">            Math.max(</span>
-<span class="fc" id="L357">                sourceLimits.maxCoefficientBitLength(),</span>
-<span class="fc" id="L358">                polynomial.maxCoefficientBitLength()));</span>
+<span class="fc" id="L359">        return new FactorizationRequest.StructuralLimits(</span>
+<span class="fc" id="L360">            Math.max(</span>
+<span class="fc" id="L361">                sourceLimits.maxVariables(),</span>
+<span class="fc" id="L362">                polynomial.ring().variableCount()),</span>
+<span class="fc" id="L363">            Math.max(</span>
+<span class="fc" id="L364">                sourceLimits.maxTotalDegree(),</span>
+<span class="fc" id="L365">                polynomial.totalDegree()),</span>
+<span class="fc" id="L366">            Math.max(</span>
+<span class="fc" id="L367">                sourceLimits.maxTerms(),</span>
+<span class="fc" id="L368">                polynomial.termCount()),</span>
+<span class="fc" id="L369">            Math.max(</span>
+<span class="fc" id="L370">                sourceLimits.maxCoefficientBitLength(),</span>
+<span class="fc" id="L371">                polynomial.maxCoefficientBitLength()));</span>
     }
 
     private static long remainingWork(
         FactorizationRequest&lt;?&gt; request,
         PolynomialWorkBudget work
     ) {
-<span class="fc" id="L365">        long remaining = request.maxWorkUnits()</span>
-<span class="fc" id="L366">            - work.ledger().totalWorkUnits();</span>
-<span class="pc bpc" id="L367" title="1 of 2 branches missed.">        if (remaining &lt; 1) {</span>
-<span class="nc" id="L368">            throw new PolynomialWorkBudget.LimitReached();</span>
+<span class="fc" id="L378">        long remaining = request.maxWorkUnits()</span>
+<span class="fc" id="L379">            - work.totalWorkUnits();</span>
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">        if (remaining &lt; 1) {</span>
+<span class="nc" id="L381">            throw new PolynomialWorkBudget.LimitReached();</span>
         }
-<span class="fc" id="L370">        return remaining;</span>
+<span class="fc" id="L383">        return remaining;</span>
     }
 
     private static void mergeWork(
         PolynomialWorkBudget target,
         PolynomialWorkLedger addition
     ) {
-<span class="fc" id="L377">        addition.stages().forEach(target::consume);</span>
-<span class="fc" id="L378">    }</span>
+<span class="fc" id="L390">        addition.stages().forEach(target::consume);</span>
+<span class="fc" id="L391">    }</span>
 
     private static SparsePolynomial&lt;ExactRational&gt; toRational(
         SparsePolynomial&lt;BigInteger&gt; source,
         PolynomialRing&lt;ExactRational&gt; targetRing,
         PolynomialWorkBudget work
     ) {
-<span class="fc" id="L385">        NavigableMap&lt;Monomial, ExactRational&gt; terms =</span>
-<span class="fc" id="L386">            new TreeMap&lt;&gt;(targetRing.monomialComparator());</span>
+<span class="fc" id="L398">        NavigableMap&lt;Monomial, ExactRational&gt; terms =</span>
+<span class="fc" id="L399">            new TreeMap&lt;&gt;(targetRing.monomialComparator());</span>
         for (Map.Entry&lt;Monomial, BigInteger&gt; term :
-<span class="fc bfc" id="L388" title="All 2 branches covered.">                source.terms().entrySet()) {</span>
-<span class="fc" id="L389">            work.consume(</span>
+<span class="fc bfc" id="L401" title="All 2 branches covered.">                source.terms().entrySet()) {</span>
+<span class="fc" id="L402">            work.consume(</span>
                 &quot;native-univariate.integer-to-rational&quot;,
                 1);
-<span class="fc" id="L392">            terms.put(</span>
-<span class="fc" id="L393">                term.getKey(),</span>
-<span class="fc" id="L394">                ExactRational.integer(term.getValue()));</span>
-<span class="fc" id="L395">        }</span>
-<span class="fc" id="L396">        return new SparsePolynomial&lt;&gt;(targetRing, terms);</span>
+<span class="fc" id="L405">            terms.put(</span>
+<span class="fc" id="L406">                term.getKey(),</span>
+<span class="fc" id="L407">                ExactRational.integer(term.getValue()));</span>
+<span class="fc" id="L408">        }</span>
+<span class="fc" id="L409">        return new SparsePolynomial&lt;&gt;(targetRing, terms);</span>
     }
 
     private static &lt;C&gt; FactorizationEngine.EngineResult&lt;C&gt; failure(
@@ -405,14 +418,14 @@ final class NativeUnivariateFactorizationPipeline {
         PolynomialWorkLedger work,
         List&lt;String&gt; certificates
     ) {
-<span class="fc" id="L408">        return result(</span>
+<span class="fc" id="L421">        return result(</span>
             request,
             policy,
             adapter,
             outcome,
             detailCode,
             work,
-<span class="fc" id="L415">            List.of(),</span>
+<span class="fc" id="L428">            List.of(),</span>
             FactorizationEngine.BackendClaim.NONE,
             certificates);
     }
@@ -428,10 +441,10 @@ final class NativeUnivariateFactorizationPipeline {
         FactorizationEngine.BackendClaim claim,
         List&lt;String&gt; certificates
     ) {
-<span class="fc" id="L431">        return NativeEngineEvidence.result(</span>
+<span class="fc" id="L444">        return NativeEngineEvidence.result(</span>
             request,
             policy,
-<span class="fc" id="L434">            adapter.engineId(),</span>
+<span class="fc" id="L447">            adapter.engineId(),</span>
             outcome,
             detailCode,
             work,
@@ -443,34 +456,34 @@ final class NativeUnivariateFactorizationPipeline {
     private static FactorizationEngine.Outcome map(
         UnivariateContentResult.Status status
     ) {
-<span class="nc bnc" id="L446" title="All 5 branches missed.">        return switch (status) {</span>
-<span class="nc" id="L447">            case COMPLETED -&gt; throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L459" title="4 of 5 branches missed.">        return switch (status) {</span>
+<span class="nc" id="L460">            case COMPLETED -&gt; throw new IllegalArgumentException(</span>
                 &quot;completed status cannot map to failure&quot;);
             case UNSUPPORTED_DOMAIN -&gt;
-<span class="nc" id="L450">                FactorizationEngine.Outcome.UNSUPPORTED_DOMAIN;</span>
+<span class="nc" id="L463">                FactorizationEngine.Outcome.UNSUPPORTED_DOMAIN;</span>
             case UNSUPPORTED_SHAPE -&gt;
-<span class="nc" id="L452">                FactorizationEngine.Outcome.UNSUPPORTED_REQUEST;</span>
+<span class="nc" id="L465">                FactorizationEngine.Outcome.UNSUPPORTED_REQUEST;</span>
             case BUDGET_INCONCLUSIVE -&gt;
-<span class="nc" id="L454">                FactorizationEngine.Outcome.BUDGET_INCONCLUSIVE;</span>
+<span class="fc" id="L467">                FactorizationEngine.Outcome.BUDGET_INCONCLUSIVE;</span>
             case TECHNICAL_FAILURE -&gt;
-<span class="nc" id="L456">                FactorizationEngine.Outcome.TECHNICAL_FAILURE;</span>
+<span class="nc" id="L469">                FactorizationEngine.Outcome.TECHNICAL_FAILURE;</span>
         };
     }
 
     private static FactorizationEngine.Outcome map(
         SquareFreeDecomposition.Status status
     ) {
-<span class="nc bnc" id="L463" title="All 5 branches missed.">        return switch (status) {</span>
-<span class="nc" id="L464">            case COMPLETED -&gt; throw new IllegalArgumentException(</span>
+<span class="nc bnc" id="L476" title="All 5 branches missed.">        return switch (status) {</span>
+<span class="nc" id="L477">            case COMPLETED -&gt; throw new IllegalArgumentException(</span>
                 &quot;completed status cannot map to failure&quot;);
             case UNSUPPORTED_DOMAIN -&gt;
-<span class="nc" id="L467">                FactorizationEngine.Outcome.UNSUPPORTED_DOMAIN;</span>
+<span class="nc" id="L480">                FactorizationEngine.Outcome.UNSUPPORTED_DOMAIN;</span>
             case UNSUPPORTED_SHAPE -&gt;
-<span class="nc" id="L469">                FactorizationEngine.Outcome.UNSUPPORTED_REQUEST;</span>
+<span class="nc" id="L482">                FactorizationEngine.Outcome.UNSUPPORTED_REQUEST;</span>
             case BUDGET_INCONCLUSIVE -&gt;
-<span class="nc" id="L471">                FactorizationEngine.Outcome.BUDGET_INCONCLUSIVE;</span>
+<span class="nc" id="L484">                FactorizationEngine.Outcome.BUDGET_INCONCLUSIVE;</span>
             case TECHNICAL_FAILURE -&gt;
-<span class="nc" id="L473">                FactorizationEngine.Outcome.TECHNICAL_FAILURE;</span>
+<span class="nc" id="L486">                FactorizationEngine.Outcome.TECHNICAL_FAILURE;</span>
         };
     }
 }

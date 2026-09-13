@@ -62,7 +62,7 @@ public record EvolutionRewriteProgramCandidate(
     }
 
     public String toCanonicalJson() {
-<span class="nc" id="L65">        return render(genome, plan, alphaStructuralHash, contentHash);</span>
+<span class="fc" id="L65">        return render(genome, plan, alphaStructuralHash, contentHash);</span>
     }
 
     private static String alphaMaterial(
@@ -95,8 +95,8 @@ public record EvolutionRewriteProgramCandidate(
 <span class="fc" id="L95">            .property(&quot;planHash&quot;, plan.contentHash())</span>
 <span class="fc" id="L96">            .property(&quot;planAlphaStructuralHash&quot;, plan.alphaStructuralHash())</span>
 <span class="fc" id="L97">            .property(&quot;alphaStructuralHash&quot;, alphaHash);</span>
-<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (contentHash != null) {</span>
-<span class="nc" id="L99">            json.property(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L99">            json.property(&quot;contentHash&quot;, contentHash);</span>
         }
 <span class="fc" id="L101">        return json.endObject().toString();</span>
     }

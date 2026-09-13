@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginDistributionJson.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginDistributionJson.java</span></div><h1>PluginDistributionJson.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import java.nio.charset.StandardCharsets;
+
+/** Strict JSON boundary shared by the distribution formats and downloaded metadata. */
+final class PluginDistributionJson {
+<span class="fc" id="L15">    private static final ObjectMapper JSON = JsonMapper.builder(JsonFactory.builder()</span>
+<span class="fc" id="L16">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build())</span>
+<span class="fc" id="L17">        .findAndAddModules()</span>
+<span class="fc" id="L18">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
+<span class="fc" id="L19">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
+<span class="fc" id="L20">        .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)</span>
+<span class="fc" id="L21">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)</span>
+<span class="fc" id="L22">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
+<span class="fc" id="L23">        .build();</span>
+
+    private PluginDistributionJson() { }
+
+    static &lt;T&gt; T read(byte[] bytes, Class&lt;T&gt; type) {
+        try {
+<span class="fc" id="L29">            T value = JSON.readValue(bytes, type);</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">            if (value == null) {</span>
+<span class="nc" id="L31">                throw new IllegalArgumentException(&quot;distribution JSON must not be null&quot;);</span>
+            }
+<span class="fc" id="L33">            return value;</span>
+<span class="fc" id="L34">        } catch (java.io.IOException failure) {</span>
+<span class="fc" id="L35">            throw new IllegalArgumentException(&quot;invalid distribution JSON&quot;, failure);</span>
+        }
+    }
+
+    static void validate(byte[] bytes) {
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (!read(bytes, com.fasterxml.jackson.databind.JsonNode.class).isObject()) {</span>
+<span class="nc" id="L41">            throw new IllegalArgumentException(&quot;distribution JSON must be an object&quot;);</span>
+        }
+<span class="fc" id="L43">    }</span>
+
+    static String canonical(Object value) {
+        try {
+<span class="fc" id="L47">            return JSON.writeValueAsString(value) + &quot;\n&quot;;</span>
+<span class="nc" id="L48">        } catch (JsonProcessingException failure) {</span>
+<span class="nc" id="L49">            throw new IllegalStateException(&quot;cannot serialize distribution JSON&quot;, failure);</span>
+        }
+    }
+
+    static String hash(String value) {
+<span class="fc" id="L54">        return PluginArtifactVerifier.sha256(value.getBytes(StandardCharsets.UTF_8));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

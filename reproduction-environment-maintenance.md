@@ -12,6 +12,7 @@ it cannot change the meaning of existing v1 artifacts or receipts.
 | `Dockerfile`, `Dockerfile.autopilot`, `Dockerfile.comparative-benchmarks`, `Dockerfile.proof`, `Dockerfile.release-readiness` | Routine Dependabot Docker updates, with the existing Java-major restriction and exact image-policy review |
 | `Dockerfile.visual-regression` | Routine Docker updates, with the existing Playwright dependency/image equality contract |
 | `Dockerfile.target-free-held-out-reproduction`, `reproduction/Dockerfile.reproduction` | Explicit versioned reproduction-environment migration |
+| `Dockerfile.safe-runtime-qualification` | Explicit versioned public runtime reproduction migration; same pinned base image, separate public qualification authority |
 
 The current v1 reproduction image is
 `eclipse-temurin:25.0.3_9-jdk-noble@sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617`.
@@ -20,7 +21,12 @@ unchanged. The v1 Java verifier, Python builder/verifiers and receipt checks
 retain their existing image and schema identities. Existing artifacts continue
 to carry their original source archive, schemas, commands and provenance.
 
-`.github/dependabot.yml` excludes the two frozen definitions through literal
+The additive public DIRECT/V4 qualification also retains its own Dockerfile and
+schema byte identities from `fc55f6cffe5d69bd2e517d0e36bdb0d5f5de4812`. This adds
+two identities without editing any of the five earlier retained files. It does
+not reopen the historical experiments or change the fixed public case manifest.
+
+`.github/dependabot.yml` excludes the three frozen definitions through literal
 `exclude-paths` entries on the root Docker job. GitHub documents these as file
 or directory exclusions relative to the update entry's directory, distinct
 from dependency-name `ignore` rules. Its Docker fetcher reads matching files
@@ -43,7 +49,7 @@ entries in `config/quality/container-image-policy.json` before qualification.
 
 `MavenFrozenReproductionEnvironmentContractTest` verifies the actual parsed
 Dependabot configuration and the declared Docker inventory. The current contract
-deliberately accepts one root Docker job and two literal exclusions. Additional
+deliberately accepts one root Docker job and three literal exclusions. Additional
 jobs, broader exclusions, dependency allow-lists, redirected targets or disabled
 routine Temurin updates require an explicit ownership review. The six ordinary
 Dockerfiles remain eligible for maintenance.
@@ -56,7 +62,7 @@ formatting change fails. These byte identities are part of the historical
 environment contract; a migration adds identities instead of updating these
 expected hashes.
 
-The five frozen files also have explicit `text eol=lf` attributes. Their
+The seven frozen files also have explicit `text eol=lf` attributes. Their
 content-addressed bytes therefore survive a checkout with `core.autocrlf=true`.
 
 The existing `MavenContainerImagePolicyContractTest`, Dockerfile path checks,

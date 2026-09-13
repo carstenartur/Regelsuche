@@ -1,0 +1,423 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MeasuredPolynomialDecompositionPipeline.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">MeasuredPolynomialDecompositionPipeline.java</span></div><h1>MeasuredPolynomialDecompositionPipeline.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.moves.enumerate.TreePosition;
+import de.regelsuche.parse.ExactParsedSubtermProjector;
+import de.regelsuche.parse.ExactParsedTerm;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.polynomial.BinaryQuarticFactorizationEngine;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.FactorizationVerifier;
+import de.regelsuche.polynomial.PolynomialWorkAuthority;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.polynomial.PolynomialWorkSink;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalInt;
+
+/**
+ * Measured occurrence adapter for the existing integer binary-quartic engine.
+ * Construction and result issuance belong to the specialized operator. Source
+ * projection, semantic inspection, engine/verifier execution, original rendering
+ * and structural replacement use the caller's one cumulative work authority.
+ */
+public final class MeasuredPolynomialDecompositionPipeline {
+    public static final String PIPELINE_ID =
+        &quot;regelsuche.measured-polynomial-decomposition-pipeline/v1&quot;;
+
+    private final PolynomialDecompositionSynthesisOperator operator;
+    private final PolynomialSemanticView semanticView;
+    private final BinaryQuarticFactorizationEngine engine;
+    private final FactorizationRequest.StructuralLimits structuralLimits;
+    private final int maxCandidates;
+    private final long maxEngineAndVerifierWork;
+
+    MeasuredPolynomialDecompositionPipeline(PolynomialDecompositionSynthesisOperator operator,
+            PolynomialSemanticView semanticView, BinaryQuarticFactorizationEngine engine,
+<span class="fc" id="L45">            FactorizationRequest.StructuralLimits structuralLimits, int maxCandidates, long maxEngineAndVerifierWork) {</span>
+<span class="fc" id="L46">        this.operator = Objects.requireNonNull(operator, &quot;operator&quot;);</span>
+<span class="fc" id="L47">        this.semanticView = Objects.requireNonNull(semanticView, &quot;semanticView&quot;);</span>
+<span class="fc" id="L48">        this.engine = Objects.requireNonNull(engine, &quot;engine&quot;);</span>
+<span class="fc" id="L49">        this.structuralLimits = Objects.requireNonNull(structuralLimits, &quot;structuralLimits&quot;);</span>
+<span class="fc" id="L50">        this.maxCandidates = maxCandidates;</span>
+<span class="fc" id="L51">        this.maxEngineAndVerifierWork = maxEngineAndVerifierWork;</span>
+<span class="fc" id="L52">    }</span>
+
+    Result factor(ExactParsedTerm root, TreePosition position, PolynomialWorkAuthority authority) {
+<span class="fc" id="L55">        Objects.requireNonNull(root, &quot;root&quot;);</span>
+<span class="fc" id="L56">        Objects.requireNonNull(position, &quot;position&quot;);</span>
+<span class="fc" id="L57">        Objects.requireNonNull(authority, &quot;authority&quot;);</span>
+<span class="fc" id="L58">        ExactParsedSubtermProjector.Result projection = new ExactParsedSubtermProjector(</span>
+<span class="fc" id="L59">            ExactParsedSubtermProjector.Policy.boundedDefaults(), authority)</span>
+<span class="fc" id="L60">            .project(root, position.path(), position.text());</span>
+<span class="fc" id="L61">        Execution execution = new Execution(projection, authority);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (!projection.successful()) {</span>
+<span class="fc" id="L63">            return execution.finish(projectionStatus(projection.status()), projection.detailCode());</span>
+        }
+        try {
+<span class="fc" id="L66">            execution.extraction = semanticView.analyze(projection.projected().orElseThrow(), authority);</span>
+<span class="fc" id="L67">            execution.work.retain(execution.extraction.work());</span>
+<span class="fc" id="L68">            PolynomialSemanticView.Analysis analysis = execution.extraction.analysis();</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            if (!analysis.supported()) {</span>
+<span class="fc" id="L70">                return execution.finish(semanticStatus(analysis.status()), analysis.detailCode());</span>
+            }
+
+<span class="fc" id="L73">            PolynomialSemanticView.PolynomialView view = analysis.view();</span>
+<span class="fc" id="L74">            execution.work.consume(&quot;exact-parsed-view.request-shape-inspections&quot;, 1);</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            if (view.polynomial().isZero()) {</span>
+<span class="fc" id="L76">                return execution.finish(Status.NO_FACTORIZATION_FOUND,</span>
+                    &quot;ZERO_POLYNOMIAL_HAS_NO_FINITE_FACTORIZATION&quot;);
+            }
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            if (view.polynomial().ring().variableCount() == 1) {</span>
+<span class="fc" id="L80">                execution.work.consume(&quot;exact-parsed-view.homogenization-degree-term-visits&quot;, view.polynomial().termCount());</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">                if (view.polynomial().totalDegree() &lt;= 4) {</span>
+<span class="fc" id="L82">                    execution.work.consume(new PolynomialWorkLedger(Map.of(</span>
+<span class="fc" id="L83">                        &quot;exact-parsed-view.homogenization-terms&quot;, (long) view.polynomial().termCount(),</span>
+                        // The existing view and polynomial each validate the degree again.
+<span class="fc" id="L85">                        &quot;exact-parsed-view.homogenization-degree-term-visits&quot;, 2L * view.polynomial().termCount(),</span>
+<span class="fc" id="L86">                        &quot;exact-parsed-view.polynomial-construction-terms&quot;, (long) view.polynomial().termCount())));</span>
+<span class="fc" id="L87">                    view = view.homogenizeWithUnitAtom(4);</span>
+                }
+            }
+<span class="fc" id="L90">            execution.view = view;</span>
+
+<span class="fc" id="L92">            PolynomialWorkLedger dispatch = authority.opaqueInvocationOverhead();</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">            if (authority.remainingOpaqueWorkUnits() &lt;= dispatch.totalWorkUnits()) {</span>
+<span class="nc" id="L94">                return execution.finish(Status.BUDGET_INCONCLUSIVE, &quot;NO_FACTORIZATION_WORK_BUDGET_REMAINING&quot;);</span>
+            }
+<span class="fc" id="L96">            execution.work.consume(dispatch);</span>
+<span class="fc" id="L97">            long admitted = Math.min(maxEngineAndVerifierWork, authority.remainingOpaqueWorkUnits());</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">            if (admitted &lt; 1) {</span>
+<span class="nc" id="L99">                return execution.finish(Status.BUDGET_INCONCLUSIVE, &quot;NO_FACTORIZATION_WORK_BUDGET_REMAINING&quot;);</span>
+            }
+<span class="fc" id="L101">            execution.request = FactorizationRequest.verifiedDecomposition(</span>
+<span class="fc" id="L102">                view.polynomial(), structuralLimits, maxCandidates, admitted);</span>
+<span class="fc" id="L103">            execution.report = FactorizationVerifier.execute(engine, execution.request);</span>
+            // An opaque call must settle its complete unchanged ledger before any further work.
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">            if (!execution.report.work().within(admitted)) {</span>
+<span class="nc" id="L106">                throw new IllegalStateException(&quot;SPECIALIZED_FACTORIZATION_EXCEEDED_ADMITTED_RAW_AUTHORITY&quot;);</span>
+            }
+            try {
+<span class="fc" id="L109">                execution.work.consume(execution.report.work());</span>
+<span class="nc" id="L110">            } catch (PolynomialWorkAuthority.LimitReached exception) {</span>
+<span class="nc" id="L111">                throw new IllegalStateException(&quot;SPECIALIZED_FACTORIZATION_WORK_REJECTED_BY_SHARED_AUTHORITY&quot;, exception);</span>
+<span class="fc" id="L112">            }</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            if (!execution.report.successful()) {</span>
+<span class="fc" id="L114">                return execution.finish(reportStatus(execution.report.status()), execution.report.detailCode());</span>
+            }
+
+<span class="fc" id="L117">            execution.candidateIndex = 0;</span>
+<span class="fc" id="L118">            execution.rendered = operator.render(execution.report.candidates().getFirst(), view,</span>
+                execution.report, execution.work);
+<span class="fc" id="L120">            String rendered = execution.rendered.transformedExpression();</span>
+<span class="fc" id="L121">            execution.work.consume(&quot;transform.exact-reparse-source-code-units&quot;, rendered.length());</span>
+            try {
+<span class="fc" id="L123">                execution.reparsed = new ExpressionParser().parseExactTerm(rendered);</span>
+<span class="nc" id="L124">            } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L125">                return execution.finish(Status.TECHNICAL_FAILURE, &quot;SPECIALIZED_RENDERED_EXPRESSION_NOT_EXACTLY_PARSEABLE&quot;);</span>
+<span class="fc" id="L126">            }</span>
+
+<span class="fc" id="L128">            execution.work.consume(new PolynomialWorkLedger(Map.of(</span>
+<span class="fc" id="L129">                &quot;nested.replacement-occurrences&quot;, 1L,</span>
+<span class="fc" id="L130">                &quot;nested.replacement-path-navigation&quot;, (long) position.path().size(),</span>
+<span class="fc" id="L131">                &quot;nested.replacement-ancestor-copies&quot;, (long) position.path().size())));</span>
+<span class="fc" id="L132">            execution.replacement = position.replaceAt(root.expression(), execution.reparsed.expression());</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            if (!execution.replacement.success()</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">                    || execution.replacement.copiedAncestors() != position.path().size()</span>
+<span class="fc" id="L135">                    || execution.replacement.selectedSubtree().orElseThrow()</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">                        != projection.projected().orElseThrow().expression()) {</span>
+<span class="nc" id="L137">                return execution.finish(Status.TECHNICAL_FAILURE, &quot;SPECIALIZED_REPLACEMENT_OCCURRENCE_MISMATCH&quot;);</span>
+            }
+<span class="fc" id="L139">            execution.work.consume(&quot;nested.rewritten-path-replay&quot;, position.path().size() + 1L);</span>
+<span class="fc" id="L140">            Expr replayed = position.subtreeAt(execution.replacement.rewrittenRoot().orElseThrow()).orElse(null);</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">            if (replayed != execution.reparsed.expression()) {</span>
+<span class="nc" id="L142">                return execution.finish(Status.TECHNICAL_FAILURE, &quot;SPECIALIZED_REWRITTEN_PATH_MISMATCH&quot;);</span>
+            }
+
+<span class="fc" id="L145">            ExactParsedTerm.SourceRange range = projection.selectedRange().orElseThrow();</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            long outputLength = position.isRoot() ? rendered.length()</span>
+<span class="fc" id="L147">                : root.source().length() - (long) (range.endExclusive() - range.startInclusive())</span>
+<span class="fc" id="L148">                    + rendered.length() + 2L;</span>
+<span class="fc" id="L149">            execution.work.consume(&quot;nested.rewritten-exact-source-code-units&quot;, outputLength);</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            execution.rewrittenSource = position.isRoot() ? rendered</span>
+<span class="fc" id="L151">                : root.source().substring(0, range.startInclusive()) + &quot;(&quot; + rendered + &quot;)&quot;</span>
+<span class="fc" id="L152">                    + root.source().substring(range.endExclusive());</span>
+<span class="fc" id="L153">            return execution.finish(Status.GENERATED, execution.report.detailCode());</span>
+<span class="fc" id="L154">        } catch (PolynomialWorkAuthority.LimitReached exception) {</span>
+<span class="fc" id="L155">            return execution.finish(Status.BUDGET_INCONCLUSIVE, exception.getMessage());</span>
+        }
+    }
+
+    private final class Execution {
+        private final ExactParsedSubtermProjector.Result projection;
+        private final Work work;
+        private PolynomialSemanticView.MeasuredAnalysis extraction;
+        private PolynomialSemanticView.PolynomialView view;
+        private FactorizationRequest&lt;BigInteger&gt; request;
+        private FactorizationVerifier.Report&lt;BigInteger&gt; report;
+<span class="fc" id="L166">        private int candidateIndex = -1;</span>
+        private ExpressionFactorizationReport.RenderedFactorization rendered;
+        private ExactParsedTerm reparsed;
+        private TreePosition.ReplacementResult replacement;
+        private String rewrittenSource;
+
+<span class="fc" id="L172">        private Execution(ExactParsedSubtermProjector.Result projection, PolynomialWorkAuthority authority) {</span>
+<span class="fc" id="L173">            this.projection = projection;</span>
+<span class="fc" id="L174">            this.work = new Work(authority);</span>
+<span class="fc" id="L175">            work.retain(new PolynomialWorkLedger(projection.work().stages()));</span>
+<span class="fc" id="L176">        }</span>
+
+        private Result finish(Status status, String detailCode) {
+<span class="fc" id="L179">            return new Result(status, detailCode, projection, Optional.ofNullable(extraction),</span>
+<span class="fc" id="L180">                Optional.ofNullable(view), Optional.ofNullable(request), Optional.ofNullable(report),</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">                candidateIndex &lt; 0 ? OptionalInt.empty() : OptionalInt.of(candidateIndex),</span>
+<span class="fc" id="L182">                Optional.ofNullable(rendered), Optional.ofNullable(reparsed), Optional.ofNullable(replacement),</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">                status == Status.GENERATED ? Optional.of(rewrittenSource) : Optional.empty(), work.ledger(),</span>
+                structuralLimits, maxCandidates, maxEngineAndVerifierWork);
+        }
+    }
+
+    /** Terminal outcome; misses do not certify irreducibility. */
+<span class="fc" id="L189">    public enum Status {</span>
+<span class="fc" id="L190">        GENERATED,</span>
+<span class="fc" id="L191">        UNSUPPORTED_SEMANTIC_VIEW,</span>
+<span class="fc" id="L192">        UNSUPPORTED_FACTORIZATION_REQUEST,</span>
+<span class="fc" id="L193">        NO_FACTORIZATION_FOUND,</span>
+<span class="fc" id="L194">        IRREDUCIBLE,</span>
+<span class="fc" id="L195">        BUDGET_INCONCLUSIVE,</span>
+<span class="fc" id="L196">        POSITION_NOT_PRESENT,</span>
+<span class="fc" id="L197">        POSITION_STALE,</span>
+<span class="fc" id="L198">        TECHNICAL_FAILURE</span>
+    }
+
+    /**
+     * Issuer-owned result binding the original request/report to its exact
+     * occurrence and output. Its ledger contains this invocation's admitted
+     * work; earlier work remains in the same caller authority. Partial render or
+     * replacement evidence never exposes an authorized transformed expression.
+     */
+    public static final class Result {
+        private final Status status;
+        private final String detailCode;
+        private final ExactParsedSubtermProjector.Result projection;
+        private final Optional&lt;PolynomialSemanticView.MeasuredAnalysis&gt; extraction;
+        private final Optional&lt;FactorizationRequest&lt;BigInteger&gt;&gt; request;
+        private final Optional&lt;FactorizationVerifier.Report&lt;BigInteger&gt;&gt; report;
+        private final OptionalInt selectedCandidateIndex;
+        private final Optional&lt;ExpressionFactorizationReport.RenderedFactorization&gt; selectedCandidate;
+        private final Optional&lt;ExactParsedTerm&gt; reparsedReplacement;
+        private final Optional&lt;TreePosition.ReplacementResult&gt; replacement;
+        private final Optional&lt;String&gt; rewrittenRootSource;
+        private final PolynomialWorkLedger totalWork;
+        private final String certificateHash;
+        private final String canonicalMaterial;
+        private final List&lt;PrimitiveStep&gt; primitiveExpansion;
+
+        private Result(Status status, String detailCode, ExactParsedSubtermProjector.Result projection,
+                Optional&lt;PolynomialSemanticView.MeasuredAnalysis&gt; extraction,
+                Optional&lt;PolynomialSemanticView.PolynomialView&gt; view,
+                Optional&lt;FactorizationRequest&lt;BigInteger&gt;&gt; request,
+                Optional&lt;FactorizationVerifier.Report&lt;BigInteger&gt;&gt; report, OptionalInt selectedCandidateIndex,
+                Optional&lt;ExpressionFactorizationReport.RenderedFactorization&gt; selectedCandidate,
+                Optional&lt;ExactParsedTerm&gt; reparsedReplacement, Optional&lt;TreePosition.ReplacementResult&gt; replacement,
+                Optional&lt;String&gt; rewrittenRootSource, PolynomialWorkLedger totalWork,
+<span class="fc" id="L232">                FactorizationRequest.StructuralLimits structuralLimits, int maxCandidates, long maxEngineAndVerifierWork) {</span>
+<span class="fc" id="L233">            this.status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L234">            this.detailCode = Objects.requireNonNull(detailCode, &quot;detailCode&quot;);</span>
+<span class="fc" id="L235">            this.projection = Objects.requireNonNull(projection, &quot;projection&quot;);</span>
+<span class="fc" id="L236">            this.extraction = Objects.requireNonNull(extraction, &quot;extraction&quot;);</span>
+<span class="fc" id="L237">            this.request = Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L238">            this.report = Objects.requireNonNull(report, &quot;report&quot;);</span>
+<span class="fc" id="L239">            this.selectedCandidateIndex = Objects.requireNonNull(selectedCandidateIndex, &quot;selectedCandidateIndex&quot;);</span>
+<span class="fc" id="L240">            this.selectedCandidate = Objects.requireNonNull(selectedCandidate, &quot;selectedCandidate&quot;);</span>
+<span class="fc" id="L241">            this.reparsedReplacement = Objects.requireNonNull(reparsedReplacement, &quot;reparsedReplacement&quot;);</span>
+<span class="fc" id="L242">            this.replacement = Objects.requireNonNull(replacement, &quot;replacement&quot;);</span>
+<span class="fc" id="L243">            this.rewrittenRootSource = Objects.requireNonNull(rewrittenRootSource, &quot;rewrittenRootSource&quot;);</span>
+<span class="fc" id="L244">            this.totalWork = Objects.requireNonNull(totalWork, &quot;totalWork&quot;);</span>
+<span class="pc bpc" id="L245" title="2 of 4 branches missed.">            if (detailCode.isBlank() || request.isPresent() != report.isPresent()</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">                    || generated() != rewrittenRootSource.isPresent()</span>
+<span class="pc bpc" id="L247" title="1 of 4 branches missed.">                    || selectedCandidateIndex.isPresent() &amp;&amp; selectedCandidateIndex.getAsInt() != 0</span>
+<span class="pc bpc" id="L248" title="2 of 6 branches missed.">                    || selectedCandidate.isPresent() &amp;&amp; (report.isEmpty() || !report.orElseThrow().successful()</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">                        || selectedCandidate.orElseThrow().factorization() != report.orElseThrow().candidates().getFirst())</span>
+<span class="pc bpc" id="L250" title="3 of 8 branches missed.">                    || generated() &amp;&amp; (selectedCandidate.isEmpty() || reparsedReplacement.isEmpty() || replacement.isEmpty())) {</span>
+<span class="nc" id="L251">                throw new IllegalArgumentException(&quot;measured specialized result lacks issuer continuity&quot;);</span>
+            }
+<span class="fc" id="L253">            String requestMaterial = request.map(FactorizationRequest::canonicalMaterial).orElse(&quot;&quot;);</span>
+<span class="fc" id="L254">            StringBuilder renderingMaterial = new StringBuilder(PIPELINE_ID + &quot;/rendering&quot;);</span>
+<span class="fc" id="L255">            selectedCandidate.ifPresent(candidate -&gt; {</span>
+<span class="fc" id="L256">                append(renderingMaterial, candidate.transformedExpression());</span>
+<span class="fc" id="L257">                append(renderingMaterial, candidate.applicationKey());</span>
+<span class="fc" id="L258">                append(renderingMaterial, candidate.factorization().verificationCertificateHash());</span>
+<span class="fc" id="L259">            });</span>
+<span class="fc" id="L260">            String reparsedMaterial = reparsedReplacement.map(MeasuredPolynomialDecompositionPipeline::exactReparseMaterial)</span>
+<span class="fc" id="L261">                .orElse(&quot;&quot;);</span>
+<span class="fc" id="L262">            StringBuilder material = new StringBuilder(PIPELINE_ID);</span>
+<span class="fc" id="L263">            append(material, PolynomialDecompositionSynthesisOperator.RULE_ID);</span>
+<span class="fc" id="L264">            append(material, BinaryQuarticFactorizationEngine.ENGINE_ID);</span>
+<span class="fc" id="L265">            append(material, structuralLimits.canonicalMaterial());</span>
+<span class="fc" id="L266">            append(material, Integer.toString(maxCandidates));</span>
+<span class="fc" id="L267">            append(material, Long.toString(maxEngineAndVerifierWork));</span>
+<span class="fc" id="L268">            append(material, status.name());</span>
+<span class="fc" id="L269">            append(material, detailCode);</span>
+<span class="fc" id="L270">            append(material, projection.certificateHash());</span>
+<span class="fc" id="L271">            append(material, extraction.map(value -&gt; value.analysis().status().name()).orElse(&quot;&quot;));</span>
+<span class="fc" id="L272">            append(material, extraction.map(value -&gt; value.analysis().detailCode()).orElse(&quot;&quot;));</span>
+<span class="fc" id="L273">            append(material, view.map(PolynomialSemanticView.PolynomialView::canonicalMaterial).orElse(&quot;&quot;));</span>
+<span class="fc" id="L274">            append(material, requestMaterial);</span>
+<span class="fc" id="L275">            append(material, report.map(FactorizationVerifier.Report::verificationHash).orElse(&quot;&quot;));</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">            append(material, selectedCandidateIndex.isPresent() ? Integer.toString(selectedCandidateIndex.getAsInt()) : &quot;&quot;);</span>
+<span class="fc" id="L277">            append(material, selectedCandidate.map(ExpressionFactorizationReport.RenderedFactorization::transformedExpression)</span>
+<span class="fc" id="L278">                .orElse(&quot;&quot;));</span>
+<span class="fc" id="L279">            append(material, selectedCandidate.map(ExpressionFactorizationReport.RenderedFactorization::applicationKey)</span>
+<span class="fc" id="L280">                .orElse(&quot;&quot;));</span>
+<span class="fc" id="L281">            append(material, reparsedMaterial);</span>
+<span class="fc" id="L282">            append(material, replacement.map(value -&gt; Integer.toString(value.copiedAncestors())).orElse(&quot;&quot;));</span>
+<span class="fc" id="L283">            append(material, rewrittenRootSource.orElse(&quot;&quot;));</span>
+<span class="fc" id="L284">            append(material, totalWork.canonicalMaterial());</span>
+<span class="fc" id="L285">            certificateHash = sha256(material.toString());</span>
+<span class="fc" id="L286">            append(material, certificateHash);</span>
+<span class="fc" id="L287">            canonicalMaterial = material.toString();</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">            primitiveExpansion = generated() ? List.of(</span>
+<span class="fc" id="L289">                new PrimitiveStep(&quot;EXACT_SOURCE_EVIDENCE&quot;, sourceEvidenceHash().orElseThrow()),</span>
+<span class="fc" id="L290">                new PrimitiveStep(&quot;EXACT_INTEGER_FACTORIZATION_REQUEST&quot;, sha256(requestMaterial)),</span>
+                new PrimitiveStep(&quot;VERIFIER_SELECTED_CANDIDATE&quot;,
+<span class="fc" id="L292">                    selectedCandidate.orElseThrow().factorization().verificationCertificateHash()),</span>
+<span class="fc" id="L293">                new PrimitiveStep(&quot;EXACT_FACTOR_RENDERING&quot;, sha256(renderingMaterial.toString())),</span>
+<span class="fc" id="L294">                new PrimitiveStep(&quot;EXACT_REPARSE&quot;, sha256(reparsedMaterial)),</span>
+<span class="fc" id="L295">                new PrimitiveStep(&quot;SPECIALIZED_OCCURRENCE_REPLACEMENT&quot;, certificateHash)) : List.of();</span>
+<span class="fc" id="L296">        }</span>
+
+<span class="fc" id="L298">        public Status status() { return status; }</span>
+<span class="fc" id="L299">        public String detailCode() { return detailCode; }</span>
+<span class="nc" id="L300">        public String engineId() { return BinaryQuarticFactorizationEngine.ENGINE_ID; }</span>
+<span class="nc" id="L301">        public String ruleId() { return PolynomialDecompositionSynthesisOperator.RULE_ID; }</span>
+<span class="nc" id="L302">        public ExactParsedSubtermProjector.Result projection() { return projection; }</span>
+<span class="fc" id="L303">        public Optional&lt;String&gt; rootSourceHash() { return projection.rootSourceHash(); }</span>
+<span class="fc" id="L304">        public List&lt;Integer&gt; path() { return projection.path(); }</span>
+<span class="fc" id="L305">        public Optional&lt;String&gt; sourceOccurrenceExpression() { return projection.projected().map(ExactParsedTerm::source); }</span>
+        public Optional&lt;String&gt; sourceEvidenceHash() {
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">            return projection.successful() ? Optional.of(projection.certificateHash()) : Optional.empty();</span>
+        }
+<span class="nc" id="L309">        public Optional&lt;PolynomialSemanticView.MeasuredAnalysis&gt; extraction() { return extraction; }</span>
+<span class="fc" id="L310">        public Optional&lt;FactorizationRequest&lt;BigInteger&gt;&gt; request() { return request; }</span>
+<span class="fc" id="L311">        public Optional&lt;FactorizationVerifier.Report&lt;BigInteger&gt;&gt; report() { return report; }</span>
+<span class="fc" id="L312">        public OptionalInt selectedCandidateIndex() { return selectedCandidateIndex; }</span>
+<span class="nc" id="L313">        public Optional&lt;ExpressionFactorizationReport.RenderedFactorization&gt; selectedCandidate() { return selectedCandidate; }</span>
+        public Optional&lt;String&gt; transformedExpression() {
+<span class="fc bfc" id="L315" title="All 2 branches covered.">            return generated() ? selectedCandidate.map(ExpressionFactorizationReport.RenderedFactorization::transformedExpression)</span>
+<span class="fc" id="L316">                : Optional.empty();</span>
+        }
+        public Optional&lt;String&gt; applicationKey() {
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">            return generated() ? selectedCandidate.map(ExpressionFactorizationReport.RenderedFactorization::applicationKey)</span>
+<span class="nc" id="L320">                : Optional.empty();</span>
+        }
+<span class="nc" id="L322">        public Optional&lt;ExactParsedTerm&gt; reparsedReplacement() { return reparsedReplacement; }</span>
+<span class="fc" id="L323">        public Optional&lt;TreePosition.ReplacementResult&gt; replacement() { return replacement; }</span>
+<span class="fc" id="L324">        public Optional&lt;String&gt; rewrittenRootSource() { return rewrittenRootSource; }</span>
+<span class="nc" id="L325">        public PolynomialWorkLedger totalWork() { return totalWork; }</span>
+<span class="fc" id="L326">        public PolynomialWorkLedger rawWork() { return totalWork; }</span>
+<span class="fc" id="L327">        public String certificateHash() { return certificateHash; }</span>
+<span class="fc" id="L328">        public String canonicalMaterial() { return canonicalMaterial; }</span>
+        /** Executed proof stages, available only after the full occurrence transformation succeeds. */
+<span class="fc" id="L330">        public List&lt;PrimitiveStep&gt; primitiveExpansion() { return primitiveExpansion; }</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">        public boolean generated() { return status == Status.GENERATED; }</span>
+    }
+
+    /** One ordered proof stage issued as part of a completed specialized result. */
+    public record PrimitiveStep(String stageId, String evidenceHash) {
+<span class="fc" id="L336">        public PrimitiveStep {</span>
+<span class="pc bpc" id="L337" title="3 of 6 branches missed.">            if (stageId == null || stageId.isBlank() || evidenceHash == null</span>
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">                    || !evidenceHash.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L339">                throw new IllegalArgumentException(&quot;specialized primitive evidence is invalid&quot;);</span>
+            }
+<span class="fc" id="L341">        }</span>
+    }
+
+    private static final class Work implements PolynomialWorkSink {
+        private final PolynomialWorkAuthority authority;
+<span class="fc" id="L346">        private final Map&lt;String, Long&gt; stages = new LinkedHashMap&lt;&gt;();</span>
+
+<span class="fc" id="L348">        private Work(PolynomialWorkAuthority authority) { this.authority = authority; }</span>
+
+        @Override
+        public void consume(String stage, long units) {
+<span class="fc" id="L352">            consume(new PolynomialWorkLedger(Map.of(stage, units)));</span>
+<span class="fc" id="L353">        }</span>
+
+        private void consume(PolynomialWorkLedger work) {
+<span class="fc" id="L356">            authority.consume(work);</span>
+<span class="fc" id="L357">            retain(work);</span>
+<span class="fc" id="L358">        }</span>
+
+        private void retain(PolynomialWorkLedger work) {
+<span class="fc" id="L361">            work.stages().forEach((stage, units) -&gt; stages.merge(stage, units, Math::addExact));</span>
+<span class="fc" id="L362">        }</span>
+
+<span class="fc" id="L364">        private PolynomialWorkLedger ledger() { return new PolynomialWorkLedger(stages); }</span>
+    }
+
+    private static Status projectionStatus(ExactParsedSubtermProjector.Status status) {
+<span class="pc bpc" id="L368" title="3 of 6 branches missed.">        return switch (status) {</span>
+<span class="fc" id="L369">            case POSITION_NOT_PRESENT -&gt; Status.POSITION_NOT_PRESENT;</span>
+<span class="fc" id="L370">            case POSITION_STALE -&gt; Status.POSITION_STALE;</span>
+<span class="nc" id="L371">            case UNSUPPORTED -&gt; Status.UNSUPPORTED_SEMANTIC_VIEW;</span>
+<span class="fc" id="L372">            case BUDGET_INCONCLUSIVE -&gt; Status.BUDGET_INCONCLUSIVE;</span>
+<span class="nc" id="L373">            case TECHNICAL_FAILURE -&gt; Status.TECHNICAL_FAILURE;</span>
+<span class="nc" id="L374">            case PROJECTED -&gt; throw new IllegalArgumentException(&quot;successful projection has no failure status&quot;);</span>
+        };
+    }
+
+    private static Status semanticStatus(PolynomialSemanticView.Status status) {
+<span class="pc bpc" id="L379" title="1 of 3 branches missed.">        return switch (status) {</span>
+<span class="fc" id="L380">            case PARSE_ERROR, UNSUPPORTED -&gt; Status.UNSUPPORTED_SEMANTIC_VIEW;</span>
+<span class="fc" id="L381">            case BUDGET_EXCEEDED -&gt; Status.BUDGET_INCONCLUSIVE;</span>
+<span class="nc" id="L382">            case SUPPORTED -&gt; throw new IllegalArgumentException(&quot;supported semantic view has no failure status&quot;);</span>
+        };
+    }
+
+    private static Status reportStatus(FactorizationVerifier.Status status) {
+<span class="pc bpc" id="L387" title="3 of 6 branches missed.">        return switch (status) {</span>
+<span class="nc" id="L388">            case COMPLETE_FACTORIZATION, PARTIAL_FACTORIZATION -&gt; Status.GENERATED;</span>
+<span class="nc" id="L389">            case IRREDUCIBLE -&gt; Status.IRREDUCIBLE;</span>
+<span class="fc" id="L390">            case NO_FACTORIZATION_FOUND -&gt; Status.NO_FACTORIZATION_FOUND;</span>
+<span class="fc" id="L391">            case UNSUPPORTED_DOMAIN, UNSUPPORTED_REQUEST -&gt; Status.UNSUPPORTED_FACTORIZATION_REQUEST;</span>
+<span class="fc" id="L392">            case BUDGET_INCONCLUSIVE -&gt; Status.BUDGET_INCONCLUSIVE;</span>
+<span class="nc" id="L393">            case TECHNICAL_FAILURE -&gt; Status.TECHNICAL_FAILURE;</span>
+        };
+    }
+
+    private static void append(StringBuilder target, String value) {
+<span class="fc" id="L398">        target.append('|').append(value.length()).append(':').append(value);</span>
+<span class="fc" id="L399">    }</span>
+
+    private static String exactReparseMaterial(ExactParsedTerm parsed) {
+<span class="fc" id="L402">        StringBuilder result = new StringBuilder(PIPELINE_ID + &quot;/exact-reparse&quot;);</span>
+<span class="fc" id="L403">        append(result, parsed.source());</span>
+<span class="fc" id="L404">        append(result, parsed.rootSourceRange().canonicalMaterial());</span>
+<span class="fc" id="L405">        parsed.literals().forEach(literal -&gt; {</span>
+<span class="fc" id="L406">            append(result, Integer.toString(literal.startInclusive()));</span>
+<span class="fc" id="L407">            append(result, Integer.toString(literal.endExclusive()));</span>
+<span class="fc" id="L408">            append(result, literal.sourceLexeme());</span>
+<span class="fc" id="L409">            append(result, literal.evidence().certificateHash());</span>
+<span class="fc" id="L410">        });</span>
+<span class="fc" id="L411">        return result.toString();</span>
+    }
+
+    private static String sha256(String material) {
+        try {
+<span class="fc" id="L416">            return &quot;sha256:&quot; + HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L417">                .digest(material.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L418">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L419">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

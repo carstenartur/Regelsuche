@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginArtifactProvenance.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginArtifactProvenance.java</span></div><h1>PluginArtifactProvenance.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.Signature;
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * A publisher's signed source/build assertion, bound to one exact index entry.
+ * Verification authenticates this assertion; it does not independently rebuild
+ * the artifact or attest that the claimed source produced those bytes.
+ */
+public record PluginArtifactProvenance(
+    String schema,
+    String artifactIdentityHash,
+    String artifactSha256,
+    String provenanceUri,
+    String sourceUri,
+    String sourceRevision,
+    String sourceSha256,
+    String buildRecipeSha256,
+    String publisherId,
+    String keyId,
+    String algorithm,
+    String signatureBase64
+) {
+    public static final String SCHEMA = &quot;regelsuche.plugin-artifact-provenance/v1&quot;;
+
+<span class="fc" id="L36">    public PluginArtifactProvenance {</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L38">            throw new IllegalArgumentException(&quot;unsupported artifact provenance schema&quot;);</span>
+        }
+<span class="fc" id="L40">        artifactIdentityHash = PluginSignatureManifest.requireSha256(artifactIdentityHash, &quot;artifactIdentityHash&quot;);</span>
+<span class="fc" id="L41">        artifactSha256 = PluginSignatureManifest.requireSha256(artifactSha256, &quot;artifactSha256&quot;);</span>
+<span class="fc" id="L42">        provenanceUri = https(provenanceUri);</span>
+<span class="fc" id="L43">        sourceUri = https(sourceUri);</span>
+<span class="fc" id="L44">        sourceRevision = PluginSignatureManifest.requireIdentifier(sourceRevision, &quot;sourceRevision&quot;);</span>
+<span class="fc" id="L45">        sourceSha256 = PluginSignatureManifest.requireSha256(sourceSha256, &quot;sourceSha256&quot;);</span>
+<span class="fc" id="L46">        buildRecipeSha256 = PluginSignatureManifest.requireSha256(buildRecipeSha256, &quot;buildRecipeSha256&quot;);</span>
+<span class="fc" id="L47">        publisherId = PluginSignatureManifest.requireIdentifier(publisherId, &quot;publisherId&quot;);</span>
+<span class="fc" id="L48">        keyId = PluginSignatureManifest.requireIdentifier(keyId, &quot;keyId&quot;);</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (!&quot;Ed25519&quot;.equals(algorithm)) {</span>
+<span class="nc" id="L50">            throw new IllegalArgumentException(&quot;unsupported provenance signature algorithm&quot;);</span>
+        }
+<span class="fc" id="L52">        byte[] signature = Base64.getDecoder().decode(Objects.requireNonNull(signatureBase64, &quot;signatureBase64&quot;));</span>
+<span class="pc bpc" id="L53" title="2 of 4 branches missed.">        if (signature.length != 64 || !Base64.getEncoder().encodeToString(signature).equals(signatureBase64)) {</span>
+<span class="nc" id="L54">            throw new IllegalArgumentException(&quot;provenance signature requires canonical Base64 of 64 bytes&quot;);</span>
+        }
+<span class="fc" id="L56">    }</span>
+
+    public static PluginArtifactProvenance read(byte[] bytes) {
+<span class="fc" id="L59">        return PluginDistributionJson.read(bytes, PluginArtifactProvenance.class);</span>
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L63">        Map&lt;String, String&gt; payload = fields();</span>
+<span class="fc" id="L64">        payload.put(&quot;signatureBase64&quot;, signatureBase64);</span>
+<span class="fc" id="L65">        return PluginDistributionJson.canonical(payload);</span>
+    }
+
+    public String contentHash() {
+<span class="fc" id="L69">        return PluginDistributionJson.hash(toCanonicalJson());</span>
+    }
+
+    /** Existing signed working trust state is the only source of publisher keys. */
+    public void requireTrusted(PluginArtifactIndex.Entry entry, PluginTrustStore trustStore) {
+<span class="fc" id="L74">        Objects.requireNonNull(entry, &quot;entry&quot;);</span>
+<span class="fc" id="L75">        Objects.requireNonNull(trustStore, &quot;trustStore&quot;);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (!artifactIdentityHash.equals(entry.identityHash())</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">                || !artifactSha256.equals(entry.artifactSha256())</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">                || !publisherId.equals(entry.publisherId())</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                || !provenanceUri.equals(entry.provenanceUri())) {</span>
+<span class="fc" id="L80">            throw new SecurityException(&quot;provenance does not bind the selected index entry&quot;);</span>
+        }
+<span class="fc" id="L82">        var key = trustStore.findKey(publisherId, keyId)</span>
+<span class="fc" id="L83">            .orElseThrow(() -&gt; new SecurityException(&quot;unknown provenance publisher/key&quot;));</span>
+<span class="pc bpc" id="L84" title="1 of 4 branches missed.">        if (key.revoked() || trustStore.isArtifactRevoked(artifactSha256)</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">                || !algorithm.equals(key.algorithm())) {</span>
+<span class="fc" id="L86">            throw new SecurityException(&quot;provenance is revoked or uses an untrusted algorithm&quot;);</span>
+        }
+        try {
+<span class="fc" id="L89">            Signature verifier = Signature.getInstance(algorithm);</span>
+<span class="fc" id="L90">            verifier.initVerify(key.publicKey());</span>
+<span class="fc" id="L91">            verifier.update(signedPayload());</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (!verifier.verify(Base64.getDecoder().decode(signatureBase64))) {</span>
+<span class="fc" id="L93">                throw new SecurityException(&quot;invalid provenance signature&quot;);</span>
+            }
+<span class="nc" id="L95">        } catch (GeneralSecurityException failure) {</span>
+<span class="nc" id="L96">            throw new SecurityException(&quot;unable to verify provenance&quot;, failure);</span>
+<span class="fc" id="L97">        }</span>
+<span class="fc" id="L98">    }</span>
+
+    /** Each UTF-8 field name and value is preceded by a 32-bit big-endian byte count. */
+    public byte[] signedPayload() {
+        try {
+<span class="fc" id="L103">            ByteArrayOutputStream bytes = new ByteArrayOutputStream();</span>
+<span class="fc" id="L104">            try (DataOutputStream output = new DataOutputStream(bytes)) {</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                for (var field : fields().entrySet()) {</span>
+<span class="fc" id="L106">                    write(output, field.getKey());</span>
+<span class="fc" id="L107">                    write(output, field.getValue());</span>
+<span class="fc" id="L108">                }</span>
+            }
+<span class="fc" id="L110">            return bytes.toByteArray();</span>
+<span class="nc" id="L111">        } catch (IOException impossible) {</span>
+<span class="nc" id="L112">            throw new IllegalStateException(&quot;cannot encode provenance payload&quot;, impossible);</span>
+        }
+    }
+
+    private Map&lt;String, String&gt; fields() {
+<span class="fc" id="L117">        Map&lt;String, String&gt; fields = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L118">        fields.put(&quot;schema&quot;, schema);</span>
+<span class="fc" id="L119">        fields.put(&quot;artifactIdentityHash&quot;, artifactIdentityHash);</span>
+<span class="fc" id="L120">        fields.put(&quot;artifactSha256&quot;, artifactSha256);</span>
+<span class="fc" id="L121">        fields.put(&quot;provenanceUri&quot;, provenanceUri);</span>
+<span class="fc" id="L122">        fields.put(&quot;sourceUri&quot;, sourceUri);</span>
+<span class="fc" id="L123">        fields.put(&quot;sourceRevision&quot;, sourceRevision);</span>
+<span class="fc" id="L124">        fields.put(&quot;sourceSha256&quot;, sourceSha256);</span>
+<span class="fc" id="L125">        fields.put(&quot;buildRecipeSha256&quot;, buildRecipeSha256);</span>
+<span class="fc" id="L126">        fields.put(&quot;publisherId&quot;, publisherId);</span>
+<span class="fc" id="L127">        fields.put(&quot;keyId&quot;, keyId);</span>
+<span class="fc" id="L128">        fields.put(&quot;algorithm&quot;, algorithm);</span>
+<span class="fc" id="L129">        return fields;</span>
+    }
+
+    private static void write(DataOutputStream output, String value) throws IOException {
+<span class="fc" id="L133">        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L134">        output.writeInt(bytes.length);</span>
+<span class="fc" id="L135">        output.write(bytes);</span>
+<span class="fc" id="L136">    }</span>
+
+    private static String https(String value) {
+<span class="fc" id="L139">        URI uri = URI.create(Objects.requireNonNull(value, &quot;URI&quot;));</span>
+<span class="pc bpc" id="L140" title="2 of 4 branches missed.">        if (!&quot;https&quot;.equals(uri.getScheme()) || uri.getHost() == null</span>
+<span class="pc bpc" id="L141" title="2 of 4 branches missed.">                || uri.getUserInfo() != null || uri.getFragment() != null</span>
+<span class="pc bpc" id="L142" title="3 of 6 branches missed.">                || uri.getPort() == 0 || uri.getPort() &gt; 65535 || !uri.normalize().equals(uri)) {</span>
+<span class="nc" id="L143">            throw new IllegalArgumentException(&quot;provenance requires a normalized HTTPS URI&quot;);</span>
+        }
+<span class="fc" id="L145">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

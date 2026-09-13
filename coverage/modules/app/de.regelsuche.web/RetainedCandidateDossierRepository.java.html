@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RetainedCandidateDossierRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.web</a> &gt; <span class="el_source">RetainedCandidateDossierRepository.java</span></div><h1>RetainedCandidateDossierRepository.java</h1><pre class="source lang-java linenums">package de.regelsuche.web;
+
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole.CANDIDATE_DOSSIERS;
+
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.discovery.representation.*;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.*;
+
+/** One bounded retained #663 artifact per immutable workspace. No live search. */
+final class RetainedCandidateDossierRepository {
+    static final int MAX_BYTES = 1_048_576;
+<span class="fc" id="L20">    private static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L21">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
+<span class="fc" id="L22">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)</span>
+<span class="fc" id="L23">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();</span>
+
+    private RetainedCandidateDossierRepository() { }
+
+    static TargetFreeSymPyBridgeDiscoveryScenario.ScenarioArtifact decode(
+        RepresentationDiscoveryRunWorkspace run, byte[] bytes
+    ) {
+        try {
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">            if (bytes.length &gt; MAX_BYTES) throw new IllegalArgumentException(&quot;dossier exceeds 1 MiB&quot;);</span>
+<span class="fc" id="L32">            var artifact = JSON.readValue(bytes, TargetFreeSymPyBridgeDiscoveryScenario.ScenarioArtifact.class);</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">            if (artifact == null) throw new IllegalArgumentException(&quot;candidate dossier is missing&quot;);</span>
+<span class="fc" id="L34">            byte[] canonical = artifact.toCanonicalJson().getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L35">            byte[] withNewline = (artifact.toCanonicalJson() + &quot;\n&quot;).getBytes(StandardCharsets.UTF_8);</span>
+<span class="pc bpc" id="L36" title="1 of 4 branches missed.">            if (!Arrays.equals(bytes, canonical) &amp;&amp; !Arrays.equals(bytes, withNewline)) {</span>
+<span class="nc" id="L37">                throw new IllegalArgumentException(&quot;dossier must contain canonical UTF-8 JSON&quot;);</span>
+            }
+<span class="fc" id="L39">            artifact.validateRetainedContract();</span>
+<span class="fc" id="L40">            var content = artifact.content();</span>
+<span class="fc" id="L41">            String searchHash = &quot;sha256:&quot; + HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L42">                .digest(JSON.writeValueAsBytes(content.search())));</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">            if (!searchHash.equals(content.searchContentHash())</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">                || !run.plan().informationTrack().id().equals(content.informationTrack())</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">                || !run.input().assumptions().equals(content.search().states().getFirst().assumptions())) {</span>
+<span class="nc" id="L46">                throw new IllegalArgumentException(&quot;dossier search or information boundary differs from run&quot;);</span>
+            }
+<span class="fc" id="L48">            new TargetFreeRepresentationDiscoveryRun.RunBundle(artifact, run);</span>
+<span class="fc" id="L49">            var bridge = content.discoveredBridge();</span>
+<span class="fc" id="L50">            var state = content.search().state(bridge.stateHash());</span>
+<span class="pc bpc" id="L51" title="3 of 6 branches missed.">            if (state.depth() == 0 || !state.expression().equals(bridge.expression()) || state.depth() != bridge.depth()</span>
+<span class="pc bpc" id="L52" title="2 of 4 branches missed.">                || !state.pathRuleIds().equals(bridge.pathRuleIds()) || !state.primitiveRuleIds().equals(bridge.primitiveRuleIds())</span>
+<span class="pc bpc" id="L53" title="2 of 4 branches missed.">                || !state.assumptions().equals(bridge.assumptions()) || !state.packIds().equals(bridge.packIds())) {</span>
+<span class="nc" id="L54">                throw new IllegalArgumentException(&quot;dossier bridge is not bound to its retained candidate&quot;);</span>
+            }
+<span class="fc" id="L56">            return artifact;</span>
+<span class="fc" id="L57">        } catch (IOException | IllegalStateException | NoSuchAlgorithmException exception) {</span>
+<span class="fc" id="L58">            throw new IllegalArgumentException(&quot;invalid or unbound candidate dossier&quot;, exception);</span>
+        }
+    }
+
+    static synchronized Optional&lt;String&gt; read(Path runs, RepresentationDiscoveryRunWorkspace run) throws IOException {
+<span class="fc" id="L63">        Path target = target(runs, run);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) return Optional.empty();</span>
+<span class="fc" id="L65">        requireRegular(target);</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (Files.size(target) &gt; MAX_BYTES) throw new IllegalArgumentException(&quot;retained dossier exceeds 1 MiB&quot;);</span>
+<span class="fc" id="L67">        try (var input = Files.newInputStream(target, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L68">            return Optional.of(decode(run, input.readNBytes(MAX_BYTES + 1)).toCanonicalJson());</span>
+        }
+    }
+
+    static synchronized String retain(Path runs, RepresentationDiscoveryRunWorkspace run, byte[] bytes) throws IOException {
+<span class="fc" id="L73">        String canonical = decode(run, bytes).toCanonicalJson();</span>
+<span class="fc" id="L74">        Path target = target(runs, run), root = target.getParent();</span>
+<span class="fc" id="L75">        Files.createDirectories(root);</span>
+<span class="fc" id="L76">        rejectSymbolicComponents(root);</span>
+<span class="fc" id="L77">        var existing = read(runs, run);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (existing.isPresent()) {</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            if (!existing.get().equals(canonical)) throw new IllegalStateException(&quot;immutable dossier conflict&quot;);</span>
+<span class="fc" id="L80">            return canonical;</span>
+        }
+<span class="fc" id="L82">        try (var entries = Files.list(root)) {</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            if (entries.limit(RepresentationDiscoveryRunWorkspace.DEFAULT_MAX_RETAINED_RUNS).count()</span>
+                &gt;= RepresentationDiscoveryRunWorkspace.DEFAULT_MAX_RETAINED_RUNS) {
+<span class="nc" id="L85">                throw new IllegalStateException(&quot;retained dossier repository limit exceeded&quot;);</span>
+            }
+        }
+<span class="fc" id="L88">        Path temporary = Files.createTempFile(root, &quot;.candidate-dossier-&quot;, &quot;.tmp&quot;);</span>
+        try {
+<span class="fc" id="L90">            Files.writeString(temporary, canonical, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L91">            try { Files.createLink(target, temporary); }</span>
+<span class="nc" id="L92">            catch (FileAlreadyExistsException exception) {</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">                if (!read(runs, run).orElseThrow().equals(canonical)) throw new IllegalStateException(&quot;immutable dossier conflict&quot;, exception);</span>
+<span class="fc" id="L94">            }</span>
+<span class="fc" id="L95">        } finally { Files.deleteIfExists(temporary); }</span>
+<span class="fc" id="L96">        return canonical;</span>
+    }
+
+    private static Path target(Path runs, RepresentationDiscoveryRunWorkspace run) {
+<span class="fc" id="L100">        run.requireArtifact(CANDIDATE_DOSSIERS, TargetFreeSymPyBridgeDiscoveryScenario.SCHEMA);</span>
+<span class="fc" id="L101">        Path absolute = runs.toAbsolutePath().normalize();</span>
+<span class="fc" id="L102">        Path root = absolute.resolveSibling(absolute.getFileName() + &quot;-dossiers&quot;);</span>
+<span class="fc" id="L103">        rejectSymbolicComponents(root);</span>
+<span class="fc" id="L104">        return root.resolve(run.runId().substring(7) + &quot;.json&quot;);</span>
+    }
+
+    private static void rejectSymbolicComponents(Path absolute) {
+<span class="fc" id="L108">        Path current = absolute.getRoot();</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        for (Path component : absolute) {</span>
+<span class="fc" id="L110">            current = current.resolve(component);</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">            if (Files.isSymbolicLink(current)) throw new IllegalStateException(&quot;symbolic dossier repository path&quot;);</span>
+<span class="fc" id="L112">        }</span>
+<span class="fc" id="L113">    }</span>
+
+    private static void requireRegular(Path path) {
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) throw new IllegalStateException(&quot;dossier is not a regular file&quot;);</span>
+<span class="fc" id="L117">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

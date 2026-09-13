@@ -285,7 +285,7 @@ public final class ExactParsedTerm {
 <span class="fc bfc" id="L285" title="All 2 branches covered.">        if (binary.operator() != BinaryOperator.SUB</span>
 <span class="fc bfc" id="L286" title="All 2 branches covered.">                || !(binary.left() instanceof NumberExpr zero)</span>
 <span class="pc bpc" id="L287" title="1 of 2 branches missed.">                || !zero.value().equalsInteger(0)</span>
-<span class="pc bpc" id="L288" title="1 of 2 branches missed.">                || literalsByNode.containsKey(zero)</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">                || literalsByNode.containsKey(zero)</span>
 <span class="pc bpc" id="L289" title="1 of 4 branches missed.">                || ranges.containsKey(zero)</span>
                 || binaryRange == null) {
 <span class="fc" id="L291">            return false;</span>

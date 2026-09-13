@@ -543,8 +543,8 @@ public final class PluginRuntime implements AutoCloseable {
 <span class="fc" id="L543">            return List.of();</span>
         }
 <span class="fc" id="L545">        List&lt;String&gt; warnings = new ArrayList&lt;&gt;();</span>
-<span class="pc bpc" id="L546" title="1 of 2 branches missed.">        if (provenance.isBlank()) {</span>
-<span class="nc" id="L547">            warnings.add(&quot;MISSING_PROVENANCE&quot;);</span>
+<span class="fc bfc" id="L546" title="All 2 branches covered.">        if (provenance.isBlank()) {</span>
+<span class="fc" id="L547">            warnings.add(&quot;MISSING_PROVENANCE&quot;);</span>
         }
 <span class="pc bpc" id="L549" title="1 of 2 branches missed.">        if (!signaturePresent) {</span>
 <span class="fc" id="L550">            warnings.add(&quot;MISSING_SIGNATURE_METADATA&quot;);</span>
@@ -571,10 +571,10 @@ public final class PluginRuntime implements AutoCloseable {
 <span class="fc" id="L571">            plugin.registerExplanations(explanationRegistry);</span>
 <span class="fc" id="L572">            plugin.registerParserExtensions(parserExtensionRegistry);</span>
 <span class="fc" id="L573">            plugin.registerExamples(exampleRegistry);</span>
-<span class="nc" id="L574">        } catch (RuntimeException ex) {</span>
-<span class="nc" id="L575">            LOGGER.warning(() -&gt; &quot;Plugin &quot; + plugin.id() + &quot; failed: &quot; + ex.getMessage());</span>
-<span class="nc" id="L576">            discoveredDiagnostics.add(new RuntimeDiagnostic(plugin.id(),</span>
-<span class="nc" id="L577">                &quot;Failed to register plugin contributions from &quot; + source + &quot;: &quot; + ex.getMessage()));</span>
+<span class="fc" id="L574">        } catch (RuntimeException ex) {</span>
+<span class="fc" id="L575">            LOGGER.warning(() -&gt; &quot;Plugin &quot; + plugin.id() + &quot; failed: &quot; + ex.getMessage());</span>
+<span class="fc" id="L576">            discoveredDiagnostics.add(new RuntimeDiagnostic(plugin.id(),</span>
+<span class="fc" id="L577">                &quot;Failed to register plugin contributions from &quot; + source + &quot;: &quot; + ex.getMessage()));</span>
 <span class="fc" id="L578">        }</span>
 <span class="fc" id="L579">    }</span>
 
