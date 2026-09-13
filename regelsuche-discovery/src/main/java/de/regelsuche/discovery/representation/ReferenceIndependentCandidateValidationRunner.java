@@ -49,15 +49,19 @@ public final class ReferenceIndependentCandidateValidationRunner {
             System.out.println("referenceIndependentValidationHash=" + artifact.contentHash());
             System.out.println("referenceIndependentValidationRows=" + artifact.content().summary().rows());
             System.out.println("referenceIndependentValidationCandidates=" + artifact.content().summary().candidates());
-        } else if (args.length == 5 && args[0].equals("verify")) {
+        } else if (args.length == 9 && args[0].equals("verify")) {
+            var budget = new Budget(Integer.parseInt(args[5]), Integer.parseInt(args[6]),
+                Integer.parseInt(args[7]));
             var artifact = ReferenceIndependentCandidateValidationVerifier.verifyReplay(
                 readArtifact(Path.of(args[1])), readArtifact(Path.of(args[2])),
-                args[3], readArtifact(Path.of(args[4])));
+                args[3], args[4], budget, readArtifact(Path.of(args[8])));
             System.out.println("referenceIndependentReplayVerifiedHash=" + artifact.contentHash());
         } else {
             throw new IllegalArgumentException("usage: run <plan.json[.gz]> <freeze.json[.gz]> "
                 + "<freeze-hash> <implementation-commit> <max-oracle-calls> <max-input-characters> "
-                + "<timeout-ms> <output.json> | verify <plan> <freeze> <freeze-hash> <validation.json>");
+                + "<timeout-ms> <output.json> | verify <plan> <freeze> <freeze-hash> "
+                + "<expected-implementation-commit> <expected-max-oracle-calls> "
+                + "<expected-max-input-characters> <expected-timeout-ms> <validation.json>");
         }
     }
 

@@ -126,6 +126,7 @@ behalten ihre ursprüngliche Bedeutung.
 | --- | --- | --- |
 | CandidateResult | v2 | v3 |
 | CandidateMeasurements | v1 | v2 |
+| FactorizationAttempt | v1 | v2 mit tatsächlicher Pipeline-/Roharbeitsbindung |
 | CacheEvent | v1 | v2 für Replay mit terminalem Ausgang |
 | CandidateBatch | v2 | v3 |
 | CandidateMeasurementBatch | v1 | v2 |
@@ -137,6 +138,34 @@ unveränderten Arbeitsprojektion v2 gegen dieselbe Eingabeautorität geprüft.
 Übergangsarbeit entspricht der Differenz zweier kumulativer Projektionen;
 einzeln gerundete Auftretenskosten werden nicht addiert. Attempts und Events
 dürfen weder fehlen noch doppelt auftauchen oder in Vorarbeit verschwinden.
+
+`PolynomialTheoryUtilityFactorizationAttempt.createObserved` erzeugt dafür
+Attempt v2 aus dem tatsächlichen, vom Kern ausgestellten Nested-Pipeline-
+Resultat. Die Bindung hält Auftretensindex, Pfad, Originalsource-Nachweis,
+Pipeline-Zertifikat und das vollständige Rohledger der ausgeführten
+Faktorisierung fest. Backend, Request, Kandidaten und Report müssen genau
+diesem Resultat entsprechen. Ein öffentlicher Konstruktor kann diese
+Metadaten auch mit neu berechneter Attempt-ID nicht durch fremde Hashes
+ersetzen. Pfad und Rohledger können nicht als frei geschätzte Daten in die
+Ausführungsbindung geschrieben werden.
+
+Die Messprüfung fordert diese Bindung für jeden Versuch eines beobachteten
+Resultats. Sie prüft das tatsächliche Auftreten und verbietet mehrfaches
+Zählen derselben Pipeline-Ausführung. Die Faktorisierungsstages der Versuche
+müssen die entsprechenden Stages der Auftretensarbeit exakt erklären;
+sämtliche weitere vom Versuch verbrauchte Arbeit muss im selben Auftreten
+enthalten sein. Die Prüfung vergleicht rohe Einheiten, keine einzeln
+gerundeten Kosten. Null-Einträge aus Präfixdifferenzen bleiben unverändert
+gespeichert und begründen keine zusätzliche Arbeit.
+
+Damit genügen ein weiterer syntaktisch gültiger Versuch, ein geteilter
+Arbeitsanteil oder ein zum identischen Geschwister verschobener Versuch
+nicht mehr. Die beobachtete Serialisierung enthält die neue Attempt-Revision
+und die vollständige Bindung. Ihre bestehenden Ergebnis- und Messumschläge
+binden die neuen Attempt-IDs. Historisches `create`, der bisherige
+Konstruktor, Attempt-v1-IDs und historische Receipt-Bytes bleiben getrennt
+und unverändert. Ein ungebundener v1-Versuch wird nicht automatisch als
+beobachteter Nachweis umgedeutet; er bleibt im historischen Resultatvertrag.
 
 Die neue Freeze bindet die gesamte Rohpartition, Vorarbeit und jedes
 Auftreten im kanonischen JSON und schreibt ausschließlich

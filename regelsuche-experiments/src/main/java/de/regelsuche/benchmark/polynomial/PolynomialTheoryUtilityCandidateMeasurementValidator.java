@@ -1,5 +1,6 @@
 package de.regelsuche.benchmark.polynomial;
 
+import de.regelsuche.polynomial.PolynomialWorkLedger;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -211,6 +212,7 @@ final class PolynomialTheoryUtilityCandidateMeasurementValidator {
         for (var occurrence : occurrences) {
             var ownAttempts = occurrence.factorizationAttemptIds().stream().map(byAttempt::get).toList();
             var ownEvents = occurrence.cacheEventIds().stream().map(byEvent::get).toList();
+            requireObservedAttemptWork(result, occurrence, ownAttempts);
             // Only check presence here. Admission and transition work use cumulative rounding, never this sum.
             var work = PolynomialTheoryUtilityCanonicalWorkProjection.measure(
                 PolynomialTheoryUtilityCanonicalWorkProjection.partition(occurrence.primitiveWork(), occurrence.rawWork()));
@@ -243,6 +245,40 @@ final class PolynomialTheoryUtilityCandidateMeasurementValidator {
                 }
             }
         }
+    }
+
+    private static void requireObservedAttemptWork(PolynomialTheoryUtilityCandidateResult result,
+            PolynomialTheoryUtilityExecutionObservations.Occurrence occurrence,
+            List<PolynomialTheoryUtilityFactorizationAttempt> attempts) {
+        var consumed = PolynomialWorkLedger.empty();
+        Set<String> pipelines = new HashSet<>();
+        for (var attempt : attempts) {
+            var execution = attempt.observedExecution();
+            if (execution == null) {
+                throw new IllegalArgumentException("observed occurrence requires an execution-bound factorization attempt");
+            }
+            execution.validateAgainst(result, occurrence);
+            if (!pipelines.add(execution.pipelineEvidenceHash())) {
+                throw new IllegalArgumentException("observed attempts repeat the same pipeline execution");
+            }
+            consumed = PolynomialTheoryUtilityExecutionObservations.plus(consumed, execution.rawWork());
+        }
+        var actualFactorization = PolynomialTheoryUtilityCanonicalWorkProjection.partition(0, consumed).factorizationWork();
+        var retainedFactorization = PolynomialTheoryUtilityCanonicalWorkProjection
+            .partition(0, occurrence.rawWork()).factorizationWork();
+        // Prefix differences retain zero-valued stage keys. Compare exact units,
+        // without changing the serialized raw partition or its identity.
+        if (differentStageUnits(actualFactorization, retainedFactorization)
+                || consumed.stages().entrySet().stream()
+                    .anyMatch(entry -> entry.getValue() > occurrence.rawWork().units(entry.getKey()))) {
+            throw new IllegalArgumentException("observed attempt raw work differs from its occurrence partition: "
+                + result.input().caseId() + " at " + occurrence.path());
+        }
+    }
+
+    private static boolean differentStageUnits(PolynomialWorkLedger first, PolynomialWorkLedger second) {
+        return first.stages().entrySet().stream().anyMatch(entry -> entry.getValue() != second.units(entry.getKey()))
+            || second.stages().entrySet().stream().anyMatch(entry -> entry.getValue() != first.units(entry.getKey()));
     }
 
     private static void requireUnboundLookup(

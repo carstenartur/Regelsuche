@@ -370,10 +370,15 @@ def replayIntrinsicCompanion = tasks.register('replayReferenceIndependentCandida
     classpath = sourceSets.main.runtimeClasspath
     mainClass = intrinsicRunnerClass
     inputs.files(intrinsicPlan, intrinsicFreeze, intrinsicReport)
+    inputs.property('expectedImplementationRevision', intrinsicRevision)
+    inputs.property('expectedMaxOracleCalls', 4316)
+    inputs.property('expectedMaxInputCharacters', 8192)
+    inputs.property('expectedTimeoutMillis', 5000)
     timeout = java.time.Duration.ofMinutes(2)
     argumentProviders.add({
         ['verify', intrinsicPlan.asFile.absolutePath, intrinsicFreeze.asFile.absolutePath,
-            intrinsicFreezeHash, intrinsicReport.get().asFile.absolutePath]
+            intrinsicFreezeHash, intrinsicRevision.get(), '4316', '8192', '5000',
+            intrinsicReport.get().asFile.absolutePath]
     } as CommandLineArgumentProvider)
 }
 

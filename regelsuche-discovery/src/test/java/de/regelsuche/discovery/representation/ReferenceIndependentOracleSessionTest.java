@@ -107,7 +107,10 @@ class ReferenceIndependentOracleSessionTest {
                 ReferenceIndependentCandidateValidationVerifier.verifyReplay(
                     ReferenceIndependentValidationFixtures.PLAN,
                     ReferenceIndependentValidationFixtures.FREEZE,
-                    ReferenceIndependentValidationFixtures.FREEZE_HASH, retained,
+                    ReferenceIndependentValidationFixtures.FREEZE_HASH,
+                    ReferenceIndependentValidationFixtures.REVISION,
+                    new ReferenceIndependentCandidateValidation.Budget(2, 8192, 1000),
+                    retained,
                     new SymPyOracleValidator()));
             assertEquals(retained, artifact.toCanonicalJson());
             assertFalse(oracle.process().isAlive());

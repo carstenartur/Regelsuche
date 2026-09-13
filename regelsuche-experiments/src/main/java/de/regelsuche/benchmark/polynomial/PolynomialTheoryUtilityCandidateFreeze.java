@@ -567,6 +567,16 @@ public record PolynomialTheoryUtilityCandidateFreeze(
         json.property("transitionId", attempt.transitionId());
         json.property("verifierOutcome", attempt.verifierOutcome());
         json.property("reportEvidenceHash", attempt.reportEvidenceHash());
+        if (attempt.observedExecution() != null) {
+            var execution = attempt.observedExecution();
+            json.object("observedExecution", value -> {
+                value.property("occurrenceIndex", execution.occurrenceIndex());
+                value.array("path", path -> execution.path().forEach(path::numberValue));
+                value.property("pipelineEvidenceHash", execution.pipelineEvidenceHash());
+                value.property("sourceRootEvidenceHash", execution.sourceRootEvidenceHash());
+                value.object("rawWork", work -> execution.rawWork().stages().forEach(work::property));
+            });
+        }
     }
 
     private static void appendCacheEvent(

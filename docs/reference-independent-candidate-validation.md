@@ -101,8 +101,10 @@ Unsupported, conditional-unresolved, refuted, timeout, technical-failure,
 ineligible and budget-refused candidates remain in the output. Work refusal
 never removes a frozen candidate. `verifyBindings` recomputes set/lineage equality,
 input bindings, classifications and work admission in canonical order.
-`verifyReplay` additionally re-executes every admitted oracle invocation in a
-new worker: a self-consistent rehashed oracle claim is insufficient. This is
+`verifyReplay` additionally requires the independently supplied expected
+implementation revision and validation budget before it re-executes every
+admitted oracle invocation in a new worker: a self-consistent rehashed oracle
+claim cannot select its own replay authority. This is
 reproduction of the declared oracle, not a second independent mathematical method.
 
 Legitimate timeouts or technical failures may differ in a fresh replay. The
@@ -146,7 +148,9 @@ ReferenceIndependentCandidateValidationRunner run
   <timeout-ms> <output.json>
 
 ReferenceIndependentCandidateValidationRunner verify
-  <plan.json[.gz]> <freeze.json[.gz]> <expected-freeze-hash> <validation.json>
+  <plan.json[.gz]> <freeze.json[.gz]> <expected-freeze-hash>
+  <expected-implementation-commit> <expected-max-oracle-calls>
+  <expected-max-input-characters> <expected-timeout-ms> <validation.json>
 
 ReferenceIndependentValidationHistoricalComparison
   <validation.json> <historical-qualification.json[.gz]>

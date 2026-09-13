@@ -131,18 +131,11 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
                 transitions.add(transition);
                 traces.add(trace(transition, nested));
             }
-            if (nested != null) {
-                var attempt = attempt(input, nested, transition, attempts.size());
-                if (attempt != null) attempts.add(attempt);
-            }
+            var attempt = attempt(input, nested, transition, attempts.size(), retainedOccurrences.size(), observed);
+            if (attempt != null) attempts.add(attempt);
             if (observed) {
-                retainedOccurrences.add(new PolynomialTheoryUtilityExecutionObservations.Occurrence(
-                    retainedOccurrences.size(), path, terminal(List.of(occurrence)), occurrence.detailCode(),
-                    nested == null ? "NONE" : nested.certificateHash(),
-                    transition == null ? "NONE" : transition.transitionId(), occurrence.work().primitiveWork(),
-                    PolynomialTheoryUtilityExecutionObservations.difference(authority.ledger(), beforeRaw),
-                    attempts.subList(firstAttempt, attempts.size()).stream()
-                        .map(PolynomialTheoryUtilityFactorizationAttempt::attemptId).toList(), List.of()));
+                retainedOccurrences.add(retainOccurrence(retainedOccurrences.size(), occurrence, transition,
+                    beforeRaw, authority.ledger(), attempts.subList(firstAttempt, attempts.size())));
             }
         }
         var retained = observed ? PolynomialTheoryUtilityExecutionObservations.create(preparation, retainedOccurrences) : null;
@@ -151,15 +144,34 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
             throw new UnrepresentableExecution(observations, authority.ledger(), authority.projection());
         }
         String proof = executionHash(authority.projection(), observations);
-        String verifier = terminal == TerminalStatus.MIXED_OUTCOMES ? "RETAINED_OCCURRENCE_OUTCOMES"
-            : terminal == TerminalStatus.VALIDATED_TRANSITION ? "VERIFIED"
-                : attempts.isEmpty() ? "NOT_REQUESTED" : "RETAINED_ATTEMPT_OUTCOMES";
+        String verifier = verifierStatus(terminal, attempts.isEmpty());
         var result = observed ? PolynomialTheoryUtilityCandidateResult.createObserved(input, formation,
             "NATIVE_SHARED_CANONICAL_AUTHORITY:" + proof, transitions, verifier, retained)
             : PolynomialTheoryUtilityCandidateResult.create(input, formation, terminal,
                 "NATIVE_SHARED_CANONICAL_AUTHORITY:" + proof, authority.work(), transitions, verifier);
         var measured = PolynomialTheoryUtilityMeasuredCandidate.create(result, traces, attempts, List.of());
         return new Execution(measured, authority.ledger(), authority.projection(), observations, proof);
+    }
+
+    private static PolynomialTheoryUtilityExecutionObservations.Occurrence retainOccurrence(int index,
+            Occurrence occurrence, PolynomialTheoryUtilityTransitionOutcome transition,
+            PolynomialWorkLedger before, PolynomialWorkLedger after,
+            List<PolynomialTheoryUtilityFactorizationAttempt> attempts) {
+        var nested = occurrence.pipeline();
+        return new PolynomialTheoryUtilityExecutionObservations.Occurrence(index, occurrence.path(),
+            terminal(List.of(occurrence)), occurrence.detailCode(),
+            nested == null ? "NONE" : nested.certificateHash(),
+            transition == null ? "NONE" : transition.transitionId(), occurrence.work().primitiveWork(),
+            PolynomialTheoryUtilityExecutionObservations.difference(after, before),
+            attempts.stream().map(PolynomialTheoryUtilityFactorizationAttempt::attemptId).toList(), List.of());
+    }
+
+    private static String verifierStatus(TerminalStatus terminal, boolean noAttempts) {
+        return switch (terminal) {
+            case MIXED_OUTCOMES -> "RETAINED_OCCURRENCE_OUTCOMES";
+            case VALIDATED_TRANSITION -> "VERIFIED";
+            default -> noAttempts ? "NOT_REQUESTED" : "RETAINED_ATTEMPT_OUTCOMES";
+        };
     }
 
     /** Explicit observed-result entry point using the same frozen row authority. */
@@ -259,6 +271,16 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
                 .map(value -> value.verificationCertificateHash()).toList(), selected,
             transition == null ? "NONE" : transition.transitionId(),
             selected.equals("NONE") ? report.status().name() : "VERIFIED", report.verificationHash());
+    }
+
+    private static PolynomialTheoryUtilityFactorizationAttempt attempt(PolynomialTheoryUtilityExecutionInput input,
+            ExactNestedFactorizationTransformationPipeline.Result nested,
+            PolynomialTheoryUtilityTransitionOutcome transition, int index, int occurrenceIndex, boolean observed) {
+        if (nested == null) return null;
+        var retained = attempt(input, nested, transition, index);
+        if (!observed || retained == null) return retained;
+        return PolynomialTheoryUtilityFactorizationAttempt.createObserved(index, input.inputId(), occurrenceIndex,
+            nested, transition == null ? "NONE" : transition.transitionId());
     }
 
     private static TerminalStatus terminal(List<Occurrence> observations) {

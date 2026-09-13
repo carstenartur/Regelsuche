@@ -81,20 +81,36 @@ public final class ReferenceIndependentCandidateValidationVerifier {
 
     /** Re-executes every admitted oracle invocation; hashes alone are not authenticity. */
     public static Artifact verifyReplay(String planJson, String freezeJson, String expectedFreezeHash,
+                                        String expectedRepositoryRevision, Budget expectedBudget,
                                         String validationJson) {
-        var checked = verifyBindings(planJson, freezeJson, expectedFreezeHash, validationJson);
-        try (var oracle = new ReferenceIndependentOracleSession(checked.content().budget().timeoutMillis())) {
-            return verifyReplay(planJson, freezeJson, expectedFreezeHash, validationJson, oracle);
+        requireReplayAuthority(expectedRepositoryRevision, expectedBudget,
+            verifyBindings(planJson, freezeJson, expectedFreezeHash, validationJson));
+        try (var oracle = new ReferenceIndependentOracleSession(expectedBudget.timeoutMillis())) {
+            return verifyReplay(planJson, freezeJson, expectedFreezeHash,
+                expectedRepositoryRevision, expectedBudget, validationJson, oracle);
         }
     }
 
     static Artifact verifyReplay(String planJson, String freezeJson, String expectedFreezeHash,
+                                 String expectedRepositoryRevision, Budget expectedBudget,
                                  String validationJson, OracleValidator oracle) {
         var artifact = verifyBindings(planJson, freezeJson, expectedFreezeHash, validationJson);
+        requireReplayAuthority(expectedRepositoryRevision, expectedBudget, artifact);
         var replay = ReferenceIndependentCandidateValidationRunner.run(planJson, freezeJson,
-            expectedFreezeHash, artifact.content().repositoryRevision(), artifact.content().budget(), oracle);
+            expectedFreezeHash, expectedRepositoryRevision, expectedBudget, oracle);
         require(replay.equals(artifact), "oracle evidence did not reproduce from the frozen inputs");
         return artifact;
+    }
+
+    private static void requireReplayAuthority(String expectedRepositoryRevision,
+                                               Budget expectedBudget, Artifact artifact) {
+        require(expectedRepositoryRevision != null
+                && expectedRepositoryRevision.matches("[0-9a-f]{40}"),
+            "expected replay repository revision must be a full Git commit");
+        require(expectedBudget != null
+                && artifact.content().repositoryRevision().equals(expectedRepositoryRevision)
+                && artifact.content().budget().equals(expectedBudget),
+            "validation companion differs from external replay revision or budget");
     }
 
     private static void require(boolean condition, String message) {

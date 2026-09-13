@@ -1,5 +1,7 @@
 package de.regelsuche.benchmark.polynomial;
 
+import de.regelsuche.polynomial.ExactNestedFactorizationTransformationPipeline;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.List;
@@ -21,14 +23,26 @@ public record PolynomialTheoryUtilityFactorizationAttempt(
     String selectedCandidateId,
     String transitionId,
     String verifierOutcome,
-    String reportEvidenceHash
+    String reportEvidenceHash,
+    ObservedExecution observedExecution
 ) {
     public static final String SCHEMA =
         "regelsuche.polynomial-theory-utility-factorization-attempt/v1";
+    public static final String OBSERVED_SCHEMA =
+        "regelsuche.polynomial-theory-utility-factorization-attempt/v2";
     public static final String NO_SELECTION = "NONE";
     public static final String NO_TRANSITION = "NONE";
     private static final Pattern SHA_256 =
         Pattern.compile("sha256:[0-9a-f]{64}");
+
+    /** Historical constructor; its v1 identity and payload remain unchanged. */
+    public PolynomialTheoryUtilityFactorizationAttempt(String attemptId, int attemptIndex,
+            String executionInputId, String backendId, String requestId, String requestEvidenceHash,
+            List<String> candidateIds, String selectedCandidateId, String transitionId,
+            String verifierOutcome, String reportEvidenceHash) {
+        this(attemptId, attemptIndex, executionInputId, backendId, requestId, requestEvidenceHash,
+            candidateIds, selectedCandidateId, transitionId, verifierOutcome, reportEvidenceHash, null);
+    }
 
     public PolynomialTheoryUtilityFactorizationAttempt {
         attemptId = requireHash(attemptId, "attemptId");
@@ -76,7 +90,7 @@ public record PolynomialTheoryUtilityFactorizationAttempt(
                 "transition lineage lacks a selected candidate"
             );
         }
-        if (!attemptId.equals(identity(
+        String metadataIdentity = identity(
                 attemptIndex,
                 executionInputId,
                 backendId,
@@ -86,7 +100,12 @@ public record PolynomialTheoryUtilityFactorizationAttempt(
                 selectedCandidateId,
                 transitionId,
                 verifierOutcome,
-                reportEvidenceHash))) {
+                reportEvidenceHash);
+        if (observedExecution != null && !metadataIdentity.equals(observedExecution
+                .metadata(attemptIndex, executionInputId, transitionId).attemptId())) {
+            throw new IllegalArgumentException("observed attempt metadata differs from its actual pipeline report");
+        }
+        if (!attemptId.equals(observedIdentity(metadataIdentity, observedExecution))) {
             throw new IllegalArgumentException(
                 "factorization attempt identity differs from its fields"
             );
@@ -140,8 +159,20 @@ public record PolynomialTheoryUtilityFactorizationAttempt(
         );
     }
 
+    /** Creates v2 evidence only from an issuer-owned, actually executed nested pipeline. */
+    public static PolynomialTheoryUtilityFactorizationAttempt createObserved(int attemptIndex,
+            String executionInputId, int occurrenceIndex,
+            ExactNestedFactorizationTransformationPipeline.Result pipeline, String transitionId) {
+        var execution = new ObservedExecution(occurrenceIndex, pipeline);
+        var metadata = execution.metadata(attemptIndex, executionInputId, transitionId);
+        return new PolynomialTheoryUtilityFactorizationAttempt(observedIdentity(metadata.attemptId(), execution),
+            metadata.attemptIndex(), metadata.executionInputId(), metadata.backendId(), metadata.requestId(),
+            metadata.requestEvidenceHash(), metadata.candidateIds(), metadata.selectedCandidateId(),
+            metadata.transitionId(), metadata.verifierOutcome(), metadata.reportEvidenceHash(), execution);
+    }
+
     public String schema() {
-        return SCHEMA;
+        return observedExecution == null ? SCHEMA : OBSERVED_SCHEMA;
     }
 
     public int candidateCount() {
@@ -166,6 +197,9 @@ public record PolynomialTheoryUtilityFactorizationAttempt(
         var frozenProfile = PolynomialTheoryUtilityExecutionInputs.profile(
             result.input().profileId()
         );
+        if (result.observations() == null && observedExecution != null) {
+            throw new IllegalArgumentException("observed attempt requires an observed result");
+        }
         if (attemptIndex != expectedIndex
                 || !profile.equals(frozenProfile)
                 || !executionInputId.equals(
@@ -191,6 +225,89 @@ public record PolynomialTheoryUtilityFactorizationAttempt(
                 );
             }
         }
+    }
+
+    private static String observedIdentity(String metadataIdentity, ObservedExecution execution) {
+        if (execution == null) return metadataIdentity;
+        StringBuilder material = new StringBuilder();
+        append(material, OBSERVED_SCHEMA);
+        append(material, metadataIdentity);
+        append(material, execution.canonicalMaterial());
+        return hash(material.toString());
+    }
+
+    /**
+     * Immutable issuer-owned binding. Callers cannot supply a replacement path,
+     * certificate or partial ledger: these are read from the actual pipeline.
+     */
+    public static final class ObservedExecution {
+        private final int occurrenceIndex;
+        private final ExactNestedFactorizationTransformationPipeline.Result pipeline;
+
+        private ObservedExecution(int occurrenceIndex,
+                ExactNestedFactorizationTransformationPipeline.Result pipeline) {
+            if (occurrenceIndex < 0) throw new IllegalArgumentException("occurrenceIndex must be non-negative");
+            this.occurrenceIndex = occurrenceIndex;
+            this.pipeline = Objects.requireNonNull(pipeline, "pipeline");
+            if (pipeline.factorization().isEmpty() || !pipeline.factorization().orElseThrow().executed()) {
+                throw new IllegalArgumentException("observed attempt requires an executed factorization pipeline");
+            }
+        }
+
+        public int occurrenceIndex() { return occurrenceIndex; }
+        public List<Integer> path() { return pipeline.position().path(); }
+        public String pipelineEvidenceHash() { return pipeline.certificateHash(); }
+        public String sourceRootEvidenceHash() {
+            return pipeline.projection().orElseThrow().rootSourceHash().orElseThrow();
+        }
+        public PolynomialWorkLedger rawWork() {
+            return pipeline.factorization().orElseThrow().totalWork();
+        }
+
+        public String canonicalMaterial() {
+            StringBuilder material = new StringBuilder();
+            append(material, Integer.toString(occurrenceIndex));
+            append(material, Integer.toString(path().size()));
+            path().forEach(value -> append(material, Integer.toString(value)));
+            append(material, pipelineEvidenceHash());
+            append(material, sourceRootEvidenceHash());
+            append(material, rawWork().canonicalMaterial());
+            return material.toString();
+        }
+
+        void validateAgainst(PolynomialTheoryUtilityCandidateResult result,
+                PolynomialTheoryUtilityExecutionObservations.Occurrence occurrence) {
+            String source = result.sourceRootExpression();
+            // ExactParsedSubtermProjector frames one UTF-8 value before hashing.
+            String rootHash = hash(source.getBytes(StandardCharsets.UTF_8).length + ":" + source + "\n");
+            if (occurrenceIndex != occurrence.occurrenceIndex() || !path().equals(occurrence.path())
+                    || !pipelineEvidenceHash().equals(occurrence.pipelineEvidenceHash())
+                    || !sourceRootEvidenceHash().equals(rootHash)) {
+                throw new IllegalArgumentException("observed attempt belongs to another source or occurrence pipeline");
+            }
+        }
+
+        private PolynomialTheoryUtilityFactorizationAttempt metadata(int index, String inputId, String transitionId) {
+            var factorization = pipeline.factorization().orElseThrow();
+            var report = factorization.report().orElseThrow();
+            String selected = pipeline.transformation().map(value -> value.candidateCertificateHash())
+                .filter(value -> !value.isEmpty()).orElse(NO_SELECTION);
+            return create(index, inputId, factorization.engineId(),
+                hash(factorization.request().orElseThrow().canonicalMaterial()), factorization.certificateHash(),
+                report.candidates().stream().map(value -> value.verificationCertificateHash()).toList(), selected,
+                transitionId, selected.equals(NO_SELECTION) ? report.status().name() : "VERIFIED",
+                report.verificationHash());
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof ObservedExecution execution
+                && occurrenceIndex == execution.occurrenceIndex
+                && pipelineEvidenceHash().equals(execution.pipelineEvidenceHash());
+        }
+
+        @Override
+        public int hashCode() { return Objects.hash(occurrenceIndex, pipelineEvidenceHash()); }
     }
 
     private static String identity(

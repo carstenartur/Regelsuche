@@ -157,36 +157,70 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
-The committed `ai-knowledge/complexity-baseline.json` is not chosen from the
-branch under test. For the 0.1.10 migration it is derived from independently
-green Regelsuche `main` commit
-`f19ee628fca26bd00950195a38eb940de9293ebc`, CI run `34581736197`, retained
-`repository-verification` artifact `10192975764`.
+The committed `ai-knowledge/complexity-baseline.json` advances only to an
+independently qualified predecessor. It is not generated from the branch under
+test. For the stacked issue integration, the accepted predecessor is `main`
+`85f6ce9301a7f3dcf3243937d5b463113c61846f`, tree
+`b8fd2b7721f19049d11d703cbe1c53869b3ccd7b`.
 
-That accepted source revision measured:
+PR #985 head `cbd7ccbda90c7f3e3c96a02ca2830938fcb5a75a` has exactly that tree.
+[CI run 34726058558](https://github.com/carstenartur/Regelsuche/actions/runs/34726058558)
+passed Gradle, Maven/product/Docker, isolated JMH, external polynomial comparison,
+isolated SymPy and the converged `ciCheck`. The retained
+`repository-verification` artifact is `10308038746`, API-reported ZIP SHA-256
+`2d13e3b3e4079984c68086a0925bc25447d9af6f50233d8ad96296a4cb230064`.
+These qualification statuses and artifact metadata were rechecked through the
+GitHub API; the ZIP was not downloaded for this update.
 
-- `estimatedContextTokens = 557650`
-- `conceptRadius = 85`
-- `dependencyRadius = 254`
-- legacy diagnostic `aiCognitiveDebt = 625.5676470588235`
-- normalized `aiContextDebt = 17.11`
+The baseline values come exclusively from a fresh, clean local reproduction of
+that identical predecessor tree at local commit
+`61650a81b69ee62264212a9ccca0f0d38e09d942`. The complete `aiKnowledgeCheck` passed
+with the pinned 0.1.10 extractor, including artifact validation and all 16
+method-hotspot checks. Its generated snapshot measured:
+
+- `estimatedContextTokens = 569510`
+- `conceptRadius = 86`
+- `dependencyRadius = 270`
+- legacy diagnostic `aiCognitiveDebt = 638.5629411764706`
+- normalized `aiContextDebt = 16.87`
 - `contextDebtModelVersion = context-footprint-v3`
 
-The normalized value comes from the schema-v3 context footprint in the retained
-artifact (`normalizedContextDebt = 17.11`). Version 0.1.10 writes the model id
-into trend snapshots, so `maxCognitiveDebtIncrease` compares normalized debt
-when baseline and current model versions match. If the current snapshot is
-normalized but the baseline model is missing or different, only that debt trend
-is reported as non-comparable and skipped; the absolute normalized debt gate and
-all other configured gates remain active. For compatibility callers that do not
-expose a normalized current context-debt model, the extractor retains the legacy
-`aiCognitiveDebt` trend path rather than silently treating it as normalized debt.
+The active baseline is a byte-for-byte copy of the retained
+[predecessor snapshot](../ai-knowledge/baseline-history/85f6ce9301-metrics-snapshot.json),
+SHA-256 `d9c1071f10b856f9e909174a0aa5562278958590f27d92a7f02764f5c74155f5`.
+The [provenance record](../ai-knowledge/baseline-history/2026-09-13-main85f6-provenance.json)
+binds the source/tree, complete CI job IDs, extractor commit, command, source and
+report hashes, and unchanged policy. The generated predecessor check, trend and
+local command log are retained alongside it.
 
-The policy limits are deliberately unchanged by this migration: the context-debt
-increase allowance remains 10 units, the context-token allowance remains 15000,
-the concept-radius allowance remains 3, and the method-hotspot rules remain in
-force. This is a metric-correctness migration, not a relaxation made to pass a
-particular pull request.
+The original integration measurement at
+`f2da31bf6652bbfaffd9541b7deb79ecc6327499` remains
+[rejected evidence](../ai-knowledge/baseline-history/f2da31bf66-rejected-trend.json):
+575165 estimated tokens exceeded the former 557650 baseline by 17515, above the
+unchanged 15000 allowance. The released estimator weights inventory counts;
+this was cumulative source/test/document/dependency growth. Relative to the
+accepted predecessor, the same integration measurement increases by 5655 tokens
+and one concept-radius unit. No integration value is used as a baseline.
+
+The predecessor was measured with its own committed capability selectors. The
+integration keeps the additional #984 reachability, preparation/replay test and
+document selectors and semantic coverage controls. Both resolve 17 capabilities
+and use `context-footprint-v3`; normalized debt differences also reflect this
+coverage expansion and are not a controlled comparison of source changes alone.
+
+Version 0.1.10 writes the model id into trend snapshots, so
+`maxCognitiveDebtIncrease` compares normalized debt when baseline and current model
+versions match. If the current snapshot is normalized but the baseline model is
+missing or different, only that debt trend is reported as non-comparable and
+skipped; the absolute normalized debt gate and all other configured gates remain
+active. Callers without a normalized current model retain the legacy
+`aiCognitiveDebt` trend path.
+
+The policy limits remain unchanged: the context-debt increase allowance is 10
+units, the context-token allowance is 15000, the concept-radius allowance is 3,
+and the absolute normalized debt and method-hotspot rules remain in force.
+Future advances require an independently qualified predecessor and retained
+provenance; a failing candidate cannot establish its own baseline.
 
 ## Historical baseline provenance
 
@@ -202,7 +236,18 @@ passed Gradle, Maven/product/Docker, isolated JMH, isolated SymPy and aggregate
 `ciCheck`; the retained artifact was `10117201394` (ZIP SHA-256
 `2754c79aab3b10eb564da5c73211bc6de10c9084687765c493bc95c9980a1864`).
 
-Those historical measurements remain useful provenance, but the active
-context-debt trend baseline is now the independently green `f19ee628...` snapshot
-above because it is the last accepted `main` state before adopting the corrected
-normalized trend semantics.
+The 0.1.10 metric-correctness migration then used independently green `main`
+`f19ee628fca26bd00950195a38eb940de9293ebc`, CI run `34581736197`, retained
+`repository-verification` artifact `10192975764`. It was the accepted `main`
+state before adopting corrected normalized trend semantics. That snapshot had
+`estimatedContextTokens = 557650`, `conceptRadius = 85`, `dependencyRadius = 254`,
+legacy `aiCognitiveDebt = 625.5676470588235`, normalized `aiContextDebt = 17.11`
+and `contextDebtModelVersion = context-footprint-v3`. The normalized value came
+from the artifact's schema-v3 `normalizedContextDebt` field.
+
+The exact formerly active baseline bytes remain in
+[baseline history](../ai-knowledge/baseline-history/f19ee628-complexity-baseline.json),
+SHA-256 `aea907748449180b6b681f5003a435048cc912bed67482f729ca007eb2c2b096`.
+All three older measurements retain their original source and qualification
+identities; the active successor is the independently accepted `85f6ce9301...`
+snapshot above.

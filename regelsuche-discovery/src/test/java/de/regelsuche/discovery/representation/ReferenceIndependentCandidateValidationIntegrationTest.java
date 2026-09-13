@@ -37,7 +37,8 @@ class ReferenceIndependentCandidateValidationIntegrationTest {
             "4316", "8192", "5000", result.toString()
         });
         ReferenceIndependentCandidateValidationRunner.main(new String[] {
-            "verify", plan.toString(), freeze.toString(), FREEZE_HASH, result.toString()
+            "verify", plan.toString(), freeze.toString(), FREEZE_HASH, revision,
+            "4316", "8192", "5000", result.toString()
         });
         String json = Files.readString(result);
         var artifact = ReferenceIndependentCandidateValidation.Artifact.fromCanonicalJson(json);
@@ -94,6 +95,9 @@ class ReferenceIndependentCandidateValidationIntegrationTest {
             PLAN, FREEZE, FREEZE_HASH, invented.toCanonicalJson());
         assertThrows(IllegalArgumentException.class, () ->
             ReferenceIndependentCandidateValidationVerifier.verifyReplay(
-                PLAN, FREEZE, FREEZE_HASH, invented.toCanonicalJson(), new SymPyOracleValidator()));
+                PLAN, FREEZE, FREEZE_HASH,
+                ReferenceIndependentValidationFixtures.REVISION,
+                ReferenceIndependentCandidateValidationTest.budget(4316),
+                invented.toCanonicalJson(), new SymPyOracleValidator()));
     }
 }

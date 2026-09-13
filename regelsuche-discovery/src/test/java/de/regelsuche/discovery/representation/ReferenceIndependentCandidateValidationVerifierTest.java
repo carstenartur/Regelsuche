@@ -5,13 +5,79 @@ import static de.regelsuche.discovery.representation.ReferenceIndependentValidat
 import static de.regelsuche.discovery.representation.ReferenceIndependentValidationFixtures.PLAN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.validation.OracleValidator.OracleValidation;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.TreeMap;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class ReferenceIndependentCandidateValidationVerifierTest {
+    @Test
+    void replayRejectsArtifactSelectedZeroCallBudget() {
+        var expected = ReferenceIndependentCandidateValidationTest.budget(4316);
+        var selectedByArtifact = new ReferenceIndependentCandidateValidation.Budget(
+            0, expected.maxInputCharacters(), expected.timeoutMillis());
+        var forged = ReferenceIndependentCandidateValidationRunner.run(
+            PLAN, FREEZE, FREEZE_HASH,
+            ReferenceIndependentValidationFixtures.REVISION,
+            selectedByArtifact,
+            (left, right) -> OracleValidation.unavailable("must not run"));
+
+        assertEquals(forged, verify(forged.toCanonicalJson()));
+        assertThrows(IllegalArgumentException.class, () ->
+            ReferenceIndependentCandidateValidationVerifier.verifyReplay(
+                PLAN, FREEZE, FREEZE_HASH,
+                ReferenceIndependentValidationFixtures.REVISION, expected,
+                forged.toCanonicalJson()));
+    }
+
+    @Test
+    void replayRejectsArtifactSelectedRepositoryRevision() {
+        var zeroCalls = new ReferenceIndependentCandidateValidation.Budget(
+            0, 8192, 5000);
+        var relabelled = ReferenceIndependentCandidateValidationRunner.run(
+            PLAN, FREEZE, FREEZE_HASH, "f".repeat(40), zeroCalls,
+            (left, right) -> OracleValidation.unavailable("must not run"));
+
+        assertEquals(relabelled, verify(relabelled.toCanonicalJson()));
+        assertThrows(IllegalArgumentException.class, () ->
+            ReferenceIndependentCandidateValidationVerifier.verifyReplay(
+                PLAN, FREEZE, FREEZE_HASH,
+                ReferenceIndependentValidationFixtures.REVISION, zeroCalls,
+                relabelled.toCanonicalJson(),
+                (left, right) -> OracleValidation.unavailable("must not run")));
+    }
+
+    @Test
+    void cliReplayUsesItsExplicitRevisionAndBudget(@TempDir Path temporary)
+            throws Exception {
+        var forged = ReferenceIndependentCandidateValidationRunner.run(
+            PLAN, FREEZE, FREEZE_HASH, "f".repeat(40),
+            new ReferenceIndependentCandidateValidation.Budget(0, 8192, 5000),
+            (left, right) -> OracleValidation.unavailable("must not run"));
+        Path plan = temporary.resolve("plan.json");
+        Path freeze = temporary.resolve("freeze.json");
+        Path validation = temporary.resolve("validation.json");
+        Files.writeString(plan, PLAN);
+        Files.writeString(freeze, FREEZE);
+        Files.writeString(validation, forged.toCanonicalJson());
+
+        IllegalArgumentException failure = assertThrows(
+            IllegalArgumentException.class, () ->
+            ReferenceIndependentCandidateValidationRunner.main(new String[] {
+                "verify", plan.toString(), freeze.toString(), FREEZE_HASH,
+                ReferenceIndependentValidationFixtures.REVISION,
+                "4316", "8192", "5000", validation.toString()
+            }));
+        assertTrue(failure.getMessage().contains(
+            "external replay revision or budget"));
+    }
+
     @Test
     void rejectsRehashedCandidateOmissionEvenWhenAllCountsBalance() throws Exception {
         ObjectNode artifact = artifact();
