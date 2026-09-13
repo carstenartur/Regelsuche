@@ -146,7 +146,7 @@ class PluginCheckpointCanonicalJsonTest {
             case "INNER_SPACE" -> canonical.replace("\":", "\": ");
             case "KEY_ORDER" -> "{" + schema + "," + canonical.substring(1).replace(schema + ",", "");
             case "ESCAPED_ASCII" -> canonical.replace("Case", "\\" + "u0043ase");
-            case "ESCAPED_SLASH" -> canonical.replace("regelsuche/", "regelsuche\\/");
+            case "ESCAPED_SLASH" -> canonical.replace("/", "\\/");
             case "EXTRA_NEWLINE" -> canonical + "\n";
             case "MISSING_NEWLINE" -> canonical.substring(0, canonical.length() - 1);
             case "DUPLICATE_ROOT" -> "{" + schema + "," + canonical.substring(1);
