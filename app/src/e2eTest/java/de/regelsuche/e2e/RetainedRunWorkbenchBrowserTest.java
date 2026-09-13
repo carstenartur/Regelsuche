@@ -29,6 +29,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** Real immutable HTTP repository and browser; no current global search data. */
 class RetainedRunWorkbenchBrowserTest {
@@ -72,8 +74,16 @@ class RetainedRunWorkbenchBrowserTest {
         }
     }
 
-    @Test void retainsImportsDeepLinksSelectionsAndOriginalBytes() throws Exception {
-        page.navigate(url("/static/index.html"));
+    @ParameterizedTest
+    @ValueSource(strings = {"/", "/static/index.html"})
+    void retainsImportsDeepLinksSelectionsAndOriginalBytes(String entryPoint) throws Exception {
+        List<String> consoleErrors = new ArrayList<>();
+        page.onConsoleMessage(message -> {
+            if (message.type().equals("error") && !message.text().contains("favicon.ico")) {
+                consoleErrors.add(message.text());
+            }
+        });
+        page.navigate(url(entryPoint));
         page.locator("[data-tab='runs']").click();
         page.locator("#importRetainedRun").setInputFiles(new FilePayload("run.json", "application/json", first.toCanonicalJson().getBytes(StandardCharsets.UTF_8)));
         ready(first);
@@ -91,6 +101,7 @@ class RetainedRunWorkbenchBrowserTest {
         page.locator("#leaveRetainedRun").click();
         assertFalse(page.locator("[data-tab='graph']").isDisabled());
         assertEquals(0, page.locator("body.retained-run").count());
+        assertTrue(consoleErrors.isEmpty(), consoleErrors.toString());
     }
 
     @Test void comparesExactLongSeedsAndRemainsUsableOnNarrowViewports() throws Exception {
