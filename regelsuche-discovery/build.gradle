@@ -287,3 +287,137 @@ rootProject.tasks.named('check') {
         generateTargetFreeRepresentationCandidateFreeze,
         generateTargetFreeRepresentationPostFreezeQualification
 }
+
+// Companion inputs are archived bytes. This lifecycle never generates a new
+// candidate freeze or invokes the historical qualification runner.
+def intrinsicFixtureDirectory = layout.projectDirectory.dir(
+    'src/test/resources/de/regelsuche/discovery/representation/reference-independent-v1')
+def intrinsicPlan = intrinsicFixtureDirectory.file('target-free-held-out-plan.json.gz')
+def intrinsicFreeze = intrinsicFixtureDirectory.file('target-free-held-out-candidate-freeze.json.gz')
+def intrinsicHistoricalQualification = intrinsicFixtureDirectory.file(
+    'target-free-held-out-post-freeze-qualification.json.gz')
+def intrinsicFreezeHash =
+    'sha256:b4a8fd1dbc70a7fc5f59df61e9c6871f1be65c47df5441b017be7804e187090a'
+// Select an explicit CI authority before evaluating the clean-checkout fallback.
+def intrinsicRevision = providers.provider {
+    def revision = providers.gradleProperty('regelsucheRepositoryRevision').orNull
+        ?: providers.environmentVariable('REGELSUCHE_AUTHORITY_GITHUB_SHA').orNull
+        ?: providers.environmentVariable('GITHUB_SHA').orNull
+    if (!revision) {
+        if (!checkoutGitStatus.get().isEmpty()) {
+            throw new GradleException('Cannot bind validation companion evidence to a dirty checkout.')
+        }
+        revision = checkoutHeadRevision.get()
+    }
+    revision = revision.trim()
+    if (!(revision ==~ /[0-9a-f]{40}/)) {
+        throw new GradleException('Validation companion revision must be a full lowercase Git commit SHA.')
+    }
+    revision
+}
+def intrinsicReport = layout.buildDirectory.file(intrinsicRevision.map {
+    "reports/reference-independent-candidate-validation/${it}/reference-independent-candidate-validation.json"
+})
+def intrinsicComparison = layout.buildDirectory.file(intrinsicRevision.map {
+    "reports/reference-independent-candidate-validation/${it}/historical-comparison.json"
+})
+def intrinsicSchema = repositoryRootDirectory.file(
+    'docs/schemas/regelsuche-reference-independent-candidate-validation-v1.schema.json')
+def intrinsicSchemaVerifier = repositoryRootDirectory.file(
+    'scripts/verify-reference-independent-validation-schema.py')
+def intrinsicSchemaTests = repositoryRootDirectory.file(
+    'scripts/test-reference-independent-validation-schema.py')
+def intrinsicRunnerClass =
+    'de.regelsuche.discovery.representation.ReferenceIndependentCandidateValidationRunner'
+
+def intrinsicControls = tasks.register('referenceIndependentCandidateValidationControls', Test) {
+    group = 'verification'
+    description = 'Checks frozen-set, evidence, budget, timeout and reference-boundary controls.'
+    dependsOn tasks.named('testClasses')
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching '*ReferenceIndependent*'
+        includeTestsMatching '*TargetFreeIntrinsicCandidateValidatorTest'
+    }
+}
+
+def generateIntrinsicCompanion = tasks.register('generateReferenceIndependentCandidateValidation', JavaExec) {
+    group = 'verification'
+    description = 'Validates every candidate in the already-public archived 144-row matrix.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = intrinsicRunnerClass
+    inputs.files(intrinsicPlan, intrinsicFreeze)
+    inputs.property('candidateFreezeHash', intrinsicFreezeHash)
+    inputs.property('implementationRevision', intrinsicRevision)
+    outputs.file(intrinsicReport)
+    timeout = java.time.Duration.ofMinutes(2)
+    argumentProviders.add({
+        ['run', intrinsicPlan.asFile.absolutePath, intrinsicFreeze.asFile.absolutePath,
+            intrinsicFreezeHash, intrinsicRevision.get(), '4316', '8192', '5000',
+            intrinsicReport.get().asFile.absolutePath]
+    } as CommandLineArgumentProvider)
+}
+
+def replayIntrinsicCompanion = tasks.register('replayReferenceIndependentCandidateValidation', JavaExec) {
+    group = 'verification'
+    description = 'Recomputes all admitted oracle results and exact candidate/work bindings.'
+    dependsOn generateIntrinsicCompanion
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = intrinsicRunnerClass
+    inputs.files(intrinsicPlan, intrinsicFreeze, intrinsicReport)
+    timeout = java.time.Duration.ofMinutes(2)
+    argumentProviders.add({
+        ['verify', intrinsicPlan.asFile.absolutePath, intrinsicFreeze.asFile.absolutePath,
+            intrinsicFreezeHash, intrinsicReport.get().asFile.absolutePath]
+    } as CommandLineArgumentProvider)
+}
+
+def compareIntrinsicHistory = tasks.register('compareReferenceIndependentValidationHistory', JavaExec) {
+    group = 'verification'
+    description = 'Joins historical reference labels only after independent validation is complete.'
+    dependsOn replayIntrinsicCompanion
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.discovery.representation.ReferenceIndependentValidationHistoricalComparison'
+    inputs.files(intrinsicReport, intrinsicHistoricalQualification)
+    outputs.file(intrinsicComparison)
+    argumentProviders.add({
+        [intrinsicReport.get().asFile.absolutePath, intrinsicHistoricalQualification.asFile.absolutePath,
+            intrinsicComparison.get().asFile.absolutePath]
+    } as CommandLineArgumentProvider)
+}
+
+def checkIntrinsicSchema = tasks.register('verifyReferenceIndependentValidationSchema', Exec) {
+    group = 'verification'
+    dependsOn rootProject.tasks.named('prepareVerificationEnvironment'), generateIntrinsicCompanion
+    workingDir repositoryRootDirectory
+    inputs.files(intrinsicSchema, intrinsicSchemaVerifier, intrinsicReport)
+    doFirst {
+        commandLine verificationPython.get().absolutePath, intrinsicSchemaVerifier.asFile.absolutePath,
+            '--schema', intrinsicSchema.asFile.absolutePath,
+            '--companion', intrinsicReport.get().asFile.absolutePath
+    }
+}
+
+def checkIntrinsicSchemaControls = tasks.register('testReferenceIndependentValidationSchema', Exec) {
+    group = 'verification'
+    dependsOn rootProject.tasks.named('prepareVerificationEnvironment'), intrinsicControls
+    workingDir repositoryRootDirectory
+    inputs.files(intrinsicSchema, intrinsicSchemaVerifier, intrinsicSchemaTests)
+    inputs.file(layout.buildDirectory.file(
+        'reports/reference-independent-candidate-validation/test/reference-independent-candidate-validation.json'))
+    environment 'PYTHONDONTWRITEBYTECODE', '1'
+    doFirst {
+        commandLine verificationPython.get().absolutePath, intrinsicSchemaTests.asFile.absolutePath
+    }
+}
+
+def verifyIntrinsicCompanion = tasks.register('verifyReferenceIndependentCandidateValidation') {
+    group = 'verification'
+    description = 'Verifies the complete archived-matrix companion, oracle replay, schema and controls.'
+    dependsOn compareIntrinsicHistory, checkIntrinsicSchema, checkIntrinsicSchemaControls
+}
+tasks.named('check') { dependsOn verifyIntrinsicCompanion }
+rootProject.tasks.named('check') { dependsOn verifyIntrinsicCompanion }
