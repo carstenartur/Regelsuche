@@ -302,3 +302,88 @@ jobs:
           user_name: github-actions[bot]
           user_email: github-actions[bot]@users.noreply.github.com
           commit_message: Publish generated reports (${{ github.sha }})
+
+  jmh-precision-study:
+    name: JMH precision study replica ${{ matrix.replicate }}
+    if: >-
+      github.event_name == 'pull_request' && github.event.action == 'opened' && github.run_attempt == 1 &&
+      github.head_ref == 'codex/issue-981-jmh-precision-study' && github.repository == 'carstenartur/Regelsuche' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-22.04
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        replicate: [1, 2, 3]
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REGELSUCHE_STUDY_REPLICATE: ${{ matrix.replicate }}
+    steps:
+      - name: Start the complete replica wall-clock budget
+        run: echo "REGELSUCHE_STUDY_JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        timeout-minutes: 5
+        with: { fetch-depth: 0, ref: '${{ github.sha }}' }
+      - uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c
+        timeout-minutes: 5
+        with: { distribution: temurin, java-version: '25' }
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+        timeout-minutes: 5
+        with: { cache-cleanup: on-success }
+      - name: Install the same isolated benchmark prerequisites
+        timeout-minutes: 5
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            patchelf=0.14.3-1 \
+            python3-venv
+      - name: Collect the preregistered protocols without retries
+        timeout-minutes: 60
+        run: >-
+          python3 -B scripts/run-jmh-precision-study-v1.py
+          --replicate "$REGELSUCHE_STUDY_REPLICATE"
+          --job-start-epoch "$REGELSUCHE_STUDY_JOB_START"
+          --output "build/reports/jmh-precision-study-v1/replicate-$REGELSUCHE_STUDY_REPLICATE"
+      - name: Retain every replica outcome and its original raw evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: jmh-precision-study-v1-replicate-${{ matrix.replicate }}
+          path: build/reports/jmh-precision-study-v1/replicate-${{ matrix.replicate }}
+          if-no-files-found: error
+
+  jmh-precision-study-report:
+    name: Retained JMH precision study analysis
+    needs: jmh-precision-study
+    if: >-
+      ${{ always() && !cancelled() && github.event_name == 'pull_request' && github.event.action == 'opened' &&
+      github.run_attempt == 1 && github.head_ref == 'codex/issue-981-jmh-precision-study' &&
+      github.repository == 'carstenartur/Regelsuche' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: { fetch-depth: 0, ref: '${{ github.sha }}' }
+      - name: Download every available replica, including failed collections
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: jmh-precision-study-v1-replicate-*
+          path: retained
+          merge-multiple: false
+      - name: Revalidate all three replicas or retain an incomplete-evidence report
+        if: ${{ always() && !cancelled() }}
+        run: >-
+          python3 -B scripts/report-jmh-precision-study-v1.py
+          --replicate retained/jmh-precision-study-v1-replicate-1
+          --replicate retained/jmh-precision-study-v1-replicate-2
+          --replicate retained/jmh-precision-study-v1-replicate-3
+          --output build/reports/jmh-precision-study-v1/analysis
+      - name: Retain canonical analysis including errors and null outcomes
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: jmh-precision-study-v1-analysis
+          path: build/reports/jmh-precision-study-v1/analysis
+          if-no-files-found: error
