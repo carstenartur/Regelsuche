@@ -65,6 +65,7 @@ public final class PluginDistributionClient {
      * successor trust revision (genesis for a new authority), never a replay.
      */
     public PluginInstallationEvidence install(Sources sources, ResolutionRequest request) throws IOException {
+        requireDirectActivationAuthority();
         return activate(prepareInstall(sources, request));
     }
 
@@ -115,6 +116,7 @@ public final class PluginDistributionClient {
 
     /** Removes the whole managed closure while retaining its history and current trust checkpoint. */
     public PluginInstallationEvidence remove() throws IOException {
+        requireDirectActivationAuthority();
         return activate(prepareRemove());
     }
 
@@ -136,6 +138,7 @@ public final class PluginDistributionClient {
      * and provenance are rechecked using CURRENT trust; trust is never rolled back.
      */
     public PluginInstallationEvidence rollback(String installationHash) throws IOException {
+        requireDirectActivationAuthority();
         return activate(prepareRollback(installationHash));
     }
 
@@ -276,8 +279,14 @@ public final class PluginDistributionClient {
         return new Prepared(previous, evidence);
     }
 
+    private void requireDirectActivationAuthority() {
+        if (authority == null) {
+            throw new IllegalStateException("operation-aware client requires transaction activation");
+        }
+    }
+
     private PluginInstallationEvidence activate(Prepared prepared) throws IOException {
-        if (authority == null) throw new IllegalStateException("operation-aware client requires transaction activation");
+        requireDirectActivationAuthority();
         var evidence = prepared.evidence();
         if (!authority.compareAndSet(prepared.expected(), new AcceptedState(evidence.contentHash(), evidence.checkpoint()))) {
             throw new SecurityException("installation authority rejected a stale or concurrent transition");
