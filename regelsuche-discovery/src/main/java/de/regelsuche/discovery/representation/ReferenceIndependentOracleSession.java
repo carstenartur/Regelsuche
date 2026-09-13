@@ -170,6 +170,9 @@ final class ReferenceIndependentOracleSession implements OracleValidator, AutoCl
         StringBuilder line = new StringBuilder();
         for (int next; (next = reader.read()) != -1;) {
             if (next == '\n') {
+                if (!line.isEmpty() && line.charAt(line.length() - 1) == '\r') {
+                    line.setLength(line.length() - 1);
+                }
                 return line.toString();
             }
             if (line.length() >= 65_536) {

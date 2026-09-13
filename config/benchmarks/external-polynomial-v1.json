@@ -1,0 +1,153 @@
+{
+  "baseRevision": "8afeda1a538c6726b0f6b8a6c8014dfcced0fbe2",
+  "cases": [
+    {
+      "id": "p01",
+      "source": "(a+b)*(a-b)+b*b+17"
+    },
+    {
+      "id": "p02",
+      "source": "7*((a+b)*(a-b)+b*b)+19"
+    },
+    {
+      "id": "p03",
+      "source": "((a+b)*(a-b)+b*b)*(a+5)*(a+7)"
+    },
+    {
+      "id": "p04",
+      "source": "(a*b+a*c)*(a+11)"
+    },
+    {
+      "id": "p05",
+      "source": "3*(a*b+a*c)+5*(a*b+a*c)+23"
+    },
+    {
+      "id": "p06",
+      "source": "(a+b)*(a-b)+b*(b+3)+29"
+    },
+    {
+      "id": "p07",
+      "source": "a^4+4*b^4"
+    },
+    {
+      "id": "p08",
+      "source": "a^6-1"
+    },
+    {
+      "id": "p09",
+      "source": "a^4+2*a^2*b^2+b^4"
+    },
+    {
+      "id": "p10",
+      "source": "a^3+3*a^2*b+3*a*b^2+b^3"
+    },
+    {
+      "id": "p11",
+      "source": "a*b+a*c+d*b+d*c"
+    },
+    {
+      "id": "p12",
+      "source": "a^2*b^2-a^2*c^2"
+    },
+    {
+      "id": "p13",
+      "source": "(a+b)^2-(a-b)^2"
+    },
+    {
+      "id": "p14",
+      "source": "(a+b)*(a+c)+(a+b)*(a-c)"
+    },
+    {
+      "id": "p15",
+      "source": "a*a*a+a*a*b+a*b*b+b*b*b"
+    },
+    {
+      "id": "p16",
+      "source": "((a+b)*(a-b)+b*b)+((c+2)*(c-2)+4)+31"
+    },
+    {
+      "id": "p17",
+      "source": "(3*a*b+3*a*c)/7"
+    },
+    {
+      "id": "p18",
+      "source": "a^2/3+2*a*b/3+b^2/3"
+    },
+    {
+      "id": "p19",
+      "source": "((a+b)*(a-b)+b*b)^2+37"
+    },
+    {
+      "id": "p20",
+      "source": "(a+2)*(a+3)*(a+5)"
+    },
+    {
+      "id": "p21",
+      "source": "a^3+41"
+    },
+    {
+      "id": "p22",
+      "source": "47"
+    },
+    {
+      "id": "p23",
+      "source": "0*(a+b)+53"
+    },
+    {
+      "id": "p24",
+      "source": "(a+0)*1+59"
+    },
+    {
+      "id": "u01",
+      "source": "ln(a)"
+    },
+    {
+      "id": "u02",
+      "source": "a/(a-1)"
+    },
+    {
+      "id": "u03",
+      "source": "a^(-1)"
+    }
+  ],
+  "complexityDebt": 24,
+  "information": "SOURCE_ONLY_NO_TARGET_REFERENCE_OR_FAMILY_LABELS",
+  "limits": {
+    "astNodes": 256,
+    "coefficientBits": 2048,
+    "inputCharacters": 2048,
+    "maxExponent": 12,
+    "maxTerms": 4096,
+    "variables": 4
+  },
+  "maxStates": 256,
+  "objective": "BINARY_ARITHMETIC_OPERATOR_COUNT/v1",
+  "portfolio": [
+    "identity",
+    "simplify",
+    "factor",
+    "cancel",
+    "horner"
+  ],
+  "primitiveDepth": 9,
+  "profiles": [
+    "BASE",
+    "LEARNED_NAIVE",
+    "LEARNED_RANKED",
+    "EXPERT",
+    "SYMPY_SIMPLIFY",
+    "SYMPY_FACTOR",
+    "SYMPY_CANCEL",
+    "SYMPY_PORTFOLIO"
+  ],
+  "queryTimeoutSeconds": 2,
+  "repetitions": 3,
+  "schema": "regelsuche.external-polynomial-comparison/v1",
+  "scope": "PUBLIC_PREREGISTERED_POLYNOMIAL_PILOT_NOT_SEALED_FINAL_TEST",
+  "searchDepth": 9,
+  "setupTimeoutSeconds": 180,
+  "strictImprovementThreshold": 0.2,
+  "sympyVersion": "1.14.0",
+  "warmupSource": "(x+0)*1",
+  "workBudget": 16384
+}

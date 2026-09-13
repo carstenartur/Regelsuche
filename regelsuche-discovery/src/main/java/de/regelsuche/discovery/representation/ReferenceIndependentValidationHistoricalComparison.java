@@ -1,5 +1,7 @@
 package de.regelsuche.discovery.representation;
 
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireSha256;
+
 import de.regelsuche.discovery.representation.ReferenceIndependentCandidateValidation.Artifact;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -14,8 +16,15 @@ public final class ReferenceIndependentValidationHistoricalComparison {
     private ReferenceIndependentValidationHistoricalComparison() {
     }
 
-    public static Comparison compare(Artifact validation, String historicalJson) {
+    /** The caller supplies historical authority independently of the untrusted artifact bytes. */
+    public static Comparison compare(Artifact validation, String historicalJson,
+                                     String expectedHistoricalQualificationHash) {
+        String expectedHash = requireSha256(
+            expectedHistoricalQualificationHash, "expectedHistoricalQualificationHash");
         var historical = QualificationArtifact.fromCanonicalJson(historicalJson);
+        if (!historical.contentHash().equals(expectedHash)) {
+            throw new IllegalArgumentException("historical comparison content hash differs from expected authority");
+        }
         if (!historical.content().candidateFreezeHash().equals(validation.content().candidateFreezeHash())) {
             throw new IllegalArgumentException("historical comparison refers to another candidate freeze");
         }
@@ -78,14 +87,15 @@ public final class ReferenceIndependentValidationHistoricalComparison {
     }
 
     public static void main(String[] args) throws IOException {
-        if (args.length != 3) {
-            throw new IllegalArgumentException("usage: <validation.json> <historical-qualification.json[.gz]> <output.json>");
+        if (args.length != 4) {
+            throw new IllegalArgumentException("usage: <validation.json> <historical-qualification.json[.gz]> "
+                + "<expected-historical-qualification-hash> <output.json>");
         }
         var validation = Artifact.fromCanonicalJson(
             ReferenceIndependentCandidateValidationRunner.readArtifact(Path.of(args[0])));
         var comparison = compare(validation,
-            ReferenceIndependentCandidateValidationRunner.readArtifact(Path.of(args[1])));
-        ReferenceIndependentCandidateValidationRunner.writeNewOrIdentical(Path.of(args[2]),
+            ReferenceIndependentCandidateValidationRunner.readArtifact(Path.of(args[1])), args[2]);
+        ReferenceIndependentCandidateValidationRunner.writeNewOrIdentical(Path.of(args[3]),
             TargetFreeHeldOutMatrixRunner.canonical(comparison));
     }
 

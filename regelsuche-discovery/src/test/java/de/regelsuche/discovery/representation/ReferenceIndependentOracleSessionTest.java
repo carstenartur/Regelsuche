@@ -1,11 +1,13 @@
 package de.regelsuche.discovery.representation;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.validation.OracleValidator.OracleValidationStatus;
+import de.regelsuche.validation.SymPyOracleValidator;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -15,6 +17,17 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 class ReferenceIndependentOracleSessionTest {
+    @Test
+    void acceptsCrlfReadinessAndConsecutiveResponsesFromARealWorker() {
+        try (var oracle = worker("crlf", 5000)) {
+            assertEquals(OracleValidationStatus.AGREE,
+                assertDoesNotThrow(() -> oracle.validateEquivalence("x + x", "2 * x")).status());
+            assertEquals(OracleValidationStatus.DISAGREE,
+                assertDoesNotThrow(() -> oracle.validateEquivalence("x", "x + 1")).status());
+            assertTrue(oracle.process().isAlive());
+        }
+    }
+
     @Test
     void realWorkerRetainsAgreementDisagreementAndUnsupportedEvidence() {
         Process handle;
@@ -85,10 +98,18 @@ class ReferenceIndependentOracleSessionTest {
             assertEquals(1, summary.terminalReasons().get("TIMEOUT"));
             assertEquals(1, summary.terminalReasons().get("UNSUPPORTED"));
             assertEquals(4314, summary.terminalReasons().get("ORACLE_BUDGET_EXHAUSTED"));
+            String retained = artifact.toCanonicalJson();
             ReferenceIndependentCandidateValidationVerifier.verifyBindings(
                 ReferenceIndependentValidationFixtures.PLAN,
                 ReferenceIndependentValidationFixtures.FREEZE,
-                ReferenceIndependentValidationFixtures.FREEZE_HASH, artifact.toCanonicalJson());
+                ReferenceIndependentValidationFixtures.FREEZE_HASH, retained);
+            assertThrows(IllegalArgumentException.class, () ->
+                ReferenceIndependentCandidateValidationVerifier.verifyReplay(
+                    ReferenceIndependentValidationFixtures.PLAN,
+                    ReferenceIndependentValidationFixtures.FREEZE,
+                    ReferenceIndependentValidationFixtures.FREEZE_HASH, retained,
+                    new SymPyOracleValidator()));
+            assertEquals(retained, artifact.toCanonicalJson());
             assertFalse(oracle.process().isAlive());
         }
     }
@@ -120,11 +141,28 @@ class ReferenceIndependentOracleSessionTest {
     /** Real process faults; no production fault switches or timing sleeps. */
     public static final class ControlledWorker {
         public static void main(String[] args) throws Exception {
-            System.out.println("REFERENCE_INDEPENDENT_ORACLE_READY_V1");
+            System.out.print("REFERENCE_INDEPENDENT_ORACLE_READY_V1"
+                + (args[0].equals("crlf") ? "\r\n" : "\n"));
+            System.out.flush();
             if (args[0].equals("exit")) {
                 return;
             }
-            new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8)).readLine();
+            var input = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
+            if (args[0].equals("crlf")) {
+                var oracle = new SymPyOracleValidator();
+                for (String line; (line = input.readLine()) != null;) {
+                    var request = ReferenceIndependentCandidateValidation.JSON.readValue(
+                        line, ReferenceIndependentOracleSession.Request.class);
+                    var result = oracle.validateEquivalence(request.source(), request.candidate());
+                    var response = new ReferenceIndependentOracleSession.Response(
+                        request.requestHash(), result.status(), result.evidence());
+                    System.out.print(ReferenceIndependentCandidateValidation.JSON.writeValueAsString(response)
+                        + "\r\n");
+                    System.out.flush();
+                }
+                return;
+            }
+            input.readLine();
             if (args[0].equals("hang")) {
                 new CountDownLatch(1).await();
             } else {

@@ -298,6 +298,8 @@ def intrinsicHistoricalQualification = intrinsicFixtureDirectory.file(
     'target-free-held-out-post-freeze-qualification.json.gz')
 def intrinsicFreezeHash =
     'sha256:b4a8fd1dbc70a7fc5f59df61e9c6871f1be65c47df5441b017be7804e187090a'
+def intrinsicHistoricalQualificationHash =
+    'sha256:7317ba66e37e532ec945364efd4f1ee61b89cab7b39ffff32d6751a69bc274c7'
 // Select an explicit CI authority before evaluating the clean-checkout fallback.
 def intrinsicRevision = providers.provider {
     def revision = providers.gradleProperty('regelsucheRepositoryRevision').orNull
@@ -382,10 +384,11 @@ def compareIntrinsicHistory = tasks.register('compareReferenceIndependentValidat
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'de.regelsuche.discovery.representation.ReferenceIndependentValidationHistoricalComparison'
     inputs.files(intrinsicReport, intrinsicHistoricalQualification)
+    inputs.property('historicalQualificationHash', intrinsicHistoricalQualificationHash)
     outputs.file(intrinsicComparison)
     argumentProviders.add({
         [intrinsicReport.get().asFile.absolutePath, intrinsicHistoricalQualification.asFile.absolutePath,
-            intrinsicComparison.get().asFile.absolutePath]
+            intrinsicHistoricalQualificationHash, intrinsicComparison.get().asFile.absolutePath]
     } as CommandLineArgumentProvider)
 }
 

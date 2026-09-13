@@ -67,9 +67,13 @@ The legacy service's explicit `no equivalence evidence found` response is
 retained as `UNAVAILABLE`, rather than turned into a refutation.
 
 `ReferenceIndependentValidationHistoricalComparison` is a separate, subsequent
-join. Its output alone depends on historical labels. Tests change every
-`referenceMatched` label and demonstrate that scheduling and the validation
-content hash remain identical.
+join. Its public API and CLI require an externally supplied expected historical
+qualification content hash, in addition to checking the candidate freeze and
+row bindings. The Gradle task pins the archived hash listed above. Relabeling
+and rehashing the historical artifact cannot pass under that original pin.
+Its output alone depends on historical labels. Tests explicitly authorize a
+different comparison hash after changing every `referenceMatched` label and
+demonstrate that scheduling and the validation content hash remain identical.
 
 ## Work and terminal outcomes
 
@@ -88,7 +92,8 @@ stays terminated; later admitted invocations explicitly return unavailable.
 There is no hidden restart, retry or free failed invocation.
 
 A fixed local JVM worker contains the existing oracle. Its heap and protocol
-lines are bounded. Deadline expiry forcibly terminates that owned process;
+lines are bounded and accept LF or CRLF terminators. Deadline expiry forcibly
+terminates that owned process;
 cleanup cannot replace the original validation error. Real-process controls
 cover hangs, exits and responses bound to the wrong request, without sleeps.
 
@@ -99,6 +104,12 @@ input bindings, classifications and work admission in canonical order.
 `verifyReplay` additionally re-executes every admitted oracle invocation in a
 new worker: a self-consistent rehashed oracle claim is insufficient. This is
 reproduction of the declared oracle, not a second independent mathematical method.
+
+Legitimate timeouts or technical failures may differ in a fresh replay. The
+original artifact and its charged work remain valid retained evidence under
+`verifyBindings`; a differing replay leaves reproduction unconfirmed and fails
+the reproduction gate. It neither overwrites the original artifact nor triggers
+an automatic retry or replaces retained failure evidence with a positive claim.
 
 ## Running and verifying
 
@@ -136,9 +147,13 @@ ReferenceIndependentCandidateValidationRunner run
 
 ReferenceIndependentCandidateValidationRunner verify
   <plan.json[.gz]> <freeze.json[.gz]> <expected-freeze-hash> <validation.json>
+
+ReferenceIndependentValidationHistoricalComparison
+  <validation.json> <historical-qualification.json[.gz]>
+  <expected-historical-qualification-hash> <output.json>
 ```
 
-Both commands use the discovery module runtime classpath. `verify` performs
+These commands use the discovery module runtime classpath. `verify` performs
 binding verification and full oracle re-execution. The separate schema checker
 uses the repository's existing pinned verification Python environment. It owns
 only the exchange schema and content-root check; Java owns candidate and work

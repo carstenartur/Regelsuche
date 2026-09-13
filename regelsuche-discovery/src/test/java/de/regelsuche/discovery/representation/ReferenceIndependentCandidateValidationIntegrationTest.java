@@ -2,6 +2,7 @@ package de.regelsuche.discovery.representation;
 
 import static de.regelsuche.discovery.representation.ReferenceIndependentValidationFixtures.FREEZE;
 import static de.regelsuche.discovery.representation.ReferenceIndependentValidationFixtures.FREEZE_HASH;
+import static de.regelsuche.discovery.representation.ReferenceIndependentValidationFixtures.HISTORICAL_QUALIFICATION_HASH;
 import static de.regelsuche.discovery.representation.ReferenceIndependentValidationFixtures.PLAN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -43,7 +44,8 @@ class ReferenceIndependentCandidateValidationIntegrationTest {
         assertEquals(4316, artifact.content().summary().oracleCalls());
         assertEquals(144, artifact.content().summary().rows());
         var comparison = ReferenceIndependentValidationHistoricalComparison.compare(
-            artifact, ReferenceIndependentValidationFixtures.read("post-freeze-qualification"));
+            artifact, ReferenceIndependentValidationFixtures.read("post-freeze-qualification"),
+            HISTORICAL_QUALIFICATION_HASH);
         assertTrue(comparison.nonReferenceOracleAgreements() > 0);
         assertEquals(4316, comparison.candidates());
         assertEquals(144, comparison.rows().size());
@@ -60,7 +62,8 @@ class ReferenceIndependentCandidateValidationIntegrationTest {
         var validation = ReferenceIndependentCandidateValidationTest.Evidence.ARTIFACT;
         String unchanged = validation.toCanonicalJson();
         String historical = ReferenceIndependentValidationFixtures.read("post-freeze-qualification");
-        var comparison = ReferenceIndependentValidationHistoricalComparison.compare(validation, historical);
+        var comparison = ReferenceIndependentValidationHistoricalComparison.compare(
+            validation, historical, HISTORICAL_QUALIFICATION_HASH);
         assertTrue(comparison.nonReferenceOracleAgreements() > 0);
         ObjectNode relabelled = (ObjectNode) ReferenceIndependentCandidateValidation.JSON.readTree(historical);
         for (var row : relabelled.path("content").path("rows")) {
@@ -70,7 +73,7 @@ class ReferenceIndependentCandidateValidationIntegrationTest {
         }
         relabelled.put("contentHash", ReferenceIndependentCandidateValidation.hash(relabelled.get("content")));
         var changed = ReferenceIndependentValidationHistoricalComparison.compare(validation,
-            TargetFreeHeldOutMatrixRunner.canonical(relabelled));
+            TargetFreeHeldOutMatrixRunner.canonical(relabelled), relabelled.path("contentHash").asText());
         assertEquals(0, changed.nonReferenceOracleAgreements());
         assertEquals(unchanged, validation.toCanonicalJson());
         assertEquals(validation, ReferenceIndependentCandidateValidationRunner.run(
