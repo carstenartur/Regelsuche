@@ -108,6 +108,18 @@ final class NativeFactorizationContractChecks {
         rejects(IllegalArgumentException.class, () -> new FactorizationEngine.Proposal<>(ExactRational.ZERO, List.of(), one, HASH));
         rejects(IllegalArgumentException.class, () -> new FactorizationEngine.Proposal<>(ExactRational.ONE, List.of(), nonconstant, HASH));
         rejects(IllegalArgumentException.class, () -> new FactorizationEngine.Proposal<>(ExactRational.ONE, List.of(), one, "bad"));
+        for (int prime : new int[] {2, 101}) {
+            var fieldRing = new PolynomialRing<BigInteger>(PrimeField.of(prime),
+                List.of(new PolynomialVariable("x")), PolynomialRing.MonomialOrder.LEXICOGRAPHIC);
+            var fieldOne = SparsePolynomial.one(fieldRing);
+            rejects(IllegalArgumentException.class, () -> new FactorizationEngine.Proposal<>(
+                BigInteger.ONE, List.of(), fieldOne, HASH));
+            var linear = UnivariatePolynomialView.of(fieldRing,
+                List.of(BigInteger.ONE, BigInteger.ONE)).toSparsePolynomial();
+            var ordinary = new FactorizationEngine.Proposal<>(BigInteger.ONE,
+                List.of(new PolynomialFactor<>(linear, 1)), fieldOne, HASH);
+            require(ordinary.factors().size() == 1, "nonempty finite-field proposals remain supported");
+        }
         var proposal = new FactorizationEngine.Proposal<>(ExactRational.integer(BigInteger.valueOf(7)), List.of(), one, HASH);
         FactorizationEngine<ExactRational> forged = new FactorizationEngine<>() {
             public String engineId() { return "test.unit-proposal/v1"; }
