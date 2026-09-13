@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExtensionRuntimeConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-extension-runtime</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.extension.runtime</a> &gt; <span class="el_source">ExtensionRuntimeConfig.java</span></div><h1>ExtensionRuntimeConfig.java</h1><pre class="source lang-java linenums">package de.regelsuche.extension.runtime;
+
+import de.regelsuche.api.StableApi;
+import de.regelsuche.extension.ExtensionApi;
+import de.regelsuche.extension.RegelsuchePlugin;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/** Immutable configuration for one extension-runtime snapshot build. */
+@StableApi(since = &quot;2&quot;)
+public record ExtensionRuntimeConfig(
+    String coreCompatibilityVersion,
+    boolean loadClasspathPlugins,
+    List&lt;RegelsuchePlugin&gt; explicitPlugins,
+    List&lt;Path&gt; externalPluginJars,
+    PluginArtifactAdmission artifactAdmission,
+    ClassLoader parentClassLoader,
+    Set&lt;Class&lt;?&gt;&gt; sharedHostTypes
+) {
+<span class="fc" id="L22">    public ExtensionRuntimeConfig {</span>
+<span class="pc bpc" id="L23" title="2 of 4 branches missed.">        if (coreCompatibilityVersion == null || coreCompatibilityVersion.isBlank()) {</span>
+<span class="nc" id="L24">            throw new IllegalArgumentException(&quot;coreCompatibilityVersion must not be blank&quot;);</span>
+        }
+        // Preserve supplied numeric text for fail-closed compatibility parsing.
+<span class="fc" id="L27">        sharedHostTypes = Set.copyOf(Objects.requireNonNull(sharedHostTypes, &quot;sharedHostTypes&quot;));</span>
+<span class="fc" id="L28">        explicitPlugins = List.copyOf(Objects.requireNonNull(explicitPlugins, &quot;explicitPlugins&quot;));</span>
+<span class="fc" id="L29">        externalPluginJars = List.copyOf(</span>
+<span class="fc" id="L30">            Objects.requireNonNull(externalPluginJars, &quot;externalPluginJars&quot;));</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        for (Path path : externalPluginJars) {</span>
+<span class="fc" id="L32">            Objects.requireNonNull(path, &quot;externalPluginJar&quot;);</span>
+<span class="fc" id="L33">        }</span>
+<span class="fc" id="L34">        Objects.requireNonNull(artifactAdmission, &quot;artifactAdmission&quot;);</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        parentClassLoader = parentClassLoader == null</span>
+<span class="fc" id="L36">            ? ExtensionRuntimeConfig.class.getClassLoader()</span>
+<span class="fc" id="L37">            : parentClassLoader;</span>
+<span class="fc" id="L38">    }</span>
+
+    /**
+     * Configuration sharing only platform types and the public extension API with external JARs.
+     * Other host contracts must be explicitly listed in the canonical constructor's
+     * {@code sharedHostTypes}; exporting a type does not export its package or dependencies.
+     */
+    public ExtensionRuntimeConfig(
+        String coreCompatibilityVersion,
+        boolean loadClasspathPlugins,
+        List&lt;RegelsuchePlugin&gt; explicitPlugins,
+        List&lt;Path&gt; externalPluginJars,
+        PluginArtifactAdmission artifactAdmission,
+        ClassLoader parentClassLoader
+    ) {
+<span class="fc" id="L53">        this(coreCompatibilityVersion, loadClasspathPlugins, explicitPlugins, externalPluginJars,</span>
+<span class="fc" id="L54">            artifactAdmission, parentClassLoader, Set.of());</span>
+<span class="fc" id="L55">    }</span>
+
+    /** Configuration containing only explicitly supplied trusted in-process plugins. */
+    public static ExtensionRuntimeConfig explicit(List&lt;RegelsuchePlugin&gt; plugins) {
+<span class="fc" id="L59">        return new ExtensionRuntimeConfig(</span>
+            ExtensionApi.CORE_COMPATIBILITY_VERSION,
+            false,
+            plugins,
+<span class="fc" id="L63">            List.of(),</span>
+            source -&gt; {
+<span class="nc" id="L65">                throw new IllegalStateException(&quot;external artifact admission is not configured&quot;);</span>
+            },
+<span class="fc" id="L67">            ExtensionRuntimeConfig.class.getClassLoader());</span>
+    }
+
+    /** Configuration that discovers generic plugins visible to the supplied class loader. */
+    public static ExtensionRuntimeConfig classpath(ClassLoader classLoader) {
+<span class="nc" id="L72">        return new ExtensionRuntimeConfig(</span>
+            ExtensionApi.CORE_COMPATIBILITY_VERSION,
+            true,
+<span class="nc" id="L75">            List.of(),</span>
+<span class="nc" id="L76">            List.of(),</span>
+            source -&gt; {
+<span class="nc" id="L78">                throw new IllegalStateException(&quot;external artifact admission is not configured&quot;);</span>
+            },
+            classLoader);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

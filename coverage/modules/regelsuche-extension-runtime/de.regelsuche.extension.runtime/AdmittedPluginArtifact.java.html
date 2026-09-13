@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AdmittedPluginArtifact.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-extension-runtime</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.extension.runtime</a> &gt; <span class="el_source">AdmittedPluginArtifact.java</span></div><h1>AdmittedPluginArtifact.java</h1><pre class="source lang-java linenums">package de.regelsuche.extension.runtime;
+
+import de.regelsuche.api.StableApi;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.Objects;
+
+/** Immutable snapshot of exact plugin bytes admitted by a host policy. */
+@StableApi(since = &quot;2&quot;)
+public final class AdmittedPluginArtifact {
+    private final byte[] admittedBytes;
+    private final String artifactSha256;
+    private final String trustEvidenceSha256;
+    private final String sourceReference;
+
+    private AdmittedPluginArtifact(
+        byte[] admittedBytes,
+        String artifactSha256,
+        String trustEvidenceSha256,
+        String sourceReference
+<span class="fc" id="L22">    ) {</span>
+<span class="fc" id="L23">        this.admittedBytes = admittedBytes.clone();</span>
+<span class="fc" id="L24">        this.artifactSha256 = requireHash(artifactSha256, &quot;artifactSha256&quot;, false);</span>
+<span class="fc" id="L25">        this.trustEvidenceSha256 = requireHash(</span>
+            trustEvidenceSha256, &quot;trustEvidenceSha256&quot;, true);
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        this.sourceReference = sourceReference == null ? &quot;&quot; : sourceReference.trim();</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        if (!sha256(this.admittedBytes).equals(this.artifactSha256)) {</span>
+<span class="nc" id="L29">            throw new IllegalArgumentException(</span>
+                &quot;artifactSha256 does not match the admitted byte snapshot&quot;);
+        }
+<span class="fc" id="L32">    }</span>
+
+    /** Creates an immutable admission result and verifies its artifact hash. */
+    public static AdmittedPluginArtifact of(
+        byte[] admittedBytes,
+        String artifactSha256,
+        String trustEvidenceSha256,
+        String sourceReference
+    ) {
+<span class="fc" id="L41">        return new AdmittedPluginArtifact(</span>
+<span class="fc" id="L42">            Objects.requireNonNull(admittedBytes, &quot;admittedBytes&quot;),</span>
+            artifactSha256,
+            trustEvidenceSha256,
+            sourceReference);
+    }
+
+    /** Returns a defensive copy of the exact admitted bytes. */
+    public byte[] admittedBytes() {
+<span class="fc" id="L50">        return admittedBytes.clone();</span>
+    }
+
+    /** SHA-256 identity of the exact admitted byte snapshot. */
+    public String artifactSha256() {
+<span class="fc" id="L55">        return artifactSha256;</span>
+    }
+
+    /** Host trust-evidence hash, empty for development admissions without such evidence. */
+    public String trustEvidenceSha256() {
+<span class="fc" id="L60">        return trustEvidenceSha256;</span>
+    }
+
+    /** Human-auditable source reference retained in extension origin metadata. */
+    public String sourceReference() {
+<span class="fc" id="L65">        return sourceReference;</span>
+    }
+
+    static String sha256(byte[] bytes) {
+        try {
+<span class="fc" id="L70">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L71">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes));</span>
+<span class="nc" id="L72">        } catch (NoSuchAlgorithmException impossible) {</span>
+<span class="nc" id="L73">            throw new IllegalStateException(&quot;SHA-256 is not available&quot;, impossible);</span>
+        }
+    }
+
+    private static String requireHash(String value, String name, boolean optional) {
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        String normalized = value == null ? &quot;&quot; : value.trim();</span>
+<span class="pc bpc" id="L79" title="1 of 4 branches missed.">        if (optional &amp;&amp; normalized.isEmpty()) {</span>
+<span class="fc" id="L80">            return &quot;&quot;;</span>
+        }
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (!normalized.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L83">            throw new IllegalArgumentException(name + &quot; must be sha256:&lt;64 lowercase hex&gt;&quot;);</span>
+        }
+<span class="fc" id="L85">        return normalized;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

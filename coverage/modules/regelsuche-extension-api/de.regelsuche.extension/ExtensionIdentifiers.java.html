@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExtensionIdentifiers.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-extension-api</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.extension</a> &gt; <span class="el_source">ExtensionIdentifiers.java</span></div><h1>ExtensionIdentifiers.java</h1><pre class="source lang-java linenums">package de.regelsuche.extension;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.TreeSet;
+import java.util.regex.Pattern;
+
+final class ExtensionIdentifiers {
+<span class="fc" id="L9">    private static final Pattern IDENTIFIER = Pattern.compile(</span>
+        &quot;[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}&quot;
+    );
+<span class="fc" id="L12">    private static final Pattern HASH = Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+
+    private ExtensionIdentifiers() {
+    }
+
+    static String identifier(String value, String name) {
+<span class="pc bpc" id="L18" title="1 of 4 branches missed.">        if (value == null || !IDENTIFIER.matcher(value).matches()) {</span>
+<span class="fc" id="L19">            throw new IllegalArgumentException(name + &quot; is not a valid identifier&quot;);</span>
+        }
+<span class="fc" id="L21">        return value;</span>
+    }
+
+    static String requiredText(String value, String name) {
+<span class="pc bpc" id="L25" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L26">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L28">        return unicodeText(value.trim(), name);</span>
+    }
+
+    static String optionalText(String value) {
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        return value == null ? &quot;&quot; : unicodeText(value.trim(), &quot;text&quot;);</span>
+    }
+
+    static List&lt;String&gt; normalizedStrings(Collection&lt;String&gt; values, String name) {
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L37">            return List.of();</span>
+        }
+<span class="fc" id="L39">        var normalized = new TreeSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        for (String value : values) {</span>
+<span class="pc bpc" id="L41" title="2 of 4 branches missed.">            if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L42">                throw new IllegalArgumentException(name + &quot; contains a blank value&quot;);</span>
+            }
+<span class="fc" id="L44">            normalized.add(unicodeText(value.trim(), name));</span>
+<span class="fc" id="L45">        }</span>
+<span class="fc" id="L46">        return List.copyOf(normalized);</span>
+    }
+
+    // Reject malformed UTF-16 before a later UTF-8 encoder can replace it with '?'.
+    // Otherwise distinct metadata strings can acquire the same catalog hash input.
+    private static String unicodeText(String value, String name) {
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        for (int index = 0; index &lt; value.length(); index++) {</span>
+<span class="fc" id="L53">            char ch = value.charAt(index);</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            if (Character.isHighSurrogate(ch)) {</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">                if (index + 1 &gt;= value.length()</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">                        || !Character.isLowSurrogate(value.charAt(index + 1))) {</span>
+<span class="fc" id="L57">                    throw new IllegalArgumentException(name + &quot; contains an unpaired surrogate&quot;);</span>
+                }
+<span class="fc" id="L59">                index++;</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            } else if (Character.isLowSurrogate(ch)) {</span>
+<span class="fc" id="L61">                throw new IllegalArgumentException(name + &quot; contains an unpaired surrogate&quot;);</span>
+            }
+        }
+<span class="fc" id="L64">        return value;</span>
+    }
+
+    static String hash(String value, String name, boolean optional) {
+<span class="fc" id="L68">        String normalized = optionalText(value);</span>
+<span class="pc bpc" id="L69" title="1 of 4 branches missed.">        if (optional &amp;&amp; normalized.isEmpty()) {</span>
+<span class="fc" id="L70">            return &quot;&quot;;</span>
+        }
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (!HASH.matcher(normalized).matches()) {</span>
+<span class="fc" id="L73">            throw new IllegalArgumentException(name + &quot; must be sha256:&lt;64 lowercase hex&gt;&quot;);</span>
+        }
+<span class="nc" id="L75">        return normalized;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

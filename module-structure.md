@@ -13,6 +13,8 @@ Verantwortung und darf keine abweichende zweite Dependency-Definition erzeugen.
 | Gradle-Projekt | Verantwortung | Typische direkte Grundlagen |
 | --- | --- | --- |
 | `:regelsuche-core` | AST, Parser, kanonische Identität, Annahmen und atomare Transformationen | keine Projektabhängigkeit |
+| `:regelsuche-extension-api` | suchunabhängige Extension Points, Plugin-Verträge, Kataloge und Herkunftsmetadaten | Core (API-Lifecycle-Annotationen) |
+| `:regelsuche-extension-runtime` | Headless-Lifecycle, transaktionale Katalogpublikation und Zulassung externer Artefakte | Extension API |
 | `:regelsuche-egraph` | E-Graph, Equality Saturation und E-Matching | Core |
 | `:regelsuche-search` | Suchprobleme, Strategien, Budgets, Scoring und Search Memory | Core, E-Graph |
 | `:regelsuche-validation` | Äquivalenz-, Validation- und Counterexample-Verträge | Core |
@@ -77,6 +79,20 @@ Mathematikadapter bleiben in eigenen Modulen. Insbesondere kapselt
 CPython-Kontrolltransport hinter dem im Core definierten
 `FactorizationEngine`-Vertrag. Details stehen unter
 [Eingebettete SymPy-Faktorisierung](sympy-factorization-adapter.md).
+
+## Generische Erweiterungsgrenze
+
+`:regelsuche-extension-api` hängt direkt nur von `:regelsuche-core` ab und
+verwendet dessen API-Lifecycle-Annotationen. Die Verträge benötigen weder Search
+noch Discovery, Web oder Persistenz. `:regelsuche-extension-runtime` baut direkt
+nur auf der Extension API auf; es besitzt den Headless-Lifecycle, die
+transaktionale Katalogpublikation und die Zulassungsgrenze für externe JARs.
+
+Die bestehenden Anwendungsplugins in `:regelsuche-plugin-api` und die Discovery-
+SPI sind dadurch noch nicht migriert. Die neuen Module dürfen diese oberen
+Schichten nicht als Rückabhängigkeit einführen. `ArchitectureBoundariesTest`
+prüft beide erlaubten direkten Kanten ausdrücklich. Öffentliche Verträge und
+Laufzeitgrenzen beschreibt [Generische Erweiterungen](generic-extensions.md).
 
 ## Solver- und Benchmark-Grenze
 

@@ -1,0 +1,563 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExtensionRuntime.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-extension-runtime</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.extension.runtime</a> &gt; <span class="el_source">ExtensionRuntime.java</span></div><h1>ExtensionRuntime.java</h1><pre class="source lang-java linenums">package de.regelsuche.extension.runtime;
+
+import de.regelsuche.api.StableApi;
+import de.regelsuche.extension.ExtensionApi;
+import de.regelsuche.extension.ExtensionCatalog;
+import de.regelsuche.extension.ExtensionCatalogs;
+import de.regelsuche.extension.ExtensionContext;
+import de.regelsuche.extension.ExtensionDescriptor;
+import de.regelsuche.extension.ExtensionOrigin;
+import de.regelsuche.extension.ExtensionPoint;
+import de.regelsuche.extension.PluginDependency;
+import de.regelsuche.extension.PluginDescriptor;
+import de.regelsuche.extension.RegelsuchePlugin;
+import de.regelsuche.extension.RegisteredExtension;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.security.CodeSource;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.ServiceConfigurationError;
+import java.util.ServiceLoader;
+import java.util.jar.Attributes;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+import java.util.stream.Stream;
+
+/**
+ * Headless, transactional runtime for generic Regelsuche extensions.
+ *
+ * &lt;p&gt;External artifacts are fully admitted as immutable byte snapshots and
+ * privately restaged before any external plugin classloader is created.&lt;/p&gt;
+ */
+@StableApi(since = &quot;2&quot;)
+public final class ExtensionRuntime implements AutoCloseable {
+<span class="fc" id="L48">    private static final String SERVICE_RESOURCE =</span>
+<span class="fc" id="L49">        &quot;META-INF/services/&quot; + RegelsuchePlugin.class.getName();</span>
+
+    private Snapshot active;
+<span class="fc" id="L52">    private final List&lt;ExternalResources&gt; retiredResources = new ArrayList&lt;&gt;();</span>
+    private boolean closed;
+    private boolean reloading;
+
+<span class="fc" id="L56">    private ExtensionRuntime(Snapshot active) {</span>
+<span class="fc" id="L57">        this.active = active;</span>
+<span class="fc" id="L58">    }</span>
+
+    /** Builds and validates the initial complete catalog snapshot. */
+    public static ExtensionRuntime open(ExtensionRuntimeConfig config) {
+<span class="fc" id="L62">        return new ExtensionRuntime(build(Objects.requireNonNull(config, &quot;config&quot;)));</span>
+    }
+
+    /**
+     * Returns the current immutable catalog snapshot.
+     *
+     * &lt;p&gt;Previously returned snapshots keep their external classes and resources
+     * available across successful reloads until this runtime is closed. Callers
+     * must finish using all implementations before closing the owning runtime.
+     * Metadata can be retained independently after close.&lt;/p&gt;
+     */
+    public synchronized ExtensionCatalog catalog() {
+<span class="fc" id="L74">        ensureOpen();</span>
+<span class="fc" id="L75">        return active.catalog();</span>
+    }
+
+    /**
+     * Builds a complete candidate snapshot and swaps atomically only on success.
+     *
+     * &lt;p&gt;A failed candidate leaves the previous catalog and resources active.
+     * Successful reloads retain published external generations until {@link #close()},
+     * because callers may still be executing an older snapshot. Rejected candidate
+     * resources are released immediately. Retention grows with successful external
+     * reloads; use a runtime scoped to the host's unit of work rather than an
+     * indefinitely reloaded runtime when that bound matters.&lt;/p&gt;
+     *
+     * &lt;p&gt;Plugin callbacks may read the previously published catalog, but cannot
+     * reenter {@code reload} or {@code close} on this runtime while a candidate
+     * is being built. Such mutation attempts throw {@link IllegalStateException}
+     * before changing the runtime's state.&lt;/p&gt;
+     */
+    public synchronized CatalogReloadResult reload(ExtensionRuntimeConfig config) {
+<span class="fc" id="L94">        ensureOpen();</span>
+<span class="fc" id="L95">        ensureNoReentrantLifecycleMutation();</span>
+<span class="fc" id="L96">        String previousHash = active.catalog().contentHash();</span>
+<span class="fc" id="L97">        reloading = true;</span>
+        try {
+<span class="fc" id="L99">            Snapshot candidate = build(Objects.requireNonNull(config, &quot;config&quot;));</span>
+<span class="fc" id="L100">            Snapshot previous = active;</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            if (previous.externalResources() != null) {</span>
+<span class="fc" id="L102">                retiredResources.add(previous.externalResources());</span>
+            }
+<span class="fc" id="L104">            active = candidate;</span>
+<span class="fc" id="L105">            return new CatalogReloadResult(</span>
+<span class="fc" id="L106">                true, previousHash, active.catalog().contentHash(), &quot;&quot;);</span>
+<span class="fc" id="L107">        } catch (RuntimeException failure) {</span>
+<span class="fc" id="L108">            return new CatalogReloadResult(</span>
+                false,
+                previousHash,
+<span class="fc" id="L111">                active.catalog().contentHash(),</span>
+<span class="fc" id="L112">                failure.getClass().getSimpleName() + &quot;: &quot; + String.valueOf(failure.getMessage()));</span>
+        } finally {
+<span class="fc" id="L114">            reloading = false;</span>
+        }
+    }
+
+    /** Releases the current and all retired published external generations. */
+    @Override
+    public synchronized void close() {
+<span class="fc" id="L121">        ensureNoReentrantLifecycleMutation();</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (!closed) {</span>
+<span class="fc" id="L123">            closed = true;</span>
+<span class="fc" id="L124">            active.close();</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            for (ExternalResources resources : retiredResources) {</span>
+<span class="fc" id="L126">                resources.close();</span>
+<span class="fc" id="L127">            }</span>
+<span class="fc" id="L128">            retiredResources.clear();</span>
+        }
+<span class="fc" id="L130">    }</span>
+
+    private void ensureNoReentrantLifecycleMutation() {
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        if (reloading) {</span>
+<span class="fc" id="L134">            throw new IllegalStateException(&quot;reentrant extension runtime lifecycle mutation&quot;);</span>
+        }
+<span class="fc" id="L136">    }</span>
+
+    private void ensureOpen() {
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (closed) {</span>
+<span class="nc" id="L140">            throw new IllegalStateException(&quot;extension runtime is closed&quot;);</span>
+        }
+<span class="fc" id="L142">    }</span>
+
+    private static Snapshot build(ExtensionRuntimeConfig config) {
+<span class="fc" id="L145">        ExternalResources external = null;</span>
+<span class="fc" id="L146">        boolean success = false;</span>
+        try {
+            // Validate the host declaration even for an empty catalog, before plugin loading.
+<span class="fc" id="L149">            CoreCompatibilityVersion.parse(config.coreCompatibilityVersion());</span>
+<span class="fc" id="L150">            List&lt;LoadedPlugin&gt; loaded = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">            for (RegelsuchePlugin plugin : config.explicitPlugins()) {</span>
+<span class="fc" id="L152">                loaded.add(classpathPlugin(plugin, &quot;explicit&quot;));</span>
+<span class="fc" id="L153">            }</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">            if (config.loadClasspathPlugins()) {</span>
+<span class="nc" id="L155">                loaded.addAll(loadClasspathPlugins(config.parentClassLoader()));</span>
+            }
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (!config.externalPluginJars().isEmpty()) {</span>
+<span class="fc" id="L158">                external = loadExternalPlugins(config);</span>
+<span class="fc" id="L159">                loaded.addAll(external.plugins());</span>
+            }
+
+<span class="fc" id="L162">            List&lt;LoadedPlugin&gt; normalized = validateDescriptors(</span>
+<span class="fc" id="L163">                loaded, config.coreCompatibilityVersion());</span>
+<span class="fc" id="L164">            List&lt;RegisteredExtension&lt;?&gt;&gt; contributions = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            for (LoadedPlugin loadedPlugin : normalized) {</span>
+<span class="fc" id="L166">                StagingContext context = new StagingContext(loadedPlugin.origin());</span>
+                try {
+<span class="fc" id="L168">                    loadedPlugin.plugin().contribute(context);</span>
+                } finally {
+<span class="fc" id="L170">                    context.freeze();</span>
+                }
+<span class="fc" id="L172">                contributions.addAll(context.snapshot());</span>
+<span class="fc" id="L173">            }</span>
+
+<span class="fc" id="L175">            Snapshot snapshot = new Snapshot(ExtensionCatalogs.of(contributions), external);</span>
+<span class="fc" id="L176">            success = true;</span>
+<span class="fc" id="L177">            return snapshot;</span>
+<span class="fc" id="L178">        } catch (ServiceConfigurationError failure) {</span>
+<span class="fc" id="L179">            throw new IllegalStateException(&quot;failed to discover extension plugins&quot;, failure);</span>
+<span class="fc" id="L180">        } catch (RuntimeException failure) {</span>
+<span class="fc" id="L181">            throw failure;</span>
+<span class="nc" id="L182">        } catch (Exception failure) {</span>
+<span class="nc" id="L183">            throw new IllegalStateException(&quot;failed to build extension catalog&quot;, failure);</span>
+        } finally {
+<span class="fc bfc" id="L185" title="All 4 branches covered.">            if (!success &amp;&amp; external != null) {</span>
+<span class="fc" id="L186">                external.close();</span>
+            }
+        }
+    }
+
+    private static List&lt;LoadedPlugin&gt; loadClasspathPlugins(ClassLoader classLoader) {
+<span class="nc" id="L192">        List&lt;LoadedPlugin&gt; plugins = new ArrayList&lt;&gt;();</span>
+        for (ServiceLoader.Provider&lt;RegelsuchePlugin&gt; provider
+<span class="nc bnc" id="L194" title="All 2 branches missed.">                : ServiceLoader.load(RegelsuchePlugin.class, classLoader).stream().toList()) {</span>
+<span class="nc" id="L195">            RegelsuchePlugin plugin = provider.get();</span>
+<span class="nc" id="L196">            plugins.add(classpathPlugin(plugin, sourceReference(plugin.getClass())));</span>
+<span class="nc" id="L197">        }</span>
+<span class="nc" id="L198">        return plugins;</span>
+    }
+
+    private static LoadedPlugin classpathPlugin(RegelsuchePlugin plugin, String reference) {
+<span class="fc" id="L202">        Objects.requireNonNull(plugin, &quot;plugin&quot;);</span>
+<span class="fc" id="L203">        PluginDescriptor descriptor = Objects.requireNonNull(</span>
+<span class="fc" id="L204">            plugin.descriptor(), &quot;plugin descriptor&quot;);</span>
+<span class="fc" id="L205">        return new LoadedPlugin(</span>
+            plugin,
+            descriptor,
+<span class="fc" id="L208">            ExtensionOrigin.classpathPlugin(descriptor.id(), descriptor.version(), reference));</span>
+    }
+
+    private static LoadedPlugin externalPlugin(
+        RegelsuchePlugin plugin,
+        ArtifactMetadata metadata
+    ) {
+<span class="fc" id="L215">        Objects.requireNonNull(plugin, &quot;plugin&quot;);</span>
+<span class="fc" id="L216">        PluginDescriptor descriptor = Objects.requireNonNull(</span>
+<span class="fc" id="L217">            plugin.descriptor(), &quot;plugin descriptor&quot;);</span>
+<span class="fc" id="L218">        return new LoadedPlugin(</span>
+            plugin,
+            descriptor,
+<span class="fc" id="L221">            ExtensionOrigin.externalPlugin(</span>
+<span class="fc" id="L222">                descriptor.id(),</span>
+<span class="fc" id="L223">                descriptor.version(),</span>
+<span class="fc" id="L224">                metadata.sourceReference(),</span>
+<span class="fc" id="L225">                metadata.artifactSha256(),</span>
+<span class="fc" id="L226">                metadata.trustEvidenceSha256()));</span>
+    }
+
+    private static List&lt;LoadedPlugin&gt; validateDescriptors(
+        List&lt;LoadedPlugin&gt; loaded,
+        String coreCompatibilityVersion
+    ) {
+<span class="fc" id="L233">        Map&lt;String, LoadedPlugin&gt; byId = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        for (LoadedPlugin plugin : loaded) {</span>
+<span class="fc" id="L235">            PluginDescriptor descriptor = plugin.descriptor();</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">            if (!ExtensionApi.VERSION.equals(descriptor.apiVersion())) {</span>
+<span class="fc" id="L237">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L238">                    &quot;incompatible extension API for &quot; + descriptor.id()</span>
+<span class="fc" id="L239">                        + &quot;: requires &quot; + descriptor.apiVersion()</span>
+                        + &quot; but runtime provides &quot; + ExtensionApi.VERSION);
+            }
+<span class="fc bfc" id="L242" title="All 2 branches covered.">            if (isNewerVersion(descriptor.minimumCoreVersion(), coreCompatibilityVersion)) {</span>
+<span class="fc" id="L243">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L244">                    &quot;plugin requires newer core: &quot; + descriptor.id()</span>
+<span class="fc" id="L245">                        + &quot; requires &quot; + descriptor.minimumCoreVersion()</span>
+                        + &quot; but runtime provides &quot; + coreCompatibilityVersion);
+            }
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            if (byId.putIfAbsent(descriptor.id(), plugin) != null) {</span>
+<span class="fc" id="L249">                throw new IllegalArgumentException(&quot;duplicate plugin id: &quot; + descriptor.id());</span>
+            }
+<span class="fc" id="L251">        }</span>
+
+<span class="fc bfc" id="L253" title="All 2 branches covered.">        for (LoadedPlugin plugin : loaded) {</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">            for (PluginDependency dependency : plugin.descriptor().dependencies()) {</span>
+<span class="fc" id="L255">                String constraint = dependency.versionConstraint();</span>
+<span class="fc bfc" id="L256" title="All 4 branches covered.">                if (!&quot;any&quot;.equals(constraint) &amp;&amp; !isExactVersionConstraint(constraint)) {</span>
+<span class="fc" id="L257">                    throw new IllegalArgumentException(</span>
+                        &quot;unsupported plugin dependency constraint: &quot; + constraint);
+                }
+<span class="fc" id="L260">                LoadedPlugin target = byId.get(dependency.pluginId());</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">                if (target == null) {</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">                    if (!dependency.optional()) {</span>
+<span class="fc" id="L263">                        throw new IllegalArgumentException(</span>
+                            &quot;missing required plugin dependency: &quot;
+<span class="fc" id="L265">                                + plugin.descriptor().id() + &quot; -&gt; &quot; + dependency.pluginId());</span>
+                    }
+                    continue;
+                }
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">                if (&quot;any&quot;.equals(constraint)) {</span>
+<span class="nc" id="L270">                    continue;</span>
+                }
+<span class="fc bfc" id="L272" title="All 2 branches covered.">                if (!target.descriptor().version().equals(constraint)) {</span>
+<span class="fc" id="L273">                    throw new IllegalArgumentException(</span>
+                        &quot;plugin dependency version mismatch: &quot;
+<span class="fc" id="L275">                            + plugin.descriptor().id() + &quot; -&gt; &quot; + dependency.pluginId()</span>
+                            + &quot; requires &quot; + constraint
+<span class="fc" id="L277">                            + &quot; but found &quot; + target.descriptor().version());</span>
+                }
+<span class="fc" id="L279">            }</span>
+<span class="fc" id="L280">        }</span>
+
+<span class="fc" id="L282">        return loaded.stream()</span>
+<span class="fc" id="L283">            .sorted(Comparator.comparing(plugin -&gt; plugin.descriptor().id()))</span>
+<span class="fc" id="L284">            .toList();</span>
+    }
+
+    private static boolean isExactVersionConstraint(String value) {
+<span class="fc" id="L288">        return value.matches(&quot;[A-Za-z0-9][A-Za-z0-9._+-]{0,127}&quot;);</span>
+    }
+
+    private static boolean isNewerVersion(String required, String available) {
+<span class="fc" id="L292">        return CoreCompatibilityVersion.parse(required)</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">            .compareTo(CoreCompatibilityVersion.parse(available)) &gt; 0;</span>
+    }
+
+    private static ExternalResources loadExternalPlugins(ExtensionRuntimeConfig config)
+            throws Exception {
+<span class="fc" id="L298">        List&lt;AdmittedPluginArtifact&gt; admitted = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        for (Path source : config.externalPluginJars()) {</span>
+<span class="fc" id="L300">            admitted.add(Objects.requireNonNull(</span>
+<span class="fc" id="L301">                config.artifactAdmission().admit(source), &quot;admitted artifact&quot;));</span>
+<span class="fc" id="L302">        }</span>
+
+<span class="fc" id="L304">        Path stagingDirectory = Files.createTempDirectory(&quot;regelsuche-extension-runtime-&quot;);</span>
+<span class="fc" id="L305">        URLClassLoader classLoader = null;</span>
+        try {
+<span class="fc" id="L307">            Map&lt;Path, ArtifactMetadata&gt; metadataByPath = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L308">            Map&lt;String, Path&gt; expectedProviders = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L309">            List&lt;URL&gt; urls = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L311" title="All 2 branches covered.">            for (int index = 0; index &lt; admitted.size(); index++) {</span>
+<span class="fc" id="L312">                AdmittedPluginArtifact artifact = admitted.get(index);</span>
+<span class="fc" id="L313">                Path staged = stagingDirectory.resolve(</span>
+<span class="fc" id="L314">                    String.format(Locale.ROOT, &quot;plugin-%03d.jar&quot;, index));</span>
+<span class="fc" id="L315">                Files.write(</span>
+                    staged,
+<span class="fc" id="L317">                    artifact.admittedBytes(),</span>
+                    StandardOpenOption.CREATE_NEW,
+                    StandardOpenOption.WRITE);
+<span class="fc" id="L320">                String stagedHash = AdmittedPluginArtifact.sha256(Files.readAllBytes(staged));</span>
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">                if (!stagedHash.equals(artifact.artifactSha256())) {</span>
+<span class="nc" id="L322">                    throw new SecurityException(&quot;privately staged plugin hash mismatch&quot;);</span>
+                }
+<span class="fc" id="L324">                Path canonicalPath = staged.toRealPath();</span>
+<span class="fc" id="L325">                metadataByPath.put(</span>
+                    canonicalPath,
+                    new ArtifactMetadata(
+<span class="fc" id="L328">                        artifact.artifactSha256(),</span>
+<span class="fc" id="L329">                        artifact.trustEvidenceSha256(),</span>
+<span class="fc" id="L330">                        artifact.sourceReference()));</span>
+<span class="fc" id="L331">                urls.add(canonicalPath.toUri().toURL());</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">                for (String providerName : serviceProviders(canonicalPath)) {</span>
+<span class="fc" id="L333">                    Path previous = expectedProviders.putIfAbsent(providerName, canonicalPath);</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">                    if (previous != null) {</span>
+<span class="fc" id="L335">                        throw new IllegalArgumentException(</span>
+                            &quot;duplicate external provider class: &quot; + providerName);
+                    }
+<span class="fc" id="L338">                }</span>
+            }
+
+<span class="fc" id="L341">            classLoader = new AdmittedPluginClassLoader(</span>
+<span class="fc" id="L342">                urls.toArray(URL[]::new), config.parentClassLoader(), config.sharedHostTypes());</span>
+<span class="fc" id="L343">            Map&lt;String, ServiceLoader.Provider&lt;RegelsuchePlugin&gt;&gt; discovered = new HashMap&lt;&gt;();</span>
+            for (ServiceLoader.Provider&lt;RegelsuchePlugin&gt; provider
+<span class="fc bfc" id="L345" title="All 2 branches covered.">                    : ServiceLoader.load(RegelsuchePlugin.class, classLoader).stream().toList()) {</span>
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">                if (expectedProviders.containsKey(provider.type().getName())) {</span>
+<span class="fc" id="L347">                    ServiceLoader.Provider&lt;RegelsuchePlugin&gt; previous = discovered.putIfAbsent(</span>
+<span class="fc" id="L348">                        provider.type().getName(), provider);</span>
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">                    if (previous != null) {</span>
+<span class="nc" id="L350">                        throw new IllegalArgumentException(</span>
+<span class="nc" id="L351">                            &quot;duplicate discovered external provider: &quot; + provider.type().getName());</span>
+                    }
+                }
+<span class="fc" id="L354">            }</span>
+
+<span class="fc" id="L356">            List&lt;LoadedPlugin&gt; plugins = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">            for (Map.Entry&lt;String, Path&gt; expected : expectedProviders.entrySet()) {</span>
+<span class="fc" id="L358">                ServiceLoader.Provider&lt;RegelsuchePlugin&gt; provider = discovered.get(expected.getKey());</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">                if (provider == null) {</span>
+<span class="nc" id="L360">                    throw new IllegalArgumentException(</span>
+<span class="nc" id="L361">                        &quot;external plugin provider not found: &quot; + expected.getKey());</span>
+                }
+                // Resolve provenance without initializing or constructing a shadowing provider.
+<span class="fc" id="L364">                Path codeSource = codeSource(provider.type());</span>
+                // A descriptor may name a provider in another admitted artifact.
+                // Bind contribution provenance to the actual defining artifact.
+<span class="fc" id="L367">                ArtifactMetadata metadata = metadataByPath.get(codeSource);</span>
+<span class="pc bpc" id="L368" title="1 of 2 branches missed.">                if (metadata == null) {</span>
+<span class="nc" id="L369">                    throw new SecurityException(</span>
+                        &quot;external plugin code source is not an admitted artifact: &quot;
+<span class="nc" id="L371">                            + expected.getKey());</span>
+                }
+<span class="fc" id="L373">                RegelsuchePlugin plugin = provider.get();</span>
+<span class="fc" id="L374">                plugins.add(externalPlugin(plugin, metadata));</span>
+<span class="fc" id="L375">            }</span>
+<span class="fc" id="L376">            return new ExternalResources(</span>
+<span class="fc" id="L377">                classLoader, stagingDirectory, List.copyOf(plugins));</span>
+<span class="fc" id="L378">        } catch (Exception | Error failure) {</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">            if (classLoader != null) {</span>
+                try {
+<span class="fc" id="L381">                    classLoader.close();</span>
+<span class="nc" id="L382">                } catch (IOException ignored) {</span>
+                    // Preserve the original failure.
+<span class="fc" id="L384">                }</span>
+            }
+<span class="fc" id="L386">            deleteTree(stagingDirectory);</span>
+<span class="fc" id="L387">            throw failure;</span>
+        }
+    }
+
+    private static List&lt;String&gt; serviceProviders(Path jar) throws IOException {
+<span class="fc" id="L392">        try (JarFile file = new JarFile(jar.toFile())) {</span>
+            // URLClassLoader follows manifest Class-Path transitively. Every dependency
+            // must instead appear explicitly in the admitted immutable artifact set.
+<span class="fc" id="L395">            var manifest = file.getManifest();</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">            String classPath = manifest == null ? null</span>
+<span class="fc" id="L397">                : manifest.getMainAttributes().getValue(Attributes.Name.CLASS_PATH);</span>
+<span class="pc bpc" id="L398" title="1 of 4 branches missed.">            if (classPath != null &amp;&amp; !classPath.isBlank()) {</span>
+<span class="fc" id="L399">                throw new SecurityException(</span>
+                    &quot;external JAR manifest Class-Path is not allowed; admit dependencies explicitly&quot;);
+            }
+<span class="fc" id="L402">            List&lt;JarEntry&gt; entries = file.stream()</span>
+<span class="fc" id="L403">                .filter(entry -&gt; SERVICE_RESOURCE.equals(entry.getName()))</span>
+<span class="fc" id="L404">                .limit(2)</span>
+<span class="fc" id="L405">                .toList();</span>
+<span class="fc bfc" id="L406" title="All 2 branches covered.">            if (entries.size() &gt; 1) {</span>
+<span class="fc" id="L407">                throw new IllegalArgumentException(</span>
+                    &quot;duplicate external service descriptor: &quot; + SERVICE_RESOURCE);
+            }
+<span class="fc bfc" id="L410" title="All 2 branches covered.">            if (entries.isEmpty()) {</span>
+<span class="fc" id="L411">                return List.of();</span>
+            }
+<span class="fc" id="L413">            JarEntry entry = entries.get(0);</span>
+<span class="fc" id="L414">            try (BufferedReader reader = new BufferedReader(new InputStreamReader(</span>
+<span class="fc" id="L415">                    file.getInputStream(entry), StandardCharsets.UTF_8))) {</span>
+<span class="fc" id="L416">                var names = new java.util.LinkedHashSet&lt;String&gt;();</span>
+                String line;
+<span class="fc bfc" id="L418" title="All 2 branches covered.">                while ((line = reader.readLine()) != null) {</span>
+<span class="fc" id="L419">                    String value = line.split(&quot;#&quot;, 2)[0].trim();</span>
+<span class="fc bfc" id="L420" title="All 4 branches covered.">                    if (!value.isEmpty() &amp;&amp; !names.add(value)) {</span>
+<span class="fc" id="L421">                        throw new IllegalArgumentException(</span>
+                            &quot;duplicate external provider class: &quot; + value);
+                    }
+<span class="fc" id="L424">                }</span>
+<span class="fc" id="L425">                return List.copyOf(names);</span>
+            }
+<span class="fc" id="L427">        }</span>
+    }
+
+    private static Path codeSource(Class&lt;?&gt; type) {
+        try {
+<span class="fc" id="L432">            CodeSource source = type.getProtectionDomain().getCodeSource();</span>
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">            if (source == null) {</span>
+<span class="nc" id="L434">                throw new SecurityException(&quot;plugin has no code source: &quot; + type.getName());</span>
+            }
+<span class="fc" id="L436">            return Path.of(source.getLocation().toURI()).toRealPath();</span>
+<span class="nc" id="L437">        } catch (RuntimeException failure) {</span>
+<span class="nc" id="L438">            throw failure;</span>
+<span class="nc" id="L439">        } catch (Exception failure) {</span>
+<span class="nc" id="L440">            throw new IllegalStateException(</span>
+<span class="nc" id="L441">                &quot;cannot resolve plugin code source: &quot; + type.getName(), failure);</span>
+        }
+    }
+
+    private static String sourceReference(Class&lt;?&gt; type) {
+        try {
+<span class="nc" id="L447">            CodeSource source = type.getProtectionDomain().getCodeSource();</span>
+<span class="nc bnc" id="L448" title="All 2 branches missed.">            return source == null ? &quot;classpath&quot; : source.getLocation().toString();</span>
+<span class="nc" id="L449">        } catch (RuntimeException failure) {</span>
+<span class="nc" id="L450">            return &quot;classpath&quot;;</span>
+        }
+    }
+
+    private static void deleteTree(Path root) {
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">        if (root == null) {</span>
+<span class="nc" id="L456">            return;</span>
+        }
+<span class="fc" id="L458">        try (Stream&lt;Path&gt; paths = Files.walk(root)) {</span>
+<span class="fc" id="L459">            paths.sorted(Comparator.reverseOrder()).forEach(path -&gt; {</span>
+                try {
+<span class="fc" id="L461">                    Files.deleteIfExists(path);</span>
+<span class="nc" id="L462">                } catch (IOException ignored) {</span>
+                    // Best-effort cleanup after classloader close or failed staging.
+<span class="fc" id="L464">                }</span>
+<span class="fc" id="L465">            });</span>
+<span class="nc" id="L466">        } catch (IOException ignored) {</span>
+            // Best-effort cleanup; no catalog identity depends on the temp directory.
+<span class="fc" id="L468">        }</span>
+<span class="fc" id="L469">    }</span>
+
+<span class="fc" id="L471">    private record LoadedPlugin(</span>
+        RegelsuchePlugin plugin,
+        PluginDescriptor descriptor,
+        ExtensionOrigin origin
+    ) {}
+
+<span class="fc" id="L477">    private record ArtifactMetadata(</span>
+        String artifactSha256,
+        String trustEvidenceSha256,
+        String sourceReference
+    ) {}
+
+    private static final class StagingContext implements ExtensionContext {
+<span class="fc" id="L484">        private final Thread owner = Thread.currentThread();</span>
+        private final ExtensionOrigin origin;
+<span class="fc" id="L486">        private final List&lt;RegisteredExtension&lt;?&gt;&gt; staged = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L487">        private boolean open = true;</span>
+
+<span class="fc" id="L489">        StagingContext(ExtensionOrigin origin) {</span>
+<span class="fc" id="L490">            this.origin = origin;</span>
+<span class="fc" id="L491">        }</span>
+
+        @Override
+        public synchronized &lt;T&gt; void contribute(
+            ExtensionPoint&lt;T&gt; point,
+            ExtensionDescriptor descriptor,
+            T implementation
+        ) {
+<span class="fc bfc" id="L499" title="All 2 branches covered.">            if (!open) {</span>
+<span class="fc" id="L500">                throw new IllegalStateException(&quot;extension contribution context is closed&quot;);</span>
+            }
+<span class="fc bfc" id="L502" title="All 2 branches covered.">            if (Thread.currentThread() != owner) {</span>
+<span class="fc" id="L503">                throw new IllegalStateException(&quot;extension contribution context is thread-confined&quot;);</span>
+            }
+<span class="fc" id="L505">            staged.add(new RegisteredExtension&lt;&gt;(point, descriptor, implementation, origin));</span>
+<span class="fc" id="L506">        }</span>
+
+        synchronized void freeze() {
+<span class="fc" id="L509">            open = false;</span>
+<span class="fc" id="L510">        }</span>
+
+        synchronized List&lt;RegisteredExtension&lt;?&gt;&gt; snapshot() {
+<span class="pc bpc" id="L513" title="1 of 2 branches missed.">            if (open) {</span>
+<span class="nc" id="L514">                throw new IllegalStateException(</span>
+                    &quot;extension contribution context must be frozen before publication&quot;);
+            }
+<span class="fc" id="L517">            return List.copyOf(staged);</span>
+        }
+    }
+
+    private static final class ExternalResources implements AutoCloseable {
+        private final URLClassLoader classLoader;
+        private final Path stagingDirectory;
+        private final List&lt;LoadedPlugin&gt; plugins;
+
+        ExternalResources(
+            URLClassLoader classLoader,
+            Path stagingDirectory,
+            List&lt;LoadedPlugin&gt; plugins
+<span class="fc" id="L530">        ) {</span>
+<span class="fc" id="L531">            this.classLoader = classLoader;</span>
+<span class="fc" id="L532">            this.stagingDirectory = stagingDirectory;</span>
+<span class="fc" id="L533">            this.plugins = plugins;</span>
+<span class="fc" id="L534">        }</span>
+
+        List&lt;LoadedPlugin&gt; plugins() {
+<span class="fc" id="L537">            return plugins;</span>
+        }
+
+        @Override
+        public void close() {
+            try {
+<span class="fc" id="L543">                classLoader.close();</span>
+<span class="nc" id="L544">            } catch (IOException ignored) {</span>
+                // Continue cleanup of private staged bytes.
+<span class="fc" id="L546">            }</span>
+<span class="fc" id="L547">            deleteTree(stagingDirectory);</span>
+<span class="fc" id="L548">        }</span>
+    }
+
+<span class="fc" id="L551">    private record Snapshot(</span>
+        ExtensionCatalog catalog,
+        ExternalResources externalResources
+    ) implements AutoCloseable {
+        @Override
+        public void close() {
+<span class="fc bfc" id="L557" title="All 2 branches covered.">            if (externalResources != null) {</span>
+<span class="fc" id="L558">                externalResources.close();</span>
+            }
+<span class="fc" id="L560">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

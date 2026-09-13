@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginDescriptor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-extension-api</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.extension</a> &gt; <span class="el_source">PluginDescriptor.java</span></div><h1>PluginDescriptor.java</h1><pre class="source lang-java linenums">package de.regelsuche.extension;
+
+import de.regelsuche.api.StableApi;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
+/** Immutable plugin identity and compatibility declaration. */
+@StableApi(since = &quot;2&quot;)
+public record PluginDescriptor(
+    String id,
+    String name,
+    String version,
+    String apiVersion,
+    String minimumCoreVersion,
+    Set&lt;String&gt; capabilities,
+    List&lt;PluginDependency&gt; dependencies,
+    String provenance
+) {
+<span class="fc" id="L24">    public PluginDescriptor {</span>
+<span class="fc" id="L25">        id = ExtensionIdentifiers.identifier(id, &quot;plugin id&quot;).toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L26">        name = ExtensionIdentifiers.requiredText(name, &quot;plugin name&quot;);</span>
+<span class="fc" id="L27">        version = ExtensionIdentifiers.requiredText(version, &quot;plugin version&quot;);</span>
+<span class="fc" id="L28">        apiVersion = ExtensionIdentifiers.requiredText(apiVersion, &quot;apiVersion&quot;);</span>
+        // Only an absent declaration defaults; supplied text must reach the strict parser.
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        minimumCoreVersion = minimumCoreVersion == null ? &quot;0.0.0&quot; : minimumCoreVersion;</span>
+<span class="fc" id="L31">        capabilities = Collections.unmodifiableSet(</span>
+<span class="fc" id="L32">            new TreeSet&lt;&gt;(ExtensionIdentifiers.normalizedStrings(capabilities, &quot;capabilities&quot;))</span>
+        );
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        dependencies = dependencies == null</span>
+<span class="nc" id="L35">            ? List.of()</span>
+<span class="fc" id="L36">            : dependencies.stream()</span>
+<span class="fc" id="L37">                .map(dependency -&gt; Objects.requireNonNull(dependency, &quot;dependency&quot;))</span>
+<span class="fc" id="L38">                .sorted(Comparator.comparing(PluginDependency::pluginId)</span>
+<span class="fc" id="L39">                    .thenComparing(PluginDependency::versionConstraint)</span>
+<span class="fc" id="L40">                    .thenComparing(PluginDependency::optional))</span>
+<span class="fc" id="L41">                .toList();</span>
+<span class="fc" id="L42">        provenance = ExtensionIdentifiers.optionalText(provenance);</span>
+<span class="fc" id="L43">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExtensionCatalogs.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-extension-api</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.extension</a> &gt; <span class="el_source">ExtensionCatalogs.java</span></div><h1>ExtensionCatalogs.java</h1><pre class="source lang-java linenums">package de.regelsuche.extension;
+
+import de.regelsuche.api.StableApi;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+/** Factory for deterministic immutable extension catalogs. */
+@StableApi(since = &quot;2&quot;)
+public final class ExtensionCatalogs {
+    private ExtensionCatalogs() {
+    }
+
+    /** Returns the canonical empty catalog. */
+    public static ExtensionCatalog empty() {
+<span class="fc" id="L27">        return of(List.of());</span>
+    }
+
+    /** Creates and validates one complete immutable catalog snapshot. */
+    public static ExtensionCatalog of(
+        Collection&lt;? extends RegisteredExtension&lt;?&gt;&gt; registrations
+    ) {
+<span class="fc" id="L34">        return new Catalog(registrations);</span>
+    }
+
+    private static final class Catalog implements ExtensionCatalog {
+<span class="fc" id="L38">        private static final Comparator&lt;RegisteredExtension&lt;?&gt;&gt; ORDER =</span>
+<span class="fc" id="L39">            Comparator.comparing((RegisteredExtension&lt;?&gt; registration) -&gt;</span>
+<span class="fc" id="L40">                    registration.point().id())</span>
+<span class="fc" id="L41">                .thenComparing(registration -&gt;</span>
+<span class="fc" id="L42">                    registration.point().contractType().getName())</span>
+<span class="fc" id="L43">                .thenComparing(registration -&gt; registration.descriptor().id())</span>
+<span class="fc" id="L44">                .thenComparing(registration -&gt; registration.origin().kind().name())</span>
+<span class="fc" id="L45">                .thenComparing(registration -&gt; registration.origin().sourceId())</span>
+<span class="fc" id="L46">                .thenComparing(registration -&gt; registration.origin().sourceVersion())</span>
+<span class="fc" id="L47">                .thenComparing(registration -&gt; registration.origin().sourceReference())</span>
+<span class="fc" id="L48">                .thenComparing(registration -&gt; registration.origin().artifactSha256())</span>
+<span class="fc" id="L49">                .thenComparing(registration -&gt; registration.origin().trustEvidenceSha256());</span>
+
+        private final List&lt;RegisteredExtension&lt;?&gt;&gt; registrations;
+        private final String canonicalManifest;
+        private final String contentHash;
+
+<span class="fc" id="L55">        Catalog(Collection&lt;? extends RegisteredExtension&lt;?&gt;&gt; source) {</span>
+<span class="fc" id="L56">            Objects.requireNonNull(source, &quot;registrations&quot;);</span>
+<span class="fc" id="L57">            var normalized = new ArrayList&lt;RegisteredExtension&lt;?&gt;&gt;();</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">            for (RegisteredExtension&lt;?&gt; registration : source) {</span>
+<span class="fc" id="L59">                normalized.add(Objects.requireNonNull(registration, &quot;registration&quot;));</span>
+<span class="fc" id="L60">            }</span>
+<span class="fc" id="L61">            normalized.sort(ORDER);</span>
+<span class="fc" id="L62">            validate(normalized);</span>
+<span class="fc" id="L63">            registrations = List.copyOf(normalized);</span>
+<span class="fc" id="L64">            canonicalManifest = render(registrations);</span>
+<span class="fc" id="L65">            contentHash = sha256(canonicalManifest);</span>
+<span class="fc" id="L66">        }</span>
+
+        @Override
+        @SuppressWarnings(&quot;unchecked&quot;)
+        public &lt;T&gt; List&lt;RegisteredExtension&lt;T&gt;&gt; registrations(ExtensionPoint&lt;T&gt; point) {
+<span class="fc" id="L71">            Objects.requireNonNull(point, &quot;point&quot;);</span>
+<span class="fc" id="L72">            return registrations.stream()</span>
+<span class="fc" id="L73">                .filter(registration -&gt; registration.point().id().equals(point.id()))</span>
+<span class="fc" id="L74">                .filter(registration -&gt;</span>
+<span class="fc" id="L75">                    registration.point().contractType().equals(point.contractType()))</span>
+<span class="fc" id="L76">                .map(registration -&gt; (RegisteredExtension&lt;T&gt;) registration)</span>
+<span class="fc" id="L77">                .toList();</span>
+        }
+
+        @Override
+        public &lt;T&gt; Optional&lt;RegisteredExtension&lt;T&gt;&gt; find(
+            ExtensionPoint&lt;T&gt; point,
+            String id
+        ) {
+<span class="fc" id="L85">            String checkedId = ExtensionIdentifiers.identifier(id, &quot;extension id&quot;);</span>
+<span class="fc" id="L86">            return registrations(point).stream()</span>
+<span class="fc" id="L87">                .filter(registration -&gt; registration.descriptor().id().equals(checkedId))</span>
+<span class="fc" id="L88">                .findFirst();</span>
+        }
+
+        @Override
+        public String canonicalManifest() {
+<span class="fc" id="L93">            return canonicalManifest;</span>
+        }
+
+        @Override
+        public String contentHash() {
+<span class="fc" id="L98">            return contentHash;</span>
+        }
+    }
+
+    private static void validate(List&lt;RegisteredExtension&lt;?&gt;&gt; registrations) {
+<span class="fc" id="L103">        Map&lt;String, Class&lt;?&gt;&gt; pointTypes = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L104">        Set&lt;String&gt; contributionIds = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        for (RegisteredExtension&lt;?&gt; registration : registrations) {</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">            if (!registration.point().contractType().isInstance(registration.implementation())) {</span>
+<span class="nc" id="L107">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L108">                    &quot;implementation type mismatch for &quot; + registration.point().id()</span>
+                );
+            }
+<span class="fc" id="L111">            Class&lt;?&gt; previous = pointTypes.putIfAbsent(</span>
+<span class="fc" id="L112">                registration.point().id(),</span>
+<span class="fc" id="L113">                registration.point().contractType()</span>
+            );
+<span class="fc bfc" id="L115" title="All 4 branches covered.">            if (previous != null &amp;&amp; !previous.equals(registration.point().contractType())) {</span>
+<span class="fc" id="L116">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L117">                    &quot;extension point type conflict: &quot; + registration.point().id()</span>
+                );
+            }
+<span class="fc" id="L120">            String key = registration.point().id() + &quot;\u0000&quot; + registration.descriptor().id();</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            if (!contributionIds.add(key)) {</span>
+<span class="fc" id="L122">                throw new IllegalArgumentException(</span>
+                    &quot;duplicate extension contribution: &quot;
+<span class="fc" id="L124">                        + registration.point().id() + &quot;/&quot; + registration.descriptor().id()</span>
+                );
+            }
+<span class="fc" id="L127">        }</span>
+<span class="fc" id="L128">    }</span>
+
+    private static String render(List&lt;RegisteredExtension&lt;?&gt;&gt; registrations) {
+<span class="fc" id="L131">        StringBuilder json = new StringBuilder(&quot;{\&quot;extensions\&quot;:[&quot;);</span>
+<span class="fc" id="L132">        boolean first = true;</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (RegisteredExtension&lt;?&gt; registration : registrations) {</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            if (!first) {</span>
+<span class="fc" id="L135">                json.append(',');</span>
+            }
+<span class="fc" id="L137">            first = false;</span>
+<span class="fc" id="L138">            json.append('{');</span>
+<span class="fc" id="L139">            property(json, &quot;point&quot;, registration.point().id()).append(',');</span>
+<span class="fc" id="L140">            property(json, &quot;contract&quot;, registration.point().contractType().getName()).append(',');</span>
+<span class="fc" id="L141">            property(json, &quot;id&quot;, registration.descriptor().id()).append(',');</span>
+<span class="fc" id="L142">            property(json, &quot;name&quot;, registration.descriptor().name()).append(',');</span>
+<span class="fc" id="L143">            json.append(&quot;\&quot;tags\&quot;:[&quot;);</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            for (int index = 0; index &lt; registration.descriptor().tags().size(); index++) {</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">                if (index &gt; 0) {</span>
+<span class="fc" id="L146">                    json.append(',');</span>
+                }
+<span class="fc" id="L148">                string(json, registration.descriptor().tags().get(index));</span>
+            }
+<span class="fc" id="L150">            json.append(&quot;],\&quot;origin\&quot;:{&quot;);</span>
+<span class="fc" id="L151">            property(json, &quot;kind&quot;, registration.origin().kind().name()).append(',');</span>
+<span class="fc" id="L152">            property(json, &quot;sourceId&quot;, registration.origin().sourceId()).append(',');</span>
+<span class="fc" id="L153">            property(json, &quot;sourceVersion&quot;, registration.origin().sourceVersion()).append(',');</span>
+<span class="fc" id="L154">            property(json, &quot;sourceReference&quot;, registration.origin().sourceReference()).append(',');</span>
+<span class="fc" id="L155">            property(json, &quot;artifactSha256&quot;, registration.origin().artifactSha256()).append(',');</span>
+<span class="fc" id="L156">            property(json, &quot;trustEvidenceSha256&quot;, registration.origin().trustEvidenceSha256());</span>
+<span class="fc" id="L157">            json.append(&quot;}}&quot;);</span>
+<span class="fc" id="L158">        }</span>
+<span class="fc" id="L159">        return json.append(&quot;]}&quot;).toString();</span>
+    }
+
+    private static StringBuilder property(StringBuilder target, String key, String value) {
+<span class="fc" id="L163">        string(target, key).append(':');</span>
+<span class="fc" id="L164">        return string(target, value);</span>
+    }
+
+    private static StringBuilder string(StringBuilder target, String value) {
+<span class="fc" id="L168">        target.append('&quot;');</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        for (int index = 0; index &lt; value.length(); index++) {</span>
+<span class="fc" id="L170">            char ch = value.charAt(index);</span>
+<span class="fc bfc" id="L171" title="All 8 branches covered.">            switch (ch) {</span>
+<span class="fc" id="L172">                case '&quot;' -&gt; target.append(&quot;\\\&quot;&quot;);</span>
+<span class="fc" id="L173">                case '\\' -&gt; target.append(&quot;\\\\&quot;);</span>
+<span class="fc" id="L174">                case '\b' -&gt; target.append(&quot;\\b&quot;);</span>
+<span class="fc" id="L175">                case '\f' -&gt; target.append(&quot;\\f&quot;);</span>
+<span class="fc" id="L176">                case '\n' -&gt; target.append(&quot;\\n&quot;);</span>
+<span class="fc" id="L177">                case '\r' -&gt; target.append(&quot;\\r&quot;);</span>
+<span class="fc" id="L178">                case '\t' -&gt; target.append(&quot;\\t&quot;);</span>
+                default -&gt; {
+<span class="fc bfc" id="L180" title="All 2 branches covered.">                    if (ch &lt; 0x20) {</span>
+<span class="fc" id="L181">                        target.append(String.format(&quot;\\u%04x&quot;, (int) ch));</span>
+                    } else {
+<span class="fc" id="L183">                        target.append(ch);</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L188">        return target.append('&quot;');</span>
+    }
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L193">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L194">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L195">            return &quot;sha256:&quot; + HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L196">        } catch (NoSuchAlgorithmException impossible) {</span>
+<span class="nc" id="L197">            throw new IllegalStateException(&quot;SHA-256 is not available&quot;, impossible);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
