@@ -3,7 +3,7 @@
 Open **Gespeicherte Runs** in the existing local Workbench. The bounded history
 lists the immutable workspaces already retained by `/api/discovery-runs`.
 You can also open a SHA-256 Run ID or import an exact canonical workspace JSON
-file (up to 2,000,000 bytes). The Java repository validates canonical bytes,
+file (up to 1,048,576 bytes, matching the default HTTP request limit). The Java repository validates canonical bytes,
 schema and all nested content hashes before accepting an import.
 
 The view shows input, assumptions, information boundary, strategy/profile,

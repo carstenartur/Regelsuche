@@ -193,7 +193,7 @@
         if (!file) return;
         activateRun();
         await store.import(async () => {
-            if (file.size > 2000000) throw new Error('Manifest überschreitet 2 MB');
+            if (file.size > 1048576) throw new Error('Manifest überschreitet 1 MiB');
             return responseReply(await fetch(base, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: await file.text()}));
         });
         if (store.state().status === 'READY') { offset = 0; loadHistory(); }
