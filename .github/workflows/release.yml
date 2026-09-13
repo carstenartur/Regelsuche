@@ -334,6 +334,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+          verify-signature: true
           cache: maven
 
       - name: Set up Gradle compatibility gate
