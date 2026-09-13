@@ -92,6 +92,49 @@ def testJmhPrecisionStudyHarness = tasks.register('testJmhPrecisionStudyHarness'
     }
 }
 
+def testJmhPrecisionStudyV2Harness = tasks.register('testJmhPrecisionStudyV2Harness', Exec) {
+    group = 'verification'
+    description = 'Checks the revisioned JMH successor and retained errors with synthetic processes; starts no benchmarks.'
+    dependsOn 'prepareVerificationEnvironment'
+    workingDir qualityRepositoryRoot
+    inputs.files([
+        'config/quality/jmh-precision-study-policy-v2.json',
+        'config/quality/jmh-precision-study-policy-v1.json',
+        'config/quality/jmh-regression-policy-v2.json',
+        'config/quality/jmh-regression-decision-policy-v3.json',
+        'scripts/jmh_precision_study_v2.py',
+        'scripts/jmh_precision_study_jar_v2.py',
+        'scripts/jmh_precision_study_v1.py',
+        'scripts/jmh_precision_study_process_v1.py',
+        'scripts/jmh_precision_study_supervisor_v1.py',
+        'scripts/run-jmh-precision-study-v2.py',
+        'scripts/report-jmh-precision-study-v2.py',
+        'scripts/test-jmh-precision-study-v2.py',
+        'scripts/test-jmh-precision-study-v1.py'
+    ].collect { path -> qualityRepositoryRoot.file(path) })
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine qualityVerificationPython.get().absolutePath,
+            '-B', 'scripts/test-jmh-precision-study-v2.py'
+    }
+}
+
+def testJmhJarIdentityV2 = tasks.register('testJmhJarIdentityV2', Exec) {
+    group = 'verification'
+    description = 'Checks ordered duplicate ZIP entries and strict overlap/CRC rejection without building a jar.'
+    dependsOn 'prepareVerificationEnvironment'
+    workingDir qualityRepositoryRoot
+    inputs.files([
+        'scripts/jmh_precision_study_jar_v2.py',
+        'scripts/test-jmh-jar-identity-v2.py'
+    ].collect { path -> qualityRepositoryRoot.file(path) })
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine qualityVerificationPython.get().absolutePath,
+            '-B', 'scripts/test-jmh-jar-identity-v2.py'
+    }
+}
+
 def verifyJmhRegression = tasks.register('verifyJmhRegression', Exec) {
     group = 'verification'
     description = 'Fails on missing, undeclared, contract-drifted or materially slower JMH benchmarks under the v3 uncertainty-aware decision authority.'
@@ -170,6 +213,8 @@ tasks.matching { candidate -> candidate.name == 'check' }.configureEach {
         verifyContainerImagePolicy,
         verifyJmhRegression,
         testJmhPrecisionStudyHarness,
+        testJmhPrecisionStudyV2Harness,
+        testJmhJarIdentityV2,
         verifySupplyChainInventory
 }
 
