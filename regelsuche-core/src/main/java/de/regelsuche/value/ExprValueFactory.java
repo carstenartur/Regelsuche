@@ -6,6 +6,7 @@ import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.symbol.SymbolId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -44,7 +45,14 @@ public final class ExprValueFactory implements AutoCloseable {
     }
 
     public synchronized VariableValue variable(String name) {
+        if (name != null && name.startsWith(SymbolId.IDENTIFIER_PREFIX)) {
+            return scopedVariable(SymbolId.fromIdentifier(name));
+        }
         return intern(new VariableValue(name), VariableValue.class);
+    }
+
+    public synchronized VariableValue scopedVariable(SymbolId symbol) {
+        return intern(new VariableValue(symbol), VariableValue.class);
     }
 
     public synchronized NumberValue number(ExactRational value) {
@@ -129,7 +137,8 @@ public final class ExprValueFactory implements AutoCloseable {
 
         ExprValue value;
         if (expression instanceof VariableExpr variable) {
-            value = variable(variable.name());
+            value = variable.symbol().isPresent()
+                ? scopedVariable(variable.symbol().orElseThrow()) : variable(variable.name());
         } else if (expression instanceof NumberExpr number) {
             value = number(number.value());
         } else if (expression instanceof FunctionExpr function) {
@@ -248,10 +257,22 @@ public final class ExprValueFactory implements AutoCloseable {
 
     public static final class VariableValue extends ExprValue {
         private final String name;
+        private final SymbolId symbol;
 
         private VariableValue(String name) {
             super(ValueKey.variable(requireName(name)));
             this.name = requireName(name);
+            this.symbol = null;
+        }
+
+        private VariableValue(SymbolId symbol) {
+            super(ValueKey.scopedVariable(Objects.requireNonNull(symbol, "symbol")));
+            this.name = symbol.identifier();
+            this.symbol = symbol;
+        }
+
+        public Optional<SymbolId> symbol() {
+            return Optional.ofNullable(symbol);
         }
 
         public String name() {
@@ -424,7 +445,9 @@ public final class ExprValueFactory implements AutoCloseable {
     /** Versioned structural key, authoritative outside one factory scope. */
     public record ValueKey(String encoded) implements Comparable<ValueKey> {
         public static final String FORMAT_VERSION = "regelsuche.expr-value/v2";
+        public static final String SCOPED_FORMAT_VERSION = "regelsuche.expr-value/v3";
         private static final String PREFIX = FORMAT_VERSION + ":";
+        private static final String SCOPED_PREFIX = SCOPED_FORMAT_VERSION + ":";
 
         public ValueKey {
             Objects.requireNonNull(encoded, "encoded");
@@ -437,13 +460,24 @@ public final class ExprValueFactory implements AutoCloseable {
             return new ValueKey(PREFIX + "V" + segment(name));
         }
 
+        private static ValueKey scopedVariable(SymbolId symbol) {
+            return new ValueKey(SCOPED_PREFIX + "S" + segment(symbol.canonicalText()));
+        }
+
+        private static String prefix(Iterable<ExprValue> operands) {
+            for (var operand : operands) {
+                if (operand.key().encoded().startsWith(SCOPED_PREFIX)) return SCOPED_PREFIX;
+            }
+            return PREFIX;
+        }
+
         private static ValueKey number(ExactRational value) {
             return new ValueKey(
                     PREFIX + "Q" + segment(value.canonicalText()));
         }
 
         private static ValueKey ordered(ValueOperator operator, List<ExprValue> operands) {
-            StringBuilder encoded = new StringBuilder(PREFIX)
+            StringBuilder encoded = new StringBuilder(prefix(operands))
                     .append('O')
                     .append(segment(operator.identityToken()))
                     .append(operands.size())
@@ -457,7 +491,7 @@ public final class ExprValueFactory implements AutoCloseable {
                 Map<ExprValue, Integer> multiplicities) {
             List<Map.Entry<ExprValue, Integer>> entries = new ArrayList<>(multiplicities.entrySet());
             entries.sort(Comparator.comparing(entry -> entry.getKey().key()));
-            StringBuilder encoded = new StringBuilder(PREFIX)
+            StringBuilder encoded = new StringBuilder(prefix(multiplicities.keySet()))
                     .append('A')
                     .append(segment(operator.identityToken()))
                     .append(entries.size())

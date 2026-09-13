@@ -1,0 +1,57 @@
+{
+  "schema": "regelsuche.ai-knowledge-baseline-provenance/v1",
+  "decision": "Advance only to the independently CI-qualified and actually merged predecessor. No feature-candidate measurements supply baseline values.",
+  "acceptedSource": {
+    "mainCommit": "779bcfaebd7eaa0656202169953f69392e3586b0",
+    "publishedPullRequest": 1003,
+    "publishedPullRequestHead": "d80fdf474e01c78089b84c4f0c275db5c980bf0c",
+    "tree": "c6af6da4f1050bfceed96ecb7a967bc25e914ea6"
+  },
+  "independentQualification": {
+    "runId": 34752823179,
+    "runNumber": 5604,
+    "conclusion": "success",
+    "requiredAuthorityJobs": {
+      "Gradle": 103712117904,
+      "MavenProductDocker": 103712118006,
+      "JMH": 103712117998,
+      "SymPy": 103712118007,
+      "PolynomialComparison": 103712118004,
+      "ciCheck": 103716522525
+    },
+    "artifactId": 10317070497,
+    "artifactBytes": 388866457,
+    "artifactSha256": "01470295f48810724517163bd3dc21f820651f7fa7858adf33c560b2a643a908",
+    "artifactSha256LocallyVerified": true,
+    "retainedSourceArchiveReconstructedTree": "c6af6da4f1050bfceed96ecb7a967bc25e914ea6"
+  },
+  "measurement": {
+    "origin": "Unmodified build/ai-knowledge report bytes from the qualified CI artifact, not a local rerun or feature-candidate estimate. The source archive was reconstructed and its complete Git tree verified before feature changes.",
+    "extractorVersion": "0.1.10",
+    "retainedFilesSha256": {
+      "779bcfaebd-ci-metrics-snapshot.json": "cf4133cd0f1a6dd9fadd2f66b693c75d06a07557c411e9fd8d32b8b1afcaa3df",
+      "779bcfaebd-ci-check.json": "a270081b66d7555adea5c875c0ceb9e5c1c714e74c0e46c9423c2c1de934c6fd",
+      "779bcfaebd-ci-trend.json": "633b93abdbfd83c92b973934bdc78cc7ebcc293de4c3e3e4fcd662e690c176f0"
+    },
+    "predecessorPassedItsOwnOldBaseline": true,
+    "predecessorTokenIncrease": 12125,
+    "localExtractorRerun": false
+  },
+  "previousBaseline": {
+    "retainedFile": "779bcfaebd-previous-baseline.json",
+    "sha256": "3d2b0f4ef3816c2a7b72faae36f8f266426a33d7a9b9f266f85dda7aa2cce885"
+  },
+  "newBaseline": {
+    "retainedFile": "779bcfaebd-ci-metrics-snapshot.json",
+    "sha256": "cf4133cd0f1a6dd9fadd2f66b693c75d06a07557c411e9fd8d32b8b1afcaa3df",
+    "byteForByteCopy": true
+  },
+  "unchangedPolicy": {
+    "maxContextTokenIncrease": 15000,
+    "maxConceptRadiusIncrease": 3,
+    "maxCognitiveDebtIncrease": 10,
+    "protectedStudiesRun": false,
+    "newExceptions": false
+  },
+  "qualificationBoundary": "This establishes the predecessor baseline only. The symbol-identity candidate still requires its own complete CI and review."
+}

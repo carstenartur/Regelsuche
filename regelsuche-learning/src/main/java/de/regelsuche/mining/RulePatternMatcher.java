@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Objects;
 
 /** Structural matcher for learned macro-rule source patterns. */
 public class RulePatternMatcher {
@@ -21,12 +22,7 @@ public class RulePatternMatcher {
     public Optional<Map<String, Expr>> match(String pattern, String expression) {
         try {
             RulePatternNode patternNode = patternParser.parse(pattern);
-            Expr expressionNode = expressionParser.parseTerm(expression);
-            Map<String, Expr> bindings = new HashMap<>();
-            if (!match(patternNode, expressionNode, bindings)) {
-                return Optional.empty();
-            }
-            return Optional.of(Map.copyOf(bindings));
+            return matchExpression(patternNode, expressionParser.parseTerm(expression));
         } catch (IllegalArgumentException exception) {
             return Optional.empty();
         }
@@ -34,15 +30,26 @@ public class RulePatternMatcher {
 
     public Optional<Map<String, Expr>> match(RulePatternNode patternNode, String expression) {
         try {
-            Expr expressionNode = expressionParser.parseTerm(expression);
-            Map<String, Expr> bindings = new HashMap<>();
-            if (!match(patternNode, expressionNode, bindings)) {
-                return Optional.empty();
-            }
-            return Optional.of(Map.copyOf(bindings));
+            return matchExpression(patternNode, expressionParser.parseTerm(expression));
         } catch (IllegalArgumentException exception) {
             return Optional.empty();
         }
+    }
+
+    /** Matches the actual AST, retaining scoped IDs and the bound subtree objects. */
+    public Optional<Map<String, Expr>> matchExpression(String pattern, Expr expression) {
+        try {
+            return matchExpression(patternParser.parse(pattern), expression);
+        } catch (IllegalArgumentException exception) {
+            return Optional.empty();
+        }
+    }
+
+    public Optional<Map<String, Expr>> matchExpression(RulePatternNode pattern, Expr expression) {
+        Objects.requireNonNull(pattern, "pattern");
+        Objects.requireNonNull(expression, "expression");
+        Map<String, Expr> bindings = new HashMap<>();
+        return match(pattern, expression, bindings) ? Optional.of(Map.copyOf(bindings)) : Optional.empty();
     }
 
     private boolean match(RulePatternNode pattern, Expr expression, Map<String, Expr> bindings) {
