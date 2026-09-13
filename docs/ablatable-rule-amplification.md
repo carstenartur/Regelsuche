@@ -185,65 +185,27 @@ script resource. Search tests use native executors. No new app or experiment
 test starts GraalPy alongside the parallel JMH lane. The explicit experiment
 CLI starts the runtime only when its `run` command is invoked separately.
 
-On the same clean committed revision, prepare dependencies and a fresh public
-plan once, before coordinating the actual new runs:
+The [public reproduction procedure](public-amplification-reproduction.md) now
+connects this authority to one preregistered cohort, two independently compiled
+clean hosts, and a separately compiled digest-pinned container. The dedicated
+`amplification-reproduction.yml` workflow only provisions those environments and
+transfers their retained files; `run-amplification-cohort.py` owns the same local
+execution and acceptance commands. The exact Temurin build is `25.0.3+9` on all
+three environments. Native package versions have explicit host/container pins.
 
-```bash
-./gradlew :regelsuche-experiments:writeAmplificationRuntimeClasspath
-python3 scripts/run-rule-amplification.py plan \
-  --classpath-file regelsuche-experiments/build/amplification-runtime-classpath.txt \
-  --output build/amplification-inputs
-```
+Before any formation, a fresh cohort binds the exact commit/tree, compiled class
+manifest, all three Java inputs, Docker source archive, image base, environment
+contract and expected role set. Execution checks that preregistered hash and
+records actual source/classes before and after Java. Qualification bytes remain
+opaque to transport until the existing Java freeze/replay/open boundary.
 
-Transfer those exact three input files to **two genuinely separate clean
-hosts**, compile the same checkout on each, and explicitly run on each host:
-
-```bash
-python3 scripts/run-rule-amplification.py host \
-  --classpath-file regelsuche-experiments/build/amplification-runtime-classpath.txt \
-  --inputs build/amplification-inputs --output build/amplification-host
-```
-
-For the container, build the committed archive with the checked-in Dockerfile's
-digest-pinned Java 25 base. This build is an explicit dependency/build operation;
-the actual container run has networking disabled:
-
-```bash
-git archive --format=tar HEAD -o build/amplification-source.tar
-AMPLIFICATION_REVISION=$(git rev-parse HEAD)
-AMPLIFICATION_SOURCE_SHA=$(sha256sum build/amplification-source.tar | cut -d ' ' -f 1)
-docker build -f reproduction/Dockerfile.amplification \
-  --build-arg REGELSUCHE_REVISION="$AMPLIFICATION_REVISION" \
-  --build-arg REGELSUCHE_SOURCE_SHA256="$AMPLIFICATION_SOURCE_SHA" \
-  --iidfile build/amplification-image-id .
-python3 scripts/run-rule-amplification.py container \
-  --image "$(cat build/amplification-image-id)" \
-  --inputs build/amplification-inputs --output build/amplification-container
-```
-
-The outer adapter retains actual `docker image inspect` identity and the source
-revision label. The receipt binds all five canonical authority files, the clean
-revision and a hash of the actual compiled Regelsuche classes. Host identity is
-the hash of the observed machine ID, not a user-provided label. These are local
-execution observations, not remote attestation or downloaded-ZIP verification.
-The source archive hash is checked inside the image build. A repeated process
-on one host does not satisfy the two-host condition.
-
-After transferring the two retained host bundles and the container bundle:
-
-```bash
-python3 scripts/verify-rule-amplification-reproduction.py \
-  retained/host-a retained/host-b retained/container \
-  --output build/amplification-reproduction.json --require-conclusive
-```
-
-The verifier requires every file, exact complete source-index/profile/operation
-and replay-row sets, hash/source/configuration/outcome/work bindings, distinct
-host observations, immutable image inspection, identical compiled authority
-and byte-identical plan/sources/qualification/freeze/report. It refuses missing,
-duplicated, substituted, noncanonical or symlinked evidence. Identical technical
+The original five canonical authority files and reproduction verifier remain
+unchanged. Additional receipts retain stdout/stderr, process exits or watchdog
+termination, before/after observations and actual container inspection. Failed
+processes retain their available prefix as `INCOMPLETE_EXECUTION`; transport
+never invents missing freeze or qualification rows. Complete identical technical
 or budget failures remain `REPRODUCED_INCONCLUSIVE`; `--require-conclusive`
-writes that diagnostic and fails. Even `REPRODUCED` authorizes no matched-work
+retains that diagnostic and fails. Even `REPRODUCED` authorizes no matched-work
 or comparative-gain claim.
 
 Native report status rows must preserve the frozen run's typed stage, matcher

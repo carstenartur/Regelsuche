@@ -1,15 +1,18 @@
 FROM eclipse-temurin:25.0.3_9-jdk-noble@sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617
 ARG REGELSUCHE_REVISION
+ARG REGELSUCHE_TREE
 ARG REGELSUCHE_SOURCE_SHA256
 LABEL org.opencontainers.image.revision=${REGELSUCHE_REVISION}
-ENV REGELSUCHE_REVISION=${REGELSUCHE_REVISION}
+LABEL de.regelsuche.source-tree=${REGELSUCHE_TREE}
+LABEL de.regelsuche.source-archive-sha256=${REGELSUCHE_SOURCE_SHA256}
+ENV REGELSUCHE_REVISION=${REGELSUCHE_REVISION} REGELSUCHE_TREE=${REGELSUCHE_TREE}
 WORKDIR /work
-COPY build/amplification-source.tar /tmp/source.tar
+COPY source.tar /tmp/source.tar
 RUN echo "${REGELSUCHE_SOURCE_SHA256}  /tmp/source.tar" | sha256sum --check - \
     && tar -xf /tmp/source.tar -C /work \
     && apt-get update \
-    && apt-get install --no-install-recommends -y patchelf=0.14.3-1 python3 \
+    && apt-get install --no-install-recommends -y patchelf=0.18.0-1.1build1 python3 \
     && chmod +x gradlew \
-    && ./gradlew --no-daemon :regelsuche-experiments:writeAmplificationRuntimeClasspath --console=plain \
+    && ./gradlew --no-daemon --no-configuration-cache --no-build-cache --max-workers=2 :regelsuche-experiments:writeAmplificationRuntimeClasspath --console=plain \
     && rm -rf /var/lib/apt/lists/* /tmp/source.tar
-ENTRYPOINT ["python3", "scripts/run-rule-amplification.py", "inside", "--classpath-file", "/work/regelsuche-experiments/build/amplification-runtime-classpath.txt", "--inputs", "/inputs", "--output", "/out/bundle"]
+ENTRYPOINT ["python3", "scripts/run-amplification-cohort.py", "inside", "--inputs", "/inputs", "--output", "/out/bundle"]
