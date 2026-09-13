@@ -123,6 +123,8 @@ public final class AblatableRulePreparationRunner {
         return fields("schema", ID, "profile", profile, "repositoryRevision", revision, "budget", budget,
             "principalInventory", RuleInventoryFingerprint.contentHash(principals),
             "preparationInventory", RuleInventoryFingerprint.contentHash(preparation),
+            "principalExecutionOrder", principals.stream().map(RewriteRule::id).toList(),
+            "preparationExecutionOrder", preparation.stream().map(RewriteRule::id).toList(),
             "recognition", profile == Profile.DIRECT_ONLY ? RecognitionProfile.exact() : RecognitionProfile.arithmeticAc(),
             "exactPreparer", profile.ordinal() >= 2 ? RulePreparationPlanner.PLANNER_ID : "DISABLED",
             "exactWorkContract", RulePreparationPlanner.MEASUREMENT_CONTRACT,

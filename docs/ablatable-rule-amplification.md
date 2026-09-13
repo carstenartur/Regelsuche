@@ -21,6 +21,18 @@ recognition, guards, budgets and measurement contracts. Each executes afresh
 from the same source. Stages run in this order for unresolved principals only;
 the first independently verified candidate for each principal is retained.
 
+The new amplification configuration now also binds `principalExecutionOrder`
+and `preparationExecutionOrder`. The existing inventory fingerprints identify
+contents independently of order, while tight work budgets make execution order
+observable. The runner preserves the supplied lists; it does not sort execution
+to obtain an identity. This deliberately corrects the still-unqualified
+amplification configuration hashes. Previous receipts are not relabelled, and
+the historical attempt/v2/V3/V4 authorities keep their existing bytes.
+The local amplification JSON codec escapes unpaired UTF-16 codeunits before
+UTF-8 hashing and transport, so distinct permitted rule IDs cannot collapse
+through replacement encoding. Valid Unicode and existing inventory fingerprints
+keep their bytes; no global historical codec or mathematical domain is changed.
+
 | Profile | Admitted authority |
 | --- | --- |
 | `DIRECT_ONLY` | Structural matching at AST occurrences; no AC or preparation |

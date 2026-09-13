@@ -108,8 +108,10 @@ Dieser Solver vervollständigt die rationale lineare C-Operation innerhalb des b
 Fragments. Der additive lineare Plan-/Evidence-Adapter ermöglicht inzwischen unabhängig
 replaygeprüfte, explizite budgetierte Programmnutzung; die bisherige endliche Evidence-Kette
 wird dafür nicht umgedeutet. Nichtlineare Hole-Systeme,
-bedingte symbolische Lösungen, automatische Basis-/Grammatikwahl, Rekurrenzinvarianten samt
-Initialwert- und Induktionszertifikaten sowie weitergehende logische Taktiken bleiben offen.
+bedingte symbolische Lösungen, automatische Basis-/Grammatikwahl sowie weitergehende logische
+Taktiken bleiben offen. Ein separater [nativer Rekurrenzpfad](recurrence-invariant-discovery.md)
+ergänzt inzwischen vorgegebene rationale homogene Rekurrenzen um begrenzte Polynom-Invarianten
+und spezialisierte, unabhängig geprüfte Initialwert-/Induktionsurkunden.
 
 Lerntransfer, historische Holdout-Zuordnung und Leistungsvergleiche erfordern ihre tatsächlich
 preregistrierten kontrollierten Studien. Öffentliche Tests schließen #874 nicht und begründen

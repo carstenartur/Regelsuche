@@ -95,6 +95,12 @@ public final class EqualitySaturation {
         return config;
     }
 
+    /** Explicitly declared scalar AC fragment with independent exact checks before unions and release. */
+    public NativeScalarPolynomialSaturation.Result saturateNativeAc(Expr source,
+            NativeScalarPolynomialSaturation.ScalarContext context, NativeScalarPolynomialSaturation.Budget budget) {
+        return NativeScalarPolynomialSaturation.run(rules, source, context, budget);
+    }
+
     /**
      * Saturate {@code eGraph} starting from {@code root}, then extract the
      * lowest-cost representative using {@code costOfNode} and return both

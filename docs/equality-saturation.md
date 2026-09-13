@@ -89,6 +89,12 @@ Neben den bisherigen Feldern enthält `SaturationStats` jetzt:
 
 ## Limitations
 
+An additive opt-in API now executes bounded native scalar AC matching with
+independent exact polynomial checks. See [native scalar AC e-matching](native-scalar-ac-ematching.md)
+for its explicit scalar declarations, atomic binding completeness, checked
+unions and unavailable formal proof/total-work fields. It uses the current
+binary graph and does not change this default Search profile.
+
 - The current ruleset uses the same atomic
   `RewriteRule`/`PatternExpr` shape as the path-based strategies — no
   conditional rewrites yet. See [`limits.md`](limits.md).

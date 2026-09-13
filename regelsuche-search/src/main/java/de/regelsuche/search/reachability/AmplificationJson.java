@@ -31,7 +31,7 @@ public final class AmplificationJson {
         if (value == null) return "null";
         if (value instanceof String text) {
             String array = new JsonWriter().beginArray().value(text).endArray().toString();
-            return array.substring(1, array.length() - 1);
+            return escapeUnpairedCodeunits(array.substring(1, array.length() - 1));
         }
         if (value instanceof Enum<?> item) return canonical(item.name());
         if (value instanceof Boolean || value instanceof Integer || value instanceof Long) return value.toString();
@@ -58,6 +58,23 @@ public final class AmplificationJson {
             return canonical(fields);
         }
         throw new IllegalArgumentException("unsupported observation type: " + value.getClass().getName());
+    }
+
+    /** Preserve permitted Java string identities before UTF-8 hashing and transport. */
+    private static String escapeUnpairedCodeunits(String quoted) {
+        var result = new StringBuilder(quoted.length());
+        for (int index = 0; index < quoted.length(); index++) {
+            char current = quoted.charAt(index);
+            if (Character.isHighSurrogate(current) && index + 1 < quoted.length()
+                    && Character.isLowSurrogate(quoted.charAt(index + 1))) {
+                result.append(current).append(quoted.charAt(++index));
+            } else if (Character.isSurrogate(current)) {
+                result.append("\\u").append(HexFormat.of().toHexDigits(current));
+            } else {
+                result.append(current);
+            }
+        }
+        return result.toString();
     }
 
     public static String hash(Object value) { return hashBytes(canonical(value).getBytes(StandardCharsets.UTF_8)); }
