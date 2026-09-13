@@ -81,6 +81,27 @@ BEGIN
     RETURN sequence_value;
 END $$;
 
+-- Private renderer for the bounded Operation/v1 wire shape, not a general JSON canonicalizer.
+-- Its admitted values are ASCII identifiers/hashes, integral sequences, objects and null.
+-- The checkpoint's content-hash algorithm above deliberately retains its own field order.
+CREATE FUNCTION plugin_checkpoints.canonical_operation_json(p jsonb, p_depth integer DEFAULT 0)
+RETURNS text LANGUAGE plpgsql IMMUTABLE STRICT SET search_path = pg_catalog, pg_temp AS $$
+DECLARE rendered text;
+BEGIN
+    IF p_depth < 0 OR p_depth > 3 THEN
+        RAISE EXCEPTION 'operation JSON nesting limit' USING ERRCODE='22023';
+    END IF;
+    IF jsonb_typeof(p) = 'object' THEN
+        SELECT '{' || coalesce(string_agg(to_jsonb(member.key)::text || ':'
+            || plugin_checkpoints.canonical_operation_json(member.value,p_depth+1),
+            ',' ORDER BY member.key COLLATE "C"),'') || '}' INTO rendered
+            FROM jsonb_each(p) AS member;
+        RETURN rendered;
+    END IF;
+    IF jsonb_typeof(p) IN ('string','number','null') THEN RETURN p::text; END IF;
+    RAISE EXCEPTION 'unsupported operation JSON value' USING ERRCODE='22023';
+END $$;
+
 CREATE FUNCTION plugin_checkpoints.read_state(p_id text, p_domain text, p_root text)
 RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
 DECLARE s plugin_checkpoints.slots;
@@ -136,6 +157,12 @@ BEGIN
         RAISE EXCEPTION 'invalid complete operation' USING ERRCODE='22023';
     END IF;
     s := plugin_checkpoints.authorized_slot(sc->>'installationId',sc->>'trustDomain',sc->>'rootTrustStoreHash');
+    -- Java Operation.read requires these exact UTF-8 bytes, not just JSONB equality.
+    -- Check before locking, idempotency lookup or any durable state/receipt/capacity change.
+    IF convert_to(p_request,'UTF8') IS DISTINCT FROM
+        convert_to(plugin_checkpoints.canonical_operation_json(v) || chr(10),'UTF8') THEN
+        RAISE EXCEPTION 'operation request must use canonical JSON bytes' USING ERRCODE='22023';
+    END IF;
     -- Serialize the entire operation, including duplicate-ID lookup, on the provisioned slot.
     SELECT * INTO STRICT s FROM plugin_checkpoints.slots
         WHERE installation_id=s.installation_id AND trust_domain=s.trust_domain FOR UPDATE;

@@ -45,6 +45,18 @@ the SQL transaction reconciles concurrent submissions of the complete operation.
 Recovery never submits a rehashed local pending file. A historical receipt remains
 available after later operations supersede its generation.
 
+The SQL entry point independently requires the exact Java Operation/v1 canonical
+UTF-8 bytes: alphabetically sorted fields, compact JSON and one trailing LF.
+Semantically equivalent alternate whitespace, field order, escaping, duplicate
+keys or numeric spelling are rejected before any selected-state, receipt or
+capacity change. The private renderer is bounded to the admitted v1 object shape,
+ASCII identifiers/hashes, integral sequences and nulls; it is not a general JSON
+canonicalization standard. Its wire ordering does not change the separate
+ChainCheckpoint/v1 content-hash algorithm. The strict Java receipt reader remains
+unchanged, so direct EXECUTE-only submissions cannot store Java-unreadable
+receipts. This admission rule does not migrate or repair a previously damaged
+externally provisioned database.
+
 The new intent boundary rejects unpaired UTF-16 code units before hashing or
 lookup, including URI values admitted by Java's URI class. UTF-8 replacement
 therefore cannot alias a distinct intent. Valid Unicode retains its existing
@@ -178,6 +190,14 @@ privilege without granting the whole-table privilege, then check that all three
 entry points reject the unsafe role and leave both state and receipts unchanged.
 The test is registered in both the existing Docker source set and the Maven full
 integration module and does not convert absent Docker into a successful skip.
+
+`PluginCheckpointCanonicalJsonTest` exercises direct EXECUTE-only submissions
+using ten semantically equivalent but noncanonical spellings from both empty and
+populated checkpoints. Each rejection must preserve selected state, operation-ID
+availability and receipt capacity. Its positive control compares actual Java
+canonical bytes after direct SQL submission and recovery for genesis, successor,
+unchanged-trust and rejected-CAS transitions. It is also included in Maven's
+explicit compilation and Failsafe test lists and uses the same pinned container.
 
 The implementation workspace had no Docker daemon/socket or PostgreSQL runtime.
 The provider controls compile; actual local execution failed with
