@@ -340,7 +340,8 @@ class PluginDistributionClientTest {
             assertEquals(PluginCheckpointAuthority.AcceptedState.empty(), authority.read());
             assertTrue(limited.active().isEmpty());
             try (var staged = Files.list(directory.resolve("limited"))) {
-                assertEquals(List.of("generations"), staged.map(path -> path.getFileName().toString()).toList());
+                assertEquals(Set.of("generations", ".cache-quota", ".cache-quota.lock"),
+                    staged.map(path -> path.getFileName().toString()).collect(java.util.stream.Collectors.toSet()));
             }
             try (var generations = Files.list(directory.resolve("limited/generations"))) {
                 assertEquals(0, generations.count());
