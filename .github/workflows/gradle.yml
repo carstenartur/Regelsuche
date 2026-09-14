@@ -72,9 +72,61 @@ jobs:
           assert int(r.attrib['failures']) == 2 and int(r.attrib['errors']) == 0, r.attrib
           print('RED: both behavioral regressions reproduced; not a compiler failure')
           PY
-      - name: Apply source-bound revision and admission checks
+      - name: Apply source-bound revision and migrate current consumers
         run: |
           python3 "$RUNNER_TEMP/pr1006-provenance.py" --apply
+          python3 - <<'PY'
+          import os, json
+          from pathlib import Path
+          manifest = Path(os.environ['RUNNER_TEMP']) / 'pr1006-changed-paths.txt'
+          changed = set(manifest.read_text().splitlines())
+          def edit(path, old, new):
+              p = Path(path)
+              s = p.read_text()
+              assert s.count(old) == 1, (path, old, s.count(old))
+              p.write_text(s.replace(old,new))
+              changed.add(path)
+          p='regelsuche-search/src/test/java/de/regelsuche/search/policy/DescriptorPolicyTrainerTest.java'
+          edit(p, 'trainsAndLoadsByteStableDescriptorModelFromTrajectoryV2', 'trainsAndLoadsByteStableDescriptorModelFromTrajectoryV3')
+          edit(p, 'assertEquals(TransformationDescriptor.SCHEMA, first.featureSchemaVersion());',
+               'assertEquals(TransformationDescriptor.SCHEMA + ";score=" + de.regelsuche.scoring.ScoreRevision.CURRENT, first.featureSchemaVersion());')
+          edit(p, 'regelsuche.search-trajectory/v2', 'regelsuche.search-trajectory/v3')
+          edit('docs/work-budget-search-frontier.md', '`regelsuche.work-search-replay/v1`',
+               '`regelsuche.work-search-replay/v2`, including the actual scoring producer revision')
+          p='docs/schemas/regelsuche-search-trajectory-v3.schema.json'
+          s=json.loads(Path(p).read_text()); s['title']='Regelsuche search trajectory event v3'
+          Path(p).write_text(json.dumps(s,indent=2)+'\n')
+          p='app/src/main/resources/web/candidate-dossier-state.js'
+          edit(p, "value.schema !== 'regelsuche.search-state-replay/v1' || !value.executionRetained",
+               "value.schema !== 'regelsuche.search-state-replay/v2'\n"
+               "                || value.scoringRevision !== 'regelsuche.expression-score/v2'\n"
+               "                || value.score?.scoringRevision !== value.scoringRevision || !value.executionRetained")
+          p='app/src/e2eTest/resources/native-search-dossier-controls.js'
+          edit(p, '    const selected = api.selection(decoded, candidate.stateId);',
+               '''    const selected = api.selection(decoded, candidate.stateId);
+              check(selected.observation.schema === 'regelsuche.search-state-replay/v2'
+                  && selected.observation.scoringRevision === 'regelsuche.expression-score/v2'
+                  && selected.observation.score.scoringRevision === selected.observation.scoringRevision,
+                  'native score lost its producer-bound revision');
+              for (const mutate of [
+                  value => { value.schema = 'regelsuche.search-state-replay/v1'; },
+                  value => { delete value.scoringRevision; },
+                  value => { value.scoringRevision = 'foreign-score/v1'; },
+                  value => { delete value.score.scoringRevision; },
+                  value => { value.score.scoringRevision = 'foreign-score/v1'; }
+              ]) {
+                  const incompatible = JSON.parse(JSON.stringify(artifact));
+                  const state = incompatible.content.states[0];
+                  const observation = window.RegelsucheRunWorkspace.parseExactJson(state.canonicalStateJson);
+                  mutate(observation);
+                  state.canonicalStateJson = JSON.stringify(observation);
+                  reject(() => api.decode(run, {...reply, raw: JSON.stringify(incompatible)}),
+                      'native dossier accepted incompatible scoring provenance');
+              }''')
+          manifest.write_text('\n'.join(sorted(changed))+'\n')
+          PY
+          node --check app/src/main/resources/web/candidate-dossier-state.js
+          node --check app/src/e2eTest/resources/native-search-dossier-controls.js
           git diff --check
           git diff --stat
       - name: Java25 core and search tests and complete application compilation
@@ -100,8 +152,9 @@ jobs:
           assert int(ET.parse(p).getroot().attrib['tests']) >= 6
           PY
           git diff --check
-          git diff --binary > "$RUNNER_TEMP/pr1006-product.patch"
           git add --pathspec-from-file="$RUNNER_TEMP/pr1006-changed-paths.txt"
+          git diff --cached --check
+          git diff --cached --binary > "$RUNNER_TEMP/pr1006-product.patch"
           git diff --cached --stat
           git config user.name 'Regelsuche maintenance automation'
           git config user.email 'noreply@github.com'
