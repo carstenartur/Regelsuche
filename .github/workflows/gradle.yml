@@ -24,10 +24,27 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          fetch-depth: 0
+          fetch-depth: 1
       - name: Keep preparation outside the product checkout
         run: |
           cp .github/scripts/pr1006-provenance.py "$RUNNER_TEMP/pr1006-provenance.py"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          path = Path(os.environ['RUNNER_TEMP']) / 'pr1006-provenance.py'
+          source = path.read_text()
+          start = source.index("path = S + 'search/telemetry/SearchEventJson.java'")
+          end = source.index('\n\nadd_revision_record(', start)
+          source = source[:start] + '''path = S + 'search/telemetry/SearchEventJson.java'
+          text = Path(path).read_text()
+          anchor = '        appendNumberField(json, "score", event.score());'
+          assert text.count(anchor) == 1
+          write(path, text.replace(anchor, anchor + '\\n        appendStringField(json, "scoringRevision", event.scoringRevision());'))
+          ''' + source[end:]
+          path.write_text(source)
+          compile(source, str(path), 'exec')
+          PY
+          git fetch --quiet --no-tags --depth=1 origin "$EXPECTED_HEAD"
           git checkout --detach "$EXPECTED_HEAD"
           actual=$(git ls-remote origin refs/heads/fix/scoped-symbol-search-prerequisites-20260913 | cut -f1)
           test "$actual" = "$EXPECTED_HEAD"
@@ -45,7 +62,7 @@ jobs:
           ./gradlew --no-daemon --no-configuration-cache --console=plain --max-workers=2 :regelsuche-search:test --tests de.regelsuche.scoring.ExpressionScoreRevisionTest > "$RUNNER_TEMP/pr1006-red.log" 2>&1
           result=$?
           set -e
-          tail -80 "$RUNNER_TEMP/pr1006-red.log"
+          tail -50 "$RUNNER_TEMP/pr1006-red.log"
           test "$result" -ne 0
           python3 - <<'PY'
           import xml.etree.ElementTree as ET
@@ -92,6 +109,18 @@ jobs:
           git push origin "HEAD:refs/heads/$CANDIDATE_BRANCH"
           echo "QUALIFIED_CANDIDATE=$(git rev-parse HEAD)"
           echo "QUALIFIED_TREE=$(git rev-parse HEAD^{tree})"
+      - name: Report any failed tests without suppressing the failure
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import pathlib, xml.etree.ElementTree as ET
+          for module in ('regelsuche-core','regelsuche-search','app'):
+            for path in pathlib.Path(module+'/build/test-results/test').glob('TEST-*.xml'):
+              for case in ET.parse(path).getroot().iter('testcase'):
+                for kind in ('failure','error'):
+                  for error in case.findall(kind):
+                    print(path, case.attrib, error.attrib, (error.text or '')[:2500])
+          PY
       - name: Preserve reports on success and failure
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
