@@ -7,6 +7,25 @@ window.nativeSearchDossierControls = async function (run, artifact) {
     const decoded = api.decode(run, reply);
     const candidate = decoded.content.states.find(state => state.generationSequences.length > 0);
     const selected = api.selection(decoded, candidate.stateId);
+    check(selected.observation.schema === 'regelsuche.search-state-replay/v2'
+        && selected.observation.scoringRevision === 'regelsuche.expression-score/v2'
+        && selected.observation.score.scoringRevision === selected.observation.scoringRevision,
+        'native score lost its producer-bound revision');
+    for (const mutate of [
+        value => { value.schema = 'regelsuche.search-state-replay/v1'; },
+        value => { delete value.scoringRevision; },
+        value => { value.scoringRevision = 'foreign-score/v1'; },
+        value => { delete value.score.scoringRevision; },
+        value => { value.score.scoringRevision = 'foreign-score/v1'; }
+    ]) {
+        const incompatible = JSON.parse(JSON.stringify(artifact));
+        const state = incompatible.content.states[0];
+        const observation = window.RegelsucheRunWorkspace.parseExactJson(state.canonicalStateJson);
+        mutate(observation);
+        state.canonicalStateJson = JSON.stringify(observation);
+        reject(() => api.decode(run, {...reply, raw: JSON.stringify(incompatible)}),
+            'native dossier accepted incompatible scoring provenance');
+    }
     check(selected.native && selected.candidate.stateId === candidate.stateId, 'native candidate selection lost its identity');
     check(selected.generations.length === candidate.generationSequences.length, 'ordered execution lost actual generation links');
     check(selected.observation.applicationKeys.every((value, index, values) => index === 0 || values[index - 1] < value), 'application keys are not a canonical set');

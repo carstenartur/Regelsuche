@@ -27,6 +27,7 @@ public final class InMemorySearchExperienceRepository implements SearchExperienc
     @Override
     public synchronized void store(SearchExperience experience) {
         Objects.requireNonNull(experience, "experience");
+        de.regelsuche.scoring.ScoreRevision.requireCurrent(experience.scoringRevision());
         SearchExperience previous = byId.put(experience.experienceId(), experience);
         if (previous != null) {
             removeFromIndex(previous);

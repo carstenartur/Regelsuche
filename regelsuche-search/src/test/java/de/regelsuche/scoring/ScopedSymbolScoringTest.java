@@ -56,9 +56,9 @@ class ScopedSymbolScoringTest {
     }
 
     @Test void nonReservedIdentifiersAndFunctionNamesKeepTheirExistingTextCosts() {
-        assertEquals(new ExpressionScore(4, 4, 1, 0, 0), scorer.score("x+12"));
-        assertEquals(new ExpressionScore(7, 7, 1, 0, 0), scorer.score("longx+0"));
-        assertEquals(new ExpressionScore(6, 4, 0, 1, 0), scorer.score("sin(x)"));
+        assertEquals(new ExpressionScore(4, 4, 1, 0, 0, ScoreRevision.CURRENT), scorer.score("x+12"));
+        assertEquals(new ExpressionScore(7, 7, 1, 0, 0, ScoreRevision.CURRENT), scorer.score("longx+0"));
+        assertEquals(new ExpressionScore(6, 4, 0, 1, 0, ScoreRevision.CURRENT), scorer.score("sin(x)"));
         String name = "prefix_" + new SymbolId(NAMESPACE, 2).identifier();
         assertEquals(name.length(), scorer.score(name).stringLength());
         String function = new SymbolId(NAMESPACE, 2).identifier();

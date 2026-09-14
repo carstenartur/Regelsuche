@@ -10,6 +10,8 @@ public interface SearchExperienceRepository {
     void store(SearchExperience experience);
 
     default void store(SearchTrajectoryRun run) {
+        // Preflight the whole batch before mutating an experience repository.
+        run.records().forEach(SearchTrajectoryRecord::requireCurrentScoring);
         for (SearchTrajectoryRecord record : run.records()) {
             if (!record.decision() || record.parent() == null || record.ruleId().isBlank()) {
                 continue;
@@ -41,9 +43,56 @@ public interface SearchExperienceRepository {
         boolean selectedPath,
         boolean eventualSuccess,
         GoalStatus terminalStatus,
-        String pruningReason
+        String pruningReason,
+        String scoringRevision
     ) {
+        /** Raw historical or custom values do not identify their scoring producer. */
+        public SearchExperience(
+            String experienceId,
+            String runId,
+            String family,
+            String parentValueHash,
+            String parentAlphaShapeHash,
+            String childValueHash,
+            String childAlphaShapeHash,
+            String targetAlphaShapeHash,
+            String ruleId,
+            RewriteKind rewriteKind,
+            List<String> assumptions,
+            int depth,
+            int parentScore,
+            int childScore,
+            int scoreDelta,
+            boolean selectedPath,
+            boolean eventualSuccess,
+            GoalStatus terminalStatus,
+            String pruningReason
+        ) {
+            this(
+                experienceId,
+                runId,
+                family,
+                parentValueHash,
+                parentAlphaShapeHash,
+                childValueHash,
+                childAlphaShapeHash,
+                targetAlphaShapeHash,
+                ruleId,
+                rewriteKind,
+                assumptions,
+                depth,
+                parentScore,
+                childScore,
+                scoreDelta,
+                selectedPath,
+                eventualSuccess,
+                terminalStatus,
+                pruningReason,
+                de.regelsuche.scoring.ScoreRevision.UNSPECIFIED);
+        }
+
         public SearchExperience {
+            scoringRevision = de.regelsuche.scoring.ScoreRevision.normalize(scoringRevision);
             experienceId = safe(experienceId);
             runId = safe(runId);
             family = safe(family);
@@ -59,6 +108,7 @@ public interface SearchExperienceRepository {
         }
 
         static SearchExperience from(SearchTrajectoryRecord record) {
+            record.requireCurrentScoring();
             String parentValue = record.parent() == null ? "" : record.parent().valueHash();
             String parentAlpha = record.parent() == null ? "" : record.parent().alphaShapeHash();
             String targetAlpha = record.target() == null ? "" : record.target().alphaShapeHash();
@@ -82,7 +132,8 @@ public interface SearchExperienceRepository {
                 record.selectedPath(),
                 record.eventualSuccess(),
                 record.terminalStatus(),
-                record.pruningReason());
+                record.pruningReason(),
+                record.scoringRevision());
         }
 
         public boolean successfulChoice() {

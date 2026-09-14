@@ -8,12 +8,13 @@ import java.util.function.Supplier;
 
 /** Portable common-state observation. Loading never reconstructs executable transformations. */
 public final class SearchStateReplay {
-    public static final String SCHEMA = "regelsuche.search-state-replay/v1";
+    public static final String SCHEMA = "regelsuche.search-state-replay/v2";
     private SearchStateReplay() { }
 
     public static String toCanonicalJson(SearchState state) {
         Objects.requireNonNull(state, "state");
         var json = new JsonWriter().beginObject().property("schema", SCHEMA)
+            .property("scoringRevision", state.score() == null ? de.regelsuche.scoring.ScoreRevision.UNSPECIFIED : state.score().scoringRevision())
             .property("expression", state.expression()).property("depth", state.depth())
             .property("canonicalHash", state.canonicalHash())
             .stringArray("path", state.path()).stringArray("appliedRuleIds", state.appliedRuleIds())
@@ -28,7 +29,8 @@ public final class SearchStateReplay {
             .stringArray("appliedRuleKinds", state.appliedRuleKinds().stream().map(Enum::name).toList())
             .array("equivalencePreservingFlags", array -> state.equivalencePreservingFlags().forEach(array::value));
         if (state.score() == null) json.nullProperty("score");
-        else json.object("score", score -> score.property("stringLength", state.score().stringLength())
+        else json.object("score", score -> score.property("scoringRevision", state.score().scoringRevision())
+                .property("stringLength", state.score().stringLength())
                 .property("astNodeCount", state.score().astNodeCount()).property("operatorCount", state.score().operatorCount())
                 .property("nestingDepth", state.score().nestingDepth()).property("recognizedPatternBonus", state.score().recognizedPatternBonus()));
         json.property("executionRetained", state.transformations() != null);
@@ -38,7 +40,13 @@ public final class SearchStateReplay {
 
     public static SearchState verifyArtifact(Path file, SearchReplayArtifact.Reference reference,
             Supplier<SearchState> independentlyReplayedState) throws IOException {
+        return verifyArtifact(file, reference, de.regelsuche.scoring.ScoreRevision.CURRENT, independentlyReplayedState);
+    }
+
+    public static SearchState verifyArtifact(Path file, SearchReplayArtifact.Reference reference,
+            String expectedScoringRevision, Supplier<SearchState> independentlyReplayedState) throws IOException {
         String expected = SearchReplayArtifact.load(file, reference);
+        de.regelsuche.scoring.ScoreRevision.requireReplay(expected, SCHEMA, expectedScoringRevision);
         SearchState actual = Objects.requireNonNull(independentlyReplayedState, "replay source").get();
         if (actual.transformations() == null) throw new IllegalArgumentException("observational-only state cannot authorize replay");
         if (!expected.equals(toCanonicalJson(actual))) throw new IllegalArgumentException("search state replay differs from artifact");

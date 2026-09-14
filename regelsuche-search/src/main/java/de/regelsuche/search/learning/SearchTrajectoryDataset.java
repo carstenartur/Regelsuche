@@ -18,7 +18,7 @@ import java.util.Set;
 
 /** Deterministic, leakage-audited collection of post-labelled search trajectories. */
 public final class SearchTrajectoryDataset {
-    public static final String SCHEMA = "regelsuche.search-trajectory-dataset/v2";
+    public static final String SCHEMA = "regelsuche.search-trajectory-dataset/v3";
 
     private static final Comparator<SearchTrajectoryRun> RUN_ORDER = Comparator
         .comparing((SearchTrajectoryRun run) -> run.context().split().ordinal())
@@ -186,6 +186,8 @@ public final class SearchTrajectoryDataset {
         DatasetSummary summary = summary();
         JsonWriter json = new JsonWriter().beginObject()
             .property("schema", SCHEMA)
+            .stringArray("scoringRevisions", runs.stream().flatMap(run -> run.records().stream())
+                .map(SearchTrajectoryRecord::scoringRevision).distinct().sorted().toList())
             .property("runs", summary.runs())
             .property("records", summary.records())
             .property("decisions", summary.decisions())
@@ -247,6 +249,10 @@ public final class SearchTrajectoryDataset {
             json.nullProperty("target");
         } else {
             json.object("target", value -> writeFingerprint(value, record.target()));
+        }
+        // Preserve the original schema and numerical meaning of legacy records.
+        if (SearchTrajectoryRecord.SCHEMA.equals(record.schema())) {
+            json.property("scoringRevision", record.scoringRevision());
         }
         ExpressionFeatures features = record.features();
         json.object("features", value -> value

@@ -34,6 +34,7 @@ public final class SearchPolicyTrainer {
         List<SearchTrajectoryRun> trainingRuns = dataset.runs().stream()
             .filter(run -> run.context().split() == DatasetSplit.TRAIN)
             .toList();
+        trainingRuns.forEach(run -> run.records().forEach(SearchTrajectoryRecord::requireCurrentScoring));
         Map<String, MutableRuleStatistics> mutable = new LinkedHashMap<>();
         TreeSet<String> inventoryHashes = new TreeSet<>();
         trainingRuns.forEach(run -> run.records().stream()

@@ -22,7 +22,8 @@ public record DescriptorPolicyModel(
     Map<String, DescriptorStatistics> descriptors,
     Map<String, FeatureStatistics> features
 ) {
-    public static final String FEATURE_SCHEMA = TransformationDescriptor.SCHEMA;
+    public static final String FEATURE_SCHEMA = TransformationDescriptor.SCHEMA
+        + ";score=" + de.regelsuche.scoring.ScoreRevision.CURRENT;
     private static final String MODEL_SCHEMA = "regelsuche.transformation-descriptor-model/v1";
 
     public DescriptorPolicyModel {

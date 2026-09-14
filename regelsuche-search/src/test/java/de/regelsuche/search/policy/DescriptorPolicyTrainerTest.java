@@ -33,7 +33,7 @@ class DescriptorPolicyTrainerTest {
     private final ExpressionScorer scorer = new ExpressionScorer();
 
     @Test
-    void trainsAndLoadsByteStableDescriptorModelFromTrajectoryV2() {
+    void trainsAndLoadsByteStableDescriptorModelFromTrajectoryV3() {
         SearchTrajectoryDataset dataset = datasetWithValidation(
             run(
                 "train-neutral",
@@ -64,13 +64,13 @@ class DescriptorPolicyTrainerTest {
         assertTrue(first.modelVersion().startsWith("descriptor-policy-v1:"));
         assertTrue(first.sourceDatasetHash().startsWith("sha256:"));
         assertTrue(first.predictiveDatasetHash().startsWith("sha256:"));
-        assertEquals(TransformationDescriptor.SCHEMA, first.featureSchemaVersion());
+        assertEquals(TransformationDescriptor.SCHEMA + ";score=" + de.regelsuche.scoring.ScoreRevision.CURRENT, first.featureSchemaVersion());
         assertEquals(2, first.descriptors().values().stream()
             .mapToInt(DescriptorPolicyModel.DescriptorStatistics::observations)
             .sum());
         assertTrue(first.features().containsKey("root.transition.ADD_TO_VARIABLE"));
         assertTrue(first.features().containsKey("root.transition.ADD_TO_MUL"));
-        assertTrue(dataset.toJsonLines().contains("\"schema\":\"regelsuche.search-trajectory/v2\""));
+        assertTrue(dataset.toJsonLines().contains("\"schema\":\"regelsuche.search-trajectory/v3\""));
         assertTrue(dataset.toJsonLines().contains("\"transformationDescriptor\""));
         assertTrue(dataset.toJsonLines().contains(TransformationDescriptor.SCHEMA));
     }

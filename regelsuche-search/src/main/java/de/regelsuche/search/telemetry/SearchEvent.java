@@ -24,9 +24,56 @@ public record SearchEvent(
     int visitedCount,
     int generatedCount,
     String pruningReason,
-    RecordedExecution execution
+    RecordedExecution execution,
+    String scoringRevision
 ) {
+    /** Raw historical or custom values do not identify their scoring producer. */
+    public SearchEvent(
+        long sequence,
+        SearchEventType type,
+        String expression,
+        String canonicalHash,
+        int depth,
+        int score,
+        String parentCanonicalHash,
+        String parentExpression,
+        String ruleId,
+        RewriteKind rewriteKind,
+        boolean mayIncreaseComplexity,
+        int estimatedCostDelta,
+        boolean equivalencePreservingByConstruction,
+        List<String> assumptions,
+        int frontierSize,
+        int visitedCount,
+        int generatedCount,
+        String pruningReason,
+        RecordedExecution execution
+    ) {
+        this(
+            sequence,
+            type,
+            expression,
+            canonicalHash,
+            depth,
+            score,
+            parentCanonicalHash,
+            parentExpression,
+            ruleId,
+            rewriteKind,
+            mayIncreaseComplexity,
+            estimatedCostDelta,
+            equivalencePreservingByConstruction,
+            assumptions,
+            frontierSize,
+            visitedCount,
+            generatedCount,
+            pruningReason,
+            execution,
+            de.regelsuche.scoring.ScoreRevision.UNSPECIFIED);
+    }
+
     public SearchEvent {
+        scoringRevision = de.regelsuche.scoring.ScoreRevision.normalize(scoringRevision);
         if (type == null) {
             throw new IllegalArgumentException("type must not be null");
         }

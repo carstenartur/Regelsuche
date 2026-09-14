@@ -89,7 +89,7 @@ incomplete alternatives. No failure status is evidence of impossibility.
 
 ## Observation and replay
 
-`Result.toCanonicalJson()` produces `regelsuche.work-search-replay/v1`. It binds
+`Result.toCanonicalJson()` produces `regelsuche.work-search-replay/v2`, including the actual scoring producer revision. It binds
 the input, target, every budget, work revision, states and scores, candidate
 decisions, expansion completeness, all work dimensions and source observations.
 Paths retain canonical typed provenance with the exact source/output, method,

@@ -84,7 +84,8 @@ public class DefaultTransformationImportService implements TransformationImportS
             intValue(values.get("astNodeCount"), 0),
             intValue(values.get("operatorCount"), 0),
             intValue(values.get("nestingDepth"), 0),
-            intValue(values.get("recognizedPatternBonus"), 0)
+            intValue(values.get("recognizedPatternBonus"), 0),
+            stringValue(values.get("scoringRevision"), de.regelsuche.scoring.ScoreRevision.UNSPECIFIED)
         );
     }
 

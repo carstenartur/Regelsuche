@@ -35,11 +35,74 @@ public record SearchTrajectoryRecord(
     String pruningReason,
     boolean eventualSuccess,
     boolean selectedPath,
-    GoalStatus terminalStatus
+    GoalStatus terminalStatus,
+    String scoringRevision
 ) {
-    public static final String SCHEMA = "regelsuche.search-trajectory/v2";
+    /** Raw historical or custom values do not identify their scoring producer. */
+    public SearchTrajectoryRecord(
+        String schema,
+        String producerVersion,
+        String runId,
+        String family,
+        DatasetSplit split,
+        String ruleInventoryHash,
+        long sequence,
+        SearchEventType eventType,
+        ExpressionFingerprint expression,
+        ExpressionFingerprint parent,
+        ExpressionFingerprint target,
+        ExpressionFeatures features,
+        TransformationDescriptor transformationDescriptor,
+        int depth,
+        int score,
+        int parentScore,
+        int frontierSize,
+        int visitedCount,
+        int generatedCount,
+        String ruleId,
+        RewriteKind rewriteKind,
+        List<String> applicableRuleIds,
+        List<String> assumptions,
+        String pruningReason,
+        boolean eventualSuccess,
+        boolean selectedPath,
+        GoalStatus terminalStatus
+    ) {
+        this(
+            schema,
+            producerVersion,
+            runId,
+            family,
+            split,
+            ruleInventoryHash,
+            sequence,
+            eventType,
+            expression,
+            parent,
+            target,
+            features,
+            transformationDescriptor,
+            depth,
+            score,
+            parentScore,
+            frontierSize,
+            visitedCount,
+            generatedCount,
+            ruleId,
+            rewriteKind,
+            applicableRuleIds,
+            assumptions,
+            pruningReason,
+            eventualSuccess,
+            selectedPath,
+            terminalStatus,
+            de.regelsuche.scoring.ScoreRevision.UNSPECIFIED);
+    }
+
+    public static final String SCHEMA = "regelsuche.search-trajectory/v3";
 
     public SearchTrajectoryRecord {
+        scoringRevision = de.regelsuche.scoring.ScoreRevision.normalize(scoringRevision);
         schema = schema == null || schema.isBlank() ? SCHEMA : schema;
         requireText(producerVersion, "producerVersion");
         requireText(runId, "runId");
@@ -61,6 +124,14 @@ public record SearchTrajectoryRecord(
             throw new IllegalArgumentException(
                 "transformationDescriptor must be present exactly for transformation decisions");
         }
+    }
+
+    /** Old schemas cannot assert the current scoring contract by merely adding a label. */
+    public void requireCurrentScoring() {
+        if (!SCHEMA.equals(schema)) {
+            throw new IllegalArgumentException("unsupported scoring trajectory schema: " + schema);
+        }
+        de.regelsuche.scoring.ScoreRevision.requireCurrent(scoringRevision);
     }
 
     public boolean decision() {

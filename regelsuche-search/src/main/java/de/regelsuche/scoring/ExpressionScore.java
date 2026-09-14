@@ -5,13 +5,38 @@ public record ExpressionScore(
     int astNodeCount,
     int operatorCount,
     int nestingDepth,
-    int recognizedPatternBonus
+    int recognizedPatternBonus,
+    String scoringRevision
 ) {
+    /** Raw historical or custom values do not identify their scoring producer. */
+    public ExpressionScore(
+        int stringLength,
+        int astNodeCount,
+        int operatorCount,
+        int nestingDepth,
+        int recognizedPatternBonus
+    ) {
+        this(
+            stringLength,
+            astNodeCount,
+            operatorCount,
+            nestingDepth,
+            recognizedPatternBonus,
+            de.regelsuche.scoring.ScoreRevision.UNSPECIFIED);
+    }
+
+    public ExpressionScore {
+        scoringRevision = de.regelsuche.scoring.ScoreRevision.normalize(scoringRevision);
+    }
+
     public int weightedTotal() {
         return stringLength + astNodeCount + operatorCount + nestingDepth - recognizedPatternBonus;
     }
 
     public int improvementTo(ExpressionScore other) {
+        if (!scoringRevision.equals(other.scoringRevision())) {
+            throw new IllegalArgumentException("cannot compare different scoring revisions");
+        }
         return weightedTotal() - other.weightedTotal();
     }
 }

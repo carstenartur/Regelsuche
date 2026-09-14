@@ -94,3 +94,28 @@ and review are required before merging.
 The prerequisite in this change does not implement steps 2 or 3 or execute step 4.
 There is no protected FINAL TEST, default-policy promotion, speedup claim or
 universal search-completeness claim in this change.
+
+
+## Producer-bound scoring provenance
+
+`ExpressionScore.scoringRevision` records the producer contract when the score is
+created. The built-in scorer uses `regelsuche.expression-score/v2`, covering both
+whole-identifier quadratic recognition and scoped-symbol heuristic costs. The
+legacy numeric constructor deliberately records `unspecified`; historical or
+custom numbers are not relabelled as current built-in scores.
+
+Telemetry retains that contract, trajectory v3 carries it through split copies
+and JSONL, and both built-in trainers preflight TRAIN records before consuming
+score deltas. The experience repository preflights complete batches before
+mutation. Old schemas and unknown/custom score contracts are not admitted to the
+built-in training contract. Named custom scores remain usable in ordinary search
+and export; this change does not discard their numerical values. Policy feature
+versions distinguish old models from models learned with the new semantics.
+
+State/work replay formats are v2. Artifact size/digest, schema, producer revision
+and nested score revisions are checked before a supplied source reconstruction
+function executes. Explicit overloads allow a caller to agree a named custom
+contract; the default contract is the current built-in scorer. Serialized data
+never becomes proof authority. Import/export retain each score's own revision;
+missing historical metadata stays `unspecified`. Old artifacts and frozen study
+inputs are not rewritten, nor are performance thresholds or work budgets changed.

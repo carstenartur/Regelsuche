@@ -126,9 +126,14 @@ public final class SearchTrajectoryCollector implements SearchObserver {
             : selectedStates.contains(eventSyntax);
         String applicableKey = transformation ? parentSyntax : eventSyntax;
         List<String> applicable = applicableByParent.getOrDefault(applicableKey, List.of());
-        int parentScore = event.parentExpression().isBlank()
-            ? event.score()
-            : problem.scorer().score(event.parentExpression()).weightedTotal();
+        int parentScore = event.score();
+        if (!event.parentExpression().isBlank()) {
+            var producedParentScore = problem.scorer().score(event.parentExpression());
+            if (!event.scoringRevision().equals(producedParentScore.scoringRevision())) {
+                throw new IllegalArgumentException("parent and child use different scoring revisions");
+            }
+            parentScore = producedParentScore.weightedTotal();
+        }
 
         return new SearchTrajectoryRecord(
             SearchTrajectoryRecord.SCHEMA,
@@ -157,7 +162,8 @@ public final class SearchTrajectoryCollector implements SearchObserver {
             event.pruningReason(),
             result.reached(),
             selected,
-            result.status());
+            result.status(),
+            event.scoringRevision());
     }
 
     private Map<String, List<String>> applicableRulesByParent() {
