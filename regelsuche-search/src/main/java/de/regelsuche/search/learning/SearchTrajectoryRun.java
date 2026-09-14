@@ -56,7 +56,7 @@ public record SearchTrajectoryRun(
                 record.pruningReason(),
                 record.eventualSuccess(),
                 record.selectedPath(),
-                record.terminalStatus()))
+                record.terminalStatus(), record.scoringRevision()))
             .toList();
         return new SearchTrajectoryRun(
             updated, root, target, taskValueFingerprint, taskAlphaFingerprint,

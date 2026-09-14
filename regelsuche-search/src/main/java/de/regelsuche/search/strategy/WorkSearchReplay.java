@@ -17,7 +17,7 @@ import java.util.Objects;
 
 /** Canonical observation and replay comparison; JSON never creates executable evidence. */
 public final class WorkSearchReplay {
-    public static final String SCHEMA = "regelsuche.work-search-replay/v1";
+    public static final String SCHEMA = "regelsuche.work-search-replay/v2";
 
     private WorkSearchReplay() {}
 
@@ -28,6 +28,9 @@ public final class WorkSearchReplay {
      */
     public static Result verify(String expectedCanonicalJson, Problem independentlyVerifiedProblem) {
         Objects.requireNonNull(expectedCanonicalJson, "expectedCanonicalJson");
+        Objects.requireNonNull(independentlyVerifiedProblem, "independentlyVerifiedProblem");
+        de.regelsuche.scoring.ScoreRevision.requireReplay(expectedCanonicalJson, SCHEMA,
+            independentlyVerifiedProblem.scorer().score(independentlyVerifiedProblem.inputExpression()).scoringRevision());
         var replay = new WorkBudgetBestFirstSearchStrategy().search(independentlyVerifiedProblem);
         if (!replay.toCanonicalJson().equals(expectedCanonicalJson)) {
             throw new IllegalArgumentException("search replay differs in state, provenance, work or decisions");
@@ -38,12 +41,19 @@ public final class WorkSearchReplay {
     /** Artifact bytes are verified before the full verifier/source reconstruction is requested. */
     public static Result verifyArtifact(java.nio.file.Path file, SearchReplayArtifact.Reference reference,
             java.util.function.Supplier<Problem> independentlyVerifiedProblem) throws java.io.IOException {
+        return verifyArtifact(file, reference, de.regelsuche.scoring.ScoreRevision.CURRENT, independentlyVerifiedProblem);
+    }
+
+    public static Result verifyArtifact(java.nio.file.Path file, SearchReplayArtifact.Reference reference,
+            String expectedScoringRevision, java.util.function.Supplier<Problem> independentlyVerifiedProblem) throws java.io.IOException {
         String expected = SearchReplayArtifact.load(file, reference);
+        de.regelsuche.scoring.ScoreRevision.requireReplay(expected, SCHEMA, expectedScoringRevision);
         return verify(expected, Objects.requireNonNull(independentlyVerifiedProblem, "verified problem source").get());
     }
 
     public static String toCanonicalJson(Result result) {
         var json = new JsonWriter().beginObject().property("schema", SCHEMA)
+            .property("scoringRevision", result.bestState().score().scoringRevision())
             .property("workRevision", result.metrics().workRevision().schema())
             .object("configuration", item -> writeConfiguration(item, result))
             .property("status", result.status().name())
@@ -79,7 +89,8 @@ public final class WorkSearchReplay {
     private static void writeState(JsonWriter json, State state) {
         json.property("expression", state.expression()).property("edgeDepth", state.edgeDepth())
             .property("primitiveDepth", state.primitiveDepth()).property("canonicalHash", state.canonicalHash())
-            .object("score", item -> item.property("stringLength", state.score().stringLength())
+            .object("score", item -> item.property("scoringRevision", state.score().scoringRevision())
+                .property("stringLength", state.score().stringLength())
                 .property("astNodeCount", state.score().astNodeCount()).property("operatorCount", state.score().operatorCount())
                 .property("nestingDepth", state.score().nestingDepth()).property("recognizedPatternBonus", state.score().recognizedPatternBonus()))
             .property("expandingSteps", state.expandingSteps())

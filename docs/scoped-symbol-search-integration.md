@@ -41,6 +41,34 @@ receive the same pattern bonus as `(a+3)*(b-3)` when `a` and `b` are distinct ID
 The AST, source occurrence ranges, value keys and symbolic document codec are not
 changed. Equal heuristic cost is not mathematical equality or proof.
 
+## Producer-bound scoring in persisted data
+
+The persisted scoring contract is `ScoreRevision.CURRENT`, currently
+`regelsuche.expression-score/v2`. It covers both whole-identifier quadratic
+recognition and identity-independent scoped-variable costs. The narrower
+`SCOPED_SYMBOL_METRIC_REVISION` source constant is not a persistence admission
+check by itself.
+
+`ExpressionScorer` attaches the contract when it produces an `ExpressionScore`.
+Telemetry, trajectory collection, dataset splits and experience records retain
+that producer identity. Fresh trajectory records use
+`regelsuche.search-trajectory/v3`; their JSON schema requires `scoringRevision`.
+The trainers and experience repository reject records that do not satisfy the
+current scoring contract. Policy feature-schema identities change with these
+score semantics as well.
+
+Score-bearing search-state and work-search replay envelopes use their v2 schemas
+and check their schema and expected scoring identity before invoking replay.
+Custom scorers need an explicitly matching replay identity; the built-in identity
+must not be inferred from arbitrary numbers or added retrospectively on export.
+
+Transformation export/import preserves the actual revision, numeric components
+and retained derivation data. Missing historical revisions remain `unspecified`;
+exporting such scores does not re-score them or relabel them as current. A JSON
+number, boolean, array or object is not a valid revision string and is rejected on
+import instead of being converted into one. Old trajectory records keep their
+old schema when exported and are not silently admitted to current training.
+
 ## Verification of this prerequisite
 
 The first 17 behavior cases ran against unchanged production: 16 failed and one
@@ -68,10 +96,39 @@ GraalVM dependencies. Those attempts are not successful tests. No committed JDK
 downgrade, stub, test exclusion or relaxed CI gate is added. Full exact-head CI
 and review are required before merging.
 
+### PR #1006 review follow-up verification
+
+The follow-up patch was applied to the source archive retained by PR #1006 CI
+run `34773747976`, repository-verification artifact `10323371799`. The unmodified
+archive subtrees for `app`, core, search, e-graph, discovery, learning, Gradle,
+scripts, configuration and documentation match the corresponding Git trees at
+PR head `ae1f5c1670aa0c8e51a5223bb4812cea0c00f5a1`.
+
+Four new malformed-revision import cases failed before the type check and passed
+after it. The nine export/import provenance cases also cover built-in, custom,
+obsolete and unspecified identities, historical numbers and preserved path data.
+The expanded supplementary Java 21 run passed 198 cases with no failures or
+skips. It compiles selected tests and their real source dependencies; it is not a
+complete Java 25 build or integration qualification. The fresh integration
+compilation still stops at three unchanged Java 25 `ScopedValue` call sites.
+The updated trainer assertion for freshly produced v3 records therefore remains
+unexecuted locally, as do the integration-level provenance cases.
+
+Replaying the retained PR JMH measurements through the unchanged regression
+verifier reproduces `INCONCLUSIVE`: `preparedTargetedSearch` has a point estimate
+of 0.806647309 ms/op, a score error of 6.820478288 ms/op and an allowed maximum of
+0.729862817 ms/op. This is neither a demonstrated regression nor passing evidence.
+The retained main report has the same inconclusive benchmark; that does not
+establish the cause or qualify the follow-up patch. The verifier self-tests pass.
+No fresh JMH measurement, precision-study retry, baseline adjustment or threshold
+relaxation is included. Exact-head Java 25 CI, admissible performance evidence and
+review are still required before merge.
+
 ## Remaining ordered implementation work
 
-1. Qualify #1004's current source and resolve its review findings. Its domain
-   validation, plugin recovery and release verifier are separate from learning.
+1. PR #1004 is merged at `3f0a3d8979e6d3f81d415514a969101ef7bf9f39`.
+   Its domain validation, plugin recovery and release verifier are separate from
+   learning. Aggregate plugin-cache limits are tracked separately in #1007.
    The main JMH failure was an INCONCLUSIVE measurement, not a missing benchmark
    list. Retained precision-study input replay and separately versioned adoption
    remain governed by #981; do not rerun until green or raise a threshold.

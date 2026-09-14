@@ -16,6 +16,7 @@ final class SearchEventJson {
         appendStringField(json, "canonicalHash", event.canonicalHash());
         appendNumberField(json, "depth", event.depth());
         appendNumberField(json, "score", event.score());
+        appendStringField(json, "scoringRevision", event.scoringRevision());
         appendStringField(json, "parentCanonicalHash", event.parentCanonicalHash());
         appendStringField(json, "ruleId", event.ruleId());
         appendEnumField(json, "rewriteKind", event.rewriteKind());

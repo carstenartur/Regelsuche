@@ -8,6 +8,7 @@ import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.RuleCandidate;
 import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.scoring.ExpressionScore;
+import de.regelsuche.scoring.ScoreRevision;
 import de.regelsuche.transform.RewriteKind;
 import java.time.Instant;
 import java.util.List;
@@ -84,8 +85,19 @@ public class DefaultTransformationImportService implements TransformationImportS
             intValue(values.get("astNodeCount"), 0),
             intValue(values.get("operatorCount"), 0),
             intValue(values.get("nestingDepth"), 0),
-            intValue(values.get("recognizedPatternBonus"), 0)
+            intValue(values.get("recognizedPatternBonus"), 0),
+            readScoreRevision(values.get("scoringRevision"))
         );
+    }
+
+    private static String readScoreRevision(Object value) {
+        if (value == null) {
+            return ScoreRevision.UNSPECIFIED;
+        }
+        if (!(value instanceof String revision)) {
+            throw new IllegalArgumentException("scoringRevision must be a string");
+        }
+        return revision;
     }
 
     private RuleCandidate readCandidate(Map<String, Object> values) {

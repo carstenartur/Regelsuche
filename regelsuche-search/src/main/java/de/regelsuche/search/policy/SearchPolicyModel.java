@@ -17,7 +17,7 @@ public record SearchPolicyModel(
     int minimumObservations,
     Map<String, RuleStatistics> rules
 ) {
-    public static final String FEATURE_SCHEMA = "regelsuche.search-policy-features/v1";
+    public static final String FEATURE_SCHEMA = "regelsuche.search-policy-features/v2";
     private static final String MODEL_SCHEMA = "regelsuche.search-policy-model/v1";
 
     public SearchPolicyModel {

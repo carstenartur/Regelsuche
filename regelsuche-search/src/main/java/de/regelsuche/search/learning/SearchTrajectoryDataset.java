@@ -18,7 +18,7 @@ import java.util.Set;
 
 /** Deterministic, leakage-audited collection of post-labelled search trajectories. */
 public final class SearchTrajectoryDataset {
-    public static final String SCHEMA = "regelsuche.search-trajectory-dataset/v2";
+    public static final String SCHEMA = "regelsuche.search-trajectory-dataset/v3";
 
     private static final Comparator<SearchTrajectoryRun> RUN_ORDER = Comparator
         .comparing((SearchTrajectoryRun run) -> run.context().split().ordinal())
@@ -228,9 +228,15 @@ public final class SearchTrajectoryDataset {
     }
 
     private static String toJson(SearchTrajectoryRecord record) {
-        JsonWriter json = new JsonWriter().beginObject()
-            .property("schema", record.schema())
-            .property("producerVersion", record.producerVersion())
+        JsonWriter json = new JsonWriter().beginObject().property("schema", record.schema());
+        if ("regelsuche.search-trajectory/v2".equals(record.schema())) {
+            if (!de.regelsuche.scoring.ScoreRevision.UNSPECIFIED.equals(record.scoringRevision())) {
+                throw new IllegalArgumentException("legacy scoring schema cannot encode a declared revision");
+            }
+        } else {
+            json.property("scoringRevision", record.scoringRevision());
+        }
+        json.property("producerVersion", record.producerVersion())
             .property("runId", record.runId())
             .property("family", record.family())
             .property("split", record.split().name())

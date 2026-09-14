@@ -8,12 +8,13 @@ import java.util.function.Supplier;
 
 /** Portable common-state observation. Loading never reconstructs executable transformations. */
 public final class SearchStateReplay {
-    public static final String SCHEMA = "regelsuche.search-state-replay/v1";
+    public static final String SCHEMA = "regelsuche.search-state-replay/v2";
     private SearchStateReplay() { }
 
     public static String toCanonicalJson(SearchState state) {
         Objects.requireNonNull(state, "state");
         var json = new JsonWriter().beginObject().property("schema", SCHEMA)
+            .property("scoringRevision", state.score() == null ? de.regelsuche.scoring.ScoreRevision.UNSPECIFIED : state.score().scoringRevision())
             .property("expression", state.expression()).property("depth", state.depth())
             .property("canonicalHash", state.canonicalHash())
             .stringArray("path", state.path()).stringArray("appliedRuleIds", state.appliedRuleIds())
@@ -38,7 +39,14 @@ public final class SearchStateReplay {
 
     public static SearchState verifyArtifact(Path file, SearchReplayArtifact.Reference reference,
             Supplier<SearchState> independentlyReplayedState) throws IOException {
+        return verifyArtifact(file, reference, de.regelsuche.scoring.ScoreRevision.CURRENT, independentlyReplayedState);
+    }
+
+    /** Explicitly identified custom scoring is opt-in; unversioned numbers never imply the built-in metric. */
+    public static SearchState verifyArtifact(Path file, SearchReplayArtifact.Reference reference,
+            String expectedScoringRevision, Supplier<SearchState> independentlyReplayedState) throws IOException {
         String expected = SearchReplayArtifact.load(file, reference);
+        de.regelsuche.scoring.ScoreRevision.requireReplay(expected, SCHEMA, expectedScoringRevision);
         SearchState actual = Objects.requireNonNull(independentlyReplayedState, "replay source").get();
         if (actual.transformations() == null) throw new IllegalArgumentException("observational-only state cannot authorize replay");
         if (!expected.equals(toCanonicalJson(actual))) throw new IllegalArgumentException("search state replay differs from artifact");

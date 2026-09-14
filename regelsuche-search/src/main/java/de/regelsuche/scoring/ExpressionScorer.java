@@ -34,7 +34,7 @@ public class ExpressionScorer {
         int bonus = recognizedPatternBonus(compact);
         SymbolOverhead overhead = symbolOverhead(compact);
         return new ExpressionScore(compact.length() - overhead.characters(), nodes - overhead.letterDigits(),
-            operators, maxNesting, bonus);
+            operators, maxNesting, bonus, ScoreRevision.CURRENT);
     }
 
     /**
