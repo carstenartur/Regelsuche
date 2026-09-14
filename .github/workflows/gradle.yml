@@ -1,493 +1,107 @@
-name: CI
+name: PR1006 isolated scoring provenance qualification
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main, 'codex/learned-scheduling-*' ]
   create:
-  workflow_dispatch:
+  push:
+    branches: [qa/pr1006-provenance-20260914]
+
+permissions:
+  contents: write
 
 concurrency:
-  group: >-
-    ${{ github.event_name == 'create' && github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1' && format('showcase-train-freeze-{0}', github.repository) || format('ci-{0}-{1}', github.repository, github.ref) }}
-  cancel-in-progress: >-
-    ${{ github.event_name != 'create' || github.event.ref_type != 'branch' || github.event.ref != 'showcase/train-freeze-authority-v1' }}
-permissions: { actions: read, contents: read, packages: read }
+  group: pr1006-provenance-qualification
+  cancel-in-progress: false
+
 jobs:
-  gradle-verification:
-    name: ${{ github.event_name == 'create' && 'Showcase train-freeze Gradle authority' || 'Checkout-local Gradle authority' }}
-    if: github.event_name != 'create' || (github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1')
-    runs-on: ubuntu-22.04
-    timeout-minutes: 300
-    env:
-      AI_KNOWLEDGE_EXTRACTOR_ENABLED: 'true'
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      REGELSUCHE_AUTHORITY_GITHUB_SHA: ${{ github.sha }}
-      REGELSUCHE_CI_TASK: ${{ github.event_name == 'create' && github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1' && 'authorizedShowcaseTrainFreeze' || 'ciCheck' }}
-      ORG_GRADLE_PROJECT_separateSympyRuntimeAuthority: 'true'
-      REGELSUCHE_SEPARATE_SYMPY_RUNTIME_AUTHORITY: required-by-workflow
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with: { fetch-depth: 0 }
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
-        with: { distribution: temurin, java-version: '25', verify-signature: true }
-      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
-        with: { cache-cleanup: on-success }
-      - name: Install checkout prerequisites
-        run: |
-          # Chrome is preinstalled by the runner; this checkout installs no Google apt packages.
-          sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
-          sudo apt-get update
-          # GraalPy isolates native modules beside the private extracted tree
-          # and invokes patchelf to relocate each context-local ELF copy.
-          sudo apt-get install -y --no-install-recommends \
-            patchelf=0.14.3-1 \
-            python3-venv \
-            z3=4.8.12-1
-          # Resolve only the pinned Playwright CLI. The independent bootstrap
-          # avoids configuring and compiling the complete production reactor.
-          ./gradlew --no-daemon -p playwright-bootstrap installPlaywrightHostDependencies --console=plain
-      - name: Run the checkout-owned Gradle authority without duplicate JMH or loaded SymPy runtime work
-        run: |
-          set -o pipefail
-          mkdir -p build/logs
-          env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache -PseparateJmhAuthority=true "$REGELSUCHE_CI_TASK" --parallel --console=plain --stacktrace 2>&1 | tee build/logs/ci-check.log
-      - name: Retain Gradle verification evidence
-        if: ${{ always() && !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: ${{ github.event_name == 'create' && github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1' && format('proof-carrying-showcase-train-freeze-{0}-{1}', github.sha, github.run_id) || 'repository-verification' }}
-          path: |
-            build/logs/**
-            build/distributions/regelsuche-sdk-*.zip
-            build/reports/**
-            build/ai-knowledge/**
-            build/independent-reproduction/**
-            build/proof-carrying-showcase/**
-            public/**
-            **/build/reports/**
-            **/build/test-results/**
-            **/build/discovery-artifacts/**
-            docs/generated/**
-            !build/reports/student-java-sdk/isolated-gradle-user-home/**
-            !build/reports/student-java-sdk/generated-gradle-user-home/**
-            !build/reports/student-java-sdk/hello-rule-java25-gradle-cache/**
-            !build/reports/student-java-sdk/finite-difference-domain-java25-gradle-cache/**
-            !build/reports/student-java-sdk/solver-adapter-java25-gradle-cache/**
-            !build/reports/student-java-sdk/number-theory-plan-java25-gradle-cache/**
-          include-hidden-files: true
-          if-no-files-found: warn
-
-  jmh-verification:
-    name: Isolated JMH authority
-    if: github.event_name != 'create' || (github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1')
-    runs-on: ubuntu-22.04
-    timeout-minutes: 120
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      REGELSUCHE_AUTHORITY_GITHUB_SHA: ${{ github.sha }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with: { fetch-depth: 0 }
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
-        with: { distribution: temurin, java-version: '25', verify-signature: true }
-      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
-        with: { cache-cleanup: on-success }
-      - name: Install isolated benchmark prerequisites
-        run: |
-          # Chrome is preinstalled by the runner; this checkout installs no Google apt packages.
-          sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            patchelf=0.14.3-1 \
-            python3-venv
-      - name: Run every JMH benchmark and fail-closed validator
-        run: bash gradle/run-isolated-jmh-authority.sh
-      - name: Retain isolated JMH evidence
-        if: ${{ always() && !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: jmh-verification
-          path: |
-            app/build/reports/jmh/**
-            app/build/reports/jmh-allocation/**
-            regelsuche-math-sympy/build/reports/jmh/**
-            build/reports/quality/jmh-regression-report.json
-            build/reports/quality/jmh-regression-report.md
-            public/dev/bench/**
-          include-hidden-files: true
-          if-no-files-found: error
-
-  sympy-runtime-verification:
-    name: Isolated SymPy runtime authority
-    if: github.event_name != 'create' || (github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1')
+  qualification:
+    if: github.ref == 'refs/heads/qa/pr1006-provenance-20260914'
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      REGELSUCHE_AUTHORITY_GITHUB_SHA: ${{ github.sha }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with: { fetch-depth: 0 }
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
-        with: { distribution: temurin, java-version: '25', verify-signature: true }
-      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
-        with: { cache-cleanup: on-success }
-      - name: Install isolated SymPy runtime prerequisites
-        run: |
-          # Chrome is preinstalled by the runner; this checkout installs no Google apt packages.
-          sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            patchelf=0.14.3-1 \
-            python3-venv
-      - name: Run the complete Gradle SymPy runtime test authority
-        run: bash gradle/run-isolated-sympy-runtime-authority.sh
-      - name: Retain isolated SymPy runtime evidence
-        if: ${{ always() && !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: sympy-runtime-verification
-          path: |
-            regelsuche-math-sympy/build/test-results/**
-            regelsuche-math-sympy/build/reports/tests/**
-            regelsuche-math-sympy/build/reports/jacoco/**
-          include-hidden-files: true
-          if-no-files-found: error
-
-  maven-product-verification:
-    name: Complete Maven product and Docker authority
-    if: github.event_name != 'create'
-    runs-on: ubuntu-22.04
-    timeout-minutes: 180
-    env:
-      AI_KNOWLEDGE_EXTRACTOR_ENABLED: 'true'
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      REGELSUCHE_AUTHORITY_GITHUB_SHA: ${{ github.sha }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with: { fetch-depth: 0 }
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
-        with:
-          distribution: temurin
-          java-version: '25'
-          verify-signature: true
-          cache: maven
-      - name: Install independent Maven checkout prerequisites
-        run: |
-          # Chrome is preinstalled by the runner; this checkout installs no Google apt packages.
-          sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            patchelf=0.14.3-1 \
-            python3-venv \
-            z3=4.8.12-1
-          mvn --batch-mode --no-transfer-progress \
-            -f playwright-bootstrap/pom.xml \
-            org.codehaus.mojo:exec-maven-plugin:3.5.0:java
-      - name: Verify the complete Maven product and Docker contract
-        run: mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify
-      - name: Retain Maven product verification evidence
-        if: ${{ always() && !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: maven-product-verification
-          path: |
-            build/reports/python-client/**
-            **/target/surefire-reports/**
-            **/target/failsafe-reports/**
-            **/target/discovery-artifacts/**
-          include-hidden-files: true
-          if-no-files-found: warn
-
-  external-polynomial-comparison:
-    name: External polynomial comparison
-    if: github.event_name != 'create'
-    runs-on: ubuntu-22.04
-    timeout-minutes: 30
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ github.token }}
+      EXPECTED_HEAD: ae1f5c1670aa0c8e51a5223bb4812cea0c00f5a1
+      CANDIDATE_BRANCH: fix/pr1006-provenance-candidate-20260914
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Keep preparation outside the product checkout
+        run: |
+          cp .github/scripts/pr1006-provenance.py "$RUNNER_TEMP/pr1006-provenance.py"
+          git checkout --detach "$EXPECTED_HEAD"
+          actual=$(git ls-remote origin refs/heads/fix/scoped-symbol-search-prerequisites-20260913 | cut -f1)
+          test "$actual" = "$EXPECTED_HEAD"
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
-        with: { distribution: temurin, java-version: '25', verify-signature: true }
+        with:
+          distribution: temurin
+          java-version: '25'
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
-        with: { cache-cleanup: on-success }
-      - name: Run the checkout-owned polynomial pilot and independent verification
-        run: bash gradle/run-external-polynomial-comparison.sh
-      - name: Retain complete evidence including negative outcomes
-        if: ${{ always() && !cancelled() }}
+        with:
+          cache-read-only: true
+      - name: Reproduce the two score provenance defects
+        run: |
+          python3 "$RUNNER_TEMP/pr1006-provenance.py" --red
+          set +e
+          ./gradlew --no-daemon --no-configuration-cache --console=plain --max-workers=2 :regelsuche-search:test --tests de.regelsuche.scoring.ExpressionScoreRevisionTest > "$RUNNER_TEMP/pr1006-red.log" 2>&1
+          result=$?
+          set -e
+          tail -80 "$RUNNER_TEMP/pr1006-red.log"
+          test "$result" -ne 0
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          p='regelsuche-search/build/test-results/test/TEST-de.regelsuche.scoring.ExpressionScoreRevisionTest.xml'
+          r=ET.parse(p).getroot()
+          assert int(r.attrib['tests']) == 2, r.attrib
+          assert int(r.attrib['failures']) == 2 and int(r.attrib['errors']) == 0, r.attrib
+          print('RED: both behavioral regressions reproduced; not a compiler failure')
+          PY
+      - name: Apply source-bound revision and admission checks
+        run: |
+          python3 "$RUNNER_TEMP/pr1006-provenance.py" --apply
+          git diff --check
+          git diff --stat
+      - name: Java25 core and search tests and complete application compilation
+        run: |
+          ./gradlew --no-daemon --no-configuration-cache --console=plain --max-workers=2 :regelsuche-core:test :regelsuche-search:test :app:compileJava :app:compileTestJava > "$RUNNER_TEMP/pr1006-green.log" 2>&1 || { tail -180 "$RUNNER_TEMP/pr1006-green.log"; exit 1; }
+          tail -100 "$RUNNER_TEMP/pr1006-green.log"
+      - name: Application import and export tests
+        run: |
+          ./gradlew --no-daemon --no-configuration-cache --console=plain --max-workers=2 :app:test --tests 'de.regelsuche.export.*' > "$RUNNER_TEMP/pr1006-export.log" 2>&1 || { tail -160 "$RUNNER_TEMP/pr1006-export.log"; exit 1; }
+          tail -70 "$RUNNER_TEMP/pr1006-export.log"
+      - name: Summarize fresh tests and publish isolated candidate only
+        run: |
+          python3 - <<'PY'
+          import pathlib, xml.etree.ElementTree as ET
+          counts={k:0 for k in ('tests','failures','errors','skipped')}
+          for m in ('regelsuche-core','regelsuche-search','app'):
+            for p in pathlib.Path(m+'/build/test-results/test').glob('TEST-*.xml'):
+              r=ET.parse(p).getroot()
+              for k in counts: counts[k]+=int(r.attrib.get(k,0))
+          print('JAVA25 QUALIFICATION:',counts)
+          assert counts['tests']>100 and counts['failures']==counts['errors']==0,counts
+          p=pathlib.Path('regelsuche-search/build/test-results/test/TEST-de.regelsuche.search.learning.ScoringProvenanceTest.xml')
+          assert int(ET.parse(p).getroot().attrib['tests']) >= 6
+          PY
+          git diff --check
+          git diff --binary > "$RUNNER_TEMP/pr1006-product.patch"
+          git add --pathspec-from-file="$RUNNER_TEMP/pr1006-changed-paths.txt"
+          git diff --cached --stat
+          git config user.name 'Regelsuche maintenance automation'
+          git config user.email 'noreply@github.com'
+          git commit -m 'Bind scoring revisions to producers and gate replay and learning data'
+          git push origin "HEAD:refs/heads/$CANDIDATE_BRANCH"
+          echo "QUALIFIED_CANDIDATE=$(git rev-parse HEAD)"
+          echo "QUALIFIED_TREE=$(git rev-parse HEAD^{tree})"
+      - name: Preserve reports on success and failure
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: external-polynomial-comparison-${{ github.event.pull_request.head.sha || github.sha }}
+          name: pr1006-scoring-provenance-qualification
           path: |
-            build/reports/external-polynomial-comparison/**
-            regelsuche-learning/build/test-results/**
-          if-no-files-found: error
-
-  verification:
-    name: ${{ github.event_name == 'create' && 'Showcase train-freeze authority v1' || 'Checkout-local ciCheck' }}
-    needs: [gradle-verification, jmh-verification, sympy-runtime-verification, maven-product-verification, external-polynomial-comparison]
-    if: >-
-      ${{ always() && (github.event_name != 'create' || (github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1')) }}
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
-    steps:
-      - name: Reject incomplete verification authority
-        if: >-
-          ${{ needs.gradle-verification.result != 'success' || needs.jmh-verification.result != 'success' || needs.sympy-runtime-verification.result != 'success' || (github.event_name != 'create' && (needs.maven-product-verification.result != 'success' || needs.external-polynomial-comparison.result != 'success')) }}
-        run: exit 1
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Download project-parallel Gradle coverage evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: ${{ github.event_name == 'create' && github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1' && format('proof-carrying-showcase-train-freeze-{0}-{1}', github.sha, github.run_id) || 'repository-verification' }}
-          path: .
-      - name: Download isolated SymPy coverage evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: sympy-runtime-verification
-          path: build/authority-evidence/sympy/regelsuche-math-sympy/build
-      - name: Download isolated JMH acceptance evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: jmh-verification
-          path: .
-      - name: Verify complete cross-authority coverage
-        run: >-
-          python3 -B scripts/verify-cross-authority-coverage.py
-          --root "$PWD"
-          --isolated-report
-          build/authority-evidence/sympy/regelsuche-math-sympy/build/reports/jacoco/test/jacocoTestReport.xml
-      - name: Collect complete checkout-owned quality acceptance evidence
-        id: acceptance_evidence
-        run: >-
-          python3 -B scripts/collect-quality-acceptance-evidence.py
-          --root "$PWD" --require-complete
-      - name: Retain quality acceptance index and bound source files
-        if: ${{ always() && !cancelled() && steps.acceptance_evidence.outcome != 'skipped' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: quality-acceptance-evidence
-          path: build/reports/quality/acceptance-evidence/**
-          include-hidden-files: true
-          if-no-files-found: error
-      - name: Retain converged coverage evidence
-        if: >-
-          ${{ always() && !cancelled() && needs.gradle-verification.result == 'success' && needs.jmh-verification.result == 'success' && needs.sympy-runtime-verification.result == 'success' && (github.event_name == 'create' || needs.maven-product-verification.result == 'success') }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: coverage-verification
-          path: |
-            build/reports/quality/coverage-report.json
-            build/reports/quality/coverage-report.md
-          include-hidden-files: true
-          if-no-files-found: error
-      - name: Record complete verification authority
-        run: echo "Gradle=${{ needs.gradle-verification.result }} JMH=${{ needs.jmh-verification.result }} SymPy=${{ needs.sympy-runtime-verification.result }} Maven=${{ needs.maven-product-verification.result }} Polynomial=${{ needs.external-polynomial-comparison.result }} Coverage=success"
-
-  publish-pages:
-    name: Publish generated reports
-    needs: verification
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-22.04
-    permissions: { actions: read, contents: write }
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with: { name: repository-verification, path: . }
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with: { name: jmh-verification, path: . }
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with: { name: coverage-verification, path: . }
-      - name: Assemble the static site
-        run: |
-          rm -rf build/pages-site && mkdir -p build/pages-site
-          cp -R docs/. build/pages-site/
-          cp -R public/. build/pages-site/
-          if [ -f app/build/reports/benchmark/benchmark-report.md ]; then cp app/build/reports/benchmark/benchmark-report.md build/pages-site/; fi
-          if [ -f app/build/reports/benchmark/benchmark-summary.json ]; then mkdir -p build/pages-site/assets; cp app/build/reports/benchmark/benchmark-summary.json build/pages-site/assets/; fi
-          touch build/pages-site/.nojekyll
-      - name: Publish generated reports to gh-pages
-        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: build/pages-site
-          keep_files: false
-          user_name: github-actions[bot]
-          user_email: github-actions[bot]@users.noreply.github.com
-          commit_message: Publish generated reports (${{ github.sha }})
-
-  jmh-precision-study:
-    name: JMH precision study replica ${{ matrix.replicate }}
-    if: >-
-      github.event_name == 'pull_request' && github.event.action == 'opened' && github.run_attempt == 1 &&
-      github.head_ref == 'codex/issue-981-jmh-precision-study' && github.repository == 'carstenartur/Regelsuche' &&
-      github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-22.04
-    timeout-minutes: 75
-    strategy:
-      fail-fast: false
-      max-parallel: 3
-      matrix:
-        replicate: [1, 2, 3]
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      REGELSUCHE_STUDY_REPLICATE: ${{ matrix.replicate }}
-    steps:
-      - name: Start the complete replica wall-clock budget
-        run: echo "REGELSUCHE_STUDY_JOB_START=$(date +%s)" >> "$GITHUB_ENV"
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        timeout-minutes: 5
-        with: { fetch-depth: 0, ref: '${{ github.sha }}' }
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
-        timeout-minutes: 5
-        with: { distribution: temurin, java-version: '25', verify-signature: true }
-      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
-        timeout-minutes: 5
-        with: { cache-cleanup: on-success }
-      - name: Install the same isolated benchmark prerequisites
-        timeout-minutes: 5
-        run: |
-          sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            patchelf=0.14.3-1 \
-            python3-venv
-      - name: Collect the preregistered protocols without retries
-        timeout-minutes: 60
-        run: >-
-          python3 -B scripts/run-jmh-precision-study-v1.py
-          --replicate "$REGELSUCHE_STUDY_REPLICATE"
-          --job-start-epoch "$REGELSUCHE_STUDY_JOB_START"
-          --output "build/reports/jmh-precision-study-v1/replicate-$REGELSUCHE_STUDY_REPLICATE"
-      - name: Retain every replica outcome and its original raw evidence
-        if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: jmh-precision-study-v1-replicate-${{ matrix.replicate }}
-          path: build/reports/jmh-precision-study-v1/replicate-${{ matrix.replicate }}
-          if-no-files-found: error
-
-  jmh-precision-study-report:
-    name: Retained JMH precision study analysis
-    needs: jmh-precision-study
-    if: >-
-      ${{ always() && !cancelled() && github.event_name == 'pull_request' && github.event.action == 'opened' &&
-      github.run_attempt == 1 && github.head_ref == 'codex/issue-981-jmh-precision-study' &&
-      github.repository == 'carstenartur/Regelsuche' && github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with: { fetch-depth: 0, ref: '${{ github.sha }}' }
-      - name: Download every available replica, including failed collections
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          pattern: jmh-precision-study-v1-replicate-*
-          path: retained
-          merge-multiple: false
-      - name: Revalidate all three replicas or retain an incomplete-evidence report
-        if: ${{ always() && !cancelled() }}
-        run: >-
-          python3 -B scripts/report-jmh-precision-study-v1.py
-          --replicate retained/jmh-precision-study-v1-replicate-1
-          --replicate retained/jmh-precision-study-v1-replicate-2
-          --replicate retained/jmh-precision-study-v1-replicate-3
-          --output build/reports/jmh-precision-study-v1/analysis
-      - name: Retain canonical analysis including errors and null outcomes
-        if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: jmh-precision-study-v1-analysis
-          path: build/reports/jmh-precision-study-v1/analysis
-          if-no-files-found: error
-
-  jmh-precision-study-v2:
-    name: JMH precision study v2 replica ${{ matrix.replicate }}
-    if: >-
-      github.event_name == 'pull_request' && github.event.action == 'opened' && github.run_attempt == 1 &&
-      github.head_ref == 'codex/issue-981-jmh-precision-study-v2' && github.repository == 'carstenartur/Regelsuche' &&
-      github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-22.04
-    timeout-minutes: 75
-    strategy:
-      fail-fast: false
-      max-parallel: 3
-      matrix:
-        replicate: [1, 2, 3]
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      REGELSUCHE_STUDY_REPLICATE: ${{ matrix.replicate }}
-    steps:
-      - name: Start the complete replica wall-clock budget
-        run: echo "REGELSUCHE_STUDY_JOB_START=$(date +%s)" >> "$GITHUB_ENV"
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        timeout-minutes: 5
-        with: { fetch-depth: 0, ref: '${{ github.sha }}' }
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
-        timeout-minutes: 5
-        with: { distribution: temurin, java-version: '25', verify-signature: true }
-      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
-        timeout-minutes: 5
-        with: { cache-cleanup: on-success }
-      - name: Install the same isolated benchmark prerequisites
-        timeout-minutes: 5
-        run: |
-          sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            patchelf=0.14.3-1 \
-            python3-venv
-      - name: Collect the preregistered protocols without retries
-        timeout-minutes: 60
-        run: >-
-          python3 -B scripts/run-jmh-precision-study-v2.py
-          --replicate "$REGELSUCHE_STUDY_REPLICATE"
-          --job-start-epoch "$REGELSUCHE_STUDY_JOB_START"
-          --output "build/reports/jmh-precision-study-v2/replicate-$REGELSUCHE_STUDY_REPLICATE"
-      - name: Retain every replica outcome and its original raw evidence
-        if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: jmh-precision-study-v2-replicate-${{ matrix.replicate }}
-          path: build/reports/jmh-precision-study-v2/replicate-${{ matrix.replicate }}
-          if-no-files-found: error
-
-  jmh-precision-study-v2-report:
-    name: Retained JMH precision study v2 analysis
-    needs: jmh-precision-study-v2
-    if: >-
-      ${{ always() && !cancelled() && github.event_name == 'pull_request' && github.event.action == 'opened' &&
-      github.run_attempt == 1 && github.head_ref == 'codex/issue-981-jmh-precision-study-v2' &&
-      github.repository == 'carstenartur/Regelsuche' && github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with: { fetch-depth: 0, ref: '${{ github.sha }}' }
-      - name: Download every available replica, including failed collections
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          pattern: jmh-precision-study-v2-replicate-*
-          path: retained
-          merge-multiple: false
-      - name: Revalidate all three replicas or retain an incomplete-evidence report
-        if: ${{ always() && !cancelled() }}
-        run: >-
-          python3 -B scripts/report-jmh-precision-study-v2.py
-          --replicate retained/jmh-precision-study-v2-replicate-1
-          --replicate retained/jmh-precision-study-v2-replicate-2
-          --replicate retained/jmh-precision-study-v2-replicate-3
-          --output build/reports/jmh-precision-study-v2/analysis
-      - name: Retain canonical analysis including errors and null outcomes
-        if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: jmh-precision-study-v2-analysis
-          path: build/reports/jmh-precision-study-v2/analysis
+            ${{ runner.temp }}/pr1006-*.log
+            ${{ runner.temp }}/pr1006-product.patch
+            ${{ runner.temp }}/pr1006-changed-paths.txt
+            regelsuche-core/build/test-results/test/TEST-*.xml
+            regelsuche-search/build/test-results/test/TEST-*.xml
+            app/build/test-results/test/TEST-*.xml
           if-no-files-found: error
