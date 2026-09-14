@@ -34,9 +34,11 @@ final class PluginInstallationStore {
     }
 
     Work work() throws IOException {
-        checkDirectories(root);
-        return new Work(Files.createTempDirectory(root, "stage-",
-            PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------"))));
+        return PluginCacheQuota.locked(root, () -> {
+            PluginCacheQuota.policy(root).requireSpace(root, 0, 1);
+            return new Work(Files.createTempDirectory(root, "stage-",
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------"))));
+        });
     }
 
     Snapshot load(String hash) throws IOException {
@@ -75,6 +77,15 @@ final class PluginInstallationStore {
     }
 
     void persist(PluginInstallationEvidence evidence, Map<String, byte[]> files) throws IOException {
+        Path target = generations.resolve(evidence.contentHash().substring(7));
+        boolean retained = PluginCacheQuota.locked(root, () -> {
+            if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) return false;
+            requireExisting(evidence);
+            forceDirectory(generations);
+            forceDirectory(root);
+            return true;
+        });
+        if (retained) return; // Idempotent validation needs no staging capacity.
         try (Work work = work()) {
             for (var entry : files.entrySet()) {
                 write(work.directory(), entry.getKey(), entry.getValue());
@@ -85,21 +96,17 @@ final class PluginInstallationStore {
                     forceDirectory(path);
                 }
             }
-            checkDirectories(generations);
-            Path target = generations.resolve(evidence.contentHash().substring(7));
-            if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
-                requireExisting(evidence);
+            PluginCacheQuota.locked(root, () -> {
+                checkDirectories(generations);
+                if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
+                    requireExisting(evidence);
+                } else {
+                    Files.move(work.directory(), target, StandardCopyOption.ATOMIC_MOVE);
+                }
                 forceDirectory(generations);
                 forceDirectory(root);
-                return;
-            }
-            try {
-                Files.move(work.directory(), target, StandardCopyOption.ATOMIC_MOVE);
-            } catch (FileAlreadyExistsException concurrent) {
-                requireExisting(evidence);
-            }
-            forceDirectory(generations);
-            forceDirectory(root);
+                return null;
+            });
         }
     }
 
@@ -116,20 +123,33 @@ final class PluginInstallationStore {
     }
 
     static void write(Path directory, String relative, byte[] bytes) throws IOException {
+        directory = directory.toAbsolutePath().normalize();
+        if (!directory.getFileName().toString().startsWith("stage-")) throw new SecurityException("writes require private staging");
+        Path root = directory.getParent();
         Path target = directory.resolve(PluginInstallationEvidence.requirePath(relative));
-        if (!Files.exists(target.getParent(), LinkOption.NOFOLLOW_LINKS)) {
+        Path stage = directory;
+        PluginCacheQuota.locked(root, () -> {
+            checkDirectories(stage);
+            if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) throw new FileAlreadyExistsException(target.toString());
+            int additionalEntries = 1;
+            Path parent = target.getParent();
+            while (!Files.exists(parent, LinkOption.NOFOLLOW_LINKS)) {
+                additionalEntries = Math.addExact(additionalEntries, 1);
+                parent = parent.getParent();
+            }
+            checkDirectories(parent);
+            PluginCacheQuota.policy(root).requireSpace(root, bytes.length, additionalEntries);
             Files.createDirectories(target.getParent(),
                 PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
-        }
-        checkDirectories(target.getParent());
-        try (FileChannel output = FileChannel.open(target, StandardOpenOption.CREATE_NEW,
-                StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS)) {
-            ByteBuffer buffer = ByteBuffer.wrap(bytes);
-            while (buffer.hasRemaining()) {
-                output.write(buffer);
+            checkDirectories(target.getParent());
+            try (FileChannel output = FileChannel.open(target, StandardOpenOption.CREATE_NEW,
+                    StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS)) {
+                ByteBuffer buffer = ByteBuffer.wrap(bytes);
+                while (buffer.hasRemaining()) output.write(buffer);
+                output.force(true);
             }
-            output.force(true);
-        }
+            return null;
+        });
     }
 
     private static byte[] read(Path path, long maximum) throws IOException {
@@ -158,19 +178,23 @@ final class PluginInstallationStore {
         return evidence.artifacts().stream().anyMatch(artifact -> artifact.path().equals(path));
     }
 
-    private static void privateDirectory(Path directory) throws IOException {
+    static void privateDirectory(Path directory) throws IOException {
         if (Files.exists(directory, LinkOption.NOFOLLOW_LINKS)) {
             checkDirectories(directory);
             if (!Files.getPosixFilePermissions(directory).equals(PosixFilePermissions.fromString("rwx------"))) {
                 throw new SecurityException("installation directory must have owner-only permissions: " + directory);
             }
         } else {
-            Files.createDirectory(directory,
-                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
+            try {
+                Files.createDirectory(directory,
+                    PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
+            } catch (FileAlreadyExistsException concurrent) {
+                privateDirectory(directory); // Validate the concurrently provisioned private directory.
+            }
         }
     }
 
-    private static void checkDirectories(Path path) throws IOException {
+    static void checkDirectories(Path path) throws IOException {
         if (path == null) {
             throw new SecurityException("installation directory must have an existing parent");
         }
@@ -183,7 +207,7 @@ final class PluginInstallationStore {
         }
     }
 
-    private static void forceDirectory(Path directory) throws IOException {
+    static void forceDirectory(Path directory) throws IOException {
         try (FileChannel channel = FileChannel.open(directory, StandardOpenOption.READ)) {
             channel.force(true);
         }
@@ -196,14 +220,15 @@ final class PluginInstallationStore {
         public void close() {
             // Cleanup must never turn a completed authority commit into an apparent failure.
             try {
-                if (Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) {
-                    try (var paths = Files.walk(directory)) {
-                        for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
-                            Files.deleteIfExists(path);
+                PluginCacheQuota.locked(directory.getParent(), () -> {
+                    if (Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) {
+                        try (var paths = Files.walk(directory)) {
+                            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
                         }
                     }
-                }
-            } catch (IOException ignored) {
+                    return null;
+                });
+            } catch (IOException | RuntimeException ignored) {
                 // Inactive private staging can be removed by the operator after reconciliation.
             }
         }

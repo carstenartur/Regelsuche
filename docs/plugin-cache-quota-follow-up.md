@@ -1,74 +1,64 @@
-# Plugin cache quota: isolated follow-up to #1004
+# Aggregate plugin-cache admission
 
-## Scope and present status
+This is the isolated correction for the pre-existing retention defect from
+#1004, merged as `3f0a3d8979e6d3f81d415514a969101ef7bf9f39`.
+It does not delete generations or change authority, trust, or installation hashes.
 
-The owner requested that the pre-existing aggregate cache-retention defect be
-handled separately from the already large lifecycle PR #1004. That PR was merged
-as `3f0a3d8979e6d3f81d415514a969101ef7bf9f39` after its exact-head CI passed.
+## Configuration and accounting
 
-The defect exists on its predecessor main
-`c4772cb86b30659f350936d23da1cc04af4d470c`: `PluginInstallationStore.persist`
-retains immutable generations before activation, and
-`docs/plugin-distribution-client.md` explicitly leaves accumulated historical
-generations and disk quotas to operator policy. Resolving the original review
-thread means scope transfer, not that this defect was fixed:
-https://github.com/carstenartur/Regelsuche/pull/1004#discussion_r4000397582
+Every new staging directory and payload write now passes a shared aggregate
+admission check. Unconfigured caches adopt a persistent default of **1 GiB of
+logical payload and 65,536 file/directory entries** before their first new write.
+Existing over-budget caches refuse new admission rather than losing old evidence.
+An operator can explicitly provision a different positive budget before use:
 
-**This initial draft adds characterization/protection tests only. It does not
-implement a quota, garbage collection or a changed installation contract.**
-The tests have not been executed locally in this session: both execution-tool
-attempts failed with transport timeouts. Source inspection is not a test result.
-The follow-up's own CI results must be inspected before claiming they pass.
+```java
+new PluginCacheQuota(256L * 1024 * 1024, 16_384).configure(packagesDirectory);
+```
 
-## Added executable cases
+All clients opening that directory use its canonical `.cache-quota` policy.
+Reprovisioning the same values is idempotent; changing established values is
+rejected and requires offline operator reconciliation. Old per-download and
+per-generation `Limits` retain their original meanings and checks.
 
-`PluginCacheRetentionCharacterizationTest` uses the existing signed HTTPS fixture
-and actual Java installation/transaction code. The authorities are explicit
-failure-injection models, not real database durability tests.
+The quota counts retained generation metadata, artifacts, in-flight stages,
+leftovers from interrupted processes, nested directories and zero-byte files.
+The only exclusions are fixed control overhead: the root, its `generations`
+container, the policy file (at most 128 bytes), and the zero-byte lock file.
+This is a logical-size/entry bound, not a physical filesystem-block guarantee.
+Transient verification/persistence copies also consume capacity; admission is
+conservative and can reject an operation whose final generation alone would fit.
 
-- Three distinct rejected legacy installs retain three inactive generations and
-  increasing payload bytes while authoritative state remains empty.
-- Three distinct unknown submissions also grow the cache without confirmed active
-  state. This cannot be treated as permission to delete possibly committed data.
-- A lost acknowledgement after an actual model commit leaves all generation file
-  hashes intact across restart, receipt recovery and offline idempotent replay.
+A bounded set of JVM locks and an operating-system file lock serialize cooperating
+writers of the same root. The check and actual write occur under that lock; no
+stale counter or releasable reservation can be lost across process death. Writes
+are refused before their payload bytes or directories would exceed the budget.
+Locking errors, malformed/noncanonical policies, overflowed values and symbolic
+links fail closed. This requires the existing POSIX private-directory environment
+and a filesystem providing working exclusive file locks; there is no unlocked
+fallback. An owner modifying files outside this protocol is outside its scope.
 
-These are small finite characterization/protection cases, not evidence that a
-quota is enforced. If admission or safe collection changes the retained behavior,
-the characterization assertions must be replaced by the explicit quota contract;
-they are not a requirement to preserve the defect.
+## Recovery and retention
 
-## Proposed correction within this PR
+No rejected or `OUTCOME_UNKNOWN` generation is automatically collected. A lost
+acknowledgement does not establish that a commit failed. Active generation reads,
+receipt recovery, offline operation replay, and revalidation of an already
+retained identical generation remain available when capacity is full. Retained
+rollback evidence remains intact; a *new* rollback generation still needs room.
+Successful staging cleanup frees capacity. Unclean shutdown leftovers remain
+charged and may be removed by the operator only after reconciliation.
 
-Add an explicit aggregate cache admission policy, distinct from existing
-per-download and per-generation `Limits.totalBytes`. Count retained files,
-installation metadata and in-flight staging/reservations. Make the policy's byte
-and entry limits finite, validated and documented; do not reinterpret old limits
-or hashes. Coordinate admission for cooperating clients and processes sharing the
-same installation root, including restart and leftover staging. A local quota
-must not be presented as protection from a malicious installation owner or as an
-exact physical-filesystem-block limit.
+## Tests
 
-Prefer rejecting new writes before exceeding the aggregate budget over adding
-an unsafe automatic collector. Keep authority-referenced generations, rollback
-history and unresolved-operation evidence intact. Reads, receipt recovery and
-idempotent replay of retained generations must remain available when the quota is
-full. Newly admitting bytes and validating an already retained generation are
-different operations. No authority reset or automatic trust rollback is allowed.
+`PluginCacheQuotaTest` checks exact/over-limit bytes, nested and empty entries,
+last-capacity races between two threads and two real JVM processes, process death
+without cleanup, restart, default provisioning, and corrupt/symlink controls.
+`PluginCacheQuotaIntegrationTest` uses real signed HTTPS retrieval and the original
+Java preparation paths. Repeated rejected and unknown submissions eventually
+stop before authority submission; full-cache lost-ack recovery, offline replay,
+artifact bytes and immutable generation hashes remain intact. Its authority is
+an explicit failure-injection model, not a substitute for PostgreSQL tests.
 
-## Required acceptance tests before marking ready
-
-1. Explicit exact-limit and one-byte-over-limit cases; aggregate entry limits;
-   zero additional payload for an already retained identical generation.
-2. Repeated rejected/unknown operations eventually refuse new admission without
-   changing accepted state or exceeding the declared storage contract.
-3. Two clients and two processes racing for the last capacity cannot both reserve
-   it. Interrupted preparation and process restart cannot lose accounting.
-4. Full-cache reads, lost-acknowledgement recovery, offline replay and retained
-   rollback evidence remain correct; no possibly committed generation is deleted.
-5. Invalid limits, overflow, symlinks, unsupported locking and damaged accounting
-   fail closed for new writes without weakening existing receipt validation.
-6. Run the focused client/transaction/recovery suites and full exact-head CI.
-
-No symbol-scoring changes, learning policy, benchmark threshold changes, database
-schema expansion or release-platform refactoring belong in this follow-up.
+The initial characterization cases remain useful checks below the default quota,
+not a requirement to preserve unlimited growth. Complete source-head CI remains
+the product qualification, including the existing client, recovery and SQL tests.
