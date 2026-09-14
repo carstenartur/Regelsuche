@@ -35,7 +35,7 @@ class TraceStrategyTransferExampleTest {
         Path repository = Path.of(System.getProperty("regelsuche.repositoryRoot", System.getProperty("user.dir"))).toAbsolutePath();
         while (repository != null && !Files.isRegularFile(repository.resolve("settings.gradle"))) repository = repository.getParent();
         assertNotNull(repository, "repository root for the published development reference");
-        assertEquals(Files.readString(repository.resolve("docs/generated/trace-strategy-transfer-reference.json")),
+        assertEquals(Files.readString(repository.resolve("docs/generated/scoring-v2/trace-strategy-transfer-reference.json")),
             report.toCanonicalJson(), "public development reference must match the actual run");
         assertEquals(Files.readString(repository.resolve("docs/generated/trace-strategy-transfer-reference.md")),
             TraceStrategyTransferExample.markdown(report));
