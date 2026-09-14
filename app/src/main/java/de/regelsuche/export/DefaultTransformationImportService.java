@@ -86,14 +86,15 @@ public class DefaultTransformationImportService implements TransformationImportS
             intValue(values.get("operatorCount"), 0),
             intValue(values.get("nestingDepth"), 0),
             intValue(values.get("recognizedPatternBonus"), 0),
-            readScoreRevision(values.get("scoringRevision"))
+            readScoreRevision(values)
         );
     }
 
-    private static String readScoreRevision(Object value) {
-        if (value == null) {
+    private static String readScoreRevision(Map<String, Object> values) {
+        if (!values.containsKey("scoringRevision")) {
             return ScoreRevision.UNSPECIFIED;
         }
+        Object value = values.get("scoringRevision");
         if (!(value instanceof String revision)) {
             throw new IllegalArgumentException("scoringRevision must be a string");
         }
