@@ -95,8 +95,8 @@ public final class PluginDistributionTransactions {
         Decision decision;
         try {
 <span class="fc" id="L97">            decision = checked(id, authority.submit(operation));</span>
-<span class="nc" id="L98">        } catch (IOException unavailable) {</span>
-<span class="nc" id="L99">            decision = new Decision(operation, Outcome.OUTCOME_UNKNOWN);</span>
+<span class="fc" id="L98">        } catch (IOException unavailable) {</span>
+<span class="fc" id="L99">            decision = new Decision(operation, Outcome.OUTCOME_UNKNOWN);</span>
 <span class="fc" id="L100">        }</span>
 <span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (!operation.equals(decision.operation())) {</span>
 <span class="nc" id="L102">            throw new SecurityException(&quot;authority returned a different complete operation&quot;);</span>

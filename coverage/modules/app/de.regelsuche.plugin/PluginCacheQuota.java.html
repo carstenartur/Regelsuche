@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginCacheQuota.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginCacheQuota.java</span></div><h1>PluginCacheQuota.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.concurrent.locks.ReentrantLock;
+
+/** Aggregate logical payload budget, shared by all cooperating writers of one private cache. */
+public record PluginCacheQuota(long bytes, int entries) {
+<span class="fc" id="L16">    public static final PluginCacheQuota DEFAULT = new PluginCacheQuota(1L &lt;&lt; 30, 65536);</span>
+    private static final String SCHEMA = &quot;regelsuche.plugin-cache-quota/v1&quot;;
+    private static final String POLICY = &quot;.cache-quota&quot;;
+    private static final String LOCK = &quot;.cache-quota.lock&quot;;
+    // Bounded stripes avoid both overlapping JVM file locks and an ever-growing root registry.
+<span class="fc" id="L21">    private static final ReentrantLock[] LOCKS = new ReentrantLock[64];</span>
+<span class="fc" id="L22">    static { Arrays.setAll(LOCKS, ignored -&gt; new ReentrantLock()); }</span>
+
+<span class="fc" id="L24">    public PluginCacheQuota {</span>
+<span class="fc bfc" id="L25" title="All 4 branches covered.">        if (bytes &lt; 1 || entries &lt; 1) throw new IllegalArgumentException(&quot;cache quotas must be positive&quot;);</span>
+<span class="fc" id="L26">    }</span>
+
+    /** Provision once, or verify the existing policy. Changing an established policy needs operator reconciliation. */
+    public void configure(Path directory) throws IOException {
+<span class="fc" id="L30">        Path root = directory.toAbsolutePath().normalize();</span>
+<span class="fc" id="L31">        PluginInstallationStore.checkDirectories(root.getParent());</span>
+<span class="fc" id="L32">        PluginInstallationStore.privateDirectory(root);</span>
+<span class="fc" id="L33">        locked(root, () -&gt; {</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">            if (Files.exists(root.resolve(POLICY), LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">                if (!equals(readPolicy(root))) throw new SecurityException(&quot;cache quota already provisioned with different limits&quot;);</span>
+            } else {
+<span class="fc" id="L37">                requireSpace(root, 0, 0);</span>
+<span class="fc" id="L38">                writePolicy(root);</span>
+            }
+<span class="fc" id="L40">            return null;</span>
+        });
+<span class="fc" id="L42">    }</span>
+
+    /** Caller holds the root lock. Old caches adopt a finite default before any new payload. */
+    static PluginCacheQuota policy(Path root) throws IOException {
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (Files.exists(root.resolve(POLICY), LinkOption.NOFOLLOW_LINKS)) return readPolicy(root);</span>
+<span class="fc" id="L47">        DEFAULT.requireSpace(root, 0, 0);</span>
+<span class="fc" id="L48">        DEFAULT.writePolicy(root);</span>
+<span class="fc" id="L49">        return DEFAULT;</span>
+    }
+
+<span class="fc" id="L52">    private String canonical() { return SCHEMA + &quot;\n&quot; + bytes + &quot;\n&quot; + entries + &quot;\n&quot;; }</span>
+
+    private void writePolicy(Path root) throws IOException {
+<span class="fc" id="L55">        try (var output = FileChannel.open(root.resolve(POLICY),</span>
+<span class="fc" id="L56">                Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS),</span>
+<span class="fc" id="L57">                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString(&quot;rw-------&quot;)))) {</span>
+<span class="fc" id="L58">            var buffer = ByteBuffer.wrap(canonical().getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            while (buffer.hasRemaining()) output.write(buffer);</span>
+<span class="fc" id="L60">            output.force(true);</span>
+        }
+<span class="fc" id="L62">        PluginInstallationStore.forceDirectory(root);</span>
+<span class="fc" id="L63">    }</span>
+
+    private static PluginCacheQuota readPolicy(Path root) throws IOException {
+<span class="fc" id="L66">        Path path = root.resolve(POLICY);</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) throw new SecurityException(&quot;invalid cache quota file&quot;);</span>
+<span class="fc" id="L68">        try (var input = FileChannel.open(path, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            if (input.size() &gt; 128) throw new SecurityException(&quot;oversized cache quota file&quot;);</span>
+<span class="fc" id="L70">            var buffer = ByteBuffer.allocate(129);</span>
+<span class="pc bpc" id="L71" title="1 of 4 branches missed.">            while (buffer.hasRemaining() &amp;&amp; input.read(buffer) != -1) { }</span>
+<span class="fc" id="L72">            String text = new String(buffer.array(), 0, buffer.position(), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L73">            String[] parts = text.split(&quot;\n&quot;, -1);</span>
+<span class="pc bpc" id="L74" title="2 of 6 branches missed.">            if (parts.length != 4 || !parts[0].equals(SCHEMA) || !parts[3].isEmpty()) throw new SecurityException(&quot;invalid cache quota file&quot;);</span>
+            try {
+<span class="fc" id="L76">                var quota = new PluginCacheQuota(Long.parseLong(parts[1]), Integer.parseInt(parts[2]));</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">                if (!text.equals(quota.canonical())) throw new SecurityException(&quot;noncanonical cache quota file&quot;);</span>
+<span class="fc" id="L78">                return quota;</span>
+<span class="fc" id="L79">            } catch (IllegalArgumentException malformed) {</span>
+<span class="fc" id="L80">                throw new SecurityException(&quot;invalid cache quota limits&quot;, malformed);</span>
+            }
+        }
+    }
+
+    /** No cached counter: interrupted stages and retained generations are charged on every admission. */
+    void requireSpace(Path root, long additionalBytes, int additionalEntries) throws IOException {
+<span class="pc bpc" id="L87" title="4 of 8 branches missed.">        if (additionalBytes &lt; 0 || additionalEntries &lt; 0 || additionalBytes &gt; bytes || additionalEntries &gt; entries)</span>
+<span class="nc" id="L88">            throw new SecurityException(&quot;aggregate plugin cache quota exceeded&quot;);</span>
+<span class="fc" id="L89">        long usedBytes = 0;</span>
+<span class="fc" id="L90">        int usedEntries = 0;</span>
+<span class="fc" id="L91">        try (var paths = Files.walk(root)) {</span>
+<span class="fc" id="L92">            var iterator = paths.iterator();</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            while (iterator.hasNext()) {</span>
+<span class="fc" id="L94">                Path path = iterator.next();</span>
+<span class="fc bfc" id="L95" title="All 6 branches covered.">                if (path.equals(root) || path.equals(root.resolve(POLICY)) || path.equals(root.resolve(LOCK))) continue;</span>
+<span class="fc" id="L96">                var attributes = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);</span>
+<span class="fc bfc" id="L97" title="All 4 branches covered.">                if (!attributes.isDirectory() &amp;&amp; !attributes.isRegularFile()) throw new SecurityException(&quot;non-regular cache entry&quot;);</span>
+<span class="pc bpc" id="L98" title="1 of 4 branches missed.">                if (path.equals(root.resolve(&quot;generations&quot;)) &amp;&amp; attributes.isDirectory()) continue; // fixed container</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                if (usedEntries &gt;= entries - additionalEntries) throw new SecurityException(&quot;aggregate plugin cache entry quota exceeded&quot;);</span>
+<span class="fc" id="L100">                usedEntries++;</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                if (attributes.isRegularFile()) {</span>
+<span class="fc" id="L102">                    long size = attributes.size();</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                    if (size &gt; bytes - additionalBytes - usedBytes) throw new SecurityException(&quot;aggregate plugin cache byte quota exceeded&quot;);</span>
+<span class="fc" id="L104">                    usedBytes += size;</span>
+                }
+<span class="fc" id="L106">            }</span>
+        }
+<span class="fc" id="L108">    }</span>
+
+    @FunctionalInterface interface IOAction&lt;T&gt; { T run() throws IOException; }
+
+    static &lt;T&gt; T locked(Path root, IOAction&lt;T&gt; action) throws IOException {
+<span class="fc" id="L113">        ReentrantLock local = LOCKS[(root.hashCode() &amp; Integer.MAX_VALUE) % LOCKS.length];</span>
+<span class="fc" id="L114">        try { local.lockInterruptibly(); }</span>
+<span class="nc" id="L115">        catch (InterruptedException interrupted) {</span>
+<span class="nc" id="L116">            Thread.currentThread().interrupt(); throw new IOException(&quot;interrupted awaiting plugin cache admission&quot;, interrupted);</span>
+<span class="fc" id="L117">        }</span>
+        try {
+<span class="fc" id="L119">            PluginInstallationStore.checkDirectories(root);</span>
+<span class="fc" id="L120">            Path lock = root.resolve(LOCK);</span>
+<span class="pc bpc" id="L121" title="1 of 4 branches missed.">            if (Files.exists(lock, LinkOption.NOFOLLOW_LINKS) &amp;&amp; !Files.isRegularFile(lock, LinkOption.NOFOLLOW_LINKS))</span>
+<span class="nc" id="L122">                throw new SecurityException(&quot;invalid cache quota lock file&quot;);</span>
+<span class="fc" id="L123">            try (var channel = FileChannel.open(lock,</span>
+<span class="fc" id="L124">                    Set.of(StandardOpenOption.CREATE, StandardOpenOption.READ, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS),</span>
+<span class="fc" id="L125">                    PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString(&quot;rw-------&quot;)));</span>
+<span class="fc" id="L126">                 var held = channel.lock()) {</span>
+<span class="pc bpc" id="L127" title="1 of 4 branches missed.">                if (!held.isValid() || channel.size() != 0) throw new SecurityException(&quot;invalid cache quota lock&quot;);</span>
+<span class="fc" id="L128">                return action.run();</span>
+            }
+<span class="fc" id="L130">        } finally { local.unlock(); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
