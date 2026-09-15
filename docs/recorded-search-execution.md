@@ -111,3 +111,12 @@ This completes a storage and replay boundary, not a new proof engine. Display
 metadata and imported validation labels are not proof authority. It does not
 invent an e-graph primitive derivation, authorize learned-plan promotion, change
 search defaults, qualify tactic utility or establish mathematical novelty.
+
+## Scoring-aware state observations
+
+`SearchStateReplay` now emits `regelsuche.search-state-replay/v2` with a required
+`scoringRevision` supplied by the score producer (the built-in scorer uses
+`regelsuche.expression-score/v2`). The Java artifact verifier checks schema and
+revision before reconstruction. The candidate-dossier browser accepts current
+native v2 states and still displays historical v1 observations without assigning
+them a new revision. Historical display does not authorize executable replay.

@@ -138,6 +138,7 @@ public class DefaultTransformationExportService implements TransformationExportS
     }
 
     private void writeScore(JsonWriter writer, ExpressionScore score) {
+        writer.property("scoringRevision", score.scoringRevision());
         writer.property("stringLength", score.stringLength());
         writer.property("astNodeCount", score.astNodeCount());
         writer.property("operatorCount", score.operatorCount());

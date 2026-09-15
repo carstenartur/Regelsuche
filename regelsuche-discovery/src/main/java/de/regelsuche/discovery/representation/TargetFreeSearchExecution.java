@@ -12,6 +12,7 @@ import de.regelsuche.knowledge.KnowledgePackSelection;
 import de.regelsuche.moves.enumerate.TreePosition;
 import de.regelsuche.parse.*;
 import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.scoring.ScoreRevision;
 import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.strategy.*;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.*;
@@ -117,6 +118,9 @@ public final class TargetFreeSearchExecution {
         public String toCanonicalJson() { return canonical(this); }
         /** Explicit additional execution. Stored bytes cannot supply the independent comparison result. */
         public RunResult replay() {
+            if (stateScoreRevision(tree(content.states().getFirst().canonicalStateJson())) == null) {
+                throw new IllegalArgumentException("historical scoring observations are read-only; generate a new native run for executable replay");
+            }
             var replayed = run(content.input().displayText(), content.heuristic(), content.revisions().repositoryCommit());
             requireReplay(replayed.artifact());
             return replayed;
@@ -186,6 +190,7 @@ public final class TargetFreeSearchExecution {
             for (JsonNode value : JSON.valueToTree(metrics)) if (!value.isIntegralNumber() || value.longValue() < 0) {
                 throw new IllegalArgumentException("invalid native search metrics");
             }
+            String scoringRevision = stateScoreRevision(tree(states.getFirst().canonicalStateJson()));
             var ids = new HashSet<String>();
             var byPath = new HashMap<List<Integer>, String>();
             for (int i = 0; i < generations.size(); i++) {
@@ -201,7 +206,7 @@ public final class TargetFreeSearchExecution {
             for (int i = 0; i < states.size(); i++) {
                 var state = states.get(i);
                 if (state.sequence() != i || !ids.add(state.stateId())) throw new IllegalArgumentException("invalid state identity");
-                state.validate(input.displayText(), generations);
+                state.validate(input.displayText(), generations, scoringRevision);
                 if (i == 0 && !state.generationSequences().isEmpty()) throw new IllegalArgumentException("first state must be root");
                 if (i > 0) {
                     var edge = transitions.get(i - 1);
@@ -218,6 +223,9 @@ public final class TargetFreeSearchExecution {
             for (int i = 0; i < events.size(); i++) {
                 var event = events.get(i);
                 if (event.sequence() != i) throw new IllegalArgumentException("native event sequence differs");
+                if (!Objects.equals(scoringRevision, event.scoringRevision())) {
+                    throw new IllegalArgumentException("native event scoring revision differs from retained states");
+                }
                 var execution = RecordedExecution.fromCanonicalJson(event.execution());
                 if (!execution.transformedExpression().equals(event.expression())) throw new IllegalArgumentException("event output differs from execution");
                 if (event.type() == SearchEventType.TRANSFORMATION_GENERATED) {
@@ -236,9 +244,9 @@ public final class TargetFreeSearchExecution {
 
     public record State(int sequence, String stateId, String canonicalStateJson, List<Integer> generationSequences, String executionHash) {
         public State { generationSequences = List.copyOf(generationSequences); }
-        private void validate(String source, List<Generation> generations) {
+        private void validate(String source, List<Generation> generations, String scoringRevision) {
             var observation = tree(canonicalStateJson);
-            if (!sha256(canonicalStateJson).equals(stateId) || !SearchStateReplay.SCHEMA.equals(observation.path("schema").asText())
+            if (!sha256(canonicalStateJson).equals(stateId) || !Objects.equals(scoringRevision, stateScoreRevision(observation))
                     || !observation.path("executionRetained").asBoolean() || observation.path("depth").asInt(-1) != generationSequences.size()) {
                 throw new IllegalArgumentException("invalid native state observation");
             }
@@ -305,13 +313,18 @@ public final class TargetFreeSearchExecution {
     public record Event(long sequence, SearchEventType type, String expression, String canonicalHash, int depth, int score,
             String parentCanonicalHash, String parentExpression, String ruleId, RewriteKind rewriteKind, boolean mayIncreaseComplexity,
             int estimatedCostDelta, boolean equivalencePreservingByConstruction, List<String> assumptions, int frontierSize,
-            int visitedCount, int generatedCount, String pruningReason, String execution) {
-        public Event { assumptions = List.copyOf(assumptions); }
+            int visitedCount, int generatedCount, String pruningReason, String execution,
+            @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+            String scoringRevision) {
+        public Event {
+            assumptions = List.copyOf(assumptions);
+            if (scoringRevision != null) ScoreRevision.requireCurrent(scoringRevision);
+        }
         private static Event capture(SearchEvent e) {
             return new Event(e.sequence(), e.type(), e.expression(), e.canonicalHash(), e.depth(), e.score(), e.parentCanonicalHash(),
                 e.parentExpression(), e.ruleId(), e.rewriteKind(), e.mayIncreaseComplexity(), e.estimatedCostDelta(),
                 e.equivalencePreservingByConstruction(), e.assumptions(), e.frontierSize(), e.visitedCount(), e.generatedCount(),
-                e.pruningReason(), Objects.requireNonNull(e.execution(), "native event lacks retained execution").toCanonicalJson());
+                e.pruningReason(), Objects.requireNonNull(e.execution(), "native event lacks retained execution").toCanonicalJson(), e.scoringRevision());
         }
     }
     /** Returned engine candidates, counted once per generation; never sums shared prefixes of retained state paths. */
@@ -324,6 +337,20 @@ public final class TargetFreeSearchExecution {
             throw new IllegalArgumentException("source or heuristic exceeds bounded native trace admission");
         }
     }
+    /** Null denotes historical observation, never an inferred current score or replay authority. */
+    private static String stateScoreRevision(JsonNode observation) {
+        String schema = observation.path("schema").asText();
+        if ("regelsuche.search-state-replay/v1".equals(schema) && !observation.has("scoringRevision")) {
+            return null;
+        }
+        var revision = observation.path("scoringRevision");
+        if (SearchStateReplay.SCHEMA.equals(schema) && revision.isTextual()
+                && ScoreRevision.CURRENT.equals(revision.textValue())) {
+            return revision.textValue();
+        }
+        throw new IllegalArgumentException("unsupported native scoring revision or state schema");
+    }
+
     private static List<String> textList(JsonNode value) {
         if (!value.isArray()) throw new IllegalArgumentException("expected string array");
         var result = new ArrayList<String>();

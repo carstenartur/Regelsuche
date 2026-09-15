@@ -10,6 +10,27 @@ window.nativeSearchDossierControls = async function (run, artifact) {
     check(selected.native && selected.candidate.stateId === candidate.stateId, 'native candidate selection lost its identity');
     check(selected.generations.length === candidate.generationSequences.length, 'ordered execution lost actual generation links');
     check(selected.observation.applicationKeys.every((value, index, values) => index === 0 || values[index - 1] < value), 'application keys are not a canonical set');
+    check(selected.observation.schema === 'regelsuche.search-state-replay/v2'
+        && selected.observation.scoringRevision === 'regelsuche.expression-score/v2', 'native producer omitted scoring revision');
+    const changedReplay = change => {
+        const altered = JSON.parse(JSON.stringify(artifact));
+        altered.content.states.forEach(state => {
+            const value = window.RegelsucheRunWorkspace.parseExactJson(state.canonicalStateJson);
+            change(value); state.canonicalStateJson = JSON.stringify(value);
+        });
+        return {...reply, raw: JSON.stringify(altered)};
+    };
+    for (const revision of [undefined, null, 3, true, [], {}, '', 'unknown/v1']) {
+        reject(() => api.decode(run, changedReplay(value => { value.scoringRevision = revision; })),
+            'missing, malformed or incompatible current scoring revision accepted');
+    }
+    reject(() => api.decode(run, changedReplay(value => { value.schema = 'regelsuche.search-state-replay/v9'; })),
+        'unknown state replay schema accepted');
+    const historical = api.decode(run, changedReplay(value => {
+        value.schema = 'regelsuche.search-state-replay/v1'; delete value.scoringRevision;
+    }));
+    check(api.selection(historical, candidate.stateId).observation.scoringRevision === undefined,
+        'historical observation was relabelled with a current score');
     const edge = selected.edges[0];
     check(api.selection(decoded, candidate.stateId, String(edge.sequence)).selectedEdge === edge, 'graph selection substituted another edge');
     const selectionStore = window.RegelsucheRunWorkspace.createStore(async () => ({raw: JSON.stringify(run), etag: '"' + run.runId.slice(7) + '"'}));

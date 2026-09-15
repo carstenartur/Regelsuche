@@ -121,7 +121,8 @@ final class SearchTelemetry {
             visitedCount,
             generatedCount,
             pruningReason,
-            state.recordedExecution().orElse(null)
+            state.recordedExecution().orElse(null),
+            state.score().scoringRevision()
         ));
     }
 
@@ -137,13 +138,14 @@ final class SearchTelemetry {
             return;
         }
         String expression = transformation.transformedExpression();
+        var score = scorer.score(expression);
         observer.onEvent(new SearchEvent(
             sequence++,
             SearchEventType.TRANSFORMATION_GENERATED,
             expression,
             canonicalizer.stableHash(expression),
             state.depth() + 1,
-            scorer.score(expression).weightedTotal(),
+            score.weightedTotal(),
             state.canonicalHash(),
             state.expression(),
             transformation.rule(),
@@ -156,7 +158,8 @@ final class SearchTelemetry {
             visitedCount,
             generatedCount,
             pruningReason,
-            de.regelsuche.transform.RecordedExecution.capture(state.expression(), java.util.List.of(transformation))
+            de.regelsuche.transform.RecordedExecution.capture(state.expression(), java.util.List.of(transformation)),
+            score.scoringRevision()
         ));
     }
 

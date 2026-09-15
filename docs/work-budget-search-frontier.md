@@ -89,15 +89,18 @@ incomplete alternatives. No failure status is evidence of impossibility.
 
 ## Observation and replay
 
-`Result.toCanonicalJson()` produces `regelsuche.work-search-replay/v1`. It binds
-the input, target, every budget, work revision, states and scores, candidate
+`Result.toCanonicalJson()` produces `regelsuche.work-search-replay/v2`. It binds
+the input, target, every budget, work revision, the required `scoringRevision`, states and scores, candidate
 decisions, expansion completeness, all work dimensions and source observations.
 Paths retain canonical typed provenance with the exact source/output, method,
 evidence hash, receipt/run references and complete canonical evidence JSON.
 Frontier decisions retain their full parent state, not only its expression.
 
 `WorkSearchReplay.verify(json, independentlyVerifiedProblem)` reruns the same
-search and compares the complete canonical observation. The caller rebuilds
+search and compares the complete canonical observation. Schema and scoring revision
+are checked before invoking the search. The built-in scorer uses
+`regelsuche.expression-score/v2`; old/unversioned observations are not silently
+relabelled, and custom scoring requires an explicitly matching revision. The caller rebuilds
 theory sources through the full solver, artifact-verification and independent
 replay pipeline. JSON is never deserialized into executable evidence. This is an
 execution comparison over trusted installed code, not a code-identity certificate

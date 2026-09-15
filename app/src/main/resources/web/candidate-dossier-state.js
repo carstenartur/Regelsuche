@@ -54,7 +54,12 @@
             if (!/^sha256:[0-9a-f]{64}$/.test(state.stateId) || typeof state.canonicalStateJson !== 'string'
                 || !Array.isArray(state.generationSequences)) fail('Ungültige native Zustandsidentität');
             const value = window.RegelsucheRunWorkspace.parseExactJson(state.canonicalStateJson);
-            if (value.schema !== 'regelsuche.search-state-replay/v1' || !value.executionRetained
+            // v1 is historical observation only; executable replay admission remains server-side.
+            const supportedScore = value.schema === 'regelsuche.search-state-replay/v1'
+                ? value.scoringRevision === undefined
+                : value.schema === 'regelsuche.search-state-replay/v2'
+                    && value.scoringRevision === 'regelsuche.expression-score/v2';
+            if (!supportedScore || !value.executionRetained
                 || value.depth !== state.generationSequences.length || value.path?.[0] !== workspace.input.displayText
                 || state.generationSequences.some(i => !Number.isInteger(i) || !data.generations[i] || data.generations[i].sequence !== i)) {
                 fail('Native Zustandslinie ist nicht an ihre Erzeugungen gebunden');

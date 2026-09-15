@@ -254,13 +254,13 @@ class ExplainableSearchPolicyTest {
             parent.valueHash(), parent.alphaShapeHash(),
             goodChild.valueHash(), goodChild.alphaShapeHash(), target.alphaShapeHash(),
             GOOD_RULE, RewriteKind.NORMALIZE, List.of(),
-            1, 0, 0, 0, true, true, GoalStatus.REACHED, ""));
+            1, 0, 0, 0, true, true, GoalStatus.REACHED, "", de.regelsuche.scoring.ScoreRevision.CURRENT));
         repository.store(new SearchExperience(
             "bad-experience", "bad-run", EVALUATION_FAMILY,
             parent.valueHash(), parent.alphaShapeHash(),
             badChild.valueHash(), badChild.alphaShapeHash(), target.alphaShapeHash(),
             BAD_RULE, RewriteKind.NORMALIZE, List.of(),
-            1, 0, 0, 0, false, false, GoalStatus.FRONTIER_EXHAUSTED, "not-selected"));
+            1, 0, 0, 0, false, false, GoalStatus.FRONTIER_EXHAUSTED, "not-selected", de.regelsuche.scoring.ScoreRevision.CURRENT));
         return repository;
     }
 
