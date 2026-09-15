@@ -11,7 +11,9 @@ public final class ScoreRevision {
     private ScoreRevision() { }
 
     public static String normalize(String revision) {
-        return revision == null || revision.isBlank() ? UNSPECIFIED : revision;
+        if (revision == null) return UNSPECIFIED;
+        if (revision.isBlank()) throw new IllegalArgumentException("scoringRevision must not be blank");
+        return revision;
     }
 
     public static void requireCurrent(String revision) {

@@ -61,8 +61,8 @@ class ScoringExportProvenanceTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"7", "true", "[]", "{}", "null"})
-    void malformedRevisionTypesAreRejectedInsteadOfCoercedIntoAnIdentity(String invalidJson) {
+    @ValueSource(strings = {"7", "true", "[]", "{}", "null", "\"\"", "\" \"", "\"\\t\\n\"", "\"\u2003\""})
+    void malformedRevisionsAreRejectedInsteadOfCoercedIntoAnIdentity(String invalidJson) {
         var scorer = new ExpressionScorer();
         String invalid = export(path(scorer.score("x/x"), scorer.score("1")))
             .replace("\"scoringRevision\":\"" + ScoreRevision.CURRENT + "\"",
