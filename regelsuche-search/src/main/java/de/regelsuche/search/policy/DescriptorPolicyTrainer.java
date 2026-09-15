@@ -30,6 +30,7 @@ public final class DescriptorPolicyTrainer {
         List<SearchTrajectoryRun> trainingRuns = dataset.runs().stream()
             .filter(run -> run.context().split() == DatasetSplit.TRAIN)
             .toList();
+        trainingRuns.forEach(run -> run.records().forEach(SearchTrajectoryRecord::requireCurrentScoring));
         List<Example> examples = trainingRuns.stream()
             .flatMap(run -> run.records().stream())
             .filter(SearchTrajectoryRecord::decision)

@@ -33,7 +33,7 @@ class TraceStrategyDispatchExampleTest {
         assertEquals(mapper.readTree(originalProtocol.get("formationProtocol").asText()).get("inventory"),
             mapper.readTree(currentProtocol.get("formationProtocol").asText()).get("inventory"));
         var report = TraceStrategyDispatchExample.run();
-        assertEquals(Files.readString(repository.resolve("docs/generated/trace-strategy-dispatch-reference.json")), report.summaryJson());
+        assertEquals(Files.readString(repository.resolve("docs/generated/scoring-v2/trace-strategy-dispatch-reference.json")), report.summaryJson());
         assertEquals(Files.readString(repository.resolve("docs/generated/trace-strategy-dispatch-reference.md")), TraceStrategyDispatchExample.markdown(report));
         assertEquals(1152, report.rows().size());
         var historical = mapper.readTree(Files.readString(repository.resolve("docs/generated/strategy-history-v1/trace-strategy-dispatch-reference.json")));
