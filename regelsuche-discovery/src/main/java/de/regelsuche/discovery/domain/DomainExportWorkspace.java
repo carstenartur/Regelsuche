@@ -71,11 +71,7 @@ public final class DomainExportWorkspace {
         long size = snapshot.manifestBytes().length;
         for (ArtifactRole role : ArtifactRole.values()) size += snapshot.artifactBytes(role).length;
         if (size > MAX_EXPORT_BYTES) throw new IllegalArgumentException("domain export exceeds 512 KiB application limit");
-        if (!FiniteDifferenceSequenceDomain.DOMAIN_ID.equals(snapshot.manifest().domainId())
-                || !FiniteDifferenceSequenceDomain.REVISION.equals(snapshot.manifest().domainRevision())) {
-            throw new IllegalArgumentException("unsupported domain export schema or revision");
-        }
-        var domain = new FiniteDifferenceSequenceDomain();
+        var domain = supportedDomain(snapshot.manifest().domainId(), snapshot.manifest().domainRevision());
         var descriptor = DiscoveryDomainDescriptor.from(domain);
         if (!read(descriptor.toCanonicalJson()).equals(read(snapshot.artifactBytes(ArtifactRole.DOMAIN_DESCRIPTOR)))) {
             throw new IllegalArgumentException("retained descriptor differs from the supported domain contract");
@@ -125,13 +121,55 @@ public final class DomainExportWorkspace {
     }
 
     public DomainDiscoveryEvidence replay() {
+        return replayObserved().result.evidence();
+    }
+
+    ReplayObservation replayObserved() {
         if (!replaySupported()) throw new IllegalStateException("source exceeds bounded replay admission");
-        DomainDiscoveryEvidence replayed = new DomainDiscoveryRunner().run(evidence.campaignId(),
-            new FiniteDifferenceSequenceDomain(), evidence.seed(), evidence.budget()).evidence();
-        if (!evidence.toCanonicalJson().equals(replayed.toCanonicalJson())) {
-            throw new IllegalStateException("replay differs from the retained source evidence");
+        return replayWith(supportedDomain(evidence.descriptor().domainId(), evidence.descriptor().revision()));
+    }
+
+    private <S, C, K> ReplayObservation replayWith(DiscoveryDomain<S, C, K> domain) {
+        var result = new DomainDiscoveryRunner().run(evidence.campaignId(), domain, evidence.seed(), evidence.budget());
+        if (!evidence.toCanonicalJson().equals(result.evidence().toCanonicalJson())) {
+            throw new ReplayMismatch(result.evidence());
         }
-        return replayed;
+        // Selected objects come only from this actual replay. Public RunResult constructors cannot issue this observation.
+        if (result.selectedCandidate().isPresent()) {
+            C candidate = result.selectedCandidate().orElseThrow();
+            K certificate = result.selectedCertificate().orElseThrow();
+            var rendered = RenderedCertificate.create(domain.certificateRenderer().render(certificate),
+                domain.certificateCodec().contentHash(certificate));
+            if (!domain.candidateCodec().contentHash(candidate).equals(evidence.selectedCandidateHash())
+                    || !rendered.equals(evidence.certificate())) throw new ReplayMismatch(result.evidence());
+        } else if (result.selectedCertificate().isPresent() || evidence.certificate() != null) {
+            throw new ReplayMismatch(result.evidence());
+        }
+        return new ReplayObservation(result);
+    }
+
+    private static DiscoveryDomain<?, ?, ?> supportedDomain(String id, String revision) {
+        if (FiniteDifferenceSequenceDomain.DOMAIN_ID.equals(id) && FiniteDifferenceSequenceDomain.REVISION.equals(revision)) {
+            return new FiniteDifferenceSequenceDomain();
+        }
+        if (LinearRecurrenceSequenceDomain.DOMAIN_ID.equals(id) && LinearRecurrenceSequenceDomain.REVISION.equals(revision)) {
+            return new LinearRecurrenceSequenceDomain();
+        }
+        throw new IllegalArgumentException("unsupported domain export schema or revision");
+    }
+
+    static final class ReplayObservation {
+        private final DomainDiscoveryRunner.RunResult<?, ?> result;
+        private ReplayObservation(DomainDiscoveryRunner.RunResult<?, ?> result) { this.result = result; }
+        DomainDiscoveryRunner.RunResult<?, ?> result() { return result; }
+    }
+
+    static final class ReplayMismatch extends IllegalStateException {
+        private final DomainDiscoveryEvidence actual;
+        private ReplayMismatch(DomainDiscoveryEvidence actual) {
+            super("replay differs from the retained source evidence"); this.actual = actual;
+        }
+        DomainDiscoveryEvidence actual() { return actual; }
     }
 
     public boolean replaySupported() {
@@ -148,6 +186,7 @@ public final class DomainExportWorkspace {
     public String contentHash() { return contentHash; }
     public String toCanonicalJson() { return canonicalJson; }
     public DomainDiscoveryEvidence evidence() { return evidence; }
+    VerifiedDomainExport snapshot() { return snapshot; }
     public byte[] originalManifestBytes() { return snapshot.manifestBytes(); }
     public byte[] originalArtifactBytes(ArtifactRole role) { return snapshot.artifactBytes(role); }
 

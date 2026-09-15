@@ -372,6 +372,93 @@
         }
       }
     },
+    "/api/discovery-domains/exports/{runDigest}/validate": {
+      "post": {
+        "tags": [
+          "Plugins"
+        ],
+        "operationId": "validateDomainExportWorkspace",
+        "summary": "Gebundene endliche Sequenzdaten unabhängig prüfen; separaten Receipt herunterladen",
+        "x-regelsuche-context": "/api/discovery-domains",
+        "parameters": [
+          {
+            "name": "runDigest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "expectedWorkspaceHash",
+                  "expectedEvidenceHash"
+                ],
+                "properties": {
+                  "expectedWorkspaceHash": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  },
+                  "expectedEvidenceHash": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Separater Receipt mit ursprünglicher Identität, vollständigem Replay, endlichem Check oder expliziter Ablehnung; keine universelle Proof- oder Lifecycle-Freigabe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestJson"
+          },
+          "404": {
+            "description": "Export oder Originaldatei fehlt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erwarteter Workspace- oder Evidence-Hash gehört nicht zur unveränderten Quelle",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          }
+        }
+      }
+    },
     "/api/discovery-domains/exports/{runDigest}/files/{fileName}": {
       "get": {
         "tags": [

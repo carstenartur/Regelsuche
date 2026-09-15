@@ -1,0 +1,644 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:regelsuche:domain-downstream-validation:v1",
+  "title": "Source-bound downstream finite-data validation receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "consumerContract",
+    "status",
+    "detail",
+    "failureClass",
+    "sourceOutcome",
+    "source",
+    "verifiedCandidateHash",
+    "verifiedCertificateObjectHash",
+    "verifiedRenderedCertificateHash",
+    "replay",
+    "checkBudget",
+    "check",
+    "evaluationStatus",
+    "counterexampleStatus",
+    "proofStatus",
+    "externalNoveltyStatus",
+    "promotionStatus",
+    "publicEvidenceStatus",
+    "universalProofStatus",
+    "artifacts",
+    "claimBoundary",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.domain-downstream-validation/v1"
+    },
+    "consumerContract": {
+      "const": "regelsuche.builtin-sequence-export-validation/v1"
+    },
+    "status": {
+      "enum": [
+        "CONFIRMED_FINITE_DATA",
+        "REFUTED_FINITE_DATA",
+        "INVALID_WITNESS",
+        "INCONCLUSIVE",
+        "UNSUPPORTED",
+        "TECHNICAL_FAILURE",
+        "NOT_EVALUATED_NO_SELECTED_CANDIDATE",
+        "REPLAY_MISMATCH"
+      ]
+    },
+    "detail": {
+      "type": "string"
+    },
+    "failureClass": {
+      "type": "string"
+    },
+    "sourceOutcome": {
+      "enum": [
+        "CONFIRMED",
+        "REFUTED",
+        "INCONCLUSIVE",
+        "UNSUPPORTED",
+        "BUDGET_EXHAUSTED",
+        "INVALID_SEED"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runId",
+        "domainId",
+        "domainRevision",
+        "manifestHash",
+        "manifestByteHash",
+        "verificationHash",
+        "workspaceHash",
+        "descriptorHash",
+        "seedHash",
+        "evidenceHash",
+        "handoffHash",
+        "artifactBytes",
+        "selectedCandidateHash",
+        "certificateObjectHash",
+        "renderedCertificateHash"
+      ],
+      "properties": {
+        "runId": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "domainId": {
+          "enum": [
+            "integer-sequence-finite-difference",
+            "integer-sequence-linear-recurrence"
+          ]
+        },
+        "domainRevision": {
+          "const": "v1"
+        },
+        "manifestHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "manifestByteHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "verificationHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "workspaceHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "descriptorHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "seedHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "evidenceHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "handoffHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "artifactBytes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "fileName",
+              "role",
+              "sourceContentHash",
+              "byteHash",
+              "byteLength"
+            ],
+            "properties": {
+              "fileName": {
+                "enum": [
+                  "domain.json",
+                  "evidence.json",
+                  "lifecycle-handoff.json"
+                ]
+              },
+              "role": {
+                "enum": [
+                  "DOMAIN_DESCRIPTOR",
+                  "DISCOVERY_EVIDENCE",
+                  "LIFECYCLE_HANDOFF"
+                ]
+              },
+              "sourceContentHash": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "byteHash": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "byteLength": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "selectedCandidateHash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "certificateObjectHash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "renderedCertificateHash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "verifiedCandidateHash": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "verifiedCertificateObjectHash": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "verifiedRenderedCertificateHash": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "replay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "maxPayloadCharacters",
+        "admission",
+        "actualEvidenceHash",
+        "resources",
+        "resourceObservation",
+        "internalArithmeticWork"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "NOT_EVALUATED",
+            "IDENTICAL_CANONICAL_EVIDENCE",
+            "MISMATCH",
+            "TECHNICAL_FAILURE"
+          ]
+        },
+        "maxPayloadCharacters": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 512
+        },
+        "admission": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "configured",
+            "executed",
+            "skipped",
+            "remaining"
+          ],
+          "properties": {
+            "configured": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "executed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "skipped": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "remaining": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "actualEvidenceHash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resources": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "resource",
+                  "configured",
+                  "executed",
+                  "skipped",
+                  "remaining"
+                ],
+                "properties": {
+                  "resource": {
+                    "enum": [
+                      "EXPLORED_STATES",
+                      "GENERATED_SUCCESSORS",
+                      "CANDIDATE_EVALUATIONS",
+                      "CERTIFICATE_ATTEMPTS",
+                      "COUNTEREXAMPLE_ATTEMPTS"
+                    ]
+                  },
+                  "configured": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "executed": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "skipped": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "remaining": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "minItems": 5,
+              "maxItems": 5
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resourceObservation": {
+          "enum": [
+            "UNAVAILABLE",
+            "RETURNED_RUNNER_ROLE_COUNTS"
+          ]
+        },
+        "internalArithmeticWork": {
+          "const": "UNAVAILABLE"
+        }
+      }
+    },
+    "checkBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxTermChecks",
+        "maxScalarOperations",
+        "maxScalarBits"
+      ],
+      "properties": {
+        "maxTermChecks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 256
+        },
+        "maxScalarOperations": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "maxScalarBits": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        }
+      }
+    },
+    "check": {
+      "anyOf": [
+        {
+          "$ref": "urn:regelsuche:domain-finite-data-check:v1"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "evaluationStatus": {
+      "enum": [
+        "NOT_EVALUATED",
+        "CONFIRMED",
+        "REFUTED",
+        "INCONCLUSIVE",
+        "UNSUPPORTED"
+      ]
+    },
+    "counterexampleStatus": {
+      "enum": [
+        "NOT_EVALUATED",
+        "FOUND",
+        "NONE_FOUND",
+        "INCONCLUSIVE"
+      ]
+    },
+    "proofStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "externalNoveltyStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "promotionStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "publicEvidenceStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "universalProofStatus": {
+      "const": "NOT_PRODUCED"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "status",
+          "artifactSchema",
+          "targetContentHash"
+        ],
+        "properties": {
+          "role": {
+            "enum": [
+              "SOURCE_LIFECYCLE_HANDOFF",
+              "VALIDATION_EVIDENCE",
+              "FINITE_COUNTEREXAMPLE_CHECK",
+              "PROOF_OBLIGATIONS",
+              "UNIVERSAL_PROOF",
+              "EXTERNAL_NOVELTY",
+              "PROMOTION",
+              "PUBLIC_EVIDENCE"
+            ]
+          },
+          "status": {
+            "enum": [
+              "AVAILABLE",
+              "NOT_EVALUATED",
+              "NOT_PRODUCED"
+            ]
+          },
+          "artifactSchema": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "targetContentHash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "AVAILABLE"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "artifactSchema": {
+                  "type": "string"
+                },
+                "targetContentHash": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "artifactSchema": {
+                  "type": "null"
+                },
+                "targetContentHash": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "role": {
+                  "enum": [
+                    "PROOF_OBLIGATIONS",
+                    "UNIVERSAL_PROOF"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "status": {
+                  "const": "NOT_PRODUCED"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "role": {
+                  "enum": [
+                    "EXTERNAL_NOVELTY",
+                    "PROMOTION",
+                    "PUBLIC_EVIDENCE"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "status": {
+                  "const": "NOT_EVALUATED"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "role": {
+                  "enum": [
+                    "SOURCE_LIFECYCLE_HANDOFF"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "status": {
+                  "const": "AVAILABLE"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "minItems": 8,
+      "maxItems": 8
+    },
+    "claimBoundary": {
+      "type": "string"
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "CONFIRMED_FINITE_DATA"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "sourceOutcome": {
+            "const": "CONFIRMED"
+          },
+          "replay": {
+            "properties": {
+              "status": {
+                "const": "IDENTICAL_CANONICAL_EVIDENCE"
+              }
+            }
+          },
+          "check": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "CONFIRMED_FINITE_DATA"
+              },
+              "complete": {
+                "const": true
+              }
+            }
+          },
+          "evaluationStatus": {
+            "const": "CONFIRMED"
+          },
+          "verifiedCandidateHash": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "verifiedCertificateObjectHash": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "verifiedRenderedCertificateHash": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    }
+  ]
+}

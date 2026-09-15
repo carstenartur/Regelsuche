@@ -67,17 +67,40 @@
         });
         return freeze(artifact);
     }
-    function selection(artifact, candidateId, edge = '') {
+    function selection(artifact, candidateId, edge = '', generation = '') {
         if (artifact.content.schema === NATIVE) {
             const data = artifact.content, candidate = data.states.find(s => s.stateId === candidateId);
             if (!candidate) fail('Kandidat ist nicht in diesem Run enthalten. Auswahl bleibt unverändert.');
             const edges = data.transitions.filter(t => t.toStateId === candidateId);
-            const selectedEdge = edge ? edges.find(t => String(t.sequence) === edge) : null;
-            if (edge && !selectedEdge) fail('Graphkante gehört nicht zum ausgewählten Kandidaten.');
+            const samePath = (left, right) => left.length === right.length && left.every((value, index) => value === right[index]);
+            const replaySteps = candidate.generationSequences.map((sequence, index, path) => {
+                const source = data.states.filter(s => samePath(s.generationSequences, path.slice(0, index)));
+                const target = data.states.filter(s => samePath(s.generationSequences, path.slice(0, index + 1)));
+                if (source.length !== 1 || target.length !== 1) fail('Replay-Pfad besitzt keinen eindeutigen gespeicherten Zustand.');
+                const transitions = data.transitions.filter(t => t.generationSequence === sequence
+                    && t.fromStateId === source[0].stateId && t.toStateId === target[0].stateId);
+                if (transitions.length !== 1) fail('Replay-Schritt besitzt keine eindeutige gespeicherte Graphkante.');
+                return {position: index + 1, generation: data.generations[sequence], edge: transitions[0]};
+            });
+            let selectedReplay = null, selectedEdge = null;
+            if (generation !== '') {
+                if (typeof generation !== 'string' || !/^(0|[1-9][0-9]*)$/.test(generation)) fail('Ungültige Replay-Generierung.');
+                selectedReplay = replaySteps.find(step => String(step.generation.sequence) === generation);
+                if (!selectedReplay) fail('Replay-Generierung gehört nicht zum Pfad des ausgewählten Kandidaten.');
+                selectedEdge = selectedReplay.edge;
+                if (edge && String(selectedEdge.sequence) !== edge) fail('Graphkante und Replay-Generierung widersprechen sich.');
+            } else {
+                // Old links without generation still select only an incoming edge of the end candidate.
+                selectedEdge = edge ? edges.find(t => String(t.sequence) === edge) : null;
+                if (edge && !selectedEdge) fail('Graphkante gehört nicht zum ausgewählten Kandidaten.');
+            }
             const observation = window.RegelsucheRunWorkspace.parseExactJson(candidate.canonicalStateJson);
             return freeze({native: true, candidate, observation, edges, selectedEdge,
-                generations: candidate.generationSequences.map(i => data.generations[i])});
+                generations: candidate.generationSequences.map(i => data.generations[i]), replaySteps, selectedReplay,
+                previousReplay: selectedReplay ? replaySteps[selectedReplay.position - 2] || null : null,
+                nextReplay: selectedReplay ? replaySteps[selectedReplay.position] || null : null});
         }
+        if (generation !== '') fail('Dieses Dossier speichert keine adressierbaren Replay-Generierungen.');
         const data = artifact.content, search = data.search;
         const candidate = search.states.find(s => s.stateHash === candidateId && s.depth > 0);
         if (!candidate) fail('Kandidat ist nicht in diesem Run enthalten. Auswahl bleibt unverändert.');

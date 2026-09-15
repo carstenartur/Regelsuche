@@ -45,12 +45,38 @@
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-clean-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>delete-stale-hidden-rule-evidence</id>
+            <phase>initialize</phase>
+            <goals><goal>clean</goal></goals>
+            <configuration>
+              <excludeDefaultDirectories>true</excludeDefaultDirectories>
+              <filesets>
+                <fileset>
+                  <!-- Keep every output component inside the no-follow scan. -->
+                  <directory>${maven.multiModuleProjectDirectory}</directory>
+                  <includes>
+                    <include>app/target/reports/hidden-rule-pilot</include>
+                    <include>app/target/reports/hidden-rule-pilot/**</include>
+                  </includes>
+                  <followSymlinks>false</followSymlinks>
+                </fileset>
+              </filesets>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <systemPropertyVariables combine.children="append">
             <regelsuche.repositoryRoot>${maven.multiModuleProjectDirectory}</regelsuche.repositoryRoot>
             <regelsuche.maven.reactor>true</regelsuche.maven.reactor>
             <regelsuche.recordDocs>false</regelsuche.recordDocs>
+            <regelsuche.hiddenRulePilot.outputDirectory>${project.build.directory}/reports/hidden-rule-pilot</regelsuche.hiddenRulePilot.outputDirectory>
           </systemPropertyVariables>
         </configuration>
       </plugin>

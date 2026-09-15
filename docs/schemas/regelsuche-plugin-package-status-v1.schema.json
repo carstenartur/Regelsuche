@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.plugin-package-status/v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "scope",
+    "installation"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.plugin-package-status/v1"
+    },
+    "scope": {
+      "$ref": "regelsuche-plugin-checkpoint-operation-v1.schema.json#/$defs/scope"
+    },
+    "installation": {
+      "anyOf": [
+        {
+          "$ref": "regelsuche-plugin-installation-v1.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "additionalProperties": false
+}

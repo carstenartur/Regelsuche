@@ -6,13 +6,16 @@ The complete Release Readiness gate is repository-owned and executable from a pl
 bash scripts/run-release-readiness-verification.sh
 ```
 
-The command requires Java 25 and a reachable Docker daemon. It manages its pinned Python schema validator in `build/verification-venv`; GitHub Actions is not required.
+The command requires Java 25 on Linux AMD64 and a reachable Docker daemon. Set
+`JAVA_HOME` or `REGELSUCHE_RELEASE_VERIFIER_JAVA` to the Java-25 installation or
+launcher respectively; the script checks the selected JVM and enables native
+access explicitly. GitHub Actions is not required.
 
 The runner performs the complete contract:
 
 1. executes the hidden-rule pilot JUnit test;
-2. generates the qualified Release Readiness evidence through Gradle;
-3. validates the local evidence root with `scripts/verify-release-readiness-evidence.py`;
+2. generates the qualified Release Readiness evidence and builds `:regelsuche-release:installDist` through Gradle;
+3. validates the local evidence root with `de.regelsuche.release.ReleaseReadinessEvidenceVerifier` from that distribution;
 4. builds `Dockerfile.release-readiness`;
 5. reproduces the same qualified evidence in the runtime container;
 6. validates the container-produced evidence independently;
@@ -49,6 +52,9 @@ build/release-readiness-docker-output/
 
 The `Release Readiness` workflow only provisions Java/Gradle, calls the same runner and uploads diagnostics. It contains no release assertions, expected values, schema programs or Docker lifecycle semantics.
 
-Issue #749 also provides a [Java retained-evidence verifier](release-readiness-java-verification.md)
-with ordinary Maven/JUnit controls. The Python verifier remains required while the
-Java alternative, its native reader and build integration receive independent review.
+Issue #749's [Java retained-evidence verifier](release-readiness-java-verification.md)
+owns both local/container decisions and the root Gradle verification gate. Ordinary
+Maven `verify` also runs the existing actual producer and this verifier under its
+separate `target/reports` paths. The four obsolete Python verifier/control/helper
+files were retired after reviewed production parity; the shared collector reader,
+shell reproduction orchestration and other Gradle/Python owners remain.

@@ -38,6 +38,8 @@
           <testIncludes>
             <testInclude>de/regelsuche/dockere2e/DockerAvailabilityIT.java</testInclude>
             <testInclude>de/regelsuche/dockere2e/PinnedPostgresContainer.java</testInclude>
+            <testInclude>de/regelsuche/dockere2e/PluginCheckpointPostgresTest.java</testInclude>
+            <testInclude>de/regelsuche/dockere2e/PluginCheckpointCanonicalJsonTest.java</testInclude>
             <testInclude>de/regelsuche/dockere2e/PostgresDiscoveryPersistenceTest.java</testInclude>
             <testInclude>de/regelsuche/dockere2e/HibernateFullModePersistenceTest.java</testInclude>
             <testInclude>de/regelsuche/dockere2e/ScientificDiscoveryPostgresE2ETest.java</testInclude>
@@ -71,6 +73,8 @@
           <includes>
             <include>**/DockerAvailabilityIT.java</include>
             <include>**/PostgresDiscoveryPersistenceTest.java</include>
+            <include>**/PluginCheckpointPostgresTest.java</include>
+            <include>**/PluginCheckpointCanonicalJsonTest.java</include>
             <include>**/HibernateFullModePersistenceTest.java</include>
             <include>**/ScientificDiscoveryPostgresE2ETest.java</include>
             <include>**/Neo4jExpressionGraphStoreTest.java</include>

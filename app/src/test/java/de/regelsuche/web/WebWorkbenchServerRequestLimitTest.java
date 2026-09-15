@@ -349,6 +349,8 @@ class WebWorkbenchServerRequestLimitTest {
             new Endpoint("/api/discovery-domains/exports", "/api/discovery-domains/exports", ""),
             new Endpoint("/api/discovery-domains/exports/{runDigest}/replay",
                 "/api/discovery-domains/exports/request-limit/replay", ""),
+            new Endpoint("/api/discovery-domains/exports/{runDigest}/validate",
+                "/api/discovery-domains/exports/request-limit/validate", ""),
             new Endpoint("/api/representations/solve", "/api/representations/solve", ""),
             new Endpoint("/api/representations/solve/replay", "/api/representations/solve/replay", ""),
             new Endpoint("/api/representations", "/api/representations", ""),
