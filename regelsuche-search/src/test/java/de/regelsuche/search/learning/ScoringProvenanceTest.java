@@ -18,6 +18,8 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class ScoringProvenanceTest {
     private static final String CURRENT = "regelsuche.expression-score/v2";
@@ -39,15 +41,19 @@ class ScoringProvenanceTest {
         assertTrue(new DescriptorPolicyTrainer().train(dataset, DescriptorPolicyModel.Mode.FREQUENCY, 1).compatible());
     }
 
-    @Test void oldNumericRowsAreNotRelabelledByExportOrAcceptedByEitherTrainer() {
+    @ParameterizedTest
+    @ValueSource(strings = {"regelsuche.search-trajectory/v1", "regelsuche.search-trajectory/v2"})
+    void oldNumericRowsAreNotRelabelledByExportOrAcceptedByEitherTrainer(String legacySchema) {
         var fresh = run(new ExpressionScorer()).withSplit(DatasetSplit.TRAIN);
         var old = new SearchTrajectoryRun(fresh.context(), fresh.root(), fresh.target(), fresh.taskValueFingerprint(),
             fresh.taskAlphaFingerprint(), fresh.terminalStatus(), fresh.success(),
-            fresh.records().stream().map(ScoringProvenanceTest::legacyCopy).toList());
+            fresh.records().stream().map(record -> legacyCopy(record, legacySchema)).toList());
         var dataset = new SearchTrajectoryDataset(List.of(old.withSplit(DatasetSplit.TRAIN)));
         dataset.toJsonLines().lines().forEach(line -> {
             var json = new JsonReader(line).readObject();
-            assertEquals("regelsuche.search-trajectory/v2", json.get("schema"));
+            assertEquals(legacySchema, json.get("schema"));
+            assertFalse(json.containsKey("scoringRevision"));
+            if (legacySchema.endsWith("/v1")) assertFalse(json.containsKey("transformationDescriptor"));
             assertNotEquals(CURRENT, json.get("scoringRevision"));
         });
         assertScoringRejection(() -> new SearchPolicyTrainer().train(dataset, SearchPolicyModel.Mode.FREQUENCY, 1));
@@ -148,8 +154,8 @@ class ScoringProvenanceTest {
     }
 
     /** The old constructor deliberately cannot infer a score contract from numeric values. */
-    private static SearchTrajectoryRecord legacyCopy(SearchTrajectoryRecord r) {
-        return new SearchTrajectoryRecord("regelsuche.search-trajectory/v2", r.producerVersion(), r.runId(), r.family(),
+    private static SearchTrajectoryRecord legacyCopy(SearchTrajectoryRecord r, String legacySchema) {
+        return new SearchTrajectoryRecord(legacySchema, r.producerVersion(), r.runId(), r.family(),
             r.split(), r.ruleInventoryHash(), r.sequence(), r.eventType(), r.expression(), r.parent(), r.target(),
             r.features(), r.transformationDescriptor(), r.depth(), r.score(), r.parentScore(), r.frontierSize(),
             r.visitedCount(), r.generatedCount(), r.ruleId(), r.rewriteKind(), r.applicableRuleIds(), r.assumptions(),
