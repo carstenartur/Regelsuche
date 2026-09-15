@@ -56,7 +56,7 @@ public record SearchTrajectoryRun(
 <span class="fc" id="L56">                record.pruningReason(),</span>
 <span class="fc" id="L57">                record.eventualSuccess(),</span>
 <span class="fc" id="L58">                record.selectedPath(),</span>
-<span class="fc" id="L59">                record.terminalStatus()))</span>
+<span class="fc" id="L59">                record.terminalStatus(), record.scoringRevision()))</span>
 <span class="fc" id="L60">            .toList();</span>
 <span class="fc" id="L61">        return new SearchTrajectoryRun(</span>
             updated, root, target, taskValueFingerprint, taskAlphaFingerprint,

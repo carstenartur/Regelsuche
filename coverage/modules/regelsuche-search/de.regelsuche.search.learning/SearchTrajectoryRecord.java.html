@@ -35,46 +35,87 @@ public record SearchTrajectoryRecord(
     String pruningReason,
     boolean eventualSuccess,
     boolean selectedPath,
-    GoalStatus terminalStatus
+    GoalStatus terminalStatus,
+    String scoringRevision
 ) {
-    public static final String SCHEMA = &quot;regelsuche.search-trajectory/v2&quot;;
+    public static final String SCHEMA = &quot;regelsuche.search-trajectory/v3&quot;;
 
-<span class="fc" id="L42">    public SearchTrajectoryRecord {</span>
-<span class="pc bpc" id="L43" title="2 of 4 branches missed.">        schema = schema == null || schema.isBlank() ? SCHEMA : schema;</span>
-<span class="fc" id="L44">        requireText(producerVersion, &quot;producerVersion&quot;);</span>
-<span class="fc" id="L45">        requireText(runId, &quot;runId&quot;);</span>
-<span class="fc" id="L46">        requireText(family, &quot;family&quot;);</span>
-<span class="fc" id="L47">        requireText(ruleInventoryHash, &quot;ruleInventoryHash&quot;);</span>
-<span class="fc" id="L48">        Objects.requireNonNull(eventType, &quot;eventType&quot;);</span>
-<span class="fc" id="L49">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
-<span class="fc" id="L50">        Objects.requireNonNull(features, &quot;features&quot;);</span>
-<span class="fc" id="L51">        Objects.requireNonNull(split, &quot;split&quot;);</span>
-<span class="fc" id="L52">        Objects.requireNonNull(terminalStatus, &quot;terminalStatus&quot;);</span>
-<span class="fc" id="L53">        ruleId = safe(ruleId);</span>
-<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        applicableRuleIds = applicableRuleIds == null</span>
-<span class="nc" id="L55">            ? List.of()</span>
-<span class="fc" id="L56">            : applicableRuleIds.stream().filter(Objects::nonNull).distinct().sorted().toList();</span>
-<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
-<span class="fc" id="L58">        pruningReason = safe(pruningReason);</span>
-<span class="fc bfc" id="L59" title="All 2 branches covered.">        boolean decision = eventType == SearchEventType.TRANSFORMATION_GENERATED;</span>
-<span class="pc bpc" id="L60" title="1 of 4 branches missed.">        if (decision != (transformationDescriptor != null)) {</span>
-<span class="nc" id="L61">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L43">    public SearchTrajectoryRecord {</span>
+<span class="fc" id="L44">        scoringRevision = de.regelsuche.scoring.ScoreRevision.normalize(scoringRevision);</span>
+<span class="pc bpc" id="L45" title="2 of 4 branches missed.">        schema = schema == null || schema.isBlank() ? SCHEMA : schema;</span>
+<span class="fc" id="L46">        requireText(producerVersion, &quot;producerVersion&quot;);</span>
+<span class="fc" id="L47">        requireText(runId, &quot;runId&quot;);</span>
+<span class="fc" id="L48">        requireText(family, &quot;family&quot;);</span>
+<span class="fc" id="L49">        requireText(ruleInventoryHash, &quot;ruleInventoryHash&quot;);</span>
+<span class="fc" id="L50">        Objects.requireNonNull(eventType, &quot;eventType&quot;);</span>
+<span class="fc" id="L51">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L52">        Objects.requireNonNull(features, &quot;features&quot;);</span>
+<span class="fc" id="L53">        Objects.requireNonNull(split, &quot;split&quot;);</span>
+<span class="fc" id="L54">        Objects.requireNonNull(terminalStatus, &quot;terminalStatus&quot;);</span>
+<span class="fc" id="L55">        ruleId = safe(ruleId);</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        applicableRuleIds = applicableRuleIds == null</span>
+<span class="nc" id="L57">            ? List.of()</span>
+<span class="fc" id="L58">            : applicableRuleIds.stream().filter(Objects::nonNull).distinct().sorted().toList();</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="fc" id="L60">        pruningReason = safe(pruningReason);</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        boolean decision = eventType == SearchEventType.TRANSFORMATION_GENERATED;</span>
+<span class="pc bpc" id="L62" title="1 of 4 branches missed.">        if (decision != (transformationDescriptor != null)) {</span>
+<span class="nc" id="L63">            throw new IllegalArgumentException(</span>
                 &quot;transformationDescriptor must be present exactly for transformation decisions&quot;);
         }
-<span class="fc" id="L64">    }</span>
+<span class="fc" id="L66">    }</span>
+
+
+    /** Unversioned callers cannot attest which scoring algorithm produced their numbers. */
+    public SearchTrajectoryRecord(String schema,
+        String producerVersion,
+        String runId,
+        String family,
+        DatasetSplit split,
+        String ruleInventoryHash,
+        long sequence,
+        SearchEventType eventType,
+        ExpressionFingerprint expression,
+        ExpressionFingerprint parent,
+        ExpressionFingerprint target,
+        ExpressionFeatures features,
+        TransformationDescriptor transformationDescriptor,
+        int depth,
+        int score,
+        int parentScore,
+        int frontierSize,
+        int visitedCount,
+        int generatedCount,
+        String ruleId,
+        RewriteKind rewriteKind,
+        List&lt;String&gt; applicableRuleIds,
+        List&lt;String&gt; assumptions,
+        String pruningReason,
+        boolean eventualSuccess,
+        boolean selectedPath,
+        GoalStatus terminalStatus) {
+<span class="fc" id="L97">        this(schema, producerVersion, runId, family, split, ruleInventoryHash, sequence, eventType, expression, parent, target, features, transformationDescriptor, depth, score, parentScore, frontierSize, visitedCount, generatedCount, ruleId, rewriteKind, applicableRuleIds, assumptions, pruningReason, eventualSuccess, selectedPath, terminalStatus, de.regelsuche.scoring.ScoreRevision.UNSPECIFIED);</span>
+<span class="fc" id="L98">    }</span>
+
+    public void requireCurrentScoring() {
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="fc" id="L102">            throw new IllegalArgumentException(&quot;unsupported scoring trajectory schema: &quot; + schema);</span>
+        }
+<span class="fc" id="L104">        de.regelsuche.scoring.ScoreRevision.requireCurrent(scoringRevision);</span>
+<span class="fc" id="L105">    }</span>
 
     public boolean decision() {
-<span class="fc bfc" id="L67" title="All 2 branches covered.">        return eventType == SearchEventType.TRANSFORMATION_GENERATED;</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        return eventType == SearchEventType.TRANSFORMATION_GENERATED;</span>
     }
 
     private static void requireText(String value, String name) {
-<span class="pc bpc" id="L71" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L72">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+<span class="pc bpc" id="L112" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L113">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
         }
-<span class="fc" id="L74">    }</span>
+<span class="fc" id="L115">    }</span>
 
     private static String safe(String value) {
-<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value;</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

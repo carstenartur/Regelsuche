@@ -34,35 +34,36 @@ import java.util.TreeSet;
 <span class="fc" id="L34">        List&lt;SearchTrajectoryRun&gt; trainingRuns = dataset.runs().stream()</span>
 <span class="fc bfc" id="L35" title="All 2 branches covered.">            .filter(run -&gt; run.context().split() == DatasetSplit.TRAIN)</span>
 <span class="fc" id="L36">            .toList();</span>
-<span class="fc" id="L37">        Map&lt;String, MutableRuleStatistics&gt; mutable = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L38">        TreeSet&lt;String&gt; inventoryHashes = new TreeSet&lt;&gt;();</span>
-<span class="fc" id="L39">        trainingRuns.forEach(run -&gt; run.records().stream()</span>
-<span class="fc" id="L40">            .filter(SearchTrajectoryRecord::decision)</span>
-<span class="pc bpc" id="L41" title="1 of 2 branches missed.">            .filter(record -&gt; !record.ruleId().isBlank())</span>
-<span class="fc" id="L42">            .forEach(record -&gt; {</span>
-<span class="fc" id="L43">                inventoryHashes.add(record.ruleInventoryHash());</span>
-<span class="fc" id="L44">                mutable.computeIfAbsent(</span>
-<span class="fc" id="L45">                    record.ruleId(), ignored -&gt; new MutableRuleStatistics())</span>
-<span class="pc bpc" id="L46" title="1 of 4 branches missed.">                    .record(record.selectedPath() &amp;&amp; record.eventualSuccess(),</span>
-<span class="fc" id="L47">                        record.score() - record.parentScore());</span>
-<span class="fc" id="L48">            }));</span>
-<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (mutable.isEmpty()) {</span>
-<span class="nc" id="L50">            throw new IllegalArgumentException(&quot;training split contains no search decisions&quot;);</span>
+<span class="fc" id="L37">        trainingRuns.forEach(run -&gt; run.records().forEach(SearchTrajectoryRecord::requireCurrentScoring));</span>
+<span class="fc" id="L38">        Map&lt;String, MutableRuleStatistics&gt; mutable = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L39">        TreeSet&lt;String&gt; inventoryHashes = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L40">        trainingRuns.forEach(run -&gt; run.records().stream()</span>
+<span class="fc" id="L41">            .filter(SearchTrajectoryRecord::decision)</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">            .filter(record -&gt; !record.ruleId().isBlank())</span>
+<span class="fc" id="L43">            .forEach(record -&gt; {</span>
+<span class="fc" id="L44">                inventoryHashes.add(record.ruleInventoryHash());</span>
+<span class="fc" id="L45">                mutable.computeIfAbsent(</span>
+<span class="fc" id="L46">                    record.ruleId(), ignored -&gt; new MutableRuleStatistics())</span>
+<span class="pc bpc" id="L47" title="1 of 4 branches missed.">                    .record(record.selectedPath() &amp;&amp; record.eventualSuccess(),</span>
+<span class="fc" id="L48">                        record.score() - record.parentScore());</span>
+<span class="fc" id="L49">            }));</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (mutable.isEmpty()) {</span>
+<span class="nc" id="L51">            throw new IllegalArgumentException(&quot;training split contains no search decisions&quot;);</span>
         }
 
-<span class="fc" id="L53">        Map&lt;String, RuleStatistics&gt; rules = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L54">        mutable.entrySet().stream()</span>
-<span class="fc" id="L55">            .sorted(Map.Entry.comparingByKey())</span>
-<span class="fc" id="L56">            .forEach(entry -&gt; rules.put(entry.getKey(), entry.getValue().freeze()));</span>
+<span class="fc" id="L54">        Map&lt;String, RuleStatistics&gt; rules = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L55">        mutable.entrySet().stream()</span>
+<span class="fc" id="L56">            .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L57">            .forEach(entry -&gt; rules.put(entry.getKey(), entry.getValue().freeze()));</span>
 
-<span class="fc" id="L58">        SearchTrajectoryDataset trainingDataset = new SearchTrajectoryDataset(trainingRuns);</span>
-<span class="fc" id="L59">        String datasetHash = &quot;sha256:&quot; + sha256(trainingDataset.toJsonLines());</span>
-<span class="fc" id="L60">        String inventoryHash = &quot;sha256:&quot; + sha256(String.join(&quot;\n&quot;, inventoryHashes));</span>
-<span class="fc" id="L61">        String modelMaterial = datasetHash + &quot;\n&quot; + SearchPolicyModel.FEATURE_SCHEMA</span>
+<span class="fc" id="L59">        SearchTrajectoryDataset trainingDataset = new SearchTrajectoryDataset(trainingRuns);</span>
+<span class="fc" id="L60">        String datasetHash = &quot;sha256:&quot; + sha256(trainingDataset.toJsonLines());</span>
+<span class="fc" id="L61">        String inventoryHash = &quot;sha256:&quot; + sha256(String.join(&quot;\n&quot;, inventoryHashes));</span>
+<span class="fc" id="L62">        String modelMaterial = datasetHash + &quot;\n&quot; + SearchPolicyModel.FEATURE_SCHEMA</span>
             + &quot;\n&quot; + inventoryHash + &quot;\n&quot; + mode + &quot;\n&quot; + minimumObservations
             + &quot;\n&quot; + rules;
-<span class="fc" id="L64">        String modelVersion = &quot;policy-v1:&quot; + sha256(modelMaterial).substring(0, 24);</span>
-<span class="fc" id="L65">        return new SearchPolicyModel(</span>
+<span class="fc" id="L65">        String modelVersion = &quot;policy-v1:&quot; + sha256(modelMaterial).substring(0, 24);</span>
+<span class="fc" id="L66">        return new SearchPolicyModel(</span>
             modelVersion,
             datasetHash,
             SearchPolicyModel.FEATURE_SCHEMA,
@@ -74,11 +75,11 @@ import java.util.TreeSet;
 
     private static String sha256(String value) {
         try {
-<span class="fc" id="L77">            return java.util.HexFormat.of().formatHex(</span>
-<span class="fc" id="L78">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
-<span class="fc" id="L79">                    .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
-<span class="nc" id="L80">        } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L81">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+<span class="fc" id="L78">            return java.util.HexFormat.of().formatHex(</span>
+<span class="fc" id="L79">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L80">                    .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L81">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L82">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
         }
     }
 
@@ -88,20 +89,20 @@ import java.util.TreeSet;
         private long scoreDeltaSum;
 
         private void record(boolean successfulChoice, int scoreDelta) {
-<span class="fc" id="L91">            observations++;</span>
-<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (successfulChoice) {</span>
-<span class="fc" id="L93">                successful++;</span>
+<span class="fc" id="L92">            observations++;</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            if (successfulChoice) {</span>
+<span class="fc" id="L94">                successful++;</span>
             }
-<span class="fc" id="L95">            scoreDeltaSum += scoreDelta;</span>
-<span class="fc" id="L96">        }</span>
+<span class="fc" id="L96">            scoreDeltaSum += scoreDelta;</span>
+<span class="fc" id="L97">        }</span>
 
         private RuleStatistics freeze() {
-<span class="fc" id="L99">            int failed = observations - successful;</span>
-<span class="pc bpc" id="L100" title="1 of 2 branches missed.">            int successPermille = observations == 0 ? 0 : successful * 1000 / observations;</span>
-<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            int meanScoreDelta = observations == 0</span>
-<span class="nc" id="L102">                ? 0</span>
-<span class="fc" id="L103">                : (int) Math.round((double) scoreDeltaSum / observations);</span>
-<span class="fc" id="L104">            return new RuleStatistics(</span>
+<span class="fc" id="L100">            int failed = observations - successful;</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            int successPermille = observations == 0 ? 0 : successful * 1000 / observations;</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            int meanScoreDelta = observations == 0</span>
+<span class="nc" id="L103">                ? 0</span>
+<span class="fc" id="L104">                : (int) Math.round((double) scoreDeltaSum / observations);</span>
+<span class="fc" id="L105">            return new RuleStatistics(</span>
                 observations, successful, failed, successPermille, meanScoreDelta);
         }
     }

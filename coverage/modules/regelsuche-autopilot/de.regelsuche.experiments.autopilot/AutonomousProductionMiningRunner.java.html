@@ -18,7 +18,7 @@ import de.regelsuche.mining.OpenTargetConjectureEvidence.SeedProvenance;
 import de.regelsuche.mining.OpenTargetConjectureMiner;
 import de.regelsuche.mining.OpenTargetConjectureMiner.MiningReport;
 import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetObservation;
-import de.regelsuche.scoring.ExpressionScore;
+import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
 import de.regelsuche.search.strategy.SearchState;
 import java.io.IOException;
@@ -254,104 +254,105 @@ import java.util.TreeSet;
 <span class="fc" id="L254">                .toList());</span>
     }
 
+    /** Recompute the mining objective; unversioned retained totals stay unchanged in the snapshot evidence. */
     private static SearchState replayState(StateSnapshot state) {
-<span class="fc" id="L258">        return new SearchState(</span>
-<span class="fc" id="L259">            state.expression(),</span>
-<span class="fc" id="L260">            state.depth(),</span>
-<span class="fc" id="L261">            new ExpressionScore(state.scoreWeightedTotal(), 0, 0, 0, 0),</span>
-<span class="fc" id="L262">            state.path(),</span>
-<span class="fc" id="L263">            state.appliedRuleIds(),</span>
-<span class="fc" id="L264">            Set.of(),</span>
+<span class="fc" id="L259">        return new SearchState(</span>
+<span class="fc" id="L260">            state.expression(),</span>
+<span class="fc" id="L261">            state.depth(),</span>
+<span class="fc" id="L262">            new ExpressionScorer().score(state.expression()),</span>
+<span class="fc" id="L263">            state.path(),</span>
+<span class="fc" id="L264">            state.appliedRuleIds(),</span>
+<span class="fc" id="L265">            Set.of(),</span>
             0,
-<span class="fc" id="L266">            state.canonicalHash(),</span>
+<span class="fc" id="L267">            state.canonicalHash(),</span>
             null,
             null,
             null,
             false,
             0,
-<span class="fc" id="L272">            state.equivalencePreservingFlags().stream()</span>
-<span class="fc" id="L273">                .allMatch(Boolean::booleanValue),</span>
+<span class="fc" id="L273">            state.equivalencePreservingFlags().stream()</span>
+<span class="fc" id="L274">                .allMatch(Boolean::booleanValue),</span>
             0,
-<span class="fc" id="L275">            List.of(),</span>
-<span class="fc" id="L276">            state.equivalencePreservingFlags(),</span>
-<span class="fc" id="L277">            state.assumptions());</span>
+<span class="fc" id="L276">            List.of(),</span>
+<span class="fc" id="L277">            state.equivalencePreservingFlags(),</span>
+<span class="fc" id="L278">            state.assumptions());</span>
     }
 
     private static List&lt;GeneratedObservation&gt; rejectionInputs(
         List&lt;GeneratedObservation&gt; observations
     ) {
-<span class="fc" id="L283">        Set&lt;String&gt; required = Set.copyOf(</span>
-<span class="fc" id="L284">            PinnedAutonomousProductionCampaign.alphaRejectionSeedIds());</span>
-<span class="fc" id="L285">        List&lt;GeneratedObservation&gt; result = observations.stream()</span>
-<span class="fc" id="L286">            .filter(item -&gt; required.contains(item.seed().id()))</span>
-<span class="fc" id="L287">            .sorted(Comparator.comparing(item -&gt; item.seed().id()))</span>
-<span class="fc" id="L288">            .toList();</span>
-<span class="pc bpc" id="L289" title="1 of 2 branches missed.">        if (result.size() != required.size()</span>
-<span class="fc" id="L290">                || result.stream().map(item -&gt; item.branch().familyId())</span>
-<span class="pc bpc" id="L291" title="1 of 2 branches missed.">                    .distinct().count() != 2L) {</span>
-<span class="nc" id="L292">            throw new IllegalStateException(</span>
+<span class="fc" id="L284">        Set&lt;String&gt; required = Set.copyOf(</span>
+<span class="fc" id="L285">            PinnedAutonomousProductionCampaign.alphaRejectionSeedIds());</span>
+<span class="fc" id="L286">        List&lt;GeneratedObservation&gt; result = observations.stream()</span>
+<span class="fc" id="L287">            .filter(item -&gt; required.contains(item.seed().id()))</span>
+<span class="fc" id="L288">            .sorted(Comparator.comparing(item -&gt; item.seed().id()))</span>
+<span class="fc" id="L289">            .toList();</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">        if (result.size() != required.size()</span>
+<span class="fc" id="L291">                || result.stream().map(item -&gt; item.branch().familyId())</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">                    .distinct().count() != 2L) {</span>
+<span class="nc" id="L293">            throw new IllegalStateException(</span>
                 &quot;pinned alpha-rejection batch must retain one seed from each family&quot;);
         }
-<span class="fc" id="L295">        return result;</span>
+<span class="fc" id="L296">        return result;</span>
     }
 
     private static void validatePinnedOutcomes(
         MiningBatch full,
         MiningBatch rejection
     ) {
-<span class="pc bpc" id="L302" title="1 of 2 branches missed.">        if (full.evidence().report().conjectures().isEmpty()</span>
-<span class="pc bpc" id="L303" title="1 of 2 branches missed.">                || full.binding().receipt().outputs().isEmpty()) {</span>
-<span class="nc" id="L304">            throw new IllegalStateException(</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">        if (full.evidence().report().conjectures().isEmpty()</span>
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">                || full.binding().receipt().outputs().isEmpty()) {</span>
+<span class="nc" id="L305">            throw new IllegalStateException(</span>
                 &quot;full production batch must retain at least one candidate&quot;);
         }
-<span class="fc" id="L307">        boolean crossFamily = full.binding().receipt().outputs().stream()</span>
-<span class="fc" id="L308">            .anyMatch(output -&gt; output.sources().stream()</span>
-<span class="fc" id="L309">                .map(AutonomousEvidenceDagV2.SourceLink::familyId)</span>
-<span class="pc bpc" id="L310" title="1 of 2 branches missed.">                .distinct().count() &gt;= 2L);</span>
-<span class="pc bpc" id="L311" title="1 of 2 branches missed.">        if (!crossFamily) {</span>
-<span class="nc" id="L312">            throw new IllegalStateException(</span>
+<span class="fc" id="L308">        boolean crossFamily = full.binding().receipt().outputs().stream()</span>
+<span class="fc" id="L309">            .anyMatch(output -&gt; output.sources().stream()</span>
+<span class="fc" id="L310">                .map(AutonomousEvidenceDagV2.SourceLink::familyId)</span>
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">                .distinct().count() &gt;= 2L);</span>
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">        if (!crossFamily) {</span>
+<span class="nc" id="L313">            throw new IllegalStateException(</span>
                 &quot;production candidate must retain exact support from both configured families&quot;);
         }
-<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        if (!rejection.evidence().report().conjectures().isEmpty()</span>
-<span class="pc bpc" id="L316" title="1 of 2 branches missed.">                || !rejection.binding().receipt().outputs().isEmpty()</span>
-<span class="fc" id="L317">                || rejection.evidence().report().rejectedClusters().stream()</span>
-<span class="pc bpc" id="L318" title="1 of 2 branches missed.">                    .noneMatch(cluster -&gt; &quot;alpha-distinct-support&lt;2&quot;</span>
-<span class="fc" id="L319">                        .equals(cluster.reason()))) {</span>
-<span class="nc" id="L320">            throw new IllegalStateException(</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">        if (!rejection.evidence().report().conjectures().isEmpty()</span>
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">                || !rejection.binding().receipt().outputs().isEmpty()</span>
+<span class="fc" id="L318">                || rejection.evidence().report().rejectedClusters().stream()</span>
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">                    .noneMatch(cluster -&gt; &quot;alpha-distinct-support&lt;2&quot;</span>
+<span class="fc" id="L320">                        .equals(cluster.reason()))) {</span>
+<span class="nc" id="L321">            throw new IllegalStateException(</span>
                 &quot;predeclared alpha-equivalent batch must terminate as rejected evidence&quot;);
         }
-<span class="fc" id="L323">    }</span>
+<span class="fc" id="L324">    }</span>
 
     private static CandidateFormationReceipt formationReceipt(
         AutonomousResearchBriefV2 brief,
         List&lt;MiningBatch&gt; batches
     ) {
-<span class="fc" id="L329">        Map&lt;ResourceKind, Long&gt; configured = brief.budget(</span>
-<span class="fc" id="L330">            EvidenceStage.CANDIDATE_FORMATION).resources();</span>
-<span class="fc" id="L331">        EnumMap&lt;ResourceKind, Long&gt; executed = new EnumMap&lt;&gt;(ResourceKind.class);</span>
-<span class="fc" id="L332">        EnumMap&lt;ResourceKind, Long&gt; skipped = new EnumMap&lt;&gt;(ResourceKind.class);</span>
-<span class="fc" id="L333">        batches.forEach(batch -&gt; {</span>
-<span class="fc" id="L334">            add(executed, batch.binding().receipt().executedResources());</span>
-<span class="fc" id="L335">            add(skipped, batch.binding().receipt().skippedResources());</span>
-<span class="fc" id="L336">        });</span>
-<span class="fc" id="L337">        Map&lt;ResourceKind, Long&gt; remaining = remaining(configured, executed, skipped);</span>
-<span class="fc" id="L338">        List&lt;String&gt; decisionHashes = batches.stream()</span>
-<span class="fc" id="L339">            .map(batch -&gt; batch.decision().contentHash()).sorted().toList();</span>
-<span class="fc" id="L340">        List&lt;String&gt; miningHashes = batches.stream()</span>
-<span class="fc" id="L341">            .map(batch -&gt; batch.evidence().contentHash()).sorted().toList();</span>
-<span class="fc" id="L342">        List&lt;String&gt; receiptHashes = batches.stream()</span>
-<span class="fc" id="L343">            .map(batch -&gt; batch.binding().receipt().contentHash()).sorted().toList();</span>
-<span class="fc" id="L344">        List&lt;String&gt; outputBranches = batches.stream()</span>
-<span class="fc" id="L345">            .flatMap(batch -&gt; batch.binding().receipt().outputs().stream())</span>
-<span class="fc" id="L346">            .map(AutonomousEvidenceDagV2.CandidateOutput::outputBranchId)</span>
-<span class="fc" id="L347">            .sorted().toList();</span>
-<span class="fc" id="L348">        List&lt;String&gt; rejected = batches.stream()</span>
-<span class="fc" id="L349">            .flatMap(batch -&gt; batch.binding().receipt().rejectedClusters().stream())</span>
-<span class="fc" id="L350">            .map(AutonomousEvidenceDagV2.RejectedCluster::contentHash)</span>
-<span class="fc" id="L351">            .sorted().toList();</span>
-<span class="fc" id="L352">        String contentHash = AutonomousResearchBriefV2.hash(</span>
+<span class="fc" id="L330">        Map&lt;ResourceKind, Long&gt; configured = brief.budget(</span>
+<span class="fc" id="L331">            EvidenceStage.CANDIDATE_FORMATION).resources();</span>
+<span class="fc" id="L332">        EnumMap&lt;ResourceKind, Long&gt; executed = new EnumMap&lt;&gt;(ResourceKind.class);</span>
+<span class="fc" id="L333">        EnumMap&lt;ResourceKind, Long&gt; skipped = new EnumMap&lt;&gt;(ResourceKind.class);</span>
+<span class="fc" id="L334">        batches.forEach(batch -&gt; {</span>
+<span class="fc" id="L335">            add(executed, batch.binding().receipt().executedResources());</span>
+<span class="fc" id="L336">            add(skipped, batch.binding().receipt().skippedResources());</span>
+<span class="fc" id="L337">        });</span>
+<span class="fc" id="L338">        Map&lt;ResourceKind, Long&gt; remaining = remaining(configured, executed, skipped);</span>
+<span class="fc" id="L339">        List&lt;String&gt; decisionHashes = batches.stream()</span>
+<span class="fc" id="L340">            .map(batch -&gt; batch.decision().contentHash()).sorted().toList();</span>
+<span class="fc" id="L341">        List&lt;String&gt; miningHashes = batches.stream()</span>
+<span class="fc" id="L342">            .map(batch -&gt; batch.evidence().contentHash()).sorted().toList();</span>
+<span class="fc" id="L343">        List&lt;String&gt; receiptHashes = batches.stream()</span>
+<span class="fc" id="L344">            .map(batch -&gt; batch.binding().receipt().contentHash()).sorted().toList();</span>
+<span class="fc" id="L345">        List&lt;String&gt; outputBranches = batches.stream()</span>
+<span class="fc" id="L346">            .flatMap(batch -&gt; batch.binding().receipt().outputs().stream())</span>
+<span class="fc" id="L347">            .map(AutonomousEvidenceDagV2.CandidateOutput::outputBranchId)</span>
+<span class="fc" id="L348">            .sorted().toList();</span>
+<span class="fc" id="L349">        List&lt;String&gt; rejected = batches.stream()</span>
+<span class="fc" id="L350">            .flatMap(batch -&gt; batch.binding().receipt().rejectedClusters().stream())</span>
+<span class="fc" id="L351">            .map(AutonomousEvidenceDagV2.RejectedCluster::contentHash)</span>
+<span class="fc" id="L352">            .sorted().toList();</span>
+<span class="fc" id="L353">        String contentHash = AutonomousResearchBriefV2.hash(</span>
             FORMATION_RECEIPT_SCHEMA
-<span class="fc" id="L354">                + &quot;\nbrief=&quot; + brief.contentHash()</span>
+<span class="fc" id="L355">                + &quot;\nbrief=&quot; + brief.contentHash()</span>
                 + &quot;\nconfigured=&quot; + configured
                 + &quot;\nexecuted=&quot; + executed
                 + &quot;\nskipped=&quot; + skipped
@@ -361,9 +362,9 @@ import java.util.TreeSet;
                 + &quot;\nreceipts=&quot; + receiptHashes
                 + &quot;\noutputs=&quot; + outputBranches
                 + &quot;\nrejected=&quot; + rejected);
-<span class="fc" id="L364">        return new CandidateFormationReceipt(</span>
+<span class="fc" id="L365">        return new CandidateFormationReceipt(</span>
             FORMATION_RECEIPT_SCHEMA,
-<span class="fc" id="L366">            brief.contentHash(),</span>
+<span class="fc" id="L367">            brief.contentHash(),</span>
             EvidenceStage.CANDIDATE_FORMATION,
             &quot;COMPLETED&quot;,
             configured,
@@ -386,67 +387,67 @@ import java.util.TreeSet;
         EnumMap&lt;ResourceKind, Long&gt; target,
         Map&lt;ResourceKind, Long&gt; values
     ) {
-<span class="fc" id="L389">        values.forEach((resource, amount) -&gt; target.merge(</span>
+<span class="fc" id="L390">        values.forEach((resource, amount) -&gt; target.merge(</span>
             resource, amount, Math::addExact));
-<span class="fc" id="L391">    }</span>
+<span class="fc" id="L392">    }</span>
 
     private static Map&lt;ResourceKind, Long&gt; remaining(
         Map&lt;ResourceKind, Long&gt; configured,
         Map&lt;ResourceKind, Long&gt; executed,
         Map&lt;ResourceKind, Long&gt; skipped
     ) {
-<span class="fc" id="L398">        EnumMap&lt;ResourceKind, Long&gt; result = new EnumMap&lt;&gt;(ResourceKind.class);</span>
-<span class="fc bfc" id="L399" title="All 2 branches covered.">        for (Map.Entry&lt;ResourceKind, Long&gt; entry : configured.entrySet()) {</span>
-<span class="fc" id="L400">            long consumed = Math.addExact(</span>
-<span class="fc" id="L401">                executed.getOrDefault(entry.getKey(), 0L),</span>
-<span class="fc" id="L402">                skipped.getOrDefault(entry.getKey(), 0L));</span>
-<span class="pc bpc" id="L403" title="1 of 2 branches missed.">            if (consumed &gt; entry.getValue()) {</span>
-<span class="nc" id="L404">                throw new IllegalArgumentException(</span>
-<span class="nc" id="L405">                    &quot;candidate formation exceeds configured resource &quot; + entry.getKey());</span>
+<span class="fc" id="L399">        EnumMap&lt;ResourceKind, Long&gt; result = new EnumMap&lt;&gt;(ResourceKind.class);</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">        for (Map.Entry&lt;ResourceKind, Long&gt; entry : configured.entrySet()) {</span>
+<span class="fc" id="L401">            long consumed = Math.addExact(</span>
+<span class="fc" id="L402">                executed.getOrDefault(entry.getKey(), 0L),</span>
+<span class="fc" id="L403">                skipped.getOrDefault(entry.getKey(), 0L));</span>
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">            if (consumed &gt; entry.getValue()) {</span>
+<span class="nc" id="L405">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L406">                    &quot;candidate formation exceeds configured resource &quot; + entry.getKey());</span>
             }
-<span class="fc" id="L407">            long amount = entry.getValue() - consumed;</span>
-<span class="pc bpc" id="L408" title="1 of 2 branches missed.">            if (amount &gt; 0L) {</span>
-<span class="nc" id="L409">                result.put(entry.getKey(), amount);</span>
+<span class="fc" id="L408">            long amount = entry.getValue() - consumed;</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">            if (amount &gt; 0L) {</span>
+<span class="nc" id="L410">                result.put(entry.getKey(), amount);</span>
             }
-<span class="fc" id="L411">        }</span>
-<span class="fc" id="L412">        Set&lt;ResourceKind&gt; unexpected = new HashSet&lt;&gt;(executed.keySet());</span>
-<span class="fc" id="L413">        unexpected.addAll(skipped.keySet());</span>
-<span class="fc" id="L414">        unexpected.removeAll(configured.keySet());</span>
-<span class="pc bpc" id="L415" title="1 of 2 branches missed.">        if (!unexpected.isEmpty()) {</span>
-<span class="nc" id="L416">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L412">        }</span>
+<span class="fc" id="L413">        Set&lt;ResourceKind&gt; unexpected = new HashSet&lt;&gt;(executed.keySet());</span>
+<span class="fc" id="L414">        unexpected.addAll(skipped.keySet());</span>
+<span class="fc" id="L415">        unexpected.removeAll(configured.keySet());</span>
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">        if (!unexpected.isEmpty()) {</span>
+<span class="nc" id="L417">            throw new IllegalArgumentException(</span>
                 &quot;candidate formation reported unconfigured resources: &quot; + unexpected);
         }
-<span class="fc" id="L419">        return Collections.unmodifiableMap(result);</span>
+<span class="fc" id="L420">        return Collections.unmodifiableMap(result);</span>
     }
 
     private static Map&lt;ResourceKind, Long&gt; immutableResources(
         Map&lt;ResourceKind, Long&gt; supplied
     ) {
-<span class="fc" id="L425">        EnumMap&lt;ResourceKind, Long&gt; result = new EnumMap&lt;&gt;(ResourceKind.class);</span>
-<span class="fc" id="L426">        supplied.forEach((resource, amount) -&gt; {</span>
-<span class="fc" id="L427">            Objects.requireNonNull(resource, &quot;resource&quot;);</span>
-<span class="pc bpc" id="L428" title="2 of 4 branches missed.">            if (amount == null || amount &lt; 0L) {</span>
-<span class="nc" id="L429">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L426">        EnumMap&lt;ResourceKind, Long&gt; result = new EnumMap&lt;&gt;(ResourceKind.class);</span>
+<span class="fc" id="L427">        supplied.forEach((resource, amount) -&gt; {</span>
+<span class="fc" id="L428">            Objects.requireNonNull(resource, &quot;resource&quot;);</span>
+<span class="pc bpc" id="L429" title="2 of 4 branches missed.">            if (amount == null || amount &lt; 0L) {</span>
+<span class="nc" id="L430">                throw new IllegalArgumentException(</span>
                     &quot;resource amounts must be non-negative&quot;);
             }
-<span class="pc bpc" id="L432" title="1 of 2 branches missed.">            if (amount &gt; 0L) {</span>
-<span class="fc" id="L433">                result.put(resource, amount);</span>
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">            if (amount &gt; 0L) {</span>
+<span class="fc" id="L434">                result.put(resource, amount);</span>
             }
-<span class="fc" id="L435">        });</span>
-<span class="fc" id="L436">        return Collections.unmodifiableMap(result);</span>
+<span class="fc" id="L436">        });</span>
+<span class="fc" id="L437">        return Collections.unmodifiableMap(result);</span>
     }
 
     private static void requireSha256(String value, String name) {
-<span class="pc bpc" id="L440" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
-<span class="nc" id="L441">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+<span class="pc bpc" id="L441" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L442">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
         }
-<span class="fc" id="L443">    }</span>
+<span class="fc" id="L444">    }</span>
 
     private static void requireNotEvaluated(String value, String name) {
-<span class="pc bpc" id="L446" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(value)) {</span>
-<span class="nc" id="L447">            throw new IllegalArgumentException(name + &quot; must be NOT_EVALUATED&quot;);</span>
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(value)) {</span>
+<span class="nc" id="L448">            throw new IllegalArgumentException(name + &quot; must be NOT_EVALUATED&quot;);</span>
         }
-<span class="fc" id="L449">    }</span>
+<span class="fc" id="L450">    }</span>
 
     public record MiningBatch(
         AggregateDecision decision,
@@ -455,27 +456,27 @@ import java.util.TreeSet;
         CampaignExecution execution,
         BranchLineageArtifact lineage
     ) {
-<span class="fc" id="L458">        public MiningBatch {</span>
-<span class="fc" id="L459">            decision = Objects.requireNonNull(decision, &quot;decision&quot;);</span>
-<span class="fc" id="L460">            evidence = Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
-<span class="fc" id="L461">            binding = Objects.requireNonNull(binding, &quot;binding&quot;);</span>
-<span class="fc" id="L462">            execution = Objects.requireNonNull(execution, &quot;execution&quot;);</span>
-<span class="fc" id="L463">            lineage = Objects.requireNonNull(lineage, &quot;lineage&quot;);</span>
-<span class="pc bpc" id="L464" title="1 of 2 branches missed.">            if (!decision.contentHash().equals(binding.decisionHash())</span>
-<span class="pc bpc" id="L465" title="1 of 2 branches missed.">                    || !evidence.contentHash().equals(binding.miningEvidenceHash())</span>
-<span class="fc" id="L466">                    || !binding.receipt().contentHash()</span>
-<span class="pc bpc" id="L467" title="1 of 2 branches missed.">                        .equals(execution.aggregateReceiptHash())</span>
-<span class="fc" id="L468">                    || !binding.receipt().contentHash()</span>
-<span class="pc bpc" id="L469" title="1 of 2 branches missed.">                        .equals(lineage.aggregateReceiptHash())) {</span>
-<span class="nc" id="L470">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L459">        public MiningBatch {</span>
+<span class="fc" id="L460">            decision = Objects.requireNonNull(decision, &quot;decision&quot;);</span>
+<span class="fc" id="L461">            evidence = Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="fc" id="L462">            binding = Objects.requireNonNull(binding, &quot;binding&quot;);</span>
+<span class="fc" id="L463">            execution = Objects.requireNonNull(execution, &quot;execution&quot;);</span>
+<span class="fc" id="L464">            lineage = Objects.requireNonNull(lineage, &quot;lineage&quot;);</span>
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">            if (!decision.contentHash().equals(binding.decisionHash())</span>
+<span class="pc bpc" id="L466" title="1 of 2 branches missed.">                    || !evidence.contentHash().equals(binding.miningEvidenceHash())</span>
+<span class="fc" id="L467">                    || !binding.receipt().contentHash()</span>
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">                        .equals(execution.aggregateReceiptHash())</span>
+<span class="fc" id="L469">                    || !binding.receipt().contentHash()</span>
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">                        .equals(lineage.aggregateReceiptHash())) {</span>
+<span class="nc" id="L471">                throw new IllegalArgumentException(</span>
                     &quot;production mining batch artifacts are not hash-linked&quot;);
             }
-<span class="fc" id="L473">        }</span>
+<span class="fc" id="L474">        }</span>
 
         String canonicalMaterial() {
-<span class="fc" id="L476">            return decision.contentHash() + '|' + evidence.contentHash() + '|'</span>
-<span class="fc" id="L477">                + binding.contentHash() + '|' + binding.receipt().contentHash() + '|'</span>
-<span class="fc" id="L478">                + execution.contentHash() + '|' + lineage.contentHash();</span>
+<span class="fc" id="L477">            return decision.contentHash() + '|' + evidence.contentHash() + '|'</span>
+<span class="fc" id="L478">                + binding.contentHash() + '|' + binding.receipt().contentHash() + '|'</span>
+<span class="fc" id="L479">                + execution.contentHash() + '|' + lineage.contentHash();</span>
         }
     }
 
@@ -499,87 +500,87 @@ import java.util.TreeSet;
         String publicEvidenceStatus,
         String contentHash
     ) {
-<span class="fc" id="L502">        public CandidateFormationReceipt {</span>
-<span class="pc bpc" id="L503" title="2 of 4 branches missed.">            if (!FORMATION_RECEIPT_SCHEMA.equals(schema)</span>
+<span class="fc" id="L503">        public CandidateFormationReceipt {</span>
+<span class="pc bpc" id="L504" title="2 of 4 branches missed.">            if (!FORMATION_RECEIPT_SCHEMA.equals(schema)</span>
                     || stage != EvidenceStage.CANDIDATE_FORMATION
-<span class="pc bpc" id="L505" title="1 of 2 branches missed.">                    || !&quot;COMPLETED&quot;.equals(disposition)) {</span>
-<span class="nc" id="L506">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L506" title="1 of 2 branches missed.">                    || !&quot;COMPLETED&quot;.equals(disposition)) {</span>
+<span class="nc" id="L507">                throw new IllegalArgumentException(</span>
                     &quot;unsupported or incomplete candidate-formation receipt&quot;);
             }
-<span class="fc" id="L509">            requireSha256(briefHash, &quot;briefHash&quot;);</span>
-<span class="fc" id="L510">            configuredResources = immutableResources(configuredResources);</span>
-<span class="fc" id="L511">            executedResources = immutableResources(executedResources);</span>
-<span class="fc" id="L512">            skippedResources = immutableResources(skippedResources);</span>
-<span class="fc" id="L513">            remainingResources = immutableResources(remainingResources);</span>
-<span class="fc" id="L514">            decisionHashes = sortedHashes(decisionHashes, &quot;decisionHashes&quot;);</span>
-<span class="fc" id="L515">            miningEvidenceHashes = sortedHashes(</span>
+<span class="fc" id="L510">            requireSha256(briefHash, &quot;briefHash&quot;);</span>
+<span class="fc" id="L511">            configuredResources = immutableResources(configuredResources);</span>
+<span class="fc" id="L512">            executedResources = immutableResources(executedResources);</span>
+<span class="fc" id="L513">            skippedResources = immutableResources(skippedResources);</span>
+<span class="fc" id="L514">            remainingResources = immutableResources(remainingResources);</span>
+<span class="fc" id="L515">            decisionHashes = sortedHashes(decisionHashes, &quot;decisionHashes&quot;);</span>
+<span class="fc" id="L516">            miningEvidenceHashes = sortedHashes(</span>
                 miningEvidenceHashes, &quot;miningEvidenceHashes&quot;);
-<span class="fc" id="L517">            aggregateReceiptHashes = sortedHashes(</span>
+<span class="fc" id="L518">            aggregateReceiptHashes = sortedHashes(</span>
                 aggregateReceiptHashes, &quot;aggregateReceiptHashes&quot;);
-<span class="fc" id="L519">            outputBranchIds = sortedText(outputBranchIds, &quot;outputBranchIds&quot;);</span>
-<span class="fc" id="L520">            rejectedClusterHashes = sortedHashes(</span>
+<span class="fc" id="L520">            outputBranchIds = sortedText(outputBranchIds, &quot;outputBranchIds&quot;);</span>
+<span class="fc" id="L521">            rejectedClusterHashes = sortedHashes(</span>
                 rejectedClusterHashes, &quot;rejectedClusterHashes&quot;);
-<span class="fc" id="L522">            validateBalance(</span>
+<span class="fc" id="L523">            validateBalance(</span>
                 configuredResources,
                 executedResources,
                 skippedResources,
                 remainingResources);
-<span class="pc bpc" id="L527" title="1 of 2 branches missed.">            if (decisionHashes.size() &lt; 2</span>
-<span class="pc bpc" id="L528" title="1 of 2 branches missed.">                    || miningEvidenceHashes.size() != decisionHashes.size()</span>
-<span class="pc bpc" id="L529" title="1 of 2 branches missed.">                    || aggregateReceiptHashes.size() != decisionHashes.size()</span>
-<span class="fc" id="L530">                    || executedResources.getOrDefault(</span>
-<span class="pc bpc" id="L531" title="1 of 2 branches missed.">                        ResourceKind.MINING_BATCHES, 0L) != decisionHashes.size()</span>
-<span class="fc" id="L532">                    || executedResources.getOrDefault(</span>
-<span class="pc bpc" id="L533" title="1 of 2 branches missed.">                        ResourceKind.CANDIDATES, 0L) != outputBranchIds.size()</span>
-<span class="pc bpc" id="L534" title="1 of 2 branches missed.">                    || outputBranchIds.isEmpty()</span>
-<span class="pc bpc" id="L535" title="1 of 2 branches missed.">                    || rejectedClusterHashes.isEmpty()) {</span>
-<span class="nc" id="L536">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L528" title="1 of 2 branches missed.">            if (decisionHashes.size() &lt; 2</span>
+<span class="pc bpc" id="L529" title="1 of 2 branches missed.">                    || miningEvidenceHashes.size() != decisionHashes.size()</span>
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">                    || aggregateReceiptHashes.size() != decisionHashes.size()</span>
+<span class="fc" id="L531">                    || executedResources.getOrDefault(</span>
+<span class="pc bpc" id="L532" title="1 of 2 branches missed.">                        ResourceKind.MINING_BATCHES, 0L) != decisionHashes.size()</span>
+<span class="fc" id="L533">                    || executedResources.getOrDefault(</span>
+<span class="pc bpc" id="L534" title="1 of 2 branches missed.">                        ResourceKind.CANDIDATES, 0L) != outputBranchIds.size()</span>
+<span class="pc bpc" id="L535" title="1 of 2 branches missed.">                    || outputBranchIds.isEmpty()</span>
+<span class="pc bpc" id="L536" title="1 of 2 branches missed.">                    || rejectedClusterHashes.isEmpty()) {</span>
+<span class="nc" id="L537">                throw new IllegalArgumentException(</span>
                     &quot;candidate formation must retain factual batches, outputs and rejection evidence&quot;);
             }
-<span class="pc bpc" id="L539" title="2 of 4 branches missed.">            if (targetProvided || receiptIsMathematicalEvidence) {</span>
-<span class="nc" id="L540">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L540" title="2 of 4 branches missed.">            if (targetProvided || receiptIsMathematicalEvidence) {</span>
+<span class="nc" id="L541">                throw new IllegalArgumentException(</span>
                     &quot;candidate-formation receipt must remain target-free and non-mathematical&quot;);
             }
-<span class="fc" id="L543">            requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
-<span class="fc" id="L544">            requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
-<span class="fc" id="L545">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
-<span class="fc" id="L546">        }</span>
+<span class="fc" id="L544">            requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L545">            requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L546">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L547">        }</span>
 
         public long executed(ResourceKind resource) {
-<span class="fc" id="L549">            return executedResources.getOrDefault(resource, 0L);</span>
+<span class="fc" id="L550">            return executedResources.getOrDefault(resource, 0L);</span>
         }
 
         public String toCanonicalJson() {
-<span class="fc" id="L553">            return new JsonWriter().beginObject()</span>
-<span class="fc" id="L554">                .property(&quot;schema&quot;, schema)</span>
-<span class="fc" id="L555">                .property(&quot;briefHash&quot;, briefHash)</span>
-<span class="fc" id="L556">                .property(&quot;stage&quot;, stage.name())</span>
-<span class="fc" id="L557">                .property(&quot;disposition&quot;, disposition)</span>
-<span class="fc" id="L558">                .array(&quot;resources&quot;, array -&gt; configuredResources.keySet().stream()</span>
-<span class="fc" id="L559">                    .sorted()</span>
-<span class="fc" id="L560">                    .forEach(resource -&gt; array.objectValue(object -&gt; object</span>
-<span class="fc" id="L561">                        .property(&quot;resource&quot;, resource.name())</span>
-<span class="fc" id="L562">                        .property(&quot;configured&quot;,</span>
-<span class="fc" id="L563">                            configuredResources.getOrDefault(resource, 0L))</span>
-<span class="fc" id="L564">                        .property(&quot;executed&quot;,</span>
-<span class="fc" id="L565">                            executedResources.getOrDefault(resource, 0L))</span>
-<span class="fc" id="L566">                        .property(&quot;skipped&quot;,</span>
-<span class="fc" id="L567">                            skippedResources.getOrDefault(resource, 0L))</span>
-<span class="fc" id="L568">                        .property(&quot;remaining&quot;,</span>
-<span class="fc" id="L569">                            remainingResources.getOrDefault(resource, 0L)))))</span>
-<span class="fc" id="L570">                .stringArray(&quot;decisionHashes&quot;, decisionHashes)</span>
-<span class="fc" id="L571">                .stringArray(&quot;miningEvidenceHashes&quot;, miningEvidenceHashes)</span>
-<span class="fc" id="L572">                .stringArray(&quot;aggregateReceiptHashes&quot;, aggregateReceiptHashes)</span>
-<span class="fc" id="L573">                .stringArray(&quot;outputBranchIds&quot;, outputBranchIds)</span>
-<span class="fc" id="L574">                .stringArray(&quot;rejectedClusterHashes&quot;, rejectedClusterHashes)</span>
-<span class="fc" id="L575">                .property(&quot;targetProvided&quot;, targetProvided)</span>
-<span class="fc" id="L576">                .property(&quot;receiptIsMathematicalEvidence&quot;,</span>
+<span class="fc" id="L554">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L555">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L556">                .property(&quot;briefHash&quot;, briefHash)</span>
+<span class="fc" id="L557">                .property(&quot;stage&quot;, stage.name())</span>
+<span class="fc" id="L558">                .property(&quot;disposition&quot;, disposition)</span>
+<span class="fc" id="L559">                .array(&quot;resources&quot;, array -&gt; configuredResources.keySet().stream()</span>
+<span class="fc" id="L560">                    .sorted()</span>
+<span class="fc" id="L561">                    .forEach(resource -&gt; array.objectValue(object -&gt; object</span>
+<span class="fc" id="L562">                        .property(&quot;resource&quot;, resource.name())</span>
+<span class="fc" id="L563">                        .property(&quot;configured&quot;,</span>
+<span class="fc" id="L564">                            configuredResources.getOrDefault(resource, 0L))</span>
+<span class="fc" id="L565">                        .property(&quot;executed&quot;,</span>
+<span class="fc" id="L566">                            executedResources.getOrDefault(resource, 0L))</span>
+<span class="fc" id="L567">                        .property(&quot;skipped&quot;,</span>
+<span class="fc" id="L568">                            skippedResources.getOrDefault(resource, 0L))</span>
+<span class="fc" id="L569">                        .property(&quot;remaining&quot;,</span>
+<span class="fc" id="L570">                            remainingResources.getOrDefault(resource, 0L)))))</span>
+<span class="fc" id="L571">                .stringArray(&quot;decisionHashes&quot;, decisionHashes)</span>
+<span class="fc" id="L572">                .stringArray(&quot;miningEvidenceHashes&quot;, miningEvidenceHashes)</span>
+<span class="fc" id="L573">                .stringArray(&quot;aggregateReceiptHashes&quot;, aggregateReceiptHashes)</span>
+<span class="fc" id="L574">                .stringArray(&quot;outputBranchIds&quot;, outputBranchIds)</span>
+<span class="fc" id="L575">                .stringArray(&quot;rejectedClusterHashes&quot;, rejectedClusterHashes)</span>
+<span class="fc" id="L576">                .property(&quot;targetProvided&quot;, targetProvided)</span>
+<span class="fc" id="L577">                .property(&quot;receiptIsMathematicalEvidence&quot;,</span>
                     receiptIsMathematicalEvidence)
-<span class="fc" id="L578">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
-<span class="fc" id="L579">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
-<span class="fc" id="L580">                .property(&quot;contentHash&quot;, contentHash)</span>
-<span class="fc" id="L581">                .endObject()</span>
-<span class="fc" id="L582">                .toString();</span>
+<span class="fc" id="L579">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L580">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L581">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L582">                .endObject()</span>
+<span class="fc" id="L583">                .toString();</span>
         }
 
         private static void validateBalance(
@@ -588,23 +589,23 @@ import java.util.TreeSet;
             Map&lt;ResourceKind, Long&gt; skipped,
             Map&lt;ResourceKind, Long&gt; remaining
         ) {
-<span class="fc" id="L591">            Set&lt;ResourceKind&gt; resources = new TreeSet&lt;&gt;();</span>
-<span class="fc" id="L592">            resources.addAll(configured.keySet());</span>
-<span class="fc" id="L593">            resources.addAll(executed.keySet());</span>
-<span class="fc" id="L594">            resources.addAll(skipped.keySet());</span>
-<span class="fc" id="L595">            resources.addAll(remaining.keySet());</span>
-<span class="fc bfc" id="L596" title="All 2 branches covered.">            for (ResourceKind resource : resources) {</span>
-<span class="fc" id="L597">                long accounted = Math.addExact(</span>
-<span class="fc" id="L598">                    Math.addExact(</span>
-<span class="fc" id="L599">                        executed.getOrDefault(resource, 0L),</span>
-<span class="fc" id="L600">                        skipped.getOrDefault(resource, 0L)),</span>
-<span class="fc" id="L601">                    remaining.getOrDefault(resource, 0L));</span>
-<span class="pc bpc" id="L602" title="1 of 2 branches missed.">                if (configured.getOrDefault(resource, 0L) != accounted) {</span>
-<span class="nc" id="L603">                    throw new IllegalArgumentException(</span>
+<span class="fc" id="L592">            Set&lt;ResourceKind&gt; resources = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L593">            resources.addAll(configured.keySet());</span>
+<span class="fc" id="L594">            resources.addAll(executed.keySet());</span>
+<span class="fc" id="L595">            resources.addAll(skipped.keySet());</span>
+<span class="fc" id="L596">            resources.addAll(remaining.keySet());</span>
+<span class="fc bfc" id="L597" title="All 2 branches covered.">            for (ResourceKind resource : resources) {</span>
+<span class="fc" id="L598">                long accounted = Math.addExact(</span>
+<span class="fc" id="L599">                    Math.addExact(</span>
+<span class="fc" id="L600">                        executed.getOrDefault(resource, 0L),</span>
+<span class="fc" id="L601">                        skipped.getOrDefault(resource, 0L)),</span>
+<span class="fc" id="L602">                    remaining.getOrDefault(resource, 0L));</span>
+<span class="pc bpc" id="L603" title="1 of 2 branches missed.">                if (configured.getOrDefault(resource, 0L) != accounted) {</span>
+<span class="nc" id="L604">                    throw new IllegalArgumentException(</span>
                         &quot;unbalanced candidate-formation resource &quot; + resource);
                 }
-<span class="fc" id="L606">            }</span>
-<span class="fc" id="L607">        }</span>
+<span class="fc" id="L607">            }</span>
+<span class="fc" id="L608">        }</span>
     }
 
     public record MiningRun(
@@ -621,139 +622,139 @@ import java.util.TreeSet;
         String publicEvidenceStatus,
         String contentHash
     ) {
-<span class="fc" id="L624">        public MiningRun {</span>
-<span class="pc bpc" id="L625" title="1 of 2 branches missed.">            if (!MINING_RUN_SCHEMA.equals(schema)) {</span>
-<span class="nc" id="L626">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L625">        public MiningRun {</span>
+<span class="pc bpc" id="L626" title="1 of 2 branches missed.">            if (!MINING_RUN_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L627">                throw new IllegalArgumentException(</span>
                     &quot;unsupported production mining schema&quot;);
             }
-<span class="fc" id="L629">            generation = Objects.requireNonNull(generation, &quot;generation&quot;);</span>
-<span class="fc" id="L630">            plan = Objects.requireNonNull(plan, &quot;plan&quot;);</span>
-<span class="fc" id="L631">            fullBatch = Objects.requireNonNull(fullBatch, &quot;fullBatch&quot;);</span>
-<span class="fc" id="L632">            rejectionBatch = Objects.requireNonNull(</span>
+<span class="fc" id="L630">            generation = Objects.requireNonNull(generation, &quot;generation&quot;);</span>
+<span class="fc" id="L631">            plan = Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L632">            fullBatch = Objects.requireNonNull(fullBatch, &quot;fullBatch&quot;);</span>
+<span class="fc" id="L633">            rejectionBatch = Objects.requireNonNull(</span>
                 rejectionBatch, &quot;rejectionBatch&quot;);
-<span class="fc" id="L634">            formationReceipt = Objects.requireNonNull(</span>
+<span class="fc" id="L635">            formationReceipt = Objects.requireNonNull(</span>
                 formationReceipt, &quot;formationReceipt&quot;);
-<span class="fc" id="L636">            dag = Objects.requireNonNull(dag, &quot;dag&quot;);</span>
-<span class="fc" id="L637">            List&lt;MiningBatch&gt; batches = List.of(fullBatch, rejectionBatch);</span>
-<span class="fc" id="L638">            Set&lt;String&gt; decisionHashes = batches.stream()</span>
-<span class="fc" id="L639">                .map(batch -&gt; batch.decision().contentHash())</span>
-<span class="fc" id="L640">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
-<span class="fc" id="L641">            Set&lt;String&gt; miningHashes = batches.stream()</span>
-<span class="fc" id="L642">                .map(batch -&gt; batch.evidence().contentHash())</span>
-<span class="fc" id="L643">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
-<span class="fc" id="L644">            Set&lt;String&gt; receiptHashes = batches.stream()</span>
-<span class="fc" id="L645">                .map(batch -&gt; batch.binding().receipt().contentHash())</span>
-<span class="fc" id="L646">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
-<span class="fc" id="L647">            Set&lt;String&gt; outputBranchIds = batches.stream()</span>
-<span class="fc" id="L648">                .flatMap(batch -&gt; batch.binding().receipt().outputs().stream())</span>
-<span class="fc" id="L649">                .map(AutonomousEvidenceDagV2.CandidateOutput::outputBranchId)</span>
-<span class="fc" id="L650">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
-<span class="fc" id="L651">            Set&lt;String&gt; rejectedHashes = batches.stream()</span>
-<span class="fc" id="L652">                .flatMap(batch -&gt; batch.binding().receipt().rejectedClusters().stream())</span>
-<span class="fc" id="L653">                .map(AutonomousEvidenceDagV2.RejectedCluster::contentHash)</span>
-<span class="fc" id="L654">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
-<span class="fc" id="L655">            Set&lt;String&gt; dagDecisionHashes = dag.decisions().stream()</span>
-<span class="fc" id="L656">                .map(AggregateDecision::contentHash)</span>
-<span class="fc" id="L657">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
-<span class="fc" id="L658">            Set&lt;String&gt; dagReceiptHashes = dag.receipts().stream()</span>
-<span class="fc" id="L659">                .map(AggregateReceipt::contentHash)</span>
-<span class="fc" id="L660">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
-<span class="pc bpc" id="L661" title="1 of 2 branches missed.">            if (!generation.brief().contentHash().equals(plan.briefHash())</span>
-<span class="pc bpc" id="L662" title="1 of 2 branches missed.">                    || !generation.brief().contentHash().equals(dag.briefHash())</span>
-<span class="fc" id="L663">                    || !generation.brief().contentHash()</span>
-<span class="pc bpc" id="L664" title="1 of 2 branches missed.">                        .equals(formationReceipt.briefHash())</span>
-<span class="pc bpc" id="L665" title="1 of 2 branches missed.">                    || !plan.contentHash().equals(fullBatch.execution().planHash())</span>
-<span class="pc bpc" id="L666" title="1 of 2 branches missed.">                    || !plan.contentHash().equals(rejectionBatch.execution().planHash())</span>
-<span class="pc bpc" id="L667" title="1 of 2 branches missed.">                    || !decisionHashes.equals(new TreeSet&lt;&gt;(</span>
-<span class="fc" id="L668">                        formationReceipt.decisionHashes()))</span>
-<span class="pc bpc" id="L669" title="1 of 2 branches missed.">                    || !miningHashes.equals(new TreeSet&lt;&gt;(</span>
-<span class="fc" id="L670">                        formationReceipt.miningEvidenceHashes()))</span>
-<span class="pc bpc" id="L671" title="1 of 2 branches missed.">                    || !receiptHashes.equals(new TreeSet&lt;&gt;(</span>
-<span class="fc" id="L672">                        formationReceipt.aggregateReceiptHashes()))</span>
-<span class="pc bpc" id="L673" title="1 of 2 branches missed.">                    || !outputBranchIds.equals(new TreeSet&lt;&gt;(</span>
-<span class="fc" id="L674">                        formationReceipt.outputBranchIds()))</span>
-<span class="pc bpc" id="L675" title="1 of 2 branches missed.">                    || !rejectedHashes.equals(new TreeSet&lt;&gt;(</span>
-<span class="fc" id="L676">                        formationReceipt.rejectedClusterHashes()))</span>
-<span class="pc bpc" id="L677" title="1 of 2 branches missed.">                    || !decisionHashes.equals(dagDecisionHashes)</span>
-<span class="pc bpc" id="L678" title="3 of 6 branches missed.">                    || !receiptHashes.equals(dagReceiptHashes)</span>
+<span class="fc" id="L637">            dag = Objects.requireNonNull(dag, &quot;dag&quot;);</span>
+<span class="fc" id="L638">            List&lt;MiningBatch&gt; batches = List.of(fullBatch, rejectionBatch);</span>
+<span class="fc" id="L639">            Set&lt;String&gt; decisionHashes = batches.stream()</span>
+<span class="fc" id="L640">                .map(batch -&gt; batch.decision().contentHash())</span>
+<span class="fc" id="L641">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="fc" id="L642">            Set&lt;String&gt; miningHashes = batches.stream()</span>
+<span class="fc" id="L643">                .map(batch -&gt; batch.evidence().contentHash())</span>
+<span class="fc" id="L644">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="fc" id="L645">            Set&lt;String&gt; receiptHashes = batches.stream()</span>
+<span class="fc" id="L646">                .map(batch -&gt; batch.binding().receipt().contentHash())</span>
+<span class="fc" id="L647">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="fc" id="L648">            Set&lt;String&gt; outputBranchIds = batches.stream()</span>
+<span class="fc" id="L649">                .flatMap(batch -&gt; batch.binding().receipt().outputs().stream())</span>
+<span class="fc" id="L650">                .map(AutonomousEvidenceDagV2.CandidateOutput::outputBranchId)</span>
+<span class="fc" id="L651">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="fc" id="L652">            Set&lt;String&gt; rejectedHashes = batches.stream()</span>
+<span class="fc" id="L653">                .flatMap(batch -&gt; batch.binding().receipt().rejectedClusters().stream())</span>
+<span class="fc" id="L654">                .map(AutonomousEvidenceDagV2.RejectedCluster::contentHash)</span>
+<span class="fc" id="L655">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="fc" id="L656">            Set&lt;String&gt; dagDecisionHashes = dag.decisions().stream()</span>
+<span class="fc" id="L657">                .map(AggregateDecision::contentHash)</span>
+<span class="fc" id="L658">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="fc" id="L659">            Set&lt;String&gt; dagReceiptHashes = dag.receipts().stream()</span>
+<span class="fc" id="L660">                .map(AggregateReceipt::contentHash)</span>
+<span class="fc" id="L661">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="pc bpc" id="L662" title="1 of 2 branches missed.">            if (!generation.brief().contentHash().equals(plan.briefHash())</span>
+<span class="pc bpc" id="L663" title="1 of 2 branches missed.">                    || !generation.brief().contentHash().equals(dag.briefHash())</span>
+<span class="fc" id="L664">                    || !generation.brief().contentHash()</span>
+<span class="pc bpc" id="L665" title="1 of 2 branches missed.">                        .equals(formationReceipt.briefHash())</span>
+<span class="pc bpc" id="L666" title="1 of 2 branches missed.">                    || !plan.contentHash().equals(fullBatch.execution().planHash())</span>
+<span class="pc bpc" id="L667" title="1 of 2 branches missed.">                    || !plan.contentHash().equals(rejectionBatch.execution().planHash())</span>
+<span class="pc bpc" id="L668" title="1 of 2 branches missed.">                    || !decisionHashes.equals(new TreeSet&lt;&gt;(</span>
+<span class="fc" id="L669">                        formationReceipt.decisionHashes()))</span>
+<span class="pc bpc" id="L670" title="1 of 2 branches missed.">                    || !miningHashes.equals(new TreeSet&lt;&gt;(</span>
+<span class="fc" id="L671">                        formationReceipt.miningEvidenceHashes()))</span>
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">                    || !receiptHashes.equals(new TreeSet&lt;&gt;(</span>
+<span class="fc" id="L673">                        formationReceipt.aggregateReceiptHashes()))</span>
+<span class="pc bpc" id="L674" title="1 of 2 branches missed.">                    || !outputBranchIds.equals(new TreeSet&lt;&gt;(</span>
+<span class="fc" id="L675">                        formationReceipt.outputBranchIds()))</span>
+<span class="pc bpc" id="L676" title="1 of 2 branches missed.">                    || !rejectedHashes.equals(new TreeSet&lt;&gt;(</span>
+<span class="fc" id="L677">                        formationReceipt.rejectedClusterHashes()))</span>
+<span class="pc bpc" id="L678" title="1 of 2 branches missed.">                    || !decisionHashes.equals(dagDecisionHashes)</span>
+<span class="pc bpc" id="L679" title="3 of 6 branches missed.">                    || !receiptHashes.equals(dagReceiptHashes)</span>
                     || targetProvided
                     || miningRunIsMathematicalEvidence) {
-<span class="nc" id="L681">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L682">                throw new IllegalArgumentException(</span>
                     &quot;production mining manifest is inconsistent or not target-free&quot;);
             }
-<span class="fc" id="L684">            requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
-<span class="fc" id="L685">            requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
-<span class="fc" id="L686">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
-<span class="fc" id="L687">        }</span>
+<span class="fc" id="L685">            requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L686">            requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L687">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L688">        }</span>
 
         public int candidateCount() {
-<span class="fc" id="L690">            return fullBatch.binding().receipt().outputs().size()</span>
-<span class="fc" id="L691">                + rejectionBatch.binding().receipt().outputs().size();</span>
+<span class="fc" id="L691">            return fullBatch.binding().receipt().outputs().size()</span>
+<span class="fc" id="L692">                + rejectionBatch.binding().receipt().outputs().size();</span>
         }
 
         public int rejectedClusterCount() {
-<span class="fc" id="L695">            return fullBatch.binding().receipt().rejectedClusters().size()</span>
-<span class="fc" id="L696">                + rejectionBatch.binding().receipt().rejectedClusters().size();</span>
+<span class="fc" id="L696">            return fullBatch.binding().receipt().rejectedClusters().size()</span>
+<span class="fc" id="L697">                + rejectionBatch.binding().receipt().rejectedClusters().size();</span>
         }
 
         public String toCanonicalJson() {
-<span class="fc" id="L700">            return new JsonWriter().beginObject()</span>
-<span class="fc" id="L701">                .property(&quot;schema&quot;, schema)</span>
-<span class="fc" id="L702">                .property(&quot;briefHash&quot;, generation.brief().contentHash())</span>
-<span class="fc" id="L703">                .property(&quot;generationRunHash&quot;, generation.contentHash())</span>
-<span class="fc" id="L704">                .property(&quot;planHash&quot;, plan.contentHash())</span>
-<span class="fc" id="L705">                .property(&quot;fullDecisionHash&quot;, fullBatch.decision().contentHash())</span>
-<span class="fc" id="L706">                .property(&quot;fullMiningEvidenceHash&quot;, fullBatch.evidence().contentHash())</span>
-<span class="fc" id="L707">                .property(&quot;fullBindingHash&quot;, fullBatch.binding().contentHash())</span>
-<span class="fc" id="L708">                .property(&quot;fullReceiptHash&quot;,</span>
-<span class="fc" id="L709">                    fullBatch.binding().receipt().contentHash())</span>
-<span class="fc" id="L710">                .property(&quot;fullExecutionHash&quot;, fullBatch.execution().contentHash())</span>
-<span class="fc" id="L711">                .property(&quot;fullLineageHash&quot;, fullBatch.lineage().contentHash())</span>
-<span class="fc" id="L712">                .property(&quot;rejectionDecisionHash&quot;,</span>
-<span class="fc" id="L713">                    rejectionBatch.decision().contentHash())</span>
-<span class="fc" id="L714">                .property(&quot;rejectionMiningEvidenceHash&quot;,</span>
-<span class="fc" id="L715">                    rejectionBatch.evidence().contentHash())</span>
-<span class="fc" id="L716">                .property(&quot;rejectionBindingHash&quot;,</span>
-<span class="fc" id="L717">                    rejectionBatch.binding().contentHash())</span>
-<span class="fc" id="L718">                .property(&quot;rejectionReceiptHash&quot;,</span>
-<span class="fc" id="L719">                    rejectionBatch.binding().receipt().contentHash())</span>
-<span class="fc" id="L720">                .property(&quot;rejectionExecutionHash&quot;,</span>
-<span class="fc" id="L721">                    rejectionBatch.execution().contentHash())</span>
-<span class="fc" id="L722">                .property(&quot;rejectionLineageHash&quot;,</span>
-<span class="fc" id="L723">                    rejectionBatch.lineage().contentHash())</span>
-<span class="fc" id="L724">                .property(&quot;candidateFormationReceiptHash&quot;,</span>
-<span class="fc" id="L725">                    formationReceipt.contentHash())</span>
-<span class="fc" id="L726">                .property(&quot;evidenceDagHash&quot;, dag.contentHash())</span>
-<span class="fc" id="L727">                .property(&quot;candidateCount&quot;, candidateCount())</span>
-<span class="fc" id="L728">                .property(&quot;rejectedClusterCount&quot;, rejectedClusterCount())</span>
-<span class="fc" id="L729">                .property(&quot;targetProvided&quot;, targetProvided)</span>
-<span class="fc" id="L730">                .property(&quot;miningRunIsMathematicalEvidence&quot;,</span>
+<span class="fc" id="L701">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L702">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L703">                .property(&quot;briefHash&quot;, generation.brief().contentHash())</span>
+<span class="fc" id="L704">                .property(&quot;generationRunHash&quot;, generation.contentHash())</span>
+<span class="fc" id="L705">                .property(&quot;planHash&quot;, plan.contentHash())</span>
+<span class="fc" id="L706">                .property(&quot;fullDecisionHash&quot;, fullBatch.decision().contentHash())</span>
+<span class="fc" id="L707">                .property(&quot;fullMiningEvidenceHash&quot;, fullBatch.evidence().contentHash())</span>
+<span class="fc" id="L708">                .property(&quot;fullBindingHash&quot;, fullBatch.binding().contentHash())</span>
+<span class="fc" id="L709">                .property(&quot;fullReceiptHash&quot;,</span>
+<span class="fc" id="L710">                    fullBatch.binding().receipt().contentHash())</span>
+<span class="fc" id="L711">                .property(&quot;fullExecutionHash&quot;, fullBatch.execution().contentHash())</span>
+<span class="fc" id="L712">                .property(&quot;fullLineageHash&quot;, fullBatch.lineage().contentHash())</span>
+<span class="fc" id="L713">                .property(&quot;rejectionDecisionHash&quot;,</span>
+<span class="fc" id="L714">                    rejectionBatch.decision().contentHash())</span>
+<span class="fc" id="L715">                .property(&quot;rejectionMiningEvidenceHash&quot;,</span>
+<span class="fc" id="L716">                    rejectionBatch.evidence().contentHash())</span>
+<span class="fc" id="L717">                .property(&quot;rejectionBindingHash&quot;,</span>
+<span class="fc" id="L718">                    rejectionBatch.binding().contentHash())</span>
+<span class="fc" id="L719">                .property(&quot;rejectionReceiptHash&quot;,</span>
+<span class="fc" id="L720">                    rejectionBatch.binding().receipt().contentHash())</span>
+<span class="fc" id="L721">                .property(&quot;rejectionExecutionHash&quot;,</span>
+<span class="fc" id="L722">                    rejectionBatch.execution().contentHash())</span>
+<span class="fc" id="L723">                .property(&quot;rejectionLineageHash&quot;,</span>
+<span class="fc" id="L724">                    rejectionBatch.lineage().contentHash())</span>
+<span class="fc" id="L725">                .property(&quot;candidateFormationReceiptHash&quot;,</span>
+<span class="fc" id="L726">                    formationReceipt.contentHash())</span>
+<span class="fc" id="L727">                .property(&quot;evidenceDagHash&quot;, dag.contentHash())</span>
+<span class="fc" id="L728">                .property(&quot;candidateCount&quot;, candidateCount())</span>
+<span class="fc" id="L729">                .property(&quot;rejectedClusterCount&quot;, rejectedClusterCount())</span>
+<span class="fc" id="L730">                .property(&quot;targetProvided&quot;, targetProvided)</span>
+<span class="fc" id="L731">                .property(&quot;miningRunIsMathematicalEvidence&quot;,</span>
                     miningRunIsMathematicalEvidence)
-<span class="fc" id="L732">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
-<span class="fc" id="L733">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
-<span class="fc" id="L734">                .property(&quot;contentHash&quot;, contentHash)</span>
-<span class="fc" id="L735">                .endObject()</span>
-<span class="fc" id="L736">                .toString();</span>
+<span class="fc" id="L733">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L734">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L735">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L736">                .endObject()</span>
+<span class="fc" id="L737">                .toString();</span>
         }
     }
 
     private static List&lt;String&gt; sortedHashes(List&lt;String&gt; values, String name) {
-<span class="pc bpc" id="L741" title="1 of 2 branches missed.">        List&lt;String&gt; result = values == null ? List.of() : values.stream().sorted().toList();</span>
-<span class="fc" id="L742">        result.forEach(value -&gt; requireSha256(value, name));</span>
-<span class="pc bpc" id="L743" title="1 of 2 branches missed.">        if (new TreeSet&lt;&gt;(result).size() != result.size()) {</span>
-<span class="nc" id="L744">            throw new IllegalArgumentException(name + &quot; must be unique&quot;);</span>
+<span class="pc bpc" id="L742" title="1 of 2 branches missed.">        List&lt;String&gt; result = values == null ? List.of() : values.stream().sorted().toList();</span>
+<span class="fc" id="L743">        result.forEach(value -&gt; requireSha256(value, name));</span>
+<span class="pc bpc" id="L744" title="1 of 2 branches missed.">        if (new TreeSet&lt;&gt;(result).size() != result.size()) {</span>
+<span class="nc" id="L745">            throw new IllegalArgumentException(name + &quot; must be unique&quot;);</span>
         }
-<span class="fc" id="L746">        return result;</span>
+<span class="fc" id="L747">        return result;</span>
     }
 
     private static List&lt;String&gt; sortedText(List&lt;String&gt; values, String name) {
-<span class="pc bpc" id="L750" title="1 of 2 branches missed.">        if (values == null) {</span>
-<span class="nc" id="L751">            return List.of();</span>
+<span class="pc bpc" id="L751" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L752">            return List.of();</span>
         }
-<span class="pc bpc" id="L753" title="3 of 6 branches missed.">        if (values.stream().anyMatch(value -&gt; value == null || value.isBlank())) {</span>
-<span class="nc" id="L754">            throw new IllegalArgumentException(name + &quot; must contain non-blank values&quot;);</span>
+<span class="pc bpc" id="L754" title="3 of 6 branches missed.">        if (values.stream().anyMatch(value -&gt; value == null || value.isBlank())) {</span>
+<span class="nc" id="L755">            throw new IllegalArgumentException(name + &quot; must contain non-blank values&quot;);</span>
         }
-<span class="fc" id="L756">        return values.stream().distinct().sorted().toList();</span>
+<span class="fc" id="L757">        return values.stream().distinct().sorted().toList();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -8,196 +8,209 @@ import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.RuleCandidate;
 import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.scoring.ExpressionScore;
+import de.regelsuche.scoring.ScoreRevision;
 import de.regelsuche.transform.RewriteKind;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-<span class="fc" id="L17">public class DefaultTransformationImportService implements TransformationImportService {</span>
+<span class="fc" id="L18">public class DefaultTransformationImportService implements TransformationImportService {</span>
 
     @Override
     public ExportBundle importJson(String json) {
-<span class="fc" id="L21">        Objects.requireNonNull(json, &quot;json must not be null&quot;);</span>
-<span class="fc" id="L22">        Map&lt;String, Object&gt; root = new JsonReader(json).readObject();</span>
-<span class="fc" id="L23">        String schemaVersion = stringValue(root.get(&quot;schemaVersion&quot;), ExportBundle.CURRENT_SCHEMA_VERSION);</span>
-<span class="fc" id="L24">        List&lt;DiscoveredTransformation&gt; transformations = readList(root.get(&quot;transformations&quot;))</span>
-<span class="fc" id="L25">            .stream()</span>
-<span class="fc" id="L26">            .map(this::asMap)</span>
-<span class="fc" id="L27">            .map(this::readTransformation)</span>
-<span class="fc" id="L28">            .toList();</span>
-<span class="fc" id="L29">        List&lt;RuleCandidate&gt; ruleCandidates = readList(root.get(&quot;ruleCandidates&quot;))</span>
-<span class="fc" id="L30">            .stream()</span>
-<span class="fc" id="L31">            .map(this::asMap)</span>
-<span class="fc" id="L32">            .map(this::readCandidate)</span>
-<span class="fc" id="L33">            .toList();</span>
-<span class="fc" id="L34">        List&lt;ReusableRule&gt; reusableRules = readList(root.get(&quot;reusableRules&quot;))</span>
-<span class="fc" id="L35">            .stream()</span>
-<span class="fc" id="L36">            .map(this::asMap)</span>
-<span class="fc" id="L37">            .map(this::readReusableRule)</span>
-<span class="fc" id="L38">            .toList();</span>
-<span class="fc" id="L39">        return new ExportBundle(schemaVersion, transformations, ruleCandidates, reusableRules);</span>
+<span class="fc" id="L22">        Objects.requireNonNull(json, &quot;json must not be null&quot;);</span>
+<span class="fc" id="L23">        Map&lt;String, Object&gt; root = new JsonReader(json).readObject();</span>
+<span class="fc" id="L24">        String schemaVersion = stringValue(root.get(&quot;schemaVersion&quot;), ExportBundle.CURRENT_SCHEMA_VERSION);</span>
+<span class="fc" id="L25">        List&lt;DiscoveredTransformation&gt; transformations = readList(root.get(&quot;transformations&quot;))</span>
+<span class="fc" id="L26">            .stream()</span>
+<span class="fc" id="L27">            .map(this::asMap)</span>
+<span class="fc" id="L28">            .map(this::readTransformation)</span>
+<span class="fc" id="L29">            .toList();</span>
+<span class="fc" id="L30">        List&lt;RuleCandidate&gt; ruleCandidates = readList(root.get(&quot;ruleCandidates&quot;))</span>
+<span class="fc" id="L31">            .stream()</span>
+<span class="fc" id="L32">            .map(this::asMap)</span>
+<span class="fc" id="L33">            .map(this::readCandidate)</span>
+<span class="fc" id="L34">            .toList();</span>
+<span class="fc" id="L35">        List&lt;ReusableRule&gt; reusableRules = readList(root.get(&quot;reusableRules&quot;))</span>
+<span class="fc" id="L36">            .stream()</span>
+<span class="fc" id="L37">            .map(this::asMap)</span>
+<span class="fc" id="L38">            .map(this::readReusableRule)</span>
+<span class="fc" id="L39">            .toList();</span>
+<span class="fc" id="L40">        return new ExportBundle(schemaVersion, transformations, ruleCandidates, reusableRules);</span>
     }
 
     private DiscoveredTransformation readTransformation(Map&lt;String, Object&gt; values) {
-<span class="fc" id="L43">        Map&lt;String, Object&gt; scores = asMap(values.get(&quot;scores&quot;));</span>
-<span class="fc" id="L44">        ExpressionScore originalScore = readScore(asMap(scores.get(&quot;original&quot;)));</span>
-<span class="fc" id="L45">        ExpressionScore improvedScore = readScore(asMap(scores.get(&quot;improved&quot;)));</span>
-<span class="fc" id="L46">        List&lt;TransformationStep&gt; steps = readList(values.get(&quot;steps&quot;))</span>
-<span class="fc" id="L47">            .stream()</span>
-<span class="fc" id="L48">            .map(this::asMap)</span>
-<span class="fc" id="L49">            .map(this::readStep)</span>
-<span class="fc" id="L50">            .toList();</span>
-<span class="fc" id="L51">        return new DiscoveredTransformation(</span>
-<span class="fc" id="L52">            stringValue(values.get(&quot;id&quot;), &quot;&quot;),</span>
-<span class="fc" id="L53">            stringValue(values.get(&quot;originalExpression&quot;), &quot;&quot;),</span>
-<span class="fc" id="L54">            stringValue(values.get(&quot;improvedExpression&quot;), &quot;&quot;),</span>
+<span class="fc" id="L44">        Map&lt;String, Object&gt; scores = asMap(values.get(&quot;scores&quot;));</span>
+<span class="fc" id="L45">        ExpressionScore originalScore = readScore(asMap(scores.get(&quot;original&quot;)));</span>
+<span class="fc" id="L46">        ExpressionScore improvedScore = readScore(asMap(scores.get(&quot;improved&quot;)));</span>
+<span class="fc" id="L47">        List&lt;TransformationStep&gt; steps = readList(values.get(&quot;steps&quot;))</span>
+<span class="fc" id="L48">            .stream()</span>
+<span class="fc" id="L49">            .map(this::asMap)</span>
+<span class="fc" id="L50">            .map(this::readStep)</span>
+<span class="fc" id="L51">            .toList();</span>
+<span class="fc" id="L52">        return new DiscoveredTransformation(</span>
+<span class="fc" id="L53">            stringValue(values.get(&quot;id&quot;), &quot;&quot;),</span>
+<span class="fc" id="L54">            stringValue(values.get(&quot;originalExpression&quot;), &quot;&quot;),</span>
+<span class="fc" id="L55">            stringValue(values.get(&quot;improvedExpression&quot;), &quot;&quot;),</span>
             steps,
             originalScore,
             improvedScore,
-<span class="fc" id="L58">            intValue(values.get(&quot;totalImprovement&quot;), originalScore.improvementTo(improvedScore)),</span>
-<span class="fc" id="L59">            CandidateProofStatus.valueOf(stringValue(values.get(&quot;validationStatus&quot;), CandidateProofStatus.OBSERVED.name())),</span>
-<span class="fc" id="L60">            parseInstant(values.get(&quot;discoveredAt&quot;), Instant.EPOCH),</span>
-<span class="fc" id="L61">            stringValue(values.get(&quot;canonicalHash&quot;), &quot;&quot;)</span>
+<span class="fc" id="L59">            intValue(values.get(&quot;totalImprovement&quot;), originalScore.improvementTo(improvedScore)),</span>
+<span class="fc" id="L60">            CandidateProofStatus.valueOf(stringValue(values.get(&quot;validationStatus&quot;), CandidateProofStatus.OBSERVED.name())),</span>
+<span class="fc" id="L61">            parseInstant(values.get(&quot;discoveredAt&quot;), Instant.EPOCH),</span>
+<span class="fc" id="L62">            stringValue(values.get(&quot;canonicalHash&quot;), &quot;&quot;)</span>
         );
     }
 
     private TransformationStep readStep(Map&lt;String, Object&gt; values) {
-<span class="fc" id="L66">        return new TransformationStep(</span>
-<span class="fc" id="L67">            intValue(values.get(&quot;index&quot;), 0),</span>
-<span class="fc" id="L68">            stringValue(values.get(&quot;beforeExpression&quot;), &quot;&quot;),</span>
-<span class="fc" id="L69">            stringValue(values.get(&quot;afterExpression&quot;), &quot;&quot;),</span>
-<span class="fc" id="L70">            stringValue(values.get(&quot;ruleId&quot;), &quot;&quot;),</span>
-<span class="fc" id="L71">            RewriteKind.valueOf(stringValue(values.get(&quot;ruleKind&quot;), RewriteKind.NORMALIZE.name())),</span>
-<span class="fc" id="L72">            intValue(values.get(&quot;scoreBefore&quot;), 0),</span>
-<span class="fc" id="L73">            intValue(values.get(&quot;scoreAfter&quot;), 0),</span>
-<span class="fc" id="L74">            booleanValue(values.get(&quot;equivalencePreserving&quot;), true),</span>
-<span class="fc" id="L75">            stringValue(values.get(&quot;explanation&quot;), &quot;&quot;),</span>
-<span class="fc" id="L76">            stringList(values.get(&quot;assumptions&quot;)),</span>
-<span class="fc" id="L77">            de.regelsuche.transform.RecordedExecution.readOptional(values)</span>
+<span class="fc" id="L67">        return new TransformationStep(</span>
+<span class="fc" id="L68">            intValue(values.get(&quot;index&quot;), 0),</span>
+<span class="fc" id="L69">            stringValue(values.get(&quot;beforeExpression&quot;), &quot;&quot;),</span>
+<span class="fc" id="L70">            stringValue(values.get(&quot;afterExpression&quot;), &quot;&quot;),</span>
+<span class="fc" id="L71">            stringValue(values.get(&quot;ruleId&quot;), &quot;&quot;),</span>
+<span class="fc" id="L72">            RewriteKind.valueOf(stringValue(values.get(&quot;ruleKind&quot;), RewriteKind.NORMALIZE.name())),</span>
+<span class="fc" id="L73">            intValue(values.get(&quot;scoreBefore&quot;), 0),</span>
+<span class="fc" id="L74">            intValue(values.get(&quot;scoreAfter&quot;), 0),</span>
+<span class="fc" id="L75">            booleanValue(values.get(&quot;equivalencePreserving&quot;), true),</span>
+<span class="fc" id="L76">            stringValue(values.get(&quot;explanation&quot;), &quot;&quot;),</span>
+<span class="fc" id="L77">            stringList(values.get(&quot;assumptions&quot;)),</span>
+<span class="fc" id="L78">            de.regelsuche.transform.RecordedExecution.readOptional(values)</span>
         );
     }
 
     private ExpressionScore readScore(Map&lt;String, Object&gt; values) {
-<span class="fc" id="L82">        return new ExpressionScore(</span>
-<span class="fc" id="L83">            intValue(values.get(&quot;stringLength&quot;), 0),</span>
-<span class="fc" id="L84">            intValue(values.get(&quot;astNodeCount&quot;), 0),</span>
-<span class="fc" id="L85">            intValue(values.get(&quot;operatorCount&quot;), 0),</span>
-<span class="fc" id="L86">            intValue(values.get(&quot;nestingDepth&quot;), 0),</span>
-<span class="fc" id="L87">            intValue(values.get(&quot;recognizedPatternBonus&quot;), 0)</span>
+<span class="fc" id="L83">        return new ExpressionScore(</span>
+<span class="fc" id="L84">            intValue(values.get(&quot;stringLength&quot;), 0),</span>
+<span class="fc" id="L85">            intValue(values.get(&quot;astNodeCount&quot;), 0),</span>
+<span class="fc" id="L86">            intValue(values.get(&quot;operatorCount&quot;), 0),</span>
+<span class="fc" id="L87">            intValue(values.get(&quot;nestingDepth&quot;), 0),</span>
+<span class="fc" id="L88">            intValue(values.get(&quot;recognizedPatternBonus&quot;), 0),</span>
+<span class="fc" id="L89">            readScoreRevision(values)</span>
         );
     }
 
+    private static String readScoreRevision(Map&lt;String, Object&gt; values) {
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (!values.containsKey(&quot;scoringRevision&quot;)) {</span>
+<span class="fc" id="L95">            return ScoreRevision.UNSPECIFIED;</span>
+        }
+<span class="fc" id="L97">        Object value = values.get(&quot;scoringRevision&quot;);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (!(value instanceof String revision)) {</span>
+<span class="fc" id="L99">            throw new IllegalArgumentException(&quot;scoringRevision must be a string&quot;);</span>
+        }
+<span class="fc" id="L101">        return revision;</span>
+    }
+
     private RuleCandidate readCandidate(Map&lt;String, Object&gt; values) {
-<span class="fc" id="L92">        return new RuleCandidate(</span>
-<span class="fc" id="L93">            stringValue(values.get(&quot;leftPattern&quot;), &quot;&quot;),</span>
-<span class="fc" id="L94">            stringValue(values.get(&quot;rightPattern&quot;), &quot;&quot;),</span>
-<span class="fc" id="L95">            intValue(values.get(&quot;examplesCount&quot;), 0),</span>
-<span class="fc" id="L96">            doubleValue(values.get(&quot;averageScoreImprovement&quot;), 0d),</span>
-<span class="fc" id="L97">            intValue(values.get(&quot;maximumScoreImprovement&quot;), 0),</span>
-<span class="fc" id="L98">            booleanValue(values.get(&quot;equivalenceVerified&quot;), false),</span>
-<span class="fc" id="L99">            booleanValue(values.get(&quot;generalizationPlausible&quot;), false),</span>
-<span class="fc" id="L100">            booleanValue(values.get(&quot;containsFreeParameters&quot;), false),</span>
-<span class="fc" id="L101">            stringList(values.get(&quot;parameterRelations&quot;)),</span>
-<span class="fc" id="L102">            RuleStatus.valueOf(stringValue(values.get(&quot;status&quot;), RuleStatus.NEW.name())),</span>
-<span class="fc" id="L103">            CandidateProofStatus.valueOf(stringValue(values.get(&quot;proofStatus&quot;), CandidateProofStatus.OBSERVED.name())),</span>
-<span class="fc" id="L104">            stringValue(values.get(&quot;canonicalHash&quot;), &quot;&quot;),</span>
-<span class="fc" id="L105">            stringList(values.get(&quot;supportingTransformationIds&quot;))</span>
+<span class="fc" id="L105">        return new RuleCandidate(</span>
+<span class="fc" id="L106">            stringValue(values.get(&quot;leftPattern&quot;), &quot;&quot;),</span>
+<span class="fc" id="L107">            stringValue(values.get(&quot;rightPattern&quot;), &quot;&quot;),</span>
+<span class="fc" id="L108">            intValue(values.get(&quot;examplesCount&quot;), 0),</span>
+<span class="fc" id="L109">            doubleValue(values.get(&quot;averageScoreImprovement&quot;), 0d),</span>
+<span class="fc" id="L110">            intValue(values.get(&quot;maximumScoreImprovement&quot;), 0),</span>
+<span class="fc" id="L111">            booleanValue(values.get(&quot;equivalenceVerified&quot;), false),</span>
+<span class="fc" id="L112">            booleanValue(values.get(&quot;generalizationPlausible&quot;), false),</span>
+<span class="fc" id="L113">            booleanValue(values.get(&quot;containsFreeParameters&quot;), false),</span>
+<span class="fc" id="L114">            stringList(values.get(&quot;parameterRelations&quot;)),</span>
+<span class="fc" id="L115">            RuleStatus.valueOf(stringValue(values.get(&quot;status&quot;), RuleStatus.NEW.name())),</span>
+<span class="fc" id="L116">            CandidateProofStatus.valueOf(stringValue(values.get(&quot;proofStatus&quot;), CandidateProofStatus.OBSERVED.name())),</span>
+<span class="fc" id="L117">            stringValue(values.get(&quot;canonicalHash&quot;), &quot;&quot;),</span>
+<span class="fc" id="L118">            stringList(values.get(&quot;supportingTransformationIds&quot;))</span>
         );
     }
 
     private ReusableRule readReusableRule(Map&lt;String, Object&gt; values) {
-<span class="fc" id="L110">        return new ReusableRule(</span>
-<span class="fc" id="L111">            stringValue(values.get(&quot;id&quot;), &quot;&quot;),</span>
-<span class="fc" id="L112">            stringValue(values.get(&quot;leftPattern&quot;), &quot;&quot;),</span>
-<span class="fc" id="L113">            stringValue(values.get(&quot;rightPattern&quot;), &quot;&quot;),</span>
-<span class="fc" id="L114">            stringList(values.get(&quot;parameterRelations&quot;)),</span>
-<span class="fc" id="L115">            CandidateProofStatus.valueOf(stringValue(values.get(&quot;proofStatus&quot;), CandidateProofStatus.OBSERVED.name())),</span>
-<span class="fc" id="L116">            RuleStatus.valueOf(stringValue(values.get(&quot;knownRuleStatus&quot;), RuleStatus.NEW.name())),</span>
-<span class="fc" id="L117">            intValue(values.get(&quot;supportingExamples&quot;), 0),</span>
-<span class="fc" id="L118">            doubleValue(values.get(&quot;averageImprovement&quot;), 0d),</span>
-<span class="fc" id="L119">            parseInstant(values.get(&quot;createdAt&quot;), Instant.EPOCH),</span>
-<span class="fc" id="L120">            stringValue(values.get(&quot;canonicalHash&quot;), &quot;&quot;),</span>
-<span class="fc bfc" id="L121" title="All 2 branches covered.">            values.get(&quot;lastUsedAt&quot;) == null ? null : parseInstant(values.get(&quot;lastUsedAt&quot;), null),</span>
-<span class="fc" id="L122">            intValue(values.get(&quot;usageCount&quot;), 0),</span>
-<span class="fc" id="L123">            intValue(values.get(&quot;occurrenceCount&quot;), 0),</span>
-<span class="fc" id="L124">            stringList(values.get(&quot;supportingPathIds&quot;)),</span>
-<span class="fc" id="L125">            doubleValue(values.get(&quot;confidenceScore&quot;), 0d),</span>
-<span class="fc" id="L126">            stringList(values.get(&quot;assumptions&quot;)),</span>
-<span class="fc" id="L127">            de.regelsuche.inventory.RuleUtilityEvidence.fromValue(values.get(&quot;utilityEvidence&quot;))</span>
+<span class="fc" id="L123">        return new ReusableRule(</span>
+<span class="fc" id="L124">            stringValue(values.get(&quot;id&quot;), &quot;&quot;),</span>
+<span class="fc" id="L125">            stringValue(values.get(&quot;leftPattern&quot;), &quot;&quot;),</span>
+<span class="fc" id="L126">            stringValue(values.get(&quot;rightPattern&quot;), &quot;&quot;),</span>
+<span class="fc" id="L127">            stringList(values.get(&quot;parameterRelations&quot;)),</span>
+<span class="fc" id="L128">            CandidateProofStatus.valueOf(stringValue(values.get(&quot;proofStatus&quot;), CandidateProofStatus.OBSERVED.name())),</span>
+<span class="fc" id="L129">            RuleStatus.valueOf(stringValue(values.get(&quot;knownRuleStatus&quot;), RuleStatus.NEW.name())),</span>
+<span class="fc" id="L130">            intValue(values.get(&quot;supportingExamples&quot;), 0),</span>
+<span class="fc" id="L131">            doubleValue(values.get(&quot;averageImprovement&quot;), 0d),</span>
+<span class="fc" id="L132">            parseInstant(values.get(&quot;createdAt&quot;), Instant.EPOCH),</span>
+<span class="fc" id="L133">            stringValue(values.get(&quot;canonicalHash&quot;), &quot;&quot;),</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            values.get(&quot;lastUsedAt&quot;) == null ? null : parseInstant(values.get(&quot;lastUsedAt&quot;), null),</span>
+<span class="fc" id="L135">            intValue(values.get(&quot;usageCount&quot;), 0),</span>
+<span class="fc" id="L136">            intValue(values.get(&quot;occurrenceCount&quot;), 0),</span>
+<span class="fc" id="L137">            stringList(values.get(&quot;supportingPathIds&quot;)),</span>
+<span class="fc" id="L138">            doubleValue(values.get(&quot;confidenceScore&quot;), 0d),</span>
+<span class="fc" id="L139">            stringList(values.get(&quot;assumptions&quot;)),</span>
+<span class="fc" id="L140">            de.regelsuche.inventory.RuleUtilityEvidence.fromValue(values.get(&quot;utilityEvidence&quot;))</span>
         );
     }
 
     private List&lt;Object&gt; readList(Object raw) {
-<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (raw == null) {</span>
-<span class="nc" id="L133">            return List.of();</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L146">            return List.of();</span>
         }
-<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (raw instanceof List&lt;?&gt; list) {</span>
-<span class="fc" id="L136">            return list.stream().map(o -&gt; (Object) o).toList();</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (raw instanceof List&lt;?&gt; list) {</span>
+<span class="fc" id="L149">            return list.stream().map(o -&gt; (Object) o).toList();</span>
         }
-<span class="nc" id="L138">        throw new IllegalArgumentException(&quot;Expected array, got &quot; + raw);</span>
+<span class="nc" id="L151">        throw new IllegalArgumentException(&quot;Expected array, got &quot; + raw);</span>
     }
 
     private List&lt;String&gt; stringList(Object raw) {
-<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (raw == null) {</span>
-<span class="fc" id="L143">            return List.of();</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (raw == null) {</span>
+<span class="fc" id="L156">            return List.of();</span>
         }
-<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        if (raw instanceof List&lt;?&gt; list) {</span>
-<span class="fc" id="L146">            return list.stream().map(String::valueOf).toList();</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        if (raw instanceof List&lt;?&gt; list) {</span>
+<span class="fc" id="L159">            return list.stream().map(String::valueOf).toList();</span>
         }
-<span class="nc" id="L148">        throw new IllegalArgumentException(&quot;Expected array of strings, got &quot; + raw);</span>
+<span class="nc" id="L161">        throw new IllegalArgumentException(&quot;Expected array of strings, got &quot; + raw);</span>
     }
 
     @SuppressWarnings(&quot;unchecked&quot;)
     private Map&lt;String, Object&gt; asMap(Object raw) {
-<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (raw == null) {</span>
-<span class="nc" id="L154">            return Map.of();</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L167">            return Map.of();</span>
         }
-<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (raw instanceof Map&lt;?, ?&gt; map) {</span>
-<span class="fc" id="L157">            return (Map&lt;String, Object&gt;) map;</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        if (raw instanceof Map&lt;?, ?&gt; map) {</span>
+<span class="fc" id="L170">            return (Map&lt;String, Object&gt;) map;</span>
         }
-<span class="nc" id="L159">        throw new IllegalArgumentException(&quot;Expected object, got &quot; + raw);</span>
+<span class="nc" id="L172">        throw new IllegalArgumentException(&quot;Expected object, got &quot; + raw);</span>
     }
 
     private String stringValue(Object raw, String fallback) {
-<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        return raw == null ? fallback : String.valueOf(raw);</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        return raw == null ? fallback : String.valueOf(raw);</span>
     }
 
     private int intValue(Object raw, int fallback) {
-<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (raw == null) {</span>
-<span class="nc" id="L168">            return fallback;</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L181">            return fallback;</span>
         }
-<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if (raw instanceof Number number) {</span>
-<span class="fc" id="L171">            return number.intValue();</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (raw instanceof Number number) {</span>
+<span class="fc" id="L184">            return number.intValue();</span>
         }
-<span class="nc" id="L173">        return Integer.parseInt(String.valueOf(raw));</span>
+<span class="nc" id="L186">        return Integer.parseInt(String.valueOf(raw));</span>
     }
 
     private double doubleValue(Object raw, double fallback) {
-<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (raw == null) {</span>
-<span class="nc" id="L178">            return fallback;</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L191">            return fallback;</span>
         }
-<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (raw instanceof Number number) {</span>
-<span class="fc" id="L181">            return number.doubleValue();</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        if (raw instanceof Number number) {</span>
+<span class="fc" id="L194">            return number.doubleValue();</span>
         }
-<span class="nc" id="L183">        return Double.parseDouble(String.valueOf(raw));</span>
+<span class="nc" id="L196">        return Double.parseDouble(String.valueOf(raw));</span>
     }
 
     private boolean booleanValue(Object raw, boolean fallback) {
-<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (raw == null) {</span>
-<span class="nc" id="L188">            return fallback;</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L201">            return fallback;</span>
         }
-<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (raw instanceof Boolean bool) {</span>
-<span class="fc" id="L191">            return bool;</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        if (raw instanceof Boolean bool) {</span>
+<span class="fc" id="L204">            return bool;</span>
         }
-<span class="nc" id="L193">        return Boolean.parseBoolean(String.valueOf(raw));</span>
+<span class="nc" id="L206">        return Boolean.parseBoolean(String.valueOf(raw));</span>
     }
 
     private Instant parseInstant(Object raw, Instant fallback) {
-<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (raw == null) {</span>
-<span class="nc" id="L198">            return fallback;</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L211">            return fallback;</span>
         }
-<span class="fc" id="L200">        return Instant.parse(String.valueOf(raw));</span>
+<span class="fc" id="L213">        return Instant.parse(String.valueOf(raw));</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
