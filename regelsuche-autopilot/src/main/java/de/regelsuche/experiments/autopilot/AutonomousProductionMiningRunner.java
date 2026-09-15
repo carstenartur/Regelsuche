@@ -18,7 +18,7 @@ import de.regelsuche.mining.OpenTargetConjectureEvidence.SeedProvenance;
 import de.regelsuche.mining.OpenTargetConjectureMiner;
 import de.regelsuche.mining.OpenTargetConjectureMiner.MiningReport;
 import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetObservation;
-import de.regelsuche.scoring.ExpressionScore;
+import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
 import de.regelsuche.search.strategy.SearchState;
 import java.io.IOException;
@@ -254,11 +254,12 @@ public final class AutonomousProductionMiningRunner {
                 .toList());
     }
 
+    /** Recompute the mining objective; unversioned retained totals stay unchanged in the snapshot evidence. */
     private static SearchState replayState(StateSnapshot state) {
         return new SearchState(
             state.expression(),
             state.depth(),
-            new ExpressionScore(state.scoreWeightedTotal(), 0, 0, 0, 0),
+            new ExpressionScorer().score(state.expression()),
             state.path(),
             state.appliedRuleIds(),
             Set.of(),

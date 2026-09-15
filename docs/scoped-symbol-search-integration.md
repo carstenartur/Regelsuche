@@ -65,7 +65,7 @@ must not be inferred from arbitrary numbers or added retrospectively on export.
 Transformation export/import preserves the actual revision, numeric components
 and retained derivation data. Missing historical revisions remain `unspecified`;
 exporting such scores does not re-score them or relabel them as current. A JSON
-number, boolean, array or object is not a valid revision string and is rejected on
+number, boolean, array, object or explicit null is not a valid revision string and is rejected on
 import instead of being converted into one. Old trajectory records keep their
 old schema when exported and are not silently admitted to current training.
 
@@ -126,12 +126,10 @@ review are still required before merge.
 
 ## Remaining ordered implementation work
 
-1. PR #1004 is merged at `3f0a3d8979e6d3f81d415514a969101ef7bf9f39`.
-   Its domain validation, plugin recovery and release verifier are separate from
-   learning. Aggregate plugin-cache limits are tracked separately in #1007.
-   The main JMH failure was an INCONCLUSIVE measurement, not a missing benchmark
-   list. Retained precision-study input replay and separately versioned adoption
-   remain governed by #981; do not rerun until green or raise a threshold.
+1. #1004 and the separate cache-quota correction #1007 are merged. Complete
+   exact-head qualification of the scoring integration in this PR. Retained
+   precision-study input replay and separately versioned adoption remain governed
+   by #981; do not rerun until green or raise a threshold.
 2. After the prerequisite above is qualified, extend the shared structured
    CLI/HTTP boundary with explicit symbol documents. Source text, symbol bindings,
    display labels and exact numeric occurrence evidence must remain distinct.
@@ -151,3 +149,31 @@ review are still required before merge.
 The prerequisite in this change does not implement steps 2 or 3 or execute step 4.
 There is no protected FINAL TEST, default-policy promotion, speedup claim or
 universal search-completeness claim in this change.
+
+
+## Persisted native and historical score boundaries
+
+Native current-state observations require a textual current scoring revision
+before artifact admission. All states and retained events in an artifact must
+agree on that revision; the event producer is copied from the actual SearchEvent,
+not inferred from its numeric score. Missing or obsolete v2 revisions are not
+executable evidence.
+
+Historical state-v1 native artifacts without score-revision fields remain
+canonical read-only observations through both the artifact store and browser.
+Their absent event metadata stays absent when serialized; they are never labelled
+as current and `Artifact.replay()` rejects them before starting a new search.
+Mixed legacy/current traces are rejected. An incomplete pre-release v2 trace
+without its required event provenance is not silently promoted to the corrected
+current format.
+
+Trajectory-v1 JSON omits both scoringRevision and the v2-only transformation
+descriptor. Trajectory-v2 omits scoringRevision. Neither legacy format may encode
+an asserted current score producer or enter current-model training. Ordinary
+policy feature identities bind the scoring revision, as descriptor policies do.
+
+Autopilot mining recomputes its current objective from each retained expression
+rather than comparing an unversioned snapshot total with a new root score.
+Snapshot numbers, paths and content commitments themselves remain unchanged.
+This is current mining over retained observations, not a claim to reproduce an
+old scoring algorithm or its historical decisions.

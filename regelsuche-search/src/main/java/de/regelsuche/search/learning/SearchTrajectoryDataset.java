@@ -229,7 +229,8 @@ public final class SearchTrajectoryDataset {
 
     private static String toJson(SearchTrajectoryRecord record) {
         JsonWriter json = new JsonWriter().beginObject().property("schema", record.schema());
-        if ("regelsuche.search-trajectory/v2".equals(record.schema())) {
+        boolean legacyV1 = "regelsuche.search-trajectory/v1".equals(record.schema());
+        if (legacyV1 || "regelsuche.search-trajectory/v2".equals(record.schema())) {
             if (!de.regelsuche.scoring.ScoreRevision.UNSPECIFIED.equals(record.scoringRevision())) {
                 throw new IllegalArgumentException("legacy scoring schema cannot encode a declared revision");
             }
@@ -268,11 +269,13 @@ public final class SearchTrajectoryDataset {
                 .property("powers", features.powers())
                 .property("functions", features.functions())
                 .property("parseable", features.parseable()));
-        if (record.transformationDescriptor() == null) {
-            json.nullProperty("transformationDescriptor");
-        } else {
-            json.object("transformationDescriptor", value ->
-                writeDescriptor(value, record.transformationDescriptor()));
+        if (!legacyV1) {
+            if (record.transformationDescriptor() == null) {
+                json.nullProperty("transformationDescriptor");
+            } else {
+                json.object("transformationDescriptor", value ->
+                    writeDescriptor(value, record.transformationDescriptor()));
+            }
         }
         json.property("depth", record.depth())
             .property("score", record.score())
