@@ -24,33 +24,34 @@ Files: `regelsuche-learning/src/main/java/de/regelsuche/mining/RulePatternMatche
   assertTrue(matcher.match("(A+B)*(A-B)", "(y+x)*(x-y)").isPresent());
   ```
 
-- [ ] Observe the intended failures in the existing Java-25 CI, not just an unrelated build failure.
-- [ ] Implement immutable pending constraints and alternative frames. Defer swapped and associative choices; revisit them when any later constraint fails. Preserve function-argument order and old successful selection order.
-- [ ] Run existing and new matcher controls through ordinary CI; retain the failed predecessor evidence.
+- [x] Observe the intended failures in Java-25 CI: run `35054095152`, Maven job `104660483534`, test-only `27b335b8`.
+- [x] Implement immutable pending constraints and alternative frames. Revisit deferred choices when a later constraint fails; preserve function-argument and direct-before-swapped search order.
+- [x] Run the matcher regression controls through ordinary CI: all six pass on `89ebe23c` in run `35055196980`, Maven job `104664044120`. The full build is not green (see Task 3).
 
 ## Task 2: bounded shared bindings across steps
 
-Files: the matcher facade/search above and new `RulePatternSequenceMatcherTest.java` in the same test package.
+Files: the matcher facade/search above and `RulePatternSequenceMatcherTest.java` in the same test package.
 
 Interface: `RulePatternMatcher.MatchStep(RulePatternNode, Expr)`; `matchSequence(List<MatchStep>, Map<String, Expr>, long)` returns status, immutable bindings and charged matching work.
 
-- [ ] Add cross-step tests for `A+B` against `y+x`, followed by `A-B` against `x-y`; require `A=x, B=y` rather than committing the first local match.
-- [ ] Add same-label/different-scope rejection, alias acceptance, composite subtree equality, immutable seed/result and input-bound controls.
-- [ ] Test exact success/failure work boundaries and a smaller allowance returning BUDGET_EXHAUSTED with no partial bindings.
-- [ ] Check all small input permutations against an independent two-variable assignment oracle, without deriving expected results from the matcher.
-- [ ] Implement the bounded sequence API using the same iterative search, with no change to the dispatcher or historical policy identity.
+- [x] Add cross-step order recovery and negative rebinding controls.
+- [x] Add scoped identity, alias, composite binding, immutable seed/result and input-bound controls.
+- [x] Exercise exact success/failure work boundaries and the smaller allowance returning BUDGET_EXHAUSTED.
+- [x] Check all 81 small input combinations against an independent assignment oracle.
+- [x] Implement the bounded sequence API without changing dispatcher or historical policy identity.
+- [ ] Confirm the full 12-method sequence suite after correcting the alias fixture's invalid display name (`shown-y` to `shownY`). On `89ebe23c`, 11 methods pass and this fixture raises an error before matching.
 
 ## Task 3: qualify and document the boundary
 
-- [ ] Document the real callable sequence API and the remaining dispatcher/CLI integration.
-- [ ] Inspect the published diff and current-head Maven/Gradle, external comparison, JMH, SymPy and code-scanning results.
-- [ ] Seek independent review when the implementation is ready. Do not merge on incomplete evidence or claim a learning gain from matcher unit tests.
+- [x] Document the callable sequence API and remaining dispatcher/CLI integration.
+- [x] Inspect the Maven failure on `89ebe23c`: 716 learning tests, zero failures, one invalid-label fixture error. Correct the documentation's predecessor counts to 702 learning tests and six existing matcher/scoped-symbol tests.
+- [ ] Inspect fresh current-head Maven/Gradle, external comparison, JMH, SymPy and code-scanning results after the fixture correction. Downstream Maven modules were skipped on `89ebe23c`; their qualification is still required.
+- [ ] Complete review and address current-head findings before merge. Copilot review was requested; a request is not approval.
 
-Ordinary reproduction:
+Reproduce the learning module and its dependencies without filtering away other tests:
 
 ```sh
-mvn --batch-mode --no-transfer-progress -pl regelsuche-learning -am \
-  -Dtest=RulePatternMatcherBindingBacktrackingTest,RulePatternSequenceMatcherTest,RulePatternMatcherTest,ScopedSymbolPatternMatcherTest test
+mvn --batch-mode --no-transfer-progress -pl regelsuche-learning -am test
 ```
 
-The complete repository lifecycle remains required in addition to this focused command.
+The complete repository lifecycle remains required in addition to this module run. No successful local execution is claimed while the execution environment is unavailable.

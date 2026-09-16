@@ -57,17 +57,29 @@ continuation or promote a new search policy.
 
 On unchanged production at test-only commit
 `27b335b8fdc2b27183f8286dd71bdd9dd42dd821`, Java-25 CI run `35054095152`,
-Maven job `104660483534`, ran 1,183 learning tests with exactly three failures:
-the new sibling, function-argument and repeated-composite backtracking cases.
-The three negative/deterministic/isolation controls and ten existing matcher
-and scoped-symbol tests passed. This establishes the original behavior; it
-is not qualification of the corrected implementation.
+Maven job `104660483534`, ran **702 learning tests with three failures, zero
+errors and zero skips**. The failures were the new sibling, function-argument
+and repeated-composite backtracking cases. The other three new controls and
+six existing matcher/scoped-symbol tests passed. Earlier versions of this page
+incorrectly reported 1,183 learning tests and ten existing matcher tests; the
+numbers here are corrected from the actual Maven log.
 
-The sequence controls additionally cover complete cancellation traces, initial
+On implementation commit `89ebe23cfe68e2053be831b553c0e7b7724bf4c6`,
+CI run `35055196980`, Maven job `104664044120`, all six backtracking tests,
+two entry-point tests and six existing matcher/scoped-symbol tests passed.
+The learning module ran **716 tests with zero failures and one error**: the alias
+test used the invalid display label `shown-y`, so `SymbolScope.requireName`
+rejected the fixture before matching. The fixture now uses the valid label
+`shownY`; symbol-name validation and all matching assertions remain unchanged.
+This establishes the original bug's red/green regression evidence, not a green
+full product build. The correction requires a fresh current-head CI run.
+
+The 20 new test methods also cover complete cancellation traces, initial
 bindings, scoped IDs and aliases, exact success/failure work boundaries, input
-bounds and all 81 two-operand permutations over three variable names against an
-independent assignment oracle. Current-head ordinary CI and review are required;
-no local compilation is claimed while the local execution environment is unavailable.
+bounds, entry-point compatibility and all 81 two-operand input combinations over
+three variable names against an independent assignment oracle. Ordinary CI and
+review remain required; no local compilation is claimed while the local
+execution environment is unavailable.
 
 Binding-aware dispatch, explicit occurrence selection and full CLI/HTTP symbol
 integration remain the next steps of the approved roadmap, recorded in

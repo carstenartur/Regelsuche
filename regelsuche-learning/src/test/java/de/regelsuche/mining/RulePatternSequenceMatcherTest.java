@@ -82,7 +82,7 @@ class RulePatternSequenceMatcherTest {
         var scope = new SymbolScope(new UUID(0, 1));
         scope.alias("v", scope.resolve("y"));
         var first = SymbolicExpression.parse("y+x", scope);
-        var second = SymbolicExpression.parse("x-v", scope).withDisplayName(scope.resolve("y"), "shown-y");
+        var second = SymbolicExpression.parse("x-v", scope).withDisplayName(scope.resolve("y"), "shownY");
         var result = match(List.of(step("A+B", first.expression()), step("A-B", second.expression())));
         assertEquals(MatchStatus.MATCH, result.status());
         assertEquals(scope.resolve("x"), ((VariableExpr) result.bindings().get("A")).symbol().orElseThrow());
