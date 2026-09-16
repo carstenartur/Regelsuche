@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TraceBindingIdentity.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">TraceBindingIdentity.java</span></div><h1>TraceBindingIdentity.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.PatternBinary;
+import de.regelsuche.mining.PatternFunction;
+import de.regelsuche.mining.PatternNumber;
+import de.regelsuche.mining.PatternVariable;
+import de.regelsuche.mining.RulePatternNode;
+import java.util.ArrayDeque;
+
+/** Ordered, typed preorder encodings: display formatting is not structural identity. */
+final class TraceBindingIdentity {
+    static final String REVISION = &quot;regelsuche.trace-binding-identity/v1&quot;;
+
+    private TraceBindingIdentity() {}
+
+    static String expression(Expr root) {
+<span class="fc" id="L23">        var pending = new ArrayDeque&lt;Expr&gt;();</span>
+<span class="fc" id="L24">        pending.push(root);</span>
+<span class="fc" id="L25">        var json = new JsonWriter().beginArray();</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L27">            var node = pending.pop();</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">            if (node instanceof NumberExpr number) {</span>
+<span class="fc" id="L29">                json.objectValue(value -&gt; value.property(&quot;node&quot;, &quot;number&quot;)</span>
+<span class="fc" id="L30">                    .property(&quot;numerator&quot;, number.value().numerator().toString())</span>
+<span class="fc" id="L31">                    .property(&quot;denominator&quot;, number.value().denominator().toString()));</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">            } else if (node instanceof VariableExpr variable) {</span>
+                // name() is the encoded SymbolId for scoped variables, never a display label.
+<span class="fc bfc" id="L34" title="All 2 branches covered.">                json.objectValue(value -&gt; value.property(&quot;node&quot;, variable.symbol().isPresent() ? &quot;symbol&quot; : &quot;variable&quot;)</span>
+<span class="fc" id="L35">                    .property(&quot;identity&quot;, variable.name()));</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">            } else if (node instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L37">                json.objectValue(value -&gt; value.property(&quot;node&quot;, &quot;binary&quot;).property(&quot;operator&quot;, binary.operator().name()));</span>
+<span class="fc" id="L38">                pending.push(binary.right());</span>
+<span class="fc" id="L39">                pending.push(binary.left());</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">            } else if (node instanceof FunctionExpr function) {</span>
+<span class="fc" id="L41">                json.objectValue(value -&gt; value.property(&quot;node&quot;, &quot;function&quot;).property(&quot;name&quot;, function.name())</span>
+<span class="fc" id="L42">                    .property(&quot;arity&quot;, function.arguments().size()));</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">                for (int i = function.arguments().size() - 1; i &gt;= 0; i--) pending.push(function.arguments().get(i));</span>
+            } else {
+<span class="nc" id="L45">                throw new IllegalArgumentException(&quot;unsupported expression identity node&quot;);</span>
+            }
+<span class="fc" id="L47">        }</span>
+<span class="fc" id="L48">        return json.endArray().toString();</span>
+    }
+
+    static String pattern(RulePatternNode root) {
+<span class="fc" id="L52">        var pending = new ArrayDeque&lt;RulePatternNode&gt;();</span>
+<span class="fc" id="L53">        pending.push(root);</span>
+<span class="fc" id="L54">        var json = new JsonWriter().beginArray();</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L56">            var node = pending.pop();</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            if (node instanceof PatternNumber number) {</span>
+<span class="fc" id="L58">                json.objectValue(value -&gt; value.property(&quot;node&quot;, &quot;number&quot;).property(&quot;value&quot;, number.value()));</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            } else if (node instanceof PatternVariable variable) {</span>
+<span class="fc" id="L60">                json.objectValue(value -&gt; value.property(&quot;node&quot;, &quot;placeholder&quot;).property(&quot;name&quot;, variable.name()));</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">            } else if (node instanceof PatternBinary binary) {</span>
+<span class="fc" id="L62">                json.objectValue(value -&gt; value.property(&quot;node&quot;, &quot;binary&quot;).property(&quot;operator&quot;, binary.op().name()));</span>
+<span class="fc" id="L63">                pending.push(binary.right());</span>
+<span class="fc" id="L64">                pending.push(binary.left());</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">            } else if (node instanceof PatternFunction function) {</span>
+<span class="fc" id="L66">                json.objectValue(value -&gt; value.property(&quot;node&quot;, &quot;function&quot;).property(&quot;name&quot;, function.name())</span>
+<span class="fc" id="L67">                    .property(&quot;arity&quot;, function.arguments().size()));</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">                for (int i = function.arguments().size() - 1; i &gt;= 0; i--) pending.push(function.arguments().get(i));</span>
+            } else {
+<span class="nc" id="L70">                throw new IllegalArgumentException(&quot;unsupported pattern identity node&quot;);</span>
+            }
+<span class="fc" id="L72">        }</span>
+<span class="fc" id="L73">        return json.endArray().toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

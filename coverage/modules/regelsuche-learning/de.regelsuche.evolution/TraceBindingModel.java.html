@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TraceBindingModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">TraceBindingModel.java</span></div><h1>TraceBindingModel.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.PatternBinary;
+import de.regelsuche.mining.PatternFunction;
+import de.regelsuche.mining.PatternNumber;
+import de.regelsuche.mining.PatternVariable;
+import de.regelsuche.mining.RulePatternMatcher;
+import de.regelsuche.mining.RulePatternNode;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+
+/** TRAIN-only trajectory abstraction. Templates constrain applicability, never authorize a rewrite. */
+final class TraceBindingModel {
+    static final String REVISION = &quot;regelsuche.trace-binding-model/v2&quot;;
+
+    record Trace(String id, List&lt;String&gt; sequence, List&lt;Expr&gt; states) {
+<span class="fc" id="L28">        Trace {</span>
+<span class="fc" id="L29">            sequence = List.copyOf(sequence);</span>
+<span class="fc" id="L30">            states = List.copyOf(states);</span>
+<span class="pc bpc" id="L31" title="4 of 8 branches missed.">            if (id == null || id.isBlank() || sequence.size() &lt; 2 || sequence.size() &gt; 8</span>
+<span class="pc bpc" id="L32" title="1 of 4 branches missed.">                    || states.size() != sequence.size() + 1 || sequence.stream().anyMatch(String::isBlank)) {</span>
+<span class="fc" id="L33">                throw new IllegalArgumentException(&quot;require an identified two-to-eight-step primitive trace&quot;);</span>
+            }
+<span class="fc" id="L35">        }</span>
+        String evidenceHash() {
+<span class="fc" id="L37">            return SchematicProofPlan.hash(new JsonWriter().beginObject().property(&quot;id&quot;, id)</span>
+<span class="fc" id="L38">                .property(&quot;identityEncoding&quot;, TraceBindingIdentity.REVISION).stringArray(&quot;sequence&quot;, sequence)</span>
+<span class="fc" id="L39">                .stringArray(&quot;states&quot;, states.stream().map(TraceBindingIdentity::expression).toList()).endObject().toString());</span>
+        }
+    }
+
+    record Template(List&lt;String&gt; sequence, List&lt;RulePatternNode&gt; patterns,
+            List&lt;String&gt; trainingIds, List&lt;String&gt; trainingHashes, Map&lt;String, Expr&gt; fixedBindings) {
+        Template(List&lt;String&gt; sequence, List&lt;RulePatternNode&gt; patterns,
+                List&lt;String&gt; trainingIds, List&lt;String&gt; trainingHashes) {
+<span class="fc" id="L47">            this(sequence, patterns, trainingIds, trainingHashes, Map.of());</span>
+<span class="fc" id="L48">        }</span>
+<span class="fc" id="L49">        Template {</span>
+<span class="fc" id="L50">            sequence = List.copyOf(sequence);</span>
+<span class="fc" id="L51">            patterns = List.copyOf(patterns);</span>
+<span class="fc" id="L52">            trainingIds = List.copyOf(trainingIds);</span>
+<span class="fc" id="L53">            trainingHashes = List.copyOf(trainingHashes);</span>
+<span class="fc" id="L54">            fixedBindings = Map.copyOf(fixedBindings);</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            for (var entry : fixedBindings.entrySet()) {</span>
+<span class="pc bpc" id="L56" title="1 of 4 branches missed.">                if (entry.getKey().isBlank() || !(entry.getValue() instanceof NumberExpr)) {</span>
+<span class="fc" id="L57">                    throw new IllegalArgumentException(&quot;fixed template bindings must be exact numeric literals&quot;);</span>
+                }
+<span class="fc" id="L59">            }</span>
+<span class="fc" id="L60">        }</span>
+        String structuralJson() {
+<span class="fc" id="L62">            return new JsonWriter().beginObject().property(&quot;identityEncoding&quot;, TraceBindingIdentity.REVISION)</span>
+<span class="fc" id="L63">                .stringArray(&quot;sequence&quot;, sequence)</span>
+<span class="fc" id="L64">                .stringArray(&quot;states&quot;, patterns.stream().map(TraceBindingIdentity::pattern).toList())</span>
+<span class="fc" id="L65">                .array(&quot;fixedBindings&quot;, array -&gt; new TreeMap&lt;&gt;(fixedBindings).forEach((name, literal) -&gt;</span>
+<span class="fc" id="L66">                    array.objectValue(value -&gt; value.property(&quot;name&quot;, name)</span>
+<span class="fc" id="L67">                        .property(&quot;value&quot;, TraceBindingIdentity.expression(literal)))))</span>
+<span class="fc" id="L68">                .endObject().toString();</span>
+        }
+    }
+
+    private final List&lt;Template&gt; templates;
+    private final long formationWork;
+    private final long maximumMatchingWork;
+    private final String json;
+    private final String hash;
+
+    private TraceBindingModel(List&lt;Template&gt; templates, long formationWork, int maximumTemplates,
+<span class="fc" id="L79">            long maximumFormationWork, long maximumMatchingWork) {</span>
+<span class="fc" id="L80">        this.templates = List.copyOf(templates);</span>
+<span class="fc" id="L81">        this.formationWork = formationWork;</span>
+<span class="fc" id="L82">        this.maximumMatchingWork = maximumMatchingWork;</span>
+<span class="fc" id="L83">        json = new JsonWriter().beginObject().property(&quot;schema&quot;, REVISION)</span>
+<span class="fc" id="L84">            .property(&quot;matcher&quot;, RulePatternMatcher.SEQUENCE_REVISION)</span>
+<span class="fc" id="L85">            .property(&quot;scope&quot;, &quot;PAIRWISE_WHOLE_STATE_TRAIN_TRAJECTORIES;NO_PROOF_AUTHORITY&quot;)</span>
+<span class="fc" id="L86">            .property(&quot;maximumTemplates&quot;, maximumTemplates).property(&quot;maximumFormationWork&quot;, maximumFormationWork)</span>
+<span class="fc" id="L87">            .property(&quot;maximumMatchingWorkPerExpansion&quot;, maximumMatchingWork).property(&quot;formationWork&quot;, formationWork)</span>
+<span class="fc" id="L88">            .array(&quot;templates&quot;, array -&gt; templates.forEach(template -&gt; array.objectValue(item -&gt; item</span>
+<span class="fc" id="L89">                .property(&quot;structure&quot;, template.structuralJson()).stringArray(&quot;trainingIds&quot;, template.trainingIds())</span>
+<span class="fc" id="L90">                .stringArray(&quot;trainingHashes&quot;, template.trainingHashes())))).endObject().toString();</span>
+<span class="fc" id="L91">        hash = SchematicProofPlan.hash(json);</span>
+<span class="fc" id="L92">    }</span>
+
+    static void requireLimits(int maximumTemplates, long maximumFormationWork, long maximumMatchingWork) {
+<span class="pc bpc" id="L95" title="3 of 12 branches missed.">        if (maximumTemplates &lt; 1 || maximumTemplates &gt; 32 || maximumFormationWork &lt; 1</span>
+                || maximumFormationWork &gt; 1_000_000 || maximumMatchingWork &lt; 1 || maximumMatchingWork &gt; 1_000_000) {
+<span class="fc" id="L97">            throw new IllegalArgumentException(&quot;invalid binding formation/matching limits&quot;);</span>
+        }
+<span class="fc" id="L99">    }</span>
+
+    static TraceBindingModel learn(List&lt;Trace&gt; traces, Set&lt;List&lt;String&gt;&gt; admitted, int maximumTemplates,
+            long maximumFormationWork, long maximumMatchingWork) {
+<span class="fc" id="L103">        return learn(traces, admitted, maximumTemplates, new FormationWork(maximumFormationWork), maximumMatchingWork);</span>
+    }
+
+    static TraceBindingModel learn(List&lt;Trace&gt; traces, Set&lt;List&lt;String&gt;&gt; admitted, int maximumTemplates,
+            FormationWork work, long maximumMatchingWork) {
+<span class="fc" id="L108">        requireLimits(maximumTemplates, work.maximum, maximumMatchingWork);</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (traces.size() &gt; 16) throw new IllegalArgumentException(&quot;binding trace limit exceeded&quot;);</span>
+<span class="fc" id="L110">        var ordered = List.copyOf(traces).stream().sorted(Comparator.comparing(Trace::id)).toList();</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (ordered.stream().map(Trace::id).distinct().count() != ordered.size()) {</span>
+<span class="fc" id="L112">            throw new IllegalArgumentException(&quot;duplicate binding TRAIN identifier&quot;);</span>
+        }
+<span class="fc" id="L114">        var distinct = new TreeMap&lt;String, Template&gt;();</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        for (int i = 0; i &lt; ordered.size(); i++) {</span>
+<span class="fc" id="L116">            work.charge();</span>
+<span class="fc" id="L117">            var left = ordered.get(i);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            for (int j = i + 1; j &lt; ordered.size(); j++) {</span>
+<span class="fc" id="L119">                work.charge();</span>
+<span class="fc" id="L120">                var right = ordered.get(j);</span>
+<span class="pc bpc" id="L121" title="1 of 4 branches missed.">                if (!admitted.contains(left.sequence()) || !left.sequence().equals(right.sequence())) continue;</span>
+                // ONE environment for ALL state pairs is the cross-step binding contract.
+<span class="fc" id="L123">                var pairs = new HashMap&lt;ExpressionPair, PatternVariable&gt;();</span>
+<span class="fc" id="L124">                var literals = new HashMap&lt;NumberExpr, PatternVariable&gt;();</span>
+<span class="fc" id="L125">                var patterns = new ArrayList&lt;RulePatternNode&gt;();</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">                for (int k = 0; k &lt; left.states().size(); k++) {</span>
+<span class="fc" id="L127">                    patterns.add(generalize(left.states().get(k), right.states().get(k), pairs, literals, work, 0));</span>
+                }
+<span class="pc bpc" id="L129" title="1 of 4 branches missed.">                if (patterns.getFirst() instanceof PatternVariable || pairs.isEmpty()) continue;</span>
+<span class="fc" id="L130">                var fixedBindings = new TreeMap&lt;String, Expr&gt;();</span>
+<span class="fc" id="L131">                literals.forEach((literal, variable) -&gt; {</span>
+<span class="fc" id="L132">                    work.charge();</span>
+<span class="fc" id="L133">                    fixedBindings.put(variable.name(), literal);</span>
+<span class="fc" id="L134">                });</span>
+<span class="fc" id="L135">                var initialNames = placeholderNames(patterns.getFirst(), work);</span>
+                // Known literal slots are bound even if their first occurrence is in a later state.
+<span class="fc" id="L137">                initialNames.addAll(fixedBindings.keySet());</span>
+<span class="fc" id="L138">                boolean closed = true;</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">                for (int k = 1; k &lt; patterns.size(); k++) {</span>
+<span class="fc" id="L140">                    closed &amp;= initialNames.containsAll(placeholderNames(patterns.get(k), work));</span>
+                }
+<span class="fc bfc" id="L142" title="All 2 branches covered.">                if (!closed) continue;</span>
+<span class="fc" id="L143">                var candidate = new Template(left.sequence(), patterns,</span>
+<span class="fc" id="L144">                    List.of(left.id(), right.id()), List.of(left.evidenceHash(), right.evidenceHash()), fixedBindings);</span>
+<span class="fc" id="L145">                String key = candidate.structuralJson();</span>
+<span class="fc" id="L146">                var previous = distinct.get(key);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">                if (previous != null) {</span>
+<span class="fc" id="L148">                    var ids = new TreeSet&lt;&gt;(previous.trainingIds());</span>
+<span class="fc" id="L149">                    ids.addAll(candidate.trainingIds());</span>
+<span class="fc" id="L150">                    var hashes = new TreeSet&lt;&gt;(previous.trainingHashes());</span>
+<span class="fc" id="L151">                    hashes.addAll(candidate.trainingHashes());</span>
+<span class="fc" id="L152">                    candidate = new Template(candidate.sequence(), candidate.patterns(),</span>
+<span class="fc" id="L153">                        List.copyOf(ids), List.copyOf(hashes), candidate.fixedBindings());</span>
+                }
+<span class="fc" id="L155">                distinct.put(key, candidate);</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">                if (distinct.size() &gt; maximumTemplates) throw new IllegalArgumentException(&quot;binding template limit exceeded&quot;);</span>
+            }
+        }
+<span class="fc" id="L159">        return new TraceBindingModel(List.copyOf(distinct.values()), work.used,</span>
+            maximumTemplates, work.maximum, maximumMatchingWork);
+    }
+
+    private static Set&lt;String&gt; placeholderNames(RulePatternNode root, FormationWork work) {
+<span class="fc" id="L164">        var names = new TreeSet&lt;String&gt;();</span>
+<span class="fc" id="L165">        var pending = new java.util.ArrayDeque&lt;RulePatternNode&gt;();</span>
+<span class="fc" id="L166">        pending.push(root);</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L168">            work.charge();</span>
+<span class="fc" id="L169">            var node = pending.pop();</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            if (node instanceof PatternVariable variable) names.add(variable.name());</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            else if (node instanceof PatternBinary binary) {</span>
+<span class="fc" id="L172">                pending.push(binary.right());</span>
+<span class="fc" id="L173">                pending.push(binary.left());</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            } else if (node instanceof PatternFunction function) {</span>
+<span class="nc" id="L175">                function.arguments().forEach(pending::push);</span>
+            }
+<span class="fc" id="L177">        }</span>
+<span class="fc" id="L178">        return names;</span>
+    }
+
+<span class="fc" id="L181">    private record ExpressionPair(Expr left, Expr right) {}</span>
+
+    private static RulePatternNode generalize(Expr left, Expr right,
+            Map&lt;ExpressionPair, PatternVariable&gt; pairs, Map&lt;NumberExpr, PatternVariable&gt; literals,
+            FormationWork work, int depth) {
+<span class="fc" id="L186">        work.charge();</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (depth &gt; 64) throw new IllegalArgumentException(&quot;binding template depth limit exceeded&quot;);</span>
+<span class="fc bfc" id="L188" title="All 6 branches covered.">        if (left instanceof BinaryExpr a &amp;&amp; right instanceof BinaryExpr b &amp;&amp; a.operator() == b.operator()) {</span>
+<span class="fc" id="L189">            return new PatternBinary(generalize(a.left(), b.left(), pairs, literals, work, depth + 1), a.operator(),</span>
+<span class="fc" id="L190">                generalize(a.right(), b.right(), pairs, literals, work, depth + 1));</span>
+        }
+<span class="pc bpc" id="L192" title="5 of 6 branches missed.">        if (left instanceof FunctionExpr a &amp;&amp; right instanceof FunctionExpr b &amp;&amp; a.name().equals(b.name())</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">                &amp;&amp; a.arguments().size() == b.arguments().size()) {</span>
+<span class="nc" id="L194">            var arguments = new ArrayList&lt;RulePatternNode&gt;();</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">            for (int i = 0; i &lt; a.arguments().size(); i++) {</span>
+<span class="nc" id="L196">                arguments.add(generalize(a.arguments().get(i), b.arguments().get(i), pairs, literals, work, depth + 1));</span>
+            }
+<span class="nc" id="L198">            return new PatternFunction(a.name(), arguments);</span>
+        }
+<span class="fc bfc" id="L200" title="All 4 branches covered.">        if (left instanceof NumberExpr number &amp;&amp; left.equals(right)) {</span>
+<span class="fc bfc" id="L201" title="All 4 branches covered.">            if (number.value().isInteger() &amp;&amp; number.value().numerator().bitLength() &lt; 32) {</span>
+<span class="fc" id="L202">                return new PatternNumber(number.value().intValueExact());</span>
+            }
+            // PatternNumber has an int payload. Preserve all other exact literals using
+            // immutable matcher seed bindings, not unconstrained anti-unification variables.
+<span class="fc" id="L206">            return literals.computeIfAbsent(number, ignored -&gt; new PatternVariable(&quot;K&quot; + literals.size()));</span>
+        }
+<span class="fc" id="L208">        var key = new ExpressionPair(left, right);</span>
+<span class="fc" id="L209">        return pairs.computeIfAbsent(key, ignored -&gt; new PatternVariable(&quot;P&quot; + pairs.size()));</span>
+    }
+
+<span class="fc" id="L212">    List&lt;Template&gt; templates() { return templates; }</span>
+<span class="fc" id="L213">    long formationWork() { return formationWork; }</span>
+<span class="fc" id="L214">    String toCanonicalJson() { return json; }</span>
+<span class="fc" id="L215">    String contentHash() { return hash; }</span>
+<span class="fc" id="L216">    Session session() { return new Session(); }</span>
+
+    /** A single allowance covers every template, prefix and completed path in one expansion. */
+<span class="fc" id="L219">    final class Session {</span>
+<span class="fc" id="L220">        private final RulePatternMatcher matcher = new RulePatternMatcher();</span>
+        private long work;
+        private boolean exhausted;
+
+        List&lt;Template&gt; matching(List&lt;String&gt; sequence, List&lt;Expr&gt; states) {
+<span class="fc" id="L225">            var matching = new ArrayList&lt;Template&gt;();</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">            for (var template : templates) {</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">                if (!charge()) break;</span>
+<span class="fc bfc" id="L228" title="All 4 branches covered.">                if (template.sequence().equals(sequence) &amp;&amp; matches(template, states)) matching.add(template);</span>
+<span class="fc" id="L229">            }</span>
+<span class="fc" id="L230">            return List.copyOf(matching);</span>
+        }
+
+        boolean matches(Template template, List&lt;Expr&gt; states) {
+<span class="fc bfc" id="L234" title="All 2 branches covered.">            if (!charge()) return false;</span>
+<span class="pc bpc" id="L235" title="2 of 4 branches missed.">            if (states.size() &lt; 2 || states.size() &gt; template.patterns().size()) return false;</span>
+<span class="fc" id="L236">            var steps = new ArrayList&lt;RulePatternMatcher.MatchStep&gt;();</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">            for (int i = 0; i &lt; states.size(); i++) {</span>
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">                if (!charge()) return false;</span>
+<span class="fc" id="L239">                steps.add(new RulePatternMatcher.MatchStep(template.patterns().get(i), states.get(i)));</span>
+            }
+<span class="fc" id="L241">            long remaining = maximumMatchingWork - work;</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">            if (remaining == 0) { exhausted = true; return false; }</span>
+            // Re-search all constraints: a prefix's first substitution must not lock later choices.
+<span class="fc" id="L244">            var result = matcher.matchSequence(steps, template.fixedBindings(), remaining);</span>
+<span class="fc" id="L245">            work += result.workUnits();</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">            exhausted |= result.status() == RulePatternMatcher.MatchStatus.BUDGET_EXHAUSTED;</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">            return result.status() == RulePatternMatcher.MatchStatus.MATCH;</span>
+        }
+
+<span class="fc" id="L250">        long workUnits() { return work; }</span>
+<span class="fc" id="L251">        boolean exhausted() { return exhausted; }</span>
+<span class="fc" id="L252">        boolean inspect() { return charge(); }</span>
+        private boolean charge() {
+<span class="fc bfc" id="L254" title="All 2 branches covered.">            if (work == maximumMatchingWork) { exhausted = true; return false; }</span>
+<span class="fc" id="L255">            work++;</span>
+<span class="fc" id="L256">            return true;</span>
+        }
+    }
+
+    static final class FormationWork {
+        private final long maximum;
+        private long used;
+<span class="fc" id="L263">        FormationWork(long maximum) {</span>
+<span class="pc bpc" id="L264" title="2 of 4 branches missed.">            if (maximum &lt; 1 || maximum &gt; 1_000_000) throw new IllegalArgumentException(&quot;invalid binding formation work&quot;);</span>
+<span class="fc" id="L265">            this.maximum = maximum;</span>
+<span class="fc" id="L266">        }</span>
+        void charge() {
+<span class="fc bfc" id="L268" title="All 2 branches covered.">            if (used == maximum) throw new IllegalArgumentException(&quot;binding formation work limit exceeded&quot;);</span>
+<span class="fc" id="L269">            used++;</span>
+<span class="fc" id="L270">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

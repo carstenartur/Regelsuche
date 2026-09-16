@@ -113,7 +113,7 @@ final class RulePatternBindingSearch {
 
     private Frame repeatedAssociative(PatternBinary pattern, BinaryExpr expression, Frame frame) {
 <span class="fc" id="L115">        var operands = flattenPattern(pattern, pattern.op());</span>
-<span class="pc bpc" id="L116" title="1 of 4 branches missed.">        if (operands.size() &lt; 3 || !(operands.getFirst() instanceof PatternVariable repeated)) {</span>
+<span class="fc bfc" id="L116" title="All 4 branches covered.">        if (operands.size() &lt; 3 || !(operands.getFirst() instanceof PatternVariable repeated)) {</span>
 <span class="fc" id="L117">            return null;</span>
         }
 <span class="fc bfc" id="L119" title="All 2 branches covered.">        for (var operand : operands) {</span>
