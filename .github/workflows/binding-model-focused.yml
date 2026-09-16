@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: f5a5432e02012a59f92352faaeb9a4231f290cb3
+          ref: e721861a6cf1d7b202fb375772569ec382652e99
           persist-credentials: false
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
         with:
@@ -23,25 +23,11 @@ jobs:
           git rev-parse HEAD
           java -version
           mvn --batch-mode --no-transfer-progress -Pfull -pl regelsuche-learning -am test
-      - name: Retain tracked source and compiled classes for offline regression investigation
-        run: |
-          mkdir -p binding-investigation
-          git rev-parse HEAD > binding-investigation/source-commit.txt
-          git archive --format=tar.gz HEAD > binding-investigation/source.tar.gz
-          find regelsuche-* -type d \( -path '*/target/classes' -o -path '*/target/test-classes' \) -print0 | tar --null -T - -czf binding-investigation/classes.tar.gz
-          sha256sum binding-investigation/*.tar.gz > binding-investigation/SHA256SUMS
       - name: Retain actual test reports, including failures
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: binding-model-focused
           path: '**/target/surefire-reports/**'
-          if-no-files-found: error
-          retention-days: 7
-      - name: Upload source-pinned investigation workspace
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: binding-transport-workspace
-          path: binding-investigation/
           if-no-files-found: error
           retention-days: 7
