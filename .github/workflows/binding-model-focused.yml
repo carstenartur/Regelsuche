@@ -1,0 +1,33 @@
+name: Source-pinned binding model regression checks
+on:
+  push:
+    branches: [qa/binding-model-integrity-20260916]
+permissions:
+  contents: read
+jobs:
+  learning-module:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 4c7c095d9a44fa18cd143218b408587e15959ccc
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Compile and test the complete learning module and its dependencies
+        run: |
+          git rev-parse HEAD
+          java -version
+          mvn --batch-mode --no-transfer-progress -Pfull -pl regelsuche-learning -am test
+      - name: Retain actual test reports, including failures
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: binding-model-focused
+          path: '**/target/surefire-reports/**'
+          if-no-files-found: error
+          retention-days: 7
