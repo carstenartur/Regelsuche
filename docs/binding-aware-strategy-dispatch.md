@@ -70,11 +70,13 @@ are outside this logical ledger. These are not walltime/CPU or memory quotas.
 
 ## Current development evidence (not a held-out benchmark)
 
-Local Java-25 source compilation and 77 JUnit tests pass, including all 16 new
+Local Java-25 source compilation and 78 JUnit tests pass, including all 17 new
 model/dispatch methods, historical dispatch/transfer examples, scoped matcher
 tests, primitive minimality checks and compiled-engine replay. The new feature
 tests were exercised against compiling no-feature scaffolds first. A separate
-regression demonstrates rejection of later unbound placeholders.
+regression demonstrates rejection of later unbound placeholders. An additional
+real-primitive occurrence test rejects a valid suffix that changes the bound
+residual; deliberately bypassing full-path matching makes that test fail.
 
 On the unchanged eight selection-TRAIN inputs, the model forms **one template**.
 Binding formation costs **376 logical units**. The flat baseline costs **235**;
