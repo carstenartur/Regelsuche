@@ -4,8 +4,6 @@ import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
-import de.regelsuche.parse.ExpressionFormatter;
-import de.regelsuche.parse.ExpressionParser;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Objects;
@@ -40,17 +38,16 @@ public final class AstRewriteTransport {
         engine = new PreparedAstRewriteTransformationEngine(rules, maximumGrowth, maximumCandidates);
     }
 
+    /** Generate with actual producer ASTs. Neither source nor result is formatted and reparsed here. */
     public List<Step> generate(Expr source) {
-        requireBounded(source);
-        // Test-first scaffold: deliberately exercise the existing lossy string boundary.
-        var parser = new ExpressionParser();
-        return engine.transform(ExpressionFormatter.format(source)).stream().map(step -> new Step(source,
-            parser.parseTerm(step.transformedExpression()), step.rule(), step.kind(), step.mayIncreaseComplexity(),
-            step.estimatedCostDelta(), step.equivalencePreservingByConstruction(), step.assumptions(),
-            step.packId(), step.license())).toList();
+        return engine.transformAst(source);
     }
 
-    /** Regenerate each primitive step under this engine's rules and bounds, checking all retained metadata. */
+    /**
+     * Regenerate each primitive under this engine's rules and bounds, checking all retained metadata.
+     * This proves replay relative to those rules, not the validity of arbitrary user-supplied rules
+     * or the truth of their retained side conditions.
+     */
     public Expr replay(Expr source, List<Step> steps) {
         requireBounded(source);
         Objects.requireNonNull(steps, "steps");

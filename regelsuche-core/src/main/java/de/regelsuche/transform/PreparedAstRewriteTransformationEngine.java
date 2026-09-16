@@ -149,15 +149,39 @@ public final class PreparedAstRewriteTransformationEngine
         return new ArrayList<>(transformations);
     }
 
+    /** Typed sibling of the historical string path; called only by the opt-in transport. */
+    List<AstRewriteTransport.Step> transformAst(Expr root) {
+        AstRewriteTransport.requireBounded(root);
+        int originalSize = canonicalAstNodeCount(root);
+        Set<AstRewriteTransport.Step> steps = new LinkedHashSet<>();
+        for (RewriteResult result : rewriteEverywhere(root, false)) {
+            AstRewriteTransport.requireBounded(result.expression());
+            if (root.equals(result.expression())
+                    || canonicalAstNodeCount(result.expression()) - originalSize > maxAstSizeIncreasePerStep) continue;
+            var rule = result.rule();
+            steps.add(new AstRewriteTransport.Step(root, result.expression(), rule.id(), rule.kind(),
+                rule.mayIncreaseComplexity(), rule.estimatedCostDelta(), rule.isEquivalencePreservingByConstruction(),
+                result.assumptions().stream().map(Assumption::expression).toList(),
+                rule.descriptor().packId(), rule.descriptor().license()));
+            if (steps.size() >= maxCandidatesPerState) break;
+        }
+        return List.copyOf(steps);
+    }
+
     private List<RewriteResult> rewriteEverywhere(Expr subtree) {
+        return rewriteEverywhere(subtree, true);
+    }
+
+    private List<RewriteResult> rewriteEverywhere(Expr subtree, boolean retainLegacyHash) {
         List<RewriteResult> results = new ArrayList<>();
         String subtreeHash = null;
         for (RewriteRule rule : rules) {
             Expr rewritten = applyIfMatched(rule, subtree);
+            if (!retainLegacyHash && rewritten != null) AstRewriteTransport.requireBounded(rewritten);
             if (rewritten == null || rewritten.equals(subtree)) {
                 continue;
             }
-            if (subtreeHash == null) {
+            if (retainLegacyHash && subtreeHash == null) {
                 subtreeHash = stableHash(subtree);
             }
             results.add(new RewriteResult(
@@ -170,7 +194,7 @@ public final class PreparedAstRewriteTransformationEngine
 
         if (subtree instanceof BinaryExpr binaryExpr) {
             for (RewriteResult leftRewrite :
-                    rewriteEverywhere(binaryExpr.left())) {
+                    rewriteEverywhere(binaryExpr.left(), retainLegacyHash)) {
                 results.add(new RewriteResult(
                     leftRewrite.rule(),
                     new BinaryExpr(
@@ -183,7 +207,7 @@ public final class PreparedAstRewriteTransformationEngine
                 ));
             }
             for (RewriteResult rightRewrite :
-                    rewriteEverywhere(binaryExpr.right())) {
+                    rewriteEverywhere(binaryExpr.right(), retainLegacyHash)) {
                 results.add(new RewriteResult(
                     rightRewrite.rule(),
                     new BinaryExpr(
@@ -200,7 +224,7 @@ public final class PreparedAstRewriteTransformationEngine
             for (int index = 0; index < arguments.size(); index++) {
                 final int position = index;
                 for (RewriteResult argumentRewrite :
-                        rewriteEverywhere(arguments.get(index))) {
+                        rewriteEverywhere(arguments.get(index), retainLegacyHash)) {
                     List<Expr> replaced = new ArrayList<>(arguments);
                     replaced.set(position, argumentRewrite.expression());
                     results.add(new RewriteResult(
