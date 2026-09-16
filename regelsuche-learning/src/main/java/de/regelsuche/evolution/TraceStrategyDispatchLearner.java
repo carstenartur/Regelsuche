@@ -36,6 +36,7 @@ import java.util.TreeSet;
  */
 public final class TraceStrategyDispatchLearner {
     public static final String REVISION = "regelsuche.trace-strategy-dispatch/v1";
+    public static final String BINDING_REVISION = "regelsuche.trace-strategy-dispatch/v2";
     public enum Profile { FLAT_EXHAUSTIVE, FLAT_GREEDY, LEARNED_DISPATCH, UNGATED_CONTINUATIONS }
     private static final ExpressionScorer SCORER = new ExpressionScorer();
     private static final Comparator<Transformation> ORDER = Comparator
@@ -53,6 +54,13 @@ public final class TraceStrategyDispatchLearner {
                     || budget.maxCandidatesPerState() > 128 || budget.maxWorkUnits() > 1_000_000) {
                 throw new IllegalArgumentException("invalid dispatch training limits");
             }
+        }
+    }
+
+    /** Opt-in formation and per-expansion applicability limits; not a CPU quota. */
+    public record BindingLimits(int maximumTemplates, long maximumFormationWork, long maximumMatchingWorkPerExpansion) {
+        public BindingLimits {
+            TraceBindingModel.requireLimits(maximumTemplates, maximumFormationWork, maximumMatchingWorkPerExpansion);
         }
     }
 
@@ -86,17 +94,22 @@ public final class TraceStrategyDispatchLearner {
         private final List<String> exclusions;
         private final long contextCollectionWork;
         private final String json;
+        private final TraceBindingModel bindings;
 
         private FrozenPolicy(FrozenStrategy formation, Limits limits, List<Route> routes, List<Trial> trials,
-                Set<String> exclusions, long contextCollectionWork) {
+                Set<String> exclusions, long contextCollectionWork, TraceBindingModel bindings) {
             this.formation = formation;
             this.limits = limits;
             this.routes = List.copyOf(routes);
             this.trials = List.copyOf(trials);
             this.exclusions = exclusions.stream().sorted().toList();
             this.contextCollectionWork = contextCollectionWork;
+            this.bindings = bindings;
             this.json = render();
         }
+        public boolean bindingAware() { return bindings != null; }
+        public int bindingTemplateCount() { return bindings == null ? 0 : bindings.templates().size(); }
+        public long bindingFormationWork() { return bindings == null ? 0 : bindings.formationWork(); }
         public FrozenStrategy formation() { return formation; }
         public Limits limits() { return limits; }
         public List<Route> routes() { return routes; }
@@ -104,7 +117,8 @@ public final class TraceStrategyDispatchLearner {
         public List<String> exclusions() { return exclusions; }
         public long contextCollectionWork() { return contextCollectionWork; }
         public long dispatchLearningWork() {
-            return Math.addExact(contextCollectionWork, trials.stream().mapToLong(Trial::measuredWork).reduce(0, Math::addExact));
+            return Math.addExact(bindingFormationWork(), Math.addExact(contextCollectionWork,
+                trials.stream().mapToLong(Trial::measuredWork).reduce(0, Math::addExact)));
         }
         public long formationWork() {
             return Math.addExact(Math.addExact(Math.addExact(formation.trainingSearchWorkUnits(), formation.trainingReplayWorkUnits()),
@@ -115,12 +129,15 @@ public final class TraceStrategyDispatchLearner {
         public String contentHash() { return SchematicProofPlan.hash(json); }
 
         private String render() {
-            return new JsonWriter().beginObject().property("schema", REVISION)
+            var writer = new JsonWriter().beginObject().property("schema", bindingAware() ? BINDING_REVISION : REVISION)
                 .property("formationHash", formation.contentHash()).property("authority", "EXPERIMENTAL_NO_PROMOTION")
                 .property("policy", "ONE_SUCCESSOR;MEASURED_TRAIN_ROUTE_ADDITION;NONINFERIOR_SCORE_AND_STRICT_WORK_REDUCTION")
-                .property("context", "AVAILABLE_PRIMITIVE_GENE_BITSET_FROM_EXISTING_BATCH")
+                .property("context", bindingAware() ? "AVAILABLE_PRIMITIVE_GENE_BITSET_AND_SHARED_TRAIN_TRAJECTORY_BINDINGS"
+                    : "AVAILABLE_PRIMITIVE_GENE_BITSET_FROM_EXISTING_BATCH")
                 .property("continuationBackend", CompiledLinearRewriteEngine.REVISION)
-                .property("workScope", "SEARCH_MECHANICS_PLUS_EXACT_AUDIT_CALLS;EXCLUDES_COMPLETE_CPU_AND_IDENTITY_WORK")
+                .property("workScope", bindingAware()
+                    ? "SEARCH_MECHANICS_PLUS_BINDING_NODES_AND_EXACT_AUDIT_CALLS;EXCLUDES_PARSER_HASH_ALLOCATION_EQUALITY_INTERNALS_AND_NUMERIC_BIT_COST"
+                    : "SEARCH_MECHANICS_PLUS_EXACT_AUDIT_CALLS;EXCLUDES_COMPLETE_CPU_AND_IDENTITY_WORK")
                 .object("limits", value -> writeLimits(value, limits))
                 .property("formationWork", formationWork()).property("contextCollectionWork", contextCollectionWork)
                 .property("dispatchLearningWork", dispatchLearningWork()).property("learningWork", learningWork())
@@ -128,12 +145,22 @@ public final class TraceStrategyDispatchLearner {
                 .array("trials", values -> trials.forEach(trial -> values.objectValue(value -> value
                     .property("id", trial.id()).property("accepted", trial.accepted()).property("measuredWork", trial.measuredWork())
                     .stringArray("routes", trial.routes().stream().map(Route::id).toList())
-                    .stringArray("observations", trial.observations().stream().map(Observation::toCanonicalJson).toList()))))
-                .endObject().toString();
+                    .stringArray("observations", trial.observations().stream().map(Observation::toCanonicalJson).toList()))));
+            if (bindings != null) writer.property("bindingModel", bindings.toCanonicalJson());
+            return writer.endObject().toString();
         }
     }
 
     public FrozenPolicy train(FrozenStrategy formation, List<Input> inputs, Limits limits) {
+        return train(formation, inputs, limits, null);
+    }
+
+    /** Separate experimental version: the historical train method and all profile names are unchanged. */
+    public FrozenPolicy trainBindingAware(FrozenStrategy formation, List<Input> inputs, Limits limits, BindingLimits bindings) {
+        return train(formation, inputs, limits, Objects.requireNonNull(bindings, "bindings"));
+    }
+
+    private FrozenPolicy train(FrozenStrategy formation, List<Input> inputs, Limits limits, BindingLimits bindingLimits) {
         Objects.requireNonNull(formation, "formation");
         Objects.requireNonNull(limits, "limits");
         if (limits.budget().maxPrimitiveSteps() > formation.limits().maximumTraceSteps()) {
@@ -153,12 +180,14 @@ public final class TraceStrategyDispatchLearner {
         }
         var executable = new Executable(formation);
         var baseline = observe(executable, ordered, limits.budget(), List.of(), Profile.FLAT_GREEDY);
+        TraceBindingModel bindings = bindingLimits == null ? null : TraceBindingDispatch.learn(formation, baseline, bindingLimits);
+        if (bindings != null) executable = new Executable(formation, bindings);
         var contexts = collectContexts(executable, baseline, limits.maximumContexts());
         var selection = selectRoutes(executable, ordered, limits, baseline, contexts.masks());
         for (var trial : selection.trials()) for (var observation : trial.observations()) {
             for (var state : observation.search().exploredStates()) exclusions.add(exact.alphaIdentity(state.expression()));
         }
-        return new FrozenPolicy(formation, limits, selection.routes(), selection.trials(), exclusions, contexts.work());
+        return new FrozenPolicy(formation, limits, selection.routes(), selection.trials(), exclusions, contexts.work(), bindings);
     }
 
     private record ContextCollection(List<Long> masks, long work) {}
@@ -219,7 +248,7 @@ public final class TraceStrategyDispatchLearner {
     public PreparedPolicy prepare(FrozenPolicy policy, Profile profile) {
         Objects.requireNonNull(policy, "policy");
         Objects.requireNonNull(profile, "profile");
-        return new PreparedPolicy(policy, new Executable(policy.formation()).engine(policy.routes(), profile));
+        return new PreparedPolicy(policy, new Executable(policy.formation(), policy.bindings).engine(policy.routes(), profile));
     }
 
     public static final class PreparedPolicy {
@@ -238,7 +267,7 @@ public final class TraceStrategyDispatchLearner {
     }
 
     static MeasuredTransformationEngine engine(FrozenPolicy policy, Profile profile) {
-        return new Executable(policy.formation()).engine(policy.routes(), profile);
+        return new Executable(policy.formation(), policy.bindings).engine(policy.routes(), profile);
     }
 
     private static List<Observation> observe(Executable executable, List<Input> inputs, Budget budget,
@@ -266,7 +295,10 @@ public final class TraceStrategyDispatchLearner {
         private final Map<String, Long> bits = new TreeMap<>();
         private final List<Continuation> continuations = new ArrayList<>();
 
-        private Executable(FrozenStrategy strategy) {
+        private final TraceBindingModel bindings;
+        private Executable(FrozenStrategy strategy) { this(strategy, null); }
+        private Executable(FrozenStrategy strategy, TraceBindingModel bindings) {
+            this.bindings = bindings;
             var inventory = strategy.inventory();
             var rules = new EvolutionGenomeCompiler().compile(inventory).rules();
             flat = MeasuredTransformationEngines.counting(AstRewriteTransformationEngines.production(rules,
@@ -305,6 +337,7 @@ public final class TraceStrategyDispatchLearner {
                 var primitives = batch.transformations();
                 if (primitives.isEmpty()) return batch;
                 var work = batch.workMetrics();
+                var bindingDispatch = bindings == null ? null : new TraceBindingDispatch(bindings);
                 List<Transformation> resumed = new ArrayList<>();
                 List<Continuation> enabled = List.of();
                 if (profile == Profile.UNGATED_CONTINUATIONS) enabled = continuations;
@@ -319,15 +352,22 @@ public final class TraceStrategyDispatchLearner {
                     for (var primitive : primitives) {
                         work = work.plus(events(1, 0, 0, 0));
                         if (!primitive.rule().equals(continuation.firstRule())) continue;
+                        var bindingAttempt = bindingDispatch == null ? null : bindingDispatch.begin(
+                            continuation.sequence(), expression, primitive);
+                        if (bindingAttempt != null && !bindingAttempt.eligible()) continue;
                         var suffixes = continuation.tail().transformMeasured(primitive.transformedExpression());
                         work = work.plus(suffixes.workMetrics());
                         for (var suffix : suffixes.transformations()) {
-                            var path = new RewriteCandidate("learned-resumption", expression, suffix.transformedExpression(), List.of(primitive, suffix));
+                            if (bindingAttempt != null && !bindingAttempt.accepts(suffix)) continue;
+                            String origin = bindings == null ? "learned-resumption" : "bound-resumption-" + bindings.contentHash();
+                            var path = new RewriteCandidate(origin, expression, suffix.transformedExpression(), List.of(primitive, suffix));
                             resumed.add(path.toTransformation());
                             work = work.plus(events(0, 0, 0, 1));
                         }
                     }
                 }
+                if (bindingDispatch != null) work = work.plus(
+                    TransformationWorkMetrics.ZERO.withDelegatedMechanicalWork(bindingDispatch.workUnits()));
                 // A learned route commits to its resumed paths. Primitive siblings
                 // remain the fallback when no complete, budget-fitting continuation exists.
                 var candidates = resumed.isEmpty() ? new ArrayList<>(primitives) : resumed;
