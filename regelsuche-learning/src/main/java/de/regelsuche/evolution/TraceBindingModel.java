@@ -9,10 +9,8 @@ import de.regelsuche.mining.PatternBinary;
 import de.regelsuche.mining.PatternFunction;
 import de.regelsuche.mining.PatternNumber;
 import de.regelsuche.mining.PatternVariable;
-import de.regelsuche.mining.RulePatternInstantiator;
 import de.regelsuche.mining.RulePatternMatcher;
 import de.regelsuche.mining.RulePatternNode;
-import de.regelsuche.parse.ExpressionFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -24,7 +22,7 @@ import java.util.TreeSet;
 
 /** TRAIN-only trajectory abstraction. Templates constrain applicability, never authorize a rewrite. */
 final class TraceBindingModel {
-    static final String REVISION = "regelsuche.trace-binding-model/v1";
+    static final String REVISION = "regelsuche.trace-binding-model/v2";
 
     record Trace(String id, List<String> sequence, List<Expr> states) {
         Trace {
@@ -37,24 +35,36 @@ final class TraceBindingModel {
         }
         String evidenceHash() {
             return SchematicProofPlan.hash(new JsonWriter().beginObject().property("id", id)
-                .stringArray("sequence", sequence)
-                .stringArray("states", states.stream().map(ExpressionFormatter::format).toList()).endObject().toString());
+                .property("identityEncoding", TraceBindingIdentity.REVISION).stringArray("sequence", sequence)
+                .stringArray("states", states.stream().map(TraceBindingIdentity::expression).toList()).endObject().toString());
         }
     }
 
     record Template(List<String> sequence, List<RulePatternNode> patterns,
-            List<String> trainingIds, List<String> trainingHashes) {
+            List<String> trainingIds, List<String> trainingHashes, Map<String, Expr> fixedBindings) {
+        Template(List<String> sequence, List<RulePatternNode> patterns,
+                List<String> trainingIds, List<String> trainingHashes) {
+            this(sequence, patterns, trainingIds, trainingHashes, Map.of());
+        }
         Template {
             sequence = List.copyOf(sequence);
             patterns = List.copyOf(patterns);
             trainingIds = List.copyOf(trainingIds);
             trainingHashes = List.copyOf(trainingHashes);
+            fixedBindings = Map.copyOf(fixedBindings);
+            for (var entry : fixedBindings.entrySet()) {
+                if (entry.getKey().isBlank() || !(entry.getValue() instanceof NumberExpr)) {
+                    throw new IllegalArgumentException("fixed template bindings must be exact numeric literals");
+                }
+            }
         }
         String structuralJson() {
-            var instantiator = new RulePatternInstantiator();
-            return new JsonWriter().beginObject().stringArray("sequence", sequence)
-                .stringArray("states", patterns.stream().map(node ->
-                    ExpressionFormatter.format(instantiator.instantiate(node, Map.of()))).toList())
+            return new JsonWriter().beginObject().property("identityEncoding", TraceBindingIdentity.REVISION)
+                .stringArray("sequence", sequence)
+                .stringArray("states", patterns.stream().map(TraceBindingIdentity::pattern).toList())
+                .array("fixedBindings", array -> new TreeMap<>(fixedBindings).forEach((name, literal) ->
+                    array.objectValue(value -> value.property("name", name)
+                        .property("value", TraceBindingIdentity.expression(literal)))))
                 .endObject().toString();
         }
     }
@@ -111,19 +121,27 @@ final class TraceBindingModel {
                 if (!admitted.contains(left.sequence()) || !left.sequence().equals(right.sequence())) continue;
                 // ONE environment for ALL state pairs is the cross-step binding contract.
                 var pairs = new HashMap<ExpressionPair, PatternVariable>();
+                var literals = new HashMap<NumberExpr, PatternVariable>();
                 var patterns = new ArrayList<RulePatternNode>();
                 for (int k = 0; k < left.states().size(); k++) {
-                    patterns.add(generalize(left.states().get(k), right.states().get(k), pairs, work, 0));
+                    patterns.add(generalize(left.states().get(k), right.states().get(k), pairs, literals, work, 0));
                 }
                 if (patterns.getFirst() instanceof PatternVariable || pairs.isEmpty()) continue;
+                var fixedBindings = new TreeMap<String, Expr>();
+                literals.forEach((literal, variable) -> {
+                    work.charge();
+                    fixedBindings.put(variable.name(), literal);
+                });
                 var initialNames = placeholderNames(patterns.getFirst(), work);
+                // Known literal slots are bound even if their first occurrence is in a later state.
+                initialNames.addAll(fixedBindings.keySet());
                 boolean closed = true;
                 for (int k = 1; k < patterns.size(); k++) {
                     closed &= initialNames.containsAll(placeholderNames(patterns.get(k), work));
                 }
                 if (!closed) continue;
                 var candidate = new Template(left.sequence(), patterns,
-                    List.of(left.id(), right.id()), List.of(left.evidenceHash(), right.evidenceHash()));
+                    List.of(left.id(), right.id()), List.of(left.evidenceHash(), right.evidenceHash()), fixedBindings);
                 String key = candidate.structuralJson();
                 var previous = distinct.get(key);
                 if (previous != null) {
@@ -132,7 +150,7 @@ final class TraceBindingModel {
                     var hashes = new TreeSet<>(previous.trainingHashes());
                     hashes.addAll(candidate.trainingHashes());
                     candidate = new Template(candidate.sequence(), candidate.patterns(),
-                        List.copyOf(ids), List.copyOf(hashes));
+                        List.copyOf(ids), List.copyOf(hashes), candidate.fixedBindings());
                 }
                 distinct.put(key, candidate);
                 if (distinct.size() > maximumTemplates) throw new IllegalArgumentException("binding template limit exceeded");
@@ -163,24 +181,29 @@ final class TraceBindingModel {
     private record ExpressionPair(Expr left, Expr right) {}
 
     private static RulePatternNode generalize(Expr left, Expr right,
-            Map<ExpressionPair, PatternVariable> pairs, FormationWork work, int depth) {
+            Map<ExpressionPair, PatternVariable> pairs, Map<NumberExpr, PatternVariable> literals,
+            FormationWork work, int depth) {
         work.charge();
         if (depth > 64) throw new IllegalArgumentException("binding template depth limit exceeded");
         if (left instanceof BinaryExpr a && right instanceof BinaryExpr b && a.operator() == b.operator()) {
-            return new PatternBinary(generalize(a.left(), b.left(), pairs, work, depth + 1), a.operator(),
-                generalize(a.right(), b.right(), pairs, work, depth + 1));
+            return new PatternBinary(generalize(a.left(), b.left(), pairs, literals, work, depth + 1), a.operator(),
+                generalize(a.right(), b.right(), pairs, literals, work, depth + 1));
         }
         if (left instanceof FunctionExpr a && right instanceof FunctionExpr b && a.name().equals(b.name())
                 && a.arguments().size() == b.arguments().size()) {
             var arguments = new ArrayList<RulePatternNode>();
             for (int i = 0; i < a.arguments().size(); i++) {
-                arguments.add(generalize(a.arguments().get(i), b.arguments().get(i), pairs, work, depth + 1));
+                arguments.add(generalize(a.arguments().get(i), b.arguments().get(i), pairs, literals, work, depth + 1));
             }
             return new PatternFunction(a.name(), arguments);
         }
-        if (left instanceof NumberExpr a && left.equals(right) && a.value().isInteger()
-                && a.value().numerator().bitLength() < 32) {
-            return new PatternNumber(a.value().intValueExact());
+        if (left instanceof NumberExpr number && left.equals(right)) {
+            if (number.value().isInteger() && number.value().numerator().bitLength() < 32) {
+                return new PatternNumber(number.value().intValueExact());
+            }
+            // PatternNumber has an int payload. Preserve all other exact literals using
+            // immutable matcher seed bindings, not unconstrained anti-unification variables.
+            return literals.computeIfAbsent(number, ignored -> new PatternVariable("K" + literals.size()));
         }
         var key = new ExpressionPair(left, right);
         return pairs.computeIfAbsent(key, ignored -> new PatternVariable("P" + pairs.size()));
@@ -218,7 +241,7 @@ final class TraceBindingModel {
             long remaining = maximumMatchingWork - work;
             if (remaining == 0) { exhausted = true; return false; }
             // Re-search all constraints: a prefix's first substitution must not lock later choices.
-            var result = matcher.matchSequence(steps, Map.of(), remaining);
+            var result = matcher.matchSequence(steps, template.fixedBindings(), remaining);
             work += result.workUnits();
             exhausted |= result.status() == RulePatternMatcher.MatchStatus.BUDGET_EXHAUSTED;
             return result.status() == RulePatternMatcher.MatchStatus.MATCH;

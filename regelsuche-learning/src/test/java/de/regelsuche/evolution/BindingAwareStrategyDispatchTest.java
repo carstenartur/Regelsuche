@@ -44,7 +44,7 @@ class BindingAwareStrategyDispatchTest {
         assertTrue(bound.bindingTemplateCount() > 0);
         assertTrue(bound.bindingFormationWork() > 0);
         assertTrue(bound.toCanonicalJson().contains("regelsuche.trace-strategy-dispatch/v2"));
-        assertTrue(bound.toCanonicalJson().contains("regelsuche.trace-binding-model/v1"));
+        assertTrue(bound.toCanonicalJson().contains("regelsuche.trace-binding-model/v2"));
         assertNotEquals(historical.contentHash(), bound.contentHash());
         var altered = LEARNER.trainBindingAware(historical.formation(), TraceStrategyDispatchExample.selectionInputs(),
             historical.limits(), new BindingLimits(32, 100_000, 20_001));
