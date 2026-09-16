@@ -1,172 +1,94 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RulePatternMatcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">RulePatternMatcher.java</span></div><h1>RulePatternMatcher.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
 
-import de.regelsuche.ast.BinaryExpr;
-import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
-import de.regelsuche.ast.FunctionExpr;
-import de.regelsuche.ast.NumberExpr;
-import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.parse.ExpressionParser;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Objects;
+import java.util.Optional;
 
-/** Structural matcher for learned macro-rule source patterns. */
-<span class="fc" id="L18">public class RulePatternMatcher {</span>
-<span class="fc" id="L19">    private final RulePatternParser patternParser = new RulePatternParser();</span>
-<span class="fc" id="L20">    private final ExpressionParser expressionParser = new ExpressionParser();</span>
+/** Structural applicability matching; a binding is not a mathematical proof. */
+<span class="fc" id="L11">public class RulePatternMatcher {</span>
+    public static final String SEQUENCE_REVISION = &quot;regelsuche.rule-pattern-sequence/v1&quot;;
+    public static final int MAXIMUM_SEQUENCE_STEPS = 64;
 
-    public Optional&lt;Map&lt;String, Expr&gt;&gt; match(String pattern, String expression) {
+<span class="fc" id="L15">    public enum MatchStatus { MATCH, NO_MATCH, BUDGET_EXHAUSTED }</span>
+
+    /** One constraint in a sequence sharing the same placeholder substitution. */
+    public record MatchStep(RulePatternNode pattern, Expr expression) {
+<span class="fc" id="L19">        public MatchStep {</span>
+<span class="fc" id="L20">            Objects.requireNonNull(pattern, &quot;pattern&quot;);</span>
+<span class="fc" id="L21">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L22">        }</span>
+    }
+
+    /** Failed or incomplete searches never expose a partial substitution. */
+    public record MatchResult(MatchStatus status, Map&lt;String, Expr&gt; bindings, long workUnits) {
+<span class="fc" id="L27">        public MatchResult {</span>
+<span class="fc" id="L28">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L29">            bindings = Map.copyOf(bindings);</span>
+<span class="pc bpc" id="L30" title="2 of 6 branches missed.">            if (workUnits &lt; 0 || (status != MatchStatus.MATCH &amp;&amp; !bindings.isEmpty())) {</span>
+<span class="nc" id="L31">                throw new IllegalArgumentException(&quot;invalid matching result&quot;);</span>
+            }
+<span class="fc" id="L33">        }</span>
+    }
+
+<span class="fc" id="L36">    private final RulePatternParser patternParser = new RulePatternParser();</span>
+<span class="fc" id="L37">    private final ExpressionParser expressionParser = new ExpressionParser();</span>
+
+    public Optional&lt;Map&lt;String, Expr&gt;&gt; match(String patternString, String expression) {
         try {
-<span class="fc" id="L24">            RulePatternNode patternNode = patternParser.parse(pattern);</span>
-<span class="fc" id="L25">            return matchExpression(patternNode, expressionParser.parseTerm(expression));</span>
-<span class="nc" id="L26">        } catch (IllegalArgumentException exception) {</span>
-<span class="nc" id="L27">            return Optional.empty();</span>
+<span class="fc" id="L41">            return matchExpression(patternParser.parse(patternString), expressionParser.parseTerm(expression));</span>
+<span class="nc" id="L42">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L43">            return Optional.empty();</span>
         }
     }
 
-    public Optional&lt;Map&lt;String, Expr&gt;&gt; match(RulePatternNode patternNode, String expression) {
+    public Optional&lt;Map&lt;String, Expr&gt;&gt; match(RulePatternNode pattern, String expression) {
         try {
-<span class="fc" id="L33">            return matchExpression(patternNode, expressionParser.parseTerm(expression));</span>
-<span class="nc" id="L34">        } catch (IllegalArgumentException exception) {</span>
-<span class="nc" id="L35">            return Optional.empty();</span>
+<span class="fc" id="L49">            return matchExpression(pattern, expressionParser.parseTerm(expression));</span>
+<span class="fc" id="L50">        } catch (IllegalArgumentException ex) {</span>
+<span class="fc" id="L51">            return Optional.empty();</span>
         }
     }
 
-    /** Matches the actual AST, retaining scoped IDs and the bound subtree objects. */
-    public Optional&lt;Map&lt;String, Expr&gt;&gt; matchExpression(String pattern, Expr expression) {
+    /** Matches an already identity-bound AST without converting it through display text. */
+    public Optional&lt;Map&lt;String, Expr&gt;&gt; matchExpression(String patternString, Expr expression) {
         try {
-<span class="fc" id="L42">            return matchExpression(patternParser.parse(pattern), expression);</span>
-<span class="fc" id="L43">        } catch (IllegalArgumentException exception) {</span>
-<span class="fc" id="L44">            return Optional.empty();</span>
+<span class="fc" id="L58">            return matchExpression(patternParser.parse(patternString), expression);</span>
+<span class="fc" id="L59">        } catch (IllegalArgumentException ex) {</span>
+<span class="fc" id="L60">            return Optional.empty();</span>
         }
     }
 
     public Optional&lt;Map&lt;String, Expr&gt;&gt; matchExpression(RulePatternNode pattern, Expr expression) {
-<span class="fc" id="L49">        Objects.requireNonNull(pattern, &quot;pattern&quot;);</span>
-<span class="fc" id="L50">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
-<span class="fc" id="L51">        Map&lt;String, Expr&gt; bindings = new HashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L52" title="All 2 branches covered.">        return match(pattern, expression, bindings) ? Optional.of(Map.copyOf(bindings)) : Optional.empty();</span>
+<span class="fc" id="L65">        return matchExpression(pattern, expression, Map.of());</span>
     }
 
-    private boolean match(RulePatternNode pattern, Expr expression, Map&lt;String, Expr&gt; bindings) {
-<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (pattern instanceof PatternVariable variable) {</span>
-<span class="fc" id="L57">            Expr existing = bindings.get(variable.name());</span>
-<span class="fc bfc" id="L58" title="All 2 branches covered.">            if (existing == null) {</span>
-<span class="fc" id="L59">                bindings.put(variable.name(), expression);</span>
-<span class="fc" id="L60">                return true;</span>
-            }
-<span class="fc" id="L62">            return existing.equals(expression);</span>
-        }
-<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (pattern instanceof PatternNumber number) {</span>
-<span class="fc bfc" id="L65" title="All 4 branches covered.">            return expression instanceof NumberExpr value &amp;&amp; value.value().equalsInteger(number.value());</span>
-        }
-<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (pattern instanceof PatternFunction function) {</span>
-<span class="nc bnc" id="L68" title="All 2 branches missed.">            if (!(expression instanceof FunctionExpr value)</span>
-<span class="nc bnc" id="L69" title="All 2 branches missed.">                || !function.name().equals(value.name())</span>
-<span class="nc bnc" id="L70" title="All 2 branches missed.">                || function.arguments().size() != value.arguments().size()) {</span>
-<span class="nc" id="L71">                return false;</span>
-            }
-<span class="nc bnc" id="L73" title="All 2 branches missed.">            for (int index = 0; index &lt; function.arguments().size(); index++) {</span>
-<span class="nc bnc" id="L74" title="All 2 branches missed.">                if (!match(function.arguments().get(index), value.arguments().get(index), bindings)) {</span>
-<span class="nc" id="L75">                    return false;</span>
-                }
-            }
-<span class="nc" id="L78">            return true;</span>
-        }
-<span class="fc" id="L80">        PatternBinary binary = (PatternBinary) pattern;</span>
-<span class="pc bpc" id="L81" title="1 of 4 branches missed.">        if (!(expression instanceof BinaryExpr value) || binary.op() != value.operator()) {</span>
-<span class="fc" id="L82">            return false;</span>
-        }
-<span class="fc" id="L84">        Map&lt;String, Expr&gt; direct = new HashMap&lt;&gt;(bindings);</span>
-<span class="fc bfc" id="L85" title="All 4 branches covered.">        if (match(binary.left(), value.left(), direct) &amp;&amp; match(binary.right(), value.right(), direct)) {</span>
-<span class="fc" id="L86">            bindings.clear();</span>
-<span class="fc" id="L87">            bindings.putAll(direct);</span>
-<span class="fc" id="L88">            return true;</span>
-        }
-<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (isCommutative(binary.op())) {</span>
-<span class="fc" id="L91">            Map&lt;String, Expr&gt; swapped = new HashMap&lt;&gt;(bindings);</span>
-<span class="pc bpc" id="L92" title="1 of 4 branches missed.">            if (match(binary.left(), value.right(), swapped) &amp;&amp; match(binary.right(), value.left(), swapped)) {</span>
-<span class="nc" id="L93">                bindings.clear();</span>
-<span class="nc" id="L94">                bindings.putAll(swapped);</span>
-<span class="nc" id="L95">                return true;</span>
-            }
-        }
-<span class="fc bfc" id="L98" title="All 2 branches covered.">        return isAssociative(binary.op())</span>
-<span class="fc bfc" id="L99" title="All 2 branches covered.">            &amp;&amp; matchRepeatedAssociativePlaceholder(binary, value, bindings);</span>
+    /** Initial bindings are constraints, not mutable output parameters. */
+    public Optional&lt;Map&lt;String, Expr&gt;&gt; matchExpression(RulePatternNode pattern, Expr expression,
+            Map&lt;String, Expr&gt; initialBindings) {
+<span class="fc" id="L71">        var result = matchSequence(List.of(new MatchStep(pattern, expression)), initialBindings, Long.MAX_VALUE);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        return result.status() == MatchStatus.MATCH ? Optional.of(result.bindings()) : Optional.empty();</span>
     }
 
-    private boolean matchRepeatedAssociativePlaceholder(
-        PatternBinary pattern,
-        BinaryExpr expression,
-        Map&lt;String, Expr&gt; bindings
-    ) {
-<span class="fc" id="L107">        List&lt;RulePatternNode&gt; patternOperands = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L108">        flattenPattern(pattern, pattern.op(), patternOperands);</span>
-<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (patternOperands.size() &lt; 3) {</span>
-<span class="fc" id="L110">            return false;</span>
+    /**
+     * Searches a bounded sequence with one shared substitution. Later constraints
+     * may reject earlier commutative choices. Work counts constraint construction,
+     * attempted node matches and associative traversal/inspection, including unused
+     * alternatives. Parsing, map-copy allocation, equality internals and numerical
+     * bit complexity are outside this logical work counter.
+     *
+     * &lt;p&gt;NO_MATCH means this existing structural matching relation was exhausted;
+     * it is not an algebraic inequivalence claim. BUDGET_EXHAUSTED is inconclusive.
+     */
+    public MatchResult matchSequence(List&lt;MatchStep&gt; steps, Map&lt;String, Expr&gt; initialBindings,
+            long maximumWorkUnits) {
+<span class="fc" id="L87">        Objects.requireNonNull(steps, &quot;steps&quot;);</span>
+<span class="fc bfc" id="L88" title="All 6 branches covered.">        if (steps.isEmpty() || steps.size() &gt; MAXIMUM_SEQUENCE_STEPS || maximumWorkUnits &lt; 1) {</span>
+<span class="fc" id="L89">            throw new IllegalArgumentException(&quot;require 1 through 64 steps and positive matching work&quot;);</span>
         }
-<span class="fc" id="L112">        PatternVariable repeated = null;</span>
-<span class="fc bfc" id="L113" title="All 2 branches covered.">        for (RulePatternNode operand : patternOperands) {</span>
-<span class="pc bpc" id="L114" title="1 of 2 branches missed.">            if (!(operand instanceof PatternVariable variable)) {</span>
-<span class="nc" id="L115">                return false;</span>
-            }
-<span class="fc bfc" id="L117" title="All 2 branches covered.">            if (repeated == null) {</span>
-<span class="fc" id="L118">                repeated = variable;</span>
-<span class="pc bpc" id="L119" title="1 of 2 branches missed.">            } else if (!repeated.name().equals(variable.name())) {</span>
-<span class="nc" id="L120">                return false;</span>
-            }
-<span class="fc" id="L122">        }</span>
-
-<span class="fc" id="L124">        List&lt;Expr&gt; expressionOperands = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L125">        flattenExpression(expression, pattern.op(), expressionOperands);</span>
-<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (expressionOperands.size() != patternOperands.size()) {</span>
-<span class="fc" id="L127">            return false;</span>
-        }
-<span class="fc" id="L129">        Expr repeatedValue = expressionOperands.getFirst();</span>
-<span class="fc bfc" id="L130" title="All 4 branches covered.">        if (expressionOperands.stream().anyMatch(operand -&gt; !operand.equals(repeatedValue))) {</span>
-<span class="fc" id="L131">            return false;</span>
-        }
-
-<span class="fc" id="L134">        Expr existing = bindings.get(repeated.name());</span>
-<span class="pc bpc" id="L135" title="3 of 4 branches missed.">        if (existing != null &amp;&amp; !existing.equals(repeatedValue)) {</span>
-<span class="nc" id="L136">            return false;</span>
-        }
-<span class="fc" id="L138">        bindings.put(repeated.name(), repeatedValue);</span>
-<span class="fc" id="L139">        return true;</span>
-    }
-
-    private void flattenPattern(
-        RulePatternNode node,
-        BinaryOperator operator,
-        List&lt;RulePatternNode&gt; operands
-    ) {
-<span class="fc bfc" id="L147" title="All 4 branches covered.">        if (node instanceof PatternBinary binary &amp;&amp; binary.op() == operator) {</span>
-<span class="fc" id="L148">            flattenPattern(binary.left(), operator, operands);</span>
-<span class="fc" id="L149">            flattenPattern(binary.right(), operator, operands);</span>
-        } else {
-<span class="fc" id="L151">            operands.add(node);</span>
-        }
-<span class="fc" id="L153">    }</span>
-
-    private void flattenExpression(Expr expression, BinaryOperator operator, List&lt;Expr&gt; operands) {
-<span class="pc bpc" id="L156" title="1 of 4 branches missed.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == operator) {</span>
-<span class="fc" id="L157">            flattenExpression(binary.left(), operator, operands);</span>
-<span class="fc" id="L158">            flattenExpression(binary.right(), operator, operands);</span>
-        } else {
-<span class="fc" id="L160">            operands.add(expression);</span>
-        }
-<span class="fc" id="L162">    }</span>
-
-    private boolean isAssociative(BinaryOperator operator) {
-<span class="fc bfc" id="L165" title="All 4 branches covered.">        return operator == BinaryOperator.ADD || operator == BinaryOperator.MUL;</span>
-    }
-
-    private boolean isCommutative(BinaryOperator operator) {
-<span class="fc bfc" id="L169" title="All 4 branches covered.">        return operator == BinaryOperator.ADD || operator == BinaryOperator.MUL;</span>
+<span class="fc" id="L91">        return new RulePatternBindingSearch(maximumWorkUnits).match(List.copyOf(steps), Map.copyOf(initialBindings));</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

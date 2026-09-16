@@ -26,12 +26,12 @@ import java.util.List;
 <span class="fc bfc" id="L26" title="All 2 branches covered.">        if (expression instanceof VariableExpr variableExpr) {</span>
 <span class="fc" id="L27">            return new PatternVariable(variableExpr.name());</span>
         }
-<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr functionExpr) {</span>
-<span class="nc" id="L30">            List&lt;RulePatternNode&gt; converted = new ArrayList&lt;&gt;(functionExpr.arguments().size());</span>
-<span class="nc bnc" id="L31" title="All 2 branches missed.">            for (Expr argument : functionExpr.arguments()) {</span>
-<span class="nc" id="L32">                converted.add(convert(argument));</span>
-<span class="nc" id="L33">            }</span>
-<span class="nc" id="L34">            return new PatternFunction(functionExpr.name(), converted);</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        if (expression instanceof FunctionExpr functionExpr) {</span>
+<span class="fc" id="L30">            List&lt;RulePatternNode&gt; converted = new ArrayList&lt;&gt;(functionExpr.arguments().size());</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            for (Expr argument : functionExpr.arguments()) {</span>
+<span class="fc" id="L32">                converted.add(convert(argument));</span>
+<span class="fc" id="L33">            }</span>
+<span class="fc" id="L34">            return new PatternFunction(functionExpr.name(), converted);</span>
         }
 <span class="fc" id="L36">        BinaryExpr binaryExpr = (BinaryExpr) expression;</span>
 <span class="fc" id="L37">        return new PatternBinary(convert(binaryExpr.left()), binaryExpr.operator(), convert(binaryExpr.right()));</span>

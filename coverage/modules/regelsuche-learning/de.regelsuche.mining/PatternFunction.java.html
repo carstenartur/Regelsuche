@@ -4,13 +4,13 @@ import java.util.List;
 import java.util.Objects;
 
 public record PatternFunction(String name, List&lt;RulePatternNode&gt; arguments) implements RulePatternNode {
-<span class="nc" id="L7">    public PatternFunction {</span>
-<span class="nc" id="L8">        Objects.requireNonNull(name, &quot;name&quot;);</span>
-<span class="nc bnc" id="L9" title="All 2 branches missed.">        if (name.isBlank()) {</span>
+<span class="fc" id="L7">    public PatternFunction {</span>
+<span class="fc" id="L8">        Objects.requireNonNull(name, &quot;name&quot;);</span>
+<span class="pc bpc" id="L9" title="1 of 2 branches missed.">        if (name.isBlank()) {</span>
 <span class="nc" id="L10">            throw new IllegalArgumentException(&quot;function name must not be blank&quot;);</span>
         }
-<span class="nc" id="L12">        Objects.requireNonNull(arguments, &quot;arguments&quot;);</span>
-<span class="nc" id="L13">        arguments = List.copyOf(arguments);</span>
-<span class="nc" id="L14">    }</span>
+<span class="fc" id="L12">        Objects.requireNonNull(arguments, &quot;arguments&quot;);</span>
+<span class="fc" id="L13">        arguments = List.copyOf(arguments);</span>
+<span class="fc" id="L14">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
