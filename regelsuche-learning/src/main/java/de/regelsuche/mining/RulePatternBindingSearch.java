@@ -62,11 +62,11 @@ final class RulePatternBindingSearch {
             return bind(variable.name(), expression, pending.next(), frame.bindings());
         }
         if (pattern instanceof PatternNumber number) {
-            return expression instanceof NumberExpr value && value.equalsInteger(number.value())
+            return expression instanceof NumberExpr value && value.value().equalsInteger(number.value())
                 ? new Frame(pending.next(), frame.bindings()) : null;
         }
         if (pattern instanceof PatternBinary binary) {
-            return expression instanceof BinaryExpr value && binary.operator() == value.operator()
+            return expression instanceof BinaryExpr value && binary.op() == value.operator()
                 ? binary(binary, value, frame) : null;
         }
         if (pattern instanceof PatternFunction function) {
@@ -87,7 +87,7 @@ final class RulePatternBindingSearch {
 
     private Frame binary(PatternBinary pattern, BinaryExpr expression, Frame frame) {
         var remaining = frame.pending().next();
-        if (isCommutative(pattern.operator())) {
+        if (isCommutative(pattern.op())) {
             // LIFO: direct first, then swapped, then the historical repeated-operand case.
             alternatives.push(new Frame(constraint(pattern, expression, true, remaining), frame.bindings()));
             alternatives.push(new Frame(pair(pattern, expression.right(), expression.left(), remaining), frame.bindings()));
@@ -112,7 +112,7 @@ final class RulePatternBindingSearch {
     }
 
     private Frame repeatedAssociative(PatternBinary pattern, BinaryExpr expression, Frame frame) {
-        var operands = flattenPattern(pattern, pattern.operator());
+        var operands = flattenPattern(pattern, pattern.op());
         if (operands.size() < 3 || !(operands.getFirst() instanceof PatternVariable repeated)) {
             return null;
         }
@@ -140,7 +140,7 @@ final class RulePatternBindingSearch {
         while (!nodes.isEmpty()) {
             charge();
             var node = nodes.pop();
-            if (node instanceof PatternBinary binary && binary.operator() == operator) {
+            if (node instanceof PatternBinary binary && binary.op() == operator) {
                 nodes.push(binary.right());
                 nodes.push(binary.left());
             } else {

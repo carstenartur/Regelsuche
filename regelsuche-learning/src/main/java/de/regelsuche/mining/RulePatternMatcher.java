@@ -8,7 +8,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Structural applicability matching; a binding is not a mathematical proof. */
-public final class RulePatternMatcher {
+public class RulePatternMatcher {
     public static final String SEQUENCE_REVISION = "regelsuche.rule-pattern-sequence/v1";
     public static final int MAXIMUM_SEQUENCE_STEPS = 64;
 
@@ -39,6 +39,14 @@ public final class RulePatternMatcher {
     public Optional<Map<String, Expr>> match(String patternString, String expression) {
         try {
             return matchExpression(patternParser.parse(patternString), expressionParser.parseTerm(expression));
+        } catch (IllegalArgumentException ex) {
+            return Optional.empty();
+        }
+    }
+
+    public Optional<Map<String, Expr>> match(RulePatternNode pattern, String expression) {
+        try {
+            return matchExpression(pattern, expressionParser.parseTerm(expression));
         } catch (IllegalArgumentException ex) {
             return Optional.empty();
         }
