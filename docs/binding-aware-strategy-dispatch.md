@@ -48,6 +48,28 @@ The initial implementation generalizes **whole-state trajectories**, not
 arbitrary occurrence placements or a newly synthesized rule sequence. Full
 CLI/HTTP scoped-input migration and a general tactic learner remain separate.
 
+### Exact constants and structural identity
+
+The binding model uses `regelsuche.trace-binding-model/v2`. Equal numeric TRAIN
+literals remain fixed regardless of their size or whether they are integral.
+Small integers retain `PatternNumber`; other exact literals use immutable `K`
+seed bindings passed to every prefix and complete-path match. These are distinct
+from the free `P` placeholders. A known constant may first appear in a later state
+without creating a new free variable. Unequal TRAIN numbers may still generalize
+through the ordinary shared expression-pair environment.
+
+The `regelsuche.trace-binding-identity/v1` encoding records typed AST nodes in
+ordered preorder, including operators, function arities, exact numerators and
+denominators, and scoped symbol identities. It distinguishes `(a+b)+c` from
+`a+(b+c)` and likewise for multiplication; those trees are not interchangeable
+under the existing structural matcher. Display formatting is never a template
+key or trace identity. The sorted fixed-literal seed map is part of the template
+identity, so different constants cannot share a structural key.
+
+This changes the experimental binding-model schema and its containing v2 policy
+hash, not the historical v1 dispatcher hash or production defaults. The existing
+matcher revision and mathematical proof/assumption authorities are unchanged.
+
 ## Budget and policy behavior
 
 One matching allowance is shared by every template, prefix and complete-path
@@ -62,34 +84,51 @@ in v2 it still requires shared-binding consistency. It is not an accepted learne
 route policy. Both flat profiles retain their historical execution semantics.
 
 Formation work charges inventory/trace preparation events, pair attempts,
-generalization nodes and binding-closure inspections. Runtime matching work
-charges template inspections, AST requests, provenance visits and the existing
-matcher's node-work ledger, through `delegatedMechanicalWorkUnits`. Parsing,
-hashing, allocation, expression-equality internals and numerical bit complexity
-are outside this logical ledger. These are not walltime/CPU or memory quotas.
+generalization nodes, fixed-literal seed formation and binding-closure inspections.
+Runtime matching work charges template inspections, AST requests, provenance
+visits and the existing matcher's node-work ledger, through
+`delegatedMechanicalWorkUnits`. Parsing, hashing, allocation, expression-equality
+internals and numerical bit complexity are outside this logical ledger. These
+are not walltime/CPU or memory quotas.
 
-## Current development evidence (not a held-out benchmark)
+## Development evidence (not a held-out benchmark)
 
-Local Java-25 source compilation and 78 JUnit tests pass, including all 17 new
-model/dispatch methods, historical dispatch/transfer examples, scoped matcher
-tests, primitive minimality checks and compiled-engine replay. The new feature
-tests were exercised against compiling no-feature scaffolds first. A separate
-regression demonstrates rejection of later unbound placeholders. An additional
-real-primitive occurrence test rejects a valid suffix that changes the bound
-residual; deliberately bypassing full-path matching makes that test fail.
+On the original implementation head `b0dc456`, local Java-25 source compilation
+and 78 JUnit tests passed, including the 17 model/dispatch/occurrence methods,
+historical dispatch/transfer examples, scoped matcher tests, primitive minimality
+and compiled-engine replay. An additional real-primitive occurrence test rejects
+a valid suffix that changes the bound residual; deliberately bypassing full-path
+matching made that test fail. The full CI for that head subsequently passed,
+but review exposed two uncovered model-integrity faults.
 
-On the unchanged eight selection-TRAIN inputs, the model forms **one template**.
-Binding formation costs **376 logical units**. The flat baseline costs **235**;
-the two route trials cost **382** and **902**, so **neither route is accepted**.
-The final v2 policy therefore falls back to flat selection. This is a negative
-utility result, not evidence of a speedup. Total reported training work is 2,332
-units, including the existing formation, context collection and rejected trials.
+Test-only commit `4c7c095` added nine integrity controls. Its ordinary CI run
+`35092576139`, Maven job `104782141531`, compiled the code and ran 742 learning
+tests: six failures, zero errors and zero skips. The six expected failures cover
+large/decimal literal widening, constant-key collisions, associative grouping
+in template and trace identities, and falsely merged training support. The
+correction is in `ba2575e`. The source-pinned learning/dependency build in run
+`35093740379` completed its compile/test step successfully. This is not a claim
+that a later head has passed the complete Maven/Docker/Gradle pipeline.
 
-A diagnostic un-gated execution does use the learned binding template, emits
-the actual three-step primitive derivation and passes independent replay and
-exact equivalence checks. The historical v1 policy hash remains
+Additional controls exercise seed immutability, known constants appearing later,
+distinct constant slots, retained generalization of unequal numbers, function
+arity/argument identity and exact decimal normalization. No successful local
+execution is claimed for this review-fix session; its local runtime is unavailable.
+
+### Earlier small-TRAIN cost observation
+
+On the original head's unchanged eight selection-TRAIN inputs, the model formed
+**one template**. Binding formation cost **376 logical units**. The flat baseline
+cost **235**; the two route trials cost **382** and **902**, so **neither route was
+accepted**. Total reported training work was 2,332 units, including existing
+formation, context collection and rejected trials. These are retained earlier
+observations, not a new performance measurement of the integrity correction.
+
+The diagnostic ungated execution used the learned binding template and retained
+the actual replayable three-step primitive derivation. The historical v1 hash is
+still checked against
 `sha256:170363d5facca1ff53615fa8197bf70df268a9d872e0915eb5f228c42cddaf43`.
 
-The focused local run is not a replacement for ordinary current-head CI,
-Maven/Docker qualification or review. No frozen evaluation inputs, references,
-thresholds, proof/assumption checks or repository protections were changed.
+No speedup is claimed. Ordinary current-head CI, Maven/Docker qualification and
+review remain required. No frozen evaluation input, reference, threshold,
+proof/assumption check or repository protection was changed.
