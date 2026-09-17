@@ -23,11 +23,25 @@ jobs:
           git rev-parse HEAD
           java -version
           mvn --batch-mode --no-transfer-progress -Pfull -pl regelsuche-learning -am test
+      - name: Retain tracked source and compiled classes
+        run: |
+          mkdir -p binding-investigation
+          git rev-parse HEAD > binding-investigation/source-commit.txt
+          git archive --format=tar.gz HEAD > binding-investigation/source.tar.gz
+          find regelsuche-* -type d \( -path '*/target/classes' -o -path '*/target/test-classes' \) -print0 | tar --null -T - -czf binding-investigation/classes.tar.gz
+          sha256sum binding-investigation/*.tar.gz > binding-investigation/SHA256SUMS
       - name: Retain actual test reports, including failures
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: binding-model-focused
           path: '**/target/surefire-reports/**'
+          if-no-files-found: error
+          retention-days: 7
+      - name: Retain source-pinned workspace
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: binding-transport-workspace
+          path: binding-investigation/
           if-no-files-found: error
           retention-days: 7
