@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CompiledAstReplayCodec.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.program</a> &gt; <span class="el_source">CompiledAstReplayCodec.java</span></div><h1>CompiledAstReplayCodec.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.program;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadConstraints;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.search.program.CompiledAstRewriteProgram.Candidate;
+import de.regelsuche.transform.AstRewriteTransport;
+import de.regelsuche.transform.RewriteKind;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/** Bounded interchange of untrusted typed histories. Decoding is not mathematical or execution approval. */
+<span class="fc" id="L27">public final class CompiledAstReplayCodec {</span>
+    public static final String SCHEMA = &quot;regelsuche.compiled-ast-replay/v1&quot;;
+    public static final int MAXIMUM_BYTES = 1_048_576;
+    public static final int MAXIMUM_TEXT_CHARACTERS = 4_096;
+    public static final int MAXIMUM_ASSUMPTIONS = 128;
+<span class="fc" id="L32">    private static final Set&lt;String&gt; ROOT_FIELDS = Set.of(&quot;schema&quot;, &quot;backend&quot;, &quot;program&quot;, &quot;sourceIds&quot;, &quot;states&quot;, &quot;steps&quot;);</span>
+<span class="fc" id="L33">    private static final Set&lt;String&gt; STEP_FIELDS = Set.of(&quot;rule&quot;, &quot;kind&quot;, &quot;mayIncreaseComplexity&quot;, &quot;estimatedCostDelta&quot;,</span>
+        &quot;equivalencePreservingByConstruction&quot;, &quot;assumptions&quot;, &quot;packId&quot;, &quot;license&quot;);
+<span class="fc" id="L35">    private static final ObjectMapper JSON = new ObjectMapper(JsonFactory.builder()</span>
+<span class="fc" id="L36">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L37">        .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(270)</span>
+<span class="fc" id="L38">            .maxStringLength(MAXIMUM_TEXT_CHARACTERS).maxNameLength(128).maxNumberLength(32).build())</span>
+<span class="fc" id="L39">        .build()).enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+
+    /** Canonical field order and exact typed values. No executable rule or class is serialized. */
+    public byte[] encode(Candidate candidate) {
+<span class="fc" id="L43">        Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc" id="L44">        var data = new AstReplayJson(JSON);</span>
+<span class="fc" id="L45">        var root = JSON.createObjectNode().put(&quot;schema&quot;, SCHEMA).put(&quot;backend&quot;, CompiledAstRewriteProgram.REVISION)</span>
+<span class="fc" id="L46">            .put(&quot;program&quot;, data.text(candidate.programId()));</span>
+<span class="fc" id="L47">        var sources = root.putArray(&quot;sourceIds&quot;);</span>
+<span class="fc" id="L48">        candidate.sourceIds().forEach(id -&gt; sources.add(data.text(id)));</span>
+<span class="fc" id="L49">        var states = root.putArray(&quot;states&quot;);</span>
+<span class="fc" id="L50">        candidate.states().forEach(state -&gt; states.add(data.write(state)));</span>
+<span class="fc" id="L51">        var steps = root.putArray(&quot;steps&quot;);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        for (var step : candidate.steps()) {</span>
+<span class="fc" id="L53">            var node = steps.addObject().put(&quot;rule&quot;, data.text(step.rule())).put(&quot;kind&quot;, step.kind().name())</span>
+<span class="fc" id="L54">                .put(&quot;mayIncreaseComplexity&quot;, step.mayIncreaseComplexity()).put(&quot;estimatedCostDelta&quot;, step.estimatedCostDelta())</span>
+<span class="fc" id="L55">                .put(&quot;equivalencePreservingByConstruction&quot;, step.equivalencePreservingByConstruction());</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">            if (step.assumptions().size() &gt; MAXIMUM_ASSUMPTIONS) throw new IllegalArgumentException(&quot;too many AST replay assumptions&quot;);</span>
+<span class="fc" id="L57">            var assumptions = node.putArray(&quot;assumptions&quot;);</span>
+<span class="fc" id="L58">            step.assumptions().forEach(value -&gt; assumptions.add(data.text(value)));</span>
+<span class="fc" id="L59">            node.put(&quot;packId&quot;, data.text(step.packId())).put(&quot;license&quot;, data.text(step.license()));</span>
+<span class="fc" id="L60">        }</span>
+        try {
+<span class="fc" id="L62">            byte[] result = JSON.writeValueAsBytes(root);</span>
+<span class="fc" id="L63">            requireBytes(result);</span>
+<span class="fc" id="L64">            return result;</span>
+<span class="nc" id="L65">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L66">            throw new IllegalArgumentException(&quot;cannot encode AST replay&quot;, exception);</span>
+        }
+    }
+
+    /** Returns data only. Use the receiving program's replayEncoded method for source-bound regeneration. */
+    public Candidate decode(byte[] bytes) {
+<span class="fc" id="L72">        requireBytes(bytes);</span>
+        try {
+<span class="fc" id="L74">            String text = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)</span>
+<span class="fc" id="L75">                .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();</span>
+<span class="fc" id="L76">            JsonNode root = JSON.readTree(text);</span>
+<span class="fc" id="L77">            AstReplayJson.fields(root, ROOT_FIELDS);</span>
+<span class="fc" id="L78">            var data = new AstReplayJson(JSON);</span>
+<span class="fc bfc" id="L79" title="All 4 branches covered.">            if (!SCHEMA.equals(data.text(root, &quot;schema&quot;)) || !CompiledAstRewriteProgram.REVISION.equals(data.text(root, &quot;backend&quot;))) {</span>
+<span class="fc" id="L80">                throw new IllegalArgumentException(&quot;unsupported AST replay version&quot;);</span>
+            }
+<span class="fc" id="L82">            var stepNodes = root.get(&quot;steps&quot;);</span>
+<span class="fc" id="L83">            AstReplayJson.array(stepNodes, 1, 8);</span>
+<span class="fc" id="L84">            var stateNodes = root.get(&quot;states&quot;);</span>
+<span class="fc" id="L85">            AstReplayJson.array(stateNodes, stepNodes.size() + 1, stepNodes.size() + 1);</span>
+<span class="fc" id="L86">            List&lt;String&gt; sourceIds = texts(root.get(&quot;sourceIds&quot;), stepNodes.size(), stepNodes.size(), data);</span>
+<span class="fc" id="L87">            var states = new ArrayList&lt;Expr&gt;();</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            for (var state : stateNodes) states.add(data.read(state));</span>
+<span class="fc" id="L89">            var steps = new ArrayList&lt;AstRewriteTransport.Step&gt;();</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            for (int i = 0; i &lt; stepNodes.size(); i++) {</span>
+<span class="fc" id="L91">                var node = stepNodes.get(i);</span>
+<span class="fc" id="L92">                AstReplayJson.fields(node, STEP_FIELDS);</span>
+<span class="fc" id="L93">                var assumptions = texts(node.get(&quot;assumptions&quot;), 0, MAXIMUM_ASSUMPTIONS, data);</span>
+<span class="fc" id="L94">                var step = new AstRewriteTransport.Step(states.get(i), states.get(i + 1), data.text(node, &quot;rule&quot;),</span>
+<span class="fc" id="L95">                    RewriteKind.valueOf(data.text(node, &quot;kind&quot;)), bool(node, &quot;mayIncreaseComplexity&quot;),</span>
+<span class="fc" id="L96">                    integer(node, &quot;estimatedCostDelta&quot;), bool(node, &quot;equivalencePreservingByConstruction&quot;), assumptions,</span>
+<span class="fc" id="L97">                    data.text(node, &quot;packId&quot;), data.text(node, &quot;license&quot;));</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">                if (!step.assumptions().equals(assumptions)) {</span>
+<span class="fc" id="L99">                    throw new IllegalArgumentException(&quot;noncanonical AST replay assumptions&quot;);</span>
+                }
+<span class="fc" id="L101">                steps.add(step);</span>
+            }
+<span class="fc" id="L103">            return new Candidate(data.text(root, &quot;program&quot;), sourceIds, steps);</span>
+<span class="fc" id="L104">        } catch (CharacterCodingException exception) {</span>
+<span class="fc" id="L105">            throw new IllegalArgumentException(&quot;invalid UTF-8 AST replay JSON&quot;, exception);</span>
+<span class="fc" id="L106">        } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L107">            throw new IllegalArgumentException(&quot;invalid AST replay JSON&quot;, exception);</span>
+        }
+    }
+
+    /** Content identity of canonical data, not a signature, rule-set identity or proof. */
+    public String contentHash(Candidate candidate) {
+        try {
+<span class="fc" id="L114">            return &quot;sha256:&quot; + HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(encode(candidate)));</span>
+<span class="nc" id="L115">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L116">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static void requireBytes(byte[] bytes) {
+<span class="fc" id="L121">        Objects.requireNonNull(bytes, &quot;bytes&quot;);</span>
+<span class="fc bfc" id="L122" title="All 4 branches covered.">        if (bytes.length == 0 || bytes.length &gt; MAXIMUM_BYTES) throw new IllegalArgumentException(&quot;invalid AST replay byte length&quot;);</span>
+<span class="fc" id="L123">    }</span>
+
+    private static List&lt;String&gt; texts(JsonNode array, int minimum, int maximum, AstReplayJson data) {
+<span class="fc" id="L126">        AstReplayJson.array(array, minimum, maximum);</span>
+<span class="fc" id="L127">        var values = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        for (var value : array) {</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (!value.isTextual()) throw new IllegalArgumentException(&quot;expected AST replay text array&quot;);</span>
+<span class="fc" id="L130">            values.add(data.text(value.textValue()));</span>
+<span class="fc" id="L131">        }</span>
+<span class="fc" id="L132">        return List.copyOf(values);</span>
+    }
+
+    private static boolean bool(JsonNode node, String field) {
+<span class="fc" id="L136">        var value = node.get(field);</span>
+<span class="pc bpc" id="L137" title="1 of 4 branches missed.">        if (value == null || !value.isBoolean()) throw new IllegalArgumentException(&quot;expected boolean: &quot; + field);</span>
+<span class="fc" id="L138">        return value.booleanValue();</span>
+    }
+
+    private static int integer(JsonNode node, String field) {
+<span class="fc" id="L142">        var value = node.get(field);</span>
+<span class="pc bpc" id="L143" title="1 of 6 branches missed.">        if (value == null || !value.isIntegralNumber() || !value.canConvertToInt()) {</span>
+<span class="fc" id="L144">            throw new IllegalArgumentException(&quot;expected exact 32-bit integer: &quot; + field);</span>
+        }
+<span class="fc" id="L146">        return value.intValue();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

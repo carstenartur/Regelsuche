@@ -154,8 +154,13 @@ public final class CompiledAstRewriteProgram {
 <span class="fc" id="L154">        return new Replay(candidate.target(), regenerated.workMetrics());</span>
     }
 
+    /** Decode untrusted persisted data, then regenerate the full program under the supplied source. */
+    public Replay replayEncoded(Expr source, byte[] document) {
+<span class="fc" id="L159">        return replay(source, new CompiledAstReplayCodec().decode(document));</span>
+    }
+
     private static void requireId(String id) {
-<span class="pc bpc" id="L158" title="2 of 4 branches missed.">        if (id == null || id.isBlank()) throw new IllegalArgumentException(&quot;program/source ID must be present&quot;);</span>
-<span class="fc" id="L159">    }</span>
+<span class="pc bpc" id="L163" title="2 of 4 branches missed.">        if (id == null || id.isBlank()) throw new IllegalArgumentException(&quot;program/source ID must be present&quot;);</span>
+<span class="fc" id="L164">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

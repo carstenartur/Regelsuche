@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AstReplayJson.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.program</a> &gt; <span class="el_source">AstReplayJson.java</span></div><h1>AstReplayJson.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.program;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.ast.*;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.symbol.SymbolId;
+import de.regelsuche.transform.AstRewriteTransport;
+import java.util.ArrayList;
+import java.util.Objects;
+import java.util.Set;
+
+/** Data-only tagged AST representation; never invokes the expression parser or imports classes. */
+final class AstReplayJson {
+    private final ObjectMapper mapper;
+    private int textCharacters;
+
+<span class="fc" id="L19">    AstReplayJson(ObjectMapper mapper) { this.mapper = mapper; }</span>
+
+<span class="fc" id="L21">    ObjectNode write(Expr expression) { return write(expression, 0, new int[1]); }</span>
+<span class="fc" id="L22">    Expr read(JsonNode node) { return read(node, 0, new int[1]); }</span>
+
+    private ObjectNode write(Expr expression, int depth, int[] nodes) {
+<span class="fc" id="L25">        visit(depth, nodes);</span>
+<span class="fc" id="L26">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L27">        var node = mapper.createObjectNode();</span>
+<span class="fc bfc" id="L28" title="All 4 branches covered.">        switch (expression) {</span>
+<span class="fc" id="L29">            case NumberExpr number -&gt; {</span>
+                // Bound conversion of arbitrarily large in-memory values before decimal rendering.
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">                if (number.value().numerator().bitLength() &gt; 4 * CompiledAstReplayCodec.MAXIMUM_TEXT_CHARACTERS</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">                        || number.value().denominator().bitLength() &gt; 4 * CompiledAstReplayCodec.MAXIMUM_TEXT_CHARACTERS) {</span>
+<span class="nc" id="L33">                    throw new IllegalArgumentException(&quot;AST replay numeric literal is too large&quot;);</span>
+                }
+<span class="fc" id="L35">                node.put(&quot;type&quot;, &quot;number&quot;).put(&quot;value&quot;, text(number.value().canonicalText()));</span>
+<span class="fc" id="L36">            }</span>
+<span class="fc" id="L37">            case VariableExpr variable -&gt; {</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">                if (variable.symbol().isPresent()) {</span>
+<span class="fc" id="L39">                    node.put(&quot;type&quot;, &quot;symbol&quot;).put(&quot;id&quot;, text(variable.symbol().orElseThrow().canonicalText()));</span>
+<span class="fc" id="L40">                } else node.put(&quot;type&quot;, &quot;variable&quot;).put(&quot;name&quot;, text(variable.name()));</span>
+<span class="fc" id="L41">            }</span>
+<span class="fc" id="L42">            case BinaryExpr binary -&gt; {</span>
+<span class="fc" id="L43">                node.put(&quot;type&quot;, &quot;binary&quot;).put(&quot;operator&quot;, binary.operator().name());</span>
+<span class="fc" id="L44">                node.set(&quot;left&quot;, write(binary.left(), depth + 1, nodes));</span>
+<span class="fc" id="L45">                node.set(&quot;right&quot;, write(binary.right(), depth + 1, nodes));</span>
+<span class="fc" id="L46">            }</span>
+<span class="fc" id="L47">            case FunctionExpr function -&gt; {</span>
+<span class="fc" id="L48">                node.put(&quot;type&quot;, &quot;function&quot;).put(&quot;name&quot;, text(function.name()));</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">                if (function.arguments().size() &gt; AstRewriteTransport.MAXIMUM_NODES - nodes[0]) {</span>
+<span class="nc" id="L50">                    throw new IllegalArgumentException(&quot;AST replay argument count exceeded&quot;);</span>
+                }
+<span class="fc" id="L52">                var arguments = node.putArray(&quot;arguments&quot;);</span>
+<span class="fc" id="L53">                function.arguments().forEach(argument -&gt; arguments.add(write(argument, depth + 1, nodes)));</span>
+            }
+        }
+<span class="fc" id="L56">        return node;</span>
+    }
+
+    private Expr read(JsonNode node, int depth, int[] nodes) {
+<span class="fc" id="L60">        visit(depth, nodes);</span>
+<span class="fc bfc" id="L61" title="All 6 branches covered.">        return switch (text(node, &quot;type&quot;)) {</span>
+            case &quot;number&quot; -&gt; {
+<span class="fc" id="L63">                fields(node, Set.of(&quot;type&quot;, &quot;value&quot;));</span>
+<span class="fc" id="L64">                yield new NumberExpr(ExactRational.fromCanonicalText(text(node, &quot;value&quot;)));</span>
+            }
+            case &quot;variable&quot; -&gt; {
+<span class="fc" id="L67">                fields(node, Set.of(&quot;type&quot;, &quot;name&quot;));</span>
+<span class="fc" id="L68">                var variable = new VariableExpr(text(node, &quot;name&quot;));</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">                if (variable.symbol().isPresent()) throw new IllegalArgumentException(&quot;scoped symbol requires a symbol tag&quot;);</span>
+<span class="fc" id="L70">                yield variable;</span>
+            }
+            case &quot;symbol&quot; -&gt; {
+<span class="fc" id="L73">                fields(node, Set.of(&quot;type&quot;, &quot;id&quot;));</span>
+<span class="fc" id="L74">                yield VariableExpr.scoped(SymbolId.fromCanonicalText(text(node, &quot;id&quot;)));</span>
+            }
+            case &quot;binary&quot; -&gt; {
+<span class="fc" id="L77">                fields(node, Set.of(&quot;type&quot;, &quot;operator&quot;, &quot;left&quot;, &quot;right&quot;));</span>
+<span class="fc" id="L78">                var operator = BinaryOperator.valueOf(text(node, &quot;operator&quot;));</span>
+<span class="fc" id="L79">                yield new BinaryExpr(read(node.get(&quot;left&quot;), depth + 1, nodes), operator,</span>
+<span class="fc" id="L80">                    read(node.get(&quot;right&quot;), depth + 1, nodes));</span>
+            }
+            case &quot;function&quot; -&gt; {
+<span class="fc" id="L83">                fields(node, Set.of(&quot;type&quot;, &quot;name&quot;, &quot;arguments&quot;));</span>
+<span class="fc" id="L84">                String name = text(node, &quot;name&quot;);</span>
+<span class="fc" id="L85">                var array = node.get(&quot;arguments&quot;);</span>
+<span class="fc" id="L86">                array(array, 0, AstRewriteTransport.MAXIMUM_NODES - nodes[0]);</span>
+<span class="fc" id="L87">                var arguments = new ArrayList&lt;Expr&gt;();</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">                for (var argument : array) arguments.add(read(argument, depth + 1, nodes));</span>
+<span class="fc" id="L89">                yield new FunctionExpr(name, arguments);</span>
+            }
+<span class="fc" id="L91">            default -&gt; throw new IllegalArgumentException(&quot;unknown AST replay node type&quot;);</span>
+        };
+    }
+
+    private static void visit(int depth, int[] nodes) {
+<span class="pc bpc" id="L96" title="1 of 4 branches missed.">        if (depth &gt; AstRewriteTransport.MAXIMUM_DEPTH || ++nodes[0] &gt; AstRewriteTransport.MAXIMUM_NODES) {</span>
+<span class="fc" id="L97">            throw new IllegalArgumentException(&quot;AST replay structural limit exceeded&quot;);</span>
+        }
+<span class="fc" id="L99">    }</span>
+
+    String text(JsonNode parent, String field) {
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        JsonNode value = parent == null ? null : parent.get(field);</span>
+<span class="pc bpc" id="L103" title="1 of 4 branches missed.">        if (value == null || !value.isTextual()) throw new IllegalArgumentException(&quot;expected text field: &quot; + field);</span>
+<span class="fc" id="L104">        return text(value.textValue());</span>
+    }
+
+    String text(String value) {
+<span class="pc bpc" id="L108" title="2 of 6 branches missed.">        if (value == null || value.isBlank() || value.length() &gt; CompiledAstReplayCodec.MAXIMUM_TEXT_CHARACTERS) {</span>
+<span class="fc" id="L109">            throw new IllegalArgumentException(&quot;invalid or oversized AST replay text&quot;);</span>
+        }
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L112">            char character = value.charAt(i);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            if (Character.isHighSurrogate(character)) {</span>
+<span class="pc bpc" id="L114" title="3 of 4 branches missed.">                if (++i == value.length() || !Character.isLowSurrogate(value.charAt(i))) {</span>
+<span class="fc" id="L115">                    throw new IllegalArgumentException(&quot;unpaired Unicode surrogate&quot;);</span>
+                }
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">            } else if (Character.isLowSurrogate(character)) throw new IllegalArgumentException(&quot;unpaired Unicode surrogate&quot;);</span>
+        }
+<span class="fc" id="L119">        textCharacters = Math.addExact(textCharacters, value.length());</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (textCharacters &gt; CompiledAstReplayCodec.MAXIMUM_BYTES) throw new IllegalArgumentException(&quot;AST replay text limit exceeded&quot;);</span>
+<span class="fc" id="L121">        return value;</span>
+    }
+
+    static void fields(JsonNode node, Set&lt;String&gt; names) {
+<span class="pc bpc" id="L125" title="1 of 6 branches missed.">        if (node == null || !node.isObject() || node.size() != names.size()) {</span>
+<span class="fc" id="L126">            throw new IllegalArgumentException(&quot;missing or unexpected AST replay fields&quot;);</span>
+        }
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        for (var entry : node.properties()) {</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (!names.contains(entry.getKey())) throw new IllegalArgumentException(&quot;unknown AST replay field&quot;);</span>
+<span class="fc" id="L130">        }</span>
+<span class="fc" id="L131">    }</span>
+
+    static void array(JsonNode node, int minimum, int maximum) {
+<span class="pc bpc" id="L134" title="2 of 8 branches missed.">        if (node == null || !node.isArray() || node.size() &lt; minimum || node.size() &gt; maximum) {</span>
+<span class="fc" id="L135">            throw new IllegalArgumentException(&quot;invalid AST replay array size&quot;);</span>
+        }
+<span class="fc" id="L137">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
