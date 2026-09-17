@@ -76,9 +76,14 @@ public final class CompiledAstRewriteProgram {
         if (retained.isEmpty() || retained.size() > 8 || maximumCandidates < 1 || maximumCandidates > 128) {
             throw new IllegalArgumentException("invalid typed pipeline bounds");
         }
-        // Reject an unsupported stage before any source can run. In particular, do not
+        // Reject unsupported or ambiguous stages before any source can run. In particular, do not
         // replace a custom reference-engine override with a base prepared implementation.
+        var sourceIds = new LinkedHashSet<String>();
         for (var source : retained) {
+            requireId(source.id());
+            if (!sourceIds.add(source.id())) {
+                throw new IllegalArgumentException("typed compilation requires unique source IDs");
+            }
             if (!(source.engine() instanceof PreparedAstRewriteTransformationEngine)) {
                 throw new IllegalArgumentException("typed compilation requires prepared AST sources");
             }
