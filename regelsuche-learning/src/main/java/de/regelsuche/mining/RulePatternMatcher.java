@@ -10,6 +10,7 @@ import java.util.Optional;
 /** Structural applicability matching; a binding is not a mathematical proof. */
 public class RulePatternMatcher {
     public static final String SEQUENCE_REVISION = "regelsuche.rule-pattern-sequence/v1";
+    public static final String LAZY_SEQUENCE_REVISION = "regelsuche.rule-pattern-sequence/lazy-v1";
     public static final int MAXIMUM_SEQUENCE_STEPS = 64;
 
     public enum MatchStatus { MATCH, NO_MATCH, BUDGET_EXHAUSTED }
@@ -84,10 +85,29 @@ public class RulePatternMatcher {
      */
     public MatchResult matchSequence(List<MatchStep> steps, Map<String, Expr> initialBindings,
             long maximumWorkUnits) {
+        return matchSequence(steps, initialBindings, maximumWorkUnits, false);
+    }
+
+    /**
+     * Opt-in execution of the same relation and depth-first choice order. Swapped
+     * and repeated-associative alternatives retain their bindings and continuation,
+     * but construct constraints only when visited. The same logical operations are
+     * charged as in {@link #matchSequence}; unused constraints are not constructed.
+     * Alternative descriptors, like the historical frame/map allocation, are not
+     * part of the node-work ledger. This is not a walltime or allocation estimate.
+     */
+    public MatchResult matchSequenceLazy(List<MatchStep> steps, Map<String, Expr> initialBindings,
+            long maximumWorkUnits) {
+        return matchSequence(steps, initialBindings, maximumWorkUnits, true);
+    }
+
+    private MatchResult matchSequence(List<MatchStep> steps, Map<String, Expr> initialBindings,
+            long maximumWorkUnits, boolean lazyAlternatives) {
         Objects.requireNonNull(steps, "steps");
         if (steps.isEmpty() || steps.size() > MAXIMUM_SEQUENCE_STEPS || maximumWorkUnits < 1) {
             throw new IllegalArgumentException("require 1 through 64 steps and positive matching work");
         }
-        return new RulePatternBindingSearch(maximumWorkUnits).match(List.copyOf(steps), Map.copyOf(initialBindings));
+        return new RulePatternBindingSearch(maximumWorkUnits, lazyAlternatives)
+            .match(List.copyOf(steps), Map.copyOf(initialBindings));
     }
 }

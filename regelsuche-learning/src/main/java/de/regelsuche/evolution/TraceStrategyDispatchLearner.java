@@ -160,7 +160,17 @@ public final class TraceStrategyDispatchLearner {
         return train(formation, inputs, limits, Objects.requireNonNull(bindings, "bindings"));
     }
 
+    /** Opt-in lazy matching; both historical training entry points remain executable controls. */
+    public FrozenPolicy trainBindingAwareLazy(FrozenStrategy formation, List<Input> inputs, Limits limits, BindingLimits bindings) {
+        return train(formation, inputs, limits, Objects.requireNonNull(bindings, "bindings"), true);
+    }
+
     private FrozenPolicy train(FrozenStrategy formation, List<Input> inputs, Limits limits, BindingLimits bindingLimits) {
+        return train(formation, inputs, limits, bindingLimits, false);
+    }
+
+    private FrozenPolicy train(FrozenStrategy formation, List<Input> inputs, Limits limits,
+            BindingLimits bindingLimits, boolean lazyAlternatives) {
         Objects.requireNonNull(formation, "formation");
         Objects.requireNonNull(limits, "limits");
         if (limits.budget().maxPrimitiveSteps() > formation.limits().maximumTraceSteps()) {
@@ -180,7 +190,7 @@ public final class TraceStrategyDispatchLearner {
         }
         var executable = new Executable(formation);
         var baseline = observe(executable, ordered, limits.budget(), List.of(), Profile.FLAT_GREEDY);
-        TraceBindingModel bindings = bindingLimits == null ? null : TraceBindingDispatch.learn(formation, baseline, bindingLimits);
+        TraceBindingModel bindings = bindingLimits == null ? null : TraceBindingDispatch.learn(formation, baseline, bindingLimits, lazyAlternatives);
         if (bindings != null) executable = new Executable(formation, bindings);
         var contexts = collectContexts(executable, baseline, limits.maximumContexts());
         var selection = selectRoutes(executable, ordered, limits, baseline, contexts.masks());
