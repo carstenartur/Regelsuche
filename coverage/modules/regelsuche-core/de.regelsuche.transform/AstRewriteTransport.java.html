@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AstRewriteTransport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">AstRewriteTransport.java</span></div><h1>AstRewriteTransport.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import java.util.ArrayDeque;
+import java.util.List;
+import java.util.Objects;
+
+/** Explicit typed primitive boundary. Construction of a step is not proof of its validity. */
+public final class AstRewriteTransport {
+    public static final String REVISION = &quot;regelsuche.ast-rewrite-transport/v1&quot;;
+    public static final int MAXIMUM_NODES = 10_000;
+    public static final int MAXIMUM_DEPTH = 128;
+    public static final int MAXIMUM_TRACE_STEPS = 64;
+
+    /** Structural source and target, with the primitive rule's metadata. No display-text identity. */
+    public record Step(Expr source, Expr target, String rule, RewriteKind kind,
+            boolean mayIncreaseComplexity, int estimatedCostDelta, boolean equivalencePreservingByConstruction,
+            List&lt;String&gt; assumptions, String packId, String license) {
+<span class="fc" id="L22">        public Step {</span>
+<span class="fc" id="L23">            requireBounded(source);</span>
+<span class="fc" id="L24">            requireBounded(target);</span>
+<span class="fc" id="L25">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="pc bpc" id="L26" title="5 of 10 branches missed.">            if (rule == null || rule.isBlank() || packId == null || packId.isBlank()</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">                    || license == null || license.isBlank()) {</span>
+<span class="nc" id="L28">                throw new IllegalArgumentException(&quot;rule and attribution must be present&quot;);</span>
+            }
+<span class="fc" id="L30">            assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();</span>
+<span class="fc" id="L31">        }</span>
+    }
+
+    private final PreparedAstRewriteTransformationEngine engine;
+
+<span class="fc" id="L36">    public AstRewriteTransport(List&lt;RewriteRule&gt; rules, int maximumGrowth, int maximumCandidates) {</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (maximumCandidates &lt; 1) throw new IllegalArgumentException(&quot;positive candidate bound required&quot;);</span>
+<span class="fc" id="L38">        engine = new PreparedAstRewriteTransformationEngine(rules, maximumGrowth, maximumCandidates);</span>
+<span class="fc" id="L39">    }</span>
+
+    /** Generate with actual producer ASTs. Neither source nor result is formatted and reparsed here. */
+    public List&lt;Step&gt; generate(Expr source) {
+<span class="fc" id="L43">        return engine.transformAst(source);</span>
+    }
+
+    /**
+     * Regenerate each primitive under this engine's rules and bounds, checking all retained metadata.
+     * This proves replay relative to those rules, not the validity of arbitrary user-supplied rules
+     * or the truth of their retained side conditions.
+     */
+    public Expr replay(Expr source, List&lt;Step&gt; steps) {
+<span class="fc" id="L52">        requireBounded(source);</span>
+<span class="fc" id="L53">        Objects.requireNonNull(steps, &quot;steps&quot;);</span>
+<span class="pc bpc" id="L54" title="1 of 4 branches missed.">        if (steps.isEmpty() || steps.size() &gt; MAXIMUM_TRACE_STEPS) {</span>
+<span class="fc" id="L55">            throw new IllegalArgumentException(&quot;require 1 through 64 primitive steps&quot;);</span>
+        }
+<span class="fc" id="L57">        var retained = List.copyOf(steps);</span>
+<span class="fc" id="L58">        Expr current = source;</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (var step : retained) {</span>
+<span class="fc bfc" id="L60" title="All 4 branches covered.">            if (!current.equals(step.source()) || !generate(current).contains(step)) {</span>
+<span class="fc" id="L61">                throw new IllegalArgumentException(&quot;AST step differs from source-bound primitive regeneration&quot;);</span>
+            }
+<span class="fc" id="L63">            current = step.target();</span>
+<span class="fc" id="L64">        }</span>
+<span class="fc" id="L65">        return current;</span>
+    }
+
+<span class="fc" id="L68">    private record Node(Expr expression, int depth) {}</span>
+
+    static void requireBounded(Expr root) {
+<span class="fc" id="L71">        Objects.requireNonNull(root, &quot;expression&quot;);</span>
+<span class="fc" id="L72">        var pending = new ArrayDeque&lt;Node&gt;();</span>
+<span class="fc" id="L73">        pending.push(new Node(root, 0));</span>
+<span class="fc" id="L74">        int nodes = 0;</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L76">            var node = pending.pop();</span>
+<span class="pc bpc" id="L77" title="1 of 4 branches missed.">            if (++nodes &gt; MAXIMUM_NODES || node.depth() &gt; MAXIMUM_DEPTH) {</span>
+<span class="fc" id="L78">                throw new IllegalArgumentException(&quot;AST transport structural limit exceeded&quot;);</span>
+            }
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (node.expression() instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L81">                pending.push(new Node(binary.right(), node.depth() + 1));</span>
+<span class="fc" id="L82">                pending.push(new Node(binary.left(), node.depth() + 1));</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            } else if (node.expression() instanceof FunctionExpr function) {</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">                if (function.arguments().size() &gt; MAXIMUM_NODES - nodes) {</span>
+<span class="fc" id="L85">                    throw new IllegalArgumentException(&quot;AST transport argument limit exceeded&quot;);</span>
+                }
+<span class="fc bfc" id="L87" title="All 2 branches covered.">                for (var argument : function.arguments()) pending.push(new Node(argument, node.depth() + 1));</span>
+            }
+<span class="fc" id="L89">        }</span>
+<span class="fc" id="L90">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
