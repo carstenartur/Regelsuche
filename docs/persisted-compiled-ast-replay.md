@@ -91,11 +91,15 @@ locale to UTF-8 resolves them. No test or production code was changed for this.
 The broader local learning-module run exceeded the 45-second invocation limit;
 it is not reported as a successful full local build.
 
-Two isolated mutations were tested: skipping regeneration fails four tests;
-reparsing numeric value text as an expression fails three. Removing both overlays
-restores the focused checks. These are targeted sensitivity checks, not complete
-mutation coverage. Exact-head Maven and ordinary product CI results belong to
-the PR discussion and remain distinct from this local verification.
+Three isolated mutations were tested: skipping regeneration fails four tests;
+reparsing numeric value text as an expression fails three; round-tripping decoded
+ASTs through display formatting and expression parsing fails six. Removing the
+mutation overlays restores all 21 new tests. These are targeted sensitivity
+checks, not complete mutation coverage. Exact-source Maven qualification at
+`cf52532aea3e49237bd03148eb1a62499c38d43f` (run 35185402453) passes 2,346
+learning/dependency tests, including all 21 new tests, with no failures, errors
+or skips. This documentation correction changes no production or test source.
+Ordinary main-based product CI and review remain separate requirements.
 
 General typed search, live dispatcher collection/backend selection and global
 work-budget integration remain open under #1010. Existing string replay, frozen
