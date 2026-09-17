@@ -17,14 +17,23 @@ import java.util.Map;
 /** Per-invocation iterative search. Maps shared by frames are never modified. */
 final class RulePatternBindingSearch {
     private record Pending(RulePatternNode pattern, Expr expression, boolean associative, Pending next) {}
-    private record Frame(Pending pending, Map<String, Expr> bindings) {}
+    private sealed interface Alternative permits Frame, Deferred {}
+    private record Frame(Pending pending, Map<String, Expr> bindings) implements Alternative {}
+    private record Deferred(PatternBinary pattern, BinaryExpr expression, boolean associative,
+            Pending remaining, Map<String, Expr> bindings) implements Alternative {}
 
     private final long maximumWork;
-    private final ArrayDeque<Frame> alternatives = new ArrayDeque<>();
+    private final boolean lazyAlternatives;
+    private final ArrayDeque<Alternative> alternatives = new ArrayDeque<>();
     private long work;
 
     RulePatternBindingSearch(long maximumWork) {
+        this(maximumWork, false);
+    }
+
+    RulePatternBindingSearch(long maximumWork, boolean lazyAlternatives) {
         this.maximumWork = maximumWork;
+        this.lazyAlternatives = lazyAlternatives;
     }
 
     MatchResult match(List<MatchStep> steps, Map<String, Expr> initialBindings) {
@@ -42,7 +51,7 @@ final class RulePatternBindingSearch {
                 charge();
                 frame = advance(frame);
                 if (frame == null && !alternatives.isEmpty()) {
-                    frame = alternatives.pop();
+                    frame = materialize(alternatives.pop());
                 }
             }
             return outcome(MatchStatus.NO_MATCH);
@@ -89,10 +98,26 @@ final class RulePatternBindingSearch {
         var remaining = frame.pending().next();
         if (isCommutative(pattern.op())) {
             // LIFO: direct first, then swapped, then the historical repeated-operand case.
-            alternatives.push(new Frame(constraint(pattern, expression, true, remaining), frame.bindings()));
-            alternatives.push(new Frame(pair(pattern, expression.right(), expression.left(), remaining), frame.bindings()));
+            if (lazyAlternatives) {
+                // Retain both branches, but do not construct their Pending constraints until visited.
+                alternatives.push(new Deferred(pattern, expression, true, remaining, frame.bindings()));
+                alternatives.push(new Deferred(pattern, expression, false, remaining, frame.bindings()));
+            } else {
+                alternatives.push(new Frame(constraint(pattern, expression, true, remaining), frame.bindings()));
+                alternatives.push(new Frame(pair(pattern, expression.right(), expression.left(), remaining), frame.bindings()));
+            }
         }
         return new Frame(pair(pattern, expression.left(), expression.right(), remaining), frame.bindings());
+    }
+
+    private Frame materialize(Alternative alternative) {
+        return switch (alternative) {
+            case Frame frame -> frame;
+            case Deferred deferred -> new Frame(deferred.associative()
+                ? constraint(deferred.pattern(), deferred.expression(), true, deferred.remaining())
+                : pair(deferred.pattern(), deferred.expression().right(), deferred.expression().left(), deferred.remaining()),
+                deferred.bindings());
+        };
     }
 
     private Pending pair(PatternBinary pattern, Expr left, Expr right, Pending remaining) {

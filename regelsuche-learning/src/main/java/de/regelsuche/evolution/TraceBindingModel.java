@@ -23,6 +23,7 @@ import java.util.TreeSet;
 /** TRAIN-only trajectory abstraction. Templates constrain applicability, never authorize a rewrite. */
 final class TraceBindingModel {
     static final String REVISION = "regelsuche.trace-binding-model/v2";
+    static final String LAZY_REVISION = "regelsuche.trace-binding-model/v3";
 
     record Trace(String id, List<String> sequence, List<Expr> states) {
         Trace {
@@ -72,16 +73,18 @@ final class TraceBindingModel {
     private final List<Template> templates;
     private final long formationWork;
     private final long maximumMatchingWork;
+    private final boolean lazyAlternatives;
     private final String json;
     private final String hash;
 
     private TraceBindingModel(List<Template> templates, long formationWork, int maximumTemplates,
-            long maximumFormationWork, long maximumMatchingWork) {
+            long maximumFormationWork, long maximumMatchingWork, boolean lazyAlternatives) {
         this.templates = List.copyOf(templates);
         this.formationWork = formationWork;
         this.maximumMatchingWork = maximumMatchingWork;
-        json = new JsonWriter().beginObject().property("schema", REVISION)
-            .property("matcher", RulePatternMatcher.SEQUENCE_REVISION)
+        this.lazyAlternatives = lazyAlternatives;
+        json = new JsonWriter().beginObject().property("schema", lazyAlternatives ? LAZY_REVISION : REVISION)
+            .property("matcher", lazyAlternatives ? RulePatternMatcher.LAZY_SEQUENCE_REVISION : RulePatternMatcher.SEQUENCE_REVISION)
             .property("scope", "PAIRWISE_WHOLE_STATE_TRAIN_TRAJECTORIES;NO_PROOF_AUTHORITY")
             .property("maximumTemplates", maximumTemplates).property("maximumFormationWork", maximumFormationWork)
             .property("maximumMatchingWorkPerExpansion", maximumMatchingWork).property("formationWork", formationWork)
@@ -105,6 +108,11 @@ final class TraceBindingModel {
 
     static TraceBindingModel learn(List<Trace> traces, Set<List<String>> admitted, int maximumTemplates,
             FormationWork work, long maximumMatchingWork) {
+        return learn(traces, admitted, maximumTemplates, work, maximumMatchingWork, false);
+    }
+
+    static TraceBindingModel learn(List<Trace> traces, Set<List<String>> admitted, int maximumTemplates,
+            FormationWork work, long maximumMatchingWork, boolean lazyAlternatives) {
         requireLimits(maximumTemplates, work.maximum, maximumMatchingWork);
         if (traces.size() > 16) throw new IllegalArgumentException("binding trace limit exceeded");
         var ordered = List.copyOf(traces).stream().sorted(Comparator.comparing(Trace::id)).toList();
@@ -157,7 +165,7 @@ final class TraceBindingModel {
             }
         }
         return new TraceBindingModel(List.copyOf(distinct.values()), work.used,
-            maximumTemplates, work.maximum, maximumMatchingWork);
+            maximumTemplates, work.maximum, maximumMatchingWork, lazyAlternatives);
     }
 
     private static Set<String> placeholderNames(RulePatternNode root, FormationWork work) {
@@ -241,7 +249,9 @@ final class TraceBindingModel {
             long remaining = maximumMatchingWork - work;
             if (remaining == 0) { exhausted = true; return false; }
             // Re-search all constraints: a prefix's first substitution must not lock later choices.
-            var result = matcher.matchSequence(steps, template.fixedBindings(), remaining);
+            var result = lazyAlternatives
+                ? matcher.matchSequenceLazy(steps, template.fixedBindings(), remaining)
+                : matcher.matchSequence(steps, template.fixedBindings(), remaining);
             work += result.workUnits();
             exhausted |= result.status() == RulePatternMatcher.MatchStatus.BUDGET_EXHAUSTED;
             return result.status() == RulePatternMatcher.MatchStatus.MATCH;
