@@ -1,0 +1,39 @@
+name: Accepted main AI snapshot diagnostic
+
+on:
+  push:
+    branches:
+      - feature/persisted-ast-replay-1010
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  snapshot:
+    name: Measure merged #1017 AI snapshot
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    env:
+      AI_KNOWLEDGE_EXTRACTOR_ENABLED: 'true'
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          ref: 9158b28c1fbc17098b715ff2da7c1bfdaeb6a4dd
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+      - name: Measure the accepted predecessor
+        run: |
+          ./gradlew --no-daemon --no-configuration-cache :ai-knowledge-verification:aiKnowledgeCheck --console=plain
+          echo '--- ACCEPTED_MAIN_METRICS_SNAPSHOT_BEGIN ---'
+          cat build/ai-knowledge/metrics-snapshot.json
+          echo '--- ACCEPTED_MAIN_METRICS_SNAPSHOT_END ---'
+          echo '--- ACCEPTED_MAIN_TREND_BEGIN ---'
+          cat build/ai-knowledge/trend.json
+          echo '--- ACCEPTED_MAIN_TREND_END ---'
