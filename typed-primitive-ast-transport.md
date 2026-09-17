@@ -1,91 +1,97 @@
-# Typed primitive AST transport
+# Typed AST transport for rewrite execution
 
-`AstRewriteTransport` is an explicit in-memory primitive execution boundary,
-revision `regelsuche.ast-rewrite-transport/v1`. It is the first implementation
-slice of #1010, not a replacement of the string-based search runtime.
+`AstRewriteTransport` is the explicit typed primitive boundary introduced for
+#1010. It preserves producer `Expr` values instead of formatting and reparsing
+them. The historical string execution remains available as an independent
+control; typed execution is opt-in.
 
-## Use
+## Primitive transport
 
 ```java
 var transport = new AstRewriteTransport(rules, maximumGrowth, maximumCandidates);
-List<AstRewriteTransport.Step> candidates = transport.generate(sourceAst);
-var chosen = candidates.getFirst(); // selection belongs to the caller
-List<AstRewriteTransport.Step> next = transport.generate(chosen.target());
+var candidates = transport.generate(sourceAst);
+var chosen = candidates.getFirst();
 Expr checked = transport.replay(sourceAst, List.of(chosen));
 ```
 
-The source and target are the actual immutable `Expr` values produced by the
-primitive engine. Do not reconstruct subsequent inputs with display formatting.
-A `NumberExpr` containing 1/3 remains one numeric node, not a DIV tree. Ordered
-ADD/MUL grouping, function arguments and scoped symbol IDs likewise survive.
+A step retains the exact source and target AST, rule ID, rewrite kind,
+growth/cost metadata, equivalence-by-construction flag, side conditions and
+attribution. Ordered ADD/MUL grouping, function arguments, exact rational
+`NumberExpr` leaves and scoped symbol IDs therefore survive. Structural equality
+is not replaced with formatted-text equality.
 
-Generation delegates to the prepared engine's shared rule traversal. Exact
-`PatternRewriteRule` instances still use its prepared matching; subclasses and
-custom rules still use their actual overrides. Only the new typed output branch
-is selected. It does not construct legacy display-based subtree hashes. The
-historical string method keeps its output, filtering, ordering and identity.
+Generation reuses the prepared engine traversal and its actual rule instances.
+Original per-step growth and candidate limits remain active. Unsupported or
+oversized structures fail explicitly; no partial trace is returned.
 
-Typed steps retain source, target, rule ID, kind, growth/cost metadata,
-equivalence-by-construction flag, side conditions and attribution. Typed
-source/target equality replaces the old display-based application-key hash;
-that hash is not imported as a structural identity or occurrence certificate.
-Generation uses structural no-op filtering and structural step deduplication,
-so two trees are not discarded solely because they have the same display text.
-Canonical AST size still supplies the existing per-step growth criterion.
+Replay regenerates each primitive under the receiving engine's rules and bounds
+and requires the complete retained record. Equivalent but structurally different
+sources or targets, changed metadata and changed per-step assumptions are
+rejected. Replay establishes reproducibility under the supplied rules; it does
+not prove arbitrary custom rules or discharge retained assumptions.
 
-## Replay and authority
+## Compiled linear continuations
 
-The replay method checks the exact source of each recorded step and regenerates
-candidates under the receiving engine's current rule set and bounds. The full
-record, including target and metadata, must be present in the regenerated
-candidate list. Equivalent-but-differently-structured sources or targets are not
-interchangeable. A changed rule set or tampered metadata cannot merely be
-accepted because a public `Step` record was constructed.
+The same typed boundary is available for an existing flat Source/Sequence
+program:
 
-This establishes reproducibility relative to the supplied rules. It does not
-prove an arbitrary custom rule correct or discharge its side conditions.
-Existing mathematical proof/audit authorities still apply. The typed transport
-does not fabricate `TransformationProvenance`, authorization, saved-policy
-hashes or a persisted certificate from the in-memory records.
+```java
+var typed = new CompiledLinearRewriteEngine(existingProgram, 128).compileAst();
+var batch = typed.transformMeasured(sourceAst);
+var candidate = batch.candidates().getFirst();
+List<Expr> states = candidate.states();
+var replay = typed.replay(sourceAst, candidate);
+```
 
-Input and output values have explicit limits of 10,000 nodes and depth 128;
-a replay contains 1 through 64 steps. Candidate count must be positive and the
-configured growth/candidate limits apply. Violating a structural limit throws
-rather than returning a partial trace. These bounds are not a CPU, total
-allocation or arbitrary-rule execution quota. The shared engine traversal
-remains eager and can prepare more results than the returned candidate limit.
-There is no new work accounting or performance claim in this slice.
+`existingProgram` may be the real plan emitted by
+`EvolutionRewriteProgramCompiler`; no replacement tactic is introduced. All
+sources must use `PreparedAstRewriteTransformationEngine`, otherwise compilation
+fails before any source executes. The producer AST from one source is passed
+directly to the next.
 
-## Verification
+A compiled candidate retains program ID, ordered source-node IDs and every
+primitive step. Different histories that converge on the same endpoint remain
+distinct because intermediate states can matter to learned binding checks; only
+identical full records are deduplicated. Replay checks the exact input and
+program/source identities, regenerates the complete bounded program and requires
+full candidate equality.
 
-The ten initial transport/control tests were first executed at `e721861` with
-a compiling scaffold that deliberately called the existing string engine and
-reparsed its results. Source-pinned Java-25 run 35119304933, job 104872693443,
-compiled successfully and ran 790 core tests: exactly five assertion failures,
-no errors or skipped tests. The failures expose grouped ADD/MUL loss, numeric
-rational-leaf loss on input/output and structure loss in function arguments.
-The five other controls and all 780 existing core tests passed.
+Typed compiled execution is separately versioned as
+`regelsuche.compiled-linear-rewrite/ast-v1`. Native source emission order is
+used; the historical formatted-string compiler and its ordering remain unchanged.
+The compiled pipeline supports one through eight prepared sources and a 1–128
+candidate bound. Per-source limits remain in force; stage overflow throws rather
+than truncating a path.
 
-The implementation replaces that scaffold with direct typed generation. Further
-controls cover growth/candidate limits, subclass dispatch, immutability and
-source-bound replay. `TypedPrimitiveBindingTransportTest` generates actual
-three-step primitive traces, learns the existing shared-binding model from two
-separate training trajectories, and applies its full-state constraints to grouped,
-rational and scoped inputs. Its legacy string-engine control retains the known
-binding rejection. Mathematical equivalence is checked separately for the
-grouped cancellation example; it is not used to bypass structural equality.
+## Work and authority boundary
 
-Current-head CI results are recorded in the PR discussion. Local execution was
-unavailable during this implementation; no local compilation or test pass is
-claimed. A successful module run does not replace full product CI and review.
+The compiled mechanical ledger records the pipeline call, actual source calls,
+emitted primitive candidates, compositions and exact duplicate removals;
+`candidateWork` retains emitted primitive work. It does not claim AST traversal,
+matcher, allocation, equality, numeric bit, CPU or elapsed-time cost. Global
+search-budget integration remains separate work.
 
-## Remaining work for #1010
+Typed generation and replay are execution evidence, not proof authority.
+Existing mathematical audits, assumption handling and learned-policy admission
+remain independent. Publicly constructible records do not authorize a rewrite.
 
-General search states, `CompiledLinearRewriteEngine`, live binding-dispatch
-observations and persisted/source-hashed replay still use their historical
-string transport. They are not migrated by the primitive API or its integration
-tests. That migration requires carrying the typed states and a versioned
-structural codec through those consumers, including real work accounting.
-No default search path is silently redirected to this transport. #1010 remains
-open until its end-to-end acceptance conditions are met. Historical studies,
-policy controls, proof checks and utility thresholds are unchanged.
+## Verification contract
+
+Regression coverage exercises grouping, rational leaves, function arguments,
+scoped identity, nonempty side conditions, metadata tampering, candidate/growth
+bounds, unsupported compiled sources, failed tails, convergent histories,
+immutable paths and unchanged legacy execution. The learning integration uses
+the actual evolution compiler and its inventoried difference-product,
+square-product and cancel-addend sequence. Correct grouped/rational/scoped
+trajectories satisfy the shared learned binding while mathematically valid paths
+at the wrong residual remain rejected.
+
+Commit-specific CI counts and mutation experiments live in the corresponding PR
+conversation rather than this stable contract.
+
+## Remaining #1010 work
+
+General search states, live dispatcher observation/backend selection, persisted
+structural replay and end-to-end work budgets still require typed integration.
+No default search path, saved policy identity, frozen study, proof requirement or
+acceptance threshold is changed by this API.

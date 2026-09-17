@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CompiledAstRewriteProgram.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.program</a> &gt; <span class="el_source">CompiledAstRewriteProgram.java</span></div><h1>CompiledAstRewriteProgram.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.program;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.transform.AstRewriteTransport;
+import de.regelsuche.transform.ExecutionWork;
+import de.regelsuche.transform.PreparedAstRewriteTransformationEngine;
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Explicit AST execution of an existing linear program. Native source emission order,
+ * structural histories and work accounting are separate from historical text execution.
+ * Replay establishes reproducibility under the supplied rules, not their proof authority.
+ */
+public final class CompiledAstRewriteProgram {
+    public static final String REVISION = &quot;regelsuche.compiled-linear-rewrite/ast-v1&quot;;
+
+    /** All intermediate states and their source-node/rule metadata, not an occurrence certificate. */
+    public record Candidate(String programId, List&lt;String&gt; sourceIds, List&lt;AstRewriteTransport.Step&gt; steps) {
+<span class="fc" id="L24">        public Candidate {</span>
+<span class="fc" id="L25">            requireId(programId);</span>
+<span class="fc" id="L26">            sourceIds = List.copyOf(sourceIds);</span>
+<span class="fc" id="L27">            steps = List.copyOf(steps);</span>
+<span class="pc bpc" id="L28" title="2 of 6 branches missed.">            if (steps.isEmpty() || steps.size() &gt; 8 || sourceIds.size() != steps.size()) {</span>
+<span class="fc" id="L29">                throw new IllegalArgumentException(&quot;require one through eight source-bound primitive steps&quot;);</span>
+            }
+<span class="fc" id="L31">            sourceIds.forEach(CompiledAstRewriteProgram::requireId);</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">            for (int i = 1; i &lt; steps.size(); i++) {</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">                if (!steps.get(i - 1).target().equals(steps.get(i).source())) {</span>
+<span class="fc" id="L34">                    throw new IllegalArgumentException(&quot;disconnected typed primitive path&quot;);</span>
+                }
+            }
+<span class="fc" id="L37">        }</span>
+<span class="fc" id="L38">        public Expr source() { return steps.getFirst().source(); }</span>
+<span class="fc" id="L39">        public Expr target() { return steps.getLast().target(); }</span>
+        public List&lt;Expr&gt; states() {
+<span class="fc" id="L41">            var states = new ArrayList&lt;Expr&gt;();</span>
+<span class="fc" id="L42">            states.add(source());</span>
+<span class="fc" id="L43">            steps.forEach(step -&gt; states.add(step.target()));</span>
+<span class="fc" id="L44">            return List.copyOf(states);</span>
+        }
+        public List&lt;String&gt; assumptions() {
+<span class="fc" id="L47">            return AssumptionSignature.ofExpressions(steps.stream()</span>
+<span class="fc" id="L48">                .flatMap(step -&gt; step.assumptions().stream()).toList()).normalizedAssumptions();</span>
+        }
+    }
+
+    /** Mechanical source/candidate/composition events; not AST-node, CPU or allocation costs. */
+    public record Batch(List&lt;Candidate&gt; candidates, TransformationWorkMetrics workMetrics) {
+<span class="fc" id="L54">        public Batch {</span>
+<span class="fc" id="L55">            candidates = List.copyOf(candidates);</span>
+<span class="fc" id="L56">            Objects.requireNonNull(workMetrics, &quot;workMetrics&quot;);</span>
+<span class="fc" id="L57">        }</span>
+    }
+
+    /** Regeneration work is returned separately instead of being hidden in a boolean check. */
+    public record Replay(Expr target, TransformationWorkMetrics workMetrics) {
+<span class="fc" id="L62">        public Replay {</span>
+<span class="fc" id="L63">            Objects.requireNonNull(target, &quot;target&quot;);</span>
+<span class="fc" id="L64">            Objects.requireNonNull(workMetrics, &quot;workMetrics&quot;);</span>
+<span class="fc" id="L65">        }</span>
+    }
+
+<span class="fc" id="L68">    private record Stage(String sourceId, AstRewriteTransport transport) {}</span>
+    private final String programId;
+    private final List&lt;Stage&gt; stages;
+    private final int maximumCandidates;
+
+<span class="fc" id="L73">    CompiledAstRewriteProgram(String programId, List&lt;RewriteProgram.Source&gt; sources, int maximumCandidates) {</span>
+<span class="fc" id="L74">        requireId(programId);</span>
+<span class="fc" id="L75">        var retained = List.copyOf(sources);</span>
+<span class="pc bpc" id="L76" title="4 of 8 branches missed.">        if (retained.isEmpty() || retained.size() &gt; 8 || maximumCandidates &lt; 1 || maximumCandidates &gt; 128) {</span>
+<span class="nc" id="L77">            throw new IllegalArgumentException(&quot;invalid typed pipeline bounds&quot;);</span>
+        }
+        // Reject unsupported or ambiguous stages before any source can run. In particular, do not
+        // replace a custom reference-engine override with a base prepared implementation.
+<span class="fc" id="L81">        var sourceIds = new LinkedHashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        for (var source : retained) {</span>
+<span class="fc" id="L83">            requireId(source.id());</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            if (!sourceIds.add(source.id())) {</span>
+<span class="fc" id="L85">                throw new IllegalArgumentException(&quot;typed compilation requires unique source IDs&quot;);</span>
+            }
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            if (!(source.engine() instanceof PreparedAstRewriteTransformationEngine)) {</span>
+<span class="fc" id="L88">                throw new IllegalArgumentException(&quot;typed compilation requires prepared AST sources&quot;);</span>
+            }
+<span class="fc" id="L90">        }</span>
+<span class="fc" id="L91">        this.programId = programId;</span>
+<span class="fc" id="L92">        this.maximumCandidates = maximumCandidates;</span>
+<span class="fc" id="L93">        stages = retained.stream().map(source -&gt; new Stage(source.id(),</span>
+<span class="fc" id="L94">            ((PreparedAstRewriteTransformationEngine) source.engine()).astTransport())).toList();</span>
+<span class="fc" id="L95">    }</span>
+
+    /** Complete paths only. Exceeding a candidate/structural limit throws, never silently truncates. */
+    public Batch transformMeasured(Expr expression) {
+<span class="fc" id="L99">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L100">        List&lt;Candidate&gt; current = List.of();</span>
+<span class="fc" id="L101">        long calls = 0, emitted = 0, composed = 0, duplicates = 0;</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        for (int index = 0; index &lt; stages.size(); index++) {</span>
+<span class="fc" id="L103">            var stage = stages.get(index);</span>
+<span class="fc" id="L104">            var next = new ArrayList&lt;Candidate&gt;();</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            int prefixes = index == 0 ? 1 : current.size();</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            for (int p = 0; p &lt; prefixes; p++) {</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">                Expr input = index == 0 ? expression : current.get(p).target();</span>
+<span class="fc" id="L108">                var generated = stage.transport().generate(input);</span>
+<span class="fc" id="L109">                calls++;</span>
+<span class="fc" id="L110">                emitted = Math.addExact(emitted, generated.size());</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                for (var step : generated) {</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">                    if (next.size() &gt;= maximumCandidates) {</span>
+<span class="fc" id="L113">                        throw new IllegalArgumentException(&quot;typed linear pipeline candidate bound exceeded&quot;);</span>
+                    }
+<span class="fc" id="L115">                    var steps = new ArrayList&lt;AstRewriteTransport.Step&gt;();</span>
+<span class="fc" id="L116">                    var ids = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">                    if (index != 0) {</span>
+<span class="fc" id="L118">                        steps.addAll(current.get(p).steps());</span>
+<span class="fc" id="L119">                        ids.addAll(current.get(p).sourceIds());</span>
+<span class="fc" id="L120">                        composed++;</span>
+                    }
+<span class="fc" id="L122">                    steps.add(step);</span>
+<span class="fc" id="L123">                    ids.add(stage.sourceId());</span>
+<span class="fc" id="L124">                    next.add(new Candidate(programId, ids, steps));</span>
+<span class="fc" id="L125">                }</span>
+            }
+            // Equal endpoints alone cannot collapse histories with different intermediate states,
+            // rule metadata or side conditions. First structural history wins deterministically.
+<span class="fc" id="L129">            current = List.copyOf(new LinkedHashSet&lt;&gt;(next));</span>
+<span class="fc" id="L130">            duplicates = Math.addExact(duplicates, next.size() - current.size());</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            if (current.isEmpty()) break;</span>
+        }
+<span class="fc" id="L133">        var metrics = new TransformationWorkMetrics(1, 0, calls, emitted, composed, 0, 0, 0, 0, 0, 0, 0, 0, duplicates)</span>
+<span class="fc" id="L134">            .withCandidateWork(new ExecutionWork(emitted, 0, 0));</span>
+<span class="fc" id="L135">        return new Batch(current, metrics);</span>
+    }
+
+    /**
+     * Regenerate the entire bounded program and require exact candidate equality. This includes
+     * stage IDs, all intermediate ASTs, rule metadata and assumptions. Public records do not
+     * authorize a candidate; side conditions remain obligations, not discharged facts.
+     */
+    public Replay replay(Expr source, Candidate candidate) {
+<span class="fc" id="L144">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L145">        Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc bfc" id="L146" title="All 4 branches covered.">        if (!programId.equals(candidate.programId()) || !source.equals(candidate.source())</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">                || !stages.stream().map(Stage::sourceId).toList().equals(candidate.sourceIds())) {</span>
+<span class="fc" id="L148">            throw new IllegalArgumentException(&quot;candidate is not bound to this program and source&quot;);</span>
+        }
+<span class="fc" id="L150">        var regenerated = transformMeasured(source);</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (!regenerated.candidates().contains(candidate)) {</span>
+<span class="fc" id="L152">            throw new IllegalArgumentException(&quot;candidate differs from complete typed program regeneration&quot;);</span>
+        }
+<span class="fc" id="L154">        return new Replay(candidate.target(), regenerated.workMetrics());</span>
+    }
+
+    private static void requireId(String id) {
+<span class="pc bpc" id="L158" title="2 of 4 branches missed.">        if (id == null || id.isBlank()) throw new IllegalArgumentException(&quot;program/source ID must be present&quot;);</span>
+<span class="fc" id="L159">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

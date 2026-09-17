@@ -265,10 +265,10 @@ public final class ProofJobScheduler implements AutoCloseable {
 <span class="nc" id="L265">            future.cancel(true);</span>
 <span class="nc" id="L266">            runningFutures.remove(job.id());</span>
 <span class="nc" id="L267">            handleFailure(job, &quot;timeout after &quot; + jobTimeoutMillis + &quot;ms&quot;);</span>
-<span class="fc" id="L268">        } catch (InterruptedException ex) {</span>
-<span class="fc" id="L269">            Thread.currentThread().interrupt();</span>
-<span class="fc" id="L270">            runningFutures.remove(job.id());</span>
-<span class="fc" id="L271">            jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));</span>
+<span class="nc" id="L268">        } catch (InterruptedException ex) {</span>
+<span class="nc" id="L269">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L270">            runningFutures.remove(job.id());</span>
+<span class="nc" id="L271">            jobRepository.save(job.withStatus(ProofJobStatus.CANCELLED));</span>
 <span class="fc" id="L272">        } catch (CancellationException ex) {</span>
 <span class="fc" id="L273">            runningFutures.remove(job.id());</span>
 <span class="fc" id="L274">            cancelRequests.remove(job.id());</span>
