@@ -82,6 +82,11 @@ public final class PreparedAstRewriteTransformationEngine
         return rules;
     }
 
+    /** Independent typed view with this source's exact rule objects and generation limits. */
+    public AstRewriteTransport astTransport() {
+        return new AstRewriteTransport(rules, maxAstSizeIncreasePerStep, maxCandidatesPerState);
+    }
+
     /** Explicit native cursor capability; the historical list-based transformation path is unchanged. */
     public TransformationCursor openCursor(String expression) {
         return openCursor(expression, TransformationCursor.DEFAULT_MATCHER_BRANCH_LIMIT);

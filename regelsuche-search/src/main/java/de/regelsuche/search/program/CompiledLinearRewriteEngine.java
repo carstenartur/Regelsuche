@@ -39,6 +39,11 @@ public final class CompiledLinearRewriteEngine implements MeasuredTransformation
         sources = List.copyOf(compiled);
     }
 
+    /** Explicit typed execution; the historical string pipeline remains unchanged. */
+    public CompiledAstRewriteProgram compileAst() {
+        return new CompiledAstRewriteProgram(programId, sources, maximumCandidates);
+    }
+
     @Override
     public TransformationBatch transformMeasured(String expression) {
         expression = java.util.Objects.requireNonNull(expression, "expression").trim().replaceAll("\\s+", " ");
