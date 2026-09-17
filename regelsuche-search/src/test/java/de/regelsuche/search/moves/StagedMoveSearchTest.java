@@ -1,8 +1,14 @@
 package de.regelsuche.search.moves;
 
 import static org.junit.jupiter.api.Assertions.*;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.search.program.RewriteCandidate;
+import de.regelsuche.transform.AstRewriteTransport;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternRewriteRule;
 import de.regelsuche.transform.Transformation;
+import static de.regelsuche.ast.BinaryOperator.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -10,6 +16,32 @@ import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
 class StagedMoveSearchTest {
+
+    @Test void typedFrontierPreservesGroupingAcrossActualPrimitiveSearchSteps() {
+        var parser = new ExpressionParser();
+        var a = PatternExpr.var("A");
+        var transport = new AstRewriteTransport(List.of(
+            new PatternRewriteRule("typed-zero", PatternExpr.op(ADD, a, PatternExpr.num(0)), a),
+            new PatternRewriteRule("typed-square", PatternExpr.op(MUL, a, a), PatternExpr.op(POW, a, PatternExpr.num(2)))
+        ), 100, 100);
+        var descriptor = new MoveProvider.Descriptor("typed-primitives", "*", SearchMove.SourceKind.PRIMITIVE,
+            SearchMove.ProofStrength.REPLAYABLE, List.of(), SearchMove.ValueEvidence.UNKNOWN, "typed-fixture");
+        var provider = TypedMoveSearch.primitiveProvider(descriptor, transport);
+        Expr source = parser.parseTerm("((a+(b+c))+0)*((a+(b+c))+0)");
+        Expr target = parser.parseTerm("(a+(b+c))^2");
+
+        var result = new TypedMoveSearch().search(new TypedMoveSearch.Problem(source,
+            TypedMoveSearch.Context.frozen(target), List.of(provider), TypedMoveSearch.Policy.INVENTORY_ORDER,
+            TypedMoveSearch.primitiveReplay(transport), state -> 0, MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED,
+            new MoveSearch.Budget(4, 4, 0, 100, 10_000)));
+
+        assertTrue(result.reached());
+        assertEquals(target, result.witness().getLast().target().expression());
+        assertTrue(result.reachedStates().stream().anyMatch(state -> state.expression().equals(target)));
+        assertEquals(parser.parseTerm("a+(b+c)"),
+            ((de.regelsuche.ast.BinaryExpr) target).left());
+    }
+
     @Test void contextValidationAndOptionalVerificationAreExplicit() {
         var error = assertThrows(NullPointerException.class, () -> new MoveSearch.Problem("a", null, List.of(),
             MovePriorityPolicy.INVENTORY_ORDER, GRAPH, state -> 0, MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED,
