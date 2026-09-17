@@ -149,6 +149,11 @@ public final class CompiledAstRewriteProgram {
         return new Replay(candidate.target(), regenerated.workMetrics());
     }
 
+    /** Decode untrusted persisted data, then regenerate the full program under the supplied source. */
+    public Replay replayEncoded(Expr source, byte[] document) {
+        return replay(source, new CompiledAstReplayCodec().decode(document));
+    }
+
     private static void requireId(String id) {
         if (id == null || id.isBlank()) throw new IllegalArgumentException("program/source ID must be present");
     }
