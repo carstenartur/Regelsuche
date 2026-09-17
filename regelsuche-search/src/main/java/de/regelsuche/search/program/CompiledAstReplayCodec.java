@@ -101,8 +101,10 @@ public final class CompiledAstReplayCodec {
                 steps.add(step);
             }
             return new Candidate(data.text(root, "program"), sourceIds, steps);
-        } catch (CharacterCodingException | JsonProcessingException exception) {
+        } catch (CharacterCodingException exception) {
             throw new IllegalArgumentException("invalid UTF-8 AST replay JSON", exception);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalArgumentException("invalid AST replay JSON", exception);
         }
     }
 
