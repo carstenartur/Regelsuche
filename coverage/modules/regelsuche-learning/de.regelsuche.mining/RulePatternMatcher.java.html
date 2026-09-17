@@ -10,66 +10,67 @@ import java.util.Optional;
 /** Structural applicability matching; a binding is not a mathematical proof. */
 <span class="fc" id="L11">public class RulePatternMatcher {</span>
     public static final String SEQUENCE_REVISION = &quot;regelsuche.rule-pattern-sequence/v1&quot;;
+    public static final String LAZY_SEQUENCE_REVISION = &quot;regelsuche.rule-pattern-sequence/lazy-v1&quot;;
     public static final int MAXIMUM_SEQUENCE_STEPS = 64;
 
-<span class="fc" id="L15">    public enum MatchStatus { MATCH, NO_MATCH, BUDGET_EXHAUSTED }</span>
+<span class="fc" id="L16">    public enum MatchStatus { MATCH, NO_MATCH, BUDGET_EXHAUSTED }</span>
 
     /** One constraint in a sequence sharing the same placeholder substitution. */
     public record MatchStep(RulePatternNode pattern, Expr expression) {
-<span class="fc" id="L19">        public MatchStep {</span>
-<span class="fc" id="L20">            Objects.requireNonNull(pattern, &quot;pattern&quot;);</span>
-<span class="fc" id="L21">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
-<span class="fc" id="L22">        }</span>
+<span class="fc" id="L20">        public MatchStep {</span>
+<span class="fc" id="L21">            Objects.requireNonNull(pattern, &quot;pattern&quot;);</span>
+<span class="fc" id="L22">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L23">        }</span>
     }
 
     /** Failed or incomplete searches never expose a partial substitution. */
     public record MatchResult(MatchStatus status, Map&lt;String, Expr&gt; bindings, long workUnits) {
-<span class="fc" id="L27">        public MatchResult {</span>
-<span class="fc" id="L28">            Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="fc" id="L29">            bindings = Map.copyOf(bindings);</span>
-<span class="pc bpc" id="L30" title="2 of 6 branches missed.">            if (workUnits &lt; 0 || (status != MatchStatus.MATCH &amp;&amp; !bindings.isEmpty())) {</span>
-<span class="nc" id="L31">                throw new IllegalArgumentException(&quot;invalid matching result&quot;);</span>
+<span class="fc" id="L28">        public MatchResult {</span>
+<span class="fc" id="L29">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L30">            bindings = Map.copyOf(bindings);</span>
+<span class="pc bpc" id="L31" title="2 of 6 branches missed.">            if (workUnits &lt; 0 || (status != MatchStatus.MATCH &amp;&amp; !bindings.isEmpty())) {</span>
+<span class="nc" id="L32">                throw new IllegalArgumentException(&quot;invalid matching result&quot;);</span>
             }
-<span class="fc" id="L33">        }</span>
+<span class="fc" id="L34">        }</span>
     }
 
-<span class="fc" id="L36">    private final RulePatternParser patternParser = new RulePatternParser();</span>
-<span class="fc" id="L37">    private final ExpressionParser expressionParser = new ExpressionParser();</span>
+<span class="fc" id="L37">    private final RulePatternParser patternParser = new RulePatternParser();</span>
+<span class="fc" id="L38">    private final ExpressionParser expressionParser = new ExpressionParser();</span>
 
     public Optional&lt;Map&lt;String, Expr&gt;&gt; match(String patternString, String expression) {
         try {
-<span class="fc" id="L41">            return matchExpression(patternParser.parse(patternString), expressionParser.parseTerm(expression));</span>
-<span class="nc" id="L42">        } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L43">            return Optional.empty();</span>
+<span class="fc" id="L42">            return matchExpression(patternParser.parse(patternString), expressionParser.parseTerm(expression));</span>
+<span class="nc" id="L43">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L44">            return Optional.empty();</span>
         }
     }
 
     public Optional&lt;Map&lt;String, Expr&gt;&gt; match(RulePatternNode pattern, String expression) {
         try {
-<span class="fc" id="L49">            return matchExpression(pattern, expressionParser.parseTerm(expression));</span>
-<span class="fc" id="L50">        } catch (IllegalArgumentException ex) {</span>
-<span class="fc" id="L51">            return Optional.empty();</span>
+<span class="fc" id="L50">            return matchExpression(pattern, expressionParser.parseTerm(expression));</span>
+<span class="fc" id="L51">        } catch (IllegalArgumentException ex) {</span>
+<span class="fc" id="L52">            return Optional.empty();</span>
         }
     }
 
     /** Matches an already identity-bound AST without converting it through display text. */
     public Optional&lt;Map&lt;String, Expr&gt;&gt; matchExpression(String patternString, Expr expression) {
         try {
-<span class="fc" id="L58">            return matchExpression(patternParser.parse(patternString), expression);</span>
-<span class="fc" id="L59">        } catch (IllegalArgumentException ex) {</span>
-<span class="fc" id="L60">            return Optional.empty();</span>
+<span class="fc" id="L59">            return matchExpression(patternParser.parse(patternString), expression);</span>
+<span class="fc" id="L60">        } catch (IllegalArgumentException ex) {</span>
+<span class="fc" id="L61">            return Optional.empty();</span>
         }
     }
 
     public Optional&lt;Map&lt;String, Expr&gt;&gt; matchExpression(RulePatternNode pattern, Expr expression) {
-<span class="fc" id="L65">        return matchExpression(pattern, expression, Map.of());</span>
+<span class="fc" id="L66">        return matchExpression(pattern, expression, Map.of());</span>
     }
 
     /** Initial bindings are constraints, not mutable output parameters. */
     public Optional&lt;Map&lt;String, Expr&gt;&gt; matchExpression(RulePatternNode pattern, Expr expression,
             Map&lt;String, Expr&gt; initialBindings) {
-<span class="fc" id="L71">        var result = matchSequence(List.of(new MatchStep(pattern, expression)), initialBindings, Long.MAX_VALUE);</span>
-<span class="fc bfc" id="L72" title="All 2 branches covered.">        return result.status() == MatchStatus.MATCH ? Optional.of(result.bindings()) : Optional.empty();</span>
+<span class="fc" id="L72">        var result = matchSequence(List.of(new MatchStep(pattern, expression)), initialBindings, Long.MAX_VALUE);</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        return result.status() == MatchStatus.MATCH ? Optional.of(result.bindings()) : Optional.empty();</span>
     }
 
     /**
@@ -84,11 +85,30 @@ import java.util.Optional;
      */
     public MatchResult matchSequence(List&lt;MatchStep&gt; steps, Map&lt;String, Expr&gt; initialBindings,
             long maximumWorkUnits) {
-<span class="fc" id="L87">        Objects.requireNonNull(steps, &quot;steps&quot;);</span>
-<span class="fc bfc" id="L88" title="All 6 branches covered.">        if (steps.isEmpty() || steps.size() &gt; MAXIMUM_SEQUENCE_STEPS || maximumWorkUnits &lt; 1) {</span>
-<span class="fc" id="L89">            throw new IllegalArgumentException(&quot;require 1 through 64 steps and positive matching work&quot;);</span>
+<span class="fc" id="L88">        return matchSequence(steps, initialBindings, maximumWorkUnits, false);</span>
+    }
+
+    /**
+     * Opt-in execution of the same relation and depth-first choice order. Swapped
+     * and repeated-associative alternatives retain their bindings and continuation,
+     * but construct constraints only when visited. The same logical operations are
+     * charged as in {@link #matchSequence}; unused constraints are not constructed.
+     * Alternative descriptors, like the historical frame/map allocation, are not
+     * part of the node-work ledger. This is not a walltime or allocation estimate.
+     */
+    public MatchResult matchSequenceLazy(List&lt;MatchStep&gt; steps, Map&lt;String, Expr&gt; initialBindings,
+            long maximumWorkUnits) {
+<span class="fc" id="L101">        return matchSequence(steps, initialBindings, maximumWorkUnits, true);</span>
+    }
+
+    private MatchResult matchSequence(List&lt;MatchStep&gt; steps, Map&lt;String, Expr&gt; initialBindings,
+            long maximumWorkUnits, boolean lazyAlternatives) {
+<span class="fc" id="L106">        Objects.requireNonNull(steps, &quot;steps&quot;);</span>
+<span class="fc bfc" id="L107" title="All 6 branches covered.">        if (steps.isEmpty() || steps.size() &gt; MAXIMUM_SEQUENCE_STEPS || maximumWorkUnits &lt; 1) {</span>
+<span class="fc" id="L108">            throw new IllegalArgumentException(&quot;require 1 through 64 steps and positive matching work&quot;);</span>
         }
-<span class="fc" id="L91">        return new RulePatternBindingSearch(maximumWorkUnits).match(List.copyOf(steps), Map.copyOf(initialBindings));</span>
+<span class="fc" id="L110">        return new RulePatternBindingSearch(maximumWorkUnits, lazyAlternatives)</span>
+<span class="fc" id="L111">            .match(List.copyOf(steps), Map.copyOf(initialBindings));</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

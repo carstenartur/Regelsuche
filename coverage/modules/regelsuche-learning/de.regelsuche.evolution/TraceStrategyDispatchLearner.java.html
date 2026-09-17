@@ -160,231 +160,241 @@ import java.util.TreeSet;
 <span class="fc" id="L160">        return train(formation, inputs, limits, Objects.requireNonNull(bindings, &quot;bindings&quot;));</span>
     }
 
-    private FrozenPolicy train(FrozenStrategy formation, List&lt;Input&gt; inputs, Limits limits, BindingLimits bindingLimits) {
-<span class="fc" id="L164">        Objects.requireNonNull(formation, &quot;formation&quot;);</span>
-<span class="fc" id="L165">        Objects.requireNonNull(limits, &quot;limits&quot;);</span>
-<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (limits.budget().maxPrimitiveSteps() &gt; formation.limits().maximumTraceSteps()) {</span>
-<span class="nc" id="L167">            throw new IllegalArgumentException(&quot;dispatch budget exceeds formation envelope&quot;);</span>
-        }
-<span class="fc" id="L169">        var ordered = List.copyOf(inputs).stream().sorted(Comparator.comparing(Input::id)).toList();</span>
-<span class="pc bpc" id="L170" title="2 of 4 branches missed.">        if (ordered.size() &lt; 2 || ordered.size() &gt; limits.maximumInputs()</span>
-<span class="pc bpc" id="L171" title="1 of 2 branches missed.">                || ordered.stream().map(Input::id).distinct().count() != ordered.size()) {</span>
-<span class="nc" id="L172">            throw new IllegalArgumentException(&quot;distinct bounded dispatch TRAIN inputs required&quot;);</span>
-        }
-<span class="fc" id="L174">        var exact = new ExactPolynomialAnalysis();</span>
-<span class="fc" id="L175">        Set&lt;String&gt; exclusions = new TreeSet&lt;&gt;(formation.excludedIdentities());</span>
-<span class="fc bfc" id="L176" title="All 2 branches covered.">        for (var input : ordered) {</span>
-<span class="fc bfc" id="L177" title="All 2 branches covered.">            if (!exclusions.add(exact.alphaIdentity(input.expression()))) {</span>
-<span class="fc" id="L178">                throw new IllegalArgumentException(&quot;dispatch TRAIN overlaps formation or another TRAIN polynomial&quot;);</span>
-            }
-<span class="fc" id="L180">        }</span>
-<span class="fc" id="L181">        var executable = new Executable(formation);</span>
-<span class="fc" id="L182">        var baseline = observe(executable, ordered, limits.budget(), List.of(), Profile.FLAT_GREEDY);</span>
-<span class="fc bfc" id="L183" title="All 2 branches covered.">        TraceBindingModel bindings = bindingLimits == null ? null : TraceBindingDispatch.learn(formation, baseline, bindingLimits);</span>
-<span class="fc bfc" id="L184" title="All 2 branches covered.">        if (bindings != null) executable = new Executable(formation, bindings);</span>
-<span class="fc" id="L185">        var contexts = collectContexts(executable, baseline, limits.maximumContexts());</span>
-<span class="fc" id="L186">        var selection = selectRoutes(executable, ordered, limits, baseline, contexts.masks());</span>
-<span class="fc bfc" id="L187" title="All 4 branches covered.">        for (var trial : selection.trials()) for (var observation : trial.observations()) {</span>
-<span class="fc bfc" id="L188" title="All 2 branches covered.">            for (var state : observation.search().exploredStates()) exclusions.add(exact.alphaIdentity(state.expression()));</span>
-<span class="fc" id="L189">        }</span>
-<span class="fc" id="L190">        return new FrozenPolicy(formation, limits, selection.routes(), selection.trials(), exclusions, contexts.work(), bindings);</span>
+    /** Opt-in lazy matching; both historical training entry points remain executable controls. */
+    public FrozenPolicy trainBindingAwareLazy(FrozenStrategy formation, List&lt;Input&gt; inputs, Limits limits, BindingLimits bindings) {
+<span class="fc" id="L165">        return train(formation, inputs, limits, Objects.requireNonNull(bindings, &quot;bindings&quot;), true);</span>
     }
 
-<span class="fc" id="L193">    private record ContextCollection(List&lt;Long&gt; masks, long work) {}</span>
-<span class="fc" id="L194">    private record RouteSelection(List&lt;Route&gt; routes, List&lt;Trial&gt; trials) {}</span>
+    private FrozenPolicy train(FrozenStrategy formation, List&lt;Input&gt; inputs, Limits limits, BindingLimits bindingLimits) {
+<span class="fc" id="L169">        return train(formation, inputs, limits, bindingLimits, false);</span>
+    }
+
+    private FrozenPolicy train(FrozenStrategy formation, List&lt;Input&gt; inputs, Limits limits,
+            BindingLimits bindingLimits, boolean lazyAlternatives) {
+<span class="fc" id="L174">        Objects.requireNonNull(formation, &quot;formation&quot;);</span>
+<span class="fc" id="L175">        Objects.requireNonNull(limits, &quot;limits&quot;);</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        if (limits.budget().maxPrimitiveSteps() &gt; formation.limits().maximumTraceSteps()) {</span>
+<span class="nc" id="L177">            throw new IllegalArgumentException(&quot;dispatch budget exceeds formation envelope&quot;);</span>
+        }
+<span class="fc" id="L179">        var ordered = List.copyOf(inputs).stream().sorted(Comparator.comparing(Input::id)).toList();</span>
+<span class="pc bpc" id="L180" title="2 of 4 branches missed.">        if (ordered.size() &lt; 2 || ordered.size() &gt; limits.maximumInputs()</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">                || ordered.stream().map(Input::id).distinct().count() != ordered.size()) {</span>
+<span class="nc" id="L182">            throw new IllegalArgumentException(&quot;distinct bounded dispatch TRAIN inputs required&quot;);</span>
+        }
+<span class="fc" id="L184">        var exact = new ExactPolynomialAnalysis();</span>
+<span class="fc" id="L185">        Set&lt;String&gt; exclusions = new TreeSet&lt;&gt;(formation.excludedIdentities());</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        for (var input : ordered) {</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            if (!exclusions.add(exact.alphaIdentity(input.expression()))) {</span>
+<span class="fc" id="L188">                throw new IllegalArgumentException(&quot;dispatch TRAIN overlaps formation or another TRAIN polynomial&quot;);</span>
+            }
+<span class="fc" id="L190">        }</span>
+<span class="fc" id="L191">        var executable = new Executable(formation);</span>
+<span class="fc" id="L192">        var baseline = observe(executable, ordered, limits.budget(), List.of(), Profile.FLAT_GREEDY);</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        TraceBindingModel bindings = bindingLimits == null ? null : TraceBindingDispatch.learn(formation, baseline, bindingLimits, lazyAlternatives);</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (bindings != null) executable = new Executable(formation, bindings);</span>
+<span class="fc" id="L195">        var contexts = collectContexts(executable, baseline, limits.maximumContexts());</span>
+<span class="fc" id="L196">        var selection = selectRoutes(executable, ordered, limits, baseline, contexts.masks());</span>
+<span class="fc bfc" id="L197" title="All 4 branches covered.">        for (var trial : selection.trials()) for (var observation : trial.observations()) {</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            for (var state : observation.search().exploredStates()) exclusions.add(exact.alphaIdentity(state.expression()));</span>
+<span class="fc" id="L199">        }</span>
+<span class="fc" id="L200">        return new FrozenPolicy(formation, limits, selection.routes(), selection.trials(), exclusions, contexts.work(), bindings);</span>
+    }
+
+<span class="fc" id="L203">    private record ContextCollection(List&lt;Long&gt; masks, long work) {}</span>
+<span class="fc" id="L204">    private record RouteSelection(List&lt;Route&gt; routes, List&lt;Trial&gt; trials) {}</span>
 
     private static ContextCollection collectContexts(Executable executable, List&lt;Observation&gt; baseline, int maximumContexts) {
-<span class="fc" id="L197">        var contexts = new TreeSet&lt;Long&gt;();</span>
-<span class="fc" id="L198">        long collectionWork = 0;</span>
-<span class="fc bfc" id="L199" title="All 2 branches covered.">        for (var observation : baseline) {</span>
-<span class="fc bfc" id="L200" title="All 2 branches covered.">            for (var state : observation.search().exploredStates()) {</span>
-<span class="fc" id="L201">                var batch = executable.flat.transformMeasured(state.expression());</span>
-<span class="fc" id="L202">                collectionWork = Math.addExact(collectionWork, batch.workMetrics().totalWorkUnits());</span>
-<span class="fc" id="L203">                collectionWork = Math.addExact(collectionWork, batch.transformations().size() + 1L);</span>
-<span class="fc" id="L204">                long context = executable.context(batch.transformations());</span>
-<span class="fc bfc" id="L205" title="All 2 branches covered.">                if (context != 0) contexts.add(context);</span>
-<span class="fc" id="L206">            }</span>
-<span class="fc" id="L207">        }</span>
-<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        if (contexts.size() &gt; maximumContexts) throw new IllegalArgumentException(&quot;dispatch context limit exceeded&quot;);</span>
-<span class="fc" id="L209">        return new ContextCollection(contexts.stream().toList(), collectionWork);</span>
+<span class="fc" id="L207">        var contexts = new TreeSet&lt;Long&gt;();</span>
+<span class="fc" id="L208">        long collectionWork = 0;</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        for (var observation : baseline) {</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">            for (var state : observation.search().exploredStates()) {</span>
+<span class="fc" id="L211">                var batch = executable.flat.transformMeasured(state.expression());</span>
+<span class="fc" id="L212">                collectionWork = Math.addExact(collectionWork, batch.workMetrics().totalWorkUnits());</span>
+<span class="fc" id="L213">                collectionWork = Math.addExact(collectionWork, batch.transformations().size() + 1L);</span>
+<span class="fc" id="L214">                long context = executable.context(batch.transformations());</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">                if (context != 0) contexts.add(context);</span>
+<span class="fc" id="L216">            }</span>
+<span class="fc" id="L217">        }</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">        if (contexts.size() &gt; maximumContexts) throw new IllegalArgumentException(&quot;dispatch context limit exceeded&quot;);</span>
+<span class="fc" id="L219">        return new ContextCollection(contexts.stream().toList(), collectionWork);</span>
     }
 
     private static RouteSelection selectRoutes(Executable executable, List&lt;Input&gt; inputs, Limits limits,
             List&lt;Observation&gt; baseline, List&lt;Long&gt; contexts) {
-<span class="fc" id="L214">        List&lt;Trial&gt; trials = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L215">        trials.add(new Trial(&quot;baseline&quot;, List.of(), baseline, false));</span>
-<span class="fc" id="L216">        List&lt;Route&gt; selected = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L217">        long bestWork = totalWork(baseline);</span>
-<span class="fc bfc" id="L218" title="All 2 branches covered.">        for (long context : contexts) {</span>
-<span class="fc bfc" id="L219" title="All 2 branches covered.">            for (var continuation : executable.continuations) {</span>
-<span class="fc bfc" id="L220" title="All 2 branches covered.">                if ((context &amp; executable.bit(continuation.firstRule())) == 0) continue;</span>
-<span class="pc bpc" id="L221" title="1 of 2 branches missed.">                if (trials.size() &gt;= limits.maximumTrials()) throw new IllegalArgumentException(&quot;dispatch trial limit exceeded&quot;);</span>
-<span class="pc bnc" id="L222" title="All 2 branches missed.">                var candidate = new ArrayList&lt;&gt;(selected.stream().filter(route -&gt; route.contextMask() != context).toList());</span>
-<span class="fc" id="L223">                candidate.add(new Route(context, continuation.sequence()));</span>
-<span class="fc" id="L224">                candidate.sort(Comparator.comparingLong(Route::contextMask));</span>
-<span class="fc" id="L225">                var observations = observe(executable, inputs, limits.budget(), candidate, Profile.LEARNED_DISPATCH);</span>
-<span class="fc" id="L226">                long work = totalWork(observations);</span>
-<span class="pc bpc" id="L227" title="1 of 4 branches missed.">                boolean accepted = scoresNoWorse(observations, baseline) &amp;&amp; work &lt; bestWork;</span>
-<span class="fc" id="L228">                trials.add(new Trial(&quot;route-&quot; + trials.size(), candidate, observations, accepted));</span>
-<span class="fc bfc" id="L229" title="All 2 branches covered.">                if (accepted) { selected = candidate; bestWork = work; }</span>
-<span class="fc" id="L230">            }</span>
-<span class="fc" id="L231">        }</span>
-<span class="fc" id="L232">        return new RouteSelection(List.copyOf(selected), List.copyOf(trials));</span>
+<span class="fc" id="L224">        List&lt;Trial&gt; trials = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L225">        trials.add(new Trial(&quot;baseline&quot;, List.of(), baseline, false));</span>
+<span class="fc" id="L226">        List&lt;Route&gt; selected = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L227">        long bestWork = totalWork(baseline);</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        for (long context : contexts) {</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            for (var continuation : executable.continuations) {</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">                if ((context &amp; executable.bit(continuation.firstRule())) == 0) continue;</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">                if (trials.size() &gt;= limits.maximumTrials()) throw new IllegalArgumentException(&quot;dispatch trial limit exceeded&quot;);</span>
+<span class="pc bnc" id="L232" title="All 2 branches missed.">                var candidate = new ArrayList&lt;&gt;(selected.stream().filter(route -&gt; route.contextMask() != context).toList());</span>
+<span class="fc" id="L233">                candidate.add(new Route(context, continuation.sequence()));</span>
+<span class="fc" id="L234">                candidate.sort(Comparator.comparingLong(Route::contextMask));</span>
+<span class="fc" id="L235">                var observations = observe(executable, inputs, limits.budget(), candidate, Profile.LEARNED_DISPATCH);</span>
+<span class="fc" id="L236">                long work = totalWork(observations);</span>
+<span class="pc bpc" id="L237" title="1 of 4 branches missed.">                boolean accepted = scoresNoWorse(observations, baseline) &amp;&amp; work &lt; bestWork;</span>
+<span class="fc" id="L238">                trials.add(new Trial(&quot;route-&quot; + trials.size(), candidate, observations, accepted));</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">                if (accepted) { selected = candidate; bestWork = work; }</span>
+<span class="fc" id="L240">            }</span>
+<span class="fc" id="L241">        }</span>
+<span class="fc" id="L242">        return new RouteSelection(List.copyOf(selected), List.copyOf(trials));</span>
     }
 
     private static boolean scoresNoWorse(List&lt;Observation&gt; observations, List&lt;Observation&gt; baseline) {
-<span class="fc bfc" id="L236" title="All 2 branches covered.">        for (int i = 0; i &lt; baseline.size(); i++) {</span>
-<span class="fc" id="L237">            if (observations.get(i).search().bestState().score().weightedTotal()</span>
-<span class="pc bpc" id="L238" title="1 of 2 branches missed.">                    &gt; baseline.get(i).search().bestState().score().weightedTotal()) return false;</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        for (int i = 0; i &lt; baseline.size(); i++) {</span>
+<span class="fc" id="L247">            if (observations.get(i).search().bestState().score().weightedTotal()</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">                    &gt; baseline.get(i).search().bestState().score().weightedTotal()) return false;</span>
         }
-<span class="fc" id="L240">        return true;</span>
+<span class="fc" id="L250">        return true;</span>
     }
 
     public Observation apply(FrozenPolicy policy, Input input, Profile profile) {
-<span class="fc" id="L244">        return prepare(policy, profile).apply(input);</span>
+<span class="fc" id="L254">        return prepare(policy, profile).apply(input);</span>
     }
 
     /** Compile once for a stream of applications; no application feedback updates the policy. */
     public PreparedPolicy prepare(FrozenPolicy policy, Profile profile) {
-<span class="fc" id="L249">        Objects.requireNonNull(policy, &quot;policy&quot;);</span>
-<span class="fc" id="L250">        Objects.requireNonNull(profile, &quot;profile&quot;);</span>
-<span class="fc" id="L251">        return new PreparedPolicy(policy, new Executable(policy.formation(), policy.bindings).engine(policy.routes(), profile));</span>
+<span class="fc" id="L259">        Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L260">        Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="fc" id="L261">        return new PreparedPolicy(policy, new Executable(policy.formation(), policy.bindings).engine(policy.routes(), profile));</span>
     }
 
     public static final class PreparedPolicy {
         private final FrozenPolicy policy;
         private final MeasuredTransformationEngine engine;
-<span class="fc" id="L257">        private PreparedPolicy(FrozenPolicy policy, MeasuredTransformationEngine engine) {</span>
-<span class="fc" id="L258">            this.policy = policy;</span>
-<span class="fc" id="L259">            this.engine = engine;</span>
-<span class="fc" id="L260">        }</span>
+<span class="fc" id="L267">        private PreparedPolicy(FrozenPolicy policy, MeasuredTransformationEngine engine) {</span>
+<span class="fc" id="L268">            this.policy = policy;</span>
+<span class="fc" id="L269">            this.engine = engine;</span>
+<span class="fc" id="L270">        }</span>
         public Observation apply(Input input) {
-<span class="fc bfc" id="L262" title="All 2 branches covered.">            if (policy.exclusions().contains(new ExactPolynomialAnalysis().alphaIdentity(input.expression()))) {</span>
-<span class="fc" id="L263">                throw new IllegalArgumentException(&quot;application overlaps an observed TRAIN polynomial&quot;);</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">            if (policy.exclusions().contains(new ExactPolynomialAnalysis().alphaIdentity(input.expression()))) {</span>
+<span class="fc" id="L273">                throw new IllegalArgumentException(&quot;application overlaps an observed TRAIN polynomial&quot;);</span>
             }
-<span class="fc" id="L265">            return observe(engine, input, policy.limits().budget());</span>
+<span class="fc" id="L275">            return observe(engine, input, policy.limits().budget());</span>
         }
     }
 
     static MeasuredTransformationEngine engine(FrozenPolicy policy, Profile profile) {
-<span class="fc" id="L270">        return new Executable(policy.formation(), policy.bindings).engine(policy.routes(), profile);</span>
+<span class="fc" id="L280">        return new Executable(policy.formation(), policy.bindings).engine(policy.routes(), profile);</span>
     }
 
     private static List&lt;Observation&gt; observe(Executable executable, List&lt;Input&gt; inputs, Budget budget,
             List&lt;Route&gt; routes, Profile profile) {
-<span class="fc" id="L275">        var engine = executable.engine(routes, profile);</span>
-<span class="fc" id="L276">        return inputs.stream().map(input -&gt; observe(engine, input, budget)).toList();</span>
+<span class="fc" id="L285">        var engine = executable.engine(routes, profile);</span>
+<span class="fc" id="L286">        return inputs.stream().map(input -&gt; observe(engine, input, budget)).toList();</span>
     }
 
     private static Observation observe(MeasuredTransformationEngine engine, Input input, Budget budget) {
-<span class="fc" id="L280">        var auditor = new TraceRewriteStrategyLearner();</span>
-<span class="fc" id="L281">        Result result = new WorkBudgetBestFirstSearchStrategy().search(Problem.withoutTarget(input.expression(),</span>
+<span class="fc" id="L290">        var auditor = new TraceRewriteStrategyLearner();</span>
+<span class="fc" id="L291">        Result result = new WorkBudgetBestFirstSearchStrategy().search(Problem.withoutTarget(input.expression(),</span>
             new SearchExpansionSource.Measured(engine), SCORER, new ExpressionCanonicalizer(), budget));
-<span class="fc" id="L283">        int audits = auditor.audit(result.bestState().path().getFirst(), result.bestState().transformations());</span>
-<span class="fc" id="L284">        return new Observation(input, result, audits);</span>
+<span class="fc" id="L293">        int audits = auditor.audit(result.bestState().path().getFirst(), result.bestState().transformations());</span>
+<span class="fc" id="L294">        return new Observation(input, result, audits);</span>
     }
 
     private static long totalWork(List&lt;Observation&gt; observations) {
-<span class="fc" id="L288">        return observations.stream().mapToLong(Observation::measuredWork).reduce(0, Math::addExact);</span>
+<span class="fc" id="L298">        return observations.stream().mapToLong(Observation::measuredWork).reduce(0, Math::addExact);</span>
     }
 
-<span class="fc" id="L291">    private record Continuation(List&lt;String&gt; sequence, String firstRule, MeasuredTransformationEngine tail) {}</span>
+<span class="fc" id="L301">    private record Continuation(List&lt;String&gt; sequence, String firstRule, MeasuredTransformationEngine tail) {}</span>
 
     private static final class Executable {
         private final MeasuredTransformationEngine flat;
-<span class="fc" id="L295">        private final Map&lt;String, Long&gt; bits = new TreeMap&lt;&gt;();</span>
-<span class="fc" id="L296">        private final List&lt;Continuation&gt; continuations = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L305">        private final Map&lt;String, Long&gt; bits = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L306">        private final List&lt;Continuation&gt; continuations = new ArrayList&lt;&gt;();</span>
 
         private final TraceBindingModel bindings;
-<span class="fc" id="L299">        private Executable(FrozenStrategy strategy) { this(strategy, null); }</span>
-<span class="fc" id="L300">        private Executable(FrozenStrategy strategy, TraceBindingModel bindings) {</span>
-<span class="fc" id="L301">            this.bindings = bindings;</span>
-<span class="fc" id="L302">            var inventory = strategy.inventory();</span>
-<span class="fc" id="L303">            var rules = new EvolutionGenomeCompiler().compile(inventory).rules();</span>
-<span class="fc" id="L304">            flat = MeasuredTransformationEngines.counting(AstRewriteTransformationEngines.production(rules,</span>
-<span class="fc" id="L305">                inventory.budget().maxAstGrowthPerStep(), inventory.budget().maxCandidatesPerState()));</span>
-<span class="fc" id="L306">            Map&lt;String, String&gt; ids = new TreeMap&lt;&gt;();</span>
-<span class="fc bfc" id="L307" title="All 2 branches covered.">            for (int i = 0; i &lt; rules.size(); i++) {</span>
-<span class="fc" id="L308">                bits.put(rules.get(i).id(), 1L &lt;&lt; i);</span>
-<span class="fc" id="L309">                ids.put(inventory.rewrites().get(i).geneId(), rules.get(i).id());</span>
+<span class="fc" id="L309">        private Executable(FrozenStrategy strategy) { this(strategy, null); }</span>
+<span class="fc" id="L310">        private Executable(FrozenStrategy strategy, TraceBindingModel bindings) {</span>
+<span class="fc" id="L311">            this.bindings = bindings;</span>
+<span class="fc" id="L312">            var inventory = strategy.inventory();</span>
+<span class="fc" id="L313">            var rules = new EvolutionGenomeCompiler().compile(inventory).rules();</span>
+<span class="fc" id="L314">            flat = MeasuredTransformationEngines.counting(AstRewriteTransformationEngines.production(rules,</span>
+<span class="fc" id="L315">                inventory.budget().maxAstGrowthPerStep(), inventory.budget().maxCandidatesPerState()));</span>
+<span class="fc" id="L316">            Map&lt;String, String&gt; ids = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">            for (int i = 0; i &lt; rules.size(); i++) {</span>
+<span class="fc" id="L318">                bits.put(rules.get(i).id(), 1L &lt;&lt; i);</span>
+<span class="fc" id="L319">                ids.put(inventory.rewrites().get(i).geneId(), rules.get(i).id());</span>
             }
-<span class="fc" id="L311">            var sequences = strategy.observations().stream().map(TraceRewriteStrategyLearner.Observation::geneSequence)</span>
-<span class="fc bfc" id="L312" title="All 2 branches covered.">                .filter(sequence -&gt; sequence.size() &gt;= 2).distinct().sorted(Comparator.comparing(Object::toString)).toList();</span>
-<span class="fc bfc" id="L313" title="All 2 branches covered.">            for (var sequence : sequences) {</span>
-<span class="fc" id="L314">                List&lt;EvolutionRewriteProgramPlan.Node&gt; nodes = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L315" title="All 2 branches covered.">                for (int i = 1; i &lt; sequence.size(); i++) nodes.add(new EvolutionRewriteProgramPlan.Source(&quot;resume-&quot; + i, List.of(sequence.get(i))));</span>
-<span class="fc bfc" id="L316" title="All 2 branches covered.">                var root = nodes.size() == 1 ? nodes.getFirst() : new EvolutionRewriteProgramPlan.Sequence(&quot;resume&quot;, nodes);</span>
-<span class="fc" id="L317">                var plan = EvolutionRewriteProgramPlan.create(inventory, root,</span>
-<span class="fc" id="L318">                    strategy.limits().maximumProgramNodes(), strategy.limits().maximumProgramNodes());</span>
-<span class="fc" id="L319">                continuations.add(new Continuation(sequence, ids.get(sequence.getFirst()),</span>
-<span class="fc" id="L320">                    new CompiledLinearRewriteEngine(new EvolutionRewriteProgramCompiler().compile(inventory, plan).program(),</span>
-<span class="fc" id="L321">                        inventory.budget().maxCandidatesPerState())));</span>
-<span class="fc" id="L322">            }</span>
-<span class="fc" id="L323">        }</span>
-<span class="fc" id="L324">        private long bit(String rule) { return bits.getOrDefault(rule, 0L); }</span>
+<span class="fc" id="L321">            var sequences = strategy.observations().stream().map(TraceRewriteStrategyLearner.Observation::geneSequence)</span>
+<span class="fc bfc" id="L322" title="All 2 branches covered.">                .filter(sequence -&gt; sequence.size() &gt;= 2).distinct().sorted(Comparator.comparing(Object::toString)).toList();</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">            for (var sequence : sequences) {</span>
+<span class="fc" id="L324">                List&lt;EvolutionRewriteProgramPlan.Node&gt; nodes = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">                for (int i = 1; i &lt; sequence.size(); i++) nodes.add(new EvolutionRewriteProgramPlan.Source(&quot;resume-&quot; + i, List.of(sequence.get(i))));</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">                var root = nodes.size() == 1 ? nodes.getFirst() : new EvolutionRewriteProgramPlan.Sequence(&quot;resume&quot;, nodes);</span>
+<span class="fc" id="L327">                var plan = EvolutionRewriteProgramPlan.create(inventory, root,</span>
+<span class="fc" id="L328">                    strategy.limits().maximumProgramNodes(), strategy.limits().maximumProgramNodes());</span>
+<span class="fc" id="L329">                continuations.add(new Continuation(sequence, ids.get(sequence.getFirst()),</span>
+<span class="fc" id="L330">                    new CompiledLinearRewriteEngine(new EvolutionRewriteProgramCompiler().compile(inventory, plan).program(),</span>
+<span class="fc" id="L331">                        inventory.budget().maxCandidatesPerState())));</span>
+<span class="fc" id="L332">            }</span>
+<span class="fc" id="L333">        }</span>
+<span class="fc" id="L334">        private long bit(String rule) { return bits.getOrDefault(rule, 0L); }</span>
         private long context(List&lt;Transformation&gt; candidates) {
-<span class="fc" id="L326">            long mask = 0;</span>
-<span class="fc bfc" id="L327" title="All 2 branches covered.">            for (var candidate : candidates) mask |= bit(candidate.rule());</span>
-<span class="fc" id="L328">            return mask;</span>
+<span class="fc" id="L336">            long mask = 0;</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">            for (var candidate : candidates) mask |= bit(candidate.rule());</span>
+<span class="fc" id="L338">            return mask;</span>
         }
 
         private MeasuredTransformationEngine engine(List&lt;Route&gt; routes, Profile profile) {
-<span class="fc bfc" id="L332" title="All 2 branches covered.">            if (profile == Profile.FLAT_EXHAUSTIVE) return flat;</span>
-<span class="fc" id="L333">            Map&lt;Long, List&lt;String&gt;&gt; lookup = new TreeMap&lt;&gt;();</span>
-<span class="fc" id="L334">            routes.forEach(route -&gt; lookup.put(route.contextMask(), route.sequence()));</span>
-<span class="fc" id="L335">            return (PrimitiveBudgetedTransformationEngine) (expression, remaining) -&gt; {</span>
-<span class="fc" id="L336">                var batch = flat.transformMeasured(expression);</span>
-<span class="fc" id="L337">                var primitives = batch.transformations();</span>
-<span class="fc bfc" id="L338" title="All 2 branches covered.">                if (primitives.isEmpty()) return batch;</span>
-<span class="fc" id="L339">                var work = batch.workMetrics();</span>
-<span class="fc bfc" id="L340" title="All 2 branches covered.">                var bindingDispatch = bindings == null ? null : new TraceBindingDispatch(bindings);</span>
-<span class="fc" id="L341">                List&lt;Transformation&gt; resumed = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L342">                List&lt;Continuation&gt; enabled = List.of();</span>
-<span class="fc bfc" id="L343" title="All 2 branches covered.">                if (profile == Profile.UNGATED_CONTINUATIONS) enabled = continuations;</span>
-<span class="pc bpc" id="L344" title="1 of 4 branches missed.">                else if (profile == Profile.LEARNED_DISPATCH &amp;&amp; !lookup.isEmpty()) {</span>
-<span class="fc" id="L345">                    var sequence = lookup.get(context(primitives));</span>
-<span class="fc" id="L346">                    work = work.plus(events(primitives.size() + 1L, 0, 0, 0));</span>
-<span class="fc bfc" id="L347" title="All 2 branches covered.">                    if (sequence != null) enabled = continuations.stream().filter(value -&gt; value.sequence().equals(sequence)).toList();</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">            if (profile == Profile.FLAT_EXHAUSTIVE) return flat;</span>
+<span class="fc" id="L343">            Map&lt;Long, List&lt;String&gt;&gt; lookup = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L344">            routes.forEach(route -&gt; lookup.put(route.contextMask(), route.sequence()));</span>
+<span class="fc" id="L345">            return (PrimitiveBudgetedTransformationEngine) (expression, remaining) -&gt; {</span>
+<span class="fc" id="L346">                var batch = flat.transformMeasured(expression);</span>
+<span class="fc" id="L347">                var primitives = batch.transformations();</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">                if (primitives.isEmpty()) return batch;</span>
+<span class="fc" id="L349">                var work = batch.workMetrics();</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">                var bindingDispatch = bindings == null ? null : new TraceBindingDispatch(bindings);</span>
+<span class="fc" id="L351">                List&lt;Transformation&gt; resumed = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L352">                List&lt;Continuation&gt; enabled = List.of();</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">                if (profile == Profile.UNGATED_CONTINUATIONS) enabled = continuations;</span>
+<span class="pc bpc" id="L354" title="1 of 4 branches missed.">                else if (profile == Profile.LEARNED_DISPATCH &amp;&amp; !lookup.isEmpty()) {</span>
+<span class="fc" id="L355">                    var sequence = lookup.get(context(primitives));</span>
+<span class="fc" id="L356">                    work = work.plus(events(primitives.size() + 1L, 0, 0, 0));</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">                    if (sequence != null) enabled = continuations.stream().filter(value -&gt; value.sequence().equals(sequence)).toList();</span>
                 }
-<span class="fc bfc" id="L349" title="All 2 branches covered.">                for (var continuation : enabled) {</span>
-<span class="fc" id="L350">                    work = work.plus(events(1, 0, 0, 0));</span>
-<span class="fc bfc" id="L351" title="All 2 branches covered.">                    if (continuation.sequence().size() &gt; remaining) continue;</span>
-<span class="fc bfc" id="L352" title="All 2 branches covered.">                    for (var primitive : primitives) {</span>
-<span class="fc" id="L353">                        work = work.plus(events(1, 0, 0, 0));</span>
-<span class="fc bfc" id="L354" title="All 2 branches covered.">                        if (!primitive.rule().equals(continuation.firstRule())) continue;</span>
-<span class="fc bfc" id="L355" title="All 2 branches covered.">                        var bindingAttempt = bindingDispatch == null ? null : bindingDispatch.begin(</span>
-<span class="fc" id="L356">                            continuation.sequence(), expression, primitive);</span>
-<span class="fc bfc" id="L357" title="All 4 branches covered.">                        if (bindingAttempt != null &amp;&amp; !bindingAttempt.eligible()) continue;</span>
-<span class="fc" id="L358">                        var suffixes = continuation.tail().transformMeasured(primitive.transformedExpression());</span>
-<span class="fc" id="L359">                        work = work.plus(suffixes.workMetrics());</span>
-<span class="fc bfc" id="L360" title="All 2 branches covered.">                        for (var suffix : suffixes.transformations()) {</span>
-<span class="pc bpc" id="L361" title="1 of 4 branches missed.">                            if (bindingAttempt != null &amp;&amp; !bindingAttempt.accepts(suffix)) continue;</span>
-<span class="fc bfc" id="L362" title="All 2 branches covered.">                            String origin = bindings == null ? &quot;learned-resumption&quot; : &quot;bound-resumption-&quot; + bindings.contentHash();</span>
-<span class="fc" id="L363">                            var path = new RewriteCandidate(origin, expression, suffix.transformedExpression(), List.of(primitive, suffix));</span>
-<span class="fc" id="L364">                            resumed.add(path.toTransformation());</span>
-<span class="fc" id="L365">                            work = work.plus(events(0, 0, 0, 1));</span>
-<span class="fc" id="L366">                        }</span>
-<span class="fc" id="L367">                    }</span>
-<span class="fc" id="L368">                }</span>
-<span class="fc bfc" id="L369" title="All 2 branches covered.">                if (bindingDispatch != null) work = work.plus(</span>
-<span class="fc" id="L370">                    TransformationWorkMetrics.ZERO.withDelegatedMechanicalWork(bindingDispatch.workUnits()));</span>
+<span class="fc bfc" id="L359" title="All 2 branches covered.">                for (var continuation : enabled) {</span>
+<span class="fc" id="L360">                    work = work.plus(events(1, 0, 0, 0));</span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">                    if (continuation.sequence().size() &gt; remaining) continue;</span>
+<span class="fc bfc" id="L362" title="All 2 branches covered.">                    for (var primitive : primitives) {</span>
+<span class="fc" id="L363">                        work = work.plus(events(1, 0, 0, 0));</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">                        if (!primitive.rule().equals(continuation.firstRule())) continue;</span>
+<span class="fc bfc" id="L365" title="All 2 branches covered.">                        var bindingAttempt = bindingDispatch == null ? null : bindingDispatch.begin(</span>
+<span class="fc" id="L366">                            continuation.sequence(), expression, primitive);</span>
+<span class="fc bfc" id="L367" title="All 4 branches covered.">                        if (bindingAttempt != null &amp;&amp; !bindingAttempt.eligible()) continue;</span>
+<span class="fc" id="L368">                        var suffixes = continuation.tail().transformMeasured(primitive.transformedExpression());</span>
+<span class="fc" id="L369">                        work = work.plus(suffixes.workMetrics());</span>
+<span class="fc bfc" id="L370" title="All 2 branches covered.">                        for (var suffix : suffixes.transformations()) {</span>
+<span class="pc bpc" id="L371" title="1 of 4 branches missed.">                            if (bindingAttempt != null &amp;&amp; !bindingAttempt.accepts(suffix)) continue;</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">                            String origin = bindings == null ? &quot;learned-resumption&quot; : &quot;bound-resumption-&quot; + bindings.contentHash();</span>
+<span class="fc" id="L373">                            var path = new RewriteCandidate(origin, expression, suffix.transformedExpression(), List.of(primitive, suffix));</span>
+<span class="fc" id="L374">                            resumed.add(path.toTransformation());</span>
+<span class="fc" id="L375">                            work = work.plus(events(0, 0, 0, 1));</span>
+<span class="fc" id="L376">                        }</span>
+<span class="fc" id="L377">                    }</span>
+<span class="fc" id="L378">                }</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">                if (bindingDispatch != null) work = work.plus(</span>
+<span class="fc" id="L380">                    TransformationWorkMetrics.ZERO.withDelegatedMechanicalWork(bindingDispatch.workUnits()));</span>
                 // A learned route commits to its resumed paths. Primitive siblings
                 // remain the fallback when no complete, budget-fitting continuation exists.
-<span class="fc bfc" id="L373" title="All 2 branches covered.">                var candidates = resumed.isEmpty() ? new ArrayList&lt;&gt;(primitives) : resumed;</span>
-<span class="fc" id="L374">                candidates.sort(ORDER);</span>
-<span class="fc" id="L375">                work = work.plus(events(0, candidates.size(), primitives.size() + resumed.size() - 1L, 0));</span>
-<span class="fc" id="L376">                return new TransformationBatch(List.of(candidates.getFirst()), work);</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">                var candidates = resumed.isEmpty() ? new ArrayList&lt;&gt;(primitives) : resumed;</span>
+<span class="fc" id="L384">                candidates.sort(ORDER);</span>
+<span class="fc" id="L385">                work = work.plus(events(0, candidates.size(), primitives.size() + resumed.size() - 1L, 0));</span>
+<span class="fc" id="L386">                return new TransformationBatch(List.of(candidates.getFirst()), work);</span>
             };
         }
     }
 
     private static TransformationWorkMetrics events(long checks, long ordered, long pruned, long composed) {
-<span class="fc" id="L382">        return new TransformationWorkMetrics(0, 0, 0, 0, composed, checks, 0, ordered, pruned, 0, 0, 0, 0, 0);</span>
+<span class="fc" id="L392">        return new TransformationWorkMetrics(0, 0, 0, 0, composed, checks, 0, ordered, pruned, 0, 0, 0, 0, 0);</span>
     }
 
     static void writeLimits(JsonWriter value, Limits limits) {
-<span class="fc" id="L386">        value.property(&quot;maximumInputs&quot;, limits.maximumInputs()).property(&quot;maximumContexts&quot;, limits.maximumContexts())</span>
-<span class="fc" id="L387">            .property(&quot;maximumTrials&quot;, limits.maximumTrials()).object(&quot;budget&quot;, budget -&gt; TraceRewriteStrategyLearner.writeBudget(budget, limits.budget()));</span>
-<span class="fc" id="L388">    }</span>
+<span class="fc" id="L396">        value.property(&quot;maximumInputs&quot;, limits.maximumInputs()).property(&quot;maximumContexts&quot;, limits.maximumContexts())</span>
+<span class="fc" id="L397">            .property(&quot;maximumTrials&quot;, limits.maximumTrials()).object(&quot;budget&quot;, budget -&gt; TraceRewriteStrategyLearner.writeBudget(budget, limits.budget()));</span>
+<span class="fc" id="L398">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
