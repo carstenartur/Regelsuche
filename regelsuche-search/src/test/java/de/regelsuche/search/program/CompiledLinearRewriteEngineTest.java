@@ -203,6 +203,10 @@ class CompiledLinearRewriteEngineTest {
         assertThrows(IllegalArgumentException.class, () -> astProgram(0, first));
         assertThrows(IllegalArgumentException.class, () -> astProgram(129, first));
 
+        var duplicateIds = new CompiledLinearRewriteEngine(RewritePrograms.sequence("duplicate-source-ids",
+            astSource("same", 64, 128, TYPED_ZERO), astSource("same", 64, 128, TYPED_SQUARE)), 128);
+        assertThrows(IllegalArgumentException.class, duplicateIds::compileAst);
+
         var calls = new AtomicInteger();
         var observed = new PatternRewriteRule("observed", A, PatternExpr.num(1)) {
             @Override public Expr apply(Expr input) { calls.incrementAndGet(); return super.apply(input); }
