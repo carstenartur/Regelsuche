@@ -151,6 +151,14 @@ class CompiledAstReplayCodecTest {
         }
     }
 
+    @Test void malformedUtf8AndMalformedJsonHaveDistinctDiagnostics() {
+        var utf8 = assertThrows(IllegalArgumentException.class, () -> codec.decode(new byte[] {(byte) 0xff}));
+        assertTrue(utf8.getMessage().contains("UTF-8"));
+        var json = assertThrows(IllegalArgumentException.class,
+            () -> codec.decode("{".getBytes(StandardCharsets.UTF_8)));
+        assertEquals("invalid AST replay JSON", json.getMessage());
+    }
+
     @Test void decodingNeverCoercesMetadataAndLengthsMustAgree() throws Exception {
         List<Consumer<ObjectNode>> mutations = List.of(
             root -> root.put("program", 12),
