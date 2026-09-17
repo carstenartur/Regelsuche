@@ -25,6 +25,11 @@ final class TraceBindingDispatch {
 
     static TraceBindingModel learn(TraceRewriteStrategyLearner.FrozenStrategy formation,
             List<Observation> baseline, BindingLimits limits) {
+        return learn(formation, baseline, limits, false);
+    }
+
+    static TraceBindingModel learn(TraceRewriteStrategyLearner.FrozenStrategy formation,
+            List<Observation> baseline, BindingLimits limits, boolean lazyAlternatives) {
         var work = new TraceBindingModel.FormationWork(limits.maximumFormationWork());
         work.charge();
         var inventory = formation.inventory();
@@ -58,7 +63,7 @@ final class TraceBindingDispatch {
             traces.add(new TraceBindingModel.Trace(observation.input().id(), sequence, states));
         }
         return TraceBindingModel.learn(traces, admitted, limits.maximumTemplates(),
-            work, limits.maximumMatchingWorkPerExpansion());
+            work, limits.maximumMatchingWorkPerExpansion(), lazyAlternatives);
     }
 
     Attempt begin(List<String> sequence, String source, Transformation first) {
