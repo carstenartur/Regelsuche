@@ -18,7 +18,7 @@ jobs:
           distribution: temurin
           java-version: '25'
           cache: maven
-      - name: Verify final typed frontier review fixes
+      - name: Verify complete search module and dependencies
         run: |
           git rev-parse HEAD
-          mvn --batch-mode --no-transfer-progress -pl regelsuche-search -am -Dtest=StagedMoveSearchTest test
+          mvn --batch-mode --no-transfer-progress -pl regelsuche-search -am test
