@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
@@ -180,6 +181,45 @@ class StagedMoveSearchTest {
         assertFalse(result.reached());
         assertTrue(result.encodedResult().events().stream()
             .anyMatch(event -> event.decision() == MoveSearch.Decision.PROOF_REJECTED));
+    }
+
+
+    @Test void typedContextNormalizesAssumptionsBeforeVerifierObservation() {
+        var a = PatternExpr.var("A");
+        var transport = new AstRewriteTransport(List.of(
+            new PatternRewriteRule("typed-zero", PatternExpr.op(ADD, a, PatternExpr.num(0)), a)
+        ), 100, 100);
+        var descriptor = new MoveProvider.Descriptor("typed-primitives", "*", SearchMove.SourceKind.PRIMITIVE,
+            SearchMove.ProofStrength.REPLAYABLE, List.of(), SearchMove.ValueEvidence.UNKNOWN, "typed-fixture");
+        var target = new VariableExpr("x");
+        var source = new BinaryExpr(target, ADD, new NumberExpr(0));
+        var observed = new AtomicReference<List<String>>();
+        var primitiveReplay = TypedMoveSearch.primitiveReplay(transport);
+        TypedMoveSearch.Verifier verifier = (state, move, context) -> {
+            observed.set(context.initialAssumptions());
+            return primitiveReplay.verify(state, move, context);
+        };
+        var context = new TypedMoveSearch.Context(target,
+            List.of(" z!=0 ", "a≠0", "z != 0"), MoveContext.Phase.FROZEN_EVALUATION);
+
+        var result = new TypedMoveSearch().search(new TypedMoveSearch.Problem(source, context,
+            List.of(TypedMoveSearch.primitiveProvider(descriptor, transport)), TypedMoveSearch.Policy.INVENTORY_ORDER,
+            verifier, state -> 0, MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED,
+            new MoveSearch.Budget(2, 2, 0, 20, 1_000)));
+
+        assertTrue(result.reached());
+        assertEquals(List.of("a != 0", "z != 0"), observed.get());
+    }
+
+    @Test void typedProblemRejectsLegacyStringProvidersBeforeTheySeeTransportJson() {
+        var legacy = provider("legacy", SearchMove.SourceKind.PRIMITIVE, expression -> List.of(), true);
+        var source = new VariableExpr("x");
+        var error = assertThrows(IllegalArgumentException.class, () -> new TypedMoveSearch.Problem(source,
+            TypedMoveSearch.Context.frozen(source), List.of(legacy), TypedMoveSearch.Policy.INVENTORY_ORDER,
+            (state, move, context) -> new MoveVerifier.Verification(true, 1, List.of("fixture"), "fixture"),
+            state -> 0, MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED,
+            new MoveSearch.Budget(1, 1, 0, 10, 100)));
+        assertTrue(error.getMessage().contains("typed"));
     }
 
     @Test void contextValidationAndOptionalVerificationAreExplicit() {
