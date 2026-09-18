@@ -94,7 +94,7 @@ class ModPowDagRediscoveryStudyTest {
                         BigInteger composed = a.modPow(BigInteger.valueOf(left), n)
                             .modPow(BigInteger.valueOf(right), n);
                         assertEquals(direct, composed,
-                            () -> "modPow composition mismatch for a=" + base
+                            "modPow composition mismatch for a=" + base
                                 + ", u=" + left + ", v=" + right + ", n=" + modulus);
                     }
                 }
