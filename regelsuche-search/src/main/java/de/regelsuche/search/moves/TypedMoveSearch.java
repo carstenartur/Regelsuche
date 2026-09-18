@@ -175,7 +175,7 @@ public final class TypedMoveSearch {
                     && step.assumptions().equals(move.transformation().assumptions())
                     && step.packId().equals(move.transformation().packId())
                     && step.license().equals(move.transformation().license()));
-            long work = Math.addExact(1L, generated.size());
+            long work = TransformationWorkMetrics.flatEngine(generated.size()).totalWorkUnits();
             return new MoveVerifier.Verification(accepted, work,
                 accepted ? List.of("typed-primitive-replay:" + sha256(encodedSource
                     + "\n" + encodedTarget + "\n" + move.ruleId())) : List.of(),
