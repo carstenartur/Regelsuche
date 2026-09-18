@@ -45,6 +45,17 @@ public final class ModPowDagRediscoveryStudy {
     private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();
     private static final Expr UNREACHABLE_GOAL =
         new FunctionExpr("unreachable_research_goal", List.of());
+    static final List<String> DOMAIN_ASSUMPTIONS = List.of(
+        "a integer",
+        "n integer",
+        "n > 0",
+        "q integer",
+        "q >= 0",
+        "e integer",
+        "e >= 0",
+        "r integer",
+        "r >= 0"
+    );
 
     public record BitProfile(String id, int qBits, int eBits, int rBits) {
         public BitProfile {
@@ -136,7 +147,10 @@ public final class ModPowDagRediscoveryStudy {
         var provider = compositionProvider();
         var result = new TypedMoveSearch().search(new TypedMoveSearch.Problem(
             source,
-            TypedMoveSearch.Context.frozen(UNREACHABLE_GOAL),
+            new TypedMoveSearch.Context(
+                UNREACHABLE_GOAL,
+                DOMAIN_ASSUMPTIONS,
+                MoveContext.Phase.FROZEN_EVALUATION),
             List.of(provider),
             TypedMoveSearch.Policy.INVENTORY_ORDER,
             compositionVerifier(),
@@ -349,8 +363,10 @@ public final class ModPowDagRediscoveryStudy {
             boolean bound = move.transformation().applicationKey()
                 .equals(applicationKey(encodedSource, encodedTarget, rule));
             int proofInstances = compositionDifferenceCount(source.expression(), target, rule);
+            boolean domain = domainContractSatisfied(source.expression(), context.initialAssumptions())
+                && domainContractSatisfied(target, context.initialAssumptions());
             long work = add(nodeCount(source.expression()), nodeCount(target));
-            boolean accepted = provenance && bound && proofInstances == 1;
+            boolean accepted = provenance && bound && domain && proofInstances == 1;
             return new MoveVerifier.Verification(
                 accepted,
                 work,
@@ -359,6 +375,73 @@ public final class ModPowDagRediscoveryStudy {
                 accepted ? "MODPOW_PRODUCT_COMPOSITION_VERIFIED" : "MODPOW_PRODUCT_COMPOSITION_REJECTED"
             );
         };
+    }
+
+    /**
+     * Research proof-domain guard for BigInteger-style modular exponentiation.
+     * Every exponent must be a nonnegative integer expression, every modulus a
+     * positive integer variable, and variable bases must be declared integral.
+     * The proof receipt therefore cannot be granted from AST shape alone.
+     */
+    static boolean domainContractSatisfied(Expr expression, List<String> assumptions) {
+        Set<String> contract = Set.copyOf(assumptions);
+        return domainContractSatisfied(expression, contract);
+    }
+
+    private static boolean domainContractSatisfied(Expr expression, Set<String> assumptions) {
+        if (expression instanceof FunctionExpr function) {
+            if (isModPow(function)) {
+                Expr base = function.arguments().get(0);
+                Expr exponent = function.arguments().get(1);
+                Expr modulus = function.arguments().get(2);
+                if (!integerValued(base, assumptions)
+                        || !nonnegativeInteger(exponent, assumptions)
+                        || !positiveIntegerModulus(modulus, assumptions)) {
+                    return false;
+                }
+            }
+            for (Expr argument : function.arguments()) {
+                if (!domainContractSatisfied(argument, assumptions)) {
+                    return false;
+                }
+            }
+        } else if (expression instanceof BinaryExpr binary) {
+            return domainContractSatisfied(binary.left(), assumptions)
+                && domainContractSatisfied(binary.right(), assumptions);
+        }
+        return true;
+    }
+
+    private static boolean integerValued(Expr expression, Set<String> assumptions) {
+        if (expression instanceof VariableExpr variable) {
+            return assumptions.contains(variable.name() + " integer");
+        }
+        if (expression instanceof FunctionExpr function && isModPow(function)) {
+            return domainContractSatisfied(function, assumptions);
+        }
+        if (expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.MUL) {
+            return integerValued(binary.left(), assumptions)
+                && integerValued(binary.right(), assumptions);
+        }
+        return false;
+    }
+
+    private static boolean nonnegativeInteger(Expr expression, Set<String> assumptions) {
+        if (expression instanceof VariableExpr variable) {
+            return assumptions.contains(variable.name() + " integer")
+                && assumptions.contains(variable.name() + " >= 0");
+        }
+        if (expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.MUL) {
+            return nonnegativeInteger(binary.left(), assumptions)
+                && nonnegativeInteger(binary.right(), assumptions);
+        }
+        return false;
+    }
+
+    private static boolean positiveIntegerModulus(Expr expression, Set<String> assumptions) {
+        return expression instanceof VariableExpr variable
+            && assumptions.contains(variable.name() + " integer")
+            && assumptions.contains(variable.name() + " > 0");
     }
 
     /**
