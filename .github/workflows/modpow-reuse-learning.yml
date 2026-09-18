@@ -49,3 +49,17 @@ jobs:
           path: regelsuche-experiments/build/reports/modpow-reuse-learning-formation/**
           if-no-files-found: error
           retention-days: 30
+
+      - name: Evaluate frozen learned artifact
+        run: |
+          ./gradlew --no-daemon --no-configuration-cache \
+            :regelsuche-experiments:modPowReuseLearningEvaluation \
+            --console=plain --stacktrace
+
+      - name: Retain held-out learning result
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: modpow-reuse-learning-evaluation
+          path: regelsuche-experiments/build/reports/modpow-reuse-learning-evaluation/**
+          if-no-files-found: error
+          retention-days: 30
