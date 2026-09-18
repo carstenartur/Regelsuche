@@ -1,0 +1,24 @@
+name: Typed move frontier focused TDD
+on:
+  push:
+    branches: [qa/typed-move-frontier-20260918]
+permissions:
+  contents: read
+jobs:
+  focused:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 1e6d9d0c2871c00fb21388559978f9b42caeaa8f
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Verify exact test-only RED head
+        run: |
+          git rev-parse HEAD
+          mvn --batch-mode --no-transfer-progress -pl regelsuche-search -am -Dtest=StagedMoveSearchTest test
