@@ -9,6 +9,7 @@ on:
       - 'regelsuche-learning/src/test/java/de/regelsuche/mining/ParameterRelationMinerBivariateTest.java'
       - 'regelsuche-learning/src/test/java/de/regelsuche/mining/PatternGeneralizerBivariateProductTest.java'
       - 'regelsuche-experiments/**'
+      - 'regelsuche-learning/**'
       - 'docs/research/modpow-reuse-learning-split.json'
       - '.github/workflows/modpow-reuse-learning.yml'
 
@@ -34,3 +35,17 @@ jobs:
             --tests 'de.regelsuche.mining.ParameterRelationMinerBivariateTest' \
             --tests 'de.regelsuche.mining.PatternGeneralizerBivariateProductTest' \
             --console=plain --stacktrace
+
+      - name: Form TRAIN-only learned artifact
+        run: |
+          ./gradlew --no-daemon --no-configuration-cache \
+            :regelsuche-experiments:modPowReuseLearningFormation \
+            --console=plain --stacktrace
+
+      - name: Retain TRAIN-only learned artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: modpow-reuse-learning-formation
+          path: regelsuche-experiments/build/reports/modpow-reuse-learning-formation/**
+          if-no-files-found: error
+          retention-days: 30
