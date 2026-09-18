@@ -35,6 +35,10 @@ jobs:
           ./gradlew --no-daemon --no-configuration-cache :regelsuche-experiments:test \
             --tests 'de.regelsuche.benchmark.ModPow*Test' --console=plain --stacktrace \
             2>&1 | tee "$RUNNER_TEMP/modpow-proof/test.log"
+      - name: Regenerate deterministic v2 result
+        run: |
+          ./gradlew --no-daemon --no-configuration-cache :regelsuche-experiments:modPowDagRediscovery --console=plain
+          cp regelsuche-experiments/build/reports/modpow-dag-rediscovery/*-v2.* "$RUNNER_TEMP/modpow-proof/"
       - name: Retain tests and exact source snapshot
         if: always()
         run: |
