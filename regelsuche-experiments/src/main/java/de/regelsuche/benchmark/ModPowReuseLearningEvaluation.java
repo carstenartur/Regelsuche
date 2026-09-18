@@ -264,9 +264,10 @@ public final class ModPowReuseLearningEvaluation {
             }
         }
 
+        Expr selectedProgram = selected;
         boolean preserved = item.requiredPreservedSubtrees().stream()
             .map(PARSER::parseTerm)
-            .allMatch(required -> containsSubtree(selected, required));
+            .allMatch(required -> containsSubtree(selectedProgram, required));
         return new CaseResult(
             item.id(),
             item.positive(),
