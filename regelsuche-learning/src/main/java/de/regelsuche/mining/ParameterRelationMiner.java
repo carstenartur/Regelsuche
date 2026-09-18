@@ -32,7 +32,140 @@ public class ParameterRelationMiner {
                 return new RelationResult(replacements, descriptions);
             }
         }
+        return mineBivariateProductRelations(placeholderValues);
+    }
+
+    /**
+     * Learn the smallest two-parameter relation currently needed by arithmetic
+     * program generalisation: repeated placeholders may denote either of two
+     * independently varying parameters, their product, or a constant.
+     *
+     * <p>This is deliberately domain-neutral. It does not know about modular
+     * exponentiation or any consuming rewrite; it only recognizes an exact
+     * element-wise integer relation present in every training observation.</p>
+     */
+    private RelationResult mineBivariateProductRelations(
+        Map<String, List<Integer>> placeholderValues
+    ) {
+        List<Map.Entry<String, List<Integer>>> entries =
+            new ArrayList<>(placeholderValues.entrySet());
+        for (int firstIndex = 0; firstIndex < entries.size(); firstIndex++) {
+            List<Integer> first = entries.get(firstIndex).getValue();
+            if (!eligibleIndependentBase(first)) {
+                continue;
+            }
+            for (int secondIndex = firstIndex + 1;
+                    secondIndex < entries.size(); secondIndex++) {
+                List<Integer> second = entries.get(secondIndex).getValue();
+                if (!eligibleIndependentBase(second)
+                        || first.size() != second.size()
+                        || first.equals(second)) {
+                    continue;
+                }
+                Map<String, NormalizedNode> replacements =
+                    new LinkedHashMap<>();
+                List<String> descriptions = new ArrayList<>();
+                boolean complete = true;
+                boolean usesFirst = false;
+                boolean usesSecond = false;
+                boolean usesProduct = false;
+                for (Map.Entry<String, List<Integer>> entry :
+                        placeholderValues.entrySet()) {
+                    BivariateRelation relation = findBivariateRelation(
+                        entry.getValue(), first, second);
+                    if (relation == null) {
+                        complete = false;
+                        break;
+                    }
+                    replacements.put(entry.getKey(), relation.node());
+                    descriptions.add(entry.getKey() + " = "
+                        + relation.description());
+                    usesFirst |= relation.kind()
+                        == BivariateRelationKind.FIRST;
+                    usesSecond |= relation.kind()
+                        == BivariateRelationKind.SECOND;
+                    usesProduct |= relation.kind()
+                        == BivariateRelationKind.PRODUCT;
+                }
+                if (complete && usesFirst && usesSecond && usesProduct) {
+                    return new RelationResult(replacements, descriptions);
+                }
+            }
+        }
         return RelationResult.empty();
+    }
+
+    private boolean eligibleIndependentBase(List<Integer> values) {
+        return values != null
+            && values.size() >= 2
+            && values.stream().distinct().count() >= 2;
+    }
+
+    private BivariateRelation findBivariateRelation(
+        List<Integer> values,
+        List<Integer> first,
+        List<Integer> second
+    ) {
+        if (values.equals(first)) {
+            return new BivariateRelation(
+                NormalizedNode.variable("A"),
+                "A",
+                BivariateRelationKind.FIRST);
+        }
+        if (values.equals(second)) {
+            return new BivariateRelation(
+                NormalizedNode.variable("A2"),
+                "A2",
+                BivariateRelationKind.SECOND);
+        }
+        if (matchesProduct(values, first, second)) {
+            return new BivariateRelation(
+                NormalizedNode.multiply(List.of(
+                    NormalizedNode.variable("A"),
+                    NormalizedNode.variable("A2"))),
+                "A*A2",
+                BivariateRelationKind.PRODUCT);
+        }
+        if (values.stream().distinct().count() == 1) {
+            int constant = values.getFirst();
+            return new BivariateRelation(
+                NormalizedNode.number(constant),
+                Integer.toString(constant),
+                BivariateRelationKind.CONSTANT);
+        }
+        return null;
+    }
+
+    private boolean matchesProduct(
+        List<Integer> values,
+        List<Integer> first,
+        List<Integer> second
+    ) {
+        if (values.size() != first.size() || values.size() != second.size()) {
+            return false;
+        }
+        for (int index = 0; index < values.size(); index++) {
+            long product = (long) first.get(index) * second.get(index);
+            if (product < Integer.MIN_VALUE || product > Integer.MAX_VALUE
+                    || values.get(index) != (int) product) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private enum BivariateRelationKind {
+        FIRST,
+        SECOND,
+        PRODUCT,
+        CONSTANT
+    }
+
+    private record BivariateRelation(
+        NormalizedNode node,
+        String description,
+        BivariateRelationKind kind
+    ) {
     }
 
     private Relation findRelation(List<Integer> values, List<Integer> baseValues) {
