@@ -138,7 +138,7 @@ public final class TypedMoveSearch {
                 var moves = new ArrayList<SearchMove>(generated.size());
                 for (var step : generated) {
                     String target = CODEC.encodeExpression(step.target());
-                    String applicationKey = "typed:" + sha256(state.expression() + "\n" + target + "\n" + step.rule());
+                    String applicationKey = applicationKey(state.expression(), target, step.rule());
                     var transformation = new Transformation(step.rule(), target, step.kind(), step.mayIncreaseComplexity(),
                         step.estimatedCostDelta(), step.equivalencePreservingByConstruction(), applicationKey,
                         step.assumptions(), step.packId(), step.license());
@@ -159,8 +159,12 @@ public final class TypedMoveSearch {
             } catch (IllegalArgumentException exception) {
                 return new MoveVerifier.Verification(false, 1, List.of(), "TYPED_TARGET_DECODE_REJECTED");
             }
+            String encodedSource = CODEC.encodeExpression(source.expression());
+            String encodedTarget = CODEC.encodeExpression(target);
+            String expectedApplicationKey = applicationKey(encodedSource, encodedTarget, move.transformation().rule());
             var generated = transport.generate(source.expression());
-            boolean accepted = generated.stream().anyMatch(step ->
+            boolean accepted = move.transformation().applicationKey().equals(expectedApplicationKey)
+                && generated.stream().anyMatch(step ->
                 step.target().equals(target)
                     && step.rule().equals(move.transformation().rule())
                     && step.kind() == move.transformation().kind()
@@ -173,10 +177,14 @@ public final class TypedMoveSearch {
                     && step.license().equals(move.transformation().license()));
             long work = Math.addExact(1L, generated.size());
             return new MoveVerifier.Verification(accepted, work,
-                accepted ? List.of("typed-primitive-replay:" + sha256(CODEC.encodeExpression(source.expression())
-                    + "\n" + CODEC.encodeExpression(target) + "\n" + move.ruleId())) : List.of(),
+                accepted ? List.of("typed-primitive-replay:" + sha256(encodedSource
+                    + "\n" + encodedTarget + "\n" + move.ruleId())) : List.of(),
                 accepted ? "TYPED_PRIMITIVE_REPLAYED" : "TYPED_PRIMITIVE_REPLAY_REJECTED");
         };
+    }
+
+    private static String applicationKey(String encodedSource, String encodedTarget, String rule) {
+        return "typed:" + sha256(encodedSource + "\n" + encodedTarget + "\n" + rule);
     }
 
     private static String sha256(String value) {
