@@ -248,6 +248,36 @@ class StagedMoveSearchTest {
         assertTrue(error.getMessage().contains("typed"));
     }
 
+    @Test void typedPrimitiveProviderPropagatesIncompleteRelationWithAndWithoutCandidates() {
+        var a = PatternExpr.var("A");
+        var transport = new AstRewriteTransport(List.of(
+            new PatternRewriteRule("typed-zero", PatternExpr.op(ADD, a, PatternExpr.num(0)), a)
+        ), 100, 100);
+        var descriptor = new MoveProvider.Descriptor("typed-primitives", "*", SearchMove.SourceKind.PRIMITIVE,
+            SearchMove.ProofStrength.REPLAYABLE, List.of(), SearchMove.ValueEvidence.UNKNOWN, "typed-fixture");
+        var provider = TypedMoveSearch.primitiveProvider(descriptor, transport);
+        var target = new VariableExpr("absent");
+        var budget = new MoveSearch.Budget(3, 3, 0, 50, 2_000);
+
+        var withCandidate = new TypedMoveSearch().search(new TypedMoveSearch.Problem(
+            new BinaryExpr(new VariableExpr("x"), ADD, new NumberExpr(0)),
+            TypedMoveSearch.Context.frozen(target), List.of(provider), TypedMoveSearch.Policy.INVENTORY_ORDER,
+            TypedMoveSearch.primitiveReplay(transport), state -> 0,
+            MoveSearch.Mode.COMPLETE_BOUNDED_REFERENCE, MoveSearch.Scheduling.STAGED, budget));
+        assertFalse(withCandidate.reached());
+        assertFalse(withCandidate.completeBoundedRelation(),
+            "finite transport without a truncation receipt must not claim bounded closure");
+
+        var withoutCandidate = new TypedMoveSearch().search(new TypedMoveSearch.Problem(
+            new VariableExpr("x"), TypedMoveSearch.Context.frozen(target), List.of(provider),
+            TypedMoveSearch.Policy.INVENTORY_ORDER, TypedMoveSearch.primitiveReplay(transport), state -> 0,
+            MoveSearch.Mode.COMPLETE_BOUNDED_REFERENCE, MoveSearch.Scheduling.STAGED, budget));
+        assertFalse(withoutCandidate.reached());
+        assertFalse(withoutCandidate.completeBoundedRelation(),
+            "zero generated candidates still do not prove the capped provider relation complete");
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE, withoutCandidate.outcome());
+    }
+
     @Test void contextValidationAndOptionalVerificationAreExplicit() {
         var error = assertThrows(NullPointerException.class, () -> new MoveSearch.Problem("a", null, List.of(),
             MovePriorityPolicy.INVENTORY_ORDER, GRAPH, state -> 0, MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED,
