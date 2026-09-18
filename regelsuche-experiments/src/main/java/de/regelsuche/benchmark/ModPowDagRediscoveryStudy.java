@@ -1,5 +1,6 @@
 package de.regelsuche.benchmark;
 
+import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -307,7 +308,7 @@ public final class ModPowDagRediscoveryStudy {
             "modpow-composition",
             SearchMove.SourceKind.HYPOTHESIS,
             SearchMove.ProofStrength.VERIFIED,
-            List.of(),
+            proofAssumptions(),
             SearchMove.ValueEvidence.UNKNOWN,
             REVISION
         );
@@ -334,7 +335,7 @@ public final class ModPowDagRediscoveryStudy {
                         0,
                         true,
                         key,
-                        List.of(),
+                        proofAssumptions(),
                         "research-1024",
                         "PROJECT"
                     );
@@ -366,11 +367,20 @@ public final class ModPowDagRediscoveryStudy {
             boolean domain = domainContractSatisfied(source.expression(), context.initialAssumptions())
                 && domainContractSatisfied(target, context.initialAssumptions());
             long work = add(nodeCount(source.expression()), nodeCount(target));
-            boolean accepted = provenance && bound && domain && proofInstances == 1;
+            var step = move.transformation();
+            boolean retainedContract = step.assumptions().equals(proofAssumptions())
+                && context.initialAssumptions().containsAll(proofAssumptions())
+                && step.kind() == RewriteKind.NORMALIZE
+                && step.mayIncreaseComplexity()
+                && step.estimatedCostDelta() == 0
+                && step.equivalencePreservingByConstruction()
+                && step.packId().equals("research-1024")
+                && step.license().equals("PROJECT");
+            boolean accepted = provenance && bound && domain && retainedContract && proofInstances == 1;
             return new MoveVerifier.Verification(
                 accepted,
                 work,
-                accepted ? List.of("modpow-product-law:" + sha256(encodedSource + "\n" + encodedTarget + "\n" + rule))
+                accepted ? List.of("modpow-product-law/v2:" + proofDigest(encodedSource, encodedTarget, rule))
                     : List.of(),
                 accepted ? "MODPOW_PRODUCT_COMPOSITION_VERIFIED" : "MODPOW_PRODUCT_COMPOSITION_REJECTED"
             );
@@ -579,7 +589,16 @@ public final class ModPowDagRediscoveryStudy {
     }
 
     private static String applicationKey(String source, String target, String rule) {
-        return "modpow-study:" + sha256(source + "\n" + target + "\n" + rule);
+        return "modpow-study/v2:" + proofDigest(source, target, rule);
+    }
+
+    static List<String> proofAssumptions() {
+        return AssumptionSignature.ofExpressions(DOMAIN_ASSUMPTIONS).normalizedAssumptions();
+    }
+
+    private static String proofDigest(String source, String target, String rule) {
+        return sha256("modpow-conditional-proof/v2\n" + source + "\n" + target + "\n" + rule
+            + "\n" + String.join("\n", proofAssumptions()));
     }
 
     private static String sha256(String value) {
