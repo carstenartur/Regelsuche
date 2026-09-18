@@ -1,6 +1,7 @@
 package de.regelsuche.search.moves;
 
 import de.regelsuche.ast.Expr;
+import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.search.program.CompiledAstReplayCodec;
 import de.regelsuche.transform.AstRewriteTransport;
 import de.regelsuche.transform.Transformation;
@@ -29,10 +30,14 @@ public final class TypedMoveSearch {
         private Policy() {}
     }
 
+    /** Marker for providers that consume the canonical tagged AST transport used by this adapter. */
+    public interface TypedProvider extends MoveProvider {}
+
     public record Context(Expr goal, List<String> initialAssumptions, MoveContext.Phase phase) {
         public Context {
             Objects.requireNonNull(goal, "goal");
-            initialAssumptions = List.copyOf(Objects.requireNonNull(initialAssumptions, "initialAssumptions"));
+            initialAssumptions = AssumptionSignature.ofExpressions(
+                Objects.requireNonNull(initialAssumptions, "initialAssumptions")).normalizedAssumptions();
             Objects.requireNonNull(phase, "phase");
         }
         public static Context frozen(Expr goal) {
@@ -77,6 +82,9 @@ public final class TypedMoveSearch {
             if (policy != Policy.INVENTORY_ORDER) {
                 throw new IllegalArgumentException("typed move search v1 supports inventory-order policy only");
             }
+            if (providers.stream().anyMatch(provider -> !(provider instanceof TypedProvider))) {
+                throw new IllegalArgumentException("typed move search requires typed providers");
+            }
         }
     }
 
@@ -118,13 +126,13 @@ public final class TypedMoveSearch {
      * Primitive AST source for this typed adapter. It deliberately reports an incomplete relation:
      * AstRewriteTransport has a finite candidate cap but no explicit truncation receipt.
      */
-    public static MoveProvider primitiveProvider(MoveProvider.Descriptor descriptor, AstRewriteTransport transport) {
+    public static TypedProvider primitiveProvider(MoveProvider.Descriptor descriptor, AstRewriteTransport transport) {
         Objects.requireNonNull(descriptor, "descriptor");
         Objects.requireNonNull(transport, "transport");
         if (descriptor.sourceKind() != SearchMove.SourceKind.PRIMITIVE) {
             throw new IllegalArgumentException("typed primitive provider requires PRIMITIVE source kind");
         }
-        return new MoveProvider() {
+        return new TypedProvider() {
             @Override public Descriptor descriptor() { return descriptor; }
 
             @Override public Batch candidates(MoveState state, MoveContext context) {
