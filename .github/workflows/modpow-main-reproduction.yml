@@ -1,0 +1,85 @@
+name: ModPow main-integrated reproduction
+
+on:
+  push:
+    branches: ['qa/1025-main-reproduction']
+    paths: ['.github/workflows/modpow-main-reproduction.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modpow-main-reproduction-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 18ee3324c6dd6967d8b7c08e2c7f0d70997e5e56
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+      - name: Verify exact integrated source and frozen archive
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/modpow-reproduction"
+          test "$(git rev-parse HEAD)" = 18ee3324c6dd6967d8b7c08e2c7f0d70997e5e56
+          git rev-parse HEAD > "$RUNNER_TEMP/modpow-reproduction/source-commit.txt"
+          test "$(git hash-object regelsuche-experiments/src/main/java/de/regelsuche/benchmark/ModPowDagRediscoveryStudy.java)" = 03b9e1574e9582729660bb2ac62e111e8351e10d
+          test "$(git hash-object regelsuche-experiments/src/main/java/de/regelsuche/benchmark/ModPowDagRediscoveryReport.java)" = dfa6deba2f1d6322e7e90ad448fc0ec302bcddb7
+          echo '2080973d63d8f3a036cc584d99e897582d2983c988936bda2d7c33c060d64f46  docs/research/modpow-dag-rediscovery-plan.json' | sha256sum -c -
+          echo '21203ea84afb51969ca66824cb0d34a94b5126273e5ea1bcc7b0e58648dc2389  docs/research/modpow-dag-rediscovery-result.json' | sha256sum -c -
+          echo 'd68111fc45d852614fcceb87c9cae054e502354110a20e58d054be9b75d84fe3  docs/research/modpow-dag-rediscovery-result-v2.json.gz' | sha256sum -c -
+          java -version 2> "$RUNNER_TEMP/modpow-reproduction/java-version.txt"
+      - name: Run existing contract tests on the integrated source
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --no-configuration-cache :regelsuche-experiments:test \
+            --tests 'de.regelsuche.benchmark.ModPow*Test' --console=plain --stacktrace \
+            2>&1 | tee "$RUNNER_TEMP/modpow-reproduction/test.log"
+      - name: Regenerate and compare retained evidence byte for byte
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --no-configuration-cache :regelsuche-experiments:modPowDagRediscovery \
+            --console=plain --stacktrace 2>&1 | tee "$RUNNER_TEMP/modpow-reproduction/reproduce.log"
+          gzip -dc docs/research/modpow-dag-rediscovery-result-v2.json.gz > "$RUNNER_TEMP/modpow-reproduction/retained-v2.json"
+          cp regelsuche-experiments/build/reports/modpow-dag-rediscovery/modpow-dag-rediscovery-result-v2.json "$RUNNER_TEMP/modpow-reproduction/regenerated-v2.json"
+          cmp "$RUNNER_TEMP/modpow-reproduction/retained-v2.json" "$RUNNER_TEMP/modpow-reproduction/regenerated-v2.json"
+          echo "a8f83977ab7b09a21e9aa8d012dcf31edc243ed258fdbc8427b4f99980b4afed  $RUNNER_TEMP/modpow-reproduction/regenerated-v2.json" | sha256sum -c -
+          python3 - <<'PY'
+          import json, os, pathlib, xml.etree.ElementTree as ET
+          reports = sorted(pathlib.Path('regelsuche-experiments/build/test-results/test').glob('TEST-*ModPow*Test.xml'))
+          totals = dict.fromkeys(('tests', 'failures', 'errors', 'skipped'), 0)
+          for report in reports:
+              root = ET.parse(report).getroot()
+              for key in totals:
+                  totals[key] += int(root.get(key, '0'))
+          assert len(reports) == 3, reports
+          assert totals == {'tests': 12, 'failures': 0, 'errors': 0, 'skipped': 0}, totals
+          result = {'sourceCommit': '18ee3324c6dd6967d8b7c08e2c7f0d70997e5e56', 'junit': totals, 'byteIdenticalToRetainedV2': True}
+          output = pathlib.Path(os.environ['RUNNER_TEMP']) / 'modpow-reproduction'
+          (output / 'verification.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(result, indent=2))
+          PY
+          git diff --exit-code
+      - name: Retain evidence including failures
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/modpow-reproduction"
+          if test -d regelsuche-experiments/build/test-results/test; then
+            cp -r regelsuche-experiments/build/test-results/test "$RUNNER_TEMP/modpow-reproduction/junit"
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: modpow-main-reproduction-${{ github.run_id }}
+          path: ${{ runner.temp }}/modpow-reproduction
+          if-no-files-found: error
