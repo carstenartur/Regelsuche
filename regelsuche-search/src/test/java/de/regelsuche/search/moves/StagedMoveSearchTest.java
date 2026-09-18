@@ -1,13 +1,18 @@
 package de.regelsuche.search.moves;
 
 import static org.junit.jupiter.api.Assertions.*;
+import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.search.program.RewriteCandidate;
 import de.regelsuche.transform.AstRewriteTransport;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
 import de.regelsuche.transform.Transformation;
+import de.regelsuche.symbol.SymbolId;
+import java.util.UUID;
 import static de.regelsuche.ast.BinaryOperator.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +45,46 @@ class StagedMoveSearchTest {
         assertTrue(result.reachedStates().stream().anyMatch(state -> state.expression().equals(target)));
         assertEquals(parser.parseTerm("a+(b+c)"),
             ((de.regelsuche.ast.BinaryExpr) target).left());
+    }
+
+
+    @Test void typedFrontierRetainsExactRationalAsOneNumericLeaf() {
+        var a = PatternExpr.var("A");
+        var transport = new AstRewriteTransport(List.of(
+            new PatternRewriteRule("typed-zero", PatternExpr.op(ADD, a, PatternExpr.num(0)), a)
+        ), 100, 100);
+        var descriptor = new MoveProvider.Descriptor("typed-primitives", "*", SearchMove.SourceKind.PRIMITIVE,
+            SearchMove.ProofStrength.REPLAYABLE, List.of(), SearchMove.ValueEvidence.UNKNOWN, "typed-fixture");
+        var source = new BinaryExpr(NumberExpr.exact("1/3"), ADD, new NumberExpr(0));
+        var target = NumberExpr.exact("1/3");
+        var result = new TypedMoveSearch().search(new TypedMoveSearch.Problem(source,
+            TypedMoveSearch.Context.frozen(target), List.of(TypedMoveSearch.primitiveProvider(descriptor, transport)),
+            TypedMoveSearch.Policy.INVENTORY_ORDER, TypedMoveSearch.primitiveReplay(transport), state -> 0,
+            MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED, new MoveSearch.Budget(2, 2, 0, 20, 1_000)));
+
+        assertTrue(result.reached());
+        assertEquals(target, result.witness().getLast().target().expression());
+        assertInstanceOf(NumberExpr.class, result.witness().getLast().target().expression());
+    }
+
+    @Test void typedFrontierRetainsScopedSymbolIdentityAcrossRewrite() {
+        var a = PatternExpr.var("A");
+        var transport = new AstRewriteTransport(List.of(
+            new PatternRewriteRule("typed-zero", PatternExpr.op(ADD, a, PatternExpr.num(0)), a)
+        ), 100, 100);
+        var descriptor = new MoveProvider.Descriptor("typed-primitives", "*", SearchMove.SourceKind.PRIMITIVE,
+            SearchMove.ProofStrength.REPLAYABLE, List.of(), SearchMove.ValueEvidence.UNKNOWN, "typed-fixture");
+        var symbol = new SymbolId(new UUID(0, 77), 3);
+        var target = VariableExpr.scoped(symbol);
+        var source = new BinaryExpr(target, ADD, new NumberExpr(0));
+        var result = new TypedMoveSearch().search(new TypedMoveSearch.Problem(source,
+            TypedMoveSearch.Context.frozen(target), List.of(TypedMoveSearch.primitiveProvider(descriptor, transport)),
+            TypedMoveSearch.Policy.INVENTORY_ORDER, TypedMoveSearch.primitiveReplay(transport), state -> 0,
+            MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED, new MoveSearch.Budget(2, 2, 0, 20, 1_000)));
+
+        assertTrue(result.reached());
+        var reached = (VariableExpr) result.witness().getLast().target().expression();
+        assertEquals(symbol, reached.symbol().orElseThrow());
     }
 
     @Test void contextValidationAndOptionalVerificationAreExplicit() {
