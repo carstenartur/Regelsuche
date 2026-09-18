@@ -11,14 +11,14 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 3812752f6728685e39be5892070fd2bbad1677ac
+          ref: 2aa454db5213dc1dcc38d1c4936be697240e1c09
           persist-credentials: false
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
         with:
           distribution: temurin
           java-version: '25'
           cache: maven
-      - name: Verify application-key fix with work regression still red
+      - name: Verify final typed frontier review fixes
         run: |
           git rev-parse HEAD
           mvn --batch-mode --no-transfer-progress -pl regelsuche-search -am -Dtest=StagedMoveSearchTest test
