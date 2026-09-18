@@ -163,7 +163,12 @@ public final class TypedMoveSearch {
             String encodedTarget = CODEC.encodeExpression(target);
             String expectedApplicationKey = applicationKey(encodedSource, encodedTarget, move.transformation().rule());
             var generated = transport.generate(source.expression());
-            boolean accepted = move.transformation().applicationKey().equals(expectedApplicationKey)
+            boolean primitiveProvenance = move.transformation().provenance()
+                    instanceof de.regelsuche.transform.TransformationProvenance.PrimitiveRewriteSequence
+                && move.transformation().primitiveRuleIds().equals(List.of(move.transformation().rule()))
+                && move.transformation().primitiveStepCount() == 1;
+            boolean accepted = primitiveProvenance
+                && move.transformation().applicationKey().equals(expectedApplicationKey)
                 && generated.stream().anyMatch(step ->
                 step.target().equals(target)
                     && step.rule().equals(move.transformation().rule())
