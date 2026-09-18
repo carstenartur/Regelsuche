@@ -1,0 +1,22 @@
+name: Typed move frontier focused TDD
+on:
+  push:
+    branches: [qa/typed-move-frontier-red-20260918]
+permissions:
+  contents: read
+jobs:
+  focused:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: a8077fe92aa4150ffba87a044f1858a2aa56c30e
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Run focused staged move tests
+        run: mvn --batch-mode --no-transfer-progress -pl regelsuche-search -am -Dtest=StagedMoveSearchTest -Dsurefire.failIfNoSpecifiedTests=false test
