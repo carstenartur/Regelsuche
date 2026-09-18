@@ -29,7 +29,7 @@ public interface MoveProvider {
 <span class="fc" id="L29">        public Batch {</span>
 <span class="fc" id="L30">            moves = List.copyOf(moves); Objects.requireNonNull(work, &quot;work&quot;);</span>
             // Legacy event-only engines still expose source work even when a macro has no endpoint.
-<span class="pc bpc" id="L32" title="1 of 2 branches missed.">            if (work.candidateWork().equals(de.regelsuche.transform.ExecutionWork.ZERO)) {</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">            if (work.candidateWork().equals(de.regelsuche.transform.ExecutionWork.ZERO)) {</span>
 <span class="fc" id="L33">                var expansion = moves.stream().map(move -&gt; move.transformation().executionWork())</span>
 <span class="fc" id="L34">                    .reduce(de.regelsuche.transform.ExecutionWork.ZERO, de.regelsuche.transform.ExecutionWork::plus);</span>
 <span class="pc bpc" id="L35" title="1 of 2 branches missed.">                long primitives = expansion.exactTheorySteps() == 0 ? Math.max(expansion.primitiveRewrites(), work.sourceCandidates())</span>
