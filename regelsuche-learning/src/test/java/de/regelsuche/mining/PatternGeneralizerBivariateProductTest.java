@@ -20,8 +20,8 @@ class PatternGeneralizerBivariateProductTest {
         GeneralizedPattern pattern =
             new PatternGeneralizer().generalize(paths).orElseThrow();
 
-        assertEquals("modpow(x,A*A2,v1)", pattern.leftPattern());
-        assertEquals("modpow(modpow(x,A,v1),A2,v1)", pattern.rightPattern());
+        assertEquals("modpow(x,A*A2,B)", pattern.leftPattern());
+        assertEquals("modpow(modpow(x,A,B),A2,B)", pattern.rightPattern());
         assertTrue(pattern.parameterRelations().contains("N1 = A*A2"));
         assertTrue(pattern.parameterRelations().contains("N2 = A"));
         assertTrue(pattern.parameterRelations().contains("N3 = A2"));
