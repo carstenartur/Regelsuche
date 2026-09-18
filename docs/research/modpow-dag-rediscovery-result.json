@@ -1,0 +1,16 @@
+{
+  "schema": "regelsuche.modpow-dag-rediscovery-result/v1",
+  "revision": "regelsuche.modpow-dag-rediscovery/v1",
+  "green": true,
+  "formation": [
+    {"id": "TRAIN_SMALL","negativeControl": false,"outcome": "BOUNDED_EXHAUSTED","completeBoundedRelation": true,"reachedStates": 3,"generatedSuccessors": 2,"totalSearchWork": 64,"verificationWork": 46,"originalTreeCost": 11,"originalDagCost": 11,"selectedTreeCost": 11,"selectedDagCost": 8,"dagImproved": true,"treeImproved": false,"expectedSharedResidue": true,"acceptedProofReceipts": 2},
+    {"id": "TRAIN_SKEW","negativeControl": false,"outcome": "BOUNDED_EXHAUSTED","completeBoundedRelation": true,"reachedStates": 3,"generatedSuccessors": 2,"totalSearchWork": 64,"verificationWork": 46,"originalTreeCost": 37,"originalDagCost": 37,"selectedTreeCost": 37,"selectedDagCost": 29,"dagImproved": true,"treeImproved": false,"expectedSharedResidue": true,"acceptedProofReceipts": 2}
+  ],
+  "test": [
+    {"id": "C31","negativeControl": false,"outcome": "BOUNDED_EXHAUSTED","completeBoundedRelation": true,"reachedStates": 3,"generatedSuccessors": 2,"totalSearchWork": 64,"verificationWork": 46,"originalTreeCost": 46,"originalDagCost": 46,"selectedTreeCost": 46,"selectedDagCost": 31,"dagImproved": true,"treeImproved": false,"expectedSharedResidue": true,"acceptedProofReceipts": 2},
+    {"id": "C61","negativeControl": false,"outcome": "BOUNDED_EXHAUSTED","completeBoundedRelation": true,"reachedStates": 3,"generatedSuccessors": 2,"totalSearchWork": 64,"verificationWork": 46,"originalTreeCost": 91,"originalDagCost": 91,"selectedTreeCost": 91,"selectedDagCost": 61,"dagImproved": true,"treeImproved": false,"expectedSharedResidue": true,"acceptedProofReceipts": 2},
+    {"id": "C93","negativeControl": false,"outcome": "BOUNDED_EXHAUSTED","completeBoundedRelation": true,"reachedStates": 3,"generatedSuccessors": 2,"totalSearchWork": 64,"verificationWork": 46,"originalTreeCost": 139,"originalDagCost": 139,"selectedTreeCost": 139,"selectedDagCost": 93,"dagImproved": true,"treeImproved": false,"expectedSharedResidue": true,"acceptedProofReceipts": 2},
+    {"id": "C123","negativeControl": false,"outcome": "BOUNDED_EXHAUSTED","completeBoundedRelation": true,"reachedStates": 3,"generatedSuccessors": 2,"totalSearchWork": 64,"verificationWork": 46,"originalTreeCost": 184,"originalDagCost": 184,"selectedTreeCost": 184,"selectedDagCost": 123,"dagImproved": true,"treeImproved": false,"expectedSharedResidue": true,"acceptedProofReceipts": 2}
+  ],
+  "negativeControl": {"id": "NEGATIVE_NO_SHARED_E","negativeControl": true,"outcome": "BOUNDED_EXHAUSTED","completeBoundedRelation": true,"reachedStates": 3,"generatedSuccessors": 2,"totalSearchWork": 64,"verificationWork": 46,"originalTreeCost": 139,"originalDagCost": 139,"selectedTreeCost": 139,"selectedDagCost": 139,"dagImproved": false,"treeImproved": false,"expectedSharedResidue": false,"acceptedProofReceipts": 2}
+}
