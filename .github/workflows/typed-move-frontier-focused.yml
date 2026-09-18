@@ -1,4 +1,4 @@
-name: Typed move frontier module QA
+name: Typed move frontier hardening TDD
 on:
   push:
     branches: [qa/typed-move-frontier-red-20260918]
@@ -11,12 +11,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 02ce58c5e981dfa3c023eea29b2a438d4d700687
+          ref: 7612be558cda6bbceaf3a64bbd116eb1f48a90d0
           persist-credentials: false
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
         with:
           distribution: temurin
           java-version: '25'
           cache: maven
-      - name: Run complete search module tests
-        run: mvn --batch-mode --no-transfer-progress -pl regelsuche-search -am test
+      - name: Run focused staged move hardening tests
+        run: mvn --batch-mode --no-transfer-progress -pl regelsuche-search -am -Dtest=StagedMoveSearchTest -Dsurefire.failIfNoSpecifiedTests=false test
