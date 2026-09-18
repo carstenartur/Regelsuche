@@ -358,3 +358,20 @@ tasks.register('modPowReuseLearningFormation', JavaExec) {
     inputs.file(rootProject.file('docs/research/modpow-reuse-learning-split.json'))
     outputs.dir(modPowReuseLearningFormationOutput)
 }
+
+
+def modPowReuseLearningEvaluationOutput =
+    layout.buildDirectory.dir('reports/modpow-reuse-learning-evaluation')
+
+tasks.register('modPowReuseLearningEvaluation', JavaExec) {
+    group = 'verification'
+    description = 'Evaluates the frozen learned modular-power artifact on held-out programs (#1026).'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.benchmark.ModPowReuseLearningEvaluation'
+    args rootProject.file('docs/research/learned-modpow-reuse-pattern.json').absolutePath,
+        modPowReuseLearningEvaluationOutput.get().asFile.absolutePath
+    inputs.file(rootProject.file('docs/research/learned-modpow-reuse-pattern.json'))
+    inputs.file(rootProject.file('docs/research/modpow-reuse-learning-split.json'))
+    outputs.dir(modPowReuseLearningEvaluationOutput)
+}
