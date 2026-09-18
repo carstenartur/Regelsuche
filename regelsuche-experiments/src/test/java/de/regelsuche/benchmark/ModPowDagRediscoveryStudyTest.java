@@ -65,6 +65,17 @@ class ModPowDagRediscoveryStudyTest {
     }
 
     @Test
+    void proofDomainMustExplicitlyEstablishIntegerAndSignPreconditions() {
+        Expr source = ModPowDagRediscoveryStudy.sourceProgram(false);
+
+        assertFalse(ModPowDagRediscoveryStudy.domainContractSatisfied(source, List.of()));
+        assertFalse(ModPowDagRediscoveryStudy.domainContractSatisfied(source, List.of(
+            "a integer", "n integer", "n > 0", "q integer", "e integer")));
+        assertTrue(ModPowDagRediscoveryStudy.domainContractSatisfied(
+            source, ModPowDagRediscoveryStudy.DOMAIN_ASSUMPTIONS));
+    }
+
+    @Test
     void shapeAuditRejectsACompositionWithTheWrongOuterExponent() {
         Expr a = new VariableExpr("a");
         Expr q = new VariableExpr("q");
