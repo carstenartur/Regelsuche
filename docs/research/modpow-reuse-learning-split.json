@@ -1,0 +1,112 @@
+{
+  "schema": "regelsuche.modpow-reuse-learning-split/v1",
+  "issue": 1026,
+  "frozenBeforeLearning": true,
+  "baseExperiment": {
+    "issue": 1024,
+    "pr": 1025,
+    "baselineHead": "4cfbda11af311238466377884450507873f55449"
+  },
+  "domainAssumptions": [
+    "base integer",
+    "modulus integer",
+    "modulus > 0",
+    "all exponents integer",
+    "all exponents >= 0"
+  ],
+  "train": [
+    {
+      "id": "TRAIN_15",
+      "source": "modpow(a,15,n)",
+      "target": "modpow(modpow(a,3,n),5,n)",
+      "factorProduct": 15,
+      "outerFactor": 5,
+      "reusableFactor": 3
+    },
+    {
+      "id": "TRAIN_28",
+      "source": "modpow(b,28,m)",
+      "target": "modpow(modpow(b,4,m),7,m)",
+      "factorProduct": 28,
+      "outerFactor": 7,
+      "reusableFactor": 4
+    },
+    {
+      "id": "TRAIN_66",
+      "source": "modpow(c,66,k)",
+      "target": "modpow(modpow(c,6,k),11,k)",
+      "factorProduct": 66,
+      "outerFactor": 11,
+      "reusableFactor": 6
+    }
+  ],
+  "shuffledControl": [
+    {
+      "id": "SHUFFLED_15",
+      "source": "modpow(a,15,n)",
+      "target": "modpow(modpow(a,5,n),3,n)"
+    },
+    {
+      "id": "SHUFFLED_28",
+      "source": "modpow(b,28,m)",
+      "target": "modpow(modpow(b,7,m),4,m)"
+    },
+    {
+      "id": "SHUFFLED_66",
+      "source": "modpow(c,66,k)",
+      "target": "modpow(modpow(c,11,k),6,k)"
+    }
+  ],
+  "heldOutTest": [
+    {
+      "id": "TEST_RENAMED",
+      "program": "program(modpow(z,13*7,t),modpow(z,7,t))",
+      "expectedReusableExponent": 7
+    },
+    {
+      "id": "TEST_SWAPPED_OUTPUTS",
+      "program": "program(modpow(y,8,u),modpow(y,17*8,u))",
+      "expectedReusableExponent": 8
+    },
+    {
+      "id": "TEST_EXTRA_OUTPUT",
+      "program": "program(extra(w),modpow(w,19*9,v),modpow(w,9,v))",
+      "expectedReusableExponent": 9
+    },
+    {
+      "id": "TEST_FACTOR_ORDER",
+      "program": "program(modpow(r,23,s),modpow(r,23*10,s))",
+      "expectedReusableExponent": 23,
+      "recognition": "multiplication AC; all legal factor bindings may be considered before DAG selection"
+    }
+  ],
+  "negativeTest": {
+    "id": "TEST_NO_REUSE",
+    "program": "program(modpow(z,13*7,t),modpow(z,5,t))"
+  },
+  "formationProtocol": {
+    "input": "TRAIN only",
+    "existingComponents": [
+      "SuccessfulTransformationPath",
+      "PatternGeneralizer",
+      "ParameterRelationMiner"
+    ],
+    "requiredGenericExtension": "if needed, allow a learned numeric placeholder to depend multiplicatively on two independently varying placeholders; no modpow-specific relation code",
+    "artifactFreeze": "left pattern, right pattern, parameter relations, assumptions and content SHA-256 are committed before TEST evaluation"
+  },
+  "testProtocol": {
+    "learnedArtifactOnly": true,
+    "primitiveCompositionRuleHiddenDuringLearnedArm": true,
+    "application": "match the frozen learned rule inside arbitrary program context; multiplication may use generic AC recognition and all legal factor bindings; select reached program only by the same frozen DAG cost",
+    "proof": "every concrete learned application independently replays the #1025 modular-exponent composition/domain verifier"
+  },
+  "green": [
+    "a non-concrete learned artifact is frozen before held-out evaluation",
+    "all four positive TEST programs obtain a lower DAG cost while preserving all other outputs",
+    "TEST_NO_REUSE obtains no lower DAG cost",
+    "SHUFFLED control does not produce an equivalent reuse advantage on the positive TEST corpus",
+    "all learned applications have accepted proof/domain receipts",
+    "learned artifact contains no TRAIN variable names and no Pocklington-specific identifier"
+  ],
+  "claimBoundary": "learning/generalization of a known proof-valid arithmetic rewrite and its reuse context; not theorem discovery"
+}
