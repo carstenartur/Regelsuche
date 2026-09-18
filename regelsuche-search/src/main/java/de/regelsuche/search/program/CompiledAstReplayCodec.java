@@ -26,10 +26,12 @@ import java.util.Set;
 /** Bounded interchange of untrusted typed histories. Decoding is not mathematical or execution approval. */
 public final class CompiledAstReplayCodec {
     public static final String SCHEMA = "regelsuche.compiled-ast-replay/v1";
+    public static final String EXPRESSION_SCHEMA = "regelsuche.typed-move-expression/v1";
     public static final int MAXIMUM_BYTES = 1_048_576;
     public static final int MAXIMUM_TEXT_CHARACTERS = 4_096;
     public static final int MAXIMUM_ASSUMPTIONS = 128;
     private static final Set<String> ROOT_FIELDS = Set.of("schema", "backend", "program", "sourceIds", "states", "steps");
+    private static final Set<String> EXPRESSION_FIELDS = Set.of("schema", "expression");
     private static final Set<String> STEP_FIELDS = Set.of("rule", "kind", "mayIncreaseComplexity", "estimatedCostDelta",
         "equivalencePreservingByConstruction", "assumptions", "packId", "license");
     private static final ObjectMapper JSON = new ObjectMapper(JsonFactory.builder()
@@ -37,6 +39,43 @@ public final class CompiledAstReplayCodec {
         .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(270)
             .maxStringLength(MAXIMUM_TEXT_CHARACTERS).maxNameLength(128).maxNumberLength(32).build())
         .build()).enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+
+    /** Canonical structural transport for one AST search state; no parser/formatter round-trip. */
+    public String encodeExpression(Expr expression) {
+        Objects.requireNonNull(expression, "expression");
+        var data = new AstReplayJson(JSON);
+        var root = JSON.createObjectNode().put("schema", EXPRESSION_SCHEMA);
+        root.set("expression", data.write(expression));
+        try {
+            String encoded = JSON.writeValueAsString(root);
+            requireBytes(encoded.getBytes(StandardCharsets.UTF_8));
+            return encoded;
+        } catch (JsonProcessingException exception) {
+            throw new IllegalArgumentException("cannot encode typed move expression", exception);
+        }
+    }
+
+    /** Decodes only the canonical expression-state schema and rejects alternate JSON spellings. */
+    public Expr decodeExpression(String document) {
+        Objects.requireNonNull(document, "document");
+        byte[] bytes = document.getBytes(StandardCharsets.UTF_8);
+        requireBytes(bytes);
+        try {
+            JsonNode root = JSON.readTree(document);
+            AstReplayJson.fields(root, EXPRESSION_FIELDS);
+            var data = new AstReplayJson(JSON);
+            if (!EXPRESSION_SCHEMA.equals(data.text(root, "schema"))) {
+                throw new IllegalArgumentException("unsupported typed move expression version");
+            }
+            Expr expression = data.read(root.get("expression"));
+            if (!encodeExpression(expression).equals(document)) {
+                throw new IllegalArgumentException("noncanonical typed move expression");
+            }
+            return expression;
+        } catch (JsonProcessingException exception) {
+            throw new IllegalArgumentException("invalid typed move expression JSON", exception);
+        }
+    }
 
     /** Canonical field order and exact typed values. No executable rule or class is serialized. */
     public byte[] encode(Candidate candidate) {
