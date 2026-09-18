@@ -118,7 +118,7 @@ class StagedMoveSearchTest {
         var descriptor = new MoveProvider.Descriptor("typed-primitives", "*", SearchMove.SourceKind.PRIMITIVE,
             SearchMove.ProofStrength.REPLAYABLE, List.of(), SearchMove.ValueEvidence.UNKNOWN, "typed-fixture");
         MoveProvider genuine = TypedMoveSearch.primitiveProvider(descriptor, transport);
-        MoveProvider forged = new MoveProvider() {
+        TypedMoveSearch.TypedProvider forged = new TypedMoveSearch.TypedProvider() {
             @Override public Descriptor descriptor() { return descriptor; }
             @Override public Batch candidates(MoveState state, MoveContext context) {
                 var batch = genuine.candidates(state, context);
@@ -155,7 +155,7 @@ class StagedMoveSearchTest {
         var descriptor = new MoveProvider.Descriptor("typed-primitives", "*", SearchMove.SourceKind.PRIMITIVE,
             SearchMove.ProofStrength.REPLAYABLE, List.of(), SearchMove.ValueEvidence.UNKNOWN, "typed-fixture");
         MoveProvider genuine = TypedMoveSearch.primitiveProvider(descriptor, transport);
-        MoveProvider forged = new MoveProvider() {
+        TypedMoveSearch.TypedProvider forged = new TypedMoveSearch.TypedProvider() {
             @Override public Descriptor descriptor() { return descriptor; }
             @Override public Batch candidates(MoveState state, MoveContext context) {
                 var batch = genuine.candidates(state, context);
