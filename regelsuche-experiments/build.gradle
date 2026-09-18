@@ -15,6 +15,7 @@ java {
 
 dependencies {
     api project(':regelsuche-search')
+    api project(':regelsuche-learning')
     api project(':regelsuche-validation')
     api project(':regelsuche-discovery')
     api project(':regelsuche-math-algorithms')
@@ -341,4 +342,19 @@ tasks.register('modPowDagRediscovery', JavaExec) {
     args modPowDagRediscoveryReportDirectory.get().asFile.absolutePath
     inputs.file(rootProject.file('docs/research/modpow-dag-rediscovery-plan.json'))
     outputs.dir(modPowDagRediscoveryReportDirectory)
+}
+
+
+def modPowReuseLearningFormationOutput =
+    layout.buildDirectory.dir('reports/modpow-reuse-learning-formation')
+
+tasks.register('modPowReuseLearningFormation', JavaExec) {
+    group = 'verification'
+    description = 'Learns and freezes the TRAIN-only modular-power reuse pattern (#1026).'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.benchmark.ModPowReuseLearningFormation'
+    args modPowReuseLearningFormationOutput.get().asFile.absolutePath
+    inputs.file(rootProject.file('docs/research/modpow-reuse-learning-split.json'))
+    outputs.dir(modPowReuseLearningFormationOutput)
 }
