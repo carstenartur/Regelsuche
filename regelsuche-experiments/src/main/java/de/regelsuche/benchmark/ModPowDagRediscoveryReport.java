@@ -1,13 +1,17 @@
 package de.regelsuche.benchmark;
 
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-/** Writes the deterministic #1024 study result; exits non-zero when the frozen GREEN gate fails. */
+/** Writes v2 evidence without overwriting the retained historical v1 results. */
 public final class ModPowDagRediscoveryReport {
+    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();
+
     private ModPowDagRediscoveryReport() {
     }
 
@@ -18,9 +22,9 @@ public final class ModPowDagRediscoveryReport {
         Path output = Path.of(arguments[0]);
         Files.createDirectories(output);
         var study = ModPowDagRediscoveryStudy.run();
-        Files.writeString(output.resolve("modpow-dag-rediscovery-result.json"),
+        Files.writeString(output.resolve("modpow-dag-rediscovery-result-v2.json"),
             json(study), StandardCharsets.UTF_8);
-        Files.writeString(output.resolve("modpow-dag-rediscovery-result.md"),
+        Files.writeString(output.resolve("modpow-dag-rediscovery-result-v2.md"),
             markdown(study), StandardCharsets.UTF_8);
         if (!study.green()) {
             throw new IllegalStateException("frozen modPow DAG rediscovery gate is not GREEN");
@@ -28,74 +32,53 @@ public final class ModPowDagRediscoveryReport {
     }
 
     static String json(ModPowDagRediscoveryStudy.StudyResult study) {
-        StringBuilder out = new StringBuilder();
-        out.append("{\n");
-        out.append("  \"schema\": \"regelsuche.modpow-dag-rediscovery-result/v1\",\n");
-        out.append("  \"revision\": \"").append(ModPowDagRediscoveryStudy.REVISION).append("\",\n");
-        out.append("  \"green\": ").append(study.green()).append(",\n");
-        appendCases(out, "formation", study.formation(), true);
-        appendCases(out, "test", study.test(), true);
-        out.append("  \"negativeControl\": ");
-        appendCase(out, study.negativeControl());
-        out.append("\n}\n");
-        return out.toString();
+        var out = new JsonWriter().beginObject()
+            .property("schema", "regelsuche.modpow-dag-rediscovery-result/v2")
+            .property("revision", ModPowDagRediscoveryStudy.REVISION)
+            .property("proofContract", "modpow-conditional-proof/v2")
+            .stringArray("proofAssumptions", ModPowDagRediscoveryStudy.proofAssumptions())
+            .property("workScope", "MECHANICAL_SEARCH_PLUS_SOURCE_TARGET_NODE_RECEIPTS;EXCLUDES_FULL_PROVIDER_TRAVERSAL_DOMAIN_CHECKS_CODEC_HASHING_ALLOCATION_AND_POSTHOC_SCORING")
+            .property("costScope", "DECLARED_EXPONENT_BIT_PROXY;OTHER_OPERATIONS_ZERO;NOT_RUNTIME_OR_BIT_COMPLEXITY")
+            .property("claimBoundary", "ONE_STEP_CLOSURE_WITH_TWO_GENERIC_FACTOR_ORDERS;FOUR_BIT_PROFILES_OF_ONE_AST;NO_LEARNED_TRANSFER")
+            .property("green", study.green());
+        appendCases(out, "formation", study.formation());
+        appendCases(out, "test", study.test());
+        out.object("negativeControl", writer -> appendCase(writer, study.negativeControl()));
+        return out.endObject().toString() + "\n";
     }
 
-    private static void appendCases(StringBuilder out, String name,
-            List<ModPowDagRediscoveryStudy.CaseResult> cases, boolean comma) {
-        out.append("  \"").append(name).append("\": [\n");
-        for (int index = 0; index < cases.size(); index++) {
-            out.append("    ");
-            appendCase(out, cases.get(index));
-            if (index + 1 < cases.size()) {
-                out.append(',');
-            }
-            out.append('\n');
-        }
-        out.append("  ]");
-        if (comma) {
-            out.append(',');
-        }
-        out.append('\n');
+    private static void appendCases(JsonWriter out, String name,
+            List<ModPowDagRediscoveryStudy.CaseResult> cases) {
+        out.array(name, writer -> cases.forEach(result ->
+            writer.objectValue(item -> appendCase(item, result))));
     }
 
-    private static void appendCase(StringBuilder out,
+    private static void appendCase(JsonWriter out,
             ModPowDagRediscoveryStudy.CaseResult result) {
-        out.append("{");
-        field(out, "id", result.id()).append(',');
-        field(out, "negativeControl", result.negativeControl()).append(',');
-        field(out, "outcome", result.outcome().name()).append(',');
-        field(out, "completeBoundedRelation", result.completeBoundedRelation()).append(',');
-        field(out, "reachedStates", result.reachedStates()).append(',');
-        field(out, "generatedSuccessors", result.generatedSuccessors()).append(',');
-        field(out, "totalSearchWork", result.totalSearchWork()).append(',');
-        field(out, "verificationWork", result.verificationWork()).append(',');
-        field(out, "originalTreeCost", result.originalCost().tree()).append(',');
-        field(out, "originalDagCost", result.originalCost().dag()).append(',');
-        field(out, "selectedTreeCost", result.selectedCost().tree()).append(',');
-        field(out, "selectedDagCost", result.selectedCost().dag()).append(',');
-        field(out, "dagImproved", result.dagImproved()).append(',');
-        field(out, "treeImproved", result.treeImproved()).append(',');
-        field(out, "expectedSharedResidue", result.expectedSharedResidue()).append(',');
-        field(out, "acceptedProofReceipts", result.acceptedProofReceipts());
-        out.append("}");
-    }
-
-    private static StringBuilder field(StringBuilder out, String name, String value) {
-        return out.append('\"').append(name).append("\": \"").append(value).append('\"');
-    }
-
-    private static StringBuilder field(StringBuilder out, String name, boolean value) {
-        return out.append('\"').append(name).append("\": ").append(value);
-    }
-
-    private static StringBuilder field(StringBuilder out, String name, long value) {
-        return out.append('\"').append(name).append("\": ").append(value);
+        out.property("id", result.id())
+            .property("negativeControl", result.negativeControl())
+            .property("outcome", result.outcome().name())
+            .property("completeBoundedRelation", result.completeBoundedRelation())
+            .property("reachedStates", result.reachedStates())
+            .property("generatedSuccessors", result.generatedSuccessors())
+            .property("totalSearchWork", result.totalSearchWork())
+            .property("verificationWork", result.verificationWork())
+            .property("originalTreeCost", result.originalCost().tree())
+            .property("originalDagCost", result.originalCost().dag())
+            .property("selectedTreeCost", result.selectedCost().tree())
+            .property("selectedDagCost", result.selectedCost().dag())
+            .property("dagImproved", result.dagImproved())
+            .property("treeImproved", result.treeImproved())
+            .property("expectedSharedResidue", result.expectedSharedResidue())
+            .property("acceptedProofReceipts", result.acceptedProofReceipts())
+            .property("sourceProgram", CODEC.encodeExpression(
+                ModPowDagRediscoveryStudy.sourceProgram(result.negativeControl())))
+            .property("selectedProgram", CODEC.encodeExpression(result.selectedProgram()));
     }
 
     private static String markdown(ModPowDagRediscoveryStudy.StudyResult study) {
         StringBuilder out = new StringBuilder();
-        out.append("# Target-blind modular exponent DAG rediscovery\n\n");
+        out.append("# Target-blind modular exponent DAG rediscovery — v2\n\n");
         out.append("Frozen verdict: **").append(study.green() ? "GREEN" : "NOT GREEN").append("**.\n\n");
         out.append("| case | original TREE | selected TREE | original DAG | selected DAG | complete | reuse |\n");
         out.append("|---|---:|---:|---:|---:|---|---|\n");
@@ -103,13 +86,17 @@ public final class ModPowDagRediscoveryReport {
             row(out, result);
         }
         row(out, study.negativeControl());
-        out.append("\nTREE is the control that charges repeated calls repeatedly. DAG charges a structurally identical modpow call once.\n");
-        out.append("The known factored Pocklington target is not supplied to the search; selection happens after bounded closure.\n");
+        out.append("\nTREE charges repeated calls repeatedly. DAG charges a structurally identical modpow call once.\n");
+        out.append("The known factored target is not supplied to the search; selection happens after one-step bounded closure.\n");
+        out.append("The JSON contains the actual canonical source/selected ASTs and normalized conditional proof assumptions.\n");
+        out.append("Work counters are mechanical search/node-receipt units, not total computational cost; the JSON states the excluded work.\n");
+        out.append("The four TEST entries share one AST and differ only in declared bit costs. This is not learned transfer or a new modular-exponent law.\n");
+        out.append("Historical v1 result files remain unchanged.\n");
         return out.toString();
     }
 
     private static void row(StringBuilder out, ModPowDagRediscoveryStudy.CaseResult result) {
-        out.append("| ").append(result.id())
+        out.append("| ").append(result.id().replace("|", "\\|").replace("\n", "\\n").replace("\r", "\\r"))
             .append(" | ").append(result.originalCost().tree())
             .append(" | ").append(result.selectedCost().tree())
             .append(" | ").append(result.originalCost().dag())
