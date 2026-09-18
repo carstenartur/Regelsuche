@@ -1,0 +1,9 @@
+{
+  "schema": "regelsuche.modpow-reuse-learning-artifact/v1",
+  "leftPattern": "modpow(x,A*A2,B)",
+  "rightPattern": "modpow(modpow(x,A,B),A2,B)",
+  "parameterRelations": ["N1 = A*A2","N2 = A","N3 = A2"],
+  "assumptions": ["base integer","modulus integer","modulus > 0","all exponents integer","all exponents >= 0"],
+  "trainingIds": ["TRAIN_15","TRAIN_28","TRAIN_66"],
+  "contentSha256": "c582cec2e85426ad89fc35af22347a0920d7c8de26aa5a07b74cc14bb58ca6d6"
+}
