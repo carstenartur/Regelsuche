@@ -1,4 +1,4 @@
-name: Typed move frontier hardening QA
+name: Typed move frontier review QA
 on:
   push:
     branches: [qa/typed-move-frontier-red-20260918]
@@ -11,12 +11,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ebd88f258bc495b8e10c4ff8a7de5f5cb505f2f5
+          ref: c590f1043e62d006dbc2b1f5a359869b706b695d
           persist-credentials: false
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
         with:
           distribution: temurin
           java-version: '25'
           cache: maven
-      - name: Run focused staged move hardening tests
-        run: mvn --batch-mode --no-transfer-progress -pl regelsuche-search -am -Dtest=StagedMoveSearchTest -Dsurefire.failIfNoSpecifiedTests=false test
+      - name: Run focused typed frontier and codec tests
+        run: mvn --batch-mode --no-transfer-progress -pl regelsuche-search -am -Dtest=StagedMoveSearchTest,CompiledAstReplayCodecTest -Dsurefire.failIfNoSpecifiedTests=false test
