@@ -1,0 +1,52 @@
+name: ModPow proof contract
+
+on:
+  push:
+    branches: ['research/1024-modpow-dag-rediscovery']
+    paths:
+      - 'regelsuche-experiments/src/**/ModPow*.java'
+      - '.github/workflows/modpow-proof-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modpow-proof-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+      - name: Run actual provider and verifier tests
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/modpow-proof"
+          git rev-parse HEAD > "$RUNNER_TEMP/modpow-proof/source-commit.txt"
+          ./gradlew --no-daemon --no-configuration-cache :regelsuche-experiments:test \
+            --tests 'de.regelsuche.benchmark.ModPow*Test' --console=plain --stacktrace \
+            2>&1 | tee "$RUNNER_TEMP/modpow-proof/test.log"
+      - name: Retain tests and exact source snapshot
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/modpow-proof"
+          tar -czf "$RUNNER_TEMP/modpow-proof/source.tar.gz" \
+            regelsuche-experiments/src/main/java/de/regelsuche/benchmark/ModPow*.java \
+            regelsuche-experiments/src/test/java/de/regelsuche/benchmark/ModPow*Test.java \
+            docs/research/modpow-dag-rediscovery-*.json
+          cp -r regelsuche-experiments/build/test-results/test "$RUNNER_TEMP/modpow-proof/junit" || true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: modpow-proof-${{ github.sha }}
+          path: ${{ runner.temp }}/modpow-proof
+          if-no-files-found: error
