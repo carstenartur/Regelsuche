@@ -3,6 +3,7 @@ package de.regelsuche.search.moves;
 import static org.junit.jupiter.api.Assertions.*;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.parse.ExpressionParser;
@@ -49,6 +50,31 @@ class StagedMoveSearchTest {
             ((de.regelsuche.ast.BinaryExpr) target).left());
     }
 
+
+    @Test void typedFrontierPreservesNestedGroupingInsideFunctionArgument() {
+        var parser = new ExpressionParser();
+        var a = PatternExpr.var("A");
+        var transport = new AstRewriteTransport(List.of(
+            new PatternRewriteRule("typed-zero", PatternExpr.op(ADD, a, PatternExpr.num(0)), a)
+        ), 100, 100);
+        var descriptor = new MoveProvider.Descriptor("typed-primitives", "*", SearchMove.SourceKind.PRIMITIVE,
+            SearchMove.ProofStrength.REPLAYABLE, List.of(), SearchMove.ValueEvidence.UNKNOWN, "typed-fixture");
+        Expr grouped = parser.parseTerm("a+(b+c)");
+        Expr source = new FunctionExpr("f", List.of(new BinaryExpr(grouped, ADD, new NumberExpr(0))));
+        Expr target = new FunctionExpr("f", List.of(grouped));
+
+        var result = new TypedMoveSearch().search(new TypedMoveSearch.Problem(source,
+            TypedMoveSearch.Context.frozen(target),
+            List.of(TypedMoveSearch.primitiveProvider(descriptor, transport)),
+            TypedMoveSearch.Policy.INVENTORY_ORDER, TypedMoveSearch.primitiveReplay(transport), state -> 0,
+            MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED, new MoveSearch.Budget(2, 2, 0, 20, 1_000)));
+
+        assertTrue(result.reached());
+        assertEquals(target, result.witness().getLast().target().expression());
+        var reached = (FunctionExpr) result.witness().getLast().target().expression();
+        assertEquals(grouped, reached.arguments().getFirst());
+        assertEquals(parser.parseTerm("a+(b+c)"), reached.arguments().getFirst());
+    }
 
     @Test void typedFrontierRetainsExactRationalAsOneNumericLeaf() {
         var a = PatternExpr.var("A");
