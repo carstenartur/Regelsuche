@@ -70,6 +70,14 @@ class CompiledAstReplayCodecTest {
         }
     }
 
+    @Test void expressionTransportIsCanonicalSingleLineEvenWhenValuesContainNewlines() {
+        Expr expression = new FunctionExpr("f\nname", List.of(new VariableExpr("x\ny")));
+        String encoded = codec.encodeExpression(expression);
+        assertFalse(encoded.contains("\n"), "canonical expression transport must escape embedded newlines");
+        assertEquals(expression, codec.decodeExpression(encoded));
+        assertEquals(encoded, codec.encodeExpression(codec.decodeExpression(encoded)));
+    }
+
     @Test void representationAndSideConditionsContributeToContentIdentity() {
         assertNotEquals(codec.contentHash(candidate(PARSER.parseTerm("a+(b+c)"))),
             codec.contentHash(candidate(PARSER.parseTerm("(a+b)+c"))));
