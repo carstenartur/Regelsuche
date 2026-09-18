@@ -7,6 +7,8 @@ on:
     paths:
       - 'regelsuche-experiments/src/main/java/de/regelsuche/benchmark/ModPowDagRediscoveryStudy.java'
       - 'regelsuche-experiments/src/test/java/de/regelsuche/benchmark/ModPowDagRediscoveryStudyTest.java'
+      - 'regelsuche-experiments/src/main/java/de/regelsuche/benchmark/ModPowDagRediscoveryReport.java'
+      - 'regelsuche-experiments/build.gradle'
       - 'docs/research/modpow-dag-rediscovery-plan.json'
       - '.github/workflows/modpow-dag-rediscovery.yml'
 
@@ -31,3 +33,17 @@ jobs:
             :regelsuche-experiments:test \
             --tests 'de.regelsuche.benchmark.ModPowDagRediscoveryStudyTest' \
             --console=plain --stacktrace
+
+      - name: Generate frozen study result
+        run: |
+          ./gradlew --no-daemon --no-configuration-cache \
+            :regelsuche-experiments:modPowDagRediscovery \
+            --console=plain --stacktrace
+
+      - name: Retain study result
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: modpow-dag-rediscovery
+          path: regelsuche-experiments/build/reports/modpow-dag-rediscovery/**
+          if-no-files-found: error
+          retention-days: 30
