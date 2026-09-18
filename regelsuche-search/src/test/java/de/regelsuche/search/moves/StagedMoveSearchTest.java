@@ -145,6 +145,43 @@ class StagedMoveSearchTest {
             .anyMatch(event -> event.decision() == MoveSearch.Decision.PROOF_REJECTED));
     }
 
+
+    @Test void typedPrimitiveReplayRejectsForgedPrimitiveProvenance() {
+        var a = PatternExpr.var("A");
+        var transport = new AstRewriteTransport(List.of(
+            new PatternRewriteRule("typed-zero", PatternExpr.op(ADD, a, PatternExpr.num(0)), a)
+        ), 100, 100);
+        var descriptor = new MoveProvider.Descriptor("typed-primitives", "*", SearchMove.SourceKind.PRIMITIVE,
+            SearchMove.ProofStrength.REPLAYABLE, List.of(), SearchMove.ValueEvidence.UNKNOWN, "typed-fixture");
+        MoveProvider genuine = TypedMoveSearch.primitiveProvider(descriptor, transport);
+        MoveProvider forged = new MoveProvider() {
+            @Override public Descriptor descriptor() { return descriptor; }
+            @Override public Batch candidates(MoveState state, MoveContext context) {
+                var batch = genuine.candidates(state, context);
+                var moves = batch.moves().stream().map(move -> {
+                    var step = move.transformation();
+                    var changed = new Transformation(step.rule(), step.transformedExpression(), step.kind(),
+                        step.mayIncreaseComplexity(), step.estimatedCostDelta(),
+                        step.equivalencePreservingByConstruction(), step.applicationKey(),
+                        step.assumptions(), step.packId(), step.license(), List.of("forged-primitive"));
+                    return SearchMove.from(changed, descriptor, batch.work().totalWorkUnits());
+                }).toList();
+                return new Batch(moves, batch.work(), batch.complete());
+            }
+        };
+        var source = new BinaryExpr(new VariableExpr("x"), ADD, new NumberExpr(0));
+        var target = new VariableExpr("x");
+
+        var result = new TypedMoveSearch().search(new TypedMoveSearch.Problem(source,
+            TypedMoveSearch.Context.frozen(target), List.of(forged), TypedMoveSearch.Policy.INVENTORY_ORDER,
+            TypedMoveSearch.primitiveReplay(transport), state -> 0, MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED,
+            new MoveSearch.Budget(2, 2, 0, 20, 1_000)));
+
+        assertFalse(result.reached());
+        assertTrue(result.encodedResult().events().stream()
+            .anyMatch(event -> event.decision() == MoveSearch.Decision.PROOF_REJECTED));
+    }
+
     @Test void contextValidationAndOptionalVerificationAreExplicit() {
         var error = assertThrows(NullPointerException.class, () -> new MoveSearch.Problem("a", null, List.of(),
             MovePriorityPolicy.INVENTORY_ORDER, GRAPH, state -> 0, MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED,
