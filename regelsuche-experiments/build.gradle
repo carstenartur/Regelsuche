@@ -327,3 +327,18 @@ rootProject.tasks.named('check') {
     dependsOn safePreparationProductQualification
     dependsOn freezePolynomialTheoryUtilityCaseCorpus
 }
+
+
+def modPowDagRediscoveryReportDirectory =
+    layout.buildDirectory.dir('reports/modpow-dag-rediscovery')
+
+tasks.register('modPowDagRediscovery', JavaExec) {
+    group = 'verification'
+    description = 'Executes the frozen target-blind modular exponent DAG rediscovery study (#1024).'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.benchmark.ModPowDagRediscoveryReport'
+    args modPowDagRediscoveryReportDirectory.get().asFile.absolutePath
+    inputs.file(rootProject.file('docs/research/modpow-dag-rediscovery-plan.json'))
+    outputs.dir(modPowDagRediscoveryReportDirectory)
+}
