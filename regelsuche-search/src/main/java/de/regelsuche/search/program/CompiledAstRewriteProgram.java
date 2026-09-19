@@ -65,6 +65,17 @@ public final class CompiledAstRewriteProgram {
         }
     }
 
+    /** Finite stage exhaustion retains work already performed, including discarded primitive candidates. */
+    public static final class CandidateLimitExceeded extends IllegalArgumentException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+        private final TransformationWorkMetrics workMetrics;
+        private CandidateLimitExceeded(TransformationWorkMetrics workMetrics) {
+            super("typed linear pipeline candidate bound exceeded");
+            this.workMetrics = workMetrics;
+        }
+        public TransformationWorkMetrics workMetrics() { return workMetrics; }
+    }
+
     private record Stage(String sourceId, AstRewriteTransport transport) {}
     private final String programId;
     private final List<Stage> stages;
@@ -110,7 +121,7 @@ public final class CompiledAstRewriteProgram {
                 emitted = Math.addExact(emitted, generated.size());
                 for (var step : generated) {
                     if (next.size() >= maximumCandidates) {
-                        throw new IllegalArgumentException("typed linear pipeline candidate bound exceeded");
+                        throw new CandidateLimitExceeded(metrics(calls, emitted, composed, duplicates));
                     }
                     var steps = new ArrayList<AstRewriteTransport.Step>();
                     var ids = new ArrayList<String>();
@@ -130,9 +141,12 @@ public final class CompiledAstRewriteProgram {
             duplicates = Math.addExact(duplicates, next.size() - current.size());
             if (current.isEmpty()) break;
         }
-        var metrics = new TransformationWorkMetrics(1, 0, calls, emitted, composed, 0, 0, 0, 0, 0, 0, 0, 0, duplicates)
+        return new Batch(current, metrics(calls, emitted, composed, duplicates));
+    }
+
+    private static TransformationWorkMetrics metrics(long calls, long emitted, long composed, long duplicates) {
+        return new TransformationWorkMetrics(1, 0, calls, emitted, composed, 0, 0, 0, 0, 0, 0, 0, 0, duplicates)
             .withCandidateWork(new ExecutionWork(emitted, 0, 0));
-        return new Batch(current, metrics);
     }
 
     /**

@@ -33,6 +33,9 @@ public final class TypedMoveSearch {
     /** Marker for providers that consume the canonical tagged AST transport used by this adapter. */
     public interface TypedProvider extends MoveProvider {}
 
+    /** Opt-in policy whose expression features consume canonical tagged ASTs, never parser text. */
+    public interface TypedPolicy extends MovePriorityPolicy {}
+
     public record Context(Expr goal, List<String> initialAssumptions, MoveContext.Phase phase) {
         public Context {
             Objects.requireNonNull(goal, "goal");
@@ -79,8 +82,8 @@ public final class TypedMoveSearch {
             Objects.requireNonNull(mode, "mode");
             Objects.requireNonNull(scheduling, "scheduling");
             Objects.requireNonNull(budget, "budget");
-            if (policy != Policy.INVENTORY_ORDER) {
-                throw new IllegalArgumentException("typed move search v1 supports inventory-order policy only");
+            if (policy != Policy.INVENTORY_ORDER && !(policy instanceof TypedPolicy)) {
+                throw new IllegalArgumentException("typed move search requires an explicitly typed policy");
             }
             if (providers.stream().anyMatch(provider -> !(provider instanceof TypedProvider))) {
                 throw new IllegalArgumentException("typed move search requires typed providers");
@@ -89,6 +92,9 @@ public final class TypedMoveSearch {
     }
 
     public record WitnessStep(State source, State target, SearchMove move, MoveVerifier.Verification verification) {}
+
+    public record Event(State source, State target, SearchMove move, MoveSearch.Decision decision,
+            MoveVerifier.Verification verification) {}
 
     public record Result(MoveSearch.Outcome outcome, List<WitnessStep> witness, Set<State> reachedStates,
             List<State> deadEndStates, MoveSearch.Metrics metrics, boolean completeBoundedRelation,
@@ -101,6 +107,12 @@ public final class TypedMoveSearch {
             Objects.requireNonNull(encodedResult, "encodedResult");
         }
         public boolean reached() { return outcome == MoveSearch.Outcome.TARGET_REACHED; }
+
+        /** Includes rejected proposals; absence of verification means it was not performed. */
+        public List<Event> events() {
+            return encodedResult.events().stream().map(event -> new Event(State.decode(event.source()),
+                State.decode(event.target()), event.move(), event.decision(), event.verification())).toList();
+        }
     }
 
     public Result search(Problem problem) {

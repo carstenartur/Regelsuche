@@ -41,6 +41,14 @@ public final class RuleHistoryMemory {
     /** TRAIN context inspection and two retained table-entry updates per observation. */
     public long measuredWork() { return measuredWork; }
     public void observe(MoveSearch.Result result, MoveContext.Phase phase, Map<String, Long> pairedWorkSavings) {
+        observe(result, phase, pairedWorkSavings, false);
+    }
+    /** Typed intermediate states are inspected directly and retained in a separate context namespace. */
+    public void observe(TypedMoveSearch.Result result, MoveContext.Phase phase, Map<String, Long> pairedWorkSavings) {
+        if (result == null) throw new IllegalArgumentException("feedback result is required");
+        observe(result.encodedResult(), phase, pairedWorkSavings, true);
+    }
+    private void observe(MoveSearch.Result result, MoveContext.Phase phase, Map<String, Long> pairedWorkSavings, boolean typed) {
         if (phase != MoveContext.Phase.TRAIN) throw new IllegalArgumentException("history updates require TRAIN");
         if (result == null || pairedWorkSavings == null) throw new IllegalArgumentException("feedback result and savings are required");
         if (pairedWorkSavings.values().stream().anyMatch(value -> value == null || value < 0)) throw new IllegalArgumentException("invalid measured work saving");
@@ -49,11 +57,11 @@ public final class RuleHistoryMemory {
         var deadEnds = new java.util.HashSet<>(result.deadEndStates());
         for (var event : result.events()) {
             var structure = contexts.computeIfAbsent(event.source(), source -> {
-                var inspected = StructuralMoveContext.of(source);
+                var inspected = typed ? StructuralMoveContext.fromTyped(source) : StructuralMoveContext.of(source);
                 measuredWork = Math.addExact(measuredWork, 2L * inspected.visitedNodes());
                 return inspected;
             });
-            String context = structure.key();
+            String context = typed ? structure.typedKey() : structure.key();
             var witness = successful.stream().filter(step -> step.source().equals(event.source()) && step.move().equals(event.move())).findFirst();
             boolean won = witness.isPresent();
             boolean dead = event.decision() == MoveSearch.Decision.ENQUEUED && deadEnds.contains(event.target());

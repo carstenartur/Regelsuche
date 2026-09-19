@@ -15,6 +15,13 @@ public record StructuralMoveContext(String rootOperator, int degree, int variabl
         int repeatedSubtrees, List<String> assumptions, List<String> capabilities, int visitedNodes) {
     public static StructuralMoveContext of(MoveState state) {
         var root = new ExpressionParser().parse(new InputRequest(InputType.TERM, state.expression())).terms().getFirst();
+        return of(root, state);
+    }
+    /** Explicit transport boundary; historical expression parsing remains unchanged. */
+    public static StructuralMoveContext fromTyped(MoveState state) {
+        return of(new de.regelsuche.search.program.CompiledAstReplayCodec().decodeExpression(state.expression()), state);
+    }
+    private static StructuralMoveContext of(Expr root, MoveState state) {
         var seen = new HashMap<Expr, Integer>(); var variables = new HashSet<String>();
         int[] counts = new int[3]; collect(root, seen, variables, counts);
         String operator = root instanceof BinaryExpr binary ? binary.operator().name()
@@ -28,6 +35,8 @@ public record StructuralMoveContext(String rootOperator, int degree, int variabl
             .property("products", products).property("powers", powers).property("repeated", repeatedSubtrees)
             .stringArray("assumptions", assumptions).stringArray("capabilities", capabilities).endObject().toString();
     }
+    /** Prevents typed observations from silently changing frozen historical feature tables. */
+    public String typedKey() { return "regelsuche.typed-structural-context/v1:" + key(); }
     private static void collect(Expr expr, HashMap<Expr, Integer> seen, HashSet<String> variables, int[] counts) {
         counts[0]++; seen.merge(expr, 1, Integer::sum);
         if (expr instanceof VariableExpr variable) variables.add(variable.name());
