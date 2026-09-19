@@ -1,0 +1,8 @@
+[
+  {"id":"RENAMED","program":"program(modpow(z,u*v,p),modpow(z,v,p))","bases":["z"],"modulus":"p","bits":{"u":41,"v":19},"positive":true},
+  {"id":"OUTPUT_ORDER","program":"program(modpow(z,v,p),modpow(z,u*v,p))","bases":["z"],"modulus":"p","bits":{"u":43,"v":21},"positive":true},
+  {"id":"EXTRA_OUTPUTS","program":"program(extra(h),modpow(z,u*v,p),modpow(z,v,p),extra(j))","bases":["z"],"modulus":"p","bits":{"u":47,"v":23},"positive":true},
+  {"id":"FACTOR_ORDER","program":"program(modpow(z,v*u,p),modpow(z,v,p))","bases":["z"],"modulus":"p","bits":{"u":53,"v":29},"positive":true},
+  {"id":"COMPOSITE_BASE","program":"program(modpow(z*w,u*v,p),modpow(z*w,v,p))","bases":["z","w"],"modulus":"p","bits":{"u":59,"v":31},"positive":true},
+  {"id":"NO_SHARED_EXPONENT","program":"program(modpow(z,u*v,p),modpow(z,r,p))","bases":["z"],"modulus":"p","bits":{"u":61,"v":37,"r":13},"positive":false}
+]
