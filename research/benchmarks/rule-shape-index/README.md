@@ -9,6 +9,8 @@ is changed.
 See [both retained runs, including losses](results/2026-09-19/RESULTS.md) and
 their raw JMH data. The large sparse fixture benefits strongly; the small and
 same-operator controls show why a universal speedup claim would be unsupported.
+The [four-step typed-search run](results/2026-09-19/SEARCH_RESULTS.md) additionally
+checks the complete search result and ledger, retaining every runtime regression.
 
 ## Scope
 
@@ -76,6 +78,14 @@ mkdir -p build/rule-shape-index-local/classes
 Use a new output directory for each run. For the original pilot, omit `-w 1s
 -r 1s` and use the annotation defaults. The annotation processor used here has
 SHA-256 `6a5604b5b804e0daca1145df1077609321687734a8b49387e49f10557c186c77`.
+
+For `RuleShapeSearchBenchmarks`, compile the search reactor with
+`mvn -pl regelsuche-search -am compile`. Add its resolved runtime classpath
+(core, egraph and search classes plus their dependencies, including Jackson
+databind/core) to the classpaths above; compile `RuleShapeSearchBenchmarks.java`
+and select `de.regelsuche.research.RuleShapeSearchBenchmarks` in JMH. Its annotation
+defaults already use 1 s iterations. Use a separate output directory and JSON
+file. Setup rejects any difference in the complete encoded search result.
 
 ## Correctness evidence
 

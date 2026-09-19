@@ -1,0 +1,30 @@
+{
+  "purpose": "FOUR_STEP_TYPED_SEARCH_DEVELOPMENT_CHARACTERIZATION",
+  "implementation_tree": "4ab34c1d17fb16cc953f5c33172c54ca9b2bdf1c",
+  "benchmark_source_sha256": "831b7e5e6ea25bbe026bd4cbef690bada4fdddb591400a6b6cc3a982ca0fe21c",
+  "raw_results_sha256": "e4d47323f3582384dcb230a91cfaee0e44b8233e2e3786ad2963609ba319097a",
+  "protocol": {
+    "warmup_iterations": 3,
+    "measurement_iterations": 5,
+    "seconds_per_iteration": 1,
+    "forks": 2,
+    "threads": 1,
+    "heap_mib": 256
+  },
+  "all_combinations_retained": 12,
+  "comparison": "entire encoded result equality checked for scan versus indexed in every setup",
+  "index_construction": "excluded from query timing; separately measured in kernel study",
+  "host": "same shared development host as kernel runs; no concurrent task-owned builds",
+  "search_metrics": {
+    "generated": 10,
+    "consumed": 4,
+    "unconsumed": 6,
+    "reached_states": 5,
+    "expanded": 4,
+    "witness_steps": 4,
+    "primitive_work": 10,
+    "search_work": 45,
+    "verification_work": 18,
+    "total_charged_work": 73
+  }
+}
