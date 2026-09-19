@@ -48,26 +48,50 @@ completed successfully under Temurin **25.0.4+1**. Counts were read from the
 workflow's explicit JUnit-XML summary, not inferred solely from its green status.
 Raw artifact 10584164439 has workflow-reported SHA-256
 `0986245a07a0c0bdf4a1196ce2ba38eeea06dac7d38d2971485b3bf2b9026e0e`.
-These ZIP digests are retained identifiers, not a claim that this session locally
-rehashed downloaded bytes.
 
-The production PR retains exactly the tested Java blobs:
+Run **35443161109** on QA commit
+`6c809010e982582b3982bcb28fdbad0287bb871f` then passed the 13 integration cases,
+all 802 learning-module tests and all 258 experiments-module tests.
+
+The review found that the original changed-modulus test refused missing `m`
+premises before testing modulus equality. Commit `fed5dffc` retains that control
+and adds three cases with BOTH positive integer moduli explicitly assumed. Both
+source and target must pass the existing domain audit before replay rejects a
+changed inner, outer or both target moduli. A valid same-modulus positive replay
+is checked under those same premises. No production source changed for this fix.
+
+Run **35443551008**, QA commit
+`bbc58ba36e3c5069c518d99a2c28b30d2e348c84`, passed both Gradle commands under
+Temurin **25.0.4+1** with a clean source working tree. Its JUnit-XML summary is:
+
+| Executed scope | Suites | Tests | Failures/errors/skips |
+| --- | ---: | ---: | ---: |
+| Expanded app integration class | 1 | 16 | 0/0/0 |
+| Complete learning module | 157 | 802 | 0/0/0 |
+| Complete experiments module | 65 | 258 | 0/0/0 |
+
+These disjoint suites total **1,076 tests**, not the complete repository suite.
+Artifact **10584306926** has workflow-reported SHA-256
+`58963f41d4a1f26ddbfb3175429a1ef1e13bd833173d936bccd47f9467102acd`.
+The ZIP digests here are retained identifiers, not claims of local rehashing.
+
+The current PR retains exactly the Java blobs tested by that latest run:
 
 - adapter: `6f09f43eec6a81fb96db9603695e39e4ae5ad64f`;
-- integration test: `fc5bf668661a96991e20fd70bc517fe86421ef93`;
+- expanded integration test: `0a350278d22b79b4994afc6a4daa1c505f501453`;
 - unchanged #1025 auditor: `03b9e1574e9582729660bb2ac62e111e8351e10d`.
 
-Reproduce the integration from the repository root:
+Reproduce from the repository root:
 
 ```sh
 ./gradlew --no-daemon --no-configuration-cache :app:test \
   --tests 'de.regelsuche.benchmark.TypedModPowTransferIntegrationTest'
+./gradlew --no-daemon --no-configuration-cache \
+  :regelsuche-learning:test :regelsuche-experiments:test
 ```
 
-A separate full learning/experiments-module run is recorded on QA commit
-`6c809010e982582b3982bcb28fdbad0287bb871f`; that commit changes only the temporary
-verification workflow. Its execution status is not implied by the 13-case result.
-Full repository CI is still required after the dependent PRs are integrated.
+The temporary QA workflow is absent from the production diff. Full repository CI
+is still required after the dependent PRs are integrated.
 
 ## Boundaries
 
