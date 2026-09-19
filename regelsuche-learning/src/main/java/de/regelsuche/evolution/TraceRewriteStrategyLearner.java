@@ -113,6 +113,8 @@ public final class TraceRewriteStrategyLearner {
         public Optional<EvolutionRewriteProgramPlan> shuffledPlan() { return shuffled; }
         public String toCanonicalJson() { return canonicalJson; }
         public String contentHash() { return SchematicProofPlan.hash(canonicalJson); }
+        /** Explicit experimental bridge; the historical string executor and frozen model are unchanged. */
+        public TypedLearnedMoveInventory typedMoves() { return new TypedLearnedMoveInventory(this); }
         public long trainingSearchWorkUnits() {
             return observations.stream().mapToLong(o -> o.search().metrics().chargedSearchWorkUnits())
                 .reduce(0L, Math::addExact);
