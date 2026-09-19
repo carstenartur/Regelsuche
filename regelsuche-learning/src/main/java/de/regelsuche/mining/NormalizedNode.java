@@ -161,31 +161,18 @@ final class NormalizedNode {
         };
     }
 
+    /**
+     * Checks the constructor at this node, not the shapes of its descendants.
+     * The generalizer recursively abstracts the children. Requiring their full
+     * shapes here would discard a shared function/operator as soon as one child
+     * needs an expression placeholder.
+     */
     boolean sameShape(NormalizedNode other) {
         if (kind != other.kind || children.size() != other.children.size()) {
             return false;
         }
-        if (kind == Kind.VARIABLE) {
+        if (kind == Kind.VARIABLE || kind == Kind.FUNCTION) {
             return name.equals(other.name);
-        }
-        if (kind == Kind.FUNCTION) {
-            if (!name.equals(other.name)) {
-                return false;
-            }
-            for (int i = 0; i < children.size(); i++) {
-                if (!children.get(i).sameShape(other.children.get(i))) {
-                    return false;
-                }
-            }
-            return true;
-        }
-        if (kind == Kind.NUMBER || kind == Kind.PLACEHOLDER) {
-            return true;
-        }
-        for (int i = 0; i < children.size(); i++) {
-            if (!children.get(i).sameShape(other.children.get(i))) {
-                return false;
-            }
         }
         return true;
     }
