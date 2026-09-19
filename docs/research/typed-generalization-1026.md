@@ -45,3 +45,43 @@ from that inventory cannot improve the optimum of the same completely exhausted
 closure; useful learning would instead reduce search work under a declared budget
 or transfer to a broader task family. Report optimum parity honestly rather than
 weakening the primitive baseline or claiming a runtime gain from a proxy score.
+
+## Executed evidence (19 September 2026)
+
+The scope above was committed at `9f21330` before implementation. The first
+behavioral run used an explicitly empty API scaffold, not a falsely described
+legacy implementation. Run **35435913509**, source `800a371`, produced **10 tests,
+8 failures, zero errors/skips**. The unchanged legacy no-abstraction
+characterization and empty target-hole control passed; the eight new behavior
+contracts failed before implementation.
+
+Implemented source **805af019b269faf34a16d338623bd198922b49a4** was then run in
+**35436020419**: **10/10 focused tests passed**, followed by **783/783 tests in the
+complete learning module**, zero failures, errors or skipped tests in either run.
+The downloaded XML contains 154 learning-module suites. Both Gradle executions
+completed successfully. Counts and identities were checked directly in the ZIP,
+not inferred solely from the workflow status.
+
+The unchanged legacy characterization demonstrates that the two renamed ModPow
+fixtures produce no legacy multi-example abstraction. The new typed path
+reconstructs both source and target using four shared bindings, without any
+ModPow-specific code. Separate arbitrary f/g syntax fixtures pin reordered and
+repeated variables; they are explicitly NOT mathematical equivalence claims.
+
+[Machine-readable evidence](typed-generalization-1026-evidence.json) retains the
+source, test, run and artifact identities. Raw workflow ZIPs are identified there
+and were downloaded for verification; they are not copied into this repository.
+The temporary branch-only workflow is removed from the final diff. The Java
+implementation and tests remain byte-identical to the verified source.
+
+Reproduce from the repository root:
+
+```sh
+./gradlew --no-daemon --no-configuration-cache :regelsuche-learning:test \
+  --tests 'de.regelsuche.mining.TypedPatternGeneralizerTest'
+./gradlew --no-daemon --no-configuration-cache :regelsuche-learning:test
+```
+
+Full repository CI remains a separate merge gate. Automatic promotion, inferred
+general premises, broader program-output matching and the separately frozen
+#1026 learned-transfer experiment are NOT completed by this prerequisite.
