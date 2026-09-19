@@ -2,6 +2,7 @@ package de.regelsuche.inventory;
 
 import de.regelsuche.json.JsonWriter;
 import de.regelsuche.search.moves.MoveContext;
+import de.regelsuche.search.moves.MovePriorityPolicy;
 import de.regelsuche.search.moves.MoveSearch;
 import de.regelsuche.search.moves.TypedMoveSearch;
 import de.regelsuche.search.program.CompiledAstReplayCodec;
@@ -16,14 +17,22 @@ import java.util.Objects;
  * This is a small empirical policy selector, not proof authority or a holdout benchmark.
  */
 public final class TypedPolicySelection {
-    public static final String REVISION = "regelsuche.typed-policy-selection/v1";
+    public static final String REVISION = "regelsuche.typed-policy-selection/v2";
     private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();
+    private static final HistoryMovePolicy.Weights ZERO = new HistoryMovePolicy.Weights(0, 0, 0, 0, 0, 0, 0, 0);
+    public enum PolicyKind { INVENTORY_ORDER, HISTORY_RANKED }
 
-    public record Profile(String id, HistoryMovePolicy.Weights weights) {
+    public record Profile(String id, PolicyKind kind, HistoryMovePolicy.Weights weights) {
+        public Profile(String id, HistoryMovePolicy.Weights weights) { this(id, PolicyKind.HISTORY_RANKED, weights); }
         public Profile {
             if (id == null || id.isBlank()) throw new IllegalArgumentException("profile ID required");
+            Objects.requireNonNull(kind, "kind");
             Objects.requireNonNull(weights, "weights");
+            if (kind == PolicyKind.INVENTORY_ORDER && !ZERO.equals(weights)) {
+                throw new IllegalArgumentException("inventory order does not apply ranking weights");
+            }
         }
+        public static Profile inventoryOrder(String id) { return new Profile(id, PolicyKind.INVENTORY_ORDER, ZERO); }
     }
 
     public record TrainingTask(String id, TypedMoveSearch.Problem problem) {
@@ -91,7 +100,8 @@ public final class TypedPolicySelection {
                 .stringArray("trainingSources", trainingSources)
                 .property("history", historyJson(history))
                 .array("trials", values -> trials.forEach(trial -> values.objectValue(value -> value
-                    .property("profile", trial.profile().id()).property("weights", weightsJson(trial.profile().weights()))
+                    .property("profile", trial.profile().id()).property("kind", trial.profile().kind().name())
+                    .property("weights", weightsJson(trial.profile().weights()))
                     .property("solved", trial.solved()).property("totalWork", trial.totalWork())
                     .array("observations", observations -> trial.observations().forEach(observation -> observations.objectValue(item -> item
                         .property("task", observation.taskId()).property("outcome", observation.outcome().name())
@@ -147,7 +157,8 @@ public final class TypedPolicySelection {
     private static TypedMoveSearch.Result execute(TypedMoveSearch.Problem problem, RuleHistoryMemory.Snapshot history,
             Profile profile) {
         return new TypedMoveSearch().search(new TypedMoveSearch.Problem(problem.source(), problem.context(), problem.providers(),
-            HistoryMovePolicy.typed(history, profile.weights()), problem.verifier(), problem.stateScore(),
+            profile.kind() == PolicyKind.INVENTORY_ORDER ? MovePriorityPolicy.INVENTORY_ORDER
+                : HistoryMovePolicy.typed(history, profile.weights()), problem.verifier(), problem.stateScore(),
             problem.mode(), problem.scheduling(), problem.budget()));
     }
 
