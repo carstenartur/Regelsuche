@@ -21,7 +21,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/public-toolchain"
           cd "$RUNNER_TEMP/public-toolchain"
           java -version 2> java-version.txt
-          tar -czf temurin25-linux-x64.tar.gz -C "$JAVA_HOME" .
+          tar -chzf temurin25-linux-x64.tar.gz -C "$JAVA_HOME" .
           sha256sum temurin25-linux-x64.tar.gz > SHA256SUMS
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
