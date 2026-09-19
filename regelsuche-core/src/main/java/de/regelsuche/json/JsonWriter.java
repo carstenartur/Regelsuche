@@ -1,5 +1,9 @@
 package de.regelsuche.json;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.io.Writer;
+import java.util.Objects;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
@@ -15,8 +19,40 @@ import java.util.function.Consumer;
 public final class JsonWriter {
     private final StringBuilder builder = new StringBuilder();
     private final Deque<Boolean> firstEntry = new ArrayDeque<>();
+    private static final int STREAM_BUFFER_SIZE = 8192;
+    private final Writer sink;
+
+    public JsonWriter() {
+        sink = null;
+    }
+
+    /**
+     * Writes in bounded chunks instead of retaining the complete document.
+     * Call {@link #flush()} after the last value. The caller owns the sink:
+     * this class never flushes or closes it. I/O failures are propagated as
+     * {@link UncheckedIOException} so nested rendering callbacks stay usable.
+     */
+    public JsonWriter(Writer sink) {
+        this.sink = Objects.requireNonNull(sink, "sink");
+    }
+
+    /** Writes the remaining chunk without flushing or closing the caller's sink. */
+    public void flush() {
+        if (sink == null || builder.isEmpty()) return;
+        try {
+            sink.write(builder.toString());
+            builder.setLength(0);
+        } catch (IOException failure) {
+            throw new UncheckedIOException(failure);
+        }
+    }
+
+    private void drainIfNeeded() {
+        if (sink != null && builder.length() >= STREAM_BUFFER_SIZE) flush();
+    }
 
     public JsonWriter beginObject() {
+        drainIfNeeded();
         builder.append('{');
         firstEntry.push(true);
         return this;
@@ -27,11 +63,13 @@ public final class JsonWriter {
             throw new IllegalStateException("No open object");
         }
         firstEntry.pop();
+        drainIfNeeded();
         builder.append('}');
         return this;
     }
 
     public JsonWriter beginArray() {
+        drainIfNeeded();
         builder.append('[');
         firstEntry.push(true);
         return this;
@@ -42,6 +80,7 @@ public final class JsonWriter {
             throw new IllegalStateException("No open array");
         }
         firstEntry.pop();
+        drainIfNeeded();
         builder.append(']');
         return this;
     }
@@ -151,6 +190,7 @@ public final class JsonWriter {
     }
 
     private void comma() {
+        drainIfNeeded();
         if (firstEntry.isEmpty()) {
             return;
         }
@@ -173,6 +213,7 @@ public final class JsonWriter {
         }
         builder.append('"');
         for (int i = 0; i < value.length(); i++) {
+            drainIfNeeded();
             char current = value.charAt(i);
             switch (current) {
                 case '\\' -> builder.append("\\\\");
@@ -196,6 +237,7 @@ public final class JsonWriter {
 
     @Override
     public String toString() {
+        if (sink != null) throw new IllegalStateException("Streaming JsonWriter does not retain its output");
         return builder.toString();
     }
 }

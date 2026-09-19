@@ -65,10 +65,10 @@ class ProductCandidateValidationTest {
             observed("first", "f(15,x)", "f(3,5,x)"),
             observed("second", "f(28,x+1)", "f(4,7,x+1)"),
             observed("third", "f(66,x^2)", "f(6,11,x^2)"))).orElseThrow();
-        assertEquals("f(A*D,B)", pattern.leftPattern());
-        assertEquals("f(A,D,C)", pattern.rightPattern());
-        assertEquals(java.util.Set.of("B", "C"), pattern.expressionPlaceholderValues().keySet());
-        assertTrue(pattern.parameterRelations().contains("N3 = D"));
+        assertEquals("f(A*C,B)", pattern.leftPattern());
+        assertEquals("f(A,C,B)", pattern.rightPattern());
+        assertEquals(java.util.Set.of("B"), pattern.expressionPlaceholderValues().keySet());
+        assertTrue(pattern.parameterRelations().contains("N3 = C"));
     }
 
     private static boolean containsOnlyOrdinaryVariable(Expr expression) {

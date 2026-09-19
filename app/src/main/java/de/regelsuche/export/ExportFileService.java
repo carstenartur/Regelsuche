@@ -4,6 +4,9 @@ import de.regelsuche.discovery.DiscoveredTransformation;
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.mining.RuleCandidate;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -39,7 +42,7 @@ public class ExportFileService {
         List<Path> written = new ArrayList<>();
         if (normalized.contains("json")) {
             Path path = directory.resolve("discovered-transformations.json");
-            Files.writeString(path, exportService.exportJson(transformations, candidates, reusableRules));
+            writeJson(path, transformations, candidates, reusableRules);
             written.add(path);
         }
         if (normalized.contains("md")) {
@@ -59,10 +62,32 @@ public class ExportFileService {
         }
         if (normalized.contains("inventory")) {
             Path path = directory.resolve("rule-inventory.json");
-            Files.writeString(path, exportService.exportJson(List.of(), List.of(), reusableRules));
+            writeJson(path, List.of(), List.of(), reusableRules);
             written.add(path);
         }
         return written;
+    }
+
+    private void writeJson(
+        Path path,
+        List<DiscoveredTransformation> transformations,
+        List<RuleCandidate> candidates,
+        List<ReusableRule> rules
+    ) throws IOException {
+        // Streaming must not replace an earlier complete export with a partial file.
+        Path temporary = Files.createTempFile(path.toAbsolutePath().getParent(), ".regelsuche-export-", ".json.tmp");
+        try {
+            try (var destination = Files.newBufferedWriter(temporary, StandardCharsets.UTF_8)) {
+                exportService.writeJson(destination, transformations, candidates, rules);
+            }
+            try {
+                Files.move(temporary, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException unsupported) {
+                Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(temporary);
+        }
     }
 
     private Set<String> normalize(List<String> formats) {
