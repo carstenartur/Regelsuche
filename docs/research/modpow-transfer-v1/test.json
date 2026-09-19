@@ -1,0 +1,11 @@
+{
+  "schema": "regelsuche.modpow-transfer-corpus/v1",
+  "split": "TEST",
+  "cases": [
+    {"id":"RENAMED","source":"program(modpow(b,s*t,m),modpow(b,t,m))","roles":{"a":"b","q":"s","e":"t","n":"m","r":"u"},"qBits":16,"eBits":15,"rBits":15,"positive":true,"assumptions":["b integer","s integer","s >= 0","t integer","t >= 0","u integer","u >= 0","m integer","m > 0"]},
+    {"id":"REORDERED","source":"program(modpow(c,v,k),modpow(c,u*v,k))","roles":{"a":"c","q":"u","e":"v","n":"k","r":"w"},"qBits":31,"eBits":30,"rBits":30,"positive":true,"assumptions":["c integer","u integer","u >= 0","v integer","v >= 0","w integer","w >= 0","k integer","k > 0"]},
+    {"id":"EXTRA_OUTPUT","source":"program(17,modpow(d,h,l),modpow(d,g*h,l))","roles":{"a":"d","q":"g","e":"h","n":"l","r":"j"},"qBits":47,"eBits":46,"rBits":46,"positive":true,"assumptions":["d integer","g integer","g >= 0","h integer","h >= 0","j integer","j >= 0","l integer","l > 0"]},
+    {"id":"REVERSED_FACTORS","source":"program(modpow(z,beta*alpha,p),modpow(z,beta,p))","roles":{"a":"z","q":"alpha","e":"beta","n":"p","r":"gamma"},"qBits":62,"eBits":61,"rBits":61,"positive":true,"assumptions":["z integer","alpha integer","alpha >= 0","beta integer","beta >= 0","gamma integer","gamma >= 0","p integer","p > 0"]},
+    {"id":"NO_REUSE","source":"program(modpow(x,f*g,d),modpow(x,h,d))","roles":{"a":"x","q":"f","e":"g","n":"d","r":"h"},"qBits":47,"eBits":46,"rBits":46,"positive":false,"assumptions":["x integer","f integer","f >= 0","g integer","g >= 0","h integer","h >= 0","d integer","d > 0"]}
+  ]
+}
