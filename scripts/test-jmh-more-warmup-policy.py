@@ -8,6 +8,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -185,6 +186,34 @@ class MoreWarmupPolicyTest(unittest.TestCase):
         start = quality.index("def verifyJmhRegression =")
         block = quality[start:quality.index("def ", start + 4)]
         self.assertIn("'verifyJmhBenchmark'", block)
+
+    def test_docker_build_stages_include_configuration_time_policies(self):
+        # The real Docker tests build these stages; this fast contract catches
+        # missing COPY inputs before starting any Gradle or Docker process.
+        for name in ("Dockerfile", "Dockerfile.proof"):
+            dockerfile = (ROOT / name).read_text(encoding="utf-8")
+            build = dockerfile.split("RUN ./gradlew --no-daemon :app:installDist", 1)[0]
+            copied = set()
+            for line in build.splitlines():
+                if not line.startswith("COPY "):
+                    continue
+                tokens = shlex.split(line, comments=True)
+                if not tokens or tokens[0] != "COPY" or tokens[1].startswith("--"):
+                    continue
+                destination = Path(tokens[-1])
+                for source in tokens[1:-1]:
+                    origin = ROOT / source
+                    if origin.is_dir():
+                        copied.update(destination / policy.relative_to(origin)
+                                      for policy in (THRESHOLD, DECISION, BASELINE)
+                                      if policy.is_relative_to(origin))
+                    elif origin.is_file():
+                        copied.add(destination / origin.name
+                                   if tokens[-1].endswith("/") else destination)
+            for policy in (THRESHOLD, DECISION, BASELINE):
+                with self.subTest(dockerfile=name, policy=policy.name):
+                    self.assertIn(policy.relative_to(ROOT), copied,
+                                  "Docker build omits required JMH policy before Gradle configuration")
 
     def test_gradle_uses_one_execution_source_and_current_verifiers(self):
         app = (ROOT / "app/build.gradle").read_text()
