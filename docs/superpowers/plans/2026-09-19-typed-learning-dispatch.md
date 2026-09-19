@@ -54,7 +54,7 @@ policy and feedback entry points; select a frozen policy from measured TRAIN run
 - [x] Complete final Maven and matching Gradle reruns after review corrections.
 - [x] Record final test counts and remaining scientific boundaries in the spec.
 - [x] Commit, obtain fresh branch review and fix material findings.
-- [ ] Publish the prepared branch and PR after the user explicitly authorizes the publication blocked by automatic approval review.
+- [x] Publish the prepared branch and PR after explicit user authorization: PR #1037.
 
 ### Task 4: Connect the existing trace learner to the typed inventory
 

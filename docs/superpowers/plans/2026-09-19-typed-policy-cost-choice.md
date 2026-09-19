@@ -33,18 +33,18 @@ learner, TypedMoveSearch and existing canonical search-artifact serialization.
 **Consumes:** Existing typed problems and immutable history snapshots.
 **Produces:** `Profile.inventoryOrder(String)` and `Profile.kind()`.
 
-- [ ] Add real-generator tests comparing `selected.evaluate(problem)` with a
+- [x] Add real-generator tests comparing `selected.evaluate(problem)` with a
   direct `TypedMoveSearch` inventory-order control and a ranked control.
   Require identical outcomes and charged work for the inventory selection.
-- [ ] Include a twelve-distractor rewrite fixture where goal ranking beats the
+- [x] Include a twelve-distractor rewrite fixture where goal ranking beats the
   inventory profile, and reject inventory profiles with nonzero weights.
-- [ ] Observe the missing API and then a failing cost assertion against a
+- [x] Observe the missing API and then a failing cost assertion against a
   compilation-only profile scaffold.
-- [ ] Dispatch by explicit profile kind, preserve the old ranked constructor,
+- [x] Dispatch by explicit profile kind, preserve the old ranked constructor,
   and serialize kinds using the v2 revision.
-- [ ] Run `TypedPolicySelectionTest,TypedHistoryMovePolicyTest,RuleHistoryMemoryTest`.
+- [x] Run `TypedPolicySelectionTest,TypedHistoryMovePolicyTest,RuleHistoryMemoryTest`.
   Expected: all tests pass, including both opposing selection outcomes.
-- [ ] Commit implementation and tests.
+- [x] Commit implementation and tests.
 
 ### Task 2: Actual learned-work development comparison
 
@@ -54,14 +54,14 @@ and the research spec's results section.
 `LearnedSchedulingArtifacts.resultJson()`; content-addressed artifact writer.
 **Produces:** `run()`, immutable report rows and `write(report, output)` artifacts.
 
-- [ ] Add integration tests requiring all 5 x 4 x 6 rows, retained budget
+- [x] Add integration tests requiring all 5 x 4 x 6 rows, retained budget
   failures, charged formation/history/profile work, frozen evaluation, and a
   successfully replayed learned solution under a budget the primitive control
   cannot meet.
-- [ ] Run tests against the absent/scaffold API and observe failures.
-- [ ] Implement the fixed protocol, separate TRAIN policies, all configurations,
+- [x] Run tests against the absent/scaffold API and observe failures.
+- [x] Implement the fixed protocol, separate TRAIN policies, all configurations,
   full search exports and the `typedLearningWorkStudy` Gradle task.
-- [ ] Run the new study tests, the complete affected Maven reactor and matching
+- [x] Run the new study tests, the complete affected Maven reactor and matching
   Gradle learning suite. Execute the study and record all outcomes honestly.
-- [ ] Obtain one independent review, repair material findings with regressions,
-  then publish the additional commits to the existing authorized feature PR.
+- [x] Obtain one independent review, repair material findings with regressions,
+  then prepare the additional commits for the existing authorized feature PR #1037.
