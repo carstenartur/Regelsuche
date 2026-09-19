@@ -71,6 +71,22 @@ POLICIES = {
                                     "suppressionPolicy", "claimBoundary")}}),
 }
 
+# The new production instances retain the native schemas and all historical
+# decision fields. Keep the old instances available for historical collection.
+for current, historical, metadata in (
+    ("jmh-regression-policy-more-warmup-v1.json", "jmh-regression-policy-v2.json",
+     {"executionRevision": str, "baselineExecution": {**EXECUTION_POLICY, "jdkMajor": int, "jmhVersion": str},
+      "execution": {**EXECUTION_POLICY, "jdkMajor": int, "jmhVersion": str,
+                    "warmupTime": str, "measurementTime": str}}),
+    ("jmh-regression-decision-policy-more-warmup-v1.json", "jmh-regression-decision-policy-v3.json", {}),
+    ("jmh-baseline-more-warmup-v1.json", "jmh-baseline.json",
+     {"executionRevision": str,
+      "baselineMeasurementPolicy": {**EXECUTION_POLICY, "warmupTime": str, "measurementTime": str,
+                                    "materialRegressionRatio": float, "decisionRule": str}}),
+):
+    schema, fields = POLICIES["config/quality/" + historical]
+    POLICIES["config/quality/" + current] = (schema, {**fields, **metadata})
+
 DATABASE_MANIFEST = {
     "archive": REFERENCE, "metadata": REFERENCE, "upstreamRetention": REFERENCE,
     "licenses": members(list, REFERENCE),

@@ -1,0 +1,48 @@
+{
+  "schema": "regelsuche.typed-output-pattern-development-evidence/v1",
+  "issue": 1026,
+  "pullRequest": 1032,
+  "scope": "Development syntax-application contracts; not the held-out arithmetic transfer experiment",
+  "specificationCommit": "5f8c294069802683898f16c9c0f3208202723f53",
+  "red": {
+    "sourceCommit": "6ead37f406729161a23f576485470784a054b880",
+    "runId": 35440711812,
+    "artifactId": 10584046151,
+    "artifactSha256": "fd7316fb104af98fa0ccb8797913ed1a5721ce8bc6273ee358d45d6f4feb6202",
+    "tests": 10,
+    "assertionFailures": 9,
+    "errors": 0,
+    "skipped": 0,
+    "description": "Deliberately empty API; only the valid nonmatching-envelope control passes"
+  },
+  "green": {
+    "sourceCommit": "2a3d4aec9c7c2c372ad86fc8853476117114e2fc",
+    "runId": 35440854923,
+    "artifactId": 10583478506,
+    "artifactSha256": "5a239c18f0ed1a76f3beb11d83522d9a030dd895f77b60e1b3685f3c3ba59bf6",
+    "focusedTests": 10,
+    "learningModuleTests": 802,
+    "learningModuleSuites": 157,
+    "newTestsIncludedInModule": 13,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "bothGradleExecutionsSuccessful": true
+  },
+  "testedJavaBlobs": {
+    "TypedOutputPattern.java": "da15f057469a6648f3cc5821fa49f2be597a51af",
+    "TypedOutputPatternTest.java": "a558bf3a345e9af2443176bfea49e83528077737",
+    "TypedOutputPatternLimitTest.java": "b4f20641438703f3d15c350370348f94bbd75f1e"
+  },
+  "verification": "Downloaded ZIP digests, source identity, JUnit XML, source blob hashes and successful Gradle logs checked directly",
+  "reproduce": "./gradlew --no-daemon --no-configuration-cache :regelsuche-learning:test",
+  "limits": [
+    "Returned applications are untrusted syntax proposals, not proved Transformations",
+    "Sample assumptions are not inferred general premises",
+    "No official #1026 held-out corpus or frozen learned artifact is claimed",
+    "Assignment attempts and matcher steps are not complete CPU/memory costs",
+    "Module regression success does not replace full repository CI",
+    "Existing #1025 and legacy #1028/#1029/#1030 work is unchanged",
+    "The final archive commit removes only the temporary workflow and adds this evidence; Java blobs remain identical"
+  ]
+}

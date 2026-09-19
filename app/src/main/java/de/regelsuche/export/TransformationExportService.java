@@ -9,6 +9,7 @@ import de.regelsuche.discovery.DiscoveredTransformation;
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.mining.RuleCandidate;
 import java.io.IOException;
+import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -27,6 +28,19 @@ public interface TransformationExportService {
         List<ReusableRule> rules
     ) {
         return exportJson(transformations, rules);
+    }
+
+    /**
+     * Writes JSON to a caller-owned destination. Implementations may stream;
+     * the default preserves compatibility with string-only exporters.
+     */
+    default void writeJson(
+        Writer destination,
+        List<DiscoveredTransformation> transformations,
+        List<RuleCandidate> candidates,
+        List<ReusableRule> rules
+    ) throws IOException {
+        destination.write(exportJson(transformations, candidates, rules));
     }
 
     default String exportBundle(ExportBundle bundle) {
