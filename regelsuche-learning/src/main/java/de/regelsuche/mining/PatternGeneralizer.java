@@ -374,19 +374,13 @@ public class PatternGeneralizer {
         if (allVariables) {
             boolean allSameName = nodes.stream().allMatch(n -> first.name().equals(n.name()));
             if (!allSameName) {
-                String placeholder = state.nextExpressionPlaceholder();
-                state.expressionValues.put(placeholder,
-                    nodes.stream().map(NormalizedNode::canonicalString).distinct().toList());
-                return Optional.of(NormalizedNode.placeholder(placeholder));
+                return state.generalizeExpression(nodes);
             }
         }
         boolean sameShape = nodes.stream().allMatch(first::sameShape);
         if (!sameShape) {
             // Anti-unification over subtrees: structurally different subtrees become expression placeholders.
-            String placeholder = state.nextExpressionPlaceholder();
-            state.expressionValues.put(placeholder,
-                nodes.stream().map(NormalizedNode::canonicalString).distinct().toList());
-            return Optional.of(NormalizedNode.placeholder(placeholder));
+            return state.generalizeExpression(nodes);
         }
         if (first.kind() == NormalizedNode.Kind.NUMBER || first.kind() == NormalizedNode.Kind.VARIABLE) {
             return Optional.empty();
@@ -478,6 +472,24 @@ public class PatternGeneralizer {
         private int expressionIndex;
         private final Map<String, List<Integer>> values = new LinkedHashMap<>();
         private final Map<String, List<String>> expressionValues = new LinkedHashMap<>();
+        private final Map<List<NormalizedNode>, String> expressionBindings = new LinkedHashMap<>();
+
+        private Optional<NormalizedNode> generalizeExpression(List<NormalizedNode> nodes) {
+            // Keep the ordered, complete TRAIN vector as the key. Its distinct
+            // value set would alias columns that disagree on individual examples.
+            List<NormalizedNode> observations = List.copyOf(nodes);
+            String placeholder = expressionBindings.get(observations);
+            if (placeholder == null) {
+                if (expressionIndex >= 'Z' - 'A') {
+                    return Optional.empty();
+                }
+                placeholder = nextExpressionPlaceholder();
+                expressionBindings.put(observations, placeholder);
+                expressionValues.put(placeholder,
+                    nodes.stream().map(NormalizedNode::canonicalString).distinct().toList());
+            }
+            return Optional.of(NormalizedNode.placeholder(placeholder));
+        }
 
         private String nextPlaceholder() {
             integerIndex++;
