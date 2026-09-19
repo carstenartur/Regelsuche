@@ -180,7 +180,7 @@ public class CliRouter {
 <span class="fc" id="L180">                .ifPresent(best -&gt; out.println(&quot;Best improvement: &quot;</span>
 <span class="fc" id="L181">                    + best.originalExpression() + &quot; -&gt; &quot; + best.improvedExpression()</span>
 <span class="fc" id="L182">                    + &quot; (Δ=&quot; + best.totalImprovement() + &quot;)&quot;));</span>
-<span class="pc bpc" id="L183" title="2 of 4 branches missed.">            if (candidates.isEmpty() &amp;&amp; transformations.isEmpty()) {</span>
+<span class="pc bpc" id="L183" title="3 of 4 branches missed.">            if (candidates.isEmpty() &amp;&amp; transformations.isEmpty()) {</span>
 <span class="nc" id="L184">                out.println(&quot;Hinweis: Keine Regel und keine Verbesserung gefunden. &quot;</span>
                     + &quot;Bereich (--min/--max) oder Suchtiefe erhöhen.&quot;);
             }
