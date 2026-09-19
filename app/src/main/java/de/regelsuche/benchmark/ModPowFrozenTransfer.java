@@ -25,9 +25,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Process-separated TRAIN/freeze/TEST research; no executable learned rule is promoted. */
+/**
+ * Process-separated TRAIN/freeze/TEST research; no executable learned rule is promoted.
+ * The public v1 command accepts only the originally committed corpus bytes.
+ * A changed corpus requires a separately versioned experiment, not a v1 verdict.
+ */
 public final class ModPowFrozenTransfer {
     private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();
+    // Content identities from corpus commit cbf07fda; independent of caller-supplied paths.
+    private static final String TRAIN_SHA256 =
+        "c2932bb1a8a4412a819da52fb0b75ec62dae768b9e2261f19b1e7c6b6725c978";
+    private static final String TEST_SHA256 =
+        "0ae4cdc2fc7335d672dfdadc99fb6b8c58b880e72605db9d74e155e21121472f";
     private ModPowFrozenTransfer() {}
 
     public static void main(String[] args) throws IOException {
@@ -35,14 +44,19 @@ public final class ModPowFrozenTransfer {
             "usage: train TRAIN.json model.json | test model.json SHA256 TEST.json result.json");
         Path destination = Path.of(args[args.length - 1]);
         if (Files.exists(destination)) throw new FileAlreadyExistsException(destination.toString());
-        ObjectNode result = args[0].equals("train") ? train(Path.of(args[1]))
-            : evaluate(Path.of(args[1]), args[2], Path.of(args[3]));
+        ObjectNode result = args[0].equals("train") ? train(Path.of(args[1]), TRAIN_SHA256)
+            : evaluate(Path.of(args[1]), args[2], Path.of(args[3]), TEST_SHA256);
         Files.write(destination, JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(result),
             StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
     }
 
+    /** Development-fixture helper; official v1 execution goes through main. */
     static ObjectNode train(Path corpus) throws IOException {
-        byte[] bytes = read(corpus);
+        return train(corpus, null);
+    }
+
+    private static ObjectNode train(Path corpus, String expectedCorpusHash) throws IOException {
+        byte[] bytes = readCorpus(corpus, expectedCorpusHash, "TRAIN");
         var rows = rows(bytes, "TRAIN"); require(rows.size() == 2, "v1 fixes exactly two TRAIN observations");
         var examples = new ArrayList<TypedPatternGeneralizer.Example>();
         var model = JSON.createObjectNode().put("schema", MODEL_SCHEMA).put("trainSha256", hash(bytes));
@@ -72,13 +86,19 @@ public final class ModPowFrozenTransfer {
         return model;
     }
 
+    /** Development-fixture helper; its arbitrary corpora do not qualify as the frozen study. */
     static ObjectNode evaluate(Path frozen, String expectedHash, Path test) throws IOException {
+        return evaluate(frozen, expectedHash, test, null);
+    }
+
+    private static ObjectNode evaluate(Path frozen, String expectedHash, Path test,
+            String expectedCorpusHash) throws IOException {
         byte[] bytes = read(frozen);
         require(expectedHash != null && expectedHash.matches("[0-9a-f]{64}") && hash(bytes).equals(expectedHash),
             "frozen model checksum mismatch"); // Must precede all TEST access.
         ObjectNode model = (ObjectNode) JSON.readTree(bytes);
         var learned = new TypedOutputPattern(candidate(model));
-        byte[] testBytes = read(test); var rows = rows(testBytes, "TEST");
+        byte[] testBytes = readCorpus(test, expectedCorpusHash, "TEST"); var rows = rows(testBytes, "TEST");
         var report = JSON.createObjectNode().put("schema", "regelsuche.modpow-transfer-result/v1")
             .put("modelSha256", expectedHash).put("testSha256", hash(testBytes));
         var results = report.putArray("cases"); int positives = 0, transferred = 0; boolean controls = true;
@@ -122,6 +142,13 @@ public final class ModPowFrozenTransfer {
         report.put("positiveCases", positives).put("positiveTransfers", transferred).put("controlsClean", controls).put("verdict", verdict);
         report.put("scope", "Structural transfer only; no runtime or fixed-budget speed claim. NO_LEARNING is the complete one-step primitive optimum.");
         return report;
+    }
+
+    /** Hash and parse the same bounded byte array: there is no second, unchecked file read. */
+    private static byte[] readCorpus(Path corpus, String expectedHash, String split) throws IOException {
+        byte[] bytes = read(corpus);
+        require(expectedHash == null || hash(bytes).equals(expectedHash), split + " corpus checksum mismatch");
+        return bytes;
     }
 
     private record Baseline(int generated, List<Expr> approved) {}
