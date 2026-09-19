@@ -7,16 +7,16 @@ they do not establish broad superiority over other systems.
 
 ## Integration and issue decisions
 
-#1013 updates Hibernate and is merged. #1038 combines #1035, #1036 and #1037
-against current main. Concurrent review subsequently added #1035's canonical
-corpus binding through `329e0c0d`; combined head `be11752a` includes that exact
-correction and requires fresh full CI. The earlier green source runs do not
-qualify this corrected tree. The frozen 3/4 result remains unchanged.
+#1013 is merged. #1038 integrated #1035, #1036 and #1037 into main `81ea9ac7`,
+including #1035's concurrent canonical-corpus correction through `329e0c0d`.
+Corrected head `be11752a` passed all five authorities and the final ciCheck in
+run `35474041553` before merge. All three original PRs are marked merged;
+#1040 is closed as a redundant integration. The frozen 3/4 result is unchanged.
 
 | Issue | Decision / actual remaining work |
 | --- | --- |
 | #1024 | Closed with retained GREEN evidence: target-blind bounded modular DAG rediscovery and repaired conditional proof transport are in main. |
-| #1021 | Close after #1038 passes and merges: typed frontier, live learned dispatch, TRAIN history, persisted replay and common work budget are delivered. Larger tactic-learning goals belong to #874. |
+| #1021 | Closed after #1038 passed and merged: typed frontier, live learned dispatch, TRAIN history, persisted replay and common work budget are delivered. Larger tactic-learning goals belong to #874. |
 | #1026 | Keep open and correct acceptance: frozen v1 is 3/4, YELLOW. AC repair is development evidence. Compare search work against primitive closure, not an impossible better optimum than that complete closure. |
 | #696 | First engineering priority: reduce inventory scans, then qualify lazy learned-action generation and useful move ordering as inventory grows. |
 | #874 | Next capability milestone: learned intermediate structures and reusable checked plans on disjoint families, with fixed/random/enumerative controls. |
