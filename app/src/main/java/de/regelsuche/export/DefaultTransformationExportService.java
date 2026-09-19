@@ -8,6 +8,9 @@ import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.json.JsonWriter;
 import de.regelsuche.mining.RuleCandidate;
 import de.regelsuche.scoring.ExpressionScore;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.io.Writer;
 import java.time.Clock;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -47,6 +50,32 @@ public class DefaultTransformationExportService implements TransformationExportS
         List<ReusableRule> rules
     ) {
         JsonWriter writer = new JsonWriter();
+        writeJsonContent(writer, transformations, candidates, rules);
+        return writer.toString();
+    }
+
+    @Override
+    public void writeJson(
+        Writer destination,
+        List<DiscoveredTransformation> transformations,
+        List<RuleCandidate> candidates,
+        List<ReusableRule> rules
+    ) throws IOException {
+        JsonWriter writer = new JsonWriter(destination);
+        try {
+            writeJsonContent(writer, transformations, candidates, rules);
+            writer.flush();
+        } catch (UncheckedIOException failure) {
+            throw failure.getCause();
+        }
+    }
+
+    private void writeJsonContent(
+        JsonWriter writer,
+        List<DiscoveredTransformation> transformations,
+        List<RuleCandidate> candidates,
+        List<ReusableRule> rules
+    ) {
         writer.beginObject();
         writer.property("schemaVersion", ExportBundle.CURRENT_SCHEMA_VERSION);
         writer.property("generatedAt", clock.instant().toString());
@@ -57,7 +86,6 @@ public class DefaultTransformationExportService implements TransformationExportS
         writer.array("reusableRules", w -> rules.forEach(rule ->
             w.objectValue(inner -> writeRule(inner, rule))));
         writer.endObject();
-        return writer.toString();
     }
 
     @Override

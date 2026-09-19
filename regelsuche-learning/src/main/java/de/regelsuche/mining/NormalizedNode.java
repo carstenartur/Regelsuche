@@ -136,7 +136,7 @@ final class NormalizedNode {
             case VARIABLE, PLACEHOLDER -> name;
             case ADD -> formatAdd();
             case MUL -> formatMul();
-            case POW -> parenthesize(children.get(0), Kind.POW) + "^" + parenthesize(children.get(1), Kind.POW);
+            case POW -> formatPower();
             case FUNCTION -> name + "(" + children.stream()
                 .map(NormalizedNode::canonicalString)
                 .collect(Collectors.joining(",")) + ")";
@@ -161,33 +161,32 @@ final class NormalizedNode {
         };
     }
 
+    /**
+     * Checks the constructor at this node, not the shapes of its descendants.
+     * The generalizer recursively abstracts the children. Requiring their full
+     * shapes here would discard a shared function/operator as soon as one child
+     * needs an expression placeholder.
+     */
     boolean sameShape(NormalizedNode other) {
         if (kind != other.kind || children.size() != other.children.size()) {
             return false;
         }
-        if (kind == Kind.VARIABLE) {
+        if (kind == Kind.VARIABLE || kind == Kind.FUNCTION) {
             return name.equals(other.name);
         }
-        if (kind == Kind.FUNCTION) {
-            if (!name.equals(other.name)) {
-                return false;
-            }
-            for (int i = 0; i < children.size(); i++) {
-                if (!children.get(i).sameShape(other.children.get(i))) {
-                    return false;
-                }
-            }
-            return true;
-        }
-        if (kind == Kind.NUMBER || kind == Kind.PLACEHOLDER) {
-            return true;
-        }
-        for (int i = 0; i < children.size(); i++) {
-            if (!children.get(i).sameShape(other.children.get(i))) {
-                return false;
-            }
-        }
         return true;
+    }
+
+    private String formatPower() {
+        NormalizedNode base = children.get(0);
+        NormalizedNode exponent = children.get(1);
+        boolean groupBase = base.kind == Kind.ADD || base.kind == Kind.MUL
+            || base.kind == Kind.POW || base.kind == Kind.NUMBER && base.number < 0;
+        boolean groupExponent = exponent.kind == Kind.ADD || exponent.kind == Kind.MUL;
+        // Powers parse right-associatively. A power used as the base therefore
+        // needs parentheses, as do products and a negative base.
+        return (groupBase ? "(" + base.canonicalString() + ")" : base.canonicalString())
+            + "^" + (groupExponent ? "(" + exponent.canonicalString() + ")" : exponent.canonicalString());
     }
 
     private String formatAdd() {
