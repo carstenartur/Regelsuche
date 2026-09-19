@@ -6,6 +6,7 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -111,6 +112,21 @@ public final class EquivalenceAwarePatternMatcher {
         }
     }
 
+    private sealed interface MatchTask permits PairTask, PermutationTask {}
+
+    private record PairTask(PatternExpr pattern, Expr expression, MatchTask next) implements MatchTask {}
+
+    private record PermutationTask(List<PatternExpr> patterns, List<Expr> expressions,
+            int patternIndex, int expressionIndex, MatchTask next) implements MatchTask {}
+
+    private record Alternative(MatchTask pending, Map<String, Expr> bindings) {}
+
+    /**
+     * Retain the entire continuation when choosing a commutative binding. A
+     * later argument may reject an earlier locally successful choice. Explicit
+     * pending tasks avoid growing the Java stack with ordered sibling count;
+     * alternative branches retain isolated bindings and share the same budget.
+     */
     private static boolean matchInternal(
         PatternExpr pattern,
         Expr expression,
@@ -118,121 +134,122 @@ public final class EquivalenceAwarePatternMatcher {
         RecognitionProfile profile,
         MatchBudget budget
     ) {
-        if (pattern instanceof PatternExpr.Placeholder placeholder) {
-            Expr bound = bindings.get(placeholder.name());
-            if (bound == null) {
-                bindings.put(placeholder.name(), expression);
-                return true;
-            }
-            return equivalent(bound, expression, profile, budget);
-        }
-        if (pattern instanceof PatternExpr.LiteralNumber number) {
-            if (expression instanceof NumberExpr numberExpr) {
-                // A literal is a constraint, not a numerical sampling tolerance.
-                return numberExpr.value().equals(number.value());
-            }
-            return profile.inferAlgebraicBindings()
-                && BoundedExactMonomial.from(expression, budget.algebraic)
-                    .map(monomial -> monomial.isConstant(number.value()))
-                    .orElse(false);
-        }
-        if (pattern instanceof PatternExpr.LiteralVariable variable) {
-            return expression instanceof VariableExpr variableExpr
-                && variableExpr.name().equals(variable.name());
-        }
-        if (pattern instanceof PatternExpr.Function function) {
-            if (!(expression instanceof FunctionExpr functionExpr)
-                    || !functionExpr.name().equals(function.name())
-                    || functionExpr.arguments().size()
-                        != function.arguments().size()) {
-                return false;
-            }
-            for (int index = 0; index < function.arguments().size(); index++) {
-                if (!matchInternal(
-                        function.arguments().get(index),
-                        functionExpr.arguments().get(index),
-                        bindings,
-                        profile,
-                        budget)) {
-                    return false;
+        var alternatives = new ArrayDeque<Alternative>();
+        alternatives.push(new Alternative(new PairTask(pattern, expression, null), new HashMap<>(bindings)));
+        search: while (!alternatives.isEmpty()) {
+            var alternative = alternatives.pop();
+            MatchTask pending = alternative.pending();
+            Map<String, Expr> current = alternative.bindings();
+            while (pending != null) {
+                if (pending instanceof PermutationTask permutation) {
+                    if (permutation.patternIndex() == permutation.patterns().size()) {
+                        if (!permutation.expressions().isEmpty()) continue search;
+                        pending = permutation.next();
+                        continue;
+                    }
+                    PatternExpr operand = permutation.patterns().get(permutation.patternIndex());
+                    int index = permutation.expressionIndex();
+                    while (index < permutation.expressions().size()
+                            && !couldStructurallyMatch(operand, permutation.expressions().get(index), profile, budget)) {
+                        index++;
+                    }
+                    if (index == permutation.expressions().size()) continue search;
+                    // Retain the next choice lazily instead of copying every permutation.
+                    if (index + 1 < permutation.expressions().size()) {
+                        alternatives.push(new Alternative(new PermutationTask(
+                            permutation.patterns(), permutation.expressions(), permutation.patternIndex(),
+                            index + 1, permutation.next()), new HashMap<>(current)));
+                    }
+                    budget.consumeBranch();
+                    Expr candidate = permutation.expressions().get(index);
+                    var remaining = new ArrayList<>(permutation.expressions());
+                    remaining.remove(index);
+                    pending = new PairTask(operand, candidate, new PermutationTask(
+                        permutation.patterns(), remaining, permutation.patternIndex() + 1, 0, permutation.next()));
+                    continue;
+                }
+
+                PairTask pair = (PairTask) pending;
+                PatternExpr node = pair.pattern();
+                Expr candidate = pair.expression();
+                pending = pair.next();
+                if (node instanceof PatternExpr.Placeholder placeholder) {
+                    Expr bound = current.get(placeholder.name());
+                    if (bound == null) current.put(placeholder.name(), candidate);
+                    else if (!equivalent(bound, candidate, profile, budget)) continue search;
+                    continue;
+                }
+                if (node instanceof PatternExpr.LiteralNumber number) {
+                    boolean matches = candidate instanceof NumberExpr literal
+                        ? literal.value().equals(number.value())
+                        : profile.inferAlgebraicBindings()
+                            && BoundedExactMonomial.from(candidate, budget.algebraic)
+                                .map(monomial -> monomial.isConstant(number.value())).orElse(false);
+                    if (!matches) continue search;
+                    continue;
+                }
+                if (node instanceof PatternExpr.LiteralVariable variable) {
+                    if (!(candidate instanceof VariableExpr literal) || !literal.name().equals(variable.name())) {
+                        continue search;
+                    }
+                    continue;
+                }
+                if (node instanceof PatternExpr.Function function) {
+                    if (!(candidate instanceof FunctionExpr concrete)
+                            || !concrete.name().equals(function.name())
+                            || concrete.arguments().size() != function.arguments().size()) {
+                        continue search;
+                    }
+                    for (int index = function.arguments().size() - 1; index >= 0; index--) {
+                        pending = new PairTask(function.arguments().get(index), concrete.arguments().get(index), pending);
+                    }
+                    continue;
+                }
+
+                PatternExpr.Operation operation = (PatternExpr.Operation) node;
+                if (profile.inferAlgebraicBindings()) {
+                    if (allPlaceholdersBound(operation, current)
+                            && equivalent(operation.instantiate(current), candidate, profile, budget)) {
+                        continue;
+                    }
+                    Map<String, Expr> inferred = new HashMap<>(current);
+                    if (tryInferPowerBinding(operation, candidate, inferred, profile, budget)) {
+                        current = inferred;
+                        continue;
+                    }
+                }
+                if (!(candidate instanceof BinaryExpr binary) || binary.operator() != operation.operator()) {
+                    continue search;
+                }
+                if (!profile.isAssociative(operation.operator())) {
+                    pending = new PairTask(operation.left(), binary.left(),
+                        new PairTask(operation.right(), binary.right(), pending));
+                    continue;
+                }
+
+                List<PatternExpr> patternOperands = new ArrayList<>();
+                flattenPattern(operation, operation.operator(), patternOperands);
+                List<Expr> expressionOperands = new ArrayList<>();
+                flattenExpression(binary, operation.operator(), expressionOperands);
+                if (patternOperands.size() != expressionOperands.size()) continue search;
+                if (profile.isCommutative(operation.operator())) {
+                    if (patternOperands.size() > DEFAULT_MAX_COMMUTATIVE_OPERANDS) {
+                        throw new MatchLimitExceeded("COMMUTATIVE_OPERAND_LIMIT");
+                    }
+                    patternOperands.sort(Comparator
+                        .comparingInt(EquivalenceAwarePatternMatcher::bindingPriority).reversed());
+                    pending = new PermutationTask(patternOperands, expressionOperands, 0, 0, pending);
+                } else {
+                    for (int index = patternOperands.size() - 1; index >= 0; index--) {
+                        pending = new PairTask(patternOperands.get(index), expressionOperands.get(index), pending);
+                    }
                 }
             }
+            bindings.clear();
+            bindings.putAll(current);
             return true;
         }
-
-        PatternExpr.Operation operation = (PatternExpr.Operation) pattern;
-        if (profile.inferAlgebraicBindings()
-                && allPlaceholdersBound(operation, bindings)) {
-            Expr instantiated = operation.instantiate(bindings);
-            if (equivalent(instantiated, expression, profile, budget)) {
-                return true;
-            }
-        }
-        if (profile.inferAlgebraicBindings()
-                && tryInferPowerBinding(
-                    operation,
-                    expression,
-                    bindings,
-                    profile,
-                    budget)) {
-            return true;
-        }
-        if (!(expression instanceof BinaryExpr binaryExpr)
-                || binaryExpr.operator() != operation.operator()) {
-            return false;
-        }
-        if (!profile.isAssociative(operation.operator())) {
-            return matchInternal(
-                    operation.left(),
-                    binaryExpr.left(),
-                    bindings,
-                    profile,
-                    budget)
-                && matchInternal(
-                    operation.right(),
-                    binaryExpr.right(),
-                    bindings,
-                    profile,
-                    budget);
-        }
-
-        List<PatternExpr> patternOperands = new ArrayList<>();
-        flattenPattern(operation, operation.operator(), patternOperands);
-        List<Expr> expressionOperands = new ArrayList<>();
-        flattenExpression(binaryExpr, operation.operator(), expressionOperands);
-        if (patternOperands.size() != expressionOperands.size()) {
-            return false;
-        }
-        if (profile.isCommutative(operation.operator())) {
-            if (patternOperands.size()
-                    > DEFAULT_MAX_COMMUTATIVE_OPERANDS) {
-                throw new MatchLimitExceeded(
-                    "COMMUTATIVE_OPERAND_LIMIT");
-            }
-            patternOperands.sort(Comparator
-                .comparingInt(
-                    EquivalenceAwarePatternMatcher::bindingPriority)
-                .reversed());
-            return matchCommutative(
-                patternOperands,
-                expressionOperands,
-                0,
-                bindings,
-                profile,
-                budget
-            );
-        }
-        for (int index = 0; index < patternOperands.size(); index++) {
-            if (!matchInternal(
-                    patternOperands.get(index),
-                    expressionOperands.get(index),
-                    bindings,
-                    profile,
-                    budget)) {
-                return false;
-            }
-        }
-        return true;
+        return false;
     }
 
     private static boolean tryInferPowerBinding(
@@ -332,50 +349,6 @@ public final class EquivalenceAwarePatternMatcher {
         return leftMonomial.isPresent()
             && rightMonomial.isPresent()
             && leftMonomial.get().equivalentTo(rightMonomial.get());
-    }
-
-    private static boolean matchCommutative(
-        List<PatternExpr> patterns,
-        List<Expr> expressions,
-        int patternIndex,
-        Map<String, Expr> bindings,
-        RecognitionProfile profile,
-        MatchBudget budget
-    ) {
-        if (patternIndex == patterns.size()) {
-            return expressions.isEmpty();
-        }
-        PatternExpr pattern = patterns.get(patternIndex);
-        for (int index = 0; index < expressions.size(); index++) {
-            Expr candidate = expressions.get(index);
-            if (!couldStructurallyMatch(pattern, candidate, profile, budget)) {
-                continue;
-            }
-            budget.consumeBranch();
-            Map<String, Expr> candidateBindings = new HashMap<>(bindings);
-            if (!matchInternal(
-                    pattern,
-                    candidate,
-                    candidateBindings,
-                    profile,
-                    budget)) {
-                continue;
-            }
-            List<Expr> remaining = new ArrayList<>(expressions);
-            remaining.remove(index);
-            if (matchCommutative(
-                    patterns,
-                    remaining,
-                    patternIndex + 1,
-                    candidateBindings,
-                    profile,
-                    budget)) {
-                bindings.clear();
-                bindings.putAll(candidateBindings);
-                return true;
-            }
-        }
-        return false;
     }
 
     private static boolean couldStructurallyMatch(
