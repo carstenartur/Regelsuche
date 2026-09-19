@@ -6,6 +6,8 @@ WORKDIR /workspace
 # for dependency downloads.
 COPY gradlew gradle.properties release.properties settings.gradle build.gradle ./
 COPY gradle ./gradle
+# app/build.gradle reads the versioned JMH policy during configuration.
+COPY config ./config
 COPY app/build.gradle ./app/build.gradle
 COPY regelsuche-core/build.gradle ./regelsuche-core/build.gradle
 COPY regelsuche-egraph/build.gradle ./regelsuche-egraph/build.gradle

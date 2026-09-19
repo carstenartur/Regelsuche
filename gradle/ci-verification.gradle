@@ -89,6 +89,7 @@ def verifyJmhBenchmark = tasks.register('verifyJmhBenchmark', Exec) {
     dependsOn 'prepareVerificationEnvironment', ':app:jmh'
     workingDir repositoryRoot
     inputs.file repositoryRoot.file('scripts/verify-jmh-benchmark.py')
+    inputs.file repositoryRoot.file('config/quality/jmh-baseline-more-warmup-v1.json')
     inputs.file project(':app').layout.buildDirectory.file('reports/jmh/result.json')
     outputs.file repositoryRoot.file('public/dev/bench/badge.json')
     outputs.file repositoryRoot.file('public/dev/bench/index.html')
@@ -97,6 +98,7 @@ def verifyJmhBenchmark = tasks.register('verifyJmhBenchmark', Exec) {
         commandLine verificationPython.get().absolutePath,
             'scripts/verify-jmh-benchmark.py',
             '--result', 'app/build/reports/jmh/result.json',
+            '--baseline', 'config/quality/jmh-baseline-more-warmup-v1.json',
             '--badge-output', 'public/dev/bench/badge.json',
             '--report-output', 'public/dev/bench/index.html'
     }
