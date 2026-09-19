@@ -1,0 +1,75 @@
+name: Frozen transfer v1 reproduction
+on:
+  push:
+    branches: ['qa/1035-frozen-transfer-v1']
+    paths: ['.github/workflows/frozen-transfer-reproduction.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reproduce:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: dabbe06435f76ac208f95937a1784750f333d3de
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+      - name: Pin exact source and retain environment
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/frozen-transfer"
+          git rev-parse HEAD | tee "$RUNNER_TEMP/frozen-transfer/source-commit.txt"
+          test "$(git rev-parse HEAD)" = dabbe06435f76ac208f95937a1784750f333d3de
+          test "$(git hash-object app/src/main/java/de/regelsuche/benchmark/ModPowFrozenTransfer.java)" = 669e4e2055c46fb0ec7f9aeb7e75387e9f003166
+          test "$(git hash-object app/src/main/java/de/regelsuche/benchmark/ModPowTransferFiles.java)" = 8acfca1127fc7ed81e52a1a2047b46784b59e279
+          java -version 2> "$RUNNER_TEMP/frozen-transfer/java-version.txt"
+      - name: Run process-boundary and existing arithmetic integration tests
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --no-configuration-cache :app:test \
+            --tests 'de.regelsuche.benchmark.ModPowFrozenTransferTest' \
+            --tests 'de.regelsuche.benchmark.TypedModPowTransferIntegrationTest' \
+            --console=plain --stacktrace 2>&1 | tee "$RUNNER_TEMP/frozen-transfer/tests.log"
+      - name: Reproduce TRAIN model without TEST arguments
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --no-configuration-cache -I scripts/modpow-transfer-v1.init.gradle \
+            :app:modPowFrozenTrain \
+            -PtransferTrain="$PWD/docs/research/modpow-transfer-v1/train.json" \
+            -PtransferModel="$RUNNER_TEMP/frozen-transfer/model.json" \
+            --console=plain --stacktrace 2>&1 | tee "$RUNNER_TEMP/frozen-transfer/train.log"
+          gzip -dc docs/research/modpow-transfer-v1/model.json.gz > "$RUNNER_TEMP/frozen-transfer/retained-model.json"
+          cmp "$RUNNER_TEMP/frozen-transfer/model.json" "$RUNNER_TEMP/frozen-transfer/retained-model.json"
+          echo "e027a7d4b2b03b5b826eb6c5c7513c7f2241be32667e3813226efa77205f2068  $RUNNER_TEMP/frozen-transfer/model.json" | sha256sum -c -
+      - name: Reproduce TEST result with externally frozen model digest
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --no-configuration-cache -I scripts/modpow-transfer-v1.init.gradle \
+            :app:modPowFrozenTest \
+            -PtransferModel="$RUNNER_TEMP/frozen-transfer/model.json" \
+            -PtransferSha=e027a7d4b2b03b5b826eb6c5c7513c7f2241be32667e3813226efa77205f2068 \
+            -PtransferTest="$PWD/docs/research/modpow-transfer-v1/test.json" \
+            -PtransferResult="$RUNNER_TEMP/frozen-transfer/result.json" \
+            --console=plain --stacktrace 2>&1 | tee "$RUNNER_TEMP/frozen-transfer/test-phase.log"
+          gzip -dc docs/research/modpow-transfer-v1/result.json.gz > "$RUNNER_TEMP/frozen-transfer/retained-result.json"
+          cmp "$RUNNER_TEMP/frozen-transfer/result.json" "$RUNNER_TEMP/frozen-transfer/retained-result.json"
+          echo "1f79ed2ecac15a74c130cc56f6815f78c6751d61faa92c6bbfee880bc9912db1  $RUNNER_TEMP/frozen-transfer/result.json" | sha256sum -c -
+          git diff --exit-code
+      - name: Retain results and failures
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/frozen-transfer"
+          cp -r app/build/test-results/test "$RUNNER_TEMP/frozen-transfer/junit" || true
+          cp docs/research/modpow-transfer-v1/freeze.json "$RUNNER_TEMP/frozen-transfer/freeze.json"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: frozen-transfer-v1-${{ github.run_id }}
+          path: ${{ runner.temp }}/frozen-transfer
+          if-no-files-found: error
