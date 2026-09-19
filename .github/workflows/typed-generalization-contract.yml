@@ -1,0 +1,62 @@
+name: Typed generalization contract
+
+on:
+  push:
+    branches: ['research/1026-typed-generalization']
+    paths:
+      - 'regelsuche-learning/src/**/TypedPatternGeneralizer*.java'
+      - '.github/workflows/typed-generalization-contract.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: typed-generalization-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+      - name: Run focused behavioral contracts
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/typed-generalization"
+          git rev-parse HEAD > "$RUNNER_TEMP/typed-generalization/source-commit.txt"
+          ./gradlew --no-daemon --no-configuration-cache :regelsuche-learning:test \
+            --tests 'de.regelsuche.mining.TypedPatternGeneralizerTest' --console=plain --stacktrace \
+            2>&1 | tee "$RUNNER_TEMP/typed-generalization/focused.log"
+      - name: Retain focused JUnit
+        if: always()
+        run: |
+          cp -r regelsuche-learning/build/test-results/test "$RUNNER_TEMP/typed-generalization/focused-junit" || true
+      - name: Run complete learning-module regression suite
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --no-configuration-cache :regelsuche-learning:test --console=plain --stacktrace \
+            2>&1 | tee "$RUNNER_TEMP/typed-generalization/learning.log"
+      - name: Retain source and regression evidence
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/typed-generalization"
+          cp -r regelsuche-learning/build/test-results/test "$RUNNER_TEMP/typed-generalization/latest-junit" || true
+          tar -czf "$RUNNER_TEMP/typed-generalization/source.tar.gz" \
+            regelsuche-learning/src/main/java/de/regelsuche/mining/TypedPatternGeneralizer.java \
+            regelsuche-learning/src/main/java/de/regelsuche/mining/PatternGeneralizer.java \
+            regelsuche-learning/src/main/java/de/regelsuche/mining/AstNormalizer.java \
+            regelsuche-learning/src/test/java/de/regelsuche/mining/TypedPatternGeneralizerTest.java \
+            docs/research/typed-generalization-1026.md
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: typed-generalization-${{ github.sha }}
+          path: ${{ runner.temp }}/typed-generalization
+          if-no-files-found: error
