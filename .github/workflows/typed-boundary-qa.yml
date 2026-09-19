@@ -1,0 +1,72 @@
+name: Typed boundary QA
+on:
+  push:
+    branches: ['qa/1031-node-boundaries']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  boundary:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 2f18f256bd7a0657959a27e91f25b321536ec9fa
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+      - name: Verify production and test source identities
+        run: |
+          mkdir -p "$RUNNER_TEMP/typed-boundaries"
+          git rev-parse HEAD > "$RUNNER_TEMP/typed-boundaries/source-commit.txt"
+          test "$(git hash-object regelsuche-learning/src/main/java/de/regelsuche/mining/TypedPatternGeneralizer.java)" = '90ad2c1c1170de98267e1671017dd44edb40ed01'
+      - name: Run unchanged implementation and full learning tests
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --no-configuration-cache :regelsuche-learning:test --console=plain --stacktrace 2>&1 | tee "$RUNNER_TEMP/typed-boundaries/green.log"
+          cp -r regelsuche-learning/build/test-results/test "$RUNNER_TEMP/typed-boundaries/green-junit"
+      - name: Require boundary tests to detect deliberate guard defects
+        shell: python
+        run: |
+          import json, os, pathlib, shutil, subprocess, xml.etree.ElementTree as ET
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'typed-boundaries'
+          path = pathlib.Path('regelsuche-learning/src/main/java/de/regelsuche/mining/TypedPatternGeneralizer.java')
+          original = path.read_text()
+          mutations = [
+              ('node-off-by-one', '++visited > MAXIMUM_NODES', '++visited >= MAXIMUM_NODES'),
+              ('node-guard-disabled', '++visited > MAXIMUM_NODES', '++visited > Integer.MAX_VALUE'),
+              ('arity-off-by-one', 'function.arguments().size() > MAXIMUM_NODES - visited', 'function.arguments().size() >= MAXIMUM_NODES - visited')
+          ]
+          results = []
+          try:
+              for name, old, new in mutations:
+                  assert original.count(old) == 1, name
+                  path.write_text(original.replace(old, new))
+                  with (root / (name + '.log')).open('w') as log:
+                      completed = subprocess.run(['./gradlew', '--no-daemon', '--no-configuration-cache', ':regelsuche-learning:test', '--tests', 'de.regelsuche.mining.TypedPatternGeneralizerBoundaryTest', '--console=plain'], stdout=log, stderr=subprocess.STDOUT)
+                  report = pathlib.Path('regelsuche-learning/build/test-results/test/TEST-de.regelsuche.mining.TypedPatternGeneralizerBoundaryTest.xml')
+                  suite = ET.parse(report).getroot()
+                  failures = int(suite.attrib['failures'])
+                  errors = int(suite.attrib['errors'])
+                  assert completed.returncode != 0 and failures > 0 and errors == 0, (name, completed.returncode, suite.attrib)
+                  shutil.copyfile(report, root / (name + '.xml'))
+                  results.append({'mutation': name, 'tests': int(suite.attrib['tests']), 'assertionFailures': failures, 'errors': errors, 'caught': True})
+          finally:
+              path.write_text(original)
+          (root / 'mutations.json').write_text(json.dumps(results, indent=2) + '\n')
+      - name: Recheck restored source
+        run: |
+          set -o pipefail
+          git diff --exit-code
+          ./gradlew --no-daemon --no-configuration-cache :regelsuche-learning:test --tests 'de.regelsuche.mining.TypedPatternGeneralizer*Test' --console=plain 2>&1 | tee "$RUNNER_TEMP/typed-boundaries/restored.log"
+          cp -r regelsuche-learning/build/test-results/test "$RUNNER_TEMP/typed-boundaries/restored-junit"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: typed-boundaries-${{ github.run_id }}
+          path: ${{ runner.temp }}/typed-boundaries
+          if-no-files-found: error
