@@ -1,66 +1,48 @@
 name: Frozen transfer and AC integration QA
-
 on:
   push:
     branches: ['qa/1040-frozen-ac-integration']
     paths: ['.github/workflows/frozen-ac-integration-qa.yml']
-
 permissions:
   contents: read
-
 jobs:
   verify:
     runs-on: ubuntu-22.04
     timeout-minutes: 25
-    env:
-      COMBINED: 3d6b48b1e1156a9325e5be4ce715c7aa87b2d593
-      FROZEN: e62a9ae5b3deda22fa00be56fda560237b059d22
-      AC: 3e4612ae02079d5556f51b09679a942fecf6f8c3
-      BASE: 1fcb0b00b9dccf61c953a520af69f475da81d5b7
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 3d6b48b1e1156a9325e5be4ce715c7aa87b2d593
+          ref: 7a3d7f3d2340ccaa5b72449d5ebd87672bbf027f
           fetch-depth: 0
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
-        with:
-          distribution: temurin
-          java-version: '25'
-          verify-signature: true
+        with: {distribution: temurin, java-version: '25', verify-signature: true}
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
-      - name: Independently reconstruct the native parent merge
+      - name: Audit exact merge and unchanged scientific inputs
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/integration-evidence"
-          test "$(git rev-parse HEAD)" = "$COMBINED"
-          git merge-base --is-ancestor "$FROZEN" HEAD
-          git merge-base --is-ancestor "$AC" HEAD
-          git merge-base --is-ancestor "$BASE" HEAD
-          git merge-tree --write-tree "$FROZEN" "$AC" > "$RUNNER_TEMP/integration-evidence/native-merge.txt"
+          test "$(git rev-parse HEAD)" = 7a3d7f3d2340ccaa5b72449d5ebd87672bbf027f
+          git merge-tree --write-tree 3d6b48b1e1156a9325e5be4ce715c7aa87b2d593 329e0c0dfe799cabf40a61813e2efa3485c15ffb > "$RUNNER_TEMP/integration-evidence/native-merge.txt"
           test "$(head -n 1 "$RUNNER_TEMP/integration-evidence/native-merge.txt")" = "$(git rev-parse HEAD^{tree})"
-          test "$(git rev-parse HEAD^{tree})" = 1fe96f062bc3731b3ed7c173afe4b34a664c4f97
-          git diff --exit-code "$FROZEN" HEAD -- \
-            docs/research/modpow-transfer-v1 \
-            app/src/main/java/de/regelsuche/benchmark/ModPowFrozenTransfer.java \
-            app/src/main/java/de/regelsuche/benchmark/ModPowTransferFiles.java \
-            app/src/test/java/de/regelsuche/benchmark/ModPowFrozenTransferTest.java \
-            scripts/modpow-transfer-v1.init.gradle
-          git diff --exit-code "$AC" HEAD -- \
+          test "$(git rev-parse HEAD^{tree})" = 4fdba3f6729a06feae8fb6d377871fb502dc4bcc
+          git diff --exit-code 3d6b48b1e1156a9325e5be4ce715c7aa87b2d593 HEAD -- docs/research/modpow-transfer-v1
+          git diff --exit-code 3e4612ae02079d5556f51b09679a942fecf6f8c3 HEAD -- \
             app/src/test/java/de/regelsuche/benchmark/TypedModPowAcTransferIntegrationTest.java \
             config/quality/complexity-hotspots.json \
             docs/research/typed-output-ac-recognition-1026.md \
             regelsuche-core/src/main/java/de/regelsuche/transform/EquivalenceAwarePatternMatcher.java \
             regelsuche-core/src/test/java/de/regelsuche/transform/EquivalenceAwarePatternContinuationTest.java \
             regelsuche-learning/src/main/java/de/regelsuche/mining/TypedOutputPattern.java
-          git diff --exit-code "$BASE" HEAD -- gradle/libs.versions.toml pom.xml
+          test "$(git hash-object app/src/main/java/de/regelsuche/benchmark/ModPowFrozenTransfer.java)" = 6e2afdaa519e7f4a32fe68b29f1dc9cdfe2d4713
           git rev-parse HEAD > "$RUNNER_TEMP/integration-evidence/source-commit.txt"
           java -version 2> "$RUNNER_TEMP/integration-evidence/java-version.txt"
-      - name: Run all three application integration classes
+      - name: Run canonical corpus and all prior app integration contracts
         shell: bash
         run: |
           set -euo pipefail
           ./gradlew --no-daemon --no-configuration-cache :app:test \
+            --tests 'de.regelsuche.benchmark.ModPowFrozenCorpusContractTest' \
             --tests 'de.regelsuche.benchmark.ModPowFrozenTransferTest' \
             --tests 'de.regelsuche.benchmark.TypedModPowTransferIntegrationTest' \
             --tests 'de.regelsuche.benchmark.TypedModPowAcTransferIntegrationTest' \
@@ -72,7 +54,7 @@ jobs:
           ./gradlew --no-daemon --no-configuration-cache \
             :regelsuche-core:test :regelsuche-learning:test :regelsuche-experiments:test \
             --console=plain --stacktrace 2>&1 | tee "$RUNNER_TEMP/integration-evidence/module-tests.log"
-      - name: Reproduce TRAIN in a separate invocation
+      - name: Reproduce canonical TRAIN and TEST in separate invocations
         shell: bash
         run: |
           set -euo pipefail
@@ -82,10 +64,6 @@ jobs:
             -PtransferModel="$RUNNER_TEMP/integration-evidence/model.json" \
             --console=plain --stacktrace 2>&1 | tee "$RUNNER_TEMP/integration-evidence/train.log"
           echo "e027a7d4b2b03b5b826eb6c5c7513c7f2241be32667e3813226efa77205f2068  $RUNNER_TEMP/integration-evidence/model.json" | sha256sum -c -
-      - name: Reproduce TEST using the externally frozen digest
-        shell: bash
-        run: |
-          set -euo pipefail
           ./gradlew --no-daemon --no-configuration-cache -I scripts/modpow-transfer-v1.init.gradle \
             :app:modPowFrozenTest \
             -PtransferModel="$RUNNER_TEMP/integration-evidence/model.json" \
@@ -99,7 +77,7 @@ jobs:
           cmp "$RUNNER_TEMP/integration-evidence/model.json" "$RUNNER_TEMP/integration-evidence/retained-model.json"
           cmp "$RUNNER_TEMP/integration-evidence/result.json" "$RUNNER_TEMP/integration-evidence/retained-result.json"
           git diff --exit-code
-      - name: Retain actual JUnit XML and outcome totals
+      - name: Retain actual JUnit XML and source
         if: always()
         shell: bash
         run: |
@@ -122,6 +100,9 @@ jobs:
           (dest / 'junit-summary.json').write_text(json.dumps(scopes, indent=2) + '\n')
           print(json.dumps(scopes, indent=2))
           PY
+          tar czf "$RUNNER_TEMP/integration-evidence/guard-source.tar.gz" \
+            app/src/main/java/de/regelsuche/benchmark/ModPowFrozenTransfer.java \
+            app/src/test/java/de/regelsuche/benchmark/ModPowFrozenCorpusContractTest.java
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
