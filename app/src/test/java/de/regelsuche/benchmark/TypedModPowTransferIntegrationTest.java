@@ -94,6 +94,25 @@ class TypedModPowTransferIntegrationTest {
         assertTrue(ModPowCompositionReplay.verify(parser.parseTerm("f(a)"), parser.parseTerm("g(a)"), premises).isEmpty());
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "modpow(modpow(a,e,m),q,n)",
+        "modpow(modpow(a,e,n),q,m)",
+        "modpow(modpow(a,e,m),q,m)"
+    })
+    void changedModuliAreRejectedEvenWhenBothArithmeticDomainsAreSatisfied(String changed) {
+        var premises = new ArrayList<>(assumptions("a", "q", "e", "n"));
+        premises.addAll(List.of("m integer", "m > 0"));
+        Expr source = parser.parseTerm("modpow(a,q*e,n)");
+        Expr target = parser.parseTerm(changed);
+        assertTrue(ModPowDagRediscoveryStudy.domainContractSatisfied(source, premises));
+        assertTrue(ModPowDagRediscoveryStudy.domainContractSatisfied(target, premises),
+            "the modulus-equality control must reach the structural auditor");
+        assertTrue(ModPowCompositionReplay.verify(source,
+            parser.parseTerm("modpow(modpow(a,e,n),q,n)"), premises).isPresent());
+        assertTrue(ModPowCompositionReplay.verify(source, target, premises).isEmpty());
+    }
+
     @Test
     void structuralPreflightBoundsBothSidesBeforeRecursiveAudit() {
         Expr oversized = new FunctionExpr("wide", java.util.Collections.nCopies(
