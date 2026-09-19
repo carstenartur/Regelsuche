@@ -13,7 +13,7 @@ current main. It introduces no further feature code or threshold changes.
 
 | Issue | Decision / actual remaining work |
 | --- | --- |
-| #1024 | Complete: target-blind bounded modular DAG rediscovery and repaired conditional proof transport are in main. Close with retained GREEN evidence. |
+| #1024 | Closed with retained GREEN evidence: target-blind bounded modular DAG rediscovery and repaired conditional proof transport are in main. |
 | #1021 | Close after #1038 passes and merges: typed frontier, live learned dispatch, TRAIN history, persisted replay and common work budget are delivered. Larger tactic-learning goals belong to #874. |
 | #1026 | Keep open and correct acceptance: frozen v1 is 3/4, YELLOW. AC repair is development evidence. Compare search work against primitive closure, not an impossible better optimum than that complete closure. |
 | #696 | First engineering priority: reduce inventory scans, then qualify lazy learned-action generation and useful move ordering as inventory grows. |
@@ -41,7 +41,11 @@ current main. It introduces no further feature code or threshold changes.
 1. **Inventory scaling (#696).** Compare unfiltered and indexed execution with
    identical ordered successors, primitive replay and bounds. Measure index
    construction separately, matching admissions, repeated execution time and
-   the same-operator control. The first implementation is opt-in.
+   the same-operator control. The first implementation is opt-in; its
+   [retained measurements](../../research/benchmarks/rule-shape-index/README.md)
+   include benefits on large sparse inventories and regressions on small ones.
+   Custom compiled genome rules still use fallback dispatch; indexing those
+   requires a separately qualified structural contract.
 2. **Knowledge utility (#696/#1026).** Grow frozen validated inventories and
    problem depth together. Measure useful reach per total work, matching and
    replay cost, and unused generated successors. Retain primitive, learned,
