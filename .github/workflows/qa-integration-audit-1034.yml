@@ -1,0 +1,101 @@
+name: Reviewed learning integration audit
+on:
+  push:
+    branches: ['qa/integration-audit-1034']
+permissions:
+  contents: read
+jobs:
+  integration-audit:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: 7f0d847475b056715dd357b1d508fce04ce4370f
+      BASE_SHA: 8ee95065885cb48db31f694e6f5b0cc3a11fcd2c
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - name: Independently reconstruct exact union and preserve every reviewed ancestor
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_tree=$(git rev-parse "$SOURCE_SHA^{tree}")
+          current="$BASE_SHA"
+          for tip in \
+            66799fdb771b56945ad17ece4247513136261ea5 \
+            66101c2118c6f3134eb658d856fb1f242ecee543 \
+            21e888acb8db84a74693b6c99fcb420369239d77 \
+            c86bdebad2c0f7f314109fa526dd7a6486409d70; do
+            git merge-base --is-ancestor "$tip" "$SOURCE_SHA"
+            tree=$(git merge-tree --write-tree "$current" "$tip")
+            current=$(printf 'Ephemeral independent integration audit\n' | git \
+              -c user.name='Regelsuche integration audit' \
+              -c user.email='integration-audit@users.noreply.github.com' \
+              commit-tree "$tree" -p "$current" -p "$tip")
+          done
+          git merge-base --is-ancestor "$BASE_SHA" "$SOURCE_SHA"
+          test "$tree" = "$actual_tree"
+          git checkout --detach "$SOURCE_SHA"
+          git diff --exit-code
+          mkdir -p build/integration-audit
+          printf 'source=%s\nbase=%s\nactual_tree=%s\nindependent_native_merge_tree=%s\nall_reviewed_tips_retained=true\n' \
+            "$SOURCE_SHA" "$BASE_SHA" "$actual_tree" "$tree" | tee build/integration-audit/native-merge.txt
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+        with:
+          cache-read-only: true
+      - name: Test actual combined app mining export and conditional transfer
+        run: |
+          ./gradlew --no-daemon --no-configuration-cache :app:test \
+            --tests 'de.regelsuche.mining.*' \
+            --tests 'de.regelsuche.export.*' \
+            --tests 'de.regelsuche.benchmark.TypedModPowTransferIntegrationTest' \
+            --console=plain
+      - name: Test complete combined learning and experiments modules
+        run: ./gradlew --no-daemon --no-configuration-cache :regelsuche-learning:test :regelsuche-experiments:test --console=plain
+      - name: Verify source and summarize actual JUnit XML
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git diff --exit-code
+          python3 - <<'PY'
+          import json, pathlib, xml.etree.ElementTree as ET
+          keys = ('tests', 'failures', 'errors', 'skipped')
+          reports = []
+          for module in ('app', 'regelsuche-learning', 'regelsuche-experiments'):
+              paths = sorted(pathlib.Path(module, 'build/test-results/test').glob('TEST-*.xml'))
+              if not paths:
+                  raise SystemExit('Missing JUnit results: ' + module)
+              totals = {key: 0 for key in keys}
+              failed = []
+              for path in paths:
+                  root = ET.parse(path).getroot()
+                  for key in keys:
+                      totals[key] += int(root.attrib[key])
+                  for case in root.findall('testcase'):
+                      messages = [failure.attrib.get('message', '') for failure in case.findall('failure') + case.findall('error')]
+                      if messages:
+                          failed.append({'suite': path.name, 'case': case.attrib['name'], 'messages': messages})
+              report = {'module': module, 'suites': len(paths), **totals, 'failedCases': failed}
+              reports.append(report)
+              print('COMBINED_INTEGRATION_JUNIT=' + json.dumps(report, sort_keys=True))
+          pathlib.Path('build/integration-audit/junit-summary.json').write_text(json.dumps(reports, indent=2) + '\n', encoding='utf-8')
+          if any(report['failures'] or report['errors'] for report in reports):
+              raise SystemExit('Combined integration tests failed')
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: reviewed-learning-integration-audit
+          path: |
+            build/integration-audit/**
+            app/build/test-results/test/**
+            regelsuche-learning/build/test-results/test/**
+            regelsuche-experiments/build/test-results/test/**
+          if-no-files-found: error
