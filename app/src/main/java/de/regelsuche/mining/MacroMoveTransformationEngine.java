@@ -1,6 +1,11 @@
 package de.regelsuche.mining;
 
 import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.assumption.AssumptionContext;
+import de.regelsuche.assumption.ExpressionDefinedness;
+import de.regelsuche.ast.FunctionExpr;
+import java.util.LinkedHashSet;
 import de.regelsuche.discovery.TransformationStep;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
@@ -145,16 +150,19 @@ public class MacroMoveTransformationEngine implements TransformationEngine, de.r
     }
 
     private List<Transformation> applyMacro(String expression, ReusableRule rule) {
-        RewriteRule rewriteRule = new PatternRewriteRule(
-            macroRuleId(rule),
-            toPatternExpr(new RulePatternParser().parse(rule.leftPattern())),
-            toPatternExpr(new RulePatternParser().parse(rule.rightPattern())),
-            RewriteKind.NORMALIZE,
-            false,
-            -Math.max(1, (int) Math.round(Math.max(1.0, rule.averageImprovement()))),
-            true
-        );
-        AstRewriteTransformationEngine macroEngine = new AstRewriteTransformationEngine(List.of(rewriteRule), Integer.MAX_VALUE, 80);
+        var parser = new RulePatternParser();
+        RulePatternNode source = parser.parse(rule.leftPattern());
+        RulePatternNode target = parser.parse(rule.rightPattern());
+        var alternatives = new ArrayList<RewriteRule>();
+        alternatives.add(executablePattern(rule, source, target));
+        RulePatternNode quotientSource = ReciprocalPatternView.quotient(source);
+        RulePatternNode quotientTarget = ReciprocalPatternView.quotient(target);
+        if (!quotientSource.equals(source)) {
+            // Retain the learned inverse spelling as well as the quotient view.
+            // Both execute the same rule; a view is not a new learned theorem.
+            alternatives.add(quotientPattern(rule, quotientSource, quotientTarget));
+        }
+        AstRewriteTransformationEngine macroEngine = new AstRewriteTransformationEngine(alternatives, Integer.MAX_VALUE, 80);
         MacroMoveStatistics before = statisticsByRuleId.getOrDefault(rule.id(), MacroMoveStatistics.empty());
         List<Transformation> transformations = macroEngine.transform(expression);
         specialUnitStepTransformation(expression, rule).ifPresent(transformations::add);
@@ -180,7 +188,7 @@ public class MacroMoveTransformationEngine implements TransformationEngine, de.r
                 transformation.transformedExpression(),
                 atomicStepsByRuleId.getOrDefault(rule.id(), List.of()),
                 rule.supportingPathIds(),
-                rule.assumptions(),
+                combinedAssumptions(rule, transformation),
                 Math.max(1.0, rule.supportingPathIds().isEmpty() ? 1.0 : rule.supportingPathIds().size()),
                 false,
                 stats
@@ -188,6 +196,51 @@ public class MacroMoveTransformationEngine implements TransformationEngine, de.r
             expansionsByEdge.put(edgeKey(expression, transformation.transformedExpression(), transformation.rule()), expansion);
         }
         return transformations;
+    }
+
+    private RewriteRule executablePattern(ReusableRule rule, RulePatternNode source, RulePatternNode target) {
+        return new PatternRewriteRule(
+            macroRuleId(rule), toPatternExpr(source), toPatternExpr(target),
+            RewriteKind.NORMALIZE, false,
+            -Math.max(1, (int) Math.round(Math.max(1.0, rule.averageImprovement()))), true);
+    }
+
+    private RewriteRule quotientPattern(ReusableRule rule, RulePatternNode source, RulePatternNode target) {
+        return new PatternRewriteRule(
+            macroRuleId(rule), toPatternExpr(source), toPatternExpr(target), RewriteKind.NORMALIZE,
+            false, -Math.max(1, (int) Math.round(Math.max(1.0, rule.averageImprovement()))), true) {
+            @Override public boolean matches(Expr subtree) {
+                return super.matches(subtree) && !hasZeroDenominator(subtree)
+                    && ExpressionDefinedness.canElideWithoutDomainLoss(subtree, new AssumptionContext());
+            }
+            @Override public boolean mayEmitAssumptions() { return true; }
+            @Override public List<Assumption> assumptions(Expr subtree) {
+                var context = new AssumptionContext();
+                ExpressionDefinedness.canElideWithoutDomainLoss(subtree, context);
+                return context.snapshot();
+            }
+        };
+    }
+
+    private static List<String> combinedAssumptions(ReusableRule rule, Transformation transformation) {
+        var conditions = new LinkedHashSet<>(rule.assumptions());
+        conditions.addAll(transformation.assumptions());
+        return List.copyOf(conditions);
+    }
+
+    private static boolean hasZeroDenominator(Expr expression) {
+        if (expression instanceof FunctionExpr function) {
+            return function.arguments().stream().anyMatch(MacroMoveTransformationEngine::hasZeroDenominator);
+        }
+        if (!(expression instanceof BinaryExpr binary)) return false;
+        return binary.operator() == BinaryOperator.DIV && hasZeroFactor(binary.right())
+            || hasZeroDenominator(binary.left()) || hasZeroDenominator(binary.right());
+    }
+
+    private static boolean hasZeroFactor(Expr expression) {
+        if (expression instanceof NumberExpr number) return number.value().equalsInteger(0);
+        return expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.MUL
+            && (hasZeroFactor(binary.left()) || hasZeroFactor(binary.right()));
     }
 
     private Optional<Transformation> specialUnitStepTransformation(String expression, ReusableRule rule) {

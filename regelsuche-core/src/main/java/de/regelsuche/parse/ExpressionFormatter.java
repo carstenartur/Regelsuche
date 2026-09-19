@@ -169,7 +169,9 @@ public final class ExpressionFormatter {
 
         int leftAdjust = operator == BinaryOperator.POW ? 1 : 0;
         int rightAdjust = switch (operator) {
-            case POW -> -1;
+            // Equal-precedence powers associate to the right. Lowering this
+            // to MUL/DIV precedence would turn x^(A*B) into x^A*B.
+            case POW -> 0;
             case DIV, SUB -> 1;
             case MUL -> isDivision(binary.right()) ? 1 : 0;
             default -> 0;
