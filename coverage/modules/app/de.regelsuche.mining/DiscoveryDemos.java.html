@@ -46,28 +46,28 @@ public final class DiscoveryDemos {
 <span class="fc" id="L46">        MacroRuleLearningService service = new MacroRuleLearningService(inventory, miner, knownRules, 3, 0.0);</span>
 <span class="fc" id="L47">        MacroLearningResult mined = service.learn(rationalSimplificationExamples());</span>
 <span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (!mined.touchedRules().isEmpty()) {</span>
-<span class="nc" id="L49">            return mined;</span>
+<span class="fc" id="L49">            return mined;</span>
         }
-<span class="fc" id="L51">        ReusableRule fallback = new ReusableRule(</span>
+<span class="nc" id="L51">        ReusableRule fallback = new ReusableRule(</span>
             &quot;rational_cancel_common_factor&quot;,
             &quot;(A * B) / (A * C)&quot;,
             &quot;B / C&quot;,
-<span class="fc" id="L55">            List.of(&quot;A != 0&quot;, &quot;C != 0&quot;),</span>
+<span class="nc" id="L55">            List.of(&quot;A != 0&quot;, &quot;C != 0&quot;),</span>
             CandidateProofStatus.VALIDATED_BY_EXAMPLES,
             RuleStatus.NEW,
-<span class="fc" id="L58">            rationalSimplificationExamples().size(),</span>
+<span class="nc" id="L58">            rationalSimplificationExamples().size(),</span>
             6.0,
-<span class="fc" id="L60">            Instant.now(),</span>
+<span class="nc" id="L60">            Instant.now(),</span>
             &quot;rational-cancel-common-factor&quot;,
             null,
             0,
-<span class="fc" id="L64">            rationalSimplificationExamples().size(),</span>
-<span class="fc" id="L65">            rationalSimplificationExamples().stream().map(SuccessfulTransformationPath::id).toList(),</span>
+<span class="nc" id="L64">            rationalSimplificationExamples().size(),</span>
+<span class="nc" id="L65">            rationalSimplificationExamples().stream().map(SuccessfulTransformationPath::id).toList(),</span>
             0.9
         );
-<span class="fc" id="L68">        inventory.save(fallback);</span>
-<span class="fc" id="L69">        inventory.setEnabled(fallback.id(), true);</span>
-<span class="fc" id="L70">        return new MacroLearningResult(List.of(fallback), List.of(fallback));</span>
+<span class="nc" id="L68">        inventory.save(fallback);</span>
+<span class="nc" id="L69">        inventory.setEnabled(fallback.id(), true);</span>
+<span class="nc" id="L70">        return new MacroLearningResult(List.of(fallback), List.of(fallback));</span>
     }
 
     public static HypothesisCandidate geometricSeriesHypothesis() {

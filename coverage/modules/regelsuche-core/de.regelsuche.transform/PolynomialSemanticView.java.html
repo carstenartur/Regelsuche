@@ -380,7 +380,7 @@ public final class PolynomialSemanticView {
 <span class="fc" id="L380">        BinaryOperator operator = binary.operator();</span>
 <span class="fc" id="L381">        int precedence = operator.precedence();</span>
 <span class="fc bfc" id="L382" title="All 3 branches covered.">        int rightAdjust = switch (operator) {</span>
-<span class="fc" id="L383">            case POW -&gt; -1;</span>
+<span class="fc" id="L383">            case POW -&gt; 0; // Preserve lower-precedence exponent grouping.</span>
 <span class="fc" id="L384">            case DIV, SUB -&gt; 1;</span>
 <span class="fc" id="L385">            default -&gt; 0;</span>
         };

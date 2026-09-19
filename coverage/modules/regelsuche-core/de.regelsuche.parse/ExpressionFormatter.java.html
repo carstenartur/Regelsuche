@@ -169,49 +169,51 @@ public final class ExpressionFormatter {
 
 <span class="fc bfc" id="L170" title="All 2 branches covered.">        int leftAdjust = operator == BinaryOperator.POW ? 1 : 0;</span>
 <span class="fc bfc" id="L171" title="All 4 branches covered.">        int rightAdjust = switch (operator) {</span>
-<span class="fc" id="L172">            case POW -&gt; -1;</span>
-<span class="fc" id="L173">            case DIV, SUB -&gt; 1;</span>
-<span class="fc bfc" id="L174" title="All 2 branches covered.">            case MUL -&gt; isDivision(binary.right()) ? 1 : 0;</span>
-<span class="fc" id="L175">            default -&gt; 0;</span>
+            // Equal-precedence powers associate to the right. Lowering this
+            // to MUL/DIV precedence would turn x^(A*B) into x^A*B.
+<span class="fc" id="L174">            case POW -&gt; 0;</span>
+<span class="fc" id="L175">            case DIV, SUB -&gt; 1;</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            case MUL -&gt; isDivision(binary.right()) ? 1 : 0;</span>
+<span class="fc" id="L177">            default -&gt; 0;</span>
         };
-<span class="fc" id="L177">        pending.push(new FormatExpression(</span>
-<span class="fc" id="L178">            binary.right(),</span>
+<span class="fc" id="L179">        pending.push(new FormatExpression(</span>
+<span class="fc" id="L180">            binary.right(),</span>
             precedence + rightAdjust));
-<span class="fc" id="L180">        pending.push(new AppendText(</span>
-<span class="fc" id="L181">            &quot; &quot; + operator.symbol() + &quot; &quot;));</span>
-<span class="fc" id="L182">        pending.push(new FormatExpression(</span>
-<span class="fc" id="L183">            binary.left(),</span>
+<span class="fc" id="L182">        pending.push(new AppendText(</span>
+<span class="fc" id="L183">            &quot; &quot; + operator.symbol() + &quot; &quot;));</span>
+<span class="fc" id="L184">        pending.push(new FormatExpression(</span>
+<span class="fc" id="L185">            binary.left(),</span>
             precedence + leftAdjust));
-<span class="fc" id="L185">    }</span>
+<span class="fc" id="L187">    }</span>
 
     private static boolean isDivision(Expr expression) {
-<span class="fc" id="L188">        return expression instanceof BinaryExpr binary</span>
-<span class="fc bfc" id="L189" title="All 4 branches covered.">            &amp;&amp; binary.operator() == BinaryOperator.DIV;</span>
+<span class="fc" id="L190">        return expression instanceof BinaryExpr binary</span>
+<span class="fc bfc" id="L191" title="All 4 branches covered.">            &amp;&amp; binary.operator() == BinaryOperator.DIV;</span>
     }
 
     private static final class Output {
-<span class="fc" id="L193">        private final StringBuilder text = new StringBuilder();</span>
+<span class="fc" id="L195">        private final StringBuilder text = new StringBuilder();</span>
         private final java.util.function.LongConsumer emittedCodeUnits;
 
-<span class="fc" id="L196">        private Output(java.util.function.LongConsumer emittedCodeUnits) {</span>
-<span class="fc" id="L197">            this.emittedCodeUnits = Objects.requireNonNull(emittedCodeUnits, &quot;emittedCodeUnits&quot;);</span>
-<span class="fc" id="L198">        }</span>
+<span class="fc" id="L198">        private Output(java.util.function.LongConsumer emittedCodeUnits) {</span>
+<span class="fc" id="L199">            this.emittedCodeUnits = Objects.requireNonNull(emittedCodeUnits, &quot;emittedCodeUnits&quot;);</span>
+<span class="fc" id="L200">        }</span>
 
         private Output append(String value) {
-<span class="fc" id="L201">            emittedCodeUnits.accept(value.length());</span>
-<span class="fc" id="L202">            text.append(value);</span>
-<span class="fc" id="L203">            return this;</span>
+<span class="fc" id="L203">            emittedCodeUnits.accept(value.length());</span>
+<span class="fc" id="L204">            text.append(value);</span>
+<span class="fc" id="L205">            return this;</span>
         }
 
         private Output append(char value) {
-<span class="fc" id="L207">            emittedCodeUnits.accept(1);</span>
-<span class="fc" id="L208">            text.append(value);</span>
-<span class="fc" id="L209">            return this;</span>
+<span class="fc" id="L209">            emittedCodeUnits.accept(1);</span>
+<span class="fc" id="L210">            text.append(value);</span>
+<span class="fc" id="L211">            return this;</span>
         }
 
         @Override
         public String toString() {
-<span class="fc" id="L214">            return text.toString();</span>
+<span class="fc" id="L216">            return text.toString();</span>
         }
     }
 
@@ -220,18 +222,18 @@ public final class ExpressionFormatter {
     }
 
     private record AppendText(String value) implements Action {
-<span class="fc" id="L223">        private AppendText {</span>
-<span class="fc" id="L224">            Objects.requireNonNull(value, &quot;value&quot;);</span>
-<span class="fc" id="L225">        }</span>
+<span class="fc" id="L225">        private AppendText {</span>
+<span class="fc" id="L226">            Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc" id="L227">        }</span>
     }
 
     private record FormatExpression(
         Expr expression,
         int parentPrecedence
     ) implements Action {
-<span class="fc" id="L232">        private FormatExpression {</span>
-<span class="fc" id="L233">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
-<span class="fc" id="L234">        }</span>
+<span class="fc" id="L234">        private FormatExpression {</span>
+<span class="fc" id="L235">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L236">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TypedPatternGeneralizer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">TypedPatternGeneralizer.java</span></div><h1>TypedPatternGeneralizer.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.transform.PatternExpr;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Opt-in structural hypothesis formation over actual producer ASTs.
+ *
+ * &lt;p&gt;One table of corresponding subtree vectors spans both sides of every
+ * example. Equal vectors receive the same placeholder; variables are never
+ * independently renamed on the two sides. Numbers remain exact, binary
+ * grouping remains structural, and scoped symbols are compared as Expr values.
+ * No formatting, parsing or arithmetic normalization occurs here.&lt;/p&gt;
+ *
+ * &lt;p&gt;A result is only a syntax hypothesis, NOT a proved rewrite rule. Even
+ * perfectly reconstructing every example does not prove a generalized identity.
+ * Assumptions are retained as sample data, not inferred for arbitrary bindings.
+ * A caller must independently verify each concrete application and its premises
+ * before passing it to a trusted rule inventory or search frontier.&lt;/p&gt;
+ */
+<span class="fc" id="L32">public final class TypedPatternGeneralizer {</span>
+    public static final int MAXIMUM_EXAMPLES = 32;
+    public static final int MAXIMUM_NODES = 1024;
+    public static final int MAXIMUM_DEPTH = 64;
+
+    /** An observation, not a claim that its source and target are equivalent. */
+    public record Example(Expr source, Expr target, List&lt;String&gt; assumptions) {
+<span class="fc" id="L39">        public Example {</span>
+<span class="fc" id="L40">            Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L41">            Objects.requireNonNull(target, &quot;target&quot;);</span>
+<span class="fc" id="L42">            assumptions = List.copyOf(Objects.requireNonNull(assumptions, &quot;assumptions&quot;));</span>
+<span class="fc" id="L43">        }</span>
+<span class="fc" id="L44">        public Example(Expr source, Expr target) { this(source, target, List.of()); }</span>
+    }
+
+    /** Immutable hypothesis plus the substitutions needed to recover the observations. */
+    public record Candidate(PatternExpr source, PatternExpr target,
+            List&lt;Example&gt; examples, List&lt;Map&lt;String, Expr&gt;&gt; bindings) {
+<span class="fc" id="L50">        public Candidate {</span>
+<span class="fc" id="L51">            Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L52">            Objects.requireNonNull(target, &quot;target&quot;);</span>
+<span class="fc" id="L53">            examples = List.copyOf(Objects.requireNonNull(examples, &quot;examples&quot;));</span>
+<span class="fc" id="L54">            bindings = Objects.requireNonNull(bindings, &quot;bindings&quot;).stream().map(Map::copyOf).toList();</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">            if (examples.size() != bindings.size()) {</span>
+<span class="nc" id="L56">                throw new IllegalArgumentException(&quot;one binding map is required per example&quot;);</span>
+            }
+<span class="fc" id="L58">        }</span>
+    }
+
+    /**
+     * Forms a directed hypothesis from two through thirty-two observations.
+     * Empty means no nontrivial, source-bound abstraction could be formed.
+     * Structural limit violations are explicit errors, not negative discoveries.
+     */
+    public Optional&lt;Candidate&gt; generalize(List&lt;Example&gt; examples) {
+<span class="fc" id="L67">        Objects.requireNonNull(examples, &quot;examples&quot;);</span>
+<span class="fc bfc" id="L68" title="All 4 branches covered.">        if (examples.size() &lt; 2 || examples.size() &gt; MAXIMUM_EXAMPLES) {</span>
+<span class="fc" id="L69">            throw new IllegalArgumentException(&quot;require 2 through &quot; + MAXIMUM_EXAMPLES + &quot; examples&quot;);</span>
+        }
+<span class="fc" id="L71">        var retained = List.copyOf(examples);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        for (var example : retained) {</span>
+<span class="fc" id="L73">            requireBounded(example.source());</span>
+<span class="fc" id="L74">            requireBounded(example.target());</span>
+<span class="fc" id="L75">        }</span>
+<span class="fc" id="L76">        var state = new Bindings();</span>
+<span class="fc" id="L77">        PatternExpr source = column(retained.stream().map(Example::source).toList(), state, true);</span>
+        PatternExpr target;
+        try {
+<span class="fc" id="L80">            target = column(retained.stream().map(Example::target).toList(), state, false);</span>
+<span class="fc" id="L81">        } catch (UnboundTarget exception) {</span>
+<span class="fc" id="L82">            return Optional.empty();</span>
+<span class="fc" id="L83">        }</span>
+<span class="pc bpc" id="L84" title="2 of 4 branches missed.">        if (state.columns.isEmpty() || source.equals(target)) {</span>
+<span class="nc" id="L85">            return Optional.empty();</span>
+        }
+<span class="fc" id="L87">        var substitutions = new ArrayList&lt;Map&lt;String, Expr&gt;&gt;(retained.size());</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        for (int i = 0; i &lt; retained.size(); i++) {</span>
+<span class="fc" id="L89">            var substitution = new LinkedHashMap&lt;String, Expr&gt;();</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            for (var entry : state.columns.entrySet()) {</span>
+<span class="fc" id="L91">                substitution.put(entry.getValue(), entry.getKey().get(i));</span>
+<span class="fc" id="L92">            }</span>
+            // A candidate must losslessly reconstruct both sides using the SAME map.
+<span class="fc" id="L94">            var example = retained.get(i);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">            if (!source.instantiate(substitution).equals(example.source())</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">                    || !target.instantiate(substitution).equals(example.target())) {</span>
+<span class="nc" id="L97">                throw new IllegalStateException(&quot;typed hypothesis does not reconstruct its observation&quot;);</span>
+            }
+<span class="fc" id="L99">            substitutions.add(substitution);</span>
+        }
+<span class="fc" id="L101">        return Optional.of(new Candidate(source, target, retained, substitutions));</span>
+    }
+
+    private static PatternExpr column(List&lt;Expr&gt; nodes, Bindings state, boolean source) {
+<span class="fc" id="L105">        Expr first = nodes.getFirst();</span>
+        // Always abstract variable leaves, including an unchanged scoped variable.
+        // PatternExpr.LiteralVariable would replace its exact SymbolId with text.
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (nodes.stream().allMatch(VariableExpr.class::isInstance)) {</span>
+<span class="fc" id="L109">            return state.placeholder(nodes, source);</span>
+        }
+<span class="pc bpc" id="L111" title="1 of 4 branches missed.">        if (first instanceof NumberExpr number &amp;&amp; nodes.stream().allMatch(first::equals)) {</span>
+<span class="fc" id="L112">            return PatternExpr.num(number.value());</span>
+        }
+<span class="fc bfc" id="L114" title="All 4 branches covered.">        if (first instanceof BinaryExpr binary &amp;&amp; nodes.stream().allMatch(node -&gt;</span>
+<span class="pc bpc" id="L115" title="1 of 4 branches missed.">                node instanceof BinaryExpr other &amp;&amp; other.operator() == binary.operator())) {</span>
+<span class="fc" id="L116">            var left = nodes.stream().map(node -&gt; ((BinaryExpr) node).left()).toList();</span>
+<span class="fc" id="L117">            var right = nodes.stream().map(node -&gt; ((BinaryExpr) node).right()).toList();</span>
+<span class="fc" id="L118">            return PatternExpr.op(binary.operator(), column(left, state, source), column(right, state, source));</span>
+        }
+<span class="pc bpc" id="L120" title="1 of 4 branches missed.">        if (first instanceof FunctionExpr function &amp;&amp; nodes.stream().allMatch(node -&gt;</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">                node instanceof FunctionExpr other &amp;&amp; other.name().equals(function.name())</span>
+<span class="pc bpc" id="L122" title="2 of 4 branches missed.">                    &amp;&amp; other.arguments().size() == function.arguments().size())) {</span>
+<span class="fc" id="L123">            var arguments = new ArrayList&lt;PatternExpr&gt;(function.arguments().size());</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            for (int i = 0; i &lt; function.arguments().size(); i++) {</span>
+<span class="fc" id="L125">                final int position = i;</span>
+<span class="fc" id="L126">                var children = nodes.stream().map(node -&gt; ((FunctionExpr) node).arguments().get(position)).toList();</span>
+<span class="fc" id="L127">                arguments.add(column(children, state, source));</span>
+            }
+<span class="fc" id="L129">            return new PatternExpr.Function(function.name(), arguments);</span>
+        }
+        // Different shapes or different exact literals can be one expression hole.
+<span class="fc" id="L132">        return state.placeholder(nodes, source);</span>
+    }
+
+<span class="fc" id="L135">    private static final class Bindings {</span>
+<span class="fc" id="L136">        private final Map&lt;List&lt;Expr&gt;, String&gt; columns = new LinkedHashMap&lt;&gt;();</span>
+
+        PatternExpr placeholder(List&lt;Expr&gt; nodes, boolean source) {
+<span class="fc" id="L139">            String name = columns.get(nodes);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (name == null) {</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">                if (!source) throw new UnboundTarget();</span>
+<span class="fc" id="L142">                name = &quot;P&quot; + columns.size();</span>
+<span class="fc" id="L143">                columns.put(List.copyOf(nodes), name);</span>
+            }
+<span class="fc" id="L145">            return PatternExpr.var(name);</span>
+        }
+    }
+
+    private static final class UnboundTarget extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
+
+<span class="fc" id="L153">    private record Pending(Expr expression, int depth) {}</span>
+
+    /** Count occurrences, not object identities, before any recursive equality/matching. */
+    private static void requireBounded(Expr root) {
+<span class="fc" id="L157">        var pending = new ArrayDeque&lt;Pending&gt;();</span>
+<span class="fc" id="L158">        pending.push(new Pending(root, 0));</span>
+<span class="fc" id="L159">        int visited = 0;</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L161">            var next = pending.pop();</span>
+<span class="fc bfc" id="L162" title="All 4 branches covered.">            if (++visited &gt; MAXIMUM_NODES || next.depth() &gt; MAXIMUM_DEPTH) {</span>
+<span class="fc" id="L163">                throw new IllegalArgumentException(&quot;typed generalization structural limit exceeded&quot;);</span>
+            }
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            if (next.expression() instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L166">                pending.push(new Pending(binary.right(), next.depth() + 1));</span>
+<span class="fc" id="L167">                pending.push(new Pending(binary.left(), next.depth() + 1));</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            } else if (next.expression() instanceof FunctionExpr function) {</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">                if (function.arguments().size() &gt; MAXIMUM_NODES - visited) {</span>
+<span class="fc" id="L170">                    throw new IllegalArgumentException(&quot;typed generalization argument limit exceeded&quot;);</span>
+                }
+<span class="fc bfc" id="L172" title="All 2 branches covered.">                for (var argument : function.arguments()) {</span>
+<span class="fc" id="L173">                    pending.push(new Pending(argument, next.depth() + 1));</span>
+<span class="fc" id="L174">                }</span>
+            }
+<span class="fc" id="L176">        }</span>
+<span class="fc" id="L177">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

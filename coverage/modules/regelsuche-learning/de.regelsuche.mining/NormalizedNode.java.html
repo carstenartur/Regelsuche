@@ -104,8 +104,8 @@ final class NormalizedNode {
                 NormalizedNode::factorSortKey,
                 NormalizedNode::compareNaturalText))
 <span class="fc" id="L106">            .toList();</span>
-<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (normalized.size() == 1) {</span>
-<span class="nc" id="L108">            return normalized.getFirst();</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (normalized.size() == 1) {</span>
+<span class="fc" id="L108">            return normalized.getFirst();</span>
         }
 <span class="fc" id="L110">        return new NormalizedNode(Kind.MUL, null, null, normalized);</span>
     }
@@ -136,7 +136,7 @@ final class NormalizedNode {
 <span class="fc" id="L136">            case VARIABLE, PLACEHOLDER -&gt; name;</span>
 <span class="fc" id="L137">            case ADD -&gt; formatAdd();</span>
 <span class="fc" id="L138">            case MUL -&gt; formatMul();</span>
-<span class="fc" id="L139">            case POW -&gt; parenthesize(children.get(0), Kind.POW) + &quot;^&quot; + parenthesize(children.get(1), Kind.POW);</span>
+<span class="fc" id="L139">            case POW -&gt; formatPower();</span>
 <span class="fc" id="L140">            case FUNCTION -&gt; name + &quot;(&quot; + children.stream()</span>
 <span class="fc" id="L141">                .map(NormalizedNode::canonicalString)</span>
 <span class="fc" id="L142">                .collect(Collectors.joining(&quot;,&quot;)) + &quot;)&quot;;</span>
@@ -177,59 +177,71 @@ final class NormalizedNode {
 <span class="fc" id="L177">        return true;</span>
     }
 
+    private String formatPower() {
+<span class="fc" id="L181">        NormalizedNode base = children.get(0);</span>
+<span class="fc" id="L182">        NormalizedNode exponent = children.get(1);</span>
+<span class="fc bfc" id="L183" title="All 8 branches covered.">        boolean groupBase = base.kind == Kind.ADD || base.kind == Kind.MUL</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">            || base.kind == Kind.POW || base.kind == Kind.NUMBER &amp;&amp; base.number &lt; 0;</span>
+<span class="fc bfc" id="L185" title="All 4 branches covered.">        boolean groupExponent = exponent.kind == Kind.ADD || exponent.kind == Kind.MUL;</span>
+        // Powers parse right-associatively. A power used as the base therefore
+        // needs parentheses, as do products and a negative base.
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        return (groupBase ? &quot;(&quot; + base.canonicalString() + &quot;)&quot; : base.canonicalString())</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            + &quot;^&quot; + (groupExponent ? &quot;(&quot; + exponent.canonicalString() + &quot;)&quot; : exponent.canonicalString());</span>
+    }
+
     private String formatAdd() {
-<span class="fc" id="L181">        StringBuilder builder = new StringBuilder();</span>
-<span class="fc bfc" id="L182" title="All 2 branches covered.">        for (NormalizedNode child : children) {</span>
-<span class="fc" id="L183">            String value = child.canonicalString();</span>
-<span class="fc bfc" id="L184" title="All 2 branches covered.">            if (builder.isEmpty()) {</span>
-<span class="fc" id="L185">                builder.append(value);</span>
-<span class="fc bfc" id="L186" title="All 2 branches covered.">            } else if (value.startsWith(&quot;-&quot;)) {</span>
-<span class="fc" id="L187">                builder.append(&quot; - &quot;).append(value.substring(1));</span>
+<span class="fc" id="L193">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        for (NormalizedNode child : children) {</span>
+<span class="fc" id="L195">            String value = child.canonicalString();</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">            if (builder.isEmpty()) {</span>
+<span class="fc" id="L197">                builder.append(value);</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            } else if (value.startsWith(&quot;-&quot;)) {</span>
+<span class="fc" id="L199">                builder.append(&quot; - &quot;).append(value.substring(1));</span>
             } else {
-<span class="fc" id="L189">                builder.append(&quot; + &quot;).append(value);</span>
+<span class="fc" id="L201">                builder.append(&quot; + &quot;).append(value);</span>
             }
-<span class="fc" id="L191">        }</span>
-<span class="fc" id="L192">        return builder.toString();</span>
+<span class="fc" id="L203">        }</span>
+<span class="fc" id="L204">        return builder.toString();</span>
     }
 
     private String formatMul() {
-<span class="fc bfc" id="L196" title="All 4 branches covered.">        if (children.getFirst().kind == Kind.NUMBER &amp;&amp; children.getFirst().number == -1) {</span>
-<span class="fc" id="L197">            return &quot;-&quot; + children.subList(1, children.size()).stream()</span>
-<span class="fc" id="L198">                .map(child -&gt; parenthesize(child, Kind.MUL))</span>
-<span class="fc" id="L199">                .collect(Collectors.joining(&quot;*&quot;));</span>
+<span class="fc bfc" id="L208" title="All 4 branches covered.">        if (children.getFirst().kind == Kind.NUMBER &amp;&amp; children.getFirst().number == -1) {</span>
+<span class="fc" id="L209">            return &quot;-&quot; + children.subList(1, children.size()).stream()</span>
+<span class="fc" id="L210">                .map(child -&gt; parenthesize(child, Kind.MUL))</span>
+<span class="fc" id="L211">                .collect(Collectors.joining(&quot;*&quot;));</span>
         }
-<span class="fc" id="L201">        return children.stream()</span>
-<span class="fc" id="L202">            .map(child -&gt; parenthesize(child, Kind.MUL))</span>
-<span class="fc" id="L203">            .collect(Collectors.joining(&quot;*&quot;));</span>
+<span class="fc" id="L213">        return children.stream()</span>
+<span class="fc" id="L214">            .map(child -&gt; parenthesize(child, Kind.MUL))</span>
+<span class="fc" id="L215">            .collect(Collectors.joining(&quot;*&quot;));</span>
     }
 
     private static String parenthesize(NormalizedNode node, Kind parent) {
-<span class="pc bpc" id="L207" title="1 of 6 branches missed.">        if ((parent == Kind.MUL || parent == Kind.POW) &amp;&amp; node.kind == Kind.ADD) {</span>
-<span class="fc" id="L208">            return &quot;(&quot; + node.canonicalString() + &quot;)&quot;;</span>
+<span class="pc bpc" id="L219" title="3 of 6 branches missed.">        if ((parent == Kind.MUL || parent == Kind.POW) &amp;&amp; node.kind == Kind.ADD) {</span>
+<span class="fc" id="L220">            return &quot;(&quot; + node.canonicalString() + &quot;)&quot;;</span>
         }
-<span class="fc" id="L210">        return node.canonicalString();</span>
+<span class="fc" id="L222">        return node.canonicalString();</span>
     }
 
     private String sortKey() {
-<span class="fc" id="L214">        String canonical = canonicalString();</span>
-<span class="fc bfc" id="L215" title="All 4 branches covered.">        if (canonical.equals(&quot;x&quot;) || canonical.matches(&quot;x\\^\\d+&quot;)) {</span>
-<span class="fc" id="L216">            return &quot;0:&quot; + canonical;</span>
+<span class="fc" id="L226">        String canonical = canonicalString();</span>
+<span class="fc bfc" id="L227" title="All 4 branches covered.">        if (canonical.equals(&quot;x&quot;) || canonical.matches(&quot;x\\^\\d+&quot;)) {</span>
+<span class="fc" id="L228">            return &quot;0:&quot; + canonical;</span>
         }
-<span class="fc bfc" id="L218" title="All 2 branches covered.">        if (canonical.contains(&quot;x&quot;)) {</span>
-<span class="fc" id="L219">            return &quot;1:&quot; + canonical.replaceFirst(&quot;^-&quot;, &quot;&quot;);</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        if (canonical.contains(&quot;x&quot;)) {</span>
+<span class="fc" id="L231">            return &quot;1:&quot; + canonical.replaceFirst(&quot;^-&quot;, &quot;&quot;);</span>
         }
-<span class="pc bpc" id="L221" title="2 of 6 branches missed.">        return switch (kind) {</span>
-<span class="fc" id="L222">            case POW -&gt; &quot;3:&quot; + canonical;</span>
-<span class="fc" id="L223">            case MUL -&gt; &quot;4:&quot; + canonical.replaceFirst(&quot;^-&quot;, &quot;&quot;);</span>
-<span class="fc" id="L224">            case VARIABLE, PLACEHOLDER -&gt; &quot;2:&quot; + canonical;</span>
-<span class="fc" id="L225">            case NUMBER -&gt; &quot;9:&quot; + Math.abs(number);</span>
-<span class="nc" id="L226">            case ADD -&gt; &quot;5:&quot; + canonical;</span>
-<span class="nc" id="L227">            case FUNCTION -&gt; &quot;6:&quot; + canonical;</span>
+<span class="pc bpc" id="L233" title="2 of 6 branches missed.">        return switch (kind) {</span>
+<span class="fc" id="L234">            case POW -&gt; &quot;3:&quot; + canonical;</span>
+<span class="fc" id="L235">            case MUL -&gt; &quot;4:&quot; + canonical.replaceFirst(&quot;^-&quot;, &quot;&quot;);</span>
+<span class="fc" id="L236">            case VARIABLE, PLACEHOLDER -&gt; &quot;2:&quot; + canonical;</span>
+<span class="fc" id="L237">            case NUMBER -&gt; &quot;9:&quot; + Math.abs(number);</span>
+<span class="nc" id="L238">            case ADD -&gt; &quot;5:&quot; + canonical;</span>
+<span class="nc" id="L239">            case FUNCTION -&gt; &quot;6:&quot; + canonical;</span>
         };
     }
 
     private String factorSortKey() {
-<span class="fc bfc" id="L232" title="All 2 branches covered.">        return kind == Kind.NUMBER ? &quot;0:&quot; + Math.abs(number) : &quot;1:&quot; + canonicalString();</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        return kind == Kind.NUMBER ? &quot;0:&quot; + Math.abs(number) : &quot;1:&quot; + canonicalString();</span>
     }
 
     /**
@@ -239,86 +251,86 @@ final class NormalizedNode {
      * because '1' sorts before '8'.
      */
     private static int compareNaturalText(String left, String right) {
-<span class="fc" id="L242">        int leftIndex = 0;</span>
-<span class="fc" id="L243">        int rightIndex = 0;</span>
-<span class="pc bpc" id="L244" title="1 of 4 branches missed.">        while (leftIndex &lt; left.length() &amp;&amp; rightIndex &lt; right.length()) {</span>
-<span class="fc" id="L245">            char leftChar = left.charAt(leftIndex);</span>
-<span class="fc" id="L246">            char rightChar = right.charAt(rightIndex);</span>
-<span class="pc bpc" id="L247" title="1 of 4 branches missed.">            if (Character.isDigit(leftChar) &amp;&amp; Character.isDigit(rightChar)) {</span>
-<span class="fc" id="L248">                int leftEnd = digitEnd(left, leftIndex);</span>
-<span class="fc" id="L249">                int rightEnd = digitEnd(right, rightIndex);</span>
-<span class="fc" id="L250">                int leftSignificant = significantDigitStart(left, leftIndex, leftEnd);</span>
-<span class="fc" id="L251">                int rightSignificant = significantDigitStart(right, rightIndex, rightEnd);</span>
-<span class="fc" id="L252">                int leftDigits = leftEnd - leftSignificant;</span>
-<span class="fc" id="L253">                int rightDigits = rightEnd - rightSignificant;</span>
-<span class="fc" id="L254">                int lengthComparison = Integer.compare(leftDigits, rightDigits);</span>
-<span class="fc bfc" id="L255" title="All 2 branches covered.">                if (lengthComparison != 0) {</span>
-<span class="fc" id="L256">                    return lengthComparison;</span>
+<span class="fc" id="L254">        int leftIndex = 0;</span>
+<span class="fc" id="L255">        int rightIndex = 0;</span>
+<span class="pc bpc" id="L256" title="1 of 4 branches missed.">        while (leftIndex &lt; left.length() &amp;&amp; rightIndex &lt; right.length()) {</span>
+<span class="fc" id="L257">            char leftChar = left.charAt(leftIndex);</span>
+<span class="fc" id="L258">            char rightChar = right.charAt(rightIndex);</span>
+<span class="pc bpc" id="L259" title="1 of 4 branches missed.">            if (Character.isDigit(leftChar) &amp;&amp; Character.isDigit(rightChar)) {</span>
+<span class="fc" id="L260">                int leftEnd = digitEnd(left, leftIndex);</span>
+<span class="fc" id="L261">                int rightEnd = digitEnd(right, rightIndex);</span>
+<span class="fc" id="L262">                int leftSignificant = significantDigitStart(left, leftIndex, leftEnd);</span>
+<span class="fc" id="L263">                int rightSignificant = significantDigitStart(right, rightIndex, rightEnd);</span>
+<span class="fc" id="L264">                int leftDigits = leftEnd - leftSignificant;</span>
+<span class="fc" id="L265">                int rightDigits = rightEnd - rightSignificant;</span>
+<span class="fc" id="L266">                int lengthComparison = Integer.compare(leftDigits, rightDigits);</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">                if (lengthComparison != 0) {</span>
+<span class="fc" id="L268">                    return lengthComparison;</span>
                 }
-<span class="fc bfc" id="L258" title="All 2 branches covered.">                int digitsComparison = left.regionMatches(</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">                int digitsComparison = left.regionMatches(</span>
                     leftSignificant,
                     right,
                     rightSignificant,
                     leftDigits)
-<span class="fc" id="L263">                    ? 0</span>
-<span class="fc" id="L264">                    : left.substring(leftSignificant, leftEnd)</span>
-<span class="fc" id="L265">                        .compareTo(right.substring(rightSignificant, rightEnd));</span>
-<span class="fc bfc" id="L266" title="All 2 branches covered.">                if (digitsComparison != 0) {</span>
-<span class="fc" id="L267">                    return digitsComparison;</span>
+<span class="fc" id="L275">                    ? 0</span>
+<span class="fc" id="L276">                    : left.substring(leftSignificant, leftEnd)</span>
+<span class="fc" id="L277">                        .compareTo(right.substring(rightSignificant, rightEnd));</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">                if (digitsComparison != 0) {</span>
+<span class="fc" id="L279">                    return digitsComparison;</span>
                 }
-<span class="fc" id="L269">                int rawLengthComparison = Integer.compare(</span>
+<span class="fc" id="L281">                int rawLengthComparison = Integer.compare(</span>
                     leftEnd - leftIndex,
                     rightEnd - rightIndex);
-<span class="pc bpc" id="L272" title="1 of 2 branches missed.">                if (rawLengthComparison != 0) {</span>
-<span class="nc" id="L273">                    return rawLengthComparison;</span>
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">                if (rawLengthComparison != 0) {</span>
+<span class="nc" id="L285">                    return rawLengthComparison;</span>
                 }
-<span class="fc" id="L275">                leftIndex = leftEnd;</span>
-<span class="fc" id="L276">                rightIndex = rightEnd;</span>
-<span class="fc" id="L277">                continue;</span>
+<span class="fc" id="L287">                leftIndex = leftEnd;</span>
+<span class="fc" id="L288">                rightIndex = rightEnd;</span>
+<span class="fc" id="L289">                continue;</span>
             }
-<span class="fc" id="L279">            int characterComparison = Character.compare(leftChar, rightChar);</span>
-<span class="fc bfc" id="L280" title="All 2 branches covered.">            if (characterComparison != 0) {</span>
-<span class="fc" id="L281">                return characterComparison;</span>
+<span class="fc" id="L291">            int characterComparison = Character.compare(leftChar, rightChar);</span>
+<span class="fc bfc" id="L292" title="All 2 branches covered.">            if (characterComparison != 0) {</span>
+<span class="fc" id="L293">                return characterComparison;</span>
             }
-<span class="fc" id="L283">            leftIndex++;</span>
-<span class="fc" id="L284">            rightIndex++;</span>
-<span class="fc" id="L285">        }</span>
-<span class="fc" id="L286">        return Integer.compare(left.length() - leftIndex, right.length() - rightIndex);</span>
+<span class="fc" id="L295">            leftIndex++;</span>
+<span class="fc" id="L296">            rightIndex++;</span>
+<span class="fc" id="L297">        }</span>
+<span class="fc" id="L298">        return Integer.compare(left.length() - leftIndex, right.length() - rightIndex);</span>
     }
 
     private static int digitEnd(String value, int start) {
-<span class="fc" id="L290">        int index = start;</span>
-<span class="fc bfc" id="L291" title="All 4 branches covered.">        while (index &lt; value.length() &amp;&amp; Character.isDigit(value.charAt(index))) {</span>
-<span class="fc" id="L292">            index++;</span>
+<span class="fc" id="L302">        int index = start;</span>
+<span class="fc bfc" id="L303" title="All 4 branches covered.">        while (index &lt; value.length() &amp;&amp; Character.isDigit(value.charAt(index))) {</span>
+<span class="fc" id="L304">            index++;</span>
         }
-<span class="fc" id="L294">        return index;</span>
+<span class="fc" id="L306">        return index;</span>
     }
 
     private static int significantDigitStart(String value, int start, int end) {
-<span class="fc" id="L298">        int index = start;</span>
-<span class="pc bpc" id="L299" title="1 of 4 branches missed.">        while (index + 1 &lt; end &amp;&amp; value.charAt(index) == '0') {</span>
-<span class="nc" id="L300">            index++;</span>
+<span class="fc" id="L310">        int index = start;</span>
+<span class="pc bpc" id="L311" title="1 of 4 branches missed.">        while (index + 1 &lt; end &amp;&amp; value.charAt(index) == '0') {</span>
+<span class="nc" id="L312">            index++;</span>
         }
-<span class="fc" id="L302">        return index;</span>
+<span class="fc" id="L314">        return index;</span>
     }
 
     @Override
     public boolean equals(Object other) {
-<span class="fc bfc" id="L307" title="All 2 branches covered.">        if (this == other) {</span>
-<span class="fc" id="L308">            return true;</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">        if (this == other) {</span>
+<span class="fc" id="L320">            return true;</span>
         }
-<span class="pc bpc" id="L310" title="1 of 2 branches missed.">        if (!(other instanceof NormalizedNode node)) {</span>
-<span class="nc" id="L311">            return false;</span>
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">        if (!(other instanceof NormalizedNode node)) {</span>
+<span class="nc" id="L323">            return false;</span>
         }
-<span class="fc bfc" id="L313" title="All 2 branches covered.">        return kind == node.kind</span>
-<span class="fc bfc" id="L314" title="All 2 branches covered.">            &amp;&amp; Objects.equals(number, node.number)</span>
-<span class="fc bfc" id="L315" title="All 2 branches covered.">            &amp;&amp; Objects.equals(name, node.name)</span>
-<span class="fc bfc" id="L316" title="All 2 branches covered.">            &amp;&amp; Objects.equals(children, node.children);</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">        return kind == node.kind</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">            &amp;&amp; Objects.equals(number, node.number)</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">            &amp;&amp; Objects.equals(name, node.name)</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">            &amp;&amp; Objects.equals(children, node.children);</span>
     }
 
     @Override
     public int hashCode() {
-<span class="fc" id="L321">        return Objects.hash(kind, number, name, children);</span>
+<span class="fc" id="L333">        return Objects.hash(kind, number, name, children);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -67,7 +67,7 @@ public final class ExactExpressionFormatter {
 <span class="fc" id="L67">        int precedence = operator.precedence();</span>
 <span class="fc bfc" id="L68" title="All 2 branches covered.">        int leftAdjust = operator == BinaryOperator.POW ? 1 : 0;</span>
 <span class="fc bfc" id="L69" title="All 3 branches covered.">        int rightAdjust = switch (operator) {</span>
-<span class="fc" id="L70">            case POW -&gt; -1;</span>
+<span class="fc" id="L70">            case POW -&gt; 0; // Preserve lower-precedence exponent grouping.</span>
 <span class="fc" id="L71">            case DIV, SUB -&gt; 1;</span>
 <span class="fc" id="L72">            default -&gt; 0;</span>
         };
