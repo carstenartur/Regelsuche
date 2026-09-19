@@ -60,7 +60,7 @@ public class PatternGeneralizer {
         // Mine integer relations if any integer placeholders exist.
         ParameterRelationMiner.RelationResult relations = state.values.isEmpty()
             ? ParameterRelationMiner.RelationResult.empty()
-            : relationMiner.mine(state.values);
+            : relationMiner.mine(state.values, state.expressionValues.keySet());
         // Require at least one kind of abstraction: integer relations or expression placeholders.
         boolean hasIntegerRelation = !relations.isEmpty();
         boolean hasExpressionPlaceholders = !state.expressionValues.isEmpty();
