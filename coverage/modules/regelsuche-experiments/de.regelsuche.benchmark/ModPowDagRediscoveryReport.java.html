@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ModPowDagRediscoveryReport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">ModPowDagRediscoveryReport.java</span></div><h1>ModPowDagRediscoveryReport.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+
+/** Writes v2 evidence without overwriting the retained historical v1 results. */
+public final class ModPowDagRediscoveryReport {
+<span class="fc" id="L13">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+
+    private ModPowDagRediscoveryReport() {
+    }
+
+    public static void main(String[] arguments) throws IOException {
+<span class="nc bnc" id="L19" title="All 2 branches missed.">        if (arguments.length != 1) {</span>
+<span class="nc" id="L20">            throw new IllegalArgumentException(&quot;expected output directory&quot;);</span>
+        }
+<span class="nc" id="L22">        Path output = Path.of(arguments[0]);</span>
+<span class="nc" id="L23">        Files.createDirectories(output);</span>
+<span class="nc" id="L24">        var study = ModPowDagRediscoveryStudy.run();</span>
+<span class="nc" id="L25">        Files.writeString(output.resolve(&quot;modpow-dag-rediscovery-result-v2.json&quot;),</span>
+<span class="nc" id="L26">            json(study), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L27">        Files.writeString(output.resolve(&quot;modpow-dag-rediscovery-result-v2.md&quot;),</span>
+<span class="nc" id="L28">            markdown(study), StandardCharsets.UTF_8);</span>
+<span class="nc bnc" id="L29" title="All 2 branches missed.">        if (!study.green()) {</span>
+<span class="nc" id="L30">            throw new IllegalStateException(&quot;frozen modPow DAG rediscovery gate is not GREEN&quot;);</span>
+        }
+<span class="nc" id="L32">    }</span>
+
+    static String json(ModPowDagRediscoveryStudy.StudyResult study) {
+<span class="fc" id="L35">        var out = new JsonWriter().beginObject()</span>
+<span class="fc" id="L36">            .property(&quot;schema&quot;, &quot;regelsuche.modpow-dag-rediscovery-result/v2&quot;)</span>
+<span class="fc" id="L37">            .property(&quot;revision&quot;, ModPowDagRediscoveryStudy.REVISION)</span>
+<span class="fc" id="L38">            .property(&quot;proofContract&quot;, &quot;modpow-conditional-proof/v2&quot;)</span>
+<span class="fc" id="L39">            .stringArray(&quot;proofAssumptions&quot;, ModPowDagRediscoveryStudy.proofAssumptions())</span>
+<span class="fc" id="L40">            .property(&quot;workScope&quot;, &quot;MECHANICAL_SEARCH_PLUS_SOURCE_TARGET_NODE_RECEIPTS;EXCLUDES_FULL_PROVIDER_TRAVERSAL_DOMAIN_CHECKS_CODEC_HASHING_ALLOCATION_AND_POSTHOC_SCORING&quot;)</span>
+<span class="fc" id="L41">            .property(&quot;costScope&quot;, &quot;DECLARED_EXPONENT_BIT_PROXY;OTHER_OPERATIONS_ZERO;NOT_RUNTIME_OR_BIT_COMPLEXITY&quot;)</span>
+<span class="fc" id="L42">            .property(&quot;claimBoundary&quot;, &quot;ONE_STEP_CLOSURE_WITH_TWO_GENERIC_FACTOR_ORDERS;FOUR_BIT_PROFILES_OF_ONE_AST;NO_LEARNED_TRANSFER&quot;)</span>
+<span class="fc" id="L43">            .property(&quot;green&quot;, study.green());</span>
+<span class="fc" id="L44">        appendCases(out, &quot;formation&quot;, study.formation());</span>
+<span class="fc" id="L45">        appendCases(out, &quot;test&quot;, study.test());</span>
+<span class="fc" id="L46">        out.object(&quot;negativeControl&quot;, writer -&gt; appendCase(writer, study.negativeControl()));</span>
+<span class="fc" id="L47">        return out.endObject().toString() + &quot;\n&quot;;</span>
+    }
+
+    private static void appendCases(JsonWriter out, String name,
+            List&lt;ModPowDagRediscoveryStudy.CaseResult&gt; cases) {
+<span class="fc" id="L52">        out.array(name, writer -&gt; cases.forEach(result -&gt;</span>
+<span class="fc" id="L53">            writer.objectValue(item -&gt; appendCase(item, result))));</span>
+<span class="fc" id="L54">    }</span>
+
+    private static void appendCase(JsonWriter out,
+            ModPowDagRediscoveryStudy.CaseResult result) {
+<span class="fc" id="L58">        out.property(&quot;id&quot;, result.id())</span>
+<span class="fc" id="L59">            .property(&quot;negativeControl&quot;, result.negativeControl())</span>
+<span class="fc" id="L60">            .property(&quot;outcome&quot;, result.outcome().name())</span>
+<span class="fc" id="L61">            .property(&quot;completeBoundedRelation&quot;, result.completeBoundedRelation())</span>
+<span class="fc" id="L62">            .property(&quot;reachedStates&quot;, result.reachedStates())</span>
+<span class="fc" id="L63">            .property(&quot;generatedSuccessors&quot;, result.generatedSuccessors())</span>
+<span class="fc" id="L64">            .property(&quot;totalSearchWork&quot;, result.totalSearchWork())</span>
+<span class="fc" id="L65">            .property(&quot;verificationWork&quot;, result.verificationWork())</span>
+<span class="fc" id="L66">            .property(&quot;originalTreeCost&quot;, result.originalCost().tree())</span>
+<span class="fc" id="L67">            .property(&quot;originalDagCost&quot;, result.originalCost().dag())</span>
+<span class="fc" id="L68">            .property(&quot;selectedTreeCost&quot;, result.selectedCost().tree())</span>
+<span class="fc" id="L69">            .property(&quot;selectedDagCost&quot;, result.selectedCost().dag())</span>
+<span class="fc" id="L70">            .property(&quot;dagImproved&quot;, result.dagImproved())</span>
+<span class="fc" id="L71">            .property(&quot;treeImproved&quot;, result.treeImproved())</span>
+<span class="fc" id="L72">            .property(&quot;expectedSharedResidue&quot;, result.expectedSharedResidue())</span>
+<span class="fc" id="L73">            .property(&quot;acceptedProofReceipts&quot;, result.acceptedProofReceipts())</span>
+<span class="fc" id="L74">            .property(&quot;sourceProgram&quot;, CODEC.encodeExpression(</span>
+<span class="fc" id="L75">                ModPowDagRediscoveryStudy.sourceProgram(result.negativeControl())))</span>
+<span class="fc" id="L76">            .property(&quot;selectedProgram&quot;, CODEC.encodeExpression(result.selectedProgram()));</span>
+<span class="fc" id="L77">    }</span>
+
+    private static String markdown(ModPowDagRediscoveryStudy.StudyResult study) {
+<span class="nc" id="L80">        StringBuilder out = new StringBuilder();</span>
+<span class="nc" id="L81">        out.append(&quot;# Target-blind modular exponent DAG rediscovery — v2\n\n&quot;);</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        out.append(&quot;Frozen verdict: **&quot;).append(study.green() ? &quot;GREEN&quot; : &quot;NOT GREEN&quot;).append(&quot;**.\n\n&quot;);</span>
+<span class="nc" id="L83">        out.append(&quot;| case | original TREE | selected TREE | original DAG | selected DAG | complete | reuse |\n&quot;);</span>
+<span class="nc" id="L84">        out.append(&quot;|---|---:|---:|---:|---:|---|---|\n&quot;);</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        for (var result : study.test()) {</span>
+<span class="nc" id="L86">            row(out, result);</span>
+<span class="nc" id="L87">        }</span>
+<span class="nc" id="L88">        row(out, study.negativeControl());</span>
+<span class="nc" id="L89">        out.append(&quot;\nTREE charges repeated calls repeatedly. DAG charges a structurally identical modpow call once.\n&quot;);</span>
+<span class="nc" id="L90">        out.append(&quot;The known factored target is not supplied to the search; selection happens after one-step bounded closure.\n&quot;);</span>
+<span class="nc" id="L91">        out.append(&quot;The JSON contains the actual canonical source/selected ASTs and normalized conditional proof assumptions.\n&quot;);</span>
+<span class="nc" id="L92">        out.append(&quot;Work counters are mechanical search/node-receipt units, not total computational cost; the JSON states the excluded work.\n&quot;);</span>
+<span class="nc" id="L93">        out.append(&quot;The four TEST entries share one AST and differ only in declared bit costs. This is not learned transfer or a new modular-exponent law.\n&quot;);</span>
+<span class="nc" id="L94">        out.append(&quot;Historical v1 result files remain unchanged.\n&quot;);</span>
+<span class="nc" id="L95">        return out.toString();</span>
+    }
+
+    private static void row(StringBuilder out, ModPowDagRediscoveryStudy.CaseResult result) {
+<span class="nc" id="L99">        out.append(&quot;| &quot;).append(result.id().replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot;\\n&quot;).replace(&quot;\r&quot;, &quot;\\r&quot;))</span>
+<span class="nc" id="L100">            .append(&quot; | &quot;).append(result.originalCost().tree())</span>
+<span class="nc" id="L101">            .append(&quot; | &quot;).append(result.selectedCost().tree())</span>
+<span class="nc" id="L102">            .append(&quot; | &quot;).append(result.originalCost().dag())</span>
+<span class="nc" id="L103">            .append(&quot; | &quot;).append(result.selectedCost().dag())</span>
+<span class="nc" id="L104">            .append(&quot; | &quot;).append(result.completeBoundedRelation())</span>
+<span class="nc" id="L105">            .append(&quot; | &quot;).append(result.expectedSharedResidue())</span>
+<span class="nc" id="L106">            .append(&quot; |\n&quot;);</span>
+<span class="nc" id="L107">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

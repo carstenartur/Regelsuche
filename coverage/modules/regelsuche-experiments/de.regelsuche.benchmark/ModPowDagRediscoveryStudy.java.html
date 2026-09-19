@@ -1,0 +1,614 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ModPowDagRediscoveryStudy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">ModPowDagRediscoveryStudy.java</span></div><h1>ModPowDagRediscoveryStudy.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.search.moves.MoveContext;
+import de.regelsuche.search.moves.MoveProvider;
+import de.regelsuche.search.moves.MoveSearch;
+import de.regelsuche.search.moves.MoveState;
+import de.regelsuche.search.moves.MoveVerifier;
+import de.regelsuche.search.moves.SearchMove;
+import de.regelsuche.search.moves.TypedMoveSearch;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationProvenance;
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Target-blind bounded study for issue #1024.
+ *
+ * &lt;p&gt;The search is told only a generic modular exponent composition law. It is
+ * not given the externally known Pocklington factored program as a goal. After
+ * the complete one-step closure is exhausted, the reached programs are scored
+ * twice: once as ordinary trees and once as computation DAGs that may reuse an
+ * identical modular-power call.&lt;/p&gt;
+ */
+public final class ModPowDagRediscoveryStudy {
+    public static final String REVISION = &quot;regelsuche.modpow-dag-rediscovery/v1&quot;;
+    public static final String RULE_LEFT = &quot;modpow-compose-product-left-first&quot;;
+    public static final String RULE_RIGHT = &quot;modpow-compose-product-right-first&quot;;
+<span class="fc" id="L46">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+<span class="fc" id="L47">    private static final Expr UNREACHABLE_GOAL =</span>
+<span class="fc" id="L48">        new FunctionExpr(&quot;unreachable_research_goal&quot;, List.of());</span>
+<span class="fc" id="L49">    static final List&lt;String&gt; DOMAIN_ASSUMPTIONS = List.of(</span>
+        &quot;a integer&quot;,
+        &quot;n integer&quot;,
+        &quot;n &gt; 0&quot;,
+        &quot;q integer&quot;,
+        &quot;q &gt;= 0&quot;,
+        &quot;e integer&quot;,
+        &quot;e &gt;= 0&quot;,
+        &quot;r integer&quot;,
+        &quot;r &gt;= 0&quot;
+    );
+
+    public record BitProfile(String id, int qBits, int eBits, int rBits) {
+<span class="fc" id="L62">        public BitProfile {</span>
+<span class="pc bpc" id="L63" title="5 of 10 branches missed.">            if (id == null || id.isBlank() || qBits &lt; 1 || eBits &lt; 1 || rBits &lt; 1) {</span>
+<span class="nc" id="L64">                throw new IllegalArgumentException(&quot;positive bit profile required&quot;);</span>
+            }
+<span class="fc" id="L66">        }</span>
+
+        public Map&lt;String, Integer&gt; variables() {
+<span class="fc" id="L69">            return Map.of(&quot;q&quot;, qBits, &quot;e&quot;, eBits, &quot;r&quot;, rBits);</span>
+        }
+    }
+
+    public record ProgramCost(long tree, long dag) {
+<span class="fc" id="L74">        public ProgramCost {</span>
+<span class="pc bpc" id="L75" title="2 of 4 branches missed.">            if (tree &lt; 0 || dag &lt; 0) {</span>
+<span class="nc" id="L76">                throw new IllegalArgumentException(&quot;nonnegative program cost required&quot;);</span>
+            }
+<span class="fc" id="L78">        }</span>
+    }
+
+<span class="fc" id="L81">    public record CaseResult(</span>
+            String id,
+            boolean negativeControl,
+            MoveSearch.Outcome outcome,
+            boolean completeBoundedRelation,
+            int reachedStates,
+            long generatedSuccessors,
+            long totalSearchWork,
+            long verificationWork,
+            ProgramCost originalCost,
+            ProgramCost selectedCost,
+            Expr selectedProgram,
+            boolean expectedSharedResidue,
+            long acceptedProofReceipts) {
+
+        public boolean dagImproved() {
+<span class="fc bfc" id="L97" title="All 2 branches covered.">            return selectedCost.dag() &lt; originalCost.dag();</span>
+        }
+
+        public boolean treeImproved() {
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            return selectedCost.tree() &lt; originalCost.tree();</span>
+        }
+    }
+
+    public record StudyResult(
+            List&lt;CaseResult&gt; formation,
+            List&lt;CaseResult&gt; test,
+            CaseResult negativeControl,
+            boolean green) {
+<span class="fc" id="L110">        public StudyResult {</span>
+<span class="fc" id="L111">            formation = List.copyOf(formation);</span>
+<span class="fc" id="L112">            test = List.copyOf(test);</span>
+<span class="fc" id="L113">            Objects.requireNonNull(negativeControl, &quot;negativeControl&quot;);</span>
+<span class="fc" id="L114">        }</span>
+    }
+
+<span class="fc" id="L117">    public static final List&lt;BitProfile&gt; FORMATION = List.of(</span>
+        new BitProfile(&quot;TRAIN_SMALL&quot;, 5, 3, 3),
+        new BitProfile(&quot;TRAIN_SKEW&quot;, 21, 8, 8)
+    );
+
+    /** Exponent bit profiles frozen in #1024 before implementation. */
+<span class="fc" id="L123">    public static final List&lt;BitProfile&gt; TEST = List.of(</span>
+        new BitProfile(&quot;C31&quot;, 16, 15, 15),
+        new BitProfile(&quot;C61&quot;, 31, 30, 30),
+        new BitProfile(&quot;C93&quot;, 47, 46, 46),
+        new BitProfile(&quot;C123&quot;, 62, 61, 61)
+    );
+
+    private ModPowDagRediscoveryStudy() {
+    }
+
+    public static StudyResult run() {
+<span class="fc" id="L134">        var formation = FORMATION.stream().map(profile -&gt; runCase(profile, false)).toList();</span>
+<span class="fc" id="L135">        var test = TEST.stream().map(profile -&gt; runCase(profile, false)).toList();</span>
+<span class="fc" id="L136">        var negative = runCase(new BitProfile(&quot;NEGATIVE_NO_SHARED_E&quot;, 47, 46, 46), true);</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        boolean green = test.stream().allMatch(ModPowDagRediscoveryStudy::greenPositive)</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">            &amp;&amp; negative.completeBoundedRelation()</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">            &amp;&amp; negative.outcome() == MoveSearch.Outcome.BOUNDED_EXHAUSTED</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">            &amp;&amp; !negative.dagImproved()</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">            &amp;&amp; !negative.treeImproved();</span>
+<span class="fc" id="L142">        return new StudyResult(formation, test, negative, green);</span>
+    }
+
+    public static CaseResult runCase(BitProfile profile, boolean negativeControl) {
+<span class="fc" id="L146">        Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="fc" id="L147">        Expr source = sourceProgram(negativeControl);</span>
+<span class="fc" id="L148">        var provider = compositionProvider();</span>
+<span class="fc" id="L149">        var result = new TypedMoveSearch().search(new TypedMoveSearch.Problem(</span>
+            source,
+            new TypedMoveSearch.Context(
+                UNREACHABLE_GOAL,
+                DOMAIN_ASSUMPTIONS,
+                MoveContext.Phase.FROZEN_EVALUATION),
+<span class="fc" id="L155">            List.of(provider),</span>
+            TypedMoveSearch.Policy.INVENTORY_ORDER,
+<span class="fc" id="L157">            compositionVerifier(),</span>
+<span class="nc" id="L158">            state -&gt; 0.0,</span>
+            MoveSearch.Mode.COMPLETE_BOUNDED_REFERENCE,
+            MoveSearch.Scheduling.STAGED,
+            new MoveSearch.Budget(1, 1, 0, 32, 10_000)
+        ));
+
+<span class="fc" id="L164">        ProgramCost original = cost(source, profile);</span>
+<span class="fc" id="L165">        var selected = result.reachedStates().stream()</span>
+<span class="fc" id="L166">            .map(TypedMoveSearch.State::expression)</span>
+<span class="fc" id="L167">            .min(Comparator</span>
+<span class="fc" id="L168">                .comparingLong((Expr expression) -&gt; cost(expression, profile).dag())</span>
+<span class="fc" id="L169">                .thenComparingLong(expression -&gt; cost(expression, profile).tree())</span>
+<span class="fc" id="L170">                .thenComparing(CODEC::encodeExpression))</span>
+<span class="fc" id="L171">            .orElseThrow();</span>
+<span class="fc" id="L172">        ProgramCost selectedCost = cost(selected, profile);</span>
+<span class="fc" id="L173">        long acceptedReceipts = result.encodedResult().events().stream()</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            .filter(event -&gt; event.decision() == MoveSearch.Decision.ENQUEUED)</span>
+<span class="fc" id="L175">            .filter(event -&gt; event.verificationResult().orElseThrow().accepted())</span>
+<span class="fc" id="L176">            .count();</span>
+
+<span class="fc" id="L178">        return new CaseResult(</span>
+<span class="fc" id="L179">            profile.id(),</span>
+            negativeControl,
+<span class="fc" id="L181">            result.outcome(),</span>
+<span class="fc" id="L182">            result.completeBoundedRelation(),</span>
+<span class="fc" id="L183">            result.reachedStates().size(),</span>
+<span class="fc" id="L184">            result.metrics().generatedSuccessors(),</span>
+<span class="fc" id="L185">            result.metrics().totalWork(),</span>
+<span class="fc" id="L186">            result.metrics().verificationWork(),</span>
+            original,
+            selectedCost,
+            selected,
+<span class="fc" id="L190">            hasSharedEResidue(selected),</span>
+            acceptedReceipts
+        );
+    }
+
+    static boolean greenPositive(CaseResult result) {
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        return result.outcome() == MoveSearch.Outcome.BOUNDED_EXHAUSTED</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            &amp;&amp; result.completeBoundedRelation()</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">            &amp;&amp; result.reachedStates() == 3</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            &amp;&amp; result.generatedSuccessors() == 2</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">            &amp;&amp; result.acceptedProofReceipts() == 2</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">            &amp;&amp; result.dagImproved()</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">            &amp;&amp; !result.treeImproved()</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">            &amp;&amp; result.expectedSharedResidue();</span>
+    }
+
+    static Expr sourceProgram(boolean negativeControl) {
+<span class="fc" id="L207">        Expr a = new VariableExpr(&quot;a&quot;);</span>
+<span class="fc" id="L208">        Expr q = new VariableExpr(&quot;q&quot;);</span>
+<span class="fc" id="L209">        Expr e = new VariableExpr(&quot;e&quot;);</span>
+<span class="fc" id="L210">        Expr n = new VariableExpr(&quot;n&quot;);</span>
+<span class="fc" id="L211">        Expr product = new BinaryExpr(q, BinaryOperator.MUL, e);</span>
+<span class="fc" id="L212">        Expr full = modPow(a, product, n);</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        Expr retained = modPow(a, new VariableExpr(negativeControl ? &quot;r&quot; : &quot;e&quot;), n);</span>
+<span class="fc" id="L214">        return new FunctionExpr(&quot;program&quot;, List.of(full, retained));</span>
+    }
+
+    static ProgramCost cost(Expr program, BitProfile profile) {
+<span class="fc" id="L218">        long tree = treeCost(program, profile.variables());</span>
+<span class="fc" id="L219">        long dag = dagCost(program, profile.variables(), new HashSet&lt;&gt;());</span>
+<span class="fc" id="L220">        return new ProgramCost(tree, dag);</span>
+    }
+
+    private static long treeCost(Expr expression, Map&lt;String, Integer&gt; bits) {
+<span class="fc bfc" id="L224" title="All 4 branches covered.">        long own = expression instanceof FunctionExpr function &amp;&amp; isModPow(function)</span>
+<span class="fc" id="L225">            ? exponentWork(function.arguments().get(1), bits)</span>
+<span class="fc" id="L226">            : 0;</span>
+<span class="fc" id="L227">        long children = 0;</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L229">            children = add(treeCost(binary.left(), bits), treeCost(binary.right(), bits));</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">            for (Expr argument : function.arguments()) {</span>
+<span class="fc" id="L232">                children = add(children, treeCost(argument, bits));</span>
+<span class="fc" id="L233">            }</span>
+        }
+<span class="fc" id="L235">        return add(own, children);</span>
+    }
+
+    private static long dagCost(Expr expression, Map&lt;String, Integer&gt; bits, Set&lt;Expr&gt; computedModPows) {
+<span class="fc bfc" id="L239" title="All 4 branches covered.">        if (expression instanceof FunctionExpr function &amp;&amp; isModPow(function)) {</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            if (!computedModPows.add(function)) {</span>
+<span class="fc" id="L241">                return 0;</span>
+            }
+<span class="fc" id="L243">            long total = exponentWork(function.arguments().get(1), bits);</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">            for (Expr argument : function.arguments()) {</span>
+<span class="fc" id="L245">                total = add(total, dagCost(argument, bits, computedModPows));</span>
+<span class="fc" id="L246">            }</span>
+<span class="fc" id="L247">            return total;</span>
+        }
+<span class="fc" id="L249">        long total = 0;</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L251">            total = add(dagCost(binary.left(), bits, computedModPows),</span>
+<span class="fc" id="L252">                dagCost(binary.right(), bits, computedModPows));</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">            for (Expr argument : function.arguments()) {</span>
+<span class="fc" id="L255">                total = add(total, dagCost(argument, bits, computedModPows));</span>
+<span class="fc" id="L256">            }</span>
+        }
+<span class="fc" id="L258">        return total;</span>
+    }
+
+    private static long exponentWork(Expr exponent, Map&lt;String, Integer&gt; bits) {
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        if (exponent instanceof VariableExpr variable) {</span>
+<span class="fc" id="L263">            Integer value = bits.get(variable.name());</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">            if (value == null) {</span>
+<span class="nc" id="L265">                throw new IllegalArgumentException(&quot;missing exponent bit length for &quot; + variable.name());</span>
+            }
+<span class="fc" id="L267">            return value;</span>
+        }
+<span class="pc bpc" id="L269" title="2 of 4 branches missed.">        if (exponent instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.MUL) {</span>
+<span class="fc" id="L270">            return add(exponentWork(binary.left(), bits), exponentWork(binary.right(), bits));</span>
+        }
+<span class="nc" id="L272">        throw new IllegalArgumentException(&quot;unsupported exponent work expression: &quot; + exponent);</span>
+    }
+
+    private static long add(long left, long right) {
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">        if (left &gt; Long.MAX_VALUE - right) {</span>
+<span class="nc" id="L277">            return Long.MAX_VALUE;</span>
+        }
+<span class="fc" id="L279">        return left + right;</span>
+    }
+
+    static boolean hasSharedEResidue(Expr program) {
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        if (!(program instanceof FunctionExpr root)</span>
+<span class="pc bpc" id="L284" title="2 of 4 branches missed.">                || !root.name().equals(&quot;program&quot;) || root.arguments().size() != 2) {</span>
+<span class="nc" id="L285">            return false;</span>
+        }
+<span class="fc" id="L287">        Expr retained = root.arguments().get(1);</span>
+<span class="pc bpc" id="L288" title="2 of 4 branches missed.">        if (!(retained instanceof FunctionExpr retainedPow) || !isModPow(retainedPow)</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">                || !(retainedPow.arguments().get(1) instanceof VariableExpr exponent)</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">                || !exponent.name().equals(&quot;e&quot;)) {</span>
+<span class="fc" id="L291">            return false;</span>
+        }
+<span class="fc" id="L293">        Expr first = root.arguments().get(0);</span>
+<span class="pc bpc" id="L294" title="2 of 4 branches missed.">        if (!(first instanceof FunctionExpr outer) || !isModPow(outer)</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">                || !(outer.arguments().get(1) instanceof VariableExpr outerExponent)</span>
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">                || !outerExponent.name().equals(&quot;q&quot;)) {</span>
+<span class="nc" id="L297">            return false;</span>
+        }
+<span class="fc" id="L299">        return outer.arguments().get(0).equals(retained);</span>
+    }
+
+<span class="fc" id="L302">    private record Generated(String rule, Expr target) {</span>
+    }
+
+    private static TypedMoveSearch.TypedProvider compositionProvider() {
+<span class="fc" id="L306">        var descriptor = new MoveProvider.Descriptor(</span>
+            &quot;research-modpow-composition&quot;,
+            &quot;modpow-composition&quot;,
+            SearchMove.SourceKind.HYPOTHESIS,
+            SearchMove.ProofStrength.VERIFIED,
+<span class="fc" id="L311">            proofAssumptions(),</span>
+            SearchMove.ValueEvidence.UNKNOWN,
+            REVISION
+        );
+<span class="fc" id="L315">        return new TypedMoveSearch.TypedProvider() {</span>
+            @Override
+            public Descriptor descriptor() {
+<span class="fc" id="L318">                return descriptor;</span>
+            }
+
+            @Override
+            public Batch candidates(MoveState state, MoveContext context) {
+<span class="fc" id="L323">                Expr source = CODEC.decodeExpression(state.expression());</span>
+<span class="fc" id="L324">                List&lt;Generated&gt; generated = compositions(source);</span>
+<span class="fc" id="L325">                TransformationWorkMetrics work = TransformationWorkMetrics.flatEngine(generated.size());</span>
+<span class="fc" id="L326">                var moves = new ArrayList&lt;SearchMove&gt;(generated.size());</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">                for (Generated candidate : generated) {</span>
+<span class="fc" id="L328">                    String target = CODEC.encodeExpression(candidate.target());</span>
+<span class="fc" id="L329">                    String key = applicationKey(state.expression(), target, candidate.rule());</span>
+<span class="fc" id="L330">                    var transformation = new Transformation(</span>
+<span class="fc" id="L331">                        candidate.rule(),</span>
+                        target,
+                        RewriteKind.NORMALIZE,
+                        true,
+                        0,
+                        true,
+                        key,
+<span class="fc" id="L338">                        proofAssumptions(),</span>
+                        &quot;research-1024&quot;,
+                        &quot;PROJECT&quot;
+                    );
+<span class="fc" id="L342">                    moves.add(SearchMove.from(transformation, descriptor, work.totalWorkUnits()));</span>
+<span class="fc" id="L343">                }</span>
+<span class="fc" id="L344">                return new Batch(moves, work, true);</span>
+            }
+        };
+    }
+
+    private static TypedMoveSearch.Verifier compositionVerifier() {
+<span class="fc" id="L350">        return (source, move, context) -&gt; {</span>
+            Expr target;
+            try {
+<span class="fc" id="L353">                target = CODEC.decodeExpression(move.transformation().transformedExpression());</span>
+<span class="nc" id="L354">            } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L355">                return new MoveVerifier.Verification(false, 1, List.of(), &quot;MODPOW_TARGET_DECODE_REJECTED&quot;);</span>
+<span class="fc" id="L356">            }</span>
+<span class="fc" id="L357">            String encodedSource = CODEC.encodeExpression(source.expression());</span>
+<span class="fc" id="L358">            String encodedTarget = CODEC.encodeExpression(target);</span>
+<span class="fc" id="L359">            String rule = move.transformation().rule();</span>
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">            boolean provenance = move.transformation().provenance()</span>
+                    instanceof TransformationProvenance.PrimitiveRewriteSequence
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">                &amp;&amp; move.transformation().primitiveStepCount() == 1</span>
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">                &amp;&amp; move.transformation().primitiveRuleIds().equals(List.of(rule));</span>
+<span class="fc" id="L364">            boolean bound = move.transformation().applicationKey()</span>
+<span class="fc" id="L365">                .equals(applicationKey(encodedSource, encodedTarget, rule));</span>
+<span class="fc" id="L366">            int proofInstances = compositionDifferenceCount(source.expression(), target, rule);</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">            boolean domain = domainContractSatisfied(source.expression(), context.initialAssumptions())</span>
+<span class="pc bpc" id="L368" title="1 of 2 branches missed.">                &amp;&amp; domainContractSatisfied(target, context.initialAssumptions());</span>
+<span class="fc" id="L369">            long work = add(nodeCount(source.expression()), nodeCount(target));</span>
+<span class="fc" id="L370">            var step = move.transformation();</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">            boolean retainedContract = step.assumptions().equals(proofAssumptions())</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">                &amp;&amp; context.initialAssumptions().containsAll(proofAssumptions())</span>
+<span class="fc bfc" id="L373" title="All 2 branches covered.">                &amp;&amp; step.kind() == RewriteKind.NORMALIZE</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">                &amp;&amp; step.mayIncreaseComplexity()</span>
+<span class="fc bfc" id="L375" title="All 2 branches covered.">                &amp;&amp; step.estimatedCostDelta() == 0</span>
+<span class="fc bfc" id="L376" title="All 2 branches covered.">                &amp;&amp; step.equivalencePreservingByConstruction()</span>
+<span class="fc bfc" id="L377" title="All 2 branches covered.">                &amp;&amp; step.packId().equals(&quot;research-1024&quot;)</span>
+<span class="fc bfc" id="L378" title="All 2 branches covered.">                &amp;&amp; step.license().equals(&quot;PROJECT&quot;);</span>
+<span class="pc bpc" id="L379" title="3 of 10 branches missed.">            boolean accepted = provenance &amp;&amp; bound &amp;&amp; domain &amp;&amp; retainedContract &amp;&amp; proofInstances == 1;</span>
+<span class="fc" id="L380">            return new MoveVerifier.Verification(</span>
+                accepted,
+                work,
+<span class="fc bfc" id="L383" title="All 2 branches covered.">                accepted ? List.of(&quot;modpow-product-law/v2:&quot; + proofDigest(encodedSource, encodedTarget, rule))</span>
+<span class="fc" id="L384">                    : List.of(),</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">                accepted ? &quot;MODPOW_PRODUCT_COMPOSITION_VERIFIED&quot; : &quot;MODPOW_PRODUCT_COMPOSITION_REJECTED&quot;</span>
+            );
+        };
+    }
+
+    /**
+     * Research proof-domain guard for BigInteger-style modular exponentiation.
+     * Every exponent must be a nonnegative integer expression, every modulus a
+     * positive integer variable, and variable bases must be declared integral.
+     * The proof receipt therefore cannot be granted from AST shape alone.
+     */
+    static boolean domainContractSatisfied(Expr expression, List&lt;String&gt; assumptions) {
+<span class="fc" id="L397">        Set&lt;String&gt; contract = Set.copyOf(assumptions);</span>
+<span class="fc" id="L398">        return domainContractSatisfied(expression, contract);</span>
+    }
+
+    private static boolean domainContractSatisfied(Expr expression, Set&lt;String&gt; assumptions) {
+<span class="fc bfc" id="L402" title="All 2 branches covered.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">            if (isModPow(function)) {</span>
+<span class="fc" id="L404">                Expr base = function.arguments().get(0);</span>
+<span class="fc" id="L405">                Expr exponent = function.arguments().get(1);</span>
+<span class="fc" id="L406">                Expr modulus = function.arguments().get(2);</span>
+<span class="fc bfc" id="L407" title="All 2 branches covered.">                if (!integerValued(base, assumptions)</span>
+<span class="fc bfc" id="L408" title="All 2 branches covered.">                        || !nonnegativeInteger(exponent, assumptions)</span>
+<span class="fc bfc" id="L409" title="All 2 branches covered.">                        || !positiveIntegerModulus(modulus, assumptions)) {</span>
+<span class="fc" id="L410">                    return false;</span>
+                }
+            }
+<span class="fc bfc" id="L413" title="All 2 branches covered.">            for (Expr argument : function.arguments()) {</span>
+<span class="fc bfc" id="L414" title="All 2 branches covered.">                if (!domainContractSatisfied(argument, assumptions)) {</span>
+<span class="fc" id="L415">                    return false;</span>
+                }
+<span class="fc" id="L417">            }</span>
+<span class="fc bfc" id="L418" title="All 2 branches covered.">        } else if (expression instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L419" title="1 of 2 branches missed.">            return domainContractSatisfied(binary.left(), assumptions)</span>
+<span class="pc bpc" id="L420" title="1 of 2 branches missed.">                &amp;&amp; domainContractSatisfied(binary.right(), assumptions);</span>
+        }
+<span class="fc" id="L422">        return true;</span>
+    }
+
+    private static boolean integerValued(Expr expression, Set&lt;String&gt; assumptions) {
+<span class="fc bfc" id="L426" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L427">            return assumptions.contains(variable.name() + &quot; integer&quot;);</span>
+        }
+<span class="pc bpc" id="L429" title="2 of 4 branches missed.">        if (expression instanceof FunctionExpr function &amp;&amp; isModPow(function)) {</span>
+<span class="fc" id="L430">            return domainContractSatisfied(function, assumptions);</span>
+        }
+<span class="nc bnc" id="L432" title="All 4 branches missed.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.MUL) {</span>
+<span class="nc bnc" id="L433" title="All 2 branches missed.">            return integerValued(binary.left(), assumptions)</span>
+<span class="nc bnc" id="L434" title="All 2 branches missed.">                &amp;&amp; integerValued(binary.right(), assumptions);</span>
+        }
+<span class="nc" id="L436">        return false;</span>
+    }
+
+    private static boolean nonnegativeInteger(Expr expression, Set&lt;String&gt; assumptions) {
+<span class="fc bfc" id="L440" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc bfc" id="L441" title="All 2 branches covered.">            return assumptions.contains(variable.name() + &quot; integer&quot;)</span>
+<span class="fc bfc" id="L442" title="All 2 branches covered.">                &amp;&amp; assumptions.contains(variable.name() + &quot; &gt;= 0&quot;);</span>
+        }
+<span class="pc bpc" id="L444" title="2 of 4 branches missed.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.MUL) {</span>
+<span class="fc bfc" id="L445" title="All 2 branches covered.">            return nonnegativeInteger(binary.left(), assumptions)</span>
+<span class="fc bfc" id="L446" title="All 2 branches covered.">                &amp;&amp; nonnegativeInteger(binary.right(), assumptions);</span>
+        }
+<span class="nc" id="L448">        return false;</span>
+    }
+
+    private static boolean positiveIntegerModulus(Expr expression, Set&lt;String&gt; assumptions) {
+<span class="fc" id="L452">        return expression instanceof VariableExpr variable</span>
+<span class="fc bfc" id="L453" title="All 2 branches covered.">            &amp;&amp; assumptions.contains(variable.name() + &quot; integer&quot;)</span>
+<span class="pc bpc" id="L454" title="1 of 4 branches missed.">            &amp;&amp; assumptions.contains(variable.name() + &quot; &gt; 0&quot;);</span>
+    }
+
+    /**
+     * Independent shape audit: exactly one subtree must instantiate
+     * (a^(u*v) mod n) = ((a^u mod n)^v mod n), in the selected factor order.
+     */
+    static int compositionDifferenceCount(Expr source, Expr target, String rule) {
+<span class="fc bfc" id="L462" title="All 2 branches covered.">        if (source.equals(target)) {</span>
+<span class="fc" id="L463">            return 0;</span>
+        }
+<span class="fc bfc" id="L465" title="All 2 branches covered.">        if (directComposition(source, target, rule)) {</span>
+<span class="fc" id="L466">            return 1;</span>
+        }
+<span class="pc bpc" id="L468" title="3 of 4 branches missed.">        if (source instanceof BinaryExpr left &amp;&amp; target instanceof BinaryExpr right</span>
+<span class="nc bnc" id="L469" title="All 2 branches missed.">                &amp;&amp; left.operator() == right.operator()) {</span>
+<span class="nc" id="L470">            int a = compositionDifferenceCount(left.left(), right.left(), rule);</span>
+<span class="nc" id="L471">            int b = compositionDifferenceCount(left.right(), right.right(), rule);</span>
+<span class="nc" id="L472">            return combineDifferenceCounts(a, b);</span>
+        }
+<span class="pc bpc" id="L474" title="1 of 4 branches missed.">        if (source instanceof FunctionExpr left &amp;&amp; target instanceof FunctionExpr right</span>
+<span class="pc bpc" id="L475" title="1 of 2 branches missed.">                &amp;&amp; left.name().equals(right.name())</span>
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">                &amp;&amp; left.arguments().size() == right.arguments().size()) {</span>
+<span class="fc" id="L477">            int total = 0;</span>
+<span class="fc bfc" id="L478" title="All 2 branches covered.">            for (int i = 0; i &lt; left.arguments().size(); i++) {</span>
+<span class="fc" id="L479">                int current = compositionDifferenceCount(left.arguments().get(i), right.arguments().get(i), rule);</span>
+<span class="fc bfc" id="L480" title="All 2 branches covered.">                if (current &lt; 0) {</span>
+<span class="fc" id="L481">                    return -1;</span>
+                }
+<span class="fc" id="L483">                total += current;</span>
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">                if (total &gt; 1) {</span>
+<span class="nc" id="L485">                    return -1;</span>
+                }
+            }
+<span class="fc" id="L488">            return total;</span>
+        }
+<span class="fc" id="L490">        return -1;</span>
+    }
+
+    private static int combineDifferenceCounts(int left, int right) {
+<span class="nc bnc" id="L494" title="All 6 branches missed.">        if (left &lt; 0 || right &lt; 0 || left + right &gt; 1) {</span>
+<span class="nc" id="L495">            return -1;</span>
+        }
+<span class="nc" id="L497">        return left + right;</span>
+    }
+
+    private static boolean directComposition(Expr source, Expr target, String rule) {
+<span class="fc bfc" id="L501" title="All 4 branches covered.">        if (!(source instanceof FunctionExpr before) || !isModPow(before)</span>
+<span class="pc bpc" id="L502" title="1 of 2 branches missed.">                || !(before.arguments().get(1) instanceof BinaryExpr product)</span>
+<span class="pc bpc" id="L503" title="2 of 4 branches missed.">                || product.operator() != BinaryOperator.MUL</span>
+<span class="pc bpc" id="L504" title="1 of 2 branches missed.">                || !(target instanceof FunctionExpr after) || !isModPow(after)) {</span>
+<span class="fc" id="L505">            return false;</span>
+        }
+<span class="pc bpc" id="L507" title="1 of 2 branches missed.">        if (!before.arguments().get(2).equals(after.arguments().get(2))) {</span>
+<span class="nc" id="L508">            return false;</span>
+        }
+        Expr innerExponent;
+        Expr outerExponent;
+<span class="fc bfc" id="L512" title="All 2 branches covered.">        if (RULE_LEFT.equals(rule)) {</span>
+<span class="fc" id="L513">            innerExponent = product.left();</span>
+<span class="fc" id="L514">            outerExponent = product.right();</span>
+<span class="pc bpc" id="L515" title="1 of 2 branches missed.">        } else if (RULE_RIGHT.equals(rule)) {</span>
+<span class="fc" id="L516">            innerExponent = product.right();</span>
+<span class="fc" id="L517">            outerExponent = product.left();</span>
+        } else {
+<span class="nc" id="L519">            return false;</span>
+        }
+<span class="fc" id="L521">        Expr expectedInner = modPow(before.arguments().get(0), innerExponent, before.arguments().get(2));</span>
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">        return after.arguments().get(0).equals(expectedInner)</span>
+<span class="fc bfc" id="L523" title="All 2 branches covered.">            &amp;&amp; after.arguments().get(1).equals(outerExponent);</span>
+    }
+
+    private static List&lt;Generated&gt; compositions(Expr expression) {
+<span class="fc" id="L527">        var raw = new ArrayList&lt;Generated&gt;();</span>
+<span class="fc" id="L528">        collectCompositions(expression, raw);</span>
+<span class="fc" id="L529">        var unique = new LinkedHashMap&lt;String, Generated&gt;();</span>
+<span class="fc bfc" id="L530" title="All 2 branches covered.">        for (Generated candidate : raw) {</span>
+<span class="fc" id="L531">            String identity = candidate.rule() + &quot;\n&quot; + CODEC.encodeExpression(candidate.target());</span>
+<span class="fc" id="L532">            unique.putIfAbsent(identity, candidate);</span>
+<span class="fc" id="L533">        }</span>
+<span class="fc" id="L534">        return List.copyOf(unique.values());</span>
+    }
+
+    private static void collectCompositions(Expr expression, List&lt;Generated&gt; output) {
+<span class="fc bfc" id="L538" title="All 4 branches covered.">        if (expression instanceof FunctionExpr function &amp;&amp; isModPow(function)</span>
+<span class="fc bfc" id="L539" title="All 2 branches covered.">                &amp;&amp; function.arguments().get(1) instanceof BinaryExpr product</span>
+<span class="pc bpc" id="L540" title="1 of 2 branches missed.">                &amp;&amp; product.operator() == BinaryOperator.MUL) {</span>
+<span class="fc" id="L541">            Expr base = function.arguments().get(0);</span>
+<span class="fc" id="L542">            Expr modulus = function.arguments().get(2);</span>
+<span class="fc" id="L543">            output.add(new Generated(RULE_LEFT,</span>
+<span class="fc" id="L544">                modPow(modPow(base, product.left(), modulus), product.right(), modulus)));</span>
+<span class="fc" id="L545">            output.add(new Generated(RULE_RIGHT,</span>
+<span class="fc" id="L546">                modPow(modPow(base, product.right(), modulus), product.left(), modulus)));</span>
+        }
+<span class="fc bfc" id="L548" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L549" title="1 of 2 branches missed.">            for (Generated child : compositions(binary.left())) {</span>
+<span class="nc" id="L550">                output.add(new Generated(child.rule(),</span>
+<span class="nc" id="L551">                    new BinaryExpr(child.target(), binary.operator(), binary.right())));</span>
+<span class="nc" id="L552">            }</span>
+<span class="pc bpc" id="L553" title="1 of 2 branches missed.">            for (Generated child : compositions(binary.right())) {</span>
+<span class="nc" id="L554">                output.add(new Generated(child.rule(),</span>
+<span class="nc" id="L555">                    new BinaryExpr(binary.left(), binary.operator(), child.target())));</span>
+<span class="pc" id="L556">            }</span>
+<span class="fc bfc" id="L557" title="All 2 branches covered.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="fc bfc" id="L558" title="All 2 branches covered.">            for (int index = 0; index &lt; function.arguments().size(); index++) {</span>
+<span class="fc" id="L559">                Expr argument = function.arguments().get(index);</span>
+<span class="fc bfc" id="L560" title="All 2 branches covered.">                for (Generated child : compositions(argument)) {</span>
+<span class="fc" id="L561">                    var arguments = new ArrayList&lt;&gt;(function.arguments());</span>
+<span class="fc" id="L562">                    arguments.set(index, child.target());</span>
+<span class="fc" id="L563">                    output.add(new Generated(child.rule(), new FunctionExpr(function.name(), arguments)));</span>
+<span class="fc" id="L564">                }</span>
+            }
+        }
+<span class="fc" id="L567">    }</span>
+
+    private static Expr modPow(Expr base, Expr exponent, Expr modulus) {
+<span class="fc" id="L570">        return new FunctionExpr(&quot;modpow&quot;, List.of(base, exponent, modulus));</span>
+    }
+
+    private static boolean isModPow(FunctionExpr function) {
+<span class="pc bpc" id="L574" title="1 of 4 branches missed.">        return function.name().equals(&quot;modpow&quot;) &amp;&amp; function.arguments().size() == 3;</span>
+    }
+
+    private static long nodeCount(Expr expression) {
+<span class="fc bfc" id="L578" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L579">            return add(1, add(nodeCount(binary.left()), nodeCount(binary.right())));</span>
+        }
+<span class="fc bfc" id="L581" title="All 2 branches covered.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L582">            long total = 1;</span>
+<span class="fc bfc" id="L583" title="All 2 branches covered.">            for (Expr argument : function.arguments()) {</span>
+<span class="fc" id="L584">                total = add(total, nodeCount(argument));</span>
+<span class="fc" id="L585">            }</span>
+<span class="fc" id="L586">            return total;</span>
+        }
+<span class="fc" id="L588">        return 1;</span>
+    }
+
+    private static String applicationKey(String source, String target, String rule) {
+<span class="fc" id="L592">        return &quot;modpow-study/v2:&quot; + proofDigest(source, target, rule);</span>
+    }
+
+    static List&lt;String&gt; proofAssumptions() {
+<span class="fc" id="L596">        return AssumptionSignature.ofExpressions(DOMAIN_ASSUMPTIONS).normalizedAssumptions();</span>
+    }
+
+    private static String proofDigest(String source, String target, String rule) {
+<span class="fc" id="L600">        return sha256(&quot;modpow-conditional-proof/v2\n&quot; + source + &quot;\n&quot; + target + &quot;\n&quot; + rule</span>
+<span class="fc" id="L601">            + &quot;\n&quot; + String.join(&quot;\n&quot;, proofAssumptions()));</span>
+    }
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L606">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L607">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L608">            return java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L609">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L610">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,80 @@
+{
+  "schema": "regelsuche.modpow-dag-rediscovery-plan/v1",
+  "issue": 1024,
+  "frozenBeforeImplementation": true,
+  "dependencyHead": "99ae8e780072c9667043bc70fd170a0e17e7c7b3",
+  "question": "Can target-blind bounded typed search select a proof-equivalent modular-power composition because a DAG cost recognizes reusable work?",
+  "sourceProgram": "program(modpow(a,q*e,n),modpow(a,e,n))",
+  "negativeControl": "program(modpow(a,q*e,n),modpow(a,r,n))",
+  "search": {
+    "targetLeakage": "unreachable sentinel only; known factored form is not passed to search, ranking, or stopping",
+    "mode": "COMPLETE_BOUNDED_REFERENCE",
+    "maxSearchDepth": 1,
+    "maxPrimitiveSteps": 1,
+    "transformations": [
+      "modpow(a,u*v,n) -> modpow(modpow(a,u,n),v,n)",
+      "modpow(a,u*v,n) -> modpow(modpow(a,v,n),u,n)"
+    ],
+    "providerRelation": "finite structural traversal, both factor orders, complete=true",
+    "verification": "independent shape audit of one legal modular-exponent composition plus source/target/application binding"
+  },
+  "cost": {
+    "tree": "sum exponent-bit work over every modpow occurrence",
+    "dag": "sum exponent-bit work over structurally unique modpow calls",
+    "exponentProductWork": "saturated sum of declared factor bit lengths",
+    "jmhTimingUsedForFit": false,
+    "lowerIsBetter": true
+  },
+  "formationCases": [
+    {
+      "id": "TRAIN_SMALL",
+      "qBits": 5,
+      "eBits": 3
+    },
+    {
+      "id": "TRAIN_SKEW",
+      "qBits": 21,
+      "eBits": 8
+    }
+  ],
+  "testCases": [
+    {
+      "id": "C31",
+      "qBits": 16,
+      "eBits": 15
+    },
+    {
+      "id": "C61",
+      "qBits": 31,
+      "eBits": 30
+    },
+    {
+      "id": "C93",
+      "qBits": 47,
+      "eBits": 46
+    },
+    {
+      "id": "C123",
+      "qBits": 62,
+      "eBits": 61
+    }
+  ],
+  "success": {
+    "green": [
+      "all TEST cases finish with complete bounded relation",
+      "DAG-selected state is strictly cheaper than original",
+      "selected state contains the reusable modpow(a,e,n) as the base of the q exponentiation",
+      "TREE_COST gives no artificial strict advantage for the same composition",
+      "negative control gives no strict DAG advantage",
+      "all accepted moves carry independent verification receipts"
+    ],
+    "yellow": "correct but only partially satisfies GREEN",
+    "red": "incorrect proof, target leakage, post-TEST tuning, or no reusable-work advantage"
+  },
+  "boundaries": [
+    "This does not claim discovery of the modular exponent law.",
+    "The exact relation N-1=q*e is considered known preprocessing for the structured candidate.",
+    "This is a research-only arithmetic-program micro-domain, not a production optimizer.",
+    "External Primachsenraum JMH results are post-hoc evaluation only."
+  ]
+}
