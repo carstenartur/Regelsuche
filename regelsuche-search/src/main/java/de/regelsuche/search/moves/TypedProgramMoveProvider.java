@@ -39,7 +39,12 @@ public final class TypedProgramMoveProvider implements TypedMoveSearch.TypedProv
         if (!context.carries(descriptor.requiredAssumptions(), state)) {
             return new Batch(List.of(), TransformationWorkMetrics.flatEngine(0), true);
         }
-        var batch = program.transformMeasured(CODEC.decodeExpression(state.expression()));
+        CompiledAstRewriteProgram.Batch batch;
+        try {
+            batch = program.transformMeasured(CODEC.decodeExpression(state.expression()));
+        } catch (CompiledAstRewriteProgram.CandidateLimitExceeded limit) {
+            return new Batch(List.of(), limit.workMetrics(), false);
+        }
         long work = batch.workMetrics().totalWorkUnits();
         return new Batch(batch.candidates().stream().map(candidate -> move(candidate, work)).toList(),
             batch.workMetrics(), false);
@@ -74,9 +79,14 @@ public final class TypedProgramMoveProvider implements TypedMoveSearch.TypedProv
                     || !available.containsAll(descriptor.requiredAssumptions())) {
                 return new MoveVerifier.Verification(false, 1, List.of(), "TYPED_PROGRAM_ASSUMPTIONS_MISSING");
             }
-            var regenerated = program.transformMeasured(source.expression());
-            long work = Math.addExact(regenerated.workMetrics().totalWorkUnits(),
-                regenerated.workMetrics().candidateWork().canonicalWorkUnits());
+            CompiledAstRewriteProgram.Batch regenerated;
+            try {
+                regenerated = program.transformMeasured(source.expression());
+            } catch (CompiledAstRewriteProgram.CandidateLimitExceeded limit) {
+                return new MoveVerifier.Verification(false, verificationWork(limit.workMetrics()), List.of(),
+                    "TYPED_PROGRAM_CANDIDATE_LIMIT");
+            }
+            long work = verificationWork(regenerated.workMetrics());
             work = Math.addExact(work, regenerated.candidates().size());
             boolean accepted = regenerated.candidates().stream()
                 .map(candidate -> move(candidate, proposal.generationCost())).anyMatch(proposal::equals);
@@ -84,5 +94,9 @@ public final class TypedProgramMoveProvider implements TypedMoveSearch.TypedProv
                 accepted ? List.of("typed-program-replay:" + proposal.transformation().applicationKey()) : List.of(),
                 accepted ? "TYPED_PROGRAM_REPLAYED" : "TYPED_PROGRAM_REPLAY_REJECTED");
         };
+    }
+
+    private static long verificationWork(TransformationWorkMetrics work) {
+        return Math.addExact(work.totalWorkUnits(), work.candidateWork().canonicalWorkUnits());
     }
 }

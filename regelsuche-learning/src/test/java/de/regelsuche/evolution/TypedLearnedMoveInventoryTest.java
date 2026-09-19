@@ -7,13 +7,38 @@ import de.regelsuche.ast.*;
 import de.regelsuche.inventory.HistoryMovePolicy;
 import de.regelsuche.inventory.RuleHistoryMemory;
 import de.regelsuche.search.moves.*;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
 import de.regelsuche.symbol.SymbolId;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class TypedLearnedMoveInventoryTest {
+    @Test void primitiveReplayUsesTheSameProviderInventoryAndCandidateCapAsGeneration() {
+        var formation = new TraceRewriteStrategyLearner().learn(TraceStrategyTransferExample.inventory(),
+            TraceStrategyTransferExample.trainingInputs(), TraceStrategyTransferExample.limits());
+        var inventory = formation.typedMoves();
+        var arguments = new ArrayList<Expr>();
+        for (int i = 0; i < 40; i++) {
+            var x = new VariableExpr("x" + i);
+            arguments.add(mul(x, x));
+        }
+        arguments.add(add(new VariableExpr("z"), new NumberExpr(0)));
+        Expr source = new FunctionExpr("f", arguments);
+        var provider = inventory.primitiveProviders().stream()
+            .filter(candidate -> candidate.descriptor().id().endsWith("_add-zero")).findFirst().orElseThrow();
+        var codec = new CompiledAstReplayCodec();
+        var batch = provider.candidates(MoveState.root(codec.encodeExpression(source)), MoveContext.frozen("unused"));
+        assertEquals(1, batch.moves().size());
+        var move = batch.moves().getFirst();
+        var context = TypedMoveSearch.Context.frozen(codec.decodeExpression(move.transformation().transformedExpression()));
+        assertTrue(inventory.verifier().verify(new TypedMoveSearch.State(source, 0, 0, "", List.of(), Set.of(), 0),
+            move, context).accepted(), "earlier rules filling another provider's cap must not reject this generated move");
+    }
+
     @Test void actualLearnedTracesDispatchOverTypedStatesAndFeedBackIntoHistory() {
         var formation = new TraceRewriteStrategyLearner().learn(TraceStrategyTransferExample.inventory(),
             TraceStrategyTransferExample.trainingInputs(), TraceStrategyTransferExample.limits());

@@ -4,7 +4,6 @@ import de.regelsuche.inventory.RuleUtilityEvidence;
 import de.regelsuche.search.moves.*;
 import de.regelsuche.search.program.CompiledLinearRewriteEngine;
 import de.regelsuche.search.program.RewriteProgram;
-import de.regelsuche.transform.AstRewriteTransport;
 import de.regelsuche.transform.PreparedAstRewriteTransformationEngine;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -17,7 +16,7 @@ public final class TypedLearnedMoveInventory {
     private final TraceRewriteStrategyLearner.FrozenStrategy formation;
     private final List<MoveProvider> primitives;
     private final List<TypedProgramMoveProvider> learned;
-    private final TypedMoveSearch.Verifier primitiveVerifier;
+    private final Map<String, TypedMoveSearch.Verifier> primitiveVerifiers;
 
     TypedLearnedMoveInventory(TraceRewriteStrategyLearner.FrozenStrategy formation) {
         this.formation = formation;
@@ -29,17 +28,19 @@ public final class TypedLearnedMoveInventory {
         var rules = new EvolutionGenomeCompiler().compile(inventory).rules();
         var engines = new HashMap<String, PreparedAstRewriteTransformationEngine>();
         var providers = new ArrayList<MoveProvider>();
+        var verifiers = new HashMap<String, TypedMoveSearch.Verifier>();
         for (int i = 0; i < rules.size(); i++) {
             var rule = rules.get(i);
             var engine = new PreparedAstRewriteTransformationEngine(List.of(rule), bounds.maxAstGrowthPerStep(), bounds.maxCandidatesPerState());
             engines.put(inventory.rewrites().get(i).geneId(), engine);
+            var transport = engine.astTransport();
             providers.add(TypedMoveSearch.primitiveProvider(new MoveProvider.Descriptor(rule.id(), rule.id(),
                 SearchMove.SourceKind.PRIMITIVE, SearchMove.ProofStrength.REPLAYABLE, List.of(),
-                SearchMove.ValueEvidence.UNKNOWN, inventory.contentHash()), engine.astTransport()));
+                SearchMove.ValueEvidence.UNKNOWN, inventory.contentHash()), transport));
+            verifiers.put(rule.id(), TypedMoveSearch.primitiveReplay(transport));
         }
         primitives = List.copyOf(providers);
-        primitiveVerifier = TypedMoveSearch.primitiveReplay(new AstRewriteTransport(rules,
-            bounds.maxAstGrowthPerStep(), bounds.maxCandidatesPerState()));
+        primitiveVerifiers = Map.copyOf(verifiers);
         var programs = new TreeMap<String, TypedProgramMoveProvider>();
         for (var observation : formation.observations()) {
             if (observation.geneSequence().size() < 2 || observation.minimality().isEmpty()
@@ -64,8 +65,7 @@ public final class TypedLearnedMoveInventory {
         var programs = new HashMap<String, TypedMoveSearch.Verifier>();
         learned.forEach(provider -> programs.put(provider.descriptor().id(), provider.verifier()));
         return (source, move, context) -> {
-            if (move.sourceKind() == SearchMove.SourceKind.PRIMITIVE) return primitiveVerifier.verify(source, move, context);
-            var verifier = programs.get(move.ruleId());
+            var verifier = (move.sourceKind() == SearchMove.SourceKind.PRIMITIVE ? primitiveVerifiers : programs).get(move.ruleId());
             return verifier == null ? new MoveVerifier.Verification(false, 1, List.of(), "UNKNOWN_TYPED_PROGRAM")
                 : verifier.verify(source, move, context);
         };

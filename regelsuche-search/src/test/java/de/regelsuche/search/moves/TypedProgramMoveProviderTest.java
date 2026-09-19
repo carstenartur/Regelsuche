@@ -19,6 +19,32 @@ class TypedProgramMoveProviderTest {
         SearchMove.SourceKind.LEARNED, SearchMove.ProofStrength.REPLAYABLE, List.of(),
         SearchMove.ValueEvidence.UNKNOWN, "cleanup-v1");
 
+    @Test void candidateLimitRetainsGenerationAndReplayWorkInsteadOfAbortingTheSearch() {
+        Expr x = new VariableExpr("x");
+        Expr y = new VariableExpr("y");
+        Expr source = new FunctionExpr("f", List.of(new BinaryExpr(x, ADD, new NumberExpr(0)),
+            new BinaryExpr(y, ADD, new NumberExpr(0))));
+        Expr goal = new FunctionExpr("f", List.of(x, y));
+        var generous = repeatedZeroProgram(128);
+        var saved = CODEC.encode(generous.transformMeasured(source).candidates().getFirst());
+        var limited = new TypedProgramMoveProvider(DESCRIPTOR, repeatedZeroProgram(1));
+        var proposal = limited.proposal(CODEC.decode(saved));
+        var replay = assertDoesNotThrow(() -> limited.verifier().verify(
+            new TypedMoveSearch.State(source, 0, 0, "", List.of(), Set.of(), 0), proposal,
+            TypedMoveSearch.Context.frozen(goal)));
+        assertFalse(replay.accepted());
+        assertEquals("TYPED_PROGRAM_CANDIDATE_LIMIT", replay.reason());
+        assertTrue(replay.work() >= 4, "both emitted primitive candidates and their mechanical work must be charged");
+
+        var live = assertDoesNotThrow(() -> run(source, goal, limited, limited.verifier(), List.of(), 2, 10_000));
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE, live.outcome());
+        assertEquals(2, live.metrics().primitiveWork());
+        assertTrue(live.metrics().searchWork() > 0);
+        var restored = assertDoesNotThrow(() -> run(source, goal, proposals(proposal), limited.verifier(), List.of(), 2, 10_000));
+        assertFalse(restored.reached());
+        assertEquals(replay.work(), restored.metrics().verificationWork());
+    }
+
     @Test void compiledContinuationRetainsTypedIntermediateStatesAndPrimitiveDepth() {
         Expr goal = new FunctionExpr("f", List.of(VariableExpr.scoped(new SymbolId(new UUID(0, 55), 2)),
             NumberExpr.exact("-7/13"), new BinaryExpr(new VariableExpr("a"), MUL,
@@ -128,6 +154,15 @@ class TypedProgramMoveProviderTest {
                 new PreparedAstRewriteTransformationEngine(List.of(zero), 64, 128)),
             new RewriteProgram.Source(RewriteProgram.NodeMetadata.named("one-stage"),
                 new PreparedAstRewriteTransformationEngine(List.of(one), 64, 128)))), 128).compileAst();
+    }
+
+    private static CompiledAstRewriteProgram repeatedZeroProgram(int maximumCandidates) {
+        var a = PatternExpr.var("A");
+        var rule = new PatternRewriteRule("zero", PatternExpr.op(ADD, a, PatternExpr.num(0)), a);
+        var engine = new PreparedAstRewriteTransformationEngine(List.of(rule), 64, 128);
+        return new CompiledLinearRewriteEngine(new RewriteProgram.Sequence(RewriteProgram.NodeMetadata.named("two-zeros"), List.of(
+            new RewriteProgram.Source(RewriteProgram.NodeMetadata.named("first-zero"), engine),
+            new RewriteProgram.Source(RewriteProgram.NodeMetadata.named("second-zero"), engine))), maximumCandidates).compileAst();
     }
 
     private static TypedMoveSearch.TypedProvider proposals(SearchMove move) {
