@@ -24,7 +24,7 @@ See [the retained study outcome](jmh-precision-study-v2-outcome.md).
 ## Migration boundary
 
 `config/quality/jmh-regression-policy-more-warmup-v1.json` is the execution
-source for `:app:jmh`. Its `executionRevision` is
+source for `:app:jmh`. Forks, iteration counts and both durations come from that record. Its `executionRevision` is
 `regelsuche.jmh-latency-execution/more-warmup-v1`. The existing v2 threshold
 schema and v3 decision algorithm are reused in separately named policy
 instances; no new statistical decision algorithm is introduced.
@@ -40,7 +40,10 @@ No retries, filtering of unfavourable results or threshold relaxation is added.
 The publication task explicitly passes `jmh-baseline-more-warmup-v1.json`.
 Its older publication ceilings also stay unchanged; `baselineMeasurementPolicy`
 preserves their original measurement context. Publication continues to check
-both iteration counts and durations. The default standalone publication
+both iteration counts and durations. `verifyJmhRegression` depends on that publication
+check, so plain `check` also rejects duration drift. The byte-bound policies are
+LF-normalized in `.gitattributes`, including `core.autocrlf=true` checkouts.
+The default standalone publication
 verifier and the historical v2/v3 regression policy files are unchanged.
 
 Allocation profiling and SymPy use their existing, separate protocols.

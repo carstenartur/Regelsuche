@@ -142,7 +142,7 @@ def testJmhMoreWarmupPolicy = tasks.register('testJmhMoreWarmupPolicy', Exec) {
     workingDir qualityRepositoryRoot
     inputs.files(fileTree(qualityRepositoryRoot.dir('config/quality')) { include 'jmh-*.json' })
     inputs.files(['scripts/test-jmh-more-warmup-policy.py', 'scripts/verify-jmh-regression-v3.py',
-        'scripts/verify-jmh-benchmark.py', 'app/build.gradle', 'gradle/ci-verification.gradle',
+        'scripts/verify-jmh-benchmark.py', '.gitattributes', 'app/build.gradle', 'gradle/ci-verification.gradle',
         'gradle/quality-gates.gradle'].collect { path -> qualityRepositoryRoot.file(path) })
     outputs.upToDateWhen { false }
     doFirst {
@@ -154,7 +154,7 @@ def testJmhMoreWarmupPolicy = tasks.register('testJmhMoreWarmupPolicy', Exec) {
 def verifyJmhRegression = tasks.register('verifyJmhRegression', Exec) {
     group = 'verification'
     description = 'Fails on missing, undeclared, contract-drifted or materially slower JMH benchmarks under the v3 uncertainty-aware decision authority.'
-    dependsOn 'prepareVerificationEnvironment', ':app:jmh', testJmhRegressionVerifier, testJmhMoreWarmupPolicy
+    dependsOn 'prepareVerificationEnvironment', ':app:jmh', 'verifyJmhBenchmark', testJmhRegressionVerifier, testJmhMoreWarmupPolicy
     mustRunAfter ':app:jmh'
     workingDir qualityRepositoryRoot
     inputs.file qualityRepositoryRoot.file('config/quality/jmh-regression-policy-more-warmup-v1.json')

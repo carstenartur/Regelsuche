@@ -2,7 +2,7 @@
   "schema": "regelsuche.quality.jmh-regression-decision-policy/v3",
   "thresholdPolicyPath": "config/quality/jmh-regression-policy-more-warmup-v1.json",
   "thresholdPolicySchema": "regelsuche.quality.jmh-regression-policy/v2",
-  "thresholdPolicyGitBlobSha1": "27e7324b79ccfcd80f9c801f3b06791f34c88a16",
+  "thresholdPolicyGitBlobSha1": "188fe77d58c519fe0b5beeaf1cd22ce1c8b1916d",
   "decisionStatistic": "max(0, currentScore - currentScoreError)",
   "failureCondition": "decisionScore > maximumAllowedScore",
   "inconclusiveCondition": "currentScore > maximumAllowedScore && decisionScore <= maximumAllowedScore",

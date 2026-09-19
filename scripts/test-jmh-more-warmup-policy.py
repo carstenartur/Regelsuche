@@ -72,7 +72,8 @@ class MoreWarmupPolicyTest(unittest.TestCase):
             self.assertEqual(self.old[key], self.threshold[key])
         self.assertEqual(self.old["execution"], self.threshold["baselineExecution"])
         self.assertEqual(2, self.old["execution"]["warmupIterations"])
-        expected = {**self.old["execution"], "warmupIterations": 6}
+        expected = {**self.old["execution"], "warmupIterations": 6,
+                    "warmupTime": "1s", "measurementTime": "1s"}
         self.assertEqual(expected, self.threshold["execution"])
         self.assertEqual("regelsuche.jmh-latency-execution/more-warmup-v1",
                          self.threshold["executionRevision"])
@@ -149,6 +150,41 @@ class MoreWarmupPolicyTest(unittest.TestCase):
             changed[0][field] = value
             with self.subTest(field=field), self.assertRaises(SystemExit):
                 verifier.validate_results(changed, baseline)
+
+    def test_autocrlf_checkout_preserves_content_bound_policy_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            checkout = Path(directory)
+            def git(*args):
+                return subprocess.run(["git", "-C", str(checkout), *args],
+                                      check=True, capture_output=True, timeout=20)
+            git("init", "-q")
+            git("config", "core.autocrlf", "true")
+            (checkout / ".gitattributes").write_bytes((ROOT / ".gitattributes").read_bytes())
+            paths = [THRESHOLD, DECISION, BASELINE]
+            for path in paths:
+                target = checkout / path.relative_to(ROOT)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(path.read_bytes())
+            git("add", ".")
+            for path in paths:
+                (checkout / path.relative_to(ROOT)).unlink()
+            git("checkout-index", "-a", "-f")
+            for path in paths:
+                with self.subTest(policy=path.name):
+                    self.assertEqual(path.read_bytes(), (checkout / path.relative_to(ROOT)).read_bytes())
+
+    def test_duration_contract_matches_publication_and_execution(self):
+        execution = self.threshold["execution"]
+        publication = read(BASELINE)["measurementPolicy"]
+        self.assertEqual(publication["warmupTime"], execution.get("warmupTime"))
+        self.assertEqual(publication["measurementTime"], execution.get("measurementTime"))
+        app = (ROOT / "app/build.gradle").read_text()
+        self.assertIn("timeOnIteration = latencyExecution.measurementTime", app)
+        self.assertIn("warmup = latencyExecution.warmupTime", app)
+        quality = (ROOT / "gradle/quality-gates.gradle").read_text()
+        start = quality.index("def verifyJmhRegression =")
+        block = quality[start:quality.index("def ", start + 4)]
+        self.assertIn("'verifyJmhBenchmark'", block)
 
     def test_gradle_uses_one_execution_source_and_current_verifiers(self):
         app = (ROOT / "app/build.gradle").read_text()

@@ -75,7 +75,9 @@ POLICIES = {
 # decision fields. Keep the old instances available for historical collection.
 for current, historical, metadata in (
     ("jmh-regression-policy-more-warmup-v1.json", "jmh-regression-policy-v2.json",
-     {"executionRevision": str, "baselineExecution": {**EXECUTION_POLICY, "jdkMajor": int, "jmhVersion": str}}),
+     {"executionRevision": str, "baselineExecution": {**EXECUTION_POLICY, "jdkMajor": int, "jmhVersion": str},
+      "execution": {**EXECUTION_POLICY, "jdkMajor": int, "jmhVersion": str,
+                    "warmupTime": str, "measurementTime": str}}),
     ("jmh-regression-decision-policy-more-warmup-v1.json", "jmh-regression-decision-policy-v3.json", {}),
     ("jmh-baseline-more-warmup-v1.json", "jmh-baseline.json",
      {"executionRevision": str,

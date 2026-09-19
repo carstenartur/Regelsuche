@@ -89,8 +89,8 @@ jmh {
     fork = latencyExecution.forks
     warmupIterations = latencyExecution.warmupIterations
     iterations = latencyExecution.measurementIterations
-    timeOnIteration = '1s'
-    warmup = '1s'
+    timeOnIteration = latencyExecution.measurementTime
+    warmup = latencyExecution.warmupTime
     failOnError = true
 }
 

@@ -43,3 +43,13 @@ collection tests, 4 v1 preregistration tests, 7 v2 policy/metric tests and
 invocation limits; it is not claimed to pass. Local Gradle could not download
 its distribution because network name resolution is unavailable. Java 25
 compilation, real measurements and full CI remain remote acceptance work.
+
+## Review follow-up
+
+Copilot found missing LF-normalization and duplicated execution durations.
+New tests first reproduced CRLF byte drift for all three new policies and
+missing duration ownership (13 tests, five failing assertions). All three
+policies now declare LF checkout normalization; durations belong to the
+current execution record and drive Gradle. Regression verification depends on
+the existing publication verifier, so `check` also validates actual durations.
+No historical file or ceiling changes. Full current-head CI remains required.
