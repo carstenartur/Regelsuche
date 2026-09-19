@@ -7,9 +7,11 @@ they do not establish broad superiority over other systems.
 
 ## Integration and issue decisions
 
-#1013 updates Hibernate and is merged. #1038 contains the unchanged, individually
-green heads of #1035, #1036 and #1037 and qualifies their combined tree against
-current main. It introduces no further feature code or threshold changes.
+#1013 updates Hibernate and is merged. #1038 combines #1035, #1036 and #1037
+against current main. Concurrent review subsequently added #1035's canonical
+corpus binding through `329e0c0d`; combined head `be11752a` includes that exact
+correction and requires fresh full CI. The earlier green source runs do not
+qualify this corrected tree. The frozen 3/4 result remains unchanged.
 
 | Issue | Decision / actual remaining work |
 | --- | --- |
