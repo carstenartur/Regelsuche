@@ -32,7 +32,7 @@ public class ParameterRelationMiner {
                 return new RelationResult(replacements, descriptions);
             }
         }
-        return RelationResult.empty();
+        return BivariateProductRelations.mine(placeholderValues);
     }
 
     private Relation findRelation(List<Integer> values, List<Integer> baseValues) {
@@ -122,7 +122,7 @@ public class ParameterRelationMiner {
         private final Map<String, NormalizedNode> replacements;
         private final List<String> descriptions;
 
-        private RelationResult(Map<String, NormalizedNode> replacements, List<String> descriptions) {
+        RelationResult(Map<String, NormalizedNode> replacements, List<String> descriptions) {
             this.replacements = Map.copyOf(replacements);
             this.descriptions = List.copyOf(descriptions);
         }
