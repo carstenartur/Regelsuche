@@ -113,6 +113,48 @@ Frozen model hash: `53c973ef4bba1e625461127400fa08790ee953281031560a9e664b4b48b9
 
 ## Final local qualification
 
+### Hosted review accounting clarification
+
+The complete hosted verification for `98ce451` passed, including the final
+`Checkout-local ciCheck` (run `35461345286`). Review identified an incorrect
+receipt on descriptor-assumption rejection: no engine executes on this path, so
+the typed compiled provider now records one requirement evaluation and one
+rejection, matching `EngineMoveProvider`. A regression first failed on the
+phantom engine/source invocations and then passed with the corrected receipt.
+
+The suggested removal of primitive formation work is not applied. This ledger
+uses the existing `LearnedSchedulingModel.trainingWorkComponents()` convention:
+mechanical candidate events and primitive mathematical applications are distinct
+dimensions, as defined by `TransformationWorkMetrics.totalWorkUnitsV2()` and
+`ExecutionWork`. The legacy learner exposes application receipts separately.
+Removing them would mix a mechanical-only discovery subtotal with the v2
+reference and search totals. Formation remains 2,734 units; this is not CPU time.
+
+The review overview also mentions incremental native scheduling. The fixed
+study uses STAGED scheduling; native scheduling requires native providers and
+inventory order, and does not support history ranking by design. This PR does
+not add an incremental typed-provider implementation or weaken that validation.
+
+After the review fix, a clean affected Maven reactor passed 2,495 tests in 431
+suites. Fresh Gradle search and learning runs passed 407 and 865 tests respectively,
+with no failures, errors or skipped tests. Independent Java 25 executions again
+matched all 132 retained artifact files byte for byte, including the unchanged
+2,734-unit formation total. Commands:
+
+```sh
+mvn -pl regelsuche-learning -am clean test
+./gradlew :regelsuche-search:clean :regelsuche-learning:clean \
+  :regelsuche-search:test :regelsuche-learning:test \
+  :regelsuche-learning:typedLearningWorkStudy \
+  --no-build-cache --no-configuration-cache -Dorg.gradle.vfs.watch=false
+```
+
+The Maven clean rebuild was necessary: an earlier incremental run retained a
+class from the rejected mechanical-only hypothesis. That run is not the final
+qualification. Full hosted CI must run again for the review-fix commit.
+
+### Original cost-choice qualification
+
 The complete affected Maven reactor passed 2,494 tests in 431 suites. A fresh
 Gradle learning build passed 865 tests in 169 suites and executed the study task.
 Both runs used Java 25, with zero failures, errors or skipped tests. Five new

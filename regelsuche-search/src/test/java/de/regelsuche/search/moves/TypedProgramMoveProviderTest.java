@@ -14,6 +14,17 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class TypedProgramMoveProviderTest {
+    @Test void missingDescriptorAssumptionsChargeOnlyRequirementRejection() {
+        var descriptor = new MoveProvider.Descriptor("gated", "gated", SearchMove.SourceKind.LEARNED,
+            SearchMove.ProofStrength.REPLAYABLE, List.of("x != 0"), SearchMove.ValueEvidence.UNKNOWN, "gated-v1");
+        var provider = new TypedProgramMoveProvider(descriptor, program(false));
+        var batch = provider.candidates(MoveState.root(CODEC.encodeExpression(source(new VariableExpr("x")))),
+            MoveContext.frozen("unused"));
+        assertTrue(batch.moves().isEmpty());
+        assertEquals(new TransformationWorkMetrics(0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0),
+            batch.work());
+    }
+
     private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();
     private static final MoveProvider.Descriptor DESCRIPTOR = new MoveProvider.Descriptor("learned-cleanup", "cleanup",
         SearchMove.SourceKind.LEARNED, SearchMove.ProofStrength.REPLAYABLE, List.of(),

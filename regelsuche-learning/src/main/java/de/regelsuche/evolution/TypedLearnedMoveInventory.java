@@ -71,7 +71,13 @@ public final class TypedLearnedMoveInventory {
         };
     }
 
-    /** Formation cost is separate from every subsequent search and policy-selection ledger. */
+    /**
+     * Formation cost is separate from subsequent search and policy-selection ledgers.
+     * Like LearnedSchedulingModel, this counts mechanical candidate events and
+     * primitive mathematical applications as distinct work dimensions (v2), not
+     * as a mechanical-only total. Source-candidate counts supply the legacy
+     * learner's supplementary primitive-application receipts.
+     */
     public long formationWork() {
         return java.util.stream.LongStream.of(formation.trainingSearchWorkUnits(), formation.trainingPrimitiveWorkUnits(),
             formation.trainingReplayWorkUnits(), formation.trainingReplayPrimitiveWorkUnits(), formation.trainingExactWorkUnits(),

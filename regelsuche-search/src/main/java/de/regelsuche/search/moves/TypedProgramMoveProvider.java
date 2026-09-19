@@ -37,7 +37,8 @@ public final class TypedProgramMoveProvider implements TypedMoveSearch.TypedProv
 
     @Override public Batch candidates(MoveState state, MoveContext context) {
         if (!context.carries(descriptor.requiredAssumptions(), state)) {
-            return new Batch(List.of(), TransformationWorkMetrics.flatEngine(0), true);
+            return new Batch(List.of(),
+                new TransformationWorkMetrics(0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0), true);
         }
         CompiledAstRewriteProgram.Batch batch;
         try {
