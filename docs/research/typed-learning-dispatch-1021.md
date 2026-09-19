@@ -28,6 +28,10 @@ is implied by an integration regression.
    runs. Prefer more solved training tasks, then less total charged work, then the
    declared profile order. Freeze the winning profile and all trial evidence.
    Record training cost separately; evaluation cannot update the frozen model.
+5. Make this usable from the existing trace learner through `FrozenStrategy.typedMoves()`:
+   compile admitted TRAIN traces to the existing program representation, retain
+   their utility evidence, and register typed primitive/learned providers with one
+   verifier dispatcher. Formation cost remains visible beside policy-training cost.
 
 ## Qualification
 

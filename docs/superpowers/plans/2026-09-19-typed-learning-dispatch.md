@@ -54,3 +54,14 @@ policy and feedback entry points; select a frozen policy from measured TRAIN run
 - [ ] Run complete affected Maven suites and matching Gradle suites.
 - [ ] Record actual results and remaining scientific boundaries in the spec.
 - [ ] Commit, obtain fresh branch review, fix material findings, push a reviewable PR.
+
+### Task 4: Connect the existing trace learner to the typed inventory
+
+- [ ] Add an integration test that trains the real `TraceRewriteStrategyLearner`,
+  compiles its admitted primitive traces, and solves a typed transfer using a
+  learned edge under a one-edge limit where the primitive control cannot succeed.
+- [ ] Preserve scoped symbols, exact rationals and nested function arguments in
+  that same transfer, with the training formation cost exposed separately.
+- [ ] Add `FrozenStrategy.typedMoves()` backed by `TypedLearnedMoveInventory` and
+  the existing compiler; no duplicate learner or execution algorithm.
+- [ ] Rerun affected module suites and obtain final review on the complete branch.
