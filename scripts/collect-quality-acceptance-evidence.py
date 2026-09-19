@@ -39,7 +39,10 @@ SECTIONS = {
     "jmh": {
         "policyFiles": ["config/quality/jmh-regression-policy-v2.json",
                         "config/quality/jmh-regression-decision-policy-v3.json",
-                        "config/quality/jmh-baseline.json"],
+                        "config/quality/jmh-baseline.json",
+                        "config/quality/jmh-regression-policy-more-warmup-v1.json",
+                        "config/quality/jmh-regression-decision-policy-more-warmup-v1.json",
+                        "config/quality/jmh-baseline-more-warmup-v1.json"],
         "supportFiles": ["scripts/verify-jmh-regression-v3.py",
                          "scripts/verify-jmh-benchmark.py"]},
     "history": {
