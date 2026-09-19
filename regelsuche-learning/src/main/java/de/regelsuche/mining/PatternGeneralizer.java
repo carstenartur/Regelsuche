@@ -63,6 +63,11 @@ public class PatternGeneralizer {
             : relationMiner.mine(state.values, state.expressionValues.keySet());
         // Require at least one kind of abstraction: integer relations or expression placeholders.
         boolean hasIntegerRelation = !relations.isEmpty();
+        if (!state.values.isEmpty() && !hasIntegerRelation) {
+            // A successful expression abstraction cannot rescue unsupported or
+            // namespace-refused numeric relations as raw N... parameters.
+            return Optional.empty();
+        }
         boolean hasExpressionPlaceholders = !state.expressionValues.isEmpty();
         if (!hasIntegerRelation && !hasExpressionPlaceholders) {
             return Optional.empty();
