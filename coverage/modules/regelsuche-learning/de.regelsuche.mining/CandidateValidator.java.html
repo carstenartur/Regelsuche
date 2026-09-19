@@ -45,13 +45,13 @@ public class CandidateValidator {
 <span class="fc" id="L45">    }</span>
 
     public boolean validate(GeneralizedPattern pattern) {
-<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        return proofStatus(pattern) != CandidateProofStatus.OBSERVED;</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        return proofStatus(pattern) != CandidateProofStatus.OBSERVED;</span>
     }
 
     public CandidateProofStatus proofStatus(GeneralizedPattern pattern) {
 <span class="fc" id="L52">        boolean validatedByFreshExamples = validateFreshExamples(pattern);</span>
-<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if (!validatedByFreshExamples) {</span>
-<span class="nc" id="L54">            return CandidateProofStatus.OBSERVED;</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (!validatedByFreshExamples) {</span>
+<span class="fc" id="L54">            return CandidateProofStatus.OBSERVED;</span>
         }
 <span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (equivalenceService.areEquivalent(pattern.leftPattern(), pattern.rightPattern())</span>
 <span class="pc bpc" id="L57" title="1 of 2 branches missed.">            &amp;&amp; equivalenceService.evidence(pattern.leftPattern(), pattern.rightPattern()).contains(&quot;SymPy&quot;)) {</span>
@@ -105,8 +105,8 @@ public class CandidateValidator {
             );
 <span class="fc" id="L106">            String left = ExpressionFormatter.format(patternInstantiator.instantiate(leftPattern, bindings));</span>
 <span class="fc" id="L107">            String right = ExpressionFormatter.format(patternInstantiator.instantiate(rightPattern, bindings));</span>
-<span class="pc bpc" id="L108" title="1 of 2 branches missed.">            if (!equivalenceService.areEquivalent(left, right)) {</span>
-<span class="nc" id="L109">                return false;</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            if (!equivalenceService.areEquivalent(left, right)) {</span>
+<span class="fc" id="L109">                return false;</span>
             }
 <span class="fc" id="L111">        }</span>
 <span class="fc" id="L112">        return true;</span>

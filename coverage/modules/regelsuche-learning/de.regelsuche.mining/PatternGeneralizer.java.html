@@ -60,7 +60,7 @@ public class PatternGeneralizer {
         // Mine integer relations if any integer placeholders exist.
 <span class="fc bfc" id="L61" title="All 2 branches covered.">        ParameterRelationMiner.RelationResult relations = state.values.isEmpty()</span>
 <span class="fc" id="L62">            ? ParameterRelationMiner.RelationResult.empty()</span>
-<span class="fc" id="L63">            : relationMiner.mine(state.values);</span>
+<span class="fc" id="L63">            : relationMiner.mine(state.values, state.expressionValues.keySet());</span>
         // Require at least one kind of abstraction: integer relations or expression placeholders.
 <span class="fc bfc" id="L65" title="All 2 branches covered.">        boolean hasIntegerRelation = !relations.isEmpty();</span>
 <span class="fc bfc" id="L66" title="All 2 branches covered.">        boolean hasExpressionPlaceholders = !state.expressionValues.isEmpty();</span>
@@ -137,9 +137,9 @@ public class PatternGeneralizer {
 <span class="fc" id="L137">            return pattern;</span>
         }
 <span class="fc" id="L139">        Map&lt;String, List&lt;Integer&gt;&gt; placeholderValues = new LinkedHashMap&lt;&gt;();</span>
-<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        for (Map.Entry&lt;String, List&lt;Integer&gt;&gt; entry : pattern.placeholderValues().entrySet()) {</span>
-<span class="nc" id="L141">            placeholderValues.put(renames.getOrDefault(entry.getKey(), entry.getKey()), entry.getValue());</span>
-<span class="nc" id="L142">        }</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;Integer&gt;&gt; entry : pattern.placeholderValues().entrySet()) {</span>
+<span class="fc" id="L141">            placeholderValues.put(renames.getOrDefault(entry.getKey(), entry.getKey()), entry.getValue());</span>
+<span class="fc" id="L142">        }</span>
 <span class="fc" id="L143">        Map&lt;String, List&lt;String&gt;&gt; expressionValues = new LinkedHashMap&lt;&gt;();</span>
 <span class="fc bfc" id="L144" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;String&gt;&gt; entry : pattern.expressionPlaceholderValues().entrySet()) {</span>
 <span class="fc" id="L145">            expressionValues.put(</span>
@@ -370,14 +370,14 @@ public class PatternGeneralizer {
 <span class="fc" id="L370">            return Optional.of(NormalizedNode.placeholder(placeholder));</span>
         }
         // Anti-unification over variables: different variable names become expression placeholders.
-<span class="pc bpc" id="L373" title="1 of 2 branches missed.">        boolean allVariables = nodes.stream().allMatch(node -&gt; node.kind() == NormalizedNode.Kind.VARIABLE);</span>
-<span class="pc bpc" id="L374" title="1 of 2 branches missed.">        if (allVariables) {</span>
-<span class="nc" id="L375">            boolean allSameName = nodes.stream().allMatch(n -&gt; first.name().equals(n.name()));</span>
-<span class="nc bnc" id="L376" title="All 2 branches missed.">            if (!allSameName) {</span>
-<span class="nc" id="L377">                String placeholder = state.nextExpressionPlaceholder();</span>
-<span class="nc" id="L378">                state.expressionValues.put(placeholder,</span>
-<span class="nc" id="L379">                    nodes.stream().map(NormalizedNode::canonicalString).distinct().toList());</span>
-<span class="nc" id="L380">                return Optional.of(NormalizedNode.placeholder(placeholder));</span>
+<span class="fc bfc" id="L373" title="All 2 branches covered.">        boolean allVariables = nodes.stream().allMatch(node -&gt; node.kind() == NormalizedNode.Kind.VARIABLE);</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">        if (allVariables) {</span>
+<span class="fc" id="L375">            boolean allSameName = nodes.stream().allMatch(n -&gt; first.name().equals(n.name()));</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">            if (!allSameName) {</span>
+<span class="fc" id="L377">                String placeholder = state.nextExpressionPlaceholder();</span>
+<span class="fc" id="L378">                state.expressionValues.put(placeholder,</span>
+<span class="fc" id="L379">                    nodes.stream().map(NormalizedNode::canonicalString).distinct().toList());</span>
+<span class="fc" id="L380">                return Optional.of(NormalizedNode.placeholder(placeholder));</span>
             }
         }
 <span class="fc" id="L383">        boolean sameShape = nodes.stream().allMatch(first::sameShape);</span>
@@ -403,11 +403,11 @@ public class PatternGeneralizer {
             }
 <span class="fc" id="L404">            generalizedChildren.add(child.orElseThrow());</span>
         }
-<span class="pc bpc" id="L406" title="3 of 6 branches missed.">        return switch (first.kind()) {</span>
+<span class="pc bpc" id="L406" title="2 of 6 branches missed.">        return switch (first.kind()) {</span>
 <span class="fc" id="L407">            case ADD -&gt; Optional.of(NormalizedNode.add(generalizedChildren));</span>
 <span class="fc" id="L408">            case MUL -&gt; Optional.of(NormalizedNode.multiply(generalizedChildren));</span>
 <span class="fc" id="L409">            case POW -&gt; Optional.of(NormalizedNode.pow(generalizedChildren.get(0), generalizedChildren.get(1)));</span>
-<span class="nc" id="L410">            case FUNCTION -&gt; Optional.of(NormalizedNode.function(first.name(), generalizedChildren));</span>
+<span class="fc" id="L410">            case FUNCTION -&gt; Optional.of(NormalizedNode.function(first.name(), generalizedChildren));</span>
 <span class="nc" id="L411">            case PLACEHOLDER -&gt; Optional.of(first);</span>
 <span class="nc" id="L412">            case NUMBER, VARIABLE -&gt; Optional.empty();</span>
         };

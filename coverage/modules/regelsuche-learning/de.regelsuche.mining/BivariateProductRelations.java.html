@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BivariateProductRelations.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">BivariateProductRelations.java</span></div><h1>BivariateProductRelations.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+import java.util.Set;
+
+/**
+ * Bounded hypothesis grammar: two observed varying parameters, their product,
+ * repeated bindings and constants. Agreement on TRAIN is not a proof of a
+ * generalized mathematical identity; the ordinary validation gates still apply.
+ */
+final class BivariateProductRelations {
+    private BivariateProductRelations() {}
+
+    static ParameterRelationMiner.RelationResult mine(Map&lt;String, List&lt;Integer&gt;&gt; observations) {
+<span class="fc" id="L20">        return mine(observations, Set.of());</span>
+    }
+
+    static ParameterRelationMiner.RelationResult mine(Map&lt;String, List&lt;Integer&gt;&gt; observations, Set&lt;String&gt; reserved) {
+<span class="fc" id="L24">        String secondName = availableParameter(reserved);</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (secondName == null) return ParameterRelationMiner.RelationResult.empty();</span>
+        // Canonical parameter names must not depend on Map.of iteration order.
+<span class="fc" id="L27">        var ordered = new TreeMap&lt;&gt;(observations);</span>
+<span class="fc" id="L28">        var entries = new ArrayList&lt;&gt;(ordered.entrySet());</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        for (int i = 0; i &lt; entries.size(); i++) {</span>
+<span class="fc" id="L30">            var first = entries.get(i).getValue();</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            if (!varying(first)) continue;</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">            for (int j = i + 1; j &lt; entries.size(); j++) {</span>
+<span class="fc" id="L33">                var second = entries.get(j).getValue();</span>
+<span class="fc bfc" id="L34" title="All 6 branches covered.">                if (!varying(second) || first.size() != second.size() || first.equals(second)) continue;</span>
+<span class="fc" id="L35">                var result = explain(ordered, first, second, secondName);</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">                if (!result.isEmpty()) return result;</span>
+            }
+        }
+<span class="fc" id="L39">        return ParameterRelationMiner.RelationResult.empty();</span>
+    }
+
+    private static String availableParameter(Set&lt;String&gt; reserved) {
+        // Validators and dynamic compilation bind single uppercase letters.
+        // Expression-level placeholders have already been allocated by the generalizer.
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (char name = 'B'; name &lt;= 'Z'; name++) {</span>
+<span class="fc" id="L46">            String candidate = String.valueOf(name);</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">            if (!reserved.contains(candidate)) return candidate;</span>
+        }
+<span class="fc" id="L49">        return null;</span>
+    }
+
+    private static boolean varying(List&lt;Integer&gt; values) {
+<span class="fc bfc" id="L53" title="All 6 branches covered.">        return values != null &amp;&amp; values.size() &gt;= 2 &amp;&amp; values.stream().noneMatch(Objects::isNull)</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            &amp;&amp; values.stream().distinct().count() &gt;= 2;</span>
+    }
+
+    private static ParameterRelationMiner.RelationResult explain(Map&lt;String, List&lt;Integer&gt;&gt; observations,
+            List&lt;Integer&gt; first, List&lt;Integer&gt; second, String secondName) {
+<span class="fc" id="L59">        var replacements = new LinkedHashMap&lt;String, NormalizedNode&gt;();</span>
+<span class="fc" id="L60">        var descriptions = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L61">        boolean productObserved = false;</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        for (var entry : observations.entrySet()) {</span>
+<span class="fc" id="L63">            var values = entry.getValue();</span>
+<span class="fc bfc" id="L64" title="All 6 branches covered.">            if (values == null || values.size() != first.size() || values.stream().anyMatch(Objects::isNull)) {</span>
+<span class="fc" id="L65">                return ParameterRelationMiner.RelationResult.empty();</span>
+            }
+            NormalizedNode node;
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            if (values.equals(first)) node = NormalizedNode.variable(&quot;A&quot;);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            else if (values.equals(second)) node = NormalizedNode.variable(secondName);</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            else if (values.stream().distinct().count() == 1) node = NormalizedNode.number(values.getFirst());</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            else if (productMatches(values, first, second)) {</span>
+<span class="fc" id="L72">                node = NormalizedNode.multiply(List.of(NormalizedNode.variable(&quot;A&quot;), NormalizedNode.variable(secondName)));</span>
+<span class="fc" id="L73">                productObserved = true;</span>
+<span class="fc" id="L74">            } else return ParameterRelationMiner.RelationResult.empty();</span>
+<span class="fc" id="L75">            replacements.put(entry.getKey(), node);</span>
+<span class="fc" id="L76">            descriptions.add(entry.getKey() + &quot; = &quot; + node.canonicalString());</span>
+<span class="fc" id="L77">        }</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        return productObserved ? new ParameterRelationMiner.RelationResult(replacements, descriptions)</span>
+<span class="fc" id="L79">            : ParameterRelationMiner.RelationResult.empty();</span>
+    }
+
+    private static boolean productMatches(List&lt;Integer&gt; values, List&lt;Integer&gt; first, List&lt;Integer&gt; second) {
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (int i = 0; i &lt; values.size(); i++) {</span>
+            // An int-by-int product fits in long; compare before any narrowing.
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            if (values.get(i).longValue() != (long) first.get(i) * second.get(i)) return false;</span>
+        }
+<span class="fc" id="L87">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

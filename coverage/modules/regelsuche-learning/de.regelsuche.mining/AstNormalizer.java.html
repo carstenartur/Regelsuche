@@ -32,11 +32,11 @@ import java.util.Map;
 <span class="fc bfc" id="L32" title="All 2 branches covered.">            String canonicalName = variables.computeIfAbsent(variableExpr.name(), key -&gt; variables.isEmpty() ? &quot;x&quot; : &quot;v&quot; + variables.size());</span>
 <span class="fc" id="L33">            return NormalizedNode.variable(canonicalName);</span>
         }
-<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr functionExpr) {</span>
-<span class="nc" id="L36">            List&lt;NormalizedNode&gt; args = functionExpr.arguments().stream()</span>
-<span class="nc" id="L37">                .map(arg -&gt; normalize(arg, variables))</span>
-<span class="nc" id="L38">                .toList();</span>
-<span class="nc" id="L39">            return NormalizedNode.function(functionExpr.name(), args);</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (expression instanceof FunctionExpr functionExpr) {</span>
+<span class="fc" id="L36">            List&lt;NormalizedNode&gt; args = functionExpr.arguments().stream()</span>
+<span class="fc" id="L37">                .map(arg -&gt; normalize(arg, variables))</span>
+<span class="fc" id="L38">                .toList();</span>
+<span class="fc" id="L39">            return NormalizedNode.function(functionExpr.name(), args);</span>
         }
 <span class="fc" id="L41">        BinaryExpr binaryExpr = (BinaryExpr) expression;</span>
 <span class="fc" id="L42">        NormalizedNode left = normalize(binaryExpr.left(), variables);</span>
