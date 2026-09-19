@@ -1,0 +1,131 @@
+name: Frozen transfer and AC integration QA
+
+on:
+  push:
+    branches: ['qa/1040-frozen-ac-integration']
+    paths: ['.github/workflows/frozen-ac-integration-qa.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      COMBINED: 3d6b48b1e1156a9325e5be4ce715c7aa87b2d593
+      FROZEN: e62a9ae5b3deda22fa00be56fda560237b059d22
+      AC: 3e4612ae02079d5556f51b09679a942fecf6f8c3
+      BASE: 1fcb0b00b9dccf61c953a520af69f475da81d5b7
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 3d6b48b1e1156a9325e5be4ce715c7aa87b2d593
+          fetch-depth: 0
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+      - name: Independently reconstruct the native parent merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/integration-evidence"
+          test "$(git rev-parse HEAD)" = "$COMBINED"
+          git merge-base --is-ancestor "$FROZEN" HEAD
+          git merge-base --is-ancestor "$AC" HEAD
+          git merge-base --is-ancestor "$BASE" HEAD
+          git merge-tree --write-tree "$FROZEN" "$AC" > "$RUNNER_TEMP/integration-evidence/native-merge.txt"
+          test "$(head -n 1 "$RUNNER_TEMP/integration-evidence/native-merge.txt")" = "$(git rev-parse HEAD^{tree})"
+          test "$(git rev-parse HEAD^{tree})" = 1fe96f062bc3731b3ed7c173afe4b34a664c4f97
+          git diff --exit-code "$FROZEN" HEAD -- \
+            docs/research/modpow-transfer-v1 \
+            app/src/main/java/de/regelsuche/benchmark/ModPowFrozenTransfer.java \
+            app/src/main/java/de/regelsuche/benchmark/ModPowTransferFiles.java \
+            app/src/test/java/de/regelsuche/benchmark/ModPowFrozenTransferTest.java \
+            scripts/modpow-transfer-v1.init.gradle
+          git diff --exit-code "$AC" HEAD -- \
+            app/src/test/java/de/regelsuche/benchmark/TypedModPowAcTransferIntegrationTest.java \
+            config/quality/complexity-hotspots.json \
+            docs/research/typed-output-ac-recognition-1026.md \
+            regelsuche-core/src/main/java/de/regelsuche/transform/EquivalenceAwarePatternMatcher.java \
+            regelsuche-core/src/test/java/de/regelsuche/transform/EquivalenceAwarePatternContinuationTest.java \
+            regelsuche-learning/src/main/java/de/regelsuche/mining/TypedOutputPattern.java
+          git diff --exit-code "$BASE" HEAD -- gradle/libs.versions.toml pom.xml
+          git rev-parse HEAD > "$RUNNER_TEMP/integration-evidence/source-commit.txt"
+          java -version 2> "$RUNNER_TEMP/integration-evidence/java-version.txt"
+      - name: Run all three application integration classes
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --no-configuration-cache :app:test \
+            --tests 'de.regelsuche.benchmark.ModPowFrozenTransferTest' \
+            --tests 'de.regelsuche.benchmark.TypedModPowTransferIntegrationTest' \
+            --tests 'de.regelsuche.benchmark.TypedModPowAcTransferIntegrationTest' \
+            --console=plain --stacktrace 2>&1 | tee "$RUNNER_TEMP/integration-evidence/app-tests.log"
+      - name: Run complete affected library module suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --no-configuration-cache \
+            :regelsuche-core:test :regelsuche-learning:test :regelsuche-experiments:test \
+            --console=plain --stacktrace 2>&1 | tee "$RUNNER_TEMP/integration-evidence/module-tests.log"
+      - name: Reproduce TRAIN in a separate invocation
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --no-configuration-cache -I scripts/modpow-transfer-v1.init.gradle \
+            :app:modPowFrozenTrain \
+            -PtransferTrain="$GITHUB_WORKSPACE/docs/research/modpow-transfer-v1/train.json" \
+            -PtransferModel="$RUNNER_TEMP/integration-evidence/model.json" \
+            --console=plain --stacktrace 2>&1 | tee "$RUNNER_TEMP/integration-evidence/train.log"
+          echo "e027a7d4b2b03b5b826eb6c5c7513c7f2241be32667e3813226efa77205f2068  $RUNNER_TEMP/integration-evidence/model.json" | sha256sum -c -
+      - name: Reproduce TEST using the externally frozen digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --no-configuration-cache -I scripts/modpow-transfer-v1.init.gradle \
+            :app:modPowFrozenTest \
+            -PtransferModel="$RUNNER_TEMP/integration-evidence/model.json" \
+            -PtransferSha=e027a7d4b2b03b5b826eb6c5c7513c7f2241be32667e3813226efa77205f2068 \
+            -PtransferTest="$GITHUB_WORKSPACE/docs/research/modpow-transfer-v1/test.json" \
+            -PtransferResult="$RUNNER_TEMP/integration-evidence/result.json" \
+            --console=plain --stacktrace 2>&1 | tee "$RUNNER_TEMP/integration-evidence/test-phase.log"
+          echo "1f79ed2ecac15a74c130cc56f6815f78c6751d61faa92c6bbfee880bc9912db1  $RUNNER_TEMP/integration-evidence/result.json" | sha256sum -c -
+          gzip -dc docs/research/modpow-transfer-v1/model.json.gz > "$RUNNER_TEMP/integration-evidence/retained-model.json"
+          gzip -dc docs/research/modpow-transfer-v1/result.json.gz > "$RUNNER_TEMP/integration-evidence/retained-result.json"
+          cmp "$RUNNER_TEMP/integration-evidence/model.json" "$RUNNER_TEMP/integration-evidence/retained-model.json"
+          cmp "$RUNNER_TEMP/integration-evidence/result.json" "$RUNNER_TEMP/integration-evidence/retained-result.json"
+          git diff --exit-code
+      - name: Retain actual JUnit XML and outcome totals
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, shutil, xml.etree.ElementTree as ET
+          dest = pathlib.Path(os.environ['RUNNER_TEMP']) / 'integration-evidence'
+          dest.mkdir(exist_ok=True)
+          scopes = {}
+          for module in ['app', 'regelsuche-core', 'regelsuche-learning', 'regelsuche-experiments']:
+              totals = dict(suites=0, tests=0, failures=0, errors=0, skipped=0)
+              for path in sorted(pathlib.Path(module, 'build/test-results/test').glob('TEST-*.xml')):
+                  root = ET.parse(path).getroot()
+                  totals['suites'] += 1
+                  for key in ['tests', 'failures', 'errors', 'skipped']:
+                      totals[key] += int(root.get(key, '0'))
+                  output = dest / 'junit' / module / path.name
+                  output.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copyfile(path, output)
+              scopes[module] = totals
+          (dest / 'junit-summary.json').write_text(json.dumps(scopes, indent=2) + '\n')
+          print(json.dumps(scopes, indent=2))
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: frozen-ac-integration-${{ github.run_id }}
+          path: ${{ runner.temp }}/integration-evidence
+          if-no-files-found: error
+          retention-days: 90
