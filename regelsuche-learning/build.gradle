@@ -58,6 +58,15 @@ tasks.register('strategyTransferDemo', JavaExec) {
     args layout.buildDirectory.dir('reports/strategy-transfer').get().asFile.absolutePath
 }
 
+tasks.register('typedLearningWorkStudy', JavaExec) {
+    group = 'verification'
+    description = 'Compares typed primitive and learned dispatch under equal budgets with TRAIN-only policy selection.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.evolution.TypedLearningWorkStudy'
+    args layout.buildDirectory.dir('reports/typed-learning-work').get().asFile.absolutePath
+}
+
 tasks.register('learnedRuleBaseline', JavaExec) {
     group = 'verification'
     description = 'Writes the frozen BASE/NAIVE/RANKED/EXPERT branching and work diagnosis.'
