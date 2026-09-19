@@ -67,7 +67,7 @@ public final class ExactExpressionFormatter {
         int precedence = operator.precedence();
         int leftAdjust = operator == BinaryOperator.POW ? 1 : 0;
         int rightAdjust = switch (operator) {
-            case POW -> -1;
+            case POW -> 0; // Preserve lower-precedence exponent grouping.
             case DIV, SUB -> 1;
             default -> 0;
         };
