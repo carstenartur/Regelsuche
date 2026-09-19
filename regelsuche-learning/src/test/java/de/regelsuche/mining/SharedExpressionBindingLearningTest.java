@@ -75,12 +75,30 @@ class SharedExpressionBindingLearningTest {
             "Every generated right-hand placeholder must remain bound on the left");
     }
 
+    @Test
+    void formationBindingsDoNotLeakBetweenCallsOnOneGeneralizer() {
+        var generalizer = new PatternGeneralizer();
+        generalizer.generalize(squareExamples());
+        var otherExamples = List.of(
+            observed("plain", "x*x", "x^2"),
+            observed("shift-seven", "(x+7)*(x+7)", "(x+7)^2"),
+            observed("shift-nine", "(x+9)*(x+9)", "(x+9)^2"));
+        var actual = generalizer.generalize(otherExamples).orElseThrow();
+        var isolated = new PatternGeneralizer().generalize(otherExamples).orElseThrow();
+        assertEquals(isolated.leftPattern(), actual.leftPattern());
+        assertEquals(isolated.rightPattern(), actual.rightPattern());
+        assertEquals(isolated.expressionPlaceholderValues(), actual.expressionPlaceholderValues());
+    }
+
     private static GeneralizedPattern squareContraction() {
-        return new PatternGeneralizer().generalize(List.of(
+        return new PatternGeneralizer().generalize(squareExamples()).orElseThrow();
+    }
+
+    private static List<SuccessfulTransformationPath> squareExamples() {
+        return List.of(
             observed("plain", "x*x", "x^2"),
             observed("shift-one", "(x+1)*(x+1)", "(x+1)^2"),
-            observed("shift-two", "(x+2)*(x+2)", "(x+2)^2")
-        )).orElseThrow();
+            observed("shift-two", "(x+2)*(x+2)", "(x+2)^2"));
     }
 
     private static SuccessfulTransformationPath observed(String id, String source, String target) {
