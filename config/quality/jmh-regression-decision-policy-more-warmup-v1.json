@@ -1,0 +1,12 @@
+{
+  "schema": "regelsuche.quality.jmh-regression-decision-policy/v3",
+  "thresholdPolicyPath": "config/quality/jmh-regression-policy-more-warmup-v1.json",
+  "thresholdPolicySchema": "regelsuche.quality.jmh-regression-policy/v2",
+  "thresholdPolicyGitBlobSha1": "27e7324b79ccfcd80f9c801f3b06791f34c88a16",
+  "decisionStatistic": "max(0, currentScore - currentScoreError)",
+  "failureCondition": "decisionScore > maximumAllowedScore",
+  "inconclusiveCondition": "currentScore > maximumAllowedScore && decisionScore <= maximumAllowedScore",
+  "boundaryPolicy": "inclusive-pass",
+  "lowPrecisionDiagnostic": "currentScoreError >= currentScore",
+  "claimBoundary": "Shared-runner average-time ratchet. The v3 decision authority preserves and content-binds the frozen v2 benchmark inventory and finite family thresholds. A material regression is established only when the JMH point estimate minus its reported scoreError remains above the configured maximum. A point estimate above the maximum whose uncertainty overlaps the boundary is INCONCLUSIVE and fails closed rather than being reported as a pass. Low-precision measurements below the maximum remain diagnostic and are not evidence of stable performance. The authority does not establish cross-hardware absolute performance or statistical significance beyond the recorded JMH uncertainty. This separately named instance binds the six-warmup execution policy. Decision semantics and every historical benchmark ceiling are unchanged; the original v3 instance remains available for two-warmup evidence."
+}

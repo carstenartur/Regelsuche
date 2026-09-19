@@ -78,14 +78,17 @@ tasks.named('check') {
 
 // ─── JMH micro-benchmarks ─────────────────────────────────────────────
 //
-// Source set `src/jmh/java`. Run with `./gradlew :app:jmh`. CI publishes the
-// JSON result via benchmark-action/github-action-benchmark to gh-pages.
+// Source set `src/jmh/java`. Run with `./gradlew :app:jmh`. The JSON result
+// is verified by the checkout-owned publication and regression tasks.
+// #981 adopts the measured six-warmup protocol without relaxing any ceiling.
+def latencyExecution = new groovy.json.JsonSlurper().parse(
+    rootProject.file('config/quality/jmh-regression-policy-more-warmup-v1.json')).execution
 jmh {
     resultFormat = 'JSON'
     resultsFile = layout.buildDirectory.file('reports/jmh/result.json')
-    fork = 1
-    warmupIterations = 2
-    iterations = 3
+    fork = latencyExecution.forks
+    warmupIterations = latencyExecution.warmupIterations
+    iterations = latencyExecution.measurementIterations
     timeOnIteration = '1s'
     warmup = '1s'
     failOnError = true
