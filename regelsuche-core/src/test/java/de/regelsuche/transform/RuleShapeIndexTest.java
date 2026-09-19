@@ -51,6 +51,15 @@ class RuleShapeIndexTest {
         }
         Expr scoped = VariableExpr.scoped(new SymbolId(new UUID(0, 7), 1));
         for (var rule : rules) if (rule.matches(scoped)) assertTrue(list(index.candidates(scoped)).contains(rule));
+        var number = new PatternRewriteRule("rational", PatternExpr.num("1/3"), a);
+        var numeric = new RuleShapeIndex(List.of(number));
+        assertEquals(List.of(number), list(numeric.candidates(NumberExpr.exact("2/6"))));
+        assertTrue(list(numeric.candidates(NumberExpr.exact("2/3"))).isEmpty());
+        for (var profile : List.of(RecognitionProfile.exact().withRecognitionRules(java.util.Set.of("external"), 0),
+                RecognitionProfile.exact().withRecognitionRules(java.util.Set.of(), 1))) {
+            var external = new PatternRewriteRule("external", PatternExpr.fn("f", a), a, profile);
+            assertEquals(List.of(external), list(new RuleShapeIndex(List.of(external)).candidates(new NumberExpr(7))));
+        }
     }
 
     @Test void indexedExecutionPreservesOrderedStringAndTypedResultsIncludingBounds() {
@@ -59,6 +68,9 @@ class RuleShapeIndexTest {
         rules.add(new PatternRewriteRule("custom", PatternExpr.fn("absent", a), a) {
             @Override public boolean matches(Expr expression) { return expression instanceof VariableExpr; }
             @Override public Expr apply(Expr expression) { return new NumberExpr(7); }
+            @Override public List<de.regelsuche.assumption.Assumption> assumptions(Expr expression) {
+                return List.of(de.regelsuche.assumption.Assumption.nonZero("x"));
+            }
         });
         rules.add(new PatternRewriteRule("ac", PatternExpr.op(ADD, a, PatternExpr.num(0)), a, RecognitionProfile.arithmeticAc()));
         for (int cap : List.of(1, 3, 80)) {
@@ -72,7 +84,17 @@ class RuleShapeIndexTest {
             Expr scoped = new FunctionExpr("f", List.of(new BinaryExpr(VariableExpr.scoped(new SymbolId(new UUID(0, 8), 1)), ADD, NumberExpr.exact("0"))));
             var steps = indexed.astTransport().generate(scoped);
             assertEquals(scan.astTransport().generate(scoped), steps);
-            for (var step : steps) assertEquals(step.target(), scan.astTransport().replay(scoped, List.of(step)));
+            for (var step : steps) {
+                assertEquals(step.target(), scan.astTransport().replay(scoped, List.of(step)));
+                assertEquals(step.target(), indexed.astTransport().replay(scoped, List.of(step)));
+            }
+            var conditional = indexed.astTransport().generate(new VariableExpr("x")).stream()
+                .filter(step -> step.rule().equals("custom")).findFirst().orElseThrow();
+            var forged = new AstRewriteTransport.Step(conditional.source(), conditional.target(), conditional.rule(),
+                conditional.kind(), conditional.mayIncreaseComplexity(), conditional.estimatedCostDelta(),
+                conditional.equivalencePreservingByConstruction(), List.of(), conditional.packId(), conditional.license());
+            assertThrows(IllegalArgumentException.class,
+                () -> indexed.astTransport().replay(conditional.source(), List.of(forged)));
         }
     }
 
