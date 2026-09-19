@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.Set;
 
 /**
  * Bounded hypothesis grammar: two observed varying parameters, their product,
@@ -16,6 +17,12 @@ final class BivariateProductRelations {
     private BivariateProductRelations() {}
 
     static ParameterRelationMiner.RelationResult mine(Map<String, List<Integer>> observations) {
+        return mine(observations, Set.of());
+    }
+
+    static ParameterRelationMiner.RelationResult mine(Map<String, List<Integer>> observations, Set<String> reserved) {
+        String secondName = availableParameter(reserved);
+        if (secondName == null) return ParameterRelationMiner.RelationResult.empty();
         // Canonical parameter names must not depend on Map.of iteration order.
         var ordered = new TreeMap<>(observations);
         var entries = new ArrayList<>(ordered.entrySet());
@@ -25,11 +32,21 @@ final class BivariateProductRelations {
             for (int j = i + 1; j < entries.size(); j++) {
                 var second = entries.get(j).getValue();
                 if (!varying(second) || first.size() != second.size() || first.equals(second)) continue;
-                var result = explain(ordered, first, second);
+                var result = explain(ordered, first, second, secondName);
                 if (!result.isEmpty()) return result;
             }
         }
         return ParameterRelationMiner.RelationResult.empty();
+    }
+
+    private static String availableParameter(Set<String> reserved) {
+        // Validators and dynamic compilation bind single uppercase letters.
+        // Expression-level placeholders have already been allocated by the generalizer.
+        for (char name = 'B'; name <= 'Z'; name++) {
+            String candidate = String.valueOf(name);
+            if (!reserved.contains(candidate)) return candidate;
+        }
+        return null;
     }
 
     private static boolean varying(List<Integer> values) {
@@ -38,7 +55,7 @@ final class BivariateProductRelations {
     }
 
     private static ParameterRelationMiner.RelationResult explain(Map<String, List<Integer>> observations,
-            List<Integer> first, List<Integer> second) {
+            List<Integer> first, List<Integer> second, String secondName) {
         var replacements = new LinkedHashMap<String, NormalizedNode>();
         var descriptions = new ArrayList<String>();
         boolean productObserved = false;
@@ -49,10 +66,10 @@ final class BivariateProductRelations {
             }
             NormalizedNode node;
             if (values.equals(first)) node = NormalizedNode.variable("A");
-            else if (values.equals(second)) node = NormalizedNode.variable("A2");
+            else if (values.equals(second)) node = NormalizedNode.variable(secondName);
             else if (values.stream().distinct().count() == 1) node = NormalizedNode.number(values.getFirst());
             else if (productMatches(values, first, second)) {
-                node = NormalizedNode.multiply(List.of(NormalizedNode.variable("A"), NormalizedNode.variable("A2")));
+                node = NormalizedNode.multiply(List.of(NormalizedNode.variable("A"), NormalizedNode.variable(secondName)));
                 productObserved = true;
             } else return ParameterRelationMiner.RelationResult.empty();
             replacements.put(entry.getKey(), node);

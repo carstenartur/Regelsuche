@@ -16,9 +16,9 @@ class ParameterRelationProductTest {
     void learnsTwoParametersTheirProductRepeatedBindingsAndConstants() {
         var result = miner.mine(observations(List.of(15, 28, 66)));
         assertFalse(result.isEmpty());
-        assertEquals("A*A2", replacement(result, "N1"));
+        assertEquals("A*B", replacement(result, "N1"));
         assertEquals("A", replacement(result, "N2"));
-        assertEquals("A2", replacement(result, "N3"));
+        assertEquals("B", replacement(result, "N3"));
         assertEquals(replacement(result, "N2"), replacement(result, "N4"));
         assertEquals("17", replacement(result, "N5"));
     }
@@ -52,7 +52,7 @@ class ParameterRelationProductTest {
         var result = miner.mine(Map.of("N1", List.of(3, 6, 9),
             "N2", List.of(1, 2, 3), "N3", List.of(3, 3, 3)));
         assertFalse(result.isEmpty());
-        assertTrue(result.descriptions().stream().noneMatch(text -> text.contains("A2")));
+        assertTrue(result.descriptions().stream().noneMatch(text -> text.contains("B")));
     }
 
     @Test
@@ -66,7 +66,7 @@ class ParameterRelationProductTest {
         var result = BivariateProductRelations.mine(Map.of(
             "N1", List.of(0, -14, -33), "N2", List.of(0, -2, 3), "N3", List.of(5, 7, -11)));
         assertFalse(result.isEmpty());
-        assertEquals("A*A2", replacement(result, "N1"));
+        assertEquals("A*B", replacement(result, "N1"));
     }
 
     @Test
@@ -83,6 +83,20 @@ class ParameterRelationProductTest {
         assertTrue(BivariateProductRelations.mine(incomplete).isEmpty());
         assertTrue(BivariateProductRelations.mine(Map.of(
             "N1", List.of(1, 4), "N2", List.of(1, 2), "N3", List.of(1, 2))).isEmpty());
+    }
+
+    @Test
+    void reservesExistingExpressionPlaceholdersBeforeNamingTheSecondParameter() {
+        var result = miner.mine(observations(List.of(15, 28, 66)), java.util.Set.of("B", "C"));
+        assertEquals("A*D", replacement(result, "N1"));
+        assertEquals("D", replacement(result, "N3"));
+    }
+
+    @Test
+    void anExhaustedBindableNamespaceDoesNotCreateAnUnboundParameter() {
+        var reserved = new java.util.HashSet<String>();
+        for (char name = 'B'; name <= 'Z'; name++) reserved.add(String.valueOf(name));
+        assertTrue(miner.mine(observations(List.of(15, 28, 66)), reserved).isEmpty());
     }
 
     private static String replacement(ParameterRelationMiner.RelationResult result, String name) {

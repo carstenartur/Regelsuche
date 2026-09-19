@@ -13,12 +13,15 @@ Only when it cannot explain every column does the new fallback try pairs of
 varying observed columns. Its grammar is deliberately finite:
 
 ```text
-A, A2, A*A2, repeated copies of either parameter, constants
+A, B, A*B, repeated copies of either parameter, constants
 ```
 
 Every observation must satisfy the proposed relation. Products are compared in
 `long` before narrowing, so Java integer wraparound cannot manufacture an exact
 product. Parameter assignment is deterministic under map iteration changes.
+The second parameter uses the existing single-uppercase-letter binding contract;
+letters already allocated to expression placeholders are skipped. Exhausting
+that namespace rejects the hypothesis rather than emitting an unbound name.
 Constant columns remain constants. At least two varying columns and an observed
 nonconstant product are required; a single example is insufficient.
 
@@ -26,7 +29,7 @@ For the observed factor pairs `(3,5)`, `(4,7)`, `(6,11)`, the existing generaliz
 can now form the candidate:
 
 ```text
-modpow(x,A*A2,B) -> modpow(modpow(x,A,B),A2,B)
+modpow(x,A*B,C) -> modpow(modpow(x,A,C),B,C)
 ```
 
 The miner does not know the meaning of `modpow`. The same column relation can
@@ -59,12 +62,18 @@ implemented by this prerequisite.
 
 ## Verification
 
-Normal Maven/Gradle learning tests discover `ParameterRelationProductTest` and
-`PatternGeneralizerProductTest`. Controls cover repeated bindings, constants,
-wrong/shuffled observations, integer wraparound, signs/zero, incomplete tables,
-deterministic parameter assignment and unchanged one-parameter precedence.
+Normal Maven/Gradle learning tests discover the miner, generalizer and candidate
+validation tests. Controls cover repeated bindings, constants, wrong/shuffled
+observations, integer wraparound, signs/zero, incomplete tables, deterministic
+parameter assignment and unchanged one-parameter precedence. Validator-level
+controls require complete fresh instantiation, reject a wrong nonzero second
+factor and an unbound compiler placeholder, and check mixed expression/numeric
+namespace collisions.
 
 A dependency-free Java-21 run of the actual miner and normalized-node classes
-first failed on the missing product relation and then passed 13 focused checks.
+first failed on the missing product relation and then passed 18 focused checks.
+The review additionally exposed the unsupported `A2` name; a production-output
+namespace check failed before the correction. After the correction that check,
+two reservation/exhaustion checks and the original 18 checks pass locally.
 This is not a claim of a complete local Java-25/JUnit build. Current-head full CI
-and review remain required before merge.
+and the new integration tests remain required before merge.

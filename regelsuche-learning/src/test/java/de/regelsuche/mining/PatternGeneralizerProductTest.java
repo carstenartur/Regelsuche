@@ -16,10 +16,10 @@ class PatternGeneralizerProductTest {
             observed("t28", "modpow(b,28,m)", "modpow(modpow(b,4,m),7,m)"),
             observed("t66", "modpow(c,66,k)", "modpow(modpow(c,6,k),11,k)")
         )).orElseThrow();
-        assertEquals("modpow(x,A*A2,B)", pattern.leftPattern());
-        assertEquals("modpow(modpow(x,A,B),A2,B)", pattern.rightPattern());
+        assertEquals("modpow(x,A*B,C)", pattern.leftPattern());
+        assertEquals("modpow(modpow(x,A,C),B,C)", pattern.rightPattern());
         assertTrue(pattern.parameterRelations().containsAll(
-            List.of("N1 = A*A2", "N2 = A", "N3 = A2")));
+            List.of("N1 = A*B", "N2 = A", "N3 = B")));
     }
 
     private static SuccessfulTransformationPath observed(String id, String source, String target) {

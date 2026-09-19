@@ -4,9 +4,14 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class ParameterRelationMiner {
     public RelationResult mine(Map<String, List<Integer>> placeholderValues) {
+        return mine(placeholderValues, Set.of());
+    }
+
+    RelationResult mine(Map<String, List<Integer>> placeholderValues, Set<String> reservedPlaceholders) {
         if (placeholderValues.isEmpty()) {
             return RelationResult.empty();
         }
@@ -32,7 +37,7 @@ public class ParameterRelationMiner {
                 return new RelationResult(replacements, descriptions);
             }
         }
-        return BivariateProductRelations.mine(placeholderValues);
+        return BivariateProductRelations.mine(placeholderValues, reservedPlaceholders);
     }
 
     private Relation findRelation(List<Integer> values, List<Integer> baseValues) {
