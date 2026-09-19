@@ -18,22 +18,23 @@ jobs:
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
         with:
           cache-read-only: true
+      - name: Characterize continuation matching at the existing core API
+        run: ./gradlew --no-daemon --no-configuration-cache :regelsuche-core:test --tests 'de.regelsuche.transform.EquivalenceAwarePatternContinuationTest' --console=plain
       - name: Exercise actual learner matcher and arithmetic replay
         run: ./gradlew --no-daemon --no-configuration-cache :app:test --tests 'de.regelsuche.benchmark.TypedModPowAcTransferIntegrationTest' --tests 'de.regelsuche.benchmark.TypedModPowTransferIntegrationTest' --console=plain
-      - name: Verify complete learning and experiments modules
-        run: ./gradlew --no-daemon --no-configuration-cache :regelsuche-learning:test :regelsuche-experiments:test --console=plain
+      - name: Verify complete core learning and experiments modules
+        run: ./gradlew --no-daemon --no-configuration-cache :regelsuche-core:test :regelsuche-learning:test :regelsuche-experiments:test --console=plain
       - name: Record actual JUnit outcomes and source identity
         if: always()
         run: |
           git rev-parse HEAD
           git diff --exit-code
+          git hash-object regelsuche-core/src/main/java/de/regelsuche/transform/EquivalenceAwarePatternMatcher.java
           git hash-object regelsuche-learning/src/main/java/de/regelsuche/mining/TypedOutputPattern.java
           python3 - <<'PY'
           import json, pathlib, xml.etree.ElementTree as ET
-          for module in ('app', 'regelsuche-learning', 'regelsuche-experiments'):
+          for module in ('regelsuche-core', 'app', 'regelsuche-learning', 'regelsuche-experiments'):
               paths = sorted(pathlib.Path(module, 'build/test-results/test').glob('TEST-*.xml'))
-              if not paths:
-                  raise SystemExit('Missing JUnit results: ' + module)
               totals = {k: 0 for k in ('tests','failures','errors','skipped')}
               failed = []
               for p in paths:
@@ -41,7 +42,7 @@ jobs:
                   for key in totals:
                       totals[key] += int(root.attrib[key])
                   failed.extend({'suite': p.name, 'name': t.attrib['name'], 'messages': [f.attrib.get('message','') for f in t.findall('failure') + t.findall('error')]} for t in root.findall('testcase') if t.find('failure') is not None or t.find('error') is not None)
-              print('AC_OUTPUT_JUNIT=' + json.dumps({'module': module, 'suites': len(paths), **totals, 'failed': failed}, sort_keys=True))
+              print('AC_OUTPUT_JUNIT=' + json.dumps({'module': module, 'executed': bool(paths), 'suites': len(paths), **totals, 'failed': failed}, sort_keys=True))
           PY
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
@@ -50,6 +51,7 @@ jobs:
           path: |
             app/build/test-results/test/**
             app/build/reports/tests/test/**
+            regelsuche-core/build/test-results/test/**
             regelsuche-learning/build/test-results/test/**
             regelsuche-experiments/build/test-results/test/**
           if-no-files-found: error
