@@ -1,0 +1,47 @@
+name: Frozen canonical corpus contract
+on:
+  push:
+    branches: ['qa/1035-canonical-corpus-contract']
+    paths: ['.github/workflows/canonical-corpus-contract.yml']
+permissions:
+  contents: read
+jobs:
+  contract:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 915a4eaeb1922b0c798a58e41cdb20663a44c3bb
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with: {distribution: temurin, java-version: '25', verify-signature: true}
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+      - name: Run the public CLI corpus contract on pinned source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/corpus-contract"
+          git rev-parse HEAD > "$RUNNER_TEMP/corpus-contract/source-commit.txt"
+          java -version 2> "$RUNNER_TEMP/corpus-contract/java-version.txt"
+          ./gradlew --no-daemon --no-configuration-cache :app:test \
+            --tests 'de.regelsuche.benchmark.ModPowFrozenCorpusContractTest' \
+            --tests 'de.regelsuche.benchmark.ModPowFrozenTransferTest' \
+            --console=plain --stacktrace 2>&1 | tee "$RUNNER_TEMP/corpus-contract/tests.log"
+      - name: Retain JUnit and actual source
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/corpus-contract/junit"
+          cp app/build/test-results/test/TEST-*.xml "$RUNNER_TEMP/corpus-contract/junit/" || true
+          tar czf "$RUNNER_TEMP/corpus-contract/source.tar.gz" \
+            app/src/main/java/de/regelsuche/benchmark/ModPowFrozenTransfer.java \
+            app/src/test/java/de/regelsuche/benchmark/ModPowFrozenCorpusContractTest.java \
+            docs/research/modpow-transfer-v1
+          git diff --exit-code
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: canonical-corpus-${{ github.run_id }}
+          path: ${{ runner.temp }}/corpus-contract
+          if-no-files-found: error
+          retention-days: 90
