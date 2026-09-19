@@ -1,0 +1,58 @@
+name: Algebraic output recognition development
+on:
+  push:
+    branches: ['qa/1026-algebraic-output-recognition']
+permissions:
+  contents: read
+jobs:
+  recognition:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Provide deliberately exact-only API scaffold for RED characterization
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('regelsuche-learning/src/main/java/de/regelsuche/mining/TypedOutputPattern.java')
+          text = path.read_text()
+          text = text.replace('import de.regelsuche.transform.PatternExpr;', 'import de.regelsuche.transform.PatternExpr;\nimport de.regelsuche.transform.RecognitionProfile;')
+          needle = '    public TypedOutputPattern(TypedPatternGeneralizer.Candidate hypothesis) {'
+          assert text.count(needle) == 1
+          text = text.replace(needle, '    public TypedOutputPattern(TypedPatternGeneralizer.Candidate hypothesis, RecognitionProfile ignored) {\n        this(hypothesis);\n    }\n\n' + needle)
+          needle = 'Map<String, Expr> bindings) {\n        public Application {'
+          assert text.count(needle) == 1
+          text = text.replace(needle, 'Map<String, Expr> bindings) {\n        public RecognitionProfile recognitionProfile() { return RecognitionProfile.exact(); }\n        public List<String> recognitionTrace() { return List.of(); }\n        public Application {')
+          path.write_text(text)
+          PY
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+        with:
+          cache-read-only: true
+      - name: Exercise actual learner matcher and arithmetic replay
+        run: ./gradlew --no-daemon --no-configuration-cache :app:test --tests 'de.regelsuche.benchmark.TypedModPowAcTransferIntegrationTest' --console=plain
+      - name: Record actual JUnit outcome
+        if: always()
+        run: |
+          git rev-parse HEAD
+          git hash-object regelsuche-learning/src/main/java/de/regelsuche/mining/TypedOutputPattern.java
+          python3 - <<'PY'
+          import json, pathlib, xml.etree.ElementTree as ET
+          p = pathlib.Path('app/build/test-results/test/TEST-de.regelsuche.benchmark.TypedModPowAcTransferIntegrationTest.xml')
+          root = ET.parse(p).getroot()
+          summary = {k: root.attrib[k] for k in ('tests','failures','errors','skipped')}
+          summary['failed'] = [{'name': t.attrib['name'], 'messages': [f.attrib.get('message','') for f in t.findall('failure') + t.findall('error')]} for t in root.findall('testcase') if t.find('failure') is not None or t.find('error') is not None]
+          print('AC_OUTPUT_JUNIT=' + json.dumps(summary, sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: algebraic-output-recognition-development
+          path: |
+            app/build/test-results/test/**
+            app/build/reports/tests/test/**
+          if-no-files-found: error
