@@ -5,7 +5,8 @@ on:
 permissions:
   contents: read
 env:
-  SOURCE_SHA: d47666d70544cf4feedc0020cb37be713d620775
+  SOURCE_SHA: 3e4612ae02079d5556f51b09679a942fecf6f8c3
+  BASE_SHA: 88aeacf0b45351ae7b4eb0f6c373939bc929d323
   AI_KNOWLEDGE_EXTRACTOR_ENABLED: 'true'
   GITHUB_TOKEN: ${{ github.token }}
 jobs:
@@ -15,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: d47666d70544cf4feedc0020cb37be713d620775
+          ref: 3e4612ae02079d5556f51b09679a942fecf6f8c3
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
         with:
           distribution: temurin
@@ -24,21 +25,72 @@ jobs:
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
         with:
           cache-read-only: true
-      - name: Verify unchanged AI quality gate on exact PR source
+      - name: Verify complete unchanged quality lifecycle on exact PR source
         run: |
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
-          ./gradlew --no-daemon --no-configuration-cache :ai-knowledge-verification:aiKnowledgeCheck --console=plain --stacktrace
+          ./gradlew --no-daemon --no-configuration-cache aiKnowledgeCheck --console=plain --stacktrace
           python3 - <<'PY'
           import json, pathlib
           check = json.loads(pathlib.Path('build/ai-knowledge/check.json').read_text())
+          trend = json.loads(pathlib.Path('build/reports/quality/complexity-hotspot-report.json').read_text())
           metrics = check['codeComplexity']
-          print('PR1036_QUALITY=' + json.dumps({'passed': check['passed'], 'maxMethodCognitiveComplexity': metrics['maxMethodCognitiveComplexity'], 'maxMethodCyclomaticComplexity': metrics['maxMethodCyclomaticComplexity']}))
-          assert check['passed'] is True
+          print('PR1036_QUALITY=' + json.dumps({'passed': check['passed'], 'hotspotStatus': trend['status'], 'maxMethodCognitiveComplexity': metrics['maxMethodCognitiveComplexity']}))
+          assert check['passed'] is True and trend['status'] == 'PASSED'
           assert metrics['maxMethodCognitiveComplexity'] <= 65
           PY
-      - name: Characterize continuation matching at the existing core API
-        run: ./gradlew --no-daemon --no-configuration-cache :regelsuche-core:test --tests 'de.regelsuche.transform.EquivalenceAwarePatternContinuationTest' --console=plain
-      - name: Exercise actual learner matcher and arithmetic replay
+      - name: Prove baseline inventory correction does not allow new or worsened hotspots
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          python3 -B - <<'PY'
+          import copy, json, os, pathlib, subprocess, sys, tempfile
+          base = os.environ['BASE_SHA']
+          policy_path = 'config/quality/complexity-hotspots.json'
+          old = json.loads(subprocess.check_output(['git','show',base + ':' + policy_path]))
+          new = json.loads(pathlib.Path(policy_path).read_text())
+          original = json.loads(pathlib.Path('build/ai-knowledge/complexity.json').read_text())
+          assert {k:v for k,v in old.items() if k != 'baselineHotspots'} == {k:v for k,v in new.items() if k != 'baselineHotspots'}
+          old_count = len(old['baselineHotspots'])
+          assert new['baselineHotspots'][:old_count] == old['baselineHotspots']
+          extras = new['baselineHotspots'][old_count:]
+          assert len(extras) == 2
+          for entry in extras:
+              path = entry['sourceFile']
+              assert subprocess.check_output(['git','rev-parse',base + ':' + path]) == subprocess.check_output(['git','rev-parse','HEAD:' + path])
+          controls = []
+          with tempfile.TemporaryDirectory() as tmp:
+              tmp = pathlib.Path(tmp)
+              def check_case(name, document, policy, expected_code, required_status=None):
+                  (tmp/'current.json').write_text(json.dumps(document))
+                  (tmp/'policy.json').write_text(json.dumps(policy))
+                  run = subprocess.run([sys.executable,'-B','scripts/verify-complexity-hotspots.py','--complexity',str(tmp/'current.json'),'--policy',str(tmp/'policy.json'),'--json-output',str(tmp/'result.json'),'--markdown-output',str(tmp/'result.md')],capture_output=True,text=True)
+                  assert run.returncode == expected_code, (name,run.stdout,run.stderr)
+                  report = json.loads((tmp/'result.json').read_text())
+                  assert report['status'] == ('PASSED' if expected_code == 0 else 'FAILED')
+                  if required_status:
+                      assert any(change['blocked'] and change['status'] == required_status for change in report['changes']), name
+                  controls.append({'name':name,'exitCode':run.returncode,'status':report['status'],'violations':report['violations']})
+              check_case('original truncated inventory rejects unchanged newly visible methods',original,old,1,'NEW_HOTSPOT')
+              check_case('corrected measured inventory passes',original,new,0)
+              for entry in extras:
+                  for field,delta in [('cognitiveComplexity',3),('cyclomaticComplexity',2)]:
+                      changed = copy.deepcopy(original)
+                      found = False
+                      for group in ('topCognitiveMethods','topCyclomaticMethods'):
+                          for item in changed['codeComplexity'][group]:
+                              if (item['sourceFile'],item['signature']) == (entry['sourceFile'],entry['signature']):
+                                  item[field] += delta
+                                  found = True
+                      assert found
+                      check_case(entry['type'] + ':' + field + ' worsening is rejected',changed,new,1,'WORSENED')
+              changed = copy.deepcopy(original)
+              unseen = dict(extras[0],signature='private void genuinelyNewHotspot()')
+              changed['codeComplexity']['topCognitiveMethods'].append(unseen)
+              check_case('genuinely new hotspot is rejected',changed,new,1,'NEW_HOTSPOT')
+          destination = pathlib.Path('build/reports/quality/hotspot-inventory-controls.json')
+          destination.write_text(json.dumps({'sourceSha':os.environ['SOURCE_SHA'],'baseSha':base,'oldEntriesUnchanged':True,'limitsUnchanged':True,'addedSourcesUnchanged':True,'controls':controls},indent=2) + '\n')
+          print('HOTSPOT_INVENTORY_CONTROLS=' + json.dumps({'passed':True,'controls':len(controls)}))
+          PY
+      - name: Exercise unchanged transfer regression suites
         run: ./gradlew --no-daemon --no-configuration-cache :app:test --tests 'de.regelsuche.benchmark.TypedModPowAcTransferIntegrationTest' --tests 'de.regelsuche.benchmark.TypedModPowTransferIntegrationTest' --console=plain
       - name: Verify complete core learning and experiments modules
         run: ./gradlew --no-daemon --no-configuration-cache :regelsuche-core:test :regelsuche-learning:test :regelsuche-experiments:test --console=plain
@@ -69,8 +121,8 @@ jobs:
           path: |
             build/ai-knowledge/check.json
             build/ai-knowledge/complexity.json
+            build/reports/quality/**
             app/build/test-results/test/**
-            app/build/reports/tests/test/**
             regelsuche-core/build/test-results/test/**
             regelsuche-learning/build/test-results/test/**
             regelsuche-experiments/build/test-results/test/**
