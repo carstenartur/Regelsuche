@@ -121,12 +121,6 @@ public final class EquivalenceAwarePatternMatcher {
 
     private record Alternative(MatchTask pending, Map<String, Expr> bindings) {}
 
-    /**
-     * Retain the entire continuation when choosing a commutative binding. A
-     * later argument may reject an earlier locally successful choice. Explicit
-     * pending tasks avoid growing the Java stack with ordered sibling count;
-     * alternative branches retain isolated bindings and share the same budget.
-     */
     private static boolean matchInternal(
         PatternExpr pattern,
         Expr expression,
@@ -134,122 +128,187 @@ public final class EquivalenceAwarePatternMatcher {
         RecognitionProfile profile,
         MatchBudget budget
     ) {
-        var alternatives = new ArrayDeque<Alternative>();
-        alternatives.push(new Alternative(new PairTask(pattern, expression, null), new HashMap<>(bindings)));
-        search: while (!alternatives.isEmpty()) {
-            var alternative = alternatives.pop();
-            MatchTask pending = alternative.pending();
-            Map<String, Expr> current = alternative.bindings();
+        return new MatchSearch(profile, budget).match(pattern, expression, bindings);
+    }
+
+    /**
+     * Owns one bounded search. A later constraint can reopen an earlier choice;
+     * node matching only schedules work or rejects the current alternative.
+     * Bindings are published only after the whole continuation succeeds.
+     */
+    private static final class MatchSearch {
+        private final RecognitionProfile profile;
+        private final MatchBudget budget;
+        private final ArrayDeque<Alternative> alternatives = new ArrayDeque<>();
+        private MatchTask pending;
+        private Map<String, Expr> current;
+
+        private MatchSearch(RecognitionProfile profile, MatchBudget budget) {
+            this.profile = profile;
+            this.budget = budget;
+        }
+
+        private boolean match(PatternExpr pattern, Expr expression, Map<String, Expr> bindings) {
+            alternatives.push(new Alternative(new PairTask(pattern, expression, null), new HashMap<>(bindings)));
+            while (!alternatives.isEmpty()) {
+                var alternative = alternatives.pop();
+                pending = alternative.pending();
+                current = alternative.bindings();
+                if (!matchContinuation()) {
+                    continue;
+                }
+                bindings.clear();
+                bindings.putAll(current);
+                return true;
+            }
+            return false;
+        }
+
+        private boolean matchContinuation() {
             while (pending != null) {
-                if (pending instanceof PermutationTask permutation) {
-                    if (permutation.patternIndex() == permutation.patterns().size()) {
-                        if (!permutation.expressions().isEmpty()) continue search;
-                        pending = permutation.next();
-                        continue;
-                    }
-                    PatternExpr operand = permutation.patterns().get(permutation.patternIndex());
-                    int index = permutation.expressionIndex();
-                    while (index < permutation.expressions().size()
-                            && !couldStructurallyMatch(operand, permutation.expressions().get(index), profile, budget)) {
-                        index++;
-                    }
-                    if (index == permutation.expressions().size()) continue search;
-                    // Retain the next choice lazily instead of copying every permutation.
-                    if (index + 1 < permutation.expressions().size()) {
-                        alternatives.push(new Alternative(new PermutationTask(
-                            permutation.patterns(), permutation.expressions(), permutation.patternIndex(),
-                            index + 1, permutation.next()), new HashMap<>(current)));
-                    }
-                    budget.consumeBranch();
-                    Expr candidate = permutation.expressions().get(index);
-                    var remaining = new ArrayList<>(permutation.expressions());
-                    remaining.remove(index);
-                    pending = new PairTask(operand, candidate, new PermutationTask(
-                        permutation.patterns(), remaining, permutation.patternIndex() + 1, 0, permutation.next()));
-                    continue;
-                }
-
-                PairTask pair = (PairTask) pending;
-                PatternExpr node = pair.pattern();
-                Expr candidate = pair.expression();
-                pending = pair.next();
-                if (node instanceof PatternExpr.Placeholder placeholder) {
-                    Expr bound = current.get(placeholder.name());
-                    if (bound == null) current.put(placeholder.name(), candidate);
-                    else if (!equivalent(bound, candidate, profile, budget)) continue search;
-                    continue;
-                }
-                if (node instanceof PatternExpr.LiteralNumber number) {
-                    boolean matches = candidate instanceof NumberExpr literal
-                        ? literal.value().equals(number.value())
-                        : profile.inferAlgebraicBindings()
-                            && BoundedExactMonomial.from(candidate, budget.algebraic)
-                                .map(monomial -> monomial.isConstant(number.value())).orElse(false);
-                    if (!matches) continue search;
-                    continue;
-                }
-                if (node instanceof PatternExpr.LiteralVariable variable) {
-                    if (!(candidate instanceof VariableExpr literal) || !literal.name().equals(variable.name())) {
-                        continue search;
-                    }
-                    continue;
-                }
-                if (node instanceof PatternExpr.Function function) {
-                    if (!(candidate instanceof FunctionExpr concrete)
-                            || !concrete.name().equals(function.name())
-                            || concrete.arguments().size() != function.arguments().size()) {
-                        continue search;
-                    }
-                    for (int index = function.arguments().size() - 1; index >= 0; index--) {
-                        pending = new PairTask(function.arguments().get(index), concrete.arguments().get(index), pending);
-                    }
-                    continue;
-                }
-
-                PatternExpr.Operation operation = (PatternExpr.Operation) node;
-                if (profile.inferAlgebraicBindings()) {
-                    if (allPlaceholdersBound(operation, current)
-                            && equivalent(operation.instantiate(current), candidate, profile, budget)) {
-                        continue;
-                    }
-                    Map<String, Expr> inferred = new HashMap<>(current);
-                    if (tryInferPowerBinding(operation, candidate, inferred, profile, budget)) {
-                        current = inferred;
-                        continue;
-                    }
-                }
-                if (!(candidate instanceof BinaryExpr binary) || binary.operator() != operation.operator()) {
-                    continue search;
-                }
-                if (!profile.isAssociative(operation.operator())) {
-                    pending = new PairTask(operation.left(), binary.left(),
-                        new PairTask(operation.right(), binary.right(), pending));
-                    continue;
-                }
-
-                List<PatternExpr> patternOperands = new ArrayList<>();
-                flattenPattern(operation, operation.operator(), patternOperands);
-                List<Expr> expressionOperands = new ArrayList<>();
-                flattenExpression(binary, operation.operator(), expressionOperands);
-                if (patternOperands.size() != expressionOperands.size()) continue search;
-                if (profile.isCommutative(operation.operator())) {
-                    if (patternOperands.size() > DEFAULT_MAX_COMMUTATIVE_OPERANDS) {
-                        throw new MatchLimitExceeded("COMMUTATIVE_OPERAND_LIMIT");
-                    }
-                    patternOperands.sort(Comparator
-                        .comparingInt(EquivalenceAwarePatternMatcher::bindingPriority).reversed());
-                    pending = new PermutationTask(patternOperands, expressionOperands, 0, 0, pending);
-                } else {
-                    for (int index = patternOperands.size() - 1; index >= 0; index--) {
-                        pending = new PairTask(patternOperands.get(index), expressionOperands.get(index), pending);
-                    }
+                boolean matched = pending instanceof PermutationTask permutation
+                    ? matchPermutation(permutation)
+                    : matchPair((PairTask) pending);
+                if (!matched) {
+                    return false;
                 }
             }
-            bindings.clear();
-            bindings.putAll(current);
             return true;
         }
-        return false;
+
+        private boolean matchPermutation(PermutationTask permutation) {
+            if (permutation.patternIndex() == permutation.patterns().size()) {
+                if (!permutation.expressions().isEmpty()) {
+                    return false;
+                }
+                pending = permutation.next();
+                return true;
+            }
+            PatternExpr operand = permutation.patterns().get(permutation.patternIndex());
+            int index = permutation.expressionIndex();
+            while (index < permutation.expressions().size()
+                    && !couldStructurallyMatch(operand, permutation.expressions().get(index), profile, budget)) {
+                index++;
+            }
+            if (index == permutation.expressions().size()) {
+                return false;
+            }
+            // Save only the next choice, before charging the current branch.
+            if (index + 1 < permutation.expressions().size()) {
+                alternatives.push(new Alternative(new PermutationTask(
+                    permutation.patterns(), permutation.expressions(), permutation.patternIndex(),
+                    index + 1, permutation.next()), new HashMap<>(current)));
+            }
+            budget.consumeBranch();
+            Expr candidate = permutation.expressions().get(index);
+            var remaining = new ArrayList<>(permutation.expressions());
+            remaining.remove(index);
+            pending = new PairTask(operand, candidate, new PermutationTask(
+                permutation.patterns(), remaining, permutation.patternIndex() + 1, 0, permutation.next()));
+            return true;
+        }
+
+        private boolean matchPair(PairTask pair) {
+            PatternExpr node = pair.pattern();
+            Expr candidate = pair.expression();
+            pending = pair.next();
+            if (node instanceof PatternExpr.Placeholder placeholder) {
+                return matchPlaceholder(placeholder, candidate);
+            }
+            if (node instanceof PatternExpr.LiteralNumber number) {
+                return matchNumber(number, candidate);
+            }
+            if (node instanceof PatternExpr.LiteralVariable variable) {
+                return candidate instanceof VariableExpr literal && literal.name().equals(variable.name());
+            }
+            if (node instanceof PatternExpr.Function function) {
+                return matchFunction(function, candidate);
+            }
+            return matchOperation((PatternExpr.Operation) node, candidate);
+        }
+
+        private boolean matchPlaceholder(PatternExpr.Placeholder placeholder, Expr candidate) {
+            Expr bound = current.get(placeholder.name());
+            if (bound == null) {
+                current.put(placeholder.name(), candidate);
+                return true;
+            }
+            return equivalent(bound, candidate, profile, budget);
+        }
+
+        private boolean matchNumber(PatternExpr.LiteralNumber number, Expr candidate) {
+            return candidate instanceof NumberExpr literal
+                ? literal.value().equals(number.value())
+                : profile.inferAlgebraicBindings()
+                    && BoundedExactMonomial.from(candidate, budget.algebraic)
+                        .map(monomial -> monomial.isConstant(number.value())).orElse(false);
+        }
+
+        private boolean matchFunction(PatternExpr.Function function, Expr candidate) {
+            if (!(candidate instanceof FunctionExpr concrete)
+                    || !concrete.name().equals(function.name())
+                    || concrete.arguments().size() != function.arguments().size()) {
+                return false;
+            }
+            prependPairs(function.arguments(), concrete.arguments());
+            return true;
+        }
+
+        private boolean matchOperation(PatternExpr.Operation operation, Expr candidate) {
+            if (profile.inferAlgebraicBindings() && matchAlgebraically(operation, candidate)) {
+                return true;
+            }
+            if (!(candidate instanceof BinaryExpr binary) || binary.operator() != operation.operator()) {
+                return false;
+            }
+            if (!profile.isAssociative(operation.operator())) {
+                pending = new PairTask(operation.left(), binary.left(),
+                    new PairTask(operation.right(), binary.right(), pending));
+                return true;
+            }
+            return matchAssociative(operation, binary);
+        }
+
+        private boolean matchAlgebraically(PatternExpr.Operation operation, Expr candidate) {
+            if (allPlaceholdersBound(operation, current)
+                    && equivalent(operation.instantiate(current), candidate, profile, budget)) {
+                return true;
+            }
+            Map<String, Expr> inferred = new HashMap<>(current);
+            if (!tryInferPowerBinding(operation, candidate, inferred, profile, budget)) {
+                return false;
+            }
+            current = inferred;
+            return true;
+        }
+
+        private boolean matchAssociative(PatternExpr.Operation operation, BinaryExpr binary) {
+            List<PatternExpr> patternOperands = new ArrayList<>();
+            flattenPattern(operation, operation.operator(), patternOperands);
+            List<Expr> expressionOperands = new ArrayList<>();
+            flattenExpression(binary, operation.operator(), expressionOperands);
+            if (patternOperands.size() != expressionOperands.size()) {
+                return false;
+            }
+            if (profile.isCommutative(operation.operator())) {
+                if (patternOperands.size() > DEFAULT_MAX_COMMUTATIVE_OPERANDS) {
+                    throw new MatchLimitExceeded("COMMUTATIVE_OPERAND_LIMIT");
+                }
+                patternOperands.sort(Comparator
+                    .comparingInt(EquivalenceAwarePatternMatcher::bindingPriority).reversed());
+                pending = new PermutationTask(patternOperands, expressionOperands, 0, 0, pending);
+            } else {
+                prependPairs(patternOperands, expressionOperands);
+            }
+            return true;
+        }
+
+        /** Reverse insertion preserves left-to-right matching without sibling recursion. */
+        private void prependPairs(List<PatternExpr> patterns, List<Expr> expressions) {
+            for (int index = patterns.size() - 1; index >= 0; index--) {
+                pending = new PairTask(patterns.get(index), expressions.get(index), pending);
+            }
+        }
     }
 
     private static boolean tryInferPowerBinding(
