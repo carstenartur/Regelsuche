@@ -25,3 +25,6 @@ env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache --max-workers=2
   --output build/reports/typed-external-polynomial-comparison
 "$pilot_python" -m external_polynomial_comparison.run_typed \
   --verify --output build/reports/typed-external-polynomial-comparison
+# Offline audit is separate from the timed query ledger and never changes its manifest.
+"$pilot_python" -m external_polynomial_comparison.audit_typed \
+  --output build/reports/typed-external-polynomial-comparison
