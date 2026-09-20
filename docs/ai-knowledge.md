@@ -157,6 +157,36 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
+### Accepted predecessor for learned-schema v2 (2026-09-20)
+
+The current baseline is the exact freshly generated snapshot of accepted main
+`81ea9ac7dc46f310f68a071b944ea144e581c2ed` after merged PR #1038, tree
+`e3a2a95e4ecd91cc9d0091995bbe66cc2c7f67b2`. Its PR and post-merge CI runs
+[35474041553](https://github.com/carstenartur/Regelsuche/actions/runs/35474041553)
+and [35476125115](https://github.com/carstenartur/Regelsuche/actions/runs/35476125115)
+passed all required authorities and `ciCheck` before this feature was evaluated.
+
+A clean detached checkout of that predecessor passed the complete unchanged
+`aiKnowledgeCheck` against the previous 622215-token baseline: 634445 tokens,
+increase 12230 below the unchanged 15000 allowance. The run also passed eight
+coverage controls, 17 method-hotspot checks and all other absolute/trend limits.
+The pinned v0.1.10 extractor source was clean. A retained local initializer
+selected JDK 25 to compile it with its unchanged `--release 17` target; it altered
+no source, estimator weight, selector, threshold or verification task.
+
+The active file is a byte-for-byte copy of
+[that generated snapshot](../ai-knowledge/baseline-history/2026-09-20-main81ea9ac7-metrics-snapshot.json),
+SHA256 `2928c6dabe73e410e8c50e584cfaa21b9e17eabc59f53c85985ea233fb217af9`.
+The [qualification and measurement provenance](../ai-knowledge/baseline-history/2026-09-20-main81ea9ac7-provenance.json)
+binds the source/tree, successful CI jobs, commands, toolchain and original report
+hashes. Independent review verified these identities and unchanged policy before
+the copy. The old baseline and rejected feature report (645285 tokens, +23070
+against the old allowance) remain retained. No failing feature supplies baseline
+values. The feature must still pass its own complete CI; this update supplies no
+performance or learning acceptance.
+
+### Earlier accepted predecessors
+
 The committed `ai-knowledge/complexity-baseline.json` advances only to an
 independently qualified predecessor. It is not generated from the branch under
 test. For the stacked issue integration, the accepted predecessor is `main`

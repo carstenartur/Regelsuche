@@ -1,0 +1,63 @@
+{
+  "schema": "regelsuche.ai-knowledge-baseline-provenance/v1",
+  "decision": "Advance only from clean, actually merged, independently CI-qualified main 81ea9ac7 after its full unchanged old-baseline gate passes; no failing feature supplies baseline values.",
+  "acceptedSource": {
+    "mainCommit": "81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+    "tree": "e3a2a95e4ecd91cc9d0091995bbe66cc2c7f67b2",
+    "pullRequest": 1038,
+    "prHead": "be11752a7be043525d84acaa1d23eb43fa6eb008",
+    "mainCiRun": 35476125115,
+    "prCiRun": 35474041553
+  },
+  "measurement": {
+    "origin": "Fresh local full aiKnowledgeCheck on clean detached accepted main, unchanged old baseline and policy; not feature-candidate estimates or inaccessible CI artifact bytes.",
+    "extractorTag": "v0.1.10",
+    "extractorCommit": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+    "compiler": "JDK25 compiling unchanged extractor with its original --release17 target; local toolchain init retained.",
+    "passed": true,
+    "estimatedContextTokens": 634445,
+    "oldBaselineTokens": 622215,
+    "increase": 12230,
+    "threshold": 15000,
+    "coverageControlTests": 8,
+    "complexityHotspots": 17
+  },
+  "oldBaselineSha256": "4565d894f55ee51171847147fb6cfee89461a7221b57f5970bf55c17fbdaf47d",
+  "newBaselineSha256": "2928c6dabe73e410e8c50e584cfaa21b9e17eabc59f53c85985ea233fb217af9",
+  "newBaselineDerivation": "Byte-for-byte copy of the retained generated accepted-predecessor metrics-snapshot.json; no numeric edits.",
+  "rejectedFeature": {
+    "commit": "c7bbe08b162fc23c75c0bf83f7de65174431b916",
+    "estimatedContextTokens": 645285,
+    "oldBaselineIncrease": 23070,
+    "passed": false,
+    "retainedUnchanged": true,
+    "usedForBaseline": false
+  },
+  "unchangedPolicy": {
+    "maxContextTokenIncrease": 15000,
+    "maxConceptRadiusIncrease": 3,
+    "maxCognitiveDebtIncrease": 10,
+    "thresholdsSelectorsAndHotspotExceptionsChanged": false,
+    "testsRemovedOrSkipped": false,
+    "frozenExperimentsChanged": false
+  },
+  "retainedFilesSha256": {
+    "2026-09-20-main81ea9ac7-previous-baseline.json": "4565d894f55ee51171847147fb6cfee89461a7221b57f5970bf55c17fbdaf47d",
+    "2026-09-20-main81ea9ac7-metrics-snapshot.json": "2928c6dabe73e410e8c50e584cfaa21b9e17eabc59f53c85985ea233fb217af9",
+    "2026-09-20-main81ea9ac7-check.json": "b12e1d3a7f2f1386062a639e9847a4fdf9f1b21a6c49eaa8213ae0c5be3b5ba5",
+    "2026-09-20-main81ea9ac7-trend.json": "5103e0fbfd658bb3ea3d425d41f684cbbd91c6c70d9274f3230bb2dca9414016",
+    "2026-09-20-main81ea9ac7-complexity.json": "31b4e9dbfa334902bbc832a1398ee74bd8e289db5fe1c18082b63d5d8a845e01",
+    "2026-09-20-main81ea9ac7-receipt.json": "506060b1e687bbd23e1cb08fbf515941fa3701fa3dfd14ea18d3f419915b4435",
+    "2026-09-20-main81ea9ac7-aiKnowledgeCheck.log": "4b7f4fb4bc6569da1004db6e3c3f531c550af5cd75b03b4abc616e4da1954334",
+    "2026-09-20-schema-c7bbe08-rejected-metrics-snapshot.json": "c08a11a812701e6f00d581397796f16363a03f375bdca3b5637b75cf22b8f58f",
+    "2026-09-20-schema-c7bbe08-rejected-check.json": "1934b5411e289289674899496cb3aa2006942b48fc6f5b9da772b247172e9334",
+    "2026-09-20-schema-c7bbe08-rejected-trend.json": "b3738a866bb26a0497a4326b5fe9a4fb388cdcab9832d3c8d0604416a1b8e148",
+    "2026-09-20-schema-c7bbe08-rejected-complexity.json": "291e13300e389e76aef1780ce5b33c0882b802ff80f74ef6f047e0c4f7dadcf8",
+    "2026-09-20-schema-c7bbe08-rejected-receipt.json": "0af5abef0da55fe19b27fca0a22133c804dde0a51999216f2790ef8aa4f89bbc",
+    "2026-09-20-schema-c7bbe08-rejected-aiKnowledgeCheck.log": "b8b25116b8a3eb137fac232df09834b90823f5df0deefc02c997127e6717eef7",
+    "2026-09-20-main81ea9ac7-ci-qualification.json": "039a447a193ec2f4451364674909c63f044d026a3bc707d57dba44618db42ae0",
+    "2026-09-20-main81ea9ac7-java25-extractor.init.gradle": "35f1944def395ee7ecbe79a629640ddf5a86eb400dacdee3261469d197e79c54",
+    "2026-09-20-main81ea9ac7-run-gate.py": "56e04895420de7b6ad3878040fb4953d8f8efc39a8d232d9e96e7d4a9cd82e88"
+  },
+  "qualificationBoundary": "The feature still requires its own complete CI. Predecessor acceptance does not imply feature acceptance or a learned performance gain."
+}

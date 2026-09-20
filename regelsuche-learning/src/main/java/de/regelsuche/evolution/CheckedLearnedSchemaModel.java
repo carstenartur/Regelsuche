@@ -149,50 +149,8 @@ public final class CheckedLearnedSchemaModel {
         Objects.requireNonNull(formation, "formation");
         Objects.requireNonNull(bounds, "bounds");
         var work = new Work();
-        var examples = new ArrayList<ObservedPair>();
-        var deferred = new ArrayList<ObservedPair>();
         var attempts = new ArrayList<Attempt>();
-        var seen = new HashSet<String>();
-        for (var observation : formation.observations()) {
-            work.add(1);
-            if (observation.geneSequence().size() < 2 || observation.minimality().isEmpty()
-                    || !observation.minimality().orElseThrow().observedReplayVerified()) {
-                attempts.add(new Attempt(List.of(observation.input().id()), "TRACE_ONLY", "NO_ADMITTED_MULTISTEP_SELECTED_PATH"));
-                continue;
-            }
-            var path = observation.search().bestState().path();
-            var assumptions = observation.search().bestState().transformations().stream()
-                .flatMap(step -> step.assumptions().stream()).distinct().toList();
-            if (!assumptions.isEmpty()) {
-                attempts.add(new Attempt(List.of(observation.input().id()), "TRACE_ONLY", "CONDITIONAL_SCHEMAS_UNSUPPORTED"));
-                continue;
-            }
-            var asts = new ArrayList<Expr>();
-            try {
-                for (String expression : path) {
-                    if (expression.length() > 16_384) throw new IllegalArgumentException("training source size limit");
-                    work.add(1);
-                    Expr ast = new ExpressionParser().parseExactTerm(expression).expression();
-                    domain(ast, bounds, work);
-                    asts.add(ast);
-                }
-                addPair(examples, seen, observation.input().id(), 0, asts.size() - 1,
-                    asts.getFirst(), asts.getLast(), work);
-                for (int length = asts.size() - 2; length >= 2; length--) {
-                    for (int start = 0; start + length < asts.size(); start++) {
-                        addPair(deferred, seen, observation.input().id(), start, start + length,
-                            asts.get(start), asts.get(start + length), work);
-                    }
-                }
-            } catch (IllegalArgumentException unsupported) {
-                attempts.add(new Attempt(List.of(observation.input().id()), "TRACE_ONLY", unsupported.getMessage()));
-            }
-        }
-        examples.addAll(deferred);
-        if (examples.size() > bounds.maximumExamples()) {
-            attempts.add(new Attempt(List.of(), "EXTRACTION_LIMIT", "UNEXAMINED_WINDOWS=" + (examples.size() - bounds.maximumExamples())));
-            examples.subList(bounds.maximumExamples(), examples.size()).clear();
-        }
+        var examples = collectObservedPairs(formation, bounds, work, attempts);
         String inventoryBinding = inventorySemanticsHash(formation.inventory().contentHash());
         var admitted = new TreeMap<String, Schema>();
         var generalizer = new TypedPatternGeneralizer();
@@ -234,6 +192,54 @@ public final class CheckedLearnedSchemaModel {
         work.add(admitted.size());
         return new CheckedLearnedSchemaModel(formation.inventory().contentHash(), formation.contentHash(), bounds,
             List.of(), List.copyOf(admitted.values()), attempts, work.units, 0);
+    }
+
+    private static List<ObservedPair> collectObservedPairs(TraceRewriteStrategyLearner.FrozenStrategy formation,
+            Bounds bounds, Work work, List<Attempt> attempts) {
+        var examples = new ArrayList<ObservedPair>();
+        var deferred = new ArrayList<ObservedPair>();
+        var seen = new HashSet<String>();
+        for (var observation : formation.observations()) {
+            work.add(1);
+            if (observation.geneSequence().size() < 2 || observation.minimality().isEmpty()
+                    || !observation.minimality().orElseThrow().observedReplayVerified()) {
+                attempts.add(new Attempt(List.of(observation.input().id()), "TRACE_ONLY", "NO_ADMITTED_MULTISTEP_SELECTED_PATH"));
+                continue;
+            }
+            var path = observation.search().bestState().path();
+            var assumptions = observation.search().bestState().transformations().stream()
+                .flatMap(step -> step.assumptions().stream()).distinct().toList();
+            if (!assumptions.isEmpty()) {
+                attempts.add(new Attempt(List.of(observation.input().id()), "TRACE_ONLY", "CONDITIONAL_SCHEMAS_UNSUPPORTED"));
+                continue;
+            }
+            var asts = new ArrayList<Expr>();
+            try {
+                for (String expression : path) {
+                    if (expression.length() > 16_384) throw new IllegalArgumentException("training source size limit");
+                    work.add(1);
+                    Expr ast = new ExpressionParser().parseExactTerm(expression).expression();
+                    domain(ast, bounds, work);
+                    asts.add(ast);
+                }
+                addPair(examples, seen, observation.input().id(), 0, asts.size() - 1,
+                    asts.getFirst(), asts.getLast(), work);
+                for (int length = asts.size() - 2; length >= 2; length--) {
+                    for (int start = 0; start + length < asts.size(); start++) {
+                        addPair(deferred, seen, observation.input().id(), start, start + length,
+                            asts.get(start), asts.get(start + length), work);
+                    }
+                }
+            } catch (IllegalArgumentException unsupported) {
+                attempts.add(new Attempt(List.of(observation.input().id()), "TRACE_ONLY", unsupported.getMessage()));
+            }
+        }
+        examples.addAll(deferred);
+        if (examples.size() > bounds.maximumExamples()) {
+            attempts.add(new Attempt(List.of(), "EXTRACTION_LIMIT", "UNEXAMINED_WINDOWS=" + (examples.size() - bounds.maximumExamples())));
+            examples.subList(bounds.maximumExamples(), examples.size()).clear();
+        }
+        return examples;
     }
 
     private record ObservedPair(String inputId, String windowId, TypedPatternGeneralizer.Example example) {}
