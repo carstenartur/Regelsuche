@@ -169,10 +169,17 @@ public final class TypedMoveSearch {
         };
     }
 
-    /** Replays the claimed primitive against the retained producer AST and exact metadata. */
+    /** Checks carried premises, then replays against the retained producer AST and exact metadata. */
     public static Verifier primitiveReplay(AstRewriteTransport transport) {
         Objects.requireNonNull(transport, "transport");
         return (source, move, context) -> {
+            if (!move.assumptions().isEmpty()) {
+                var available = new java.util.HashSet<>(context.initialAssumptions());
+                available.addAll(AssumptionSignature.ofExpressions(source.assumptions()).normalizedAssumptions());
+                if (!available.containsAll(move.assumptions())) {
+                    return new MoveVerifier.Verification(false, 1, List.of(), "TYPED_PRIMITIVE_ASSUMPTIONS_MISSING");
+                }
+            }
             Expr target;
             try {
                 target = CODEC.decodeExpression(move.transformation().transformedExpression());

@@ -17,6 +17,19 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class TypedLearnedMoveInventoryTest {
+    @Test void unusedConditionalGenesAreRejectedBeforeTypedInventoryFormation() {
+        var original = TraceStrategyTransferExample.inventory();
+        var genes = new ArrayList<>(original.rewrites());
+        genes.add(new EvolutionGenome.RewriteGene("conditional-division", "?A/?A", "1",
+            de.regelsuche.transform.RewriteKind.SIMPLIFY, false, -2, 8, 32,
+            List.of(new EvolutionGenome.AssumptionTemplate(
+                de.regelsuche.assumption.Assumption.Kind.NON_ZERO, "?A != 0", List.of("?A"))),
+            original.rewrites().getFirst().evidenceObligations()));
+        var rejected = assertThrows(IllegalArgumentException.class, () -> new TraceRewriteStrategyLearner().learn(
+            original.withRewrites(genes), TraceStrategyTransferExample.trainingInputs(), TraceStrategyTransferExample.limits()));
+        assertEquals("only unconditional polynomial rules supported", rejected.getMessage());
+    }
+
     @Test void primitiveReplayUsesTheSameProviderInventoryAndCandidateCapAsGeneration() {
         var formation = new TraceRewriteStrategyLearner().learn(TraceStrategyTransferExample.inventory(),
             TraceStrategyTransferExample.trainingInputs(), TraceStrategyTransferExample.limits());
