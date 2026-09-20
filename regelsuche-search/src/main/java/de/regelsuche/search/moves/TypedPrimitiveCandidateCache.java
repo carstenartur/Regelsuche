@@ -132,6 +132,16 @@ public final class TypedPrimitiveCandidateCache implements TypedMoveSearch.Typed
             characters = Math.addExact(characters, step.transformedExpression().length());
             characters = Math.addExact(characters, step.applicationKey().length());
             inspections = Math.addExact(inspections, 2);
+            // Generated premises are variable retained text too. Count both the
+            // producer and normalized move forms conservatively, even if shared.
+            for (var premise : step.assumptions()) {
+                characters = Math.addExact(characters, premise.length());
+                inspections = Math.addExact(inspections, 1);
+            }
+            for (var premise : move.assumptions()) {
+                characters = Math.addExact(characters, premise.length());
+                inspections = Math.addExact(inspections, 1);
+            }
         }
         return new Footprint(characters, inspections);
     }
