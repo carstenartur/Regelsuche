@@ -1,0 +1,7 @@
+allprojects {
+    afterEvaluate {
+        if (rootProject.name == 'ai-knowledge-extractor' && plugins.hasPlugin('java')) {
+            java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+        }
+    }
+}

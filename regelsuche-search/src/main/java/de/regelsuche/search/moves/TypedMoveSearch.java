@@ -36,9 +36,14 @@ public final class TypedMoveSearch {
     /** Opt-in policy whose expression features consume canonical tagged ASTs, never parser text. */
     public interface TypedPolicy extends MovePriorityPolicy {}
 
-    public record Context(Expr goal, List<String> initialAssumptions, MoveContext.Phase phase) {
+    /** A null goal is permitted only in the explicit source-only mode. */
+    public record Context(Expr goal, List<String> initialAssumptions, MoveContext.Phase phase, boolean sourceOnly) {
+        public Context(Expr goal, List<String> initialAssumptions, MoveContext.Phase phase) {
+            this(Objects.requireNonNull(goal, "goal"), initialAssumptions, phase, false);
+        }
         public Context {
-            Objects.requireNonNull(goal, "goal");
+            if (sourceOnly && goal != null) throw new IllegalArgumentException("source-only context cannot carry a goal");
+            if (!sourceOnly) Objects.requireNonNull(goal, "goal");
             initialAssumptions = AssumptionSignature.ofExpressions(
                 Objects.requireNonNull(initialAssumptions, "initialAssumptions")).normalizedAssumptions();
             Objects.requireNonNull(phase, "phase");
@@ -46,8 +51,11 @@ public final class TypedMoveSearch {
         public static Context frozen(Expr goal) {
             return new Context(goal, List.of(), MoveContext.Phase.FROZEN_EVALUATION);
         }
+        public static Context sourceOnly(List<String> assumptions, MoveContext.Phase phase) {
+            return new Context(null, assumptions, phase, true);
+        }
         private MoveContext encoded() {
-            return new MoveContext(CODEC.encodeExpression(goal), initialAssumptions, phase);
+            return new MoveContext(sourceOnly ? "" : CODEC.encodeExpression(goal), initialAssumptions, phase);
         }
     }
 
@@ -69,9 +77,20 @@ public final class TypedMoveSearch {
         MoveVerifier.Verification verify(State source, SearchMove move, Context context);
     }
 
+    /** Measured structural valuation; it never grants mathematical authority. */
+    @FunctionalInterface public interface StateEvaluator {
+        StateValue.Assessment evaluate(State state, Context context);
+    }
+
     public record Problem(Expr source, Context context, List<MoveProvider> providers, MovePriorityPolicy policy,
             Verifier verifier, ToDoubleFunction<State> stateScore, MoveSearch.Mode mode,
-            MoveSearch.Scheduling scheduling, MoveSearch.Budget budget) {
+            MoveSearch.Scheduling scheduling, MoveSearch.Budget budget, StateEvaluator stateValue) {
+        public Problem(Expr source, Context context, List<MoveProvider> providers, MovePriorityPolicy policy,
+                Verifier verifier, ToDoubleFunction<State> stateScore, MoveSearch.Mode mode,
+                MoveSearch.Scheduling scheduling, MoveSearch.Budget budget) {
+            this(source, context, providers, policy, verifier, stateScore, mode, scheduling, budget,
+                (state, ignored) -> StateValue.Assessment.EMPTY);
+        }
         public Problem {
             Objects.requireNonNull(source, "source");
             Objects.requireNonNull(context, "context");
@@ -82,6 +101,7 @@ public final class TypedMoveSearch {
             Objects.requireNonNull(mode, "mode");
             Objects.requireNonNull(scheduling, "scheduling");
             Objects.requireNonNull(budget, "budget");
+            Objects.requireNonNull(stateValue, "stateValue");
             if (policy != Policy.INVENTORY_ORDER && !(policy instanceof TypedPolicy)) {
                 throw new IllegalArgumentException("typed move search requires an explicitly typed policy");
             }
@@ -108,6 +128,12 @@ public final class TypedMoveSearch {
         }
         public boolean reached() { return outcome == MoveSearch.Outcome.TARGET_REACHED; }
 
+        /** Root including the assessed capabilities, even when its work exhausts the budget. */
+        public State initialState() {
+            return encodedResult.stateAssessments().keySet().stream()
+                .filter(state -> state.searchDepth() == 0).map(State::decode).findFirst().orElseThrow();
+        }
+
         /** Includes rejected proposals; absence of verification means it was not performed. */
         public List<Event> events() {
             return encodedResult.events().stream().map(event -> new Event(State.decode(event.source()),
@@ -123,7 +149,8 @@ public final class TypedMoveSearch {
         ToDoubleFunction<MoveState> score = state -> problem.stateScore().applyAsDouble(State.decode(state));
         var encoded = new MoveSearch().search(new MoveSearch.Problem(CODEC.encodeExpression(problem.source()),
             encodedContext, problem.providers(), problem.policy(), verifier, score, problem.mode(),
-            problem.scheduling(), problem.budget()));
+            problem.scheduling(), problem.budget(),
+            (state, ignored) -> problem.stateValue().evaluate(State.decode(state), problem.context())));
         var witness = encoded.witness().stream()
             .map(step -> new WitnessStep(State.decode(step.source()), State.decode(step.target()),
                 step.move(), step.verification())).toList();

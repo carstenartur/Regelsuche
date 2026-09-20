@@ -85,7 +85,7 @@ public final class TypedLearningWorkStudy {
         return new Report(protocol, formation, formationWork, primitive, learned, rows);
     }
 
-    private static Training train(TraceRewriteStrategyLearner.FrozenStrategy formation,
+    static Training train(TraceRewriteStrategyLearner.FrozenStrategy formation,
             TypedLearnedMoveInventory inventory, boolean learned) {
         var history = new RuleHistoryMemory();
         var runs = new ArrayList<TrainingRun>();

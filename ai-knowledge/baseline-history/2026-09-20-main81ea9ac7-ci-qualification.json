@@ -1,0 +1,1557 @@
+{
+  "schema": "regelsuche.independent-predecessor-qualification/v1",
+  "checkedAtUtc": "2026-09-20T08:14:16.946Z",
+  "repository": "carstenartur/Regelsuche",
+  "result": "QUALIFIED_ACCEPTED_PREDECESSOR_FOR_FRESH_MEASUREMENT",
+  "scope": "Read-only GitHub API qualification; no baseline mutation, local build or artifact ZIP download.",
+  "sourcePr": {
+    "number": 1038,
+    "url": "https://github.com/carstenartur/Regelsuche/pull/1038",
+    "apiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/pulls/1038",
+    "state": "closed",
+    "merged": true,
+    "mergedAt": "2026-09-19T23:26:17Z",
+    "title": "Integrate verified typed learning and modular transfer PRs #1035–#1037",
+    "baseRef": "main",
+    "baseSha": "1fcb0b00b9dccf61c953a520af69f475da81d5b7",
+    "headRef": "codex/integrate-green-learning-prs",
+    "headSha": "be11752a7be043525d84acaa1d23eb43fa6eb008",
+    "mergeCommitSha": "81ea9ac7dc46f310f68a071b944ea144e581c2ed"
+  },
+  "headCommit": {
+    "sha": "be11752a7be043525d84acaa1d23eb43fa6eb008",
+    "tree": "e3a2a95e4ecd91cc9d0091995bbe66cc2c7f67b2",
+    "parents": [
+      "da6ac064a5a893033834924ecf6eeadb32d85deb",
+      "329e0c0dfe799cabf40a61813e2efa3485c15ffb"
+    ],
+    "apiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/git/commits/be11752a7be043525d84acaa1d23eb43fa6eb008"
+  },
+  "mergeCommit": {
+    "sha": "81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+    "tree": "e3a2a95e4ecd91cc9d0091995bbe66cc2c7f67b2",
+    "parents": [
+      "1fcb0b00b9dccf61c953a520af69f475da81d5b7",
+      "be11752a7be043525d84acaa1d23eb43fa6eb008"
+    ],
+    "apiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/git/commits/81ea9ac7dc46f310f68a071b944ea144e581c2ed"
+  },
+  "checks": {
+    "headAndMergedMainHaveIdenticalTree": true,
+    "mergedMainIncludesExactPrHead": true,
+    "prMergedAfterSuccessfulPrQualification": true,
+    "allWorkflowRequiredAuthoritiesPassedOnBothHeads": true,
+    "allCollectionPagesComplete": true,
+    "administrativeBranchProtectionNotQueried": true
+  },
+  "workflowAuthorityDefinition": {
+    "path": ".github/workflows/gradle.yml",
+    "blobSha": "0bd417fdca585033d6976c5108a6ed900429c811",
+    "sha256": "253860864155be6c835d8e6f16d292a039afc545cb6ed919a91f5054060747ff",
+    "aggregateJobKey": "verification",
+    "aggregateNonCreateName": "Checkout-local ciCheck",
+    "needs": [
+      "gradle-verification",
+      "jmh-verification",
+      "sympy-runtime-verification",
+      "maven-product-verification",
+      "external-polynomial-comparison"
+    ],
+    "rejectIncompleteExpression": "${{ needs.gradle-verification.result != 'success' || needs.jmh-verification.result != 'success' || needs.sympy-runtime-verification.result != 'success' || (github.event_name != 'create' && (needs.maven-product-verification.result != 'success' || needs.external-polynomial-comparison.result != 'success')) }}",
+    "rejectIncompleteRun": "exit 1",
+    "sourceCommit": "be11752a7be043525d84acaa1d23eb43fa6eb008",
+    "requiredNonCreateJobNames": [
+      "Checkout-local Gradle authority",
+      "Complete Maven product and Docker authority",
+      "Isolated JMH authority",
+      "Isolated SymPy runtime authority",
+      "External polynomial comparison",
+      "Checkout-local ciCheck"
+    ]
+  },
+  "qualifications": [
+    {
+      "label": "PR head before merge",
+      "apiRunListUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/runs?head_sha=be11752a7be043525d84acaa1d23eb43fa6eb008&per_page=100",
+      "apiJobsUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/runs/35474041553/jobs?per_page=100&filter=latest",
+      "apiArtifactsUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/runs/35474041553/artifacts?per_page=100",
+      "id": 35474041553,
+      "checkSuiteId": 96060824592,
+      "event": "pull_request",
+      "runAttempt": 1,
+      "headSha": "be11752a7be043525d84acaa1d23eb43fa6eb008",
+      "headBranch": "codex/integrate-green-learning-prs",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35474041553",
+      "createdAt": "2026-09-19T22:41:18Z",
+      "updatedAt": "2026-09-19T23:25:43Z",
+      "requiredJobIds": [
+        105980106505,
+        105980106507,
+        105980106489,
+        105980106473,
+        105980106367,
+        105985446081
+      ],
+      "completeJobCount": 11,
+      "jobs": [
+        {
+          "id": 105980106367,
+          "name": "External polynomial comparison",
+          "runId": 35474041553,
+          "headSha": "be11752a7be043525d84acaa1d23eb43fa6eb008",
+          "status": "completed",
+          "conclusion": "success",
+          "requiredByCiCheck": true,
+          "startedAt": "2026-09-19T22:41:44Z",
+          "completedAt": "2026-09-19T22:43:26Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35474041553/job/105980106367",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105980106367",
+          "steps": [
+            {
+              "number": 1,
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 2,
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 3,
+              "name": "Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 4,
+              "name": "Run gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 5,
+              "name": "Run the checkout-owned polynomial pilot and independent verification",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 6,
+              "name": "Retain complete evidence including negative outcomes",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 10,
+              "name": "Post Run gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 11,
+              "name": "Post Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 12,
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 13,
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 105980106473,
+          "name": "Isolated SymPy runtime authority",
+          "runId": 35474041553,
+          "headSha": "be11752a7be043525d84acaa1d23eb43fa6eb008",
+          "status": "completed",
+          "conclusion": "success",
+          "requiredByCiCheck": true,
+          "startedAt": "2026-09-19T22:41:43Z",
+          "completedAt": "2026-09-19T22:46:49Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35474041553/job/105980106473",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105980106473",
+          "steps": [
+            {
+              "number": 1,
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 2,
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 3,
+              "name": "Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 4,
+              "name": "Run gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 5,
+              "name": "Install isolated SymPy runtime prerequisites",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 6,
+              "name": "Run the complete Gradle SymPy runtime test authority",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 7,
+              "name": "Retain isolated SymPy runtime evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 12,
+              "name": "Post Run gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 13,
+              "name": "Post Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 14,
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 15,
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 105980106489,
+          "name": "Isolated JMH authority",
+          "runId": 35474041553,
+          "headSha": "be11752a7be043525d84acaa1d23eb43fa6eb008",
+          "status": "completed",
+          "conclusion": "success",
+          "requiredByCiCheck": true,
+          "startedAt": "2026-09-19T22:41:43Z",
+          "completedAt": "2026-09-19T23:07:31Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35474041553/job/105980106489",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105980106489",
+          "steps": [
+            {
+              "number": 1,
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 2,
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 3,
+              "name": "Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 4,
+              "name": "Run gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 5,
+              "name": "Install isolated benchmark prerequisites",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 6,
+              "name": "Run every JMH benchmark and fail-closed validator",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 7,
+              "name": "Retain isolated JMH evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 12,
+              "name": "Post Run gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 13,
+              "name": "Post Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 14,
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 15,
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 105980106505,
+          "name": "Checkout-local Gradle authority",
+          "runId": 35474041553,
+          "headSha": "be11752a7be043525d84acaa1d23eb43fa6eb008",
+          "status": "completed",
+          "conclusion": "success",
+          "requiredByCiCheck": true,
+          "startedAt": "2026-09-19T22:41:49Z",
+          "completedAt": "2026-09-19T23:25:20Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35474041553/job/105980106505",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105980106505",
+          "steps": [
+            {
+              "number": 1,
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 2,
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 3,
+              "name": "Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 4,
+              "name": "Run gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 5,
+              "name": "Install checkout prerequisites",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 6,
+              "name": "Run the checkout-owned Gradle authority without duplicate JMH or loaded SymPy runtime work",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 7,
+              "name": "Retain Gradle verification evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 12,
+              "name": "Post Run gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 13,
+              "name": "Post Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 14,
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 15,
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 105980106507,
+          "name": "Complete Maven product and Docker authority",
+          "runId": 35474041553,
+          "headSha": "be11752a7be043525d84acaa1d23eb43fa6eb008",
+          "status": "completed",
+          "conclusion": "success",
+          "requiredByCiCheck": true,
+          "startedAt": "2026-09-19T22:41:44Z",
+          "completedAt": "2026-09-19T22:56:48Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35474041553/job/105980106507",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105980106507",
+          "steps": [
+            {
+              "number": 1,
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 2,
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 3,
+              "name": "Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 4,
+              "name": "Install independent Maven checkout prerequisites",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 5,
+              "name": "Verify the complete Maven product and Docker contract",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 6,
+              "name": "Retain Maven product verification evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 11,
+              "name": "Post Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 12,
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 13,
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 105980106816,
+          "name": "JMH precision study replica ${{ matrix.replicate }}",
+          "runId": 35474041553,
+          "headSha": "be11752a7be043525d84acaa1d23eb43fa6eb008",
+          "status": "completed",
+          "conclusion": "skipped",
+          "requiredByCiCheck": false,
+          "startedAt": "2026-09-19T22:41:41Z",
+          "completedAt": "2026-09-19T22:41:40Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35474041553/job/105980106816",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105980106816",
+          "steps": []
+        },
+        {
+          "id": 105980106983,
+          "name": "Retained JMH precision study v2 analysis",
+          "runId": 35474041553,
+          "headSha": "be11752a7be043525d84acaa1d23eb43fa6eb008",
+          "status": "completed",
+          "conclusion": "skipped",
+          "requiredByCiCheck": false,
+          "startedAt": "2026-09-19T22:41:41Z",
+          "completedAt": "2026-09-19T22:41:40Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35474041553/job/105980106983",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105980106983",
+          "steps": []
+        },
+        {
+          "id": 105980107195,
+          "name": "Retained JMH precision study analysis",
+          "runId": 35474041553,
+          "headSha": "be11752a7be043525d84acaa1d23eb43fa6eb008",
+          "status": "completed",
+          "conclusion": "skipped",
+          "requiredByCiCheck": false,
+          "startedAt": "2026-09-19T22:41:41Z",
+          "completedAt": "2026-09-19T22:41:40Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35474041553/job/105980107195",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105980107195",
+          "steps": []
+        },
+        {
+          "id": 105980123027,
+          "name": "JMH precision study v2 replica ${{ matrix.replicate }}",
+          "runId": 35474041553,
+          "headSha": "be11752a7be043525d84acaa1d23eb43fa6eb008",
+          "status": "completed",
+          "conclusion": "skipped",
+          "requiredByCiCheck": false,
+          "startedAt": "2026-09-19T22:41:48Z",
+          "completedAt": "2026-09-19T22:41:40Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35474041553/job/105980123027",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105980123027",
+          "steps": []
+        },
+        {
+          "id": 105985446081,
+          "name": "Checkout-local ciCheck",
+          "runId": 35474041553,
+          "headSha": "be11752a7be043525d84acaa1d23eb43fa6eb008",
+          "status": "completed",
+          "conclusion": "success",
+          "requiredByCiCheck": true,
+          "startedAt": "2026-09-19T23:25:23Z",
+          "completedAt": "2026-09-19T23:25:43Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35474041553/job/105985446081",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105985446081",
+          "steps": [
+            {
+              "number": 1,
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 2,
+              "name": "Reject incomplete verification authority",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 3,
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 4,
+              "name": "Download project-parallel Gradle coverage evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 5,
+              "name": "Download isolated SymPy coverage evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 6,
+              "name": "Download isolated JMH acceptance evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 7,
+              "name": "Verify complete cross-authority coverage",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 8,
+              "name": "Collect complete checkout-owned quality acceptance evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 9,
+              "name": "Retain quality acceptance index and bound source files",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 10,
+              "name": "Retain converged coverage evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 11,
+              "name": "Record complete verification authority",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 22,
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 23,
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 105985491296,
+          "name": "Publish generated reports",
+          "runId": 35474041553,
+          "headSha": "be11752a7be043525d84acaa1d23eb43fa6eb008",
+          "status": "completed",
+          "conclusion": "skipped",
+          "requiredByCiCheck": false,
+          "startedAt": "2026-09-19T23:25:43Z",
+          "completedAt": "2026-09-19T23:25:43Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35474041553/job/105985491296",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105985491296",
+          "steps": []
+        }
+      ],
+      "artifactCount": 7,
+      "artifactMetadata": [
+        {
+          "id": 10594164921,
+          "name": "repository-verification",
+          "sizeInBytes": 392569603,
+          "digest": "sha256:757c674af1d3d481f5e91303c46a010a0d1f51834d9203427757c9f62cbdf651",
+          "expired": false,
+          "createdAt": "2026-09-19T23:25:16Z",
+          "updatedAt": "2026-09-19T23:25:16Z",
+          "expiresAt": "2026-12-18T22:41:18Z",
+          "apiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10594164921",
+          "archiveDownloadApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10594164921/zip"
+        },
+        {
+          "id": 10593639598,
+          "name": "jmh-verification",
+          "sizeInBytes": 35508,
+          "digest": "sha256:99b2c7ea5131cf8e1099362d18149bf1da005bf863d9c46a7deb3dcb100cb48f",
+          "expired": false,
+          "createdAt": "2026-09-19T23:07:29Z",
+          "updatedAt": "2026-09-19T23:07:29Z",
+          "expiresAt": "2026-12-18T22:41:18Z",
+          "apiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10593639598",
+          "archiveDownloadApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10593639598/zip"
+        },
+        {
+          "id": 10593573912,
+          "name": "maven-product-verification",
+          "sizeInBytes": 3033169,
+          "digest": "sha256:47c6a7c02375cdec30cec5b3a32640eec768fba67f9dfe74bae83d16acadfc81",
+          "expired": false,
+          "createdAt": "2026-09-19T22:56:45Z",
+          "updatedAt": "2026-09-19T22:56:45Z",
+          "expiresAt": "2026-12-18T22:41:18Z",
+          "apiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10593573912",
+          "archiveDownloadApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10593573912/zip"
+        },
+        {
+          "id": 10593402164,
+          "name": "sympy-runtime-verification",
+          "sizeInBytes": 376095,
+          "digest": "sha256:10a13a5b6dd8da051f4b1dbf83b01e78a2cea4eac4017717872bfefc887a6f4a",
+          "expired": false,
+          "createdAt": "2026-09-19T22:46:46Z",
+          "updatedAt": "2026-09-19T22:46:46Z",
+          "expiresAt": "2026-12-18T22:41:18Z",
+          "apiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10593402164",
+          "archiveDownloadApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10593402164/zip"
+        },
+        {
+          "id": 10593247308,
+          "name": "external-polynomial-comparison-be11752a7be043525d84acaa1d23eb43fa6eb008",
+          "sizeInBytes": 496856,
+          "digest": "sha256:61b47b42dee578f48ffd6ce2f6c2df65aea1563ae1cbde2217507a44be251aa0",
+          "expired": false,
+          "createdAt": "2026-09-19T22:43:23Z",
+          "updatedAt": "2026-09-19T22:43:23Z",
+          "expiresAt": "2026-12-18T22:41:18Z",
+          "apiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10593247308",
+          "archiveDownloadApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10593247308/zip"
+        },
+        {
+          "id": 10593239139,
+          "name": "coverage-verification",
+          "sizeInBytes": 2292,
+          "digest": "sha256:7a4b38c6894678585c6357323732438a40f9a8945f01e339df311f6a11c1f807",
+          "expired": false,
+          "createdAt": "2026-09-19T23:25:41Z",
+          "updatedAt": "2026-09-19T23:25:41Z",
+          "expiresAt": "2026-12-18T22:41:18Z",
+          "apiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10593239139",
+          "archiveDownloadApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10593239139/zip"
+        },
+        {
+          "id": 10593114522,
+          "name": "quality-acceptance-evidence",
+          "sizeInBytes": 29166414,
+          "digest": "sha256:5313762f41efdfbd154405ea8eb6b957da45d21a5989c2d46fe9b67d783c7c05",
+          "expired": false,
+          "createdAt": "2026-09-19T23:25:40Z",
+          "updatedAt": "2026-09-19T23:25:40Z",
+          "expiresAt": "2026-12-18T22:41:18Z",
+          "apiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10593114522",
+          "archiveDownloadApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10593114522/zip"
+        }
+      ],
+      "artifactZipDownloaded": false,
+      "artifactDigests": "API_REPORTED_NOT_LOCALLY_REHASHED"
+    },
+    {
+      "label": "Accepted main after merge",
+      "apiRunListUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/runs?head_sha=81ea9ac7dc46f310f68a071b944ea144e581c2ed&per_page=100",
+      "apiJobsUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/runs/35476125115/jobs?per_page=100&filter=latest",
+      "apiArtifactsUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/runs/35476125115/artifacts?per_page=100",
+      "id": 35476125115,
+      "checkSuiteId": 96065896106,
+      "event": "push",
+      "runAttempt": 1,
+      "headSha": "81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+      "headBranch": "main",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35476125115",
+      "createdAt": "2026-09-19T23:26:19Z",
+      "updatedAt": "2026-09-20T00:07:28Z",
+      "requiredJobIds": [
+        105985561935,
+        105985562000,
+        105985561941,
+        105985562073,
+        105985561847,
+        105990205641
+      ],
+      "completeJobCount": 11,
+      "jobs": [
+        {
+          "id": 105985561847,
+          "name": "External polynomial comparison",
+          "runId": 35476125115,
+          "headSha": "81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+          "status": "completed",
+          "conclusion": "success",
+          "requiredByCiCheck": true,
+          "startedAt": "2026-09-19T23:26:22Z",
+          "completedAt": "2026-09-19T23:27:45Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35476125115/job/105985561847",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105985561847",
+          "steps": [
+            {
+              "number": 1,
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 2,
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 3,
+              "name": "Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 4,
+              "name": "Run gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 5,
+              "name": "Run the checkout-owned polynomial pilot and independent verification",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 6,
+              "name": "Retain complete evidence including negative outcomes",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 10,
+              "name": "Post Run gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 11,
+              "name": "Post Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 12,
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 13,
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 105985561935,
+          "name": "Checkout-local Gradle authority",
+          "runId": 35476125115,
+          "headSha": "81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+          "status": "completed",
+          "conclusion": "success",
+          "requiredByCiCheck": true,
+          "startedAt": "2026-09-19T23:26:23Z",
+          "completedAt": "2026-09-20T00:06:28Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35476125115/job/105985561935",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105985561935",
+          "steps": [
+            {
+              "number": 1,
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 2,
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 3,
+              "name": "Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 4,
+              "name": "Run gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 5,
+              "name": "Install checkout prerequisites",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 6,
+              "name": "Run the checkout-owned Gradle authority without duplicate JMH or loaded SymPy runtime work",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 7,
+              "name": "Retain Gradle verification evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 12,
+              "name": "Post Run gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 13,
+              "name": "Post Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 14,
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 15,
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 105985561941,
+          "name": "Isolated JMH authority",
+          "runId": 35476125115,
+          "headSha": "81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+          "status": "completed",
+          "conclusion": "success",
+          "requiredByCiCheck": true,
+          "startedAt": "2026-09-19T23:26:23Z",
+          "completedAt": "2026-09-19T23:47:55Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35476125115/job/105985561941",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105985561941",
+          "steps": [
+            {
+              "number": 1,
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 2,
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 3,
+              "name": "Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 4,
+              "name": "Run gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 5,
+              "name": "Install isolated benchmark prerequisites",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 6,
+              "name": "Run every JMH benchmark and fail-closed validator",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 7,
+              "name": "Retain isolated JMH evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 12,
+              "name": "Post Run gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 13,
+              "name": "Post Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 14,
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 15,
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 105985562000,
+          "name": "Complete Maven product and Docker authority",
+          "runId": 35476125115,
+          "headSha": "81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+          "status": "completed",
+          "conclusion": "success",
+          "requiredByCiCheck": true,
+          "startedAt": "2026-09-19T23:26:23Z",
+          "completedAt": "2026-09-19T23:41:52Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35476125115/job/105985562000",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105985562000",
+          "steps": [
+            {
+              "number": 1,
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 2,
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 3,
+              "name": "Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 4,
+              "name": "Install independent Maven checkout prerequisites",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 5,
+              "name": "Verify the complete Maven product and Docker contract",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 6,
+              "name": "Retain Maven product verification evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 11,
+              "name": "Post Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 12,
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 13,
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 105985562073,
+          "name": "Isolated SymPy runtime authority",
+          "runId": 35476125115,
+          "headSha": "81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+          "status": "completed",
+          "conclusion": "success",
+          "requiredByCiCheck": true,
+          "startedAt": "2026-09-19T23:26:23Z",
+          "completedAt": "2026-09-19T23:31:01Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35476125115/job/105985562073",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105985562073",
+          "steps": [
+            {
+              "number": 1,
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 2,
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 3,
+              "name": "Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 4,
+              "name": "Run gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 5,
+              "name": "Install isolated SymPy runtime prerequisites",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 6,
+              "name": "Run the complete Gradle SymPy runtime test authority",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 7,
+              "name": "Retain isolated SymPy runtime evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 12,
+              "name": "Post Run gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 13,
+              "name": "Post Run actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 14,
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 15,
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 105985562475,
+          "name": "JMH precision study replica ${{ matrix.replicate }}",
+          "runId": 35476125115,
+          "headSha": "81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+          "status": "completed",
+          "conclusion": "skipped",
+          "requiredByCiCheck": false,
+          "startedAt": "2026-09-19T23:26:20Z",
+          "completedAt": "2026-09-19T23:26:20Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35476125115/job/105985562475",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105985562475",
+          "steps": []
+        },
+        {
+          "id": 105985562496,
+          "name": "JMH precision study v2 replica ${{ matrix.replicate }}",
+          "runId": 35476125115,
+          "headSha": "81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+          "status": "completed",
+          "conclusion": "skipped",
+          "requiredByCiCheck": false,
+          "startedAt": "2026-09-19T23:26:20Z",
+          "completedAt": "2026-09-19T23:26:20Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35476125115/job/105985562496",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105985562496",
+          "steps": []
+        },
+        {
+          "id": 105985562571,
+          "name": "Retained JMH precision study analysis",
+          "runId": 35476125115,
+          "headSha": "81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+          "status": "completed",
+          "conclusion": "skipped",
+          "requiredByCiCheck": false,
+          "startedAt": "2026-09-19T23:26:20Z",
+          "completedAt": "2026-09-19T23:26:20Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35476125115/job/105985562571",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105985562571",
+          "steps": []
+        },
+        {
+          "id": 105985562612,
+          "name": "Retained JMH precision study v2 analysis",
+          "runId": 35476125115,
+          "headSha": "81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+          "status": "completed",
+          "conclusion": "skipped",
+          "requiredByCiCheck": false,
+          "startedAt": "2026-09-19T23:26:20Z",
+          "completedAt": "2026-09-19T23:26:20Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35476125115/job/105985562612",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105985562612",
+          "steps": []
+        },
+        {
+          "id": 105990205641,
+          "name": "Checkout-local ciCheck",
+          "runId": 35476125115,
+          "headSha": "81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+          "status": "completed",
+          "conclusion": "success",
+          "requiredByCiCheck": true,
+          "startedAt": "2026-09-20T00:06:31Z",
+          "completedAt": "2026-09-20T00:06:52Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35476125115/job/105990205641",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105990205641",
+          "steps": [
+            {
+              "number": 1,
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 2,
+              "name": "Reject incomplete verification authority",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "number": 3,
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 4,
+              "name": "Download project-parallel Gradle coverage evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 5,
+              "name": "Download isolated SymPy coverage evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 6,
+              "name": "Download isolated JMH acceptance evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 7,
+              "name": "Verify complete cross-authority coverage",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 8,
+              "name": "Collect complete checkout-owned quality acceptance evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 9,
+              "name": "Retain quality acceptance index and bound source files",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 10,
+              "name": "Retain converged coverage evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 11,
+              "name": "Record complete verification authority",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 22,
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 23,
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 105990253154,
+          "name": "Publish generated reports",
+          "runId": 35476125115,
+          "headSha": "81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+          "status": "completed",
+          "conclusion": "success",
+          "requiredByCiCheck": false,
+          "startedAt": "2026-09-20T00:06:55Z",
+          "completedAt": "2026-09-20T00:07:27Z",
+          "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35476125115/job/105990253154",
+          "checkRunApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/check-runs/105990253154",
+          "steps": [
+            {
+              "number": 1,
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 2,
+              "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 3,
+              "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 4,
+              "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 5,
+              "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 6,
+              "name": "Assemble the static site",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 7,
+              "name": "Publish generated reports to gh-pages",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 14,
+              "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "number": 15,
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        }
+      ],
+      "artifactCount": 7,
+      "artifactMetadata": [
+        {
+          "id": 10594966303,
+          "name": "repository-verification",
+          "sizeInBytes": 392573066,
+          "digest": "sha256:e3d323f3477c58aa9e541d46e7096a06db8af81c4f2548ffa96e993a1456c697",
+          "expired": false,
+          "createdAt": "2026-09-20T00:06:18Z",
+          "updatedAt": "2026-09-20T00:06:18Z",
+          "expiresAt": "2026-12-18T23:26:20Z",
+          "apiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10594966303",
+          "archiveDownloadApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10594966303/zip"
+        },
+        {
+          "id": 10594877535,
+          "name": "coverage-verification",
+          "sizeInBytes": 2291,
+          "digest": "sha256:7795c821e882bfed85448804a13dcd2989e7f7062ca81dfdbb6a06040ca41794",
+          "expired": false,
+          "createdAt": "2026-09-20T00:06:50Z",
+          "updatedAt": "2026-09-20T00:06:50Z",
+          "expiresAt": "2026-12-18T23:26:20Z",
+          "apiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10594877535",
+          "archiveDownloadApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10594877535/zip"
+        },
+        {
+          "id": 10594615669,
+          "name": "external-polynomial-comparison-81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+          "sizeInBytes": 496222,
+          "digest": "sha256:7ed7bd6e1ce57c5fa51b840eee6721f943f0ccf76047fc7be088ce546966b2f2",
+          "expired": false,
+          "createdAt": "2026-09-19T23:27:40Z",
+          "updatedAt": "2026-09-19T23:27:40Z",
+          "expiresAt": "2026-12-18T23:26:20Z",
+          "apiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10594615669",
+          "archiveDownloadApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10594615669/zip"
+        },
+        {
+          "id": 10594590853,
+          "name": "sympy-runtime-verification",
+          "sizeInBytes": 376087,
+          "digest": "sha256:a366ba517a1660cb428286c0582ef1d94e36c90d69c2db10821ff95c09957613",
+          "expired": false,
+          "createdAt": "2026-09-19T23:30:54Z",
+          "updatedAt": "2026-09-19T23:30:54Z",
+          "expiresAt": "2026-12-18T23:26:20Z",
+          "apiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10594590853",
+          "archiveDownloadApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10594590853/zip"
+        },
+        {
+          "id": 10594551994,
+          "name": "jmh-verification",
+          "sizeInBytes": 35946,
+          "digest": "sha256:10c20a01e201e10c86199b2594efba0471834b2ea09f17494e149d397525cdbb",
+          "expired": false,
+          "createdAt": "2026-09-19T23:47:47Z",
+          "updatedAt": "2026-09-19T23:47:47Z",
+          "expiresAt": "2026-12-18T23:26:20Z",
+          "apiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10594551994",
+          "archiveDownloadApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10594551994/zip"
+        },
+        {
+          "id": 10594361866,
+          "name": "maven-product-verification",
+          "sizeInBytes": 3034480,
+          "digest": "sha256:351395c273f9cfcbf257556919de8e5432d2a5676728e89a4032e13ad2122b60",
+          "expired": false,
+          "createdAt": "2026-09-19T23:41:48Z",
+          "updatedAt": "2026-09-19T23:41:48Z",
+          "expiresAt": "2026-12-18T23:26:20Z",
+          "apiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10594361866",
+          "archiveDownloadApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10594361866/zip"
+        },
+        {
+          "id": 10594338363,
+          "name": "quality-acceptance-evidence",
+          "sizeInBytes": 29166914,
+          "digest": "sha256:3d7eb693435826509e34cff0dfa5cb1397c581f2a699a37519651659df47a68f",
+          "expired": false,
+          "createdAt": "2026-09-20T00:06:49Z",
+          "updatedAt": "2026-09-20T00:06:49Z",
+          "expiresAt": "2026-12-18T23:26:20Z",
+          "apiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10594338363",
+          "archiveDownloadApiUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/10594338363/zip"
+        }
+      ],
+      "artifactZipDownloaded": false,
+      "artifactDigests": "API_REPORTED_NOT_LOCALLY_REHASHED"
+    }
+  ],
+  "otherObservedRuns": {
+    "head": [
+      {
+        "id": 35474039477,
+        "name": "PR #1038",
+        "event": "dynamic",
+        "headSha": "be11752a7be043525d84acaa1d23eb43fa6eb008",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35474039477"
+      },
+      {
+        "id": 35474038704,
+        "name": "Automatic Dependency Submission (Maven)",
+        "event": "dynamic",
+        "headSha": "be11752a7be043525d84acaa1d23eb43fa6eb008",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35474038704"
+      },
+      {
+        "id": 35474038406,
+        "name": "Automatic Dependency Submission (Gradle)",
+        "event": "dynamic",
+        "headSha": "be11752a7be043525d84acaa1d23eb43fa6eb008",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35474038406"
+      }
+    ],
+    "merge": [
+      {
+        "id": 35486542278,
+        "name": "CI",
+        "event": "create",
+        "headSha": "81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+        "status": "completed",
+        "conclusion": "skipped",
+        "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35486542278"
+      },
+      {
+        "id": 35486542070,
+        "name": "Automatic Dependency Submission (Gradle)",
+        "event": "dynamic",
+        "headSha": "81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35486542070"
+      },
+      {
+        "id": 35486541897,
+        "name": "Automatic Dependency Submission (Maven)",
+        "event": "dynamic",
+        "headSha": "81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35486541897"
+      },
+      {
+        "id": 35476126108,
+        "name": "Automatic Dependency Submission (Gradle)",
+        "event": "dynamic",
+        "headSha": "81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35476126108"
+      },
+      {
+        "id": 35476125151,
+        "name": "Push on main",
+        "event": "dynamic",
+        "headSha": "81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35476125151"
+      },
+      {
+        "id": 35476125025,
+        "name": "Automatic Dependency Submission (Maven)",
+        "event": "dynamic",
+        "headSha": "81ea9ac7dc46f310f68a071b944ea144e581c2ed",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/carstenartur/Regelsuche/actions/runs/35476125025"
+      }
+    ]
+  },
+  "limits": [
+    "Required authorities mean the five dependencies and aggregate gate defined in the immutable checkout-owned CI workflow; no administrative branch-protection claim is made.",
+    "Four manual JMH study jobs were skipped on each qualifying run. PR report publication was skipped; post-merge report publication succeeded.",
+    "The later create-event CI at the merge SHA was intentionally skipped and is not used as qualification.",
+    "Artifact hashes and sizes are API metadata; ZIPs were neither downloaded nor hashed locally.",
+    "This source qualification does not supply metrics or advance a baseline. A fresh clean predecessor measurement must still pass its existing unchanged gates."
+  ]
+}

@@ -15,6 +15,9 @@ public/
 # Ignore Kotlin plugin data
 .kotlin
 
+# Generated Python bytecode is never part of an evaluation source freeze.
+__pycache__/
+
 # Generated browser-flow videos are produced by `./gradlew e2eTest
 # -Pregelsuche.recordDocs=true` and uploaded as CI artifacts; they
 # are too large to commit. Screenshots under

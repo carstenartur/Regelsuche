@@ -22,6 +22,13 @@ public final class TypedPolicySelection {
     private static final HistoryMovePolicy.Weights ZERO = new HistoryMovePolicy.Weights(0, 0, 0, 0, 0, 0, 0, 0);
     public enum PolicyKind { INVENTORY_ORDER, HISTORY_RANKED }
 
+    /** Same selector lifecycle for optimization tasks with no manufactured endpoint. */
+    public TypedSourcePolicySelection.Frozen trainSourceOnly(List<TrainingTask> tasks,
+            List<TypedSourcePolicySelection.Profile> profiles,
+            de.regelsuche.search.moves.TypedSourceOnlySearch.Objective objective) {
+        return TypedSourcePolicySelection.train(tasks, profiles, objective);
+    }
+
     public record Profile(String id, PolicyKind kind, HistoryMovePolicy.Weights weights) {
         public Profile(String id, HistoryMovePolicy.Weights weights) { this(id, PolicyKind.HISTORY_RANKED, weights); }
         public Profile {
@@ -159,7 +166,7 @@ public final class TypedPolicySelection {
         return new TypedMoveSearch().search(new TypedMoveSearch.Problem(problem.source(), problem.context(), problem.providers(),
             profile.kind() == PolicyKind.INVENTORY_ORDER ? MovePriorityPolicy.INVENTORY_ORDER
                 : HistoryMovePolicy.typed(history, profile.weights()), problem.verifier(), problem.stateScore(),
-            problem.mode(), problem.scheduling(), problem.budget()));
+            problem.mode(), problem.scheduling(), problem.budget(), problem.stateValue()));
     }
 
     private static String weightsJson(HistoryMovePolicy.Weights weights) {

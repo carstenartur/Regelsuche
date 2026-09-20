@@ -151,6 +151,9 @@ public final class LearnedSchedulingArtifacts {
     private static Object normalize(Object value) throws ReflectiveOperationException, IOException {
         if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean) return value;
         if (value instanceof Enum<?> enumeration) return enumeration.name();
+        // An observational binding may be serialized; it cannot reconstruct the private capability.
+        if (value instanceof de.regelsuche.transform.ExactTheoryEvidence evidence)
+            return Map.of("binding", normalize(evidence.binding()));
         if (value instanceof Map<?, ?> map) {
             var result = new TreeMap<String, Object>();
             for (var entry : map.entrySet()) result.put((String) entry.getKey(), normalize(entry.getValue())); return result;

@@ -1,0 +1,1718 @@
+[
+  {
+    "profile": "BASE",
+    "phases": {
+      "queries": {
+        "execution": 1286,
+        "allocation": 8482,
+        "weight": 14157680840
+      },
+      "startup": {
+        "execution": 4,
+        "allocation": 23,
+        "weight": 29752224
+      },
+      "initialize": {
+        "execution": 8,
+        "allocation": 19,
+        "weight": 10466520
+      }
+    },
+    "queryTruncatedSamples": 0,
+    "queryExecutionThreads": {
+      "main": 1285,
+      "JFR Periodic Tasks": 1
+    },
+    "mechanismExecution": [
+      {
+        "name": "typed JSON codec",
+        "value": 461,
+        "percent": 35.84758942457232
+      },
+      {
+        "name": "result/model/response JSON serialization",
+        "value": 389,
+        "percent": 30.248833592534993
+      },
+      {
+        "name": "canonicalization and polynomial normalization",
+        "value": 235,
+        "percent": 18.27371695178849
+      },
+      {
+        "name": "source exclusion/frozen-model checks",
+        "value": 69,
+        "percent": 5.36547433903577
+      },
+      {
+        "name": "remaining search/path/incumbent management",
+        "value": 49,
+        "percent": 3.8102643856920686
+      },
+      {
+        "name": "remaining candidate generation",
+        "value": 37,
+        "percent": 2.8771384136858478
+      },
+      {
+        "name": "remaining replay/verification",
+        "value": 20,
+        "percent": 1.5552099533437014
+      },
+      {
+        "name": "other Java/runtime/boundary",
+        "value": 19,
+        "percent": 1.4774494556765163
+      },
+      {
+        "name": "mathematical pattern match/instantiate",
+        "value": 7,
+        "percent": 0.5443234836702955
+      }
+    ],
+    "mechanismAllocationWeight": [
+      {
+        "name": "result/model/response JSON serialization",
+        "value": 4933623344,
+        "percent": 34.847680208053056
+      },
+      {
+        "name": "typed JSON codec",
+        "value": 4901007008,
+        "percent": 34.61730112006113
+      },
+      {
+        "name": "canonicalization and polynomial normalization",
+        "value": 3294858104,
+        "percent": 23.27258356249257
+      },
+      {
+        "name": "source exclusion/frozen-model checks",
+        "value": 461167992,
+        "percent": 3.2573696017857117
+      },
+      {
+        "name": "remaining candidate generation",
+        "value": 288315096,
+        "percent": 2.036457095327486
+      },
+      {
+        "name": "remaining replay/verification",
+        "value": 168387304,
+        "percent": 1.189370673791796
+      },
+      {
+        "name": "remaining search/path/incumbent management",
+        "value": 88149008,
+        "percent": 0.6226232177162146
+      },
+      {
+        "name": "other Java/runtime/boundary",
+        "value": 11855144,
+        "percent": 0.08373648293091483
+      },
+      {
+        "name": "mathematical pattern match/instantiate",
+        "value": 10317840,
+        "percent": 0.07287803784111861
+      }
+    ],
+    "purposeExecution": [
+      {
+        "name": "primitive generation",
+        "value": 467,
+        "percent": 36.314152410575424
+      },
+      {
+        "name": "search evidence export",
+        "value": 251,
+        "percent": 19.51788491446345
+      },
+      {
+        "name": "path/state/incumbent management",
+        "value": 225,
+        "percent": 17.49611197511664
+      },
+      {
+        "name": "worker JSON response serialization",
+        "value": 131,
+        "percent": 10.186625194401245
+      },
+      {
+        "name": "primitive verification/replay",
+        "value": 113,
+        "percent": 8.786936236391913
+      },
+      {
+        "name": "per-query frozen-model reconstruction/check",
+        "value": 49,
+        "percent": 3.8102643856920686
+      },
+      {
+        "name": "TRAIN exclusion identity check",
+        "value": 27,
+        "percent": 2.099533437013997
+      },
+      {
+        "name": "other Java/runtime/boundary",
+        "value": 23,
+        "percent": 1.7884914463452566
+      }
+    ],
+    "purposeAllocationWeight": [
+      {
+        "name": "primitive generation",
+        "value": 5208256528,
+        "percent": 36.78749780320659
+      },
+      {
+        "name": "search evidence export",
+        "value": 3875741824,
+        "percent": 27.375541713370055
+      },
+      {
+        "name": "path/state/incumbent management",
+        "value": 2093556752,
+        "percent": 14.78742723232628
+      },
+      {
+        "name": "primitive verification/replay",
+        "value": 1406348800,
+        "percent": 9.933468736112573
+      },
+      {
+        "name": "worker JSON response serialization",
+        "value": 1048865728,
+        "percent": 7.408457217347471
+      },
+      {
+        "name": "per-query frozen-model reconstruction/check",
+        "value": 376427400,
+        "percent": 2.6588210615432972
+      },
+      {
+        "name": "TRAIN exclusion identity check",
+        "value": 93756384,
+        "percent": 0.6622298175779473
+      },
+      {
+        "name": "other Java/runtime/boundary",
+        "value": 54727424,
+        "percent": 0.3865564185157885
+      }
+    ],
+    "inclusiveExecution": [
+      {
+        "name": "candidate generation (primitive or macro)",
+        "value": 467,
+        "percent": 36.314152410575424
+      },
+      {
+        "name": "primitive generation",
+        "value": 467,
+        "percent": 36.314152410575424
+      },
+      {
+        "name": "typed JSON codec",
+        "value": 461,
+        "percent": 35.84758942457232
+      },
+      {
+        "name": "JSON artifact/response serialization",
+        "value": 387,
+        "percent": 30.093312597200622
+      },
+      {
+        "name": "canonical size check",
+        "value": 235,
+        "percent": 18.27371695178849
+      },
+      {
+        "name": "typed state decoding",
+        "value": 175,
+        "percent": 13.608087091757387
+      },
+      {
+        "name": "primitive verification/replay",
+        "value": 113,
+        "percent": 8.786936236391913
+      },
+      {
+        "name": "numeric text regular-expression validation",
+        "value": 65,
+        "percent": 5.05443234836703
+      },
+      {
+        "name": "per-query frozen-model reconstruction/check",
+        "value": 49,
+        "percent": 3.8102643856920686
+      },
+      {
+        "name": "mathematical pattern matching",
+        "value": 6,
+        "percent": 0.4665629860031104
+      }
+    ],
+    "inclusiveAllocationWeight": [
+      {
+        "name": "candidate generation (primitive or macro)",
+        "value": 5208256528,
+        "percent": 36.78749780320659
+      },
+      {
+        "name": "primitive generation",
+        "value": 5208256528,
+        "percent": 36.78749780320659
+      },
+      {
+        "name": "JSON artifact/response serialization",
+        "value": 4932052248,
+        "percent": 34.83658307980335
+      },
+      {
+        "name": "typed JSON codec",
+        "value": 4901007008,
+        "percent": 34.61730112006113
+      },
+      {
+        "name": "canonical size check",
+        "value": 3294858104,
+        "percent": 23.27258356249257
+      },
+      {
+        "name": "typed state decoding",
+        "value": 2001256248,
+        "percent": 14.135480737394557
+      },
+      {
+        "name": "primitive verification/replay",
+        "value": 1406348800,
+        "percent": 9.933468736112573
+      },
+      {
+        "name": "numeric text regular-expression validation",
+        "value": 935793968,
+        "percent": 6.609797032265915
+      },
+      {
+        "name": "per-query frozen-model reconstruction/check",
+        "value": 376427400,
+        "percent": 2.6588210615432972
+      },
+      {
+        "name": "mathematical pattern matching",
+        "value": 7699320,
+        "percent": 0.05438263573682877
+      }
+    ],
+    "inclusiveMechanismBreakdown": {
+      "candidate generation (primitive or macro)": [
+        {
+          "name": "typed JSON codec",
+          "value": 243,
+          "percent": 52.03426124197002
+        },
+        {
+          "name": "canonicalization and polynomial normalization",
+          "value": 181,
+          "percent": 38.75802997858673
+        },
+        {
+          "name": "remaining candidate generation",
+          "value": 37,
+          "percent": 7.922912205567452
+        },
+        {
+          "name": "mathematical pattern match/instantiate",
+          "value": 6,
+          "percent": 1.284796573875803
+        }
+      ],
+      "primitive generation": [
+        {
+          "name": "typed JSON codec",
+          "value": 243,
+          "percent": 52.03426124197002
+        },
+        {
+          "name": "canonicalization and polynomial normalization",
+          "value": 181,
+          "percent": 38.75802997858673
+        },
+        {
+          "name": "remaining candidate generation",
+          "value": 37,
+          "percent": 7.922912205567452
+        },
+        {
+          "name": "mathematical pattern match/instantiate",
+          "value": 6,
+          "percent": 1.284796573875803
+        }
+      ],
+      "canonical size check": [
+        {
+          "name": "canonicalization and polynomial normalization",
+          "value": 235,
+          "percent": 100.0
+        }
+      ],
+      "typed JSON codec": [
+        {
+          "name": "typed JSON codec",
+          "value": 461,
+          "percent": 100.0
+        }
+      ],
+      "typed state decoding": [
+        {
+          "name": "typed JSON codec",
+          "value": 175,
+          "percent": 100.0
+        }
+      ],
+      "numeric text regular-expression validation": [
+        {
+          "name": "typed JSON codec",
+          "value": 65,
+          "percent": 100.0
+        }
+      ],
+      "JSON artifact/response serialization": [
+        {
+          "name": "result/model/response JSON serialization",
+          "value": 387,
+          "percent": 100.0
+        }
+      ],
+      "primitive verification/replay": [
+        {
+          "name": "canonicalization and polynomial normalization",
+          "value": 54,
+          "percent": 47.78761061946903
+        },
+        {
+          "name": "typed JSON codec",
+          "value": 38,
+          "percent": 33.6283185840708
+        },
+        {
+          "name": "remaining replay/verification",
+          "value": 20,
+          "percent": 17.699115044247787
+        },
+        {
+          "name": "mathematical pattern match/instantiate",
+          "value": 1,
+          "percent": 0.8849557522123894
+        }
+      ],
+      "per-query frozen-model reconstruction/check": [
+        {
+          "name": "source exclusion/frozen-model checks",
+          "value": 42,
+          "percent": 85.71428571428571
+        },
+        {
+          "name": "result/model/response JSON serialization",
+          "value": 7,
+          "percent": 14.285714285714286
+        }
+      ],
+      "mathematical pattern matching": [
+        {
+          "name": "mathematical pattern match/instantiate",
+          "value": 6,
+          "percent": 100.0
+        }
+      ]
+    },
+    "topLeafMethods": [
+      {
+        "name": "com.fasterxml.jackson.core.json.WriterBasedJsonGenerator._writeString2",
+        "value": 139,
+        "percent": 10.808709175738725
+      },
+      {
+        "name": "com.fasterxml.jackson.core.json.WriterBasedJsonGenerator._writeSegment",
+        "value": 66,
+        "percent": 5.132192846034215
+      },
+      {
+        "name": "java.util.HashMap.putVal",
+        "value": 42,
+        "percent": 3.265940902021773
+      },
+      {
+        "name": "java.util.LinkedHashMap.afterNodeInsertion",
+        "value": 42,
+        "percent": 3.265940902021773
+      },
+      {
+        "name": "com.fasterxml.jackson.core.util.TextBuffer.contentsAsString",
+        "value": 41,
+        "percent": 3.188180404354588
+      },
+      {
+        "name": "java.util.HashMap.resize",
+        "value": 27,
+        "percent": 2.099533437013997
+      },
+      {
+        "name": "java.util.Objects.equals",
+        "value": 21,
+        "percent": 1.6329704510108864
+      },
+      {
+        "name": "com.fasterxml.jackson.core.json.ReaderBasedJsonParser._parseName",
+        "value": 21,
+        "percent": 1.6329704510108864
+      },
+      {
+        "name": "java.util.ImmutableCollections$SetN.probe",
+        "value": 20,
+        "percent": 1.5552099533437014
+      },
+      {
+        "name": "java.util.HashSet.add",
+        "value": 19,
+        "percent": 1.4774494556765163
+      },
+      {
+        "name": "com.fasterxml.jackson.core.sym.CharsToNameCanonicalizer.findSymbol",
+        "value": 17,
+        "percent": 1.3219284603421462
+      },
+      {
+        "name": "com.fasterxml.jackson.core.json.WriterBasedJsonGenerator._prependOrWriteCharacterEscape",
+        "value": 17,
+        "percent": 1.3219284603421462
+      },
+      {
+        "name": "java.lang.StringLatin1.hashCode",
+        "value": 16,
+        "percent": 1.244167962674961
+      },
+      {
+        "name": "java.lang.StringUTF16.compress",
+        "value": 16,
+        "percent": 1.244167962674961
+      },
+      {
+        "name": "java.util.AbstractMap.hashCode",
+        "value": 15,
+        "percent": 1.166407465007776
+      },
+      {
+        "name": "com.fasterxml.jackson.core.json.WriterBasedJsonGenerator._writeString",
+        "value": 13,
+        "percent": 1.010886469673406
+      },
+      {
+        "name": "java.util.AbstractMap.putAll",
+        "value": 13,
+        "percent": 1.010886469673406
+      },
+      {
+        "name": "de.regelsuche.search.program.AstReplayJson.text",
+        "value": 13,
+        "percent": 1.010886469673406
+      },
+      {
+        "name": "com.fasterxml.jackson.databind.deser.std.BaseNodeDeserializer._deserializeContainerNoRecursion",
+        "value": 12,
+        "percent": 0.9331259720062208
+      },
+      {
+        "name": "java.util.TreeMap.<init>",
+        "value": 12,
+        "percent": 0.9331259720062208
+      },
+      {
+        "name": "java.lang.AbstractStringBuilder.needsNewBuffer",
+        "value": 12,
+        "percent": 0.9331259720062208
+      },
+      {
+        "name": "jdk.internal.util.ArraysSupport.mismatch",
+        "value": 12,
+        "percent": 0.9331259720062208
+      },
+      {
+        "name": "de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize",
+        "value": 11,
+        "percent": 0.8553654743390358
+      },
+      {
+        "name": "de.regelsuche.canonical.PolynomialNormalizer$Polynomial.normalizedTerms",
+        "value": 11,
+        "percent": 0.8553654743390358
+      },
+      {
+        "name": "java.util.HashMap.getNode",
+        "value": 11,
+        "percent": 0.8553654743390358
+      },
+      {
+        "name": "de.regelsuche.search.program.AstReplayJson.write",
+        "value": 11,
+        "percent": 0.8553654743390358
+      },
+      {
+        "name": "java.util.HashMap.hash",
+        "value": 10,
+        "percent": 0.7776049766718507
+      },
+      {
+        "name": "java.util.regex.Pattern.clazz",
+        "value": 10,
+        "percent": 0.7776049766718507
+      },
+      {
+        "name": "com.fasterxml.jackson.databind.node.ObjectNode.replace",
+        "value": 10,
+        "percent": 0.7776049766718507
+      },
+      {
+        "name": "de.regelsuche.search.program.AstReplayJson.read",
+        "value": 10,
+        "percent": 0.7776049766718507
+      }
+    ],
+    "topProjectStacks": [
+      {
+        "name": "de.regelsuche.evolution.LearnedSchedulingArtifacts.json > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 122,
+        "percent": 9.486780715396579
+      },
+      {
+        "name": "de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$1.candidates > de.regelsuche.search.moves.StagedMovePicker.next > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 95,
+        "percent": 7.387247278382581
+      },
+      {
+        "name": "de.regelsuche.evolution.LearnedSchedulingArtifacts.json > de.regelsuche.evolution.LearnedSchedulingArtifacts.resultJson > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 77,
+        "percent": 5.9875583203732505
+      },
+      {
+        "name": "de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.json > de.regelsuche.evolution.LearnedSchedulingArtifacts$$Lambda.apply > de.regelsuche.evolution.LearnedSchedulingArtifacts.resultPayload > de.regelsuche.evolution.LearnedSchedulingArtifacts.resultJson > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 44,
+        "percent": 3.421461897356143
+      },
+      {
+        "name": "de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$State.decode > de.regelsuche.search.moves.TypedMoveSearch$Result.lambda$events$0 > de.regelsuche.search.moves.TypedMoveSearch$Result$$Lambda.apply > de.regelsuche.search.moves.TypedMoveSearch$Result.events > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 36,
+        "percent": 2.7993779160186625
+      },
+      {
+        "name": "de.regelsuche.search.program.CompiledAstReplayCodec.encodeExpression > de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$1.candidates > de.regelsuche.search.moves.StagedMovePicker.next > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 33,
+        "percent": 2.5660964230171075
+      },
+      {
+        "name": "de.regelsuche.evolution.LearnedSchedulingArtifacts.json > de.regelsuche.evolution.LearnedSchedulingArtifacts$$Lambda.apply > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.json > de.regelsuche.evolution.LearnedSchedulingArtifacts.resultJson > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 33,
+        "percent": 2.5660964230171075
+      },
+      {
+        "name": "de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.json > de.regelsuche.evolution.LearnedSchedulingArtifacts.resultJson > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 30,
+        "percent": 2.332814930015552
+      },
+      {
+        "name": "de.regelsuche.evolution.LearnedSchedulingArtifacts.json > de.regelsuche.evolution.LearnedSchedulingArtifacts$$Lambda.apply > de.regelsuche.evolution.LearnedSchedulingArtifacts.resultPayload > de.regelsuche.evolution.LearnedSchedulingArtifacts.resultJson > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 29,
+        "percent": 2.255054432348367
+      },
+      {
+        "name": "de.regelsuche.scalar.ExactRational.fromCanonicalText > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$1.candidates > de.regelsuche.search.moves.StagedMovePicker.next > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 25,
+        "percent": 1.9440124416796267
+      },
+      {
+        "name": "de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$State.decode > de.regelsuche.search.moves.TypedMoveSearch.lambda$search$1 > de.regelsuche.search.moves.TypedMoveSearch$$Lambda.applyAsDouble > de.regelsuche.search.moves.MoveSearch.priority > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 17,
+        "percent": 1.3219284603421462
+      },
+      {
+        "name": "de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.json > de.regelsuche.evolution.LearnedSchedulingArtifacts.resultJson > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 13,
+        "percent": 1.010886469673406
+      },
+      {
+        "name": "de.regelsuche.search.program.CompiledAstReplayCodec.encodeExpression > de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$State.decode > de.regelsuche.search.moves.TypedMoveSearch$Result.lambda$events$0 > de.regelsuche.search.moves.TypedMoveSearch$Result$$Lambda.apply > de.regelsuche.search.moves.TypedMoveSearch$Result.events > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 12,
+        "percent": 0.9331259720062208
+      },
+      {
+        "name": "de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$State.decode > de.regelsuche.search.moves.TypedMoveSearch.lambda$search$0 > de.regelsuche.search.moves.TypedMoveSearch$$Lambda.verify > de.regelsuche.search.moves.MoveSearch.admit > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 10,
+        "percent": 0.7776049766718507
+      },
+      {
+        "name": "de.regelsuche.scalar.ExactRational.fromCanonicalText > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$1.candidates > de.regelsuche.search.moves.StagedMovePicker.next > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 9,
+        "percent": 0.6998444790046656
+      },
+      {
+        "name": "de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch.lambda$primitiveReplay$0 > de.regelsuche.search.moves.TypedMoveSearch$$Lambda.verify > de.regelsuche.evolution.TypedLearnedMoveInventory.lambda$verifier$1 > de.regelsuche.evolution.TypedLearnedMoveInventory$$Lambda.verify > de.regelsuche.search.moves.TypedMoveSearch.lambda$search$0 > de.regelsuche.search.moves.TypedMoveSearch$$Lambda.verify > de.regelsuche.search.moves.MoveSearch.admit > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 9,
+        "percent": 0.6998444790046656
+      },
+      {
+        "name": "de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$State.decode > de.regelsuche.search.moves.TypedMoveSearch.lambda$search$3 > de.regelsuche.search.moves.TypedMoveSearch$$Lambda.accept > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 8,
+        "percent": 0.6220839813374806
+      },
+      {
+        "name": "de.regelsuche.scalar.ExactRational.fromCanonicalText > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$State.decode > de.regelsuche.search.moves.TypedMoveSearch.lambda$search$1 > de.regelsuche.search.moves.TypedMoveSearch$$Lambda.applyAsDouble > de.regelsuche.search.moves.MoveSearch.priority > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 7,
+        "percent": 0.5443234836702955
+      },
+      {
+        "name": "de.regelsuche.canonical.PolynomialNormalizer$Polynomial.orderedTerms > de.regelsuche.canonical.PolynomialNormalizer$Polynomial.toExpr > de.regelsuche.canonical.PolynomialNormalizer.normalize > de.regelsuche.canonical.ExpressionCanonicalizer.canonicalize > de.regelsuche.canonical.ExpressionCanonicalizer.canonicalize > de.regelsuche.transform.PreparedAstRewriteTransformationEngine.canonicalAstNodeCount > de.regelsuche.transform.PreparedAstRewriteTransformationEngine.transformAst > de.regelsuche.transform.AstRewriteTransport.generate > de.regelsuche.search.moves.TypedMoveSearch$1.candidates > de.regelsuche.search.moves.StagedMovePicker.next > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 7,
+        "percent": 0.5443234836702955
+      },
+      {
+        "name": "de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.json > de.regelsuche.evolution.LearnedSchedulingArtifacts.resultJson > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 7,
+        "percent": 0.5443234836702955
+      },
+      {
+        "name": "de.regelsuche.search.program.AstReplayJson.write > de.regelsuche.search.program.AstReplayJson.write > de.regelsuche.search.program.AstReplayJson.write > de.regelsuche.search.program.AstReplayJson.write > de.regelsuche.search.program.AstReplayJson.write > de.regelsuche.search.program.CompiledAstReplayCodec.encodeExpression > de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$1.candidates > de.regelsuche.search.moves.StagedMovePicker.next > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 7,
+        "percent": 0.5443234836702955
+      },
+      {
+        "name": "de.regelsuche.canonical.ExpressionCanonicalizer.canonicalizeMultiplication > de.regelsuche.canonical.ExpressionCanonicalizer.canonicalize > de.regelsuche.canonical.ExpressionCanonicalizer.canonicalizeAddition > de.regelsuche.canonical.ExpressionCanonicalizer.canonicalize > de.regelsuche.canonical.ExpressionCanonicalizer.canonicalize > de.regelsuche.transform.PreparedAstRewriteTransformationEngine.canonicalAstNodeCount > de.regelsuche.transform.PreparedAstRewriteTransformationEngine.transformAst > de.regelsuche.transform.AstRewriteTransport.generate > de.regelsuche.search.moves.TypedMoveSearch$1.candidates > de.regelsuche.search.moves.StagedMovePicker.next > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 6,
+        "percent": 0.4665629860031104
+      },
+      {
+        "name": "de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 5,
+        "percent": 0.38880248833592534
+      },
+      {
+        "name": "de.regelsuche.search.moves.TypedMoveSearch.sha256 > de.regelsuche.search.moves.TypedMoveSearch.applicationKey > de.regelsuche.search.moves.TypedMoveSearch$1.candidates > de.regelsuche.search.moves.StagedMovePicker.next > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 5,
+        "percent": 0.38880248833592534
+      },
+      {
+        "name": "de.regelsuche.search.moves.StagedMovePicker.<init> > de.regelsuche.search.moves.MoveSearch.picker > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 5,
+        "percent": 0.38880248833592534
+      }
+    ],
+    "topAllocationClasses": [
+      {
+        "name": "[B",
+        "value": 2209656096,
+        "percent": 15.607472162792448
+      },
+      {
+        "name": "[Ljava.util.HashMap$Node;",
+        "value": 1142737480,
+        "percent": 8.071501914151074
+      },
+      {
+        "name": "java.util.LinkedHashMap$Entry",
+        "value": 1010916960,
+        "percent": 7.140413542476778
+      },
+      {
+        "name": "java.util.LinkedHashMap",
+        "value": 785485056,
+        "percent": 5.548119532266557
+      },
+      {
+        "name": "[C",
+        "value": 777835488,
+        "percent": 5.494088310017307
+      },
+      {
+        "name": "java.lang.invoke.MemberName",
+        "value": 443649464,
+        "percent": 3.1336309174773005
+      },
+      {
+        "name": "[Z",
+        "value": 426135888,
+        "percent": 3.0099272106490007
+      },
+      {
+        "name": "[Ljava.lang.Class;",
+        "value": 396472656,
+        "percent": 2.8004067931792704
+      },
+      {
+        "name": "[I",
+        "value": 386444768,
+        "percent": 2.7295767743836215
+      },
+      {
+        "name": "java.util.LinkedHashMap$LinkedEntrySet",
+        "value": 355347552,
+        "percent": 2.5099276923663156
+      },
+      {
+        "name": "java.lang.String",
+        "value": 349266704,
+        "percent": 2.4669768159570973
+      },
+      {
+        "name": "java.lang.invoke.BoundMethodHandle$Species_LL",
+        "value": 334284808,
+        "percent": 2.3611551339364705
+      },
+      {
+        "name": "java.lang.invoke.MethodType",
+        "value": 309694040,
+        "percent": 2.1874630703993185
+      },
+      {
+        "name": "com.fasterxml.jackson.core.json.JsonWriteContext",
+        "value": 239055712,
+        "percent": 1.6885231041837783
+      },
+      {
+        "name": "[Ljava.lang.Object;",
+        "value": 238586088,
+        "percent": 1.6852060072290767
+      },
+      {
+        "name": "java.util.TreeMap",
+        "value": 235812600,
+        "percent": 1.665616019071101
+      },
+      {
+        "name": "jdk.internal.reflect.DirectMethodHandleAccessor",
+        "value": 235283776,
+        "percent": 1.6618807745351039
+      },
+      {
+        "name": "java.lang.reflect.Method",
+        "value": 200909440,
+        "percent": 1.4190843985715955
+      },
+      {
+        "name": "java.math.MutableBigInteger",
+        "value": 191289264,
+        "percent": 1.3511341734696147
+      },
+      {
+        "name": "com.fasterxml.jackson.databind.node.ObjectNode",
+        "value": 185796264,
+        "percent": 1.3123354460362309
+      }
+    ],
+    "queryGarbageCollections": 143,
+    "queryGcPauseSeconds": 0.46110434100000003,
+    "queryGcCpuSeconds": 0.579999978,
+    "maxObservedHeapUsedBytes": 325594768,
+    "sampledAllocationWeightPerQuery": 12162956.048109965,
+    "method": "ExecutionSample counts and ObjectAllocationSample weights in controller-recorded query phase. Inclusive rows overlap. Exclusive mechanism rows use listed precedence; purpose rows classify broad caller. Weights estimate allocated bytes, not exact cumulative bytes, object counts or retained heap. No conversion of Java sample percentages into whole-process CPU seconds."
+  },
+  {
+    "profile": "LEARNED_NAIVE",
+    "phases": {
+      "initialize": {
+        "execution": 34,
+        "allocation": 70,
+        "weight": 37277960
+      },
+      "startup": {
+        "execution": 5,
+        "allocation": 24,
+        "weight": 29778928
+      },
+      "queries": {
+        "execution": 1427,
+        "allocation": 8325,
+        "weight": 15850791560
+      }
+    },
+    "queryTruncatedSamples": 0,
+    "queryExecutionThreads": {
+      "main": 1426,
+      "JFR Periodic Tasks": 1
+    },
+    "mechanismExecution": [
+      {
+        "name": "typed JSON codec",
+        "value": 526,
+        "percent": 36.86054660126139
+      },
+      {
+        "name": "result/model/response JSON serialization",
+        "value": 413,
+        "percent": 28.941836019621583
+      },
+      {
+        "name": "canonicalization and polynomial normalization",
+        "value": 283,
+        "percent": 19.831814996496146
+      },
+      {
+        "name": "source exclusion/frozen-model checks",
+        "value": 66,
+        "percent": 4.625087596355992
+      },
+      {
+        "name": "remaining search/path/incumbent management",
+        "value": 40,
+        "percent": 2.803083391730904
+      },
+      {
+        "name": "remaining candidate generation",
+        "value": 40,
+        "percent": 2.803083391730904
+      },
+      {
+        "name": "remaining replay/verification",
+        "value": 27,
+        "percent": 1.8920812894183603
+      },
+      {
+        "name": "other Java/runtime/boundary",
+        "value": 22,
+        "percent": 1.5416958654519972
+      },
+      {
+        "name": "mathematical pattern match/instantiate",
+        "value": 10,
+        "percent": 0.700770847932726
+      }
+    ],
+    "mechanismAllocationWeight": [
+      {
+        "name": "result/model/response JSON serialization",
+        "value": 5284833656,
+        "percent": 33.34113401211113
+      },
+      {
+        "name": "typed JSON codec",
+        "value": 4826536856,
+        "percent": 30.44981594597412
+      },
+      {
+        "name": "canonicalization and polynomial normalization",
+        "value": 4407837544,
+        "percent": 27.80831182666817
+      },
+      {
+        "name": "source exclusion/frozen-model checks",
+        "value": 624272360,
+        "percent": 3.938430189034673
+      },
+      {
+        "name": "remaining candidate generation",
+        "value": 368172016,
+        "percent": 2.322735836922456
+      },
+      {
+        "name": "remaining search/path/incumbent management",
+        "value": 165995800,
+        "percent": 1.0472398136815824
+      },
+      {
+        "name": "remaining replay/verification",
+        "value": 141848016,
+        "percent": 0.8948954723369033
+      },
+      {
+        "name": "other Java/runtime/boundary",
+        "value": 19823856,
+        "percent": 0.1250654008347833
+      },
+      {
+        "name": "mathematical pattern match/instantiate",
+        "value": 11471456,
+        "percent": 0.07237150243618495
+      }
+    ],
+    "purposeExecution": [
+      {
+        "name": "primitive generation",
+        "value": 387,
+        "percent": 27.119831814996495
+      },
+      {
+        "name": "search evidence export",
+        "value": 247,
+        "percent": 17.30903994393833
+      },
+      {
+        "name": "path/state/incumbent management",
+        "value": 212,
+        "percent": 14.856341976173791
+      },
+      {
+        "name": "learned macro generation",
+        "value": 170,
+        "percent": 11.913104414856342
+      },
+      {
+        "name": "worker JSON response serialization",
+        "value": 148,
+        "percent": 10.371408549404345
+      },
+      {
+        "name": "primitive verification/replay",
+        "value": 89,
+        "percent": 6.236860546601261
+      },
+      {
+        "name": "learned macro verification/replay",
+        "value": 65,
+        "percent": 4.555010511562719
+      },
+      {
+        "name": "per-query frozen-model reconstruction/check",
+        "value": 58,
+        "percent": 4.06447091800981
+      },
+      {
+        "name": "TRAIN exclusion identity check",
+        "value": 26,
+        "percent": 1.8220042046250875
+      },
+      {
+        "name": "other Java/runtime/boundary",
+        "value": 25,
+        "percent": 1.751927119831815
+      }
+    ],
+    "purposeAllocationWeight": [
+      {
+        "name": "primitive generation",
+        "value": 4962402520,
+        "percent": 31.306969757414436
+      },
+      {
+        "name": "search evidence export",
+        "value": 3954226072,
+        "percent": 24.946552713358624
+      },
+      {
+        "name": "learned macro generation",
+        "value": 1790070072,
+        "percent": 11.293253496041809
+      },
+      {
+        "name": "path/state/incumbent management",
+        "value": 1674669280,
+        "percent": 10.565209148457189
+      },
+      {
+        "name": "worker JSON response serialization",
+        "value": 1270612000,
+        "percent": 8.016079166711343
+      },
+      {
+        "name": "primitive verification/replay",
+        "value": 1015969824,
+        "percent": 6.4095841532850235
+      },
+      {
+        "name": "per-query frozen-model reconstruction/check",
+        "value": 465137872,
+        "percent": 2.934477248276931
+      },
+      {
+        "name": "learned macro verification/replay",
+        "value": 463048288,
+        "percent": 2.9212944113688164
+      },
+      {
+        "name": "TRAIN exclusion identity check",
+        "value": 219130072,
+        "percent": 1.3824550727989007
+      },
+      {
+        "name": "other Java/runtime/boundary",
+        "value": 35525560,
+        "percent": 0.2241248322869246
+      }
+    ],
+    "inclusiveExecution": [
+      {
+        "name": "candidate generation (primitive or macro)",
+        "value": 557,
+        "percent": 39.03293622985284
+      },
+      {
+        "name": "typed JSON codec",
+        "value": 526,
+        "percent": 36.86054660126139
+      },
+      {
+        "name": "JSON artifact/response serialization",
+        "value": 412,
+        "percent": 28.87175893482831
+      },
+      {
+        "name": "primitive generation",
+        "value": 387,
+        "percent": 27.119831814996495
+      },
+      {
+        "name": "canonical size check",
+        "value": 283,
+        "percent": 19.831814996496146
+      },
+      {
+        "name": "typed state decoding",
+        "value": 175,
+        "percent": 12.263489838822705
+      },
+      {
+        "name": "macro generation",
+        "value": 170,
+        "percent": 11.913104414856342
+      },
+      {
+        "name": "primitive verification/replay",
+        "value": 89,
+        "percent": 6.236860546601261
+      },
+      {
+        "name": "numeric text regular-expression validation",
+        "value": 71,
+        "percent": 4.9754730203223545
+      },
+      {
+        "name": "macro verification/replay",
+        "value": 65,
+        "percent": 4.555010511562719
+      },
+      {
+        "name": "per-query frozen-model reconstruction/check",
+        "value": 58,
+        "percent": 4.06447091800981
+      },
+      {
+        "name": "mathematical pattern matching",
+        "value": 9,
+        "percent": 0.6306937631394534
+      }
+    ],
+    "inclusiveAllocationWeight": [
+      {
+        "name": "candidate generation (primitive or macro)",
+        "value": 6752472592,
+        "percent": 42.60022325345624
+      },
+      {
+        "name": "JSON artifact/response serialization",
+        "value": 5283758784,
+        "percent": 33.33435282395449
+      },
+      {
+        "name": "primitive generation",
+        "value": 4962402520,
+        "percent": 31.306969757414436
+      },
+      {
+        "name": "typed JSON codec",
+        "value": 4826536856,
+        "percent": 30.44981594597412
+      },
+      {
+        "name": "canonical size check",
+        "value": 4407837544,
+        "percent": 27.80831182666817
+      },
+      {
+        "name": "macro generation",
+        "value": 1790070072,
+        "percent": 11.293253496041809
+      },
+      {
+        "name": "typed state decoding",
+        "value": 1470947192,
+        "percent": 9.279960476623668
+      },
+      {
+        "name": "primitive verification/replay",
+        "value": 1015969824,
+        "percent": 6.4095841532850235
+      },
+      {
+        "name": "numeric text regular-expression validation",
+        "value": 957409416,
+        "percent": 6.040136307236886
+      },
+      {
+        "name": "per-query frozen-model reconstruction/check",
+        "value": 465137872,
+        "percent": 2.934477248276931
+      },
+      {
+        "name": "macro verification/replay",
+        "value": 463048288,
+        "percent": 2.9212944113688164
+      },
+      {
+        "name": "mathematical pattern matching",
+        "value": 8644168,
+        "percent": 0.054534614042959506
+      }
+    ],
+    "inclusiveMechanismBreakdown": {
+      "typed JSON codec": [
+        {
+          "name": "typed JSON codec",
+          "value": 526,
+          "percent": 100.0
+        }
+      ],
+      "candidate generation (primitive or macro)": [
+        {
+          "name": "typed JSON codec",
+          "value": 298,
+          "percent": 53.50089766606822
+        },
+        {
+          "name": "canonicalization and polynomial normalization",
+          "value": 210,
+          "percent": 37.70197486535009
+        },
+        {
+          "name": "remaining candidate generation",
+          "value": 40,
+          "percent": 7.1813285457809695
+        },
+        {
+          "name": "mathematical pattern match/instantiate",
+          "value": 9,
+          "percent": 1.6157989228007181
+        }
+      ],
+      "macro generation": [
+        {
+          "name": "typed JSON codec",
+          "value": 80,
+          "percent": 47.05882352941177
+        },
+        {
+          "name": "canonicalization and polynomial normalization",
+          "value": 66,
+          "percent": 38.8235294117647
+        },
+        {
+          "name": "remaining candidate generation",
+          "value": 21,
+          "percent": 12.352941176470589
+        },
+        {
+          "name": "mathematical pattern match/instantiate",
+          "value": 3,
+          "percent": 1.7647058823529411
+        }
+      ],
+      "macro verification/replay": [
+        {
+          "name": "canonicalization and polynomial normalization",
+          "value": 30,
+          "percent": 46.15384615384615
+        },
+        {
+          "name": "typed JSON codec",
+          "value": 22,
+          "percent": 33.84615384615385
+        },
+        {
+          "name": "remaining replay/verification",
+          "value": 13,
+          "percent": 20.0
+        }
+      ],
+      "canonical size check": [
+        {
+          "name": "canonicalization and polynomial normalization",
+          "value": 283,
+          "percent": 100.0
+        }
+      ],
+      "typed state decoding": [
+        {
+          "name": "typed JSON codec",
+          "value": 173,
+          "percent": 98.85714285714286
+        },
+        {
+          "name": "remaining search/path/incumbent management",
+          "value": 2,
+          "percent": 1.1428571428571428
+        }
+      ],
+      "numeric text regular-expression validation": [
+        {
+          "name": "typed JSON codec",
+          "value": 71,
+          "percent": 100.0
+        }
+      ],
+      "primitive generation": [
+        {
+          "name": "typed JSON codec",
+          "value": 218,
+          "percent": 56.33074935400517
+        },
+        {
+          "name": "canonicalization and polynomial normalization",
+          "value": 144,
+          "percent": 37.2093023255814
+        },
+        {
+          "name": "remaining candidate generation",
+          "value": 19,
+          "percent": 4.909560723514212
+        },
+        {
+          "name": "mathematical pattern match/instantiate",
+          "value": 6,
+          "percent": 1.550387596899225
+        }
+      ],
+      "primitive verification/replay": [
+        {
+          "name": "canonicalization and polynomial normalization",
+          "value": 43,
+          "percent": 48.31460674157304
+        },
+        {
+          "name": "typed JSON codec",
+          "value": 31,
+          "percent": 34.831460674157306
+        },
+        {
+          "name": "remaining replay/verification",
+          "value": 14,
+          "percent": 15.730337078651685
+        },
+        {
+          "name": "mathematical pattern match/instantiate",
+          "value": 1,
+          "percent": 1.1235955056179776
+        }
+      ],
+      "JSON artifact/response serialization": [
+        {
+          "name": "result/model/response JSON serialization",
+          "value": 412,
+          "percent": 100.0
+        }
+      ],
+      "per-query frozen-model reconstruction/check": [
+        {
+          "name": "source exclusion/frozen-model checks",
+          "value": 40,
+          "percent": 68.96551724137932
+        },
+        {
+          "name": "result/model/response JSON serialization",
+          "value": 18,
+          "percent": 31.03448275862069
+        }
+      ],
+      "mathematical pattern matching": [
+        {
+          "name": "mathematical pattern match/instantiate",
+          "value": 9,
+          "percent": 100.0
+        }
+      ]
+    },
+    "topLeafMethods": [
+      {
+        "name": "com.fasterxml.jackson.core.json.WriterBasedJsonGenerator._writeString2",
+        "value": 103,
+        "percent": 7.217939733707078
+      },
+      {
+        "name": "com.fasterxml.jackson.core.json.WriterBasedJsonGenerator._writeSegment",
+        "value": 93,
+        "percent": 6.5171688857743515
+      },
+      {
+        "name": "com.fasterxml.jackson.core.util.TextBuffer.contentsAsString",
+        "value": 63,
+        "percent": 4.414856341976174
+      },
+      {
+        "name": "java.util.HashMap.resize",
+        "value": 47,
+        "percent": 3.2936229852838124
+      },
+      {
+        "name": "java.util.LinkedHashMap.newNode",
+        "value": 39,
+        "percent": 2.7330063069376314
+      },
+      {
+        "name": "java.util.HashMap.putVal",
+        "value": 38,
+        "percent": 2.662929222144359
+      },
+      {
+        "name": "java.util.Objects.equals",
+        "value": 24,
+        "percent": 1.6818500350385424
+      },
+      {
+        "name": "com.fasterxml.jackson.core.json.ReaderBasedJsonParser._parseName",
+        "value": 23,
+        "percent": 1.6117729502452698
+      },
+      {
+        "name": "java.util.TreeMap.<init>",
+        "value": 22,
+        "percent": 1.5416958654519972
+      },
+      {
+        "name": "de.regelsuche.canonical.PolynomialNormalizer$Polynomial.normalizedTerms",
+        "value": 21,
+        "percent": 1.4716187806587246
+      },
+      {
+        "name": "com.fasterxml.jackson.databind.node.ObjectNode.replace",
+        "value": 20,
+        "percent": 1.401541695865452
+      },
+      {
+        "name": "de.regelsuche.search.program.AstReplayJson.write",
+        "value": 19,
+        "percent": 1.3314646110721795
+      },
+      {
+        "name": "java.util.TreeMap.successor",
+        "value": 19,
+        "percent": 1.3314646110721795
+      },
+      {
+        "name": "java.math.MutableBigInteger.divideKnuth",
+        "value": 18,
+        "percent": 1.2613875262789067
+      },
+      {
+        "name": "java.util.LinkedHashMap.linkNodeAtEnd",
+        "value": 18,
+        "percent": 1.2613875262789067
+      },
+      {
+        "name": "com.fasterxml.jackson.core.sym.CharsToNameCanonicalizer.findSymbol",
+        "value": 17,
+        "percent": 1.1913104414856341
+      },
+      {
+        "name": "java.util.AbstractMap.putAll",
+        "value": 16,
+        "percent": 1.1212333566923616
+      },
+      {
+        "name": "java.util.regex.Pattern.clazz",
+        "value": 15,
+        "percent": 1.051156271899089
+      },
+      {
+        "name": "jdk.internal.util.ArraysSupport.mismatch",
+        "value": 15,
+        "percent": 1.051156271899089
+      },
+      {
+        "name": "java.lang.StringUTF16.compress",
+        "value": 15,
+        "percent": 1.051156271899089
+      },
+      {
+        "name": "java.util.HashSet.add",
+        "value": 15,
+        "percent": 1.051156271899089
+      },
+      {
+        "name": "com.fasterxml.jackson.core.util.BufferRecycler.releaseCharBuffer",
+        "value": 15,
+        "percent": 1.051156271899089
+      },
+      {
+        "name": "com.fasterxml.jackson.databind.node.ObjectNode._put",
+        "value": 14,
+        "percent": 0.9810791871058164
+      },
+      {
+        "name": "com.fasterxml.jackson.databind.node.ObjectNode.serialize",
+        "value": 14,
+        "percent": 0.9810791871058164
+      },
+      {
+        "name": "java.util.TreeMap.putAll",
+        "value": 14,
+        "percent": 0.9810791871058164
+      },
+      {
+        "name": "java.lang.StringBuilder.append",
+        "value": 14,
+        "percent": 0.9810791871058164
+      },
+      {
+        "name": "com.fasterxml.jackson.core.json.WriterBasedJsonGenerator._writeString",
+        "value": 14,
+        "percent": 0.9810791871058164
+      },
+      {
+        "name": "java.util.regex.Pattern.expr",
+        "value": 13,
+        "percent": 0.9110021023125437
+      },
+      {
+        "name": "com.fasterxml.jackson.core.json.WriterBasedJsonGenerator._prependOrWriteCharacterEscape",
+        "value": 11,
+        "percent": 0.7708479327259986
+      },
+      {
+        "name": "de.regelsuche.canonical.PolynomialNormalizer$Polynomial.monomial",
+        "value": 11,
+        "percent": 0.7708479327259986
+      }
+    ],
+    "topProjectStacks": [
+      {
+        "name": "de.regelsuche.evolution.LearnedSchedulingArtifacts.json > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 139,
+        "percent": 9.740714786264892
+      },
+      {
+        "name": "de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$1.candidates > de.regelsuche.search.moves.StagedMovePicker.next > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 94,
+        "percent": 6.587245970567625
+      },
+      {
+        "name": "de.regelsuche.evolution.LearnedSchedulingArtifacts.json > de.regelsuche.evolution.LearnedSchedulingArtifacts.resultJson > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 84,
+        "percent": 5.886475122634899
+      },
+      {
+        "name": "de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.json > de.regelsuche.evolution.LearnedSchedulingArtifacts$$Lambda.apply > de.regelsuche.evolution.LearnedSchedulingArtifacts.resultPayload > de.regelsuche.evolution.LearnedSchedulingArtifacts.resultJson > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 46,
+        "percent": 3.2235459004905396
+      },
+      {
+        "name": "de.regelsuche.evolution.LearnedSchedulingArtifacts.json > de.regelsuche.evolution.LearnedSchedulingArtifacts$$Lambda.apply > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.json > de.regelsuche.evolution.LearnedSchedulingArtifacts.resultJson > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 30,
+        "percent": 2.102312543798178
+      },
+      {
+        "name": "de.regelsuche.search.program.CompiledAstReplayCodec.encodeExpression > de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$1.candidates > de.regelsuche.search.moves.StagedMovePicker.next > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 29,
+        "percent": 2.032235459004905
+      },
+      {
+        "name": "de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedProgramMoveProvider.candidates > de.regelsuche.search.moves.StagedMovePicker.next > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 27,
+        "percent": 1.8920812894183603
+      },
+      {
+        "name": "de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$State.decode > de.regelsuche.search.moves.TypedMoveSearch.lambda$search$1 > de.regelsuche.search.moves.TypedMoveSearch$$Lambda.applyAsDouble > de.regelsuche.search.moves.MoveSearch.priority > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 24,
+        "percent": 1.6818500350385424
+      },
+      {
+        "name": "de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$State.decode > de.regelsuche.search.moves.TypedMoveSearch$Result.lambda$events$0 > de.regelsuche.search.moves.TypedMoveSearch$Result$$Lambda.apply > de.regelsuche.search.moves.TypedMoveSearch$Result.events > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 23,
+        "percent": 1.6117729502452698
+      },
+      {
+        "name": "de.regelsuche.evolution.LearnedSchedulingArtifacts.json > de.regelsuche.evolution.LearnedSchedulingArtifacts$$Lambda.apply > de.regelsuche.evolution.LearnedSchedulingArtifacts.resultPayload > de.regelsuche.evolution.LearnedSchedulingArtifacts.resultJson > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 21,
+        "percent": 1.4716187806587246
+      },
+      {
+        "name": "de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.json > de.regelsuche.evolution.LearnedSchedulingArtifacts.resultJson > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 18,
+        "percent": 1.2613875262789067
+      },
+      {
+        "name": "de.regelsuche.evolution.LearnedSchedulingArtifacts.json > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.modelJson > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 16,
+        "percent": 1.1212333566923616
+      },
+      {
+        "name": "de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.json > de.regelsuche.evolution.LearnedSchedulingArtifacts.resultJson > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 14,
+        "percent": 0.9810791871058164
+      },
+      {
+        "name": "de.regelsuche.scalar.ExactRational.fromCanonicalText > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$1.candidates > de.regelsuche.search.moves.StagedMovePicker.next > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 13,
+        "percent": 0.9110021023125437
+      },
+      {
+        "name": "de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$State.decode > de.regelsuche.search.moves.TypedMoveSearch.lambda$search$3 > de.regelsuche.search.moves.TypedMoveSearch$$Lambda.accept > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 12,
+        "percent": 0.8409250175192712
+      },
+      {
+        "name": "de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.json > de.regelsuche.evolution.LearnedSchedulingArtifacts.resultJson > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 12,
+        "percent": 0.8409250175192712
+      },
+      {
+        "name": "de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$State.decode > de.regelsuche.search.moves.TypedMoveSearch.lambda$search$0 > de.regelsuche.search.moves.TypedMoveSearch$$Lambda.verify > de.regelsuche.search.moves.MoveSearch.admit > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 11,
+        "percent": 0.7708479327259986
+      },
+      {
+        "name": "de.regelsuche.search.program.CompiledAstReplayCodec.encode > de.regelsuche.search.program.CompiledAstReplayCodec.contentHash > de.regelsuche.search.moves.TypedProgramMoveProvider.move > de.regelsuche.search.moves.TypedProgramMoveProvider.lambda$candidates$0 > de.regelsuche.search.moves.TypedProgramMoveProvider$$Lambda.apply > de.regelsuche.search.moves.TypedProgramMoveProvider.candidates > de.regelsuche.search.moves.StagedMovePicker.next > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 10,
+        "percent": 0.700770847932726
+      },
+      {
+        "name": "de.regelsuche.scalar.ExactRational.fromCanonicalText > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.AstReplayJson.read > de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$1.candidates > de.regelsuche.search.moves.StagedMovePicker.next > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 10,
+        "percent": 0.700770847932726
+      },
+      {
+        "name": "de.regelsuche.search.program.CompiledAstReplayCodec.encode > de.regelsuche.search.program.CompiledAstReplayCodec.contentHash > de.regelsuche.search.moves.TypedProgramMoveProvider.move > de.regelsuche.search.moves.TypedProgramMoveProvider.lambda$verifier$1 > de.regelsuche.search.moves.TypedProgramMoveProvider$$Lambda.apply > de.regelsuche.search.moves.TypedProgramMoveProvider.lambda$verifier$0 > de.regelsuche.search.moves.TypedProgramMoveProvider$$Lambda.verify > de.regelsuche.evolution.TypedLearnedMoveInventory.lambda$verifier$1 > de.regelsuche.evolution.TypedLearnedMoveInventory$$Lambda.verify > de.regelsuche.search.moves.TypedMoveSearch.lambda$search$0 > de.regelsuche.search.moves.TypedMoveSearch$$Lambda.verify > de.regelsuche.search.moves.MoveSearch.admit > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 9,
+        "percent": 0.6306937631394534
+      },
+      {
+        "name": "de.regelsuche.search.program.CompiledAstReplayCodec.encodeExpression > de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$State.decode > de.regelsuche.search.moves.TypedMoveSearch.lambda$search$1 > de.regelsuche.search.moves.TypedMoveSearch$$Lambda.applyAsDouble > de.regelsuche.search.moves.MoveSearch.priority > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 8,
+        "percent": 0.5606166783461808
+      },
+      {
+        "name": "de.regelsuche.search.program.CompiledAstReplayCodec.encodeExpression > de.regelsuche.search.program.CompiledAstReplayCodec.decodeExpression > de.regelsuche.search.moves.TypedMoveSearch$State.decode > de.regelsuche.search.moves.TypedMoveSearch$Result.lambda$events$0 > de.regelsuche.search.moves.TypedMoveSearch$Result$$Lambda.apply > de.regelsuche.search.moves.TypedMoveSearch$Result.events > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 8,
+        "percent": 0.5606166783461808
+      },
+      {
+        "name": "de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 8,
+        "percent": 0.5606166783461808
+      },
+      {
+        "name": "de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.normalize > de.regelsuche.evolution.LearnedSchedulingArtifacts.json > de.regelsuche.evolution.LearnedSchedulingArtifacts.resultJson > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 8,
+        "percent": 0.5606166783461808
+      },
+      {
+        "name": "de.regelsuche.search.program.CompiledAstReplayCodec.encodeExpression > de.regelsuche.search.moves.TypedMoveSearch.lambda$primitiveReplay$0 > de.regelsuche.search.moves.TypedMoveSearch$$Lambda.verify > de.regelsuche.evolution.TypedLearnedMoveInventory.lambda$verifier$1 > de.regelsuche.evolution.TypedLearnedMoveInventory$$Lambda.verify > de.regelsuche.search.moves.TypedMoveSearch.lambda$search$0 > de.regelsuche.search.moves.TypedMoveSearch$$Lambda.verify > de.regelsuche.search.moves.MoveSearch.admit > de.regelsuche.search.moves.MoveSearch.expand > de.regelsuche.search.moves.MoveSearch.search > de.regelsuche.search.moves.TypedMoveSearch.search > de.regelsuche.search.moves.TypedSourceOnlySearch.search > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.run > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.handle > de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker.main",
+        "value": 7,
+        "percent": 0.4905395935529082
+      }
+    ],
+    "topAllocationClasses": [
+      {
+        "name": "[B",
+        "value": 1700846648,
+        "percent": 10.730357796718135
+      },
+      {
+        "name": "[Ljava.util.HashMap$Node;",
+        "value": 1482416984,
+        "percent": 9.352321481161411
+      },
+      {
+        "name": "java.util.LinkedHashMap$Entry",
+        "value": 1276563984,
+        "percent": 8.05362924096139
+      },
+      {
+        "name": "[C",
+        "value": 897012352,
+        "percent": 5.659101304843605
+      },
+      {
+        "name": "java.util.LinkedHashMap",
+        "value": 805094512,
+        "percent": 5.07920698441132
+      },
+      {
+        "name": "java.lang.String",
+        "value": 542528896,
+        "percent": 3.422724309674791
+      },
+      {
+        "name": "[Z",
+        "value": 498191768,
+        "percent": 3.1430087646676492
+      },
+      {
+        "name": "java.util.HashMap$Node",
+        "value": 491816328,
+        "percent": 3.102787177147133
+      },
+      {
+        "name": "java.lang.reflect.Method",
+        "value": 417212528,
+        "percent": 2.632124247049275
+      },
+      {
+        "name": "[Ljava.lang.Class;",
+        "value": 407019120,
+        "percent": 2.5678157362634577
+      },
+      {
+        "name": "java.util.TreeMap$Entry",
+        "value": 400750072,
+        "percent": 2.528265358124487
+      },
+      {
+        "name": "java.util.LinkedHashMap$LinkedEntrySet",
+        "value": 392415384,
+        "percent": 2.4756832017794825
+      },
+      {
+        "name": "[I",
+        "value": 381151936,
+        "percent": 2.404623987119038
+      },
+      {
+        "name": "[Ljava.lang.Object;",
+        "value": 339365576,
+        "percent": 2.141000811949356
+      },
+      {
+        "name": "java.lang.invoke.MemberName",
+        "value": 299899344,
+        "percent": 1.8920149373284674
+      },
+      {
+        "name": "java.util.HashMap",
+        "value": 272298128,
+        "percent": 1.7178834695369622
+      },
+      {
+        "name": "java.util.TreeMap",
+        "value": 255536184,
+        "percent": 1.6121351607755292
+      },
+      {
+        "name": "java.lang.invoke.MethodType",
+        "value": 242181192,
+        "percent": 1.527880743893903
+      },
+      {
+        "name": "java.lang.invoke.BoundMethodHandle$Species_L",
+        "value": 241761840,
+        "percent": 1.5252351220748752
+      },
+      {
+        "name": "java.lang.ref.WeakReference",
+        "value": 219720840,
+        "percent": 1.386182129569307
+      }
+    ],
+    "queryGarbageCollections": 335,
+    "queryGcPauseSeconds": 0.857040849,
+    "queryGcCpuSeconds": 1.679999924,
+    "maxObservedHeapUsedBytes": 326754160,
+    "sampledAllocationWeightPerQuery": 18604215.44600939,
+    "method": "ExecutionSample counts and ObjectAllocationSample weights in controller-recorded query phase. Inclusive rows overlap. Exclusive mechanism rows use listed precedence; purpose rows classify broad caller. Weights estimate allocated bytes, not exact cumulative bytes, object counts or retained heap. No conversion of Java sample percentages into whole-process CPU seconds."
+  }
+]

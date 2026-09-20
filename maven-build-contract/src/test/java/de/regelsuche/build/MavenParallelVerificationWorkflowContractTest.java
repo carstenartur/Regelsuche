@@ -5,12 +5,20 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class MavenParallelVerificationWorkflowContractTest {
+  private static final ObjectMapper YAML = new ObjectMapper(YAMLFactory.builder()
+      .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build());
   private static final String PLAYWRIGHT_VERSION = "1.60.0";
   private static final String FULL_MAVEN_COMMAND =
       "mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify";
@@ -137,14 +145,15 @@ class MavenParallelVerificationWorkflowContractTest {
     assertTrue(compactConvergence.contains(
         "needs: [gradle-verification, jmh-verification, "
             + "sympy-runtime-verification, maven-product-verification, "
-            + "external-polynomial-comparison]"));
+            + "external-polynomial-comparison, typed-external-polynomial-comparison]"));
     assertTrue(compactConvergence.contains(
         "needs.gradle-verification.result != 'success' || "
             + "needs.jmh-verification.result != 'success' || "
             + "needs.sympy-runtime-verification.result != 'success' || "
             + "(github.event_name != 'create' && "
             + "(needs.maven-product-verification.result != 'success' || "
-            + "needs.external-polynomial-comparison.result != 'success'))"),
+            + "needs.external-polynomial-comparison.result != 'success' || "
+            + "needs.typed-external-polynomial-comparison.result != 'success'))"),
         "the stable required check must reject any incomplete authority");
     assertTrue(convergence.contains("run: exit 1"),
         "an incomplete authority set must fail rather than become skipped-success");
@@ -206,6 +215,76 @@ class MavenParallelVerificationWorkflowContractTest {
     assertFalse(workflow.contains(" --exclude-task "));
     assertFalse(workflow.contains(" -x "),
         "moving work to required jobs must not use Gradle task exclusion");
+  }
+
+  @Test
+  void ciCoversStackedTypedAndLearnedPullRequests() throws IOException {
+    JsonNode workflow = YAML.readTree(repositoryRoot().resolve(
+        ".github/workflows/gradle.yml").toFile());
+    List<String> branches = workflow.path("on").path("pull_request").path("branches")
+        .valueStream().map(JsonNode::asText).toList();
+    for (String base : List.of("main", "codex/learned-scheduling-v1",
+        "codex/typed-external-source-only-comparison", "codex/typed-primitive-candidate-reuse",
+        "codex/learned-schema-utility")) {
+      assertTrue(branches.stream().anyMatch(pattern -> FileSystems.getDefault()
+          .getPathMatcher("glob:" + pattern).matches(Path.of(base))),
+          () -> "CI must run for pull requests into " + base);
+    }
+  }
+
+  @Test
+  void typedComparisonRunsTheCheckoutOwnedProtocolAndRetainsEveryOutcome()
+      throws IOException {
+    JsonNode workflow = YAML.readTree(repositoryRoot().resolve(
+        ".github/workflows/gradle.yml").toFile());
+    JsonNode comparison = workflow.path("jobs").path(
+        "typed-external-polynomial-comparison");
+    assertTrue(comparison.isObject(),
+        "the typed comparison must run within the required CI workflow");
+    assertEquals("github.event_name != 'create'", comparison.path("if").asText());
+    assertEquals("ubuntu-22.04", comparison.path("runs-on").asText());
+    assertEquals(30, comparison.path("timeout-minutes").asInt());
+    assertFalse(comparison.has("needs"),
+        "the typed comparison must start independently of the other authorities");
+    assertFalse(comparison.has("continue-on-error"));
+
+    List<JsonNode> steps = comparison.path("steps").valueStream().toList();
+    JsonNode checkout = steps.stream().filter(step -> step.path("uses").asText()
+        .startsWith("actions/checkout@")).findFirst().orElseThrow();
+    assertEquals(0, checkout.path("with").path("fetch-depth").asInt(-1));
+    assertEquals("${{ github.event.pull_request.head.sha || github.sha }}",
+        checkout.path("with").path("ref").asText());
+
+    List<JsonNode> commands = steps.stream().filter(step -> step.has("run")).toList();
+    assertEquals(List.of(
+        "bash gradle/run-typed-external-polynomial-comparison.sh",
+        "bash gradle/run-checked-schema-comparison.sh"),
+        commands.stream().map(command -> command.path("run").asText()).toList(),
+        "both versioned checkout-owned comparisons must run, in prerequisite order");
+    for (JsonNode command : commands) {
+      assertFalse(command.has("if"));
+      assertFalse(command.has("continue-on-error"));
+    }
+    String schemaRunner = Files.readString(repositoryRoot().resolve(
+        "gradle/run-checked-schema-comparison.sh"));
+    assertTrue(schemaRunner.contains("set -euo pipefail"));
+    assertTrue(schemaRunner.contains("build/typed-external-polynomial-venv/bin/python"));
+    assertTrue(schemaRunner.contains("-m external_polynomial_comparison.run_schema"));
+    assertTrue(schemaRunner.contains("--verify --output build/reports/learned-schema-efficiency-v2"),
+        "the new comparison must independently verify every retained lifecycle receipt");
+
+    JsonNode upload = steps.stream().filter(step -> step.path("uses").asText()
+        .startsWith("actions/upload-artifact@")).findFirst().orElseThrow();
+    assertEquals("${{ always() && !cancelled() }}", upload.path("if").asText());
+    assertEquals("typed-external-polynomial-${{ github.event.pull_request.head.sha || github.sha }}",
+        upload.path("with").path("name").asText());
+    assertEquals(List.of(
+        "build/reports/typed-external-polynomial-comparison/**",
+        "build/reports/learned-schema-efficiency-v2/**",
+        "regelsuche-search/build/test-results/**",
+        "regelsuche-learning/build/test-results/**"),
+        upload.path("with").path("path").asText().lines().toList());
+    assertEquals("error", upload.path("with").path("if-no-files-found").asText());
   }
 
   @Test

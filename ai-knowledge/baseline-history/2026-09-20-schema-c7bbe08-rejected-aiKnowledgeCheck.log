@@ -1,0 +1,727 @@
+Initialized native services in: /root/.gradle/native
+Initialized jansi services in: /root/.gradle/native
+The current JVM process isn't compatible with build requirement. The maximum heap size is insufficient.
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.7.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Starting process 'Gradle build daemon'. Working directory: /root/.gradle/daemon/9.7.1 Command: /workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10/bin/java --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.prefs/java.util.prefs=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED --add-opens=java.base/java.nio.charset=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.xml/javax.xml.namespace=ALL-UNNAMED --add-opens=java.base/java.time=ALL-UNNAMED --enable-native-access=ALL-UNNAMED -XX:MaxMetaspaceSize=384m -XX:+HeapDumpOnOutOfMemoryError -Xms256m -Xmx512m -Dfile.encoding=UTF-8 -Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts -Duser.country -Duser.language=en -Duser.variant -cp /root/.gradle/wrapper/dists/gradle-9.7.1-bin/1w1c7tv4s851m17nbqdsro2tv/gradle-9.7.1/lib/gradle-daemon-main-9.7.1.jar -javaagent:/root/.gradle/wrapper/dists/gradle-9.7.1-bin/1w1c7tv4s851m17nbqdsro2tv/gradle-9.7.1/lib/agents/gradle-instrumentation-agent-9.7.1.jar org.gradle.launcher.daemon.bootstrap.GradleDaemon 9.7.1
+Successfully started process 'Gradle build daemon'
+An attempt to start the daemon took 1.826 secs.
+The client will now receive all logging from the daemon (pid: 56). The daemon log file: /root/.gradle/daemon/9.7.1/daemon-56.out.log
+Daemon will be stopped at the end of the build 
+Using 2 worker leases.
+Operational build model parameters: {cachingModelBuilding=false, configurationCache=false, configurationCacheDisabledReason=null, configurationCacheParallelLoad=false, configurationCacheParallelStore=false, configureOnDemand=false, invalidateCoupledProjects=false, isolatedProjects=false, isolatedProjectsDiagnostics=false, isolatedProjectsDangerouslyIgnoreProblems=false, modelAsProjectDependency=false, modelBuilding=false, parallelModelBuilding=false, parallelProjectConfiguration=false, parallelProjectExecution=false, vintage=true}
+Received JVM installation metadata from '/workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10': {JAVA_HOME=/workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10, JAVA_VERSION=25.0.2, JAVA_VENDOR=Eclipse Adoptium, RUNTIME_NAME=OpenJDK Runtime Environment, RUNTIME_VERSION=25.0.2+10-LTS, VM_NAME=OpenJDK 64-Bit Server VM, VM_VERSION=25.0.2+10-LTS, VM_VENDOR=Eclipse Adoptium, OS_ARCH=amd64}
+Watching the file system is configured to be enabled if available
+Not watching /workspace/scratch/6b23a1484cae/Regelsuche since the file system is not supported
+File system watching is active
+Caching disabled for Groovy DSL script compilation (cp_init) because:
+  Build cache is disabled
+  Not worth caching.
+Compiling initialization script '/workspace/scratch/6b23a1484cae/ai-trend-diagnosis/java25-extractor.init.gradle' using SubsetScriptTransformer.
+Caching disabled for Groovy DSL script compilation (init) because:
+  Build cache is disabled
+  Not worth caching.
+Compiling initialization script '/workspace/scratch/6b23a1484cae/ai-trend-diagnosis/java25-extractor.init.gradle' using BuildScriptTransformer.
+Starting Build
+Resolved plugin [id: 'org.gradle.toolchains.foojay-resolver-convention', version: '1.0.0']
+Settings evaluated using settings file '/workspace/scratch/6b23a1484cae/Regelsuche/settings.gradle'.
+Not watching /workspace/scratch/6b23a1484cae/ai-trend-diagnosis/ai-knowledge-extractor since the file system is not supported
+Projects loaded. Root project using build file '/workspace/scratch/6b23a1484cae/Regelsuche/build.gradle'.
+Included projects: [root project 'Regelsuche', project ':ai-knowledge-verification', project ':app', project ':regelsuche-autopilot', project ':regelsuche-benchmarks', project ':regelsuche-bom', project ':regelsuche-cli', project ':regelsuche-core', project ':regelsuche-discovery', project ':regelsuche-discovery-sdk', project ':regelsuche-egraph', project ':regelsuche-experiments', project ':regelsuche-extension-api', project ':regelsuche-extension-runtime', project ':regelsuche-learning', project ':regelsuche-math-algorithms', project ':regelsuche-math-jas', project ':regelsuche-math-sympy', project ':regelsuche-persistence', project ':regelsuche-persistence-hibernate', project ':regelsuche-plugin-api', project ':regelsuche-quality', project ':regelsuche-release', project ':regelsuche-search', project ':regelsuche-solver-ir', project ':regelsuche-solver-portfolio', project ':regelsuche-validation']
+
+> Configure project :ai-knowledge-extractor
+Evaluating project ':ai-knowledge-extractor' using build file '/workspace/scratch/6b23a1484cae/ai-trend-diagnosis/ai-knowledge-extractor/build.gradle'.
+
+> Configure project :ai-knowledge-extractor:core
+Evaluating project ':ai-knowledge-extractor:core' using build file '/workspace/scratch/6b23a1484cae/ai-trend-diagnosis/ai-knowledge-extractor/core/build.gradle'.
+
+> Configure project :ai-knowledge-extractor:gradle-plugin
+Evaluating project ':ai-knowledge-extractor:gradle-plugin' using build file '/workspace/scratch/6b23a1484cae/ai-trend-diagnosis/ai-knowledge-extractor/gradle-plugin/build.gradle'.
+Resolved plugin [id: 'java-gradle-plugin']
+
+> Configure project :ai-knowledge-extractor:maven
+Evaluating project ':ai-knowledge-extractor:maven' using build file '/workspace/scratch/6b23a1484cae/ai-trend-diagnosis/ai-knowledge-extractor/maven/build.gradle'.
+Registering project ':ai-knowledge-extractor' in composite build. Will substitute for module 'org.aiknowledge:ai-knowledge-extractor'.
+Registering project ':ai-knowledge-extractor:core' in composite build. Will substitute for module 'org.aiknowledge:core'.
+Registering project ':ai-knowledge-extractor:gradle-plugin' in composite build. Will substitute for module 'org.aiknowledge:gradle-plugin'.
+Registering project ':ai-knowledge-extractor:maven' in composite build. Will substitute for module 'org.aiknowledge:maven'.
+
+> Configure project :
+Evaluating root project 'Regelsuche' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/build.gradle'.
+destroyer locations for task group 0 (Thread[#82,Execution worker,5,main]) started.
+
+> Configure project :ai-knowledge-verification
+Evaluating project ':ai-knowledge-verification' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/ai-knowledge-verification/build.gradle'.
+Resolved plugin [id: 'org.aiknowledge.extractor', version: '0.1.10']
+Starting process 'command '/usr/lib/jvm/java-17-openjdk-amd64/bin/java''. Working directory: /root/.gradle/.tmp/tmp-jvm8271088249413354004probe Command: /usr/lib/jvm/java-17-openjdk-amd64/bin/java -Xmx32m -Xms32m -cp . JavaProbe
+Successfully started process 'command '/usr/lib/jvm/java-17-openjdk-amd64/bin/java''
+Received JVM installation metadata from '/usr/lib/jvm/java-17-openjdk-amd64': {JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64, JAVA_VERSION=17.0.20, JAVA_VENDOR=Ubuntu, RUNTIME_NAME=OpenJDK Runtime Environment, RUNTIME_VERSION=17.0.20+8-1-24.04-Ubuntu, VM_NAME=OpenJDK 64-Bit Server VM, VM_VERSION=17.0.20+8-1-24.04-Ubuntu, VM_VENDOR=Ubuntu, OS_ARCH=amd64}
+Resolve mutations for :ai-knowledge-extractor:core:compileJava (Thread[#81,included builds,5,main]) started.
+:ai-knowledge-extractor:core:compileJava (Thread[#81,included builds,5,main]) started.
+
+> Task :ai-knowledge-extractor:core:compileJava
+Downloading https://repo.maven.apache.org/maven2/org/eclipse/platform/org.eclipse.core.resources/3.22.100/org.eclipse.core.resources-3.22.100.jar to /root/.gradle/.tmp/gradle_download740723215994602872bin
+Downloading https://repo.maven.apache.org/maven2/org/eclipse/jdt/org.eclipse.jdt.core/3.41.0/org.eclipse.jdt.core-3.41.0.jar to /root/.gradle/.tmp/gradle_download12593006199291830814bin
+Downloading https://repo.maven.apache.org/maven2/org/eclipse/platform/org.eclipse.core.filesystem/1.11.100/org.eclipse.core.filesystem-1.11.100.jar to /root/.gradle/.tmp/gradle_download13084273602030352119bin
+Downloading https://repo.maven.apache.org/maven2/org/eclipse/platform/org.eclipse.text/3.14.300/org.eclipse.text-3.14.300.jar to /root/.gradle/.tmp/gradle_download7710948808830252038bin
+Downloading https://repo.maven.apache.org/maven2/org/eclipse/platform/org.eclipse.core.expressions/3.9.400/org.eclipse.core.expressions-3.9.400.jar to /root/.gradle/.tmp/gradle_download6088168598225525863bin
+Downloading https://repo.maven.apache.org/maven2/org/eclipse/platform/org.eclipse.core.runtime/3.33.0/org.eclipse.core.runtime-3.33.0.jar to /root/.gradle/.tmp/gradle_download3099823342215787795bin
+Downloading https://repo.maven.apache.org/maven2/org/eclipse/jdt/ecj/3.41.0/ecj-3.41.0.jar to /root/.gradle/.tmp/gradle_download6915630103342292987bin
+Downloading https://repo.maven.apache.org/maven2/net/java/dev/jna/jna-platform/5.15.0/jna-platform-5.15.0.jar to /root/.gradle/.tmp/gradle_download10257943323137993949bin
+Downloading https://repo.maven.apache.org/maven2/net/java/dev/jna/jna/5.16.0/jna-5.16.0.jar to /root/.gradle/.tmp/gradle_download11584455681646751435bin
+Downloading https://repo.maven.apache.org/maven2/org/eclipse/platform/org.eclipse.core.jobs/3.15.500/org.eclipse.core.jobs-3.15.500.jar to /root/.gradle/.tmp/gradle_download4068072077721894943bin
+Downloading https://repo.maven.apache.org/maven2/org/eclipse/platform/org.eclipse.core.contenttype/3.9.600/org.eclipse.core.contenttype-3.9.600.jar to /root/.gradle/.tmp/gradle_download2295034671699047587bin
+Downloading https://repo.maven.apache.org/maven2/org/eclipse/platform/org.eclipse.equinox.app/1.7.300/org.eclipse.equinox.app-1.7.300.jar to /root/.gradle/.tmp/gradle_download8215656391451436332bin
+Downloading https://repo.maven.apache.org/maven2/org/eclipse/platform/org.eclipse.equinox.registry/3.12.300/org.eclipse.equinox.registry-3.12.300.jar to /root/.gradle/.tmp/gradle_download3764936612914920468bin
+Downloading https://repo.maven.apache.org/maven2/org/eclipse/platform/org.eclipse.equinox.preferences/3.11.300/org.eclipse.equinox.preferences-3.11.300.jar to /root/.gradle/.tmp/gradle_download12635543800293119204bin
+Downloading https://repo.maven.apache.org/maven2/org/eclipse/platform/org.eclipse.core.commands/3.12.300/org.eclipse.core.commands-3.12.300.jar to /root/.gradle/.tmp/gradle_download3028424809618109544bin
+Downloading https://repo.maven.apache.org/maven2/org/eclipse/platform/org.eclipse.equinox.common/3.20.0/org.eclipse.equinox.common-3.20.0.jar to /root/.gradle/.tmp/gradle_download15826710919730845159bin
+Downloading https://repo.maven.apache.org/maven2/org/eclipse/platform/org.eclipse.osgi/3.23.0/org.eclipse.osgi-3.23.0.jar to /root/.gradle/.tmp/gradle_download10344767523529664446bin
+Downloading https://repo.maven.apache.org/maven2/org/osgi/org.osgi.service.prefs/1.1.2/org.osgi.service.prefs-1.1.2.jar to /root/.gradle/.tmp/gradle_download2913777166030721995bin
+Downloading https://repo.maven.apache.org/maven2/org/osgi/osgi.annotation/8.0.1/osgi.annotation-8.0.1.jar to /root/.gradle/.tmp/gradle_download8249610204902524819bin
+Caching disabled for task ':ai-knowledge-extractor:core:compileJava' because:
+  Build cache is disabled
+Task ':ai-knowledge-extractor:core:compileJava' is not up-to-date because:
+  No history is available.
+The input changes require a full rebuild for incremental task ':ai-knowledge-extractor:core:compileJava'.
+Compilation mode: in-process compilation
+Full recompilation is required because no incremental change information is available. This is usually caused by clean builds or changing compiler arguments.
+Compiling with toolchain '/workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10'.
+Compiling with JDK Java compiler API.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+Class dependency analysis for incremental compilation took 0.157 secs.
+Created classpath snapshot for incremental compilation in 2.118 secs.
+
+> Configure project :ai-knowledge-verification
+work action resolve main (project ':ai-knowledge-extractor:core') (Thread[#81,included builds,5,main]) started.
+Resolve mutations for :ai-knowledge-extractor:gradle-plugin:compileJava (Thread[#81,included builds,5,main]) started.
+:ai-knowledge-extractor:gradle-plugin:compileJava (Thread[#81,included builds,5,main]) started.
+
+> Task :ai-knowledge-extractor:gradle-plugin:compileJava
+Generating Gradle API jar: /root/.gradle/caches/9.7.1/generated-gradle-jars/gradle-api-9.7.1.jar
+Caching disabled for task ':ai-knowledge-extractor:gradle-plugin:compileJava' because:
+  Build cache is disabled
+Task ':ai-knowledge-extractor:gradle-plugin:compileJava' is not up-to-date because:
+  No history is available.
+The input changes require a full rebuild for incremental task ':ai-knowledge-extractor:gradle-plugin:compileJava'.
+Compilation mode: in-process compilation
+Full recompilation is required because no incremental change information is available. This is usually caused by clean builds or changing compiler arguments.
+Compiling with toolchain '/workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10'.
+Compiling with JDK Java compiler API.
+Class dependency analysis for incremental compilation took 0.013 secs.
+Created classpath snapshot for incremental compilation in 9.326 secs.
+
+> Task :ai-knowledge-extractor:gradle-plugin:pluginDescriptors
+Caching disabled for task ':ai-knowledge-extractor:gradle-plugin:pluginDescriptors' because:
+  Build cache is disabled
+  Not worth caching
+Task ':ai-knowledge-extractor:gradle-plugin:pluginDescriptors' is not up-to-date because:
+  No history is available.
+
+> Task :ai-knowledge-extractor:gradle-plugin:processResources
+Caching disabled for task ':ai-knowledge-extractor:gradle-plugin:processResources' because:
+  Build cache is disabled
+  Not worth caching
+Task ':ai-knowledge-extractor:gradle-plugin:processResources' is not up-to-date because:
+  No history is available.
+file or directory '/workspace/scratch/6b23a1484cae/ai-trend-diagnosis/ai-knowledge-extractor/gradle-plugin/src/main/resources', not found
+
+> Task :ai-knowledge-extractor:gradle-plugin:classes
+Skipping task ':ai-knowledge-extractor:gradle-plugin:classes' as it has no actions.
+
+> Configure project :ai-knowledge-verification
+Resolve mutations for :ai-knowledge-extractor:gradle-plugin:pluginDescriptors (Thread[#81,included builds,5,main]) started.
+:ai-knowledge-extractor:gradle-plugin:pluginDescriptors (Thread[#81,included builds,5,main]) started.
+Resolve mutations for :ai-knowledge-extractor:gradle-plugin:processResources (Thread[#81,included builds,5,main]) started.
+:ai-knowledge-extractor:gradle-plugin:processResources (Thread[#81,included builds,5,main]) started.
+Resolve mutations for :ai-knowledge-extractor:gradle-plugin:classes (Thread[#81,included builds,5,main]) started.
+:ai-knowledge-extractor:gradle-plugin:classes (Thread[#81,included builds,5,main]) started.
+Resolve mutations for :ai-knowledge-extractor:gradle-plugin:jar (Thread[#81,included builds,5,main]) started.
+:ai-knowledge-extractor:gradle-plugin:jar (Thread[#81,included builds,5,main]) started.
+
+> Task :ai-knowledge-extractor:gradle-plugin:jar
+Caching disabled for task ':ai-knowledge-extractor:gradle-plugin:jar' because:
+  Build cache is disabled
+  Not worth caching
+Task ':ai-knowledge-extractor:gradle-plugin:jar' is not up-to-date because:
+  No history is available.
+
+> Task :ai-knowledge-extractor:core:processResources
+Caching disabled for task ':ai-knowledge-extractor:core:processResources' because:
+  Build cache is disabled
+  Not worth caching
+Task ':ai-knowledge-extractor:core:processResources' is not up-to-date because:
+  No history is available.
+
+> Task :ai-knowledge-extractor:core:classes
+Skipping task ':ai-knowledge-extractor:core:classes' as it has no actions.
+
+> Task :ai-knowledge-extractor:core:jar
+Caching disabled for task ':ai-knowledge-extractor:core:jar' because:
+  Build cache is disabled
+  Not worth caching
+Task ':ai-knowledge-extractor:core:jar' is not up-to-date because:
+  No history is available.
+
+> Configure project :ai-knowledge-verification
+Resolve mutations for :ai-knowledge-extractor:core:processResources (Thread[#81,included builds,5,main]) started.
+:ai-knowledge-extractor:core:processResources (Thread[#81,included builds,5,main]) started.
+Resolve mutations for :ai-knowledge-extractor:core:classes (Thread[#81,included builds,5,main]) started.
+:ai-knowledge-extractor:core:classes (Thread[#81,included builds,5,main]) started.
+Resolve mutations for :ai-knowledge-extractor:core:jar (Thread[#81,included builds,5,main]) started.
+:ai-knowledge-extractor:core:jar (Thread[#81,included builds,5,main]) started.
+Found locally available resource with matching checksum: [https://plugins.gradle.org/m2/org/eclipse/jdt/org.eclipse.jdt.core/3.41.0/org.eclipse.jdt.core-3.41.0.jar, /root/.gradle/caches/modules-2/files-2.1/org.eclipse.jdt/org.eclipse.jdt.core/3.41.0/6ce386e67a53c63b3263df52d90dcd428eaa3354/org.eclipse.jdt.core-3.41.0.jar]
+Found locally available resource with matching checksum: [https://plugins.gradle.org/m2/org/eclipse/platform/org.eclipse.core.resources/3.22.100/org.eclipse.core.resources-3.22.100.jar, /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.resources/3.22.100/6481bc4447c55a0b321a39fc1608a6f4a24f0b6b/org.eclipse.core.resources-3.22.100.jar]
+Found locally available resource with matching checksum: [https://plugins.gradle.org/m2/org/eclipse/platform/org.eclipse.text/3.14.300/org.eclipse.text-3.14.300.jar, /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.text/3.14.300/d54b0fea69f001f33c46cda9f86c65ca9a0c9ea6/org.eclipse.text-3.14.300.jar]
+Found locally available resource with matching checksum: [https://plugins.gradle.org/m2/org/eclipse/platform/org.eclipse.core.expressions/3.9.400/org.eclipse.core.expressions-3.9.400.jar, /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.expressions/3.9.400/5c29a8b92d6ae9b9d5f70ef1db19cec2c7bb0688/org.eclipse.core.expressions-3.9.400.jar]
+Found locally available resource with matching checksum: [https://plugins.gradle.org/m2/org/eclipse/platform/org.eclipse.core.filesystem/1.11.100/org.eclipse.core.filesystem-1.11.100.jar, /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.filesystem/1.11.100/bcc7c20c74722a601223c31c14703ce619d1684c/org.eclipse.core.filesystem-1.11.100.jar]
+Found locally available resource with matching checksum: [https://plugins.gradle.org/m2/org/eclipse/platform/org.eclipse.core.runtime/3.33.0/org.eclipse.core.runtime-3.33.0.jar, /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.runtime/3.33.0/7409f85b3d9bb4b4512d0753bb52eb67c4bdd85a/org.eclipse.core.runtime-3.33.0.jar]
+Found locally available resource with matching checksum: [https://plugins.gradle.org/m2/net/java/dev/jna/jna-platform/5.15.0/jna-platform-5.15.0.jar, /root/.gradle/caches/modules-2/files-2.1/net.java.dev.jna/jna-platform/5.15.0/86b502cad57d45da172b5e3231c537b042e296ef/jna-platform-5.15.0.jar]
+Found locally available resource with matching checksum: [https://plugins.gradle.org/m2/org/eclipse/jdt/ecj/3.41.0/ecj-3.41.0.jar, /root/.gradle/caches/modules-2/files-2.1/org.eclipse.jdt/ecj/3.41.0/85fcc33ed386425923566e604f3b114d71cef6b7/ecj-3.41.0.jar]
+Found locally available resource with matching checksum: [https://plugins.gradle.org/m2/net/java/dev/jna/jna/5.16.0/jna-5.16.0.jar, /root/.gradle/caches/modules-2/files-2.1/net.java.dev.jna/jna/5.16.0/ebea09f91dc9f7048099f963fb8d6f919f0a4d9c/jna-5.16.0.jar]
+Found locally available resource with matching checksum: [https://plugins.gradle.org/m2/org/eclipse/platform/org.eclipse.core.jobs/3.15.500/org.eclipse.core.jobs-3.15.500.jar, /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.jobs/3.15.500/e7c187f00c656fcb930924182b48264de6edd5f1/org.eclipse.core.jobs-3.15.500.jar]
+Found locally available resource with matching checksum: [https://plugins.gradle.org/m2/org/eclipse/platform/org.eclipse.core.contenttype/3.9.600/org.eclipse.core.contenttype-3.9.600.jar, /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.contenttype/3.9.600/76cf366809d40e675ef2446493b05d0f34633d49/org.eclipse.core.contenttype-3.9.600.jar]
+Found locally available resource with matching checksum: [https://plugins.gradle.org/m2/org/eclipse/platform/org.eclipse.equinox.app/1.7.300/org.eclipse.equinox.app-1.7.300.jar, /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.equinox.app/1.7.300/8fcd9e20961a450356e77ac8ccdd05812266f61b/org.eclipse.equinox.app-1.7.300.jar]
+Found locally available resource with matching checksum: [https://plugins.gradle.org/m2/org/eclipse/platform/org.eclipse.equinox.registry/3.12.300/org.eclipse.equinox.registry-3.12.300.jar, /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.equinox.registry/3.12.300/c98bc522a002791f3dd1ee7620956e526fe3df94/org.eclipse.equinox.registry-3.12.300.jar]
+Found locally available resource with matching checksum: [https://plugins.gradle.org/m2/org/eclipse/platform/org.eclipse.equinox.preferences/3.11.300/org.eclipse.equinox.preferences-3.11.300.jar, /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.equinox.preferences/3.11.300/3c6791631b3a082faa53de10fa57f4d5021e554a/org.eclipse.equinox.preferences-3.11.300.jar]
+Found locally available resource with matching checksum: [https://plugins.gradle.org/m2/org/eclipse/platform/org.eclipse.core.commands/3.12.300/org.eclipse.core.commands-3.12.300.jar, /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.commands/3.12.300/b12bc043debd377259d65dea479d5a2f2df7c603/org.eclipse.core.commands-3.12.300.jar]
+Found locally available resource with matching checksum: [https://plugins.gradle.org/m2/org/eclipse/platform/org.eclipse.equinox.common/3.20.0/org.eclipse.equinox.common-3.20.0.jar, /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.equinox.common/3.20.0/e069c0741f1d0ac894e80a3c44ec96635227ee3/org.eclipse.equinox.common-3.20.0.jar]
+Found locally available resource with matching checksum: [https://plugins.gradle.org/m2/org/eclipse/platform/org.eclipse.osgi/3.23.0/org.eclipse.osgi-3.23.0.jar, /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.osgi/3.23.0/bf00f37805a9f161831216d4790761d3692b8e8/org.eclipse.osgi-3.23.0.jar]
+Found locally available resource with matching checksum: [https://plugins.gradle.org/m2/org/osgi/org.osgi.service.prefs/1.1.2/org.osgi.service.prefs-1.1.2.jar, /root/.gradle/caches/modules-2/files-2.1/org.osgi/org.osgi.service.prefs/1.1.2/44351fdfb119ee920394c1a27c938288c93c03c8/org.osgi.service.prefs-1.1.2.jar]
+Found locally available resource with matching checksum: [https://plugins.gradle.org/m2/org/osgi/osgi.annotation/8.0.1/osgi.annotation-8.0.1.jar, /root/.gradle/caches/modules-2/files-2.1/org.osgi/osgi.annotation/8.0.1/593d823753aa6e128129da357d7891758e66aa1d/osgi.annotation-8.0.1.jar]
+Caching disabled for InstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.jdt/org.eclipse.jdt.core/3.41.0/6ce386e67a53c63b3263df52d90dcd428eaa3354/org.eclipse.jdt.core-3.41.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for InstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.resources/3.22.100/6481bc4447c55a0b321a39fc1608a6f4a24f0b6b/org.eclipse.core.resources-3.22.100.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for InstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.filesystem/1.11.100/bcc7c20c74722a601223c31c14703ce619d1684c/org.eclipse.core.filesystem-1.11.100.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for InstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.text/3.14.300/d54b0fea69f001f33c46cda9f86c65ca9a0c9ea6/org.eclipse.text-3.14.300.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for InstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.expressions/3.9.400/5c29a8b92d6ae9b9d5f70ef1db19cec2c7bb0688/org.eclipse.core.expressions-3.9.400.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for InstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.runtime/3.33.0/7409f85b3d9bb4b4512d0753bb52eb67c4bdd85a/org.eclipse.core.runtime-3.33.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for InstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.jdt/ecj/3.41.0/85fcc33ed386425923566e604f3b114d71cef6b7/ecj-3.41.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for InstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/net.java.dev.jna/jna-platform/5.15.0/86b502cad57d45da172b5e3231c537b042e296ef/jna-platform-5.15.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for InstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/net.java.dev.jna/jna/5.16.0/ebea09f91dc9f7048099f963fb8d6f919f0a4d9c/jna-5.16.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for InstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.jobs/3.15.500/e7c187f00c656fcb930924182b48264de6edd5f1/org.eclipse.core.jobs-3.15.500.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for InstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.contenttype/3.9.600/76cf366809d40e675ef2446493b05d0f34633d49/org.eclipse.core.contenttype-3.9.600.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for InstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.equinox.app/1.7.300/8fcd9e20961a450356e77ac8ccdd05812266f61b/org.eclipse.equinox.app-1.7.300.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for InstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.equinox.registry/3.12.300/c98bc522a002791f3dd1ee7620956e526fe3df94/org.eclipse.equinox.registry-3.12.300.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for InstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.equinox.preferences/3.11.300/3c6791631b3a082faa53de10fa57f4d5021e554a/org.eclipse.equinox.preferences-3.11.300.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for InstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.commands/3.12.300/b12bc043debd377259d65dea479d5a2f2df7c603/org.eclipse.core.commands-3.12.300.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for InstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.equinox.common/3.20.0/e069c0741f1d0ac894e80a3c44ec96635227ee3/org.eclipse.equinox.common-3.20.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for InstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.osgi/3.23.0/bf00f37805a9f161831216d4790761d3692b8e8/org.eclipse.osgi-3.23.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for InstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.osgi/org.osgi.service.prefs/1.1.2/44351fdfb119ee920394c1a27c938288c93c03c8/org.osgi.service.prefs-1.1.2.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for InstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.osgi/osgi.annotation/8.0.1/593d823753aa6e128129da357d7891758e66aa1d/osgi.annotation-8.0.1.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for InstrumentationAnalysisTransform: /workspace/scratch/6b23a1484cae/ai-trend-diagnosis/ai-knowledge-extractor/gradle-plugin/build/classes/java/main because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for InstrumentationAnalysisTransform: /workspace/scratch/6b23a1484cae/ai-trend-diagnosis/ai-knowledge-extractor/core/build/classes/java/main because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/43491eb1d89a2d465a73173984e0bbdd/transformed/.gradle-instrumented-classpath.marker because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/43491eb1d89a2d465a73173984e0bbdd/transformed/analysis/instrumentation-hierarchy.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/549c144cb1c7cf5d59e2abbf3dea5985/transformed/analysis/instrumentation-hierarchy.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/43491eb1d89a2d465a73173984e0bbdd/transformed/analysis/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/549c144cb1c7cf5d59e2abbf3dea5985/transformed/analysis/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.resources/3.22.100/6481bc4447c55a0b321a39fc1608a6f4a24f0b6b/org.eclipse.core.resources-3.22.100.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/9.7.1/transforms/8b372bd8e70991eaf1b7c606d230edc1/transformed/merge/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.jdt/org.eclipse.jdt.core/3.41.0/6ce386e67a53c63b3263df52d90dcd428eaa3354/org.eclipse.jdt.core-3.41.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/9.7.1/transforms/4e51712f44981a366e912d1e4ba4f332/transformed/merge/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.resources/3.22.100/6481bc4447c55a0b321a39fc1608a6f4a24f0b6b/org.eclipse.core.resources-3.22.100.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/a34f878d0d2a207c7895c1eff56aaf99/transformed/analysis/instrumentation-hierarchy.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/a34f878d0d2a207c7895c1eff56aaf99/transformed/analysis/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.filesystem/1.11.100/bcc7c20c74722a601223c31c14703ce619d1684c/org.eclipse.core.filesystem-1.11.100.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/9.7.1/transforms/dff545ce796e4c02c9e48aea2758588a/transformed/merge/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.filesystem/1.11.100/bcc7c20c74722a601223c31c14703ce619d1684c/org.eclipse.core.filesystem-1.11.100.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/8d9596118c2d84284c5712a01ec8876e/transformed/analysis/instrumentation-hierarchy.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/8d9596118c2d84284c5712a01ec8876e/transformed/analysis/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.text/3.14.300/d54b0fea69f001f33c46cda9f86c65ca9a0c9ea6/org.eclipse.text-3.14.300.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/9.7.1/transforms/d115980ce2baefc05a75ccb2f65647fa/transformed/merge/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.text/3.14.300/d54b0fea69f001f33c46cda9f86c65ca9a0c9ea6/org.eclipse.text-3.14.300.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/29015b569921ec2ba5c12087a5fbb87e/transformed/analysis/instrumentation-hierarchy.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/29015b569921ec2ba5c12087a5fbb87e/transformed/analysis/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.expressions/3.9.400/5c29a8b92d6ae9b9d5f70ef1db19cec2c7bb0688/org.eclipse.core.expressions-3.9.400.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/9.7.1/transforms/bce1957b06ea99445817b05088e2ca5f/transformed/merge/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.expressions/3.9.400/5c29a8b92d6ae9b9d5f70ef1db19cec2c7bb0688/org.eclipse.core.expressions-3.9.400.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/0f04a81eeb9b8ea4cd1b30396696199b/transformed/analysis/instrumentation-hierarchy.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/0f04a81eeb9b8ea4cd1b30396696199b/transformed/analysis/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.runtime/3.33.0/7409f85b3d9bb4b4512d0753bb52eb67c4bdd85a/org.eclipse.core.runtime-3.33.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/9.7.1/transforms/b76ddde7ee60cf9ad3821d850b6c2f5d/transformed/merge/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.runtime/3.33.0/7409f85b3d9bb4b4512d0753bb52eb67c4bdd85a/org.eclipse.core.runtime-3.33.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/185dcd43b00259c2b64d243a1f4bce90/transformed/analysis/instrumentation-hierarchy.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/185dcd43b00259c2b64d243a1f4bce90/transformed/analysis/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.jdt/ecj/3.41.0/85fcc33ed386425923566e604f3b114d71cef6b7/ecj-3.41.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/9.7.1/transforms/ec7aad1cfaabb84afef57cc2565c73e3/transformed/merge/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.jdt/ecj/3.41.0/85fcc33ed386425923566e604f3b114d71cef6b7/ecj-3.41.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/9a1c6f5cc6af30f2ce70cd775cd31027/transformed/analysis/instrumentation-hierarchy.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/9a1c6f5cc6af30f2ce70cd775cd31027/transformed/analysis/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/net.java.dev.jna/jna-platform/5.15.0/86b502cad57d45da172b5e3231c537b042e296ef/jna-platform-5.15.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.jdt/org.eclipse.jdt.core/3.41.0/6ce386e67a53c63b3263df52d90dcd428eaa3354/org.eclipse.jdt.core-3.41.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/9.7.1/transforms/230949075efa1992b3ede99511a463a3/transformed/merge/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/dacbd9e8151b1d161064422b3d913e5f/transformed/analysis/instrumentation-hierarchy.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/dacbd9e8151b1d161064422b3d913e5f/transformed/analysis/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/net.java.dev.jna/jna/5.16.0/ebea09f91dc9f7048099f963fb8d6f919f0a4d9c/jna-5.16.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/9.7.1/transforms/8c4d44f6f4d1a5fcc6172f76d2b3589a/transformed/merge/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/modules-2/files-2.1/net.java.dev.jna/jna/5.16.0/ebea09f91dc9f7048099f963fb8d6f919f0a4d9c/jna-5.16.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/ac1183d9f1aa2b20855dc7674747b4a5/transformed/analysis/instrumentation-hierarchy.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/ac1183d9f1aa2b20855dc7674747b4a5/transformed/analysis/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.jobs/3.15.500/e7c187f00c656fcb930924182b48264de6edd5f1/org.eclipse.core.jobs-3.15.500.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/9.7.1/transforms/0705aef9fb724733f83b6bb7a8445116/transformed/merge/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.jobs/3.15.500/e7c187f00c656fcb930924182b48264de6edd5f1/org.eclipse.core.jobs-3.15.500.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/abd03a69847eaccfe7e17f4011dcd9be/transformed/analysis/instrumentation-hierarchy.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/modules-2/files-2.1/net.java.dev.jna/jna-platform/5.15.0/86b502cad57d45da172b5e3231c537b042e296ef/jna-platform-5.15.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/abd03a69847eaccfe7e17f4011dcd9be/transformed/analysis/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/70facfde45c69ea5e6805eb7ea12d1af/transformed/analysis/instrumentation-hierarchy.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.contenttype/3.9.600/76cf366809d40e675ef2446493b05d0f34633d49/org.eclipse.core.contenttype-3.9.600.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/70facfde45c69ea5e6805eb7ea12d1af/transformed/analysis/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.equinox.app/1.7.300/8fcd9e20961a450356e77ac8ccdd05812266f61b/org.eclipse.equinox.app-1.7.300.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/9.7.1/transforms/2261e0a48c4ae9df56695422c9efcb21/transformed/merge/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/9.7.1/transforms/26d1d66e3aaad04c479280198c3b96c1/transformed/merge/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.equinox.app/1.7.300/8fcd9e20961a450356e77ac8ccdd05812266f61b/org.eclipse.equinox.app-1.7.300.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/b5c09ca55f8f0283b376c58cc084dd6b/transformed/analysis/instrumentation-hierarchy.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/b5c09ca55f8f0283b376c58cc084dd6b/transformed/analysis/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.contenttype/3.9.600/76cf366809d40e675ef2446493b05d0f34633d49/org.eclipse.core.contenttype-3.9.600.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.equinox.registry/3.12.300/c98bc522a002791f3dd1ee7620956e526fe3df94/org.eclipse.equinox.registry-3.12.300.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/9.7.1/transforms/7d8c58ab9a45857221d8a529591dcbdd/transformed/merge/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/80faf23e1831830d81537013702b1100/transformed/analysis/instrumentation-hierarchy.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/80faf23e1831830d81537013702b1100/transformed/analysis/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.equinox.preferences/3.11.300/3c6791631b3a082faa53de10fa57f4d5021e554a/org.eclipse.equinox.preferences-3.11.300.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/9.7.1/transforms/e9cfef84ac70c75cda84da05796ec1e3/transformed/merge/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.equinox.registry/3.12.300/c98bc522a002791f3dd1ee7620956e526fe3df94/org.eclipse.equinox.registry-3.12.300.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/7aa1f1c4c08651b5e0515e13edb55f27/transformed/analysis/instrumentation-hierarchy.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/7aa1f1c4c08651b5e0515e13edb55f27/transformed/analysis/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.commands/3.12.300/b12bc043debd377259d65dea479d5a2f2df7c603/org.eclipse.core.commands-3.12.300.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/9.7.1/transforms/0bf7b104fa52f80f2f57044d5011f3b9/transformed/merge/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.equinox.preferences/3.11.300/3c6791631b3a082faa53de10fa57f4d5021e554a/org.eclipse.equinox.preferences-3.11.300.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/2835b8403fb6c5815a80263dc297b407/transformed/analysis/instrumentation-hierarchy.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.core.commands/3.12.300/b12bc043debd377259d65dea479d5a2f2df7c603/org.eclipse.core.commands-3.12.300.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/2835b8403fb6c5815a80263dc297b407/transformed/analysis/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.equinox.common/3.20.0/e069c0741f1d0ac894e80a3c44ec96635227ee3/org.eclipse.equinox.common-3.20.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/3a24344fb0cf1d090f49cebfe8520e86/transformed/analysis/instrumentation-hierarchy.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/9.7.1/transforms/a8b6e68684e4c3aedd199784cef7e770/transformed/merge/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/3a24344fb0cf1d090f49cebfe8520e86/transformed/analysis/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.osgi/3.23.0/bf00f37805a9f161831216d4790761d3692b8e8/org.eclipse.osgi-3.23.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/9.7.1/transforms/11f2d099a5a9f9aad895a460918ee226/transformed/merge/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.equinox.common/3.20.0/e069c0741f1d0ac894e80a3c44ec96635227ee3/org.eclipse.equinox.common-3.20.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/ab6b2b9eb2bd89dddb0ce26ef9e36bdf/transformed/analysis/instrumentation-hierarchy.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/ab6b2b9eb2bd89dddb0ce26ef9e36bdf/transformed/analysis/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.osgi/org.osgi.service.prefs/1.1.2/44351fdfb119ee920394c1a27c938288c93c03c8/org.osgi.service.prefs-1.1.2.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/9.7.1/transforms/895151281dc04cddf02a3b38035956f2/transformed/merge/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/modules-2/files-2.1/org.osgi/org.osgi.service.prefs/1.1.2/44351fdfb119ee920394c1a27c938288c93c03c8/org.osgi.service.prefs-1.1.2.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/9.7.1/transforms/ca827ef85b6fd2b66f7ec008aa6b4363/transformed/analysis/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for MergeInstrumentationAnalysisTransform: /root/.gradle/caches/modules-2/files-2.1/org.osgi/osgi.annotation/8.0.1/593d823753aa6e128129da357d7891758e66aa1d/osgi.annotation-8.0.1.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/9.7.1/transforms/8db0bbe98f1f5bbb0bb9677f69f0d8c8/transformed/merge/instrumentation-dependencies.bin because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/modules-2/files-2.1/org.osgi/osgi.annotation/8.0.1/593d823753aa6e128129da357d7891758e66aa1d/osgi.annotation-8.0.1.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ExternalDependencyInstrumentingArtifactTransform: /root/.gradle/caches/modules-2/files-2.1/org.eclipse.platform/org.eclipse.osgi/3.23.0/bf00f37805a9f161831216d4790761d3692b8e8/org.eclipse.osgi-3.23.0.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ProjectDependencyInstrumentingArtifactTransform: /workspace/scratch/6b23a1484cae/ai-trend-diagnosis/ai-knowledge-extractor/gradle-plugin/build/libs/gradle-plugin-0.1.10.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for ProjectDependencyInstrumentingArtifactTransform: /workspace/scratch/6b23a1484cae/ai-trend-diagnosis/ai-knowledge-extractor/core/build/libs/core-0.1.10.jar because:
+  Build cache is disabled
+  Caching not enabled.
+Caching disabled for Groovy DSL script compilation (proj) because:
+  Build cache is disabled
+  Not worth caching.
+Compiling build file '/workspace/scratch/6b23a1484cae/Regelsuche/ai-knowledge-verification/build.gradle' using BuildScriptTransformer.
+Caching disabled for Groovy DSL script compilation (cp_dsl) because:
+  Build cache is disabled
+  Not worth caching.
+Compiling script '/workspace/scratch/6b23a1484cae/Regelsuche/gradle/ai-knowledge-verification.gradle' using SubsetScriptTransformer.
+Caching disabled for Groovy DSL script compilation (dsl) because:
+  Build cache is disabled
+  Not worth caching.
+Compiling script '/workspace/scratch/6b23a1484cae/Regelsuche/gradle/ai-knowledge-verification.gradle' using BuildScriptTransformer.
+
+> Configure project :app
+Evaluating project ':app' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/app/build.gradle'.
+Resolved plugin [id: 'application']
+Resolved plugin [id: 'jacoco']
+Resolved plugin [id: 'me.champeau.jmh', version: '0.7.3']
+
+> Configure project :regelsuche-autopilot
+Evaluating project ':regelsuche-autopilot' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-autopilot/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'application']
+Resolved plugin [id: 'jacoco']
+
+> Configure project :regelsuche-benchmarks
+Evaluating project ':regelsuche-benchmarks' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-benchmarks/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'application']
+Resolved plugin [id: 'jacoco']
+
+> Configure project :regelsuche-bom
+Evaluating project ':regelsuche-bom' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-bom/build.gradle'.
+Resolved plugin [id: 'java-platform']
+Resolved plugin [id: 'maven-publish']
+
+> Configure project :regelsuche-cli
+Evaluating project ':regelsuche-cli' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-cli/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'jacoco']
+
+> Configure project :regelsuche-core
+Evaluating project ':regelsuche-core' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-core/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'jacoco']
+
+> Configure project :regelsuche-discovery
+Evaluating project ':regelsuche-discovery' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-discovery/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'jacoco']
+
+> Configure project :regelsuche-discovery-sdk
+Evaluating project ':regelsuche-discovery-sdk' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-discovery-sdk/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'jacoco']
+
+> Configure project :regelsuche-egraph
+Evaluating project ':regelsuche-egraph' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-egraph/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'jacoco']
+
+> Configure project :regelsuche-experiments
+Evaluating project ':regelsuche-experiments' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-experiments/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'jacoco']
+
+> Configure project :regelsuche-extension-api
+Evaluating project ':regelsuche-extension-api' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-extension-api/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'jacoco']
+
+> Configure project :regelsuche-extension-runtime
+Evaluating project ':regelsuche-extension-runtime' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-extension-runtime/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'jacoco']
+
+> Configure project :regelsuche-learning
+Evaluating project ':regelsuche-learning' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-learning/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'jacoco']
+
+> Configure project :regelsuche-math-algorithms
+Evaluating project ':regelsuche-math-algorithms' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-math-algorithms/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'jacoco']
+
+> Configure project :regelsuche-math-jas
+Evaluating project ':regelsuche-math-jas' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-math-jas/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'jacoco']
+
+> Configure project :regelsuche-math-sympy
+Evaluating project ':regelsuche-math-sympy' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-math-sympy/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'jacoco']
+Resolved plugin [id: 'me.champeau.jmh', version: '0.7.3']
+Resolved plugin [id: 'org.graalvm.python', version: '25.1.3']
+
+> Configure project :regelsuche-persistence
+Evaluating project ':regelsuche-persistence' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-persistence/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'jacoco']
+
+> Configure project :regelsuche-persistence-hibernate
+Evaluating project ':regelsuche-persistence-hibernate' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-persistence-hibernate/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'jacoco']
+
+> Configure project :regelsuche-plugin-api
+Evaluating project ':regelsuche-plugin-api' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-plugin-api/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'jacoco']
+
+> Configure project :regelsuche-quality
+Evaluating project ':regelsuche-quality' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-quality/build.gradle'.
+Resolved plugin [id: 'java-library']
+
+> Configure project :regelsuche-release
+Evaluating project ':regelsuche-release' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-release/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'application']
+Resolved plugin [id: 'jacoco']
+
+> Configure project :regelsuche-search
+Evaluating project ':regelsuche-search' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-search/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'jacoco']
+
+> Configure project :regelsuche-solver-ir
+Evaluating project ':regelsuche-solver-ir' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-solver-ir/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'jacoco']
+
+> Configure project :regelsuche-solver-portfolio
+Evaluating project ':regelsuche-solver-portfolio' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-solver-portfolio/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'jacoco']
+
+> Configure project :regelsuche-validation
+Evaluating project ':regelsuche-validation' using build file '/workspace/scratch/6b23a1484cae/Regelsuche/regelsuche-validation/build.gradle'.
+Resolved plugin [id: 'java-library']
+Resolved plugin [id: 'jacoco']
+All projects evaluated.
+Task name matched 'aiKnowledgeCheck'
+Selected primary task 'aiKnowledgeCheck' from project :
+Tasks to be executed: [task ':ai-knowledge-verification:aiKnowledgeCheck', task ':ai-knowledge-verification:verifyAiKnowledgeArtifacts', task ':ai-knowledge-verification:verifyAiKnowledgeCoverageControls', task ':ai-knowledge-verification:verifyRegelsucheAiKnowledgeArtifacts', task ':ai-knowledge-verification:verifyComplexityHotspots', task ':ai-knowledge-verification:verifyRegelsucheAiKnowledgeLifecycle', task ':aiKnowledgeCheck']
+Tasks that were excluded: []
+Resolve mutations for :ai-knowledge-verification:aiKnowledgeCheck (Thread[#81,included builds,5,main]) started.
+:ai-knowledge-verification:aiKnowledgeCheck (Thread[#82,Execution worker,5,main]) started.
+
+> Task :ai-knowledge-verification:aiKnowledgeCheck
+Caching disabled for task ':ai-knowledge-verification:aiKnowledgeCheck' because:
+  Build cache is disabled
+Task ':ai-knowledge-verification:aiKnowledgeCheck' is not up-to-date because:
+  Task has not declared any outputs despite executing actions.
+
+> Task :ai-knowledge-verification:aiKnowledgeCheck FAILED
+
+[Incubating] Problems report is available at: file:///workspace/scratch/6b23a1484cae/Regelsuche/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':ai-knowledge-verification:aiKnowledgeCheck' (registered by plugin 'org.aiknowledge.extractor').
+> AI knowledge task failed
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.7.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 1m 34s
+8 actionable tasks: 8 executed
+Some of the file system contents retained in the virtual file system are on file systems that Gradle doesn't support watching. The relevant state was discarded to ensure changes to these locations are properly detected. You can override this by explicitly enabling file system watching.

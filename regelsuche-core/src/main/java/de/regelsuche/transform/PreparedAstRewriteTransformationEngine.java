@@ -53,6 +53,7 @@ public final class PreparedAstRewriteTransformationEngine
     private final ExpressionCanonicalizer canonicalizer =
         new ExpressionCanonicalizer();
     private final List<RewriteRule> rules;
+    private final RuleShapeIndex ruleIndex;
     private final int maxAstSizeIncreasePerStep;
     private final int maxCandidatesPerState;
 
@@ -73,7 +74,13 @@ public final class PreparedAstRewriteTransformationEngine
         int maxAstSizeIncreasePerStep,
         int maxCandidatesPerState
     ) {
+        this(rules, maxAstSizeIncreasePerStep, maxCandidatesPerState, false);
+    }
+
+    PreparedAstRewriteTransformationEngine(List<RewriteRule> rules,
+            int maxAstSizeIncreasePerStep, int maxCandidatesPerState, boolean indexed) {
         this.rules = List.copyOf(rules);
+        this.ruleIndex = indexed ? new RuleShapeIndex(this.rules) : null;
         this.maxAstSizeIncreasePerStep = maxAstSizeIncreasePerStep;
         this.maxCandidatesPerState = maxCandidatesPerState;
     }
@@ -82,9 +89,15 @@ public final class PreparedAstRewriteTransformationEngine
         return rules;
     }
 
+    /** Opt-in root discrimination; preserves original rule order and the unfiltered reference path. */
+    public PreparedAstRewriteTransformationEngine withRuleIndex() {
+        return ruleIndex == null ? new PreparedAstRewriteTransformationEngine(
+            rules, maxAstSizeIncreasePerStep, maxCandidatesPerState, true) : this;
+    }
+
     /** Independent typed view with this source's exact rule objects and generation limits. */
     public AstRewriteTransport astTransport() {
-        return new AstRewriteTransport(rules, maxAstSizeIncreasePerStep, maxCandidatesPerState);
+        return new AstRewriteTransport(rules, maxAstSizeIncreasePerStep, maxCandidatesPerState, ruleIndex != null);
     }
 
     /** Explicit native cursor capability; the historical list-based transformation path is unchanged. */
@@ -180,7 +193,7 @@ public final class PreparedAstRewriteTransformationEngine
     private List<RewriteResult> rewriteEverywhere(Expr subtree, boolean retainLegacyHash) {
         List<RewriteResult> results = new ArrayList<>();
         String subtreeHash = null;
-        for (RewriteRule rule : rules) {
+        for (RewriteRule rule : ruleIndex == null ? rules : ruleIndex.candidates(subtree)) {
             Expr rewritten = applyIfMatched(rule, subtree);
             if (!retainLegacyHash && rewritten != null) AstRewriteTransport.requireBounded(rewritten);
             if (rewritten == null || rewritten.equals(subtree)) {

@@ -1,0 +1,21 @@
+{
+  "purpose": "DEVELOPMENT_ONLY;NOT_HELD_OUT;NO_GENERAL_SPEEDUP_CLAIM",
+  "implementation_commit": "172dfa0f3fca6108e8f1e35ce4a72ecf936ef1e9",
+  "commit_scope": "local validation commit; API publication recreates commit identities while verifying identical trees and blobs",
+  "benchmark_source_sha256": "217180ffdad509d8fe3fbc7219fed02e4c799c45471fa7ba211705f449618714",
+  "platform": "Linux 6.18.44 x86_64 glibc 2.39",
+  "cpu": "Intel Xeon Platinum 8370C @ 2.80GHz",
+  "visible_cpus": 9,
+  "pilot_overlap": "early pilot measurements overlapped task-owned builds",
+  "repeat_isolation": "no concurrent task-owned builds; shared development host",
+  "retained_runs": {
+    "pilot": {
+      "file": "pilot.json",
+      "sha256": "b75834d1993c3a0bc843d4e6aad7ef878536b27c38e075333c7f3a912f89b93a"
+    },
+    "repeat": {
+      "file": "repeat.json",
+      "sha256": "58f5ee3f04cac5fbd9fae3138e9a2140969f1f07b65646390af9e5db45db0df1"
+    }
+  }
+}

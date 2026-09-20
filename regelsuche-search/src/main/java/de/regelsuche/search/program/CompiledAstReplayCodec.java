@@ -19,9 +19,12 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /** Bounded interchange of untrusted typed histories. Decoding is not mathematical or execution approval. */
 public final class CompiledAstReplayCodec {
@@ -39,10 +42,76 @@ public final class CompiledAstReplayCodec {
         .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(270)
             .maxStringLength(MAXIMUM_TEXT_CHARACTERS).maxNameLength(128).maxNumberLength(32).build())
         .build()).enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+    private static final ThreadLocal<ExpressionCache> EXPRESSION_CACHE = new ThreadLocal<>();
+
+    /**
+     * Reuses pure immutable expression transport within this thread's lexical scope.
+     * Every scope is fresh, including nested scopes, and is discarded even when work fails.
+     * Zero limits disable reuse; calls outside a scope remain uncached.
+     *
+     * <p>This retains only canonical expression text and one immutable AST per text,
+     * bounded by FIFO entry count and total canonical characters. It does not retain
+     * proofs, assumptions, candidates or path state, and never authorizes replay.</p>
+     */
+    public static <T> T withExpressionCache(int maximumEntries, long maximumCharacters, Supplier<T> work) {
+        if (maximumEntries < 0 || maximumCharacters < 0) {
+            throw new IllegalArgumentException("negative expression cache bound");
+        }
+        Objects.requireNonNull(work, "work");
+        ExpressionCache previous = EXPRESSION_CACHE.get();
+        try {
+            if (maximumEntries == 0 || maximumCharacters == 0) EXPRESSION_CACHE.remove();
+            else EXPRESSION_CACHE.set(new ExpressionCache(maximumEntries, maximumCharacters));
+            return work.get();
+        } finally {
+            if (previous == null) EXPRESSION_CACHE.remove();
+            else EXPRESSION_CACHE.set(previous);
+        }
+    }
+
+    private static final class ExpressionCache {
+        private final int maximumEntries;
+        private final long maximumCharacters;
+        private final LinkedHashMap<String, Expr> byDocument = new LinkedHashMap<>();
+        private final IdentityHashMap<Expr, String> byIdentity = new IdentityHashMap<>();
+        private long retainedCharacters;
+
+        private ExpressionCache(int maximumEntries, long maximumCharacters) {
+            this.maximumEntries = maximumEntries;
+            this.maximumCharacters = maximumCharacters;
+        }
+
+        private String retain(Expr expression, String document) {
+            Expr existing = byDocument.get(document);
+            // Equal but distinct ASTs must not add unbounded identity aliases.
+            if (existing != null) return byIdentity.get(existing);
+            if (document.length() > maximumCharacters) return document;
+            while (byDocument.size() >= maximumEntries
+                    || retainedCharacters > maximumCharacters - document.length()) {
+                var evicted = byDocument.pollFirstEntry();
+                byIdentity.remove(evicted.getValue());
+                retainedCharacters -= evicted.getKey().length();
+            }
+            byDocument.put(document, expression);
+            byIdentity.put(expression, document);
+            retainedCharacters += document.length();
+            return document;
+        }
+    }
 
     /** Canonical structural transport for one AST search state; no parser/formatter round-trip. */
     public String encodeExpression(Expr expression) {
         Objects.requireNonNull(expression, "expression");
+        ExpressionCache cache = EXPRESSION_CACHE.get();
+        if (cache != null) {
+            String existing = cache.byIdentity.get(expression);
+            if (existing != null) return existing;
+        }
+        String encoded = encodeExpressionUncached(expression);
+        return cache == null ? encoded : cache.retain(expression, encoded);
+    }
+
+    private String encodeExpressionUncached(Expr expression) {
         var data = new AstReplayJson(JSON);
         var root = JSON.createObjectNode().put("schema", EXPRESSION_SCHEMA);
         root.set("expression", data.write(expression));
@@ -58,6 +127,11 @@ public final class CompiledAstReplayCodec {
     /** Decodes only the canonical expression-state schema and rejects alternate JSON spellings. */
     public Expr decodeExpression(String document) {
         Objects.requireNonNull(document, "document");
+        ExpressionCache cache = EXPRESSION_CACHE.get();
+        if (cache != null) {
+            Expr existing = cache.byDocument.get(document);
+            if (existing != null) return existing;
+        }
         byte[] bytes = document.getBytes(StandardCharsets.UTF_8);
         requireBytes(bytes);
         try {
@@ -68,9 +142,10 @@ public final class CompiledAstReplayCodec {
                 throw new IllegalArgumentException("unsupported typed move expression version");
             }
             Expr expression = data.read(root.get("expression"));
-            if (!encodeExpression(expression).equals(document)) {
+            if (!encodeExpressionUncached(expression).equals(document)) {
                 throw new IllegalArgumentException("noncanonical typed move expression");
             }
+            if (cache != null) cache.retain(expression, document);
             return expression;
         } catch (JsonProcessingException exception) {
             throw new IllegalArgumentException("invalid typed move expression JSON", exception);
