@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MoveSearchObjective.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">MoveSearchObjective.java</span></div><h1>MoveSearchObjective.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import java.util.List;
+import java.util.Objects;
+
+/** A per-run incumbent, updated only for the trusted input and mathematically admitted edges. */
+final class MoveSearchObjective {
+    private final MoveSearch.Objective objective;
+    private final long maximumOutputScore;
+    private MoveState incumbent;
+<span class="fc" id="L11">    private MoveWitnessPath path = MoveWitnessPath.ROOT;</span>
+    private long inputScore;
+    private long outputScore;
+    private long objectiveWork;
+<span class="fc" id="L15">    private List&lt;MoveSearch.WitnessStep&gt; witness = List.of();</span>
+
+<span class="fc" id="L17">    MoveSearchObjective(MoveSearch.Objective objective, long maximumOutputScore) {</span>
+<span class="fc" id="L18">        this.objective = Objects.requireNonNull(objective, &quot;objective&quot;);</span>
+<span class="fc" id="L19">        this.maximumOutputScore = maximumOutputScore;</span>
+<span class="fc" id="L20">    }</span>
+    long observe(MoveState state, MoveWitnessPath candidatePath) {
+<span class="fc" id="L22">        var assessment = Objects.requireNonNull(objective.evaluate(state), &quot;objective assessment&quot;);</span>
+<span class="fc" id="L23">        objectiveWork = Math.addExact(objectiveWork, assessment.work());</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">        if (incumbent == null) inputScore = assessment.value();</span>
+<span class="fc bfc" id="L25" title="All 4 branches covered.">        if (incumbent == null || assessment.value() &lt; outputScore) {</span>
+<span class="fc" id="L26">            incumbent = state;</span>
+<span class="fc" id="L27">            outputScore = assessment.value();</span>
+<span class="fc" id="L28">            path = candidatePath;</span>
+        }
+<span class="fc" id="L30">        return assessment.work();</span>
+    }
+<span class="pc bpc" id="L32" title="1 of 4 branches missed.">    boolean satisfied() { return incumbent != null &amp;&amp; outputScore &lt;= maximumOutputScore; }</span>
+    long finish() {
+<span class="fc" id="L34">        witness = path.steps();</span>
+<span class="fc" id="L35">        return witness.size() + 1L;</span>
+    }
+<span class="fc" id="L37">    MoveState incumbent() { return incumbent; }</span>
+<span class="fc" id="L38">    long inputScore() { return inputScore; }</span>
+<span class="fc" id="L39">    long outputScore() { return outputScore; }</span>
+<span class="fc" id="L40">    long objectiveWork() { return objectiveWork; }</span>
+<span class="fc" id="L41">    List&lt;MoveSearch.WitnessStep&gt; witness() { return witness; }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
