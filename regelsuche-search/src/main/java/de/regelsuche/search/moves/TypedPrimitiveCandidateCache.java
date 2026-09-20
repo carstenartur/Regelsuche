@@ -2,29 +2,117 @@ package de.regelsuche.search.moves;
 
 import de.regelsuche.transform.AstRewriteTransport;
 import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 
-/** Initial uncached control for the candidate-reuse regression tests. */
+/**
+ * Opt-in, caller-owned primitive candidate reuse. Create a fresh instance for each
+ * independently measured search. This caches generation, never proof authorization.
+ * The descriptor, concrete pattern rules and transport bounds are fixed per instance.
+ */
 public final class TypedPrimitiveCandidateCache implements TypedMoveSearch.TypedProvider {
     public record Statistics(long hits, long misses, long bypasses, int entries, long retainedCharacters) {}
+    private record Key(String expression, List<String> assumptions, MoveContext context) {
+        private Key { assumptions = List.copyOf(assumptions); }
+    }
+    private record Entry(Batch batch, long characters) {}
+    private record Footprint(long characters, long inspections) {}
+
     private final TypedMoveSearch.TypedProvider delegate;
+    private final int capacity;
+    private final long maximumCharacters;
+    private final LinkedHashMap<Key, Entry> entries = new LinkedHashMap<>();
+    private long hits;
     private long misses;
+    private long bypasses;
+    private long retainedCharacters;
 
     public TypedPrimitiveCandidateCache(Descriptor descriptor, List<PatternRewriteRule> rules,
             int maximumGrowth, int maximumCandidates, int capacity, long maximumCharacters) {
-        Objects.requireNonNull(rules, "rules");
+        var retainedRules = List.copyOf(Objects.requireNonNull(rules, "rules"));
         if (capacity < 0 || maximumCharacters < 0) throw new IllegalArgumentException("negative retention bound");
-        if (rules.stream().anyMatch(rule -> rule == null || rule.getClass() != PatternRewriteRule.class)) {
+        // Arbitrary providers and rule subclasses may depend on mutable state.
+        if (retainedRules.stream().anyMatch(rule -> rule.getClass() != PatternRewriteRule.class)) {
             throw new IllegalArgumentException("only immutable concrete pattern rules are cacheable");
         }
         delegate = TypedMoveSearch.primitiveProvider(descriptor,
-            new AstRewriteTransport(List.copyOf(rules), maximumGrowth, maximumCandidates));
+            new AstRewriteTransport(List.copyOf(retainedRules), maximumGrowth, maximumCandidates));
+        this.capacity = capacity;
+        this.maximumCharacters = maximumCharacters;
     }
+
     @Override public Descriptor descriptor() { return delegate.descriptor(); }
-    @Override public Batch candidates(MoveState state, MoveContext context) {
+
+    @Override public synchronized Batch candidates(MoveState state, MoveContext context) {
+        Objects.requireNonNull(state, "state");
+        Objects.requireNonNull(context, "context");
+        if (capacity == 0 || maximumCharacters == 0) {
+            bypasses++;
+            return delegate.candidates(state, context);
+        }
+        // The restricted delegate reads only the expression and these premises.
+        // Keep phase/goal as additional isolation. Depth/history/capabilities remain
+        // untouched in MoveSearch state identity, scheduling and edge admission.
+        var key = new Key(state.expression(), state.assumptions(), context);
+        var retained = entries.get(key);
+        if (retained != null) {
+            hits++;
+            var original = retained.batch();
+            var work = TransformationWorkMetrics.ZERO
+                .withCandidateWork(original.work().candidateWork())
+                .withDelegatedMechanicalWork(1L + original.moves().size());
+            return new Batch(original.moves(), work, original.complete());
+        }
         misses++;
-        return delegate.candidates(state, context);
+        var generated = delegate.candidates(state, context);
+        var footprint = footprint(key, generated);
+        long overhead = Math.addExact(1, footprint.inspections());
+        if (footprint.characters() > maximumCharacters) {
+            bypasses++;
+            return charged(generated, overhead);
+        }
+        // FIFO is deterministic. Eviction affects reuse only, never candidate admission.
+        while (entries.size() >= capacity || footprint.characters() > maximumCharacters - retainedCharacters) {
+            var iterator = entries.entrySet().iterator();
+            var oldest = iterator.next();
+            retainedCharacters -= oldest.getValue().characters();
+            iterator.remove();
+            overhead = Math.addExact(overhead, 1);
+        }
+        entries.put(key, new Entry(generated, footprint.characters()));
+        retainedCharacters = Math.addExact(retainedCharacters, footprint.characters());
+        return charged(generated, Math.addExact(overhead, 1));
     }
-    public Statistics statistics() { return new Statistics(0, misses, 0, 0, 0); }
+
+    public synchronized Statistics statistics() {
+        return new Statistics(hits, misses, bypasses, entries.size(), retainedCharacters);
+    }
+
+    private static Batch charged(Batch original, long overhead) {
+        return new Batch(original.moves(), original.work().plus(
+            TransformationWorkMetrics.ZERO.withDelegatedMechanicalWork(overhead)), original.complete());
+    }
+
+    /** Bound retained variable text, not JVM heap bytes. Fixed inventory metadata is shared. */
+    private static Footprint footprint(Key key, Batch batch) {
+        long characters = Math.addExact(key.expression().length(), key.context().goal().length());
+        long inspections = 2;
+        for (var premise : key.assumptions()) {
+            characters = Math.addExact(characters, premise.length());
+            inspections++;
+        }
+        for (var premise : key.context().initialAssumptions()) {
+            characters = Math.addExact(characters, premise.length());
+            inspections++;
+        }
+        for (var move : batch.moves()) {
+            var step = move.transformation();
+            characters = Math.addExact(characters, step.transformedExpression().length());
+            characters = Math.addExact(characters, step.applicationKey().length());
+            inspections = Math.addExact(inspections, 2);
+        }
+        return new Footprint(characters, inspections);
+    }
 }
