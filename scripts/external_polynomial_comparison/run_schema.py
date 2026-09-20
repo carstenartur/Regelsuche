@@ -27,7 +27,12 @@ from .run import canonical, judge, summarize, untimed, verify_row
 from .run_typed import MeasuredSession, natural
 
 PROTOCOL_HASH = '7e9b51c8f4c66655489350ef4be982411b6ab5ae0585ddb8b725b1ef15d7113c'
-FREEZE_COMMIT = '5bc9e21e61131be287b89060ef39f93df111dc25'
+# API publication reconstructs commits on the published history. Commit IDs bind
+# parent/metadata as well as trees, so the identical registration blob can have a
+# different containing commit. Require the published ancestor AND its exact blob.
+FREEZE_COMMIT = '5ce2980fe68eb78e352f262934cf338f002a72f4'
+SOURCE_LOCAL_FREEZE_COMMIT = '5bc9e21e61131be287b89060ef39f93df111dc25'
+REGISTERED_PROTOCOL_PATH = 'config/benchmarks/learned-schema-efficiency-v2.json'
 JAVA_WORKER = 'de.regelsuche.evolution.CheckedSchemaComparisonWorker'
 SYMPY_VERSION = '1.14.0'  # The unchanged native_worker pins this competitor version.
 CPU_SCOPE = 'OWNED_WORKER_PROCESSES_ALL_THREADS_INCLUDING_STARTUP_AND_SHUTDOWN'
@@ -44,6 +49,23 @@ def load_protocol(path: Path) -> dict:
                         'maxExponent': 12, 'maxTerms': 4096, 'coefficientBits': 2048},
              'shared independent judge limits changed')
     return _load(data.decode('utf-8'))
+
+
+def check_freeze(repository: Path, freeze_commit=FREEZE_COMMIT) -> dict:
+    """Require both published history and the registered historical protocol bytes.
+
+    load_protocol separately checks the current bytes. The original local commit
+    is descriptive provenance; published clones need not contain that Git object.
+    """
+    ancestry = subprocess.run(['git', 'merge-base', '--is-ancestor', freeze_commit, 'HEAD'],
+                              cwd=repository, capture_output=True)
+    _require(ancestry.returncode == 0, 'published protocol freeze is missing or is not an ancestor of HEAD')
+    historical = subprocess.run(['git', 'show', freeze_commit + ':' + REGISTERED_PROTOCOL_PATH],
+                                cwd=repository, capture_output=True)
+    _require(historical.returncode == 0, 'published freeze lacks the registered protocol file')
+    digest = hashlib.sha256(historical.stdout).hexdigest()
+    _require(digest == PROTOCOL_HASH, 'published historical protocol bytes differ from the pre-execution registration')
+    return {'freezeCommit': freeze_commit, 'freezeProtocolHash': digest}
 
 
 def source_provenance(repository: Path) -> dict:
@@ -654,7 +676,7 @@ def execute(protocol_path: Path, classpath_path: Path, output: Path):
     controller = time.process_time_ns()
     preparation = time.perf_counter_ns()
     protocol = load_protocol(protocol_path)
-    subprocess.run(['git', 'merge-base', '--is-ancestor', FREEZE_COMMIT, 'HEAD'], check=True, capture_output=True)
+    freeze = check_freeze(Path.cwd())
     provenance = source_provenance(Path.cwd())
     revision = provenance['sourceRevision']
     classpath = classpath_path.read_text(encoding='utf-8').strip()
@@ -666,7 +688,8 @@ def execute(protocol_path: Path, classpath_path: Path, output: Path):
     commands = {'java': [java['executable'], '-Xmx512m', '-cp',
                 os.pathsep.join(str((output / entry).resolve()) for entry in runtime['classpathEntries']), JAVA_WORKER],
                 'sympy': [sys.executable, '-u', '-m', 'external_polynomial_comparison.native_worker']}
-    metadata = {'revision': revision, 'protocolHash': PROTOCOL_HASH, 'freezeCommit': FREEZE_COMMIT,
+    metadata = {'revision': revision, 'protocolHash': PROTOCOL_HASH, **freeze,
+        'sourceLocalFreezeCommit': SOURCE_LOCAL_FREEZE_COMMIT,
         **provenance, 'runtimeBytesHash': runtime['runtimeBytesHash'], 'java': java, 'commands': commands,
         'outputDirectoryAtExecution': str(output.resolve()),
         'sharedHarnessPreparationWallNanos': time.perf_counter_ns() - preparation,
@@ -727,7 +750,9 @@ def verify(output: Path):
         _require(not Path(name).is_absolute() and '..' not in Path(name).parts
                  and inventory[name]['sha256'] == digest, 'manifest digest mismatch')
     metadata = _load((output / 'metadata.json').read_text(encoding='utf-8'))
-    _require(metadata['protocolHash'] == PROTOCOL_HASH and metadata['freezeCommit'] == FREEZE_COMMIT,
+    _require(metadata['protocolHash'] == metadata['freezeProtocolHash'] == PROTOCOL_HASH
+             and metadata['freezeCommit'] == FREEZE_COMMIT
+             and metadata['sourceLocalFreezeCommit'] == SOURCE_LOCAL_FREEZE_COMMIT,
              'provenance protocol binding mismatch')
     _require(metadata['revision'] == metadata['sourceRevision'] and metadata['sourceTreeHash'].startswith('git:'),
              'source revision/tree provenance mismatch')

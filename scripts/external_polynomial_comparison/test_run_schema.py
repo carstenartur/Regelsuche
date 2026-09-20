@@ -364,6 +364,75 @@ for line in sys.stdin:
             self.assertNotEqual(original['sourceRevision'], changed['sourceRevision'])
             self.assertNotEqual(original['sourceTreeHash'], changed['sourceTreeHash'])
 
+    def test_published_freeze_requires_matching_historical_bytes_and_ancestry(self):
+        self.assertTrue(hasattr(self.driver, 'check_freeze'), 'historical freeze byte/ancestry gate missing')
+        registered = Path('config/benchmarks/learned-schema-efficiency-v2.json').read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def git(*args):
+                return subprocess.check_output(['git', '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', *args], cwd=root).decode().strip()
+            git('init', '-q')
+            path = root / 'config/benchmarks/learned-schema-efficiency-v2.json'
+            path.parent.mkdir(parents=True)
+            path.write_bytes(registered)
+            git('add', '.')
+            git('commit', '-qm', 'published registration')
+            freeze = git('rev-parse', 'HEAD')
+            (root / 'implementation.py').write_text('print("implementation after registration")\n')
+            git('add', '.')
+            git('commit', '-qm', 'later implementation')
+            self.driver.load_protocol(path)
+            receipt = self.driver.check_freeze(root, freeze)
+            self.assertEqual(freeze, receipt['freezeCommit'])
+            self.assertEqual('7e9b51c8f4c66655489350ef4be982411b6ab5ae0585ddb8b725b1ef15d7113c', receipt['freezeProtocolHash'])
+
+    def test_correct_current_bytes_cannot_hide_changed_historical_registration(self):
+        self.assertTrue(hasattr(self.driver, 'check_freeze'), 'historical freeze byte/ancestry gate missing')
+        registered = Path('config/benchmarks/learned-schema-efficiency-v2.json').read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def git(*args):
+                return subprocess.check_output(['git', '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', *args], cwd=root).decode().strip()
+            git('init', '-q')
+            path = root / 'config/benchmarks/learned-schema-efficiency-v2.json'
+            path.parent.mkdir(parents=True)
+            path.write_bytes(registered + b' ')
+            git('add', '.')
+            git('commit', '-qm', 'different historical registration bytes')
+            freeze = git('rev-parse', 'HEAD')
+            path.write_bytes(registered)
+            git('add', '.')
+            git('commit', '-qm', 'current bytes happen to match')
+            self.driver.load_protocol(path)
+            with self.assertRaises(ValueError):
+                self.driver.check_freeze(root, freeze)
+
+    def test_matching_protocol_bytes_on_a_nonancestor_cannot_authorize_execution(self):
+        self.assertTrue(hasattr(self.driver, 'check_freeze'), 'historical freeze byte/ancestry gate missing')
+        registered = Path('config/benchmarks/learned-schema-efficiency-v2.json').read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def git(*args):
+                return subprocess.check_output(['git', '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', *args], cwd=root).decode().strip()
+            git('init', '-q')
+            path = root / 'config/benchmarks/learned-schema-efficiency-v2.json'
+            path.parent.mkdir(parents=True)
+            path.write_bytes(registered)
+            git('add', '.')
+            git('commit', '-qm', 'common protocol bytes')
+            base = git('rev-parse', 'HEAD')
+            (root / 'local-marker.txt').write_text('local freeze history')
+            git('add', '.')
+            git('commit', '-qm', 'freeze on another history branch')
+            freeze = git('rev-parse', 'HEAD')
+            git('checkout', '-q', '-b', 'published', base)
+            (root / 'published-marker.txt').write_text('published history')
+            git('add', '.')
+            git('commit', '-qm', 'published sibling history')
+            self.driver.load_protocol(path)
+            with self.assertRaises(ValueError):
+                self.driver.check_freeze(root, freeze)
+
 
 if __name__ == '__main__':
     unittest.main()

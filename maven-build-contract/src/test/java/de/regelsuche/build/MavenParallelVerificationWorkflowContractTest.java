@@ -256,12 +256,22 @@ class MavenParallelVerificationWorkflowContractTest {
         checkout.path("with").path("ref").asText());
 
     List<JsonNode> commands = steps.stream().filter(step -> step.has("run")).toList();
-    assertEquals(1, commands.size(),
-        "the checkout-owned runner must own comparison and independent verification");
-    assertEquals("bash gradle/run-typed-external-polynomial-comparison.sh",
-        commands.getFirst().path("run").asText());
-    assertFalse(commands.getFirst().has("if"));
-    assertFalse(commands.getFirst().has("continue-on-error"));
+    assertEquals(List.of(
+        "bash gradle/run-typed-external-polynomial-comparison.sh",
+        "bash gradle/run-checked-schema-comparison.sh"),
+        commands.stream().map(command -> command.path("run").asText()).toList(),
+        "both versioned checkout-owned comparisons must run, in prerequisite order");
+    for (JsonNode command : commands) {
+      assertFalse(command.has("if"));
+      assertFalse(command.has("continue-on-error"));
+    }
+    String schemaRunner = Files.readString(repositoryRoot().resolve(
+        "gradle/run-checked-schema-comparison.sh"));
+    assertTrue(schemaRunner.contains("set -euo pipefail"));
+    assertTrue(schemaRunner.contains("build/typed-external-polynomial-venv/bin/python"));
+    assertTrue(schemaRunner.contains("-m external_polynomial_comparison.run_schema"));
+    assertTrue(schemaRunner.contains("--verify --output build/reports/learned-schema-efficiency-v2"),
+        "the new comparison must independently verify every retained lifecycle receipt");
 
     JsonNode upload = steps.stream().filter(step -> step.path("uses").asText()
         .startsWith("actions/upload-artifact@")).findFirst().orElseThrow();
@@ -270,6 +280,7 @@ class MavenParallelVerificationWorkflowContractTest {
         upload.path("with").path("name").asText());
     assertEquals(List.of(
         "build/reports/typed-external-polynomial-comparison/**",
+        "build/reports/learned-schema-efficiency-v2/**",
         "regelsuche-search/build/test-results/**",
         "regelsuche-learning/build/test-results/**"),
         upload.path("with").path("path").asText().lines().toList());
