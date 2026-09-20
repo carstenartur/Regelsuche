@@ -22,6 +22,9 @@ public final class NativeIncrementalMoveProvider implements IncrementalMoveProvi
     }
     @Override public Descriptor descriptor() { return descriptor; }
     @Override public TransformationCursor.Definition definition() { return definition; }
+    TransformationCursor openResumableCursor(String expression) {
+        return engine.openResumableCursor(expression, definition.matcherBranchLimit());
+    }
     @Override public TransformationCursor openCursor(MoveState state, MoveContext context) {
         if (!context.carries(descriptor.requiredAssumptions(), state))
             throw new AssumptionsNotCarried();

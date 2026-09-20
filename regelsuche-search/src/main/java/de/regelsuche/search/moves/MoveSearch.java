@@ -13,7 +13,7 @@ import java.util.function.ToDoubleFunction;
 /** A frontier of states AND suspended expansions. Old mechanical v1/v2 replay remains unchanged. */
 public final class MoveSearch {
     public enum Mode { FAST, COMPLETE_BOUNDED_REFERENCE }
-    public enum Scheduling { EAGER_CONTROL, STAGED, INCREMENTAL_NATIVE_ORDER }
+    public enum Scheduling { EAGER_CONTROL, STAGED, INCREMENTAL_NATIVE_ORDER, STAGED_INCREMENTAL }
     public enum Outcome { TARGET_REACHED, BOUNDED_EXHAUSTED, INCONCLUSIVE, WORK_EXHAUSTED, STATE_LIMIT, QUALITY_REACHED }
     public enum Decision { ENQUEUED, DUPLICATE, PATH_BOUND, ASSUMPTION_REJECTED, PROOF_REJECTED, COMPLEXITY_BOUND, WORK_LIMIT, DOMINATED }
     public record Budget(int maxPrimitiveSteps, int maxSearchDepth, long maxTheoryWork, int maxStates, long totalWork, int maxComplexityDebt) {
@@ -44,8 +44,11 @@ public final class MoveSearch {
 
     private static void validateScheduling(Scheduling scheduling, List<MoveProvider> providers, MovePriorityPolicy policy) {
         if (scheduling == Scheduling.INCREMENTAL_NATIVE_ORDER) {
-            if (policy != MovePriorityPolicy.INVENTORY_ORDER || providers.stream().anyMatch(provider -> !(provider instanceof IncrementalMoveProvider)))
+            if (policy != MovePriorityPolicy.INVENTORY_ORDER || providers.stream().anyMatch(provider -> !(provider instanceof NativeIncrementalMoveProvider)))
                 throw new IllegalArgumentException("incremental native ordering requires native providers and INVENTORY_ORDER");
+        } else if (scheduling == Scheduling.STAGED_INCREMENTAL) {
+            if (providers.stream().anyMatch(provider -> !StagedIncrementalSources.supported(provider)))
+                throw new IllegalArgumentException("staged incremental requires an explicit supported provider contract");
         } else if (providers.stream().anyMatch(provider -> provider instanceof IncrementalMoveProvider)) {
             throw new IllegalArgumentException("incremental providers require INCREMENTAL_NATIVE_ORDER scheduling");
         }
@@ -69,7 +72,13 @@ public final class MoveSearch {
     }
     public record Result(Outcome outcome, List<WitnessStep> witness, List<Event> events, Set<MoveState> reachedStates, List<MoveState> deadEndStates,
             Metrics metrics, boolean completeBoundedRelation, Map<MoveState, StateValue.Assessment> stateAssessments,
-            IncrementalMoveExecution incrementalExecution) {
+            IncrementalMoveExecution incrementalExecution, StagedIncrementalMoveExecution stagedIncrementalExecution) {
+        public Result(Outcome outcome, List<WitnessStep> witness, List<Event> events, Set<MoveState> reachedStates,
+                List<MoveState> deadEndStates, Metrics metrics, boolean completeBoundedRelation,
+                Map<MoveState, StateValue.Assessment> stateAssessments, IncrementalMoveExecution incrementalExecution) {
+            this(outcome, witness, events, reachedStates, deadEndStates, metrics, completeBoundedRelation,
+                stateAssessments, incrementalExecution, null);
+        }
         /** Historical constructor and exports retain their original work contract. */
         public Result(Outcome outcome, List<WitnessStep> witness, List<Event> events, Set<MoveState> reachedStates,
                 List<MoveState> deadEndStates, Metrics metrics, boolean completeBoundedRelation,
@@ -78,6 +87,9 @@ public final class MoveSearch {
         }
         public Result { witness = List.copyOf(witness); events = List.copyOf(events); reachedStates = Set.copyOf(reachedStates); deadEndStates = List.copyOf(deadEndStates); stateAssessments = Map.copyOf(stateAssessments); }
         public boolean reached() { return outcome == Outcome.TARGET_REACHED; }
+        public boolean accountingComplete() {
+            return stagedIncrementalExecution == null || stagedIncrementalExecution.accountingComplete();
+        }
     }
     /** A caller-supplied quality objective, not a desired expression or mathematical authority. */
     public record ObjectiveScore(long value, long work) {
@@ -281,16 +293,21 @@ public final class MoveSearch {
                 hit = -1;
                 primitiveHit = -1;
             }
+            var stagedExecution = stagedIncrementalExecution(problem, opened);
+            if (stagedExecution != null && !stagedExecution.accountingComplete() && outcome != Outcome.WORK_EXHAUSTED) {
+                stop(Outcome.INCONCLUSIVE); witness = List.of(); hit = -1; primitiveHit = -1;
+            }
             if (outcome == Outcome.BOUNDED_EXHAUSTED && !complete) outcome = Outcome.INCONCLUSIVE;
             return new Result(outcome, witness, events, reached, deadEnds, new Metrics(ledger.generated, ledger.consumed, ledger.discarded,
                 ledger.generated - ledger.consumed, ledger.duplicates, ledger.deadEnds, ledger.explored, ledger.expanded,
                 ledger.primitive, ledger.search, ledger.verification, hit, primitiveHit, ledger.matches), complete, assessments,
-                incrementalExecution(problem, opened));
+                incrementalExecution(problem, opened), stagedExecution);
         }
     }
 
     private static MovePicker picker(Problem problem, MoveState state) {
         return switch (problem.scheduling()) {
+            case STAGED_INCREMENTAL -> new IncrementalMovePicker(problem.providers(), problem.policy(), state, problem.context());
             case STAGED -> new StagedMovePicker(problem.providers(), problem.policy(), state, problem.context());
             case EAGER_CONTROL -> new EagerMovePicker(problem.providers(), problem.policy(), state, problem.context());
             case INCREMENTAL_NATIVE_ORDER -> new IncrementalMovePicker(problem.providers(), state, problem.context());
@@ -305,7 +322,7 @@ public final class MoveSearch {
         }
     }
     private static boolean cleanupOverrun(Problem problem, Ledger ledger) {
-        return problem.scheduling() == Scheduling.INCREMENTAL_NATIVE_ORDER && ledger.total() > problem.budget().totalWork();
+        return (problem.scheduling() == Scheduling.INCREMENTAL_NATIVE_ORDER || problem.scheduling() == Scheduling.STAGED_INCREMENTAL) && ledger.total() > problem.budget().totalWork();
     }
     private static IncrementalMoveExecution incrementalExecution(Problem problem, List<Node> opened) {
         if (problem.scheduling() != Scheduling.INCREMENTAL_NATIVE_ORDER) return null;
@@ -316,9 +333,18 @@ public final class MoveSearch {
         return new IncrementalMoveExecution(IncrementalMoveExecution.WORK_REVISION, IncrementalMoveExecution.ORDER_REVISION,
             providers, opened.stream().map(node -> ((IncrementalMovePicker) node.picker).receipt()).toList());
     }
+    private static StagedIncrementalMoveExecution stagedIncrementalExecution(Problem problem, List<Node> opened) {
+        if (problem.scheduling() != Scheduling.STAGED_INCREMENTAL) return null;
+        var providers = problem.providers().stream().map(provider ->
+            new StagedIncrementalMoveExecution.Provider(provider.descriptor(), StagedIncrementalSources.definition(provider))).toList();
+        return new StagedIncrementalMoveExecution(StagedIncrementalMoveExecution.WORK_REVISION,
+            StagedIncrementalMoveExecution.ORDER_REVISION, providers,
+            opened.stream().map(node -> ((IncrementalMovePicker) node.picker).stagedReceipt()).toList());
+    }
     private enum Expansion { MORE, EXHAUSTED, REJECTED_PROOF, WORK_LIMIT }
     private static Expansion expand(Problem problem, Node node, Ledger ledger, List<Event> events,
             MoveSearchVisits visited, PriorityQueue<Ticket> frontier, long[] serial, Map<MoveState, StateValue.Assessment> assessments) {
+        if (problem.scheduling() == Scheduling.STAGED_INCREMENTAL) ledger.collect(node);
         var next = node.picker instanceof IncrementalMovePicker incremental
             ? incremental.next(Math.max(0, problem.budget().totalWork() - ledger.total())) : node.picker.next();
         ledger.collect(node); node.pulls++;
@@ -345,7 +371,8 @@ public final class MoveSearch {
         events.add(new Event(node.state, child, move, decision, verification));
         if (decision == Decision.WORK_LIMIT) return Expansion.WORK_LIMIT;
         if (ledger.qualityReached()) return Expansion.MORE;
-        int stage = node.picker instanceof StagedMovePicker staged ? staged.nextStage() : 0;
+        int stage = node.picker instanceof StagedMovePicker staged ? staged.nextStage()
+            : node.picker instanceof IncrementalMovePicker incremental ? incremental.nextStage() : 0;
         // Parent widening stays on the frontier, so promising children can finish before later stages open.
         double continuation = problem.mode() == Mode.COMPLETE_BOUNDED_REFERENCE ? node.state.searchDepth()
             : priority(problem, node.state, node.value) + 1 + stage + node.pulls / 2.0;

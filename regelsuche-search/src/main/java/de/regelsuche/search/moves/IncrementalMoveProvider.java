@@ -2,9 +2,16 @@ package de.regelsuche.search.moves;
 
 import de.regelsuche.transform.TransformationCursor;
 
-/** Explicit native capability. This first revision does not admit opaque, learned or plugin providers. */
-public sealed interface IncrementalMoveProvider extends MoveProvider permits NativeIncrementalMoveProvider {
+/** Sealed incremental admission: native v1 or explicit registered v2. No arbitrary implementation admission. */
+public sealed interface IncrementalMoveProvider extends MoveProvider permits NativeIncrementalMoveProvider, RegisteredIncrementalMoveProvider {
     TransformationCursor.Definition definition();
+    /** General v2 metadata; a registered schema is never represented as a native rule. */
+    default IncrementalProviderContract.Definition contractDefinition() {
+        return StagedIncrementalSources.definition(this);
+    }
+    default IncrementalProviderContract.Cursor openSession(MoveState state, MoveContext context) {
+        return StagedIncrementalSources.open(this, state, context, ignored -> {});
+    }
     /** Checks provider admission once, before opening/charging a transformation cursor. */
     TransformationCursor openCursor(MoveState state, MoveContext context);
 
@@ -16,6 +23,6 @@ public sealed interface IncrementalMoveProvider extends MoveProvider permits Nat
 
     /** A batch adapter would discard this revision's suspension and work contract. */
     @Override default Batch candidates(MoveState state, MoveContext context) {
-        throw new UnsupportedOperationException("incremental providers require INCREMENTAL_NATIVE_ORDER scheduling");
+        throw new UnsupportedOperationException("incremental providers require their explicit incremental scheduling contract");
     }
 }

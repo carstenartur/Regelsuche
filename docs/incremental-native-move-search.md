@@ -126,3 +126,6 @@ AC-internal suspension, arbitrary global priority order, plugin/learned/theory
 providers, product defaults, large search studies and runtime qualification are
 outside this slice. This work does not close the full #696 issue or claim that
 the admitted-work diagnostics from #620 constitute full runtime profiling.
+
+P02 adds a separate [registered/staged v2 contract](staged-incremental-provider-contract.md).
+The native v1 contract and historical scope recorded above remain unchanged.

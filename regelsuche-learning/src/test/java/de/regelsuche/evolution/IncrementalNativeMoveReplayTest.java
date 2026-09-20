@@ -94,6 +94,21 @@ class IncrementalNativeMoveReplayTest {
             .units(TransformationCursor.Operation.CLOSE));
     }
 
+    @Test void nativeV1BytesMatchTheQualifiedPredecessor() {
+        assertNativeHash(search(MoveSearch.Scheduling.INCREMENTAL_NATIVE_ORDER),
+            "07adb2580402829f0fa114e884929295e95073841d17cc070054e746f1114dcc");
+        assertNativeHash(search(MoveSearch.Scheduling.INCREMENTAL_NATIVE_ORDER, "absent", 100000, 100),
+            "e9983f81fed9b667a7c7d79fba98ddbf71350898cf51981174f1063eb5c1a8d5");
+        assertNativeHash(search(MoveSearch.Scheduling.INCREMENTAL_NATIVE_ORDER, "absent", 8, 100),
+            "d008d9ed15fdaba923a4e4f3bf463a064675879edf4bd455156432e1dfb57ac1");
+        assertNativeHash(search(MoveSearch.Scheduling.INCREMENTAL_NATIVE_ORDER, "absent", 100000, 1),
+            "c486a4a5c32fb8007e5839f79e7a37339539907d3da4160efefb3e6abb9a4f63");
+    }
+
+    private static void assertNativeHash(MoveSearch.Result result, String expected) {
+        assertEquals("sha256:" + expected, SchematicProofPlan.hash(LearnedSchedulingArtifacts.resultJson(result)));
+    }
+
     @Test void nativeReplayRejectsForgeryAndUnfrozenRuleIdentifiers() {
         var verifier = PrimitiveReplayMoveVerifier.nativePatterns(List.of(ADD_ZERO));
         var state = MoveState.root(SOURCE);

@@ -22,7 +22,7 @@ public final class TypedSourcePolicySelection {
             if (id == null || id.isBlank()) throw new IllegalArgumentException("profile ID required");
             providers = List.copyOf(providers);
             Objects.requireNonNull(policy, "policy");
-            if (providers.stream().anyMatch(provider -> !(provider instanceof TypedMoveSearch.TypedProvider)))
+            if (providers.stream().anyMatch(provider -> !TypedMoveSearch.isTypedProvider(provider)))
                 throw new IllegalArgumentException("typed providers required");
         }
     }

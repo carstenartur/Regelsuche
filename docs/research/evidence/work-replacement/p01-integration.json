@@ -1,0 +1,106 @@
+{
+  "schema": "regelsuche.work-replacement-integration/v1",
+  "package": "P01",
+  "pr": 1049,
+  "qualifiedHead": "75848fd26639c1aa675b87a9dccdfa7fd9f16e83",
+  "localReviewedHead": "5e6963adeb47e6624937d50bd8098ee40c11536d",
+  "mergeCommit": "3deeb519357cdd6e67184d8104c0d925a0cf19d7",
+  "tree": "1f54ebfc29986396cc1db530829234f708a617c6",
+  "predecessorMain": "7aec9ae0a1619dda98f859d1277ac8b287471423",
+  "ciRun": 35523215069,
+  "ciConclusion": "success",
+  "requiredAuthorities": [
+    "External polynomial comparison",
+    "Checkout-local Gradle authority",
+    "Complete Maven product and Docker authority",
+    "Typed source-only learning comparison",
+    "Isolated JMH authority",
+    "Isolated SymPy runtime authority",
+    "Checkout-local ciCheck"
+  ],
+  "codeql": "success",
+  "localTests": {
+    "core": 844,
+    "search": 471,
+    "learning": 938,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0
+  },
+  "independentReview": {
+    "status": "approved",
+    "reviewedLocalHead": "5e6963adeb47e6624937d50bd8098ee40c11536d",
+    "critical": 0,
+    "important": 0,
+    "minor": 0
+  },
+  "resolvedReviewThreads": [
+    "PRRT_kwDOSiJVMM6kKS0v",
+    "PRRT_kwDOSiJVMM6kKS03",
+    "PRRT_kwDOSiJVMM6kKS06"
+  ],
+  "artifactDigests": "API-reported; ZIP archives not downloaded",
+  "artifacts": [
+    {
+      "id": 10610390290,
+      "name": "quality-acceptance-evidence",
+      "bytes": 29166708,
+      "digest": "sha256:cf775ef891e14b20cbe5f35c7081a4d3981b64fe393a45eb9d7be10882b00e59",
+      "qualifiedHead": "75848fd26639c1aa675b87a9dccdfa7fd9f16e83"
+    },
+    {
+      "id": 10610370370,
+      "name": "coverage-verification",
+      "bytes": 2297,
+      "digest": "sha256:bbaf1a0d6d3227d137cc31ec5d0eb94a48cdd358036e7be28ed3f06e6169e755",
+      "qualifiedHead": "75848fd26639c1aa675b87a9dccdfa7fd9f16e83"
+    },
+    {
+      "id": 10609445326,
+      "name": "jmh-verification",
+      "bytes": 35812,
+      "digest": "sha256:f7d91026dead7a00479ba9d1838c6e2817e25494f577af751063f68a8cb40ffa",
+      "qualifiedHead": "75848fd26639c1aa675b87a9dccdfa7fd9f16e83"
+    },
+    {
+      "id": 10609257748,
+      "name": "external-polynomial-comparison-75848fd26639c1aa675b87a9dccdfa7fd9f16e83",
+      "bytes": 496841,
+      "digest": "sha256:8196d009f865802d4dde78ddd5203c028358c30d743c66d1adb4a6f2e9314f06",
+      "qualifiedHead": "75848fd26639c1aa675b87a9dccdfa7fd9f16e83"
+    },
+    {
+      "id": 10608923782,
+      "name": "typed-external-polynomial-75848fd26639c1aa675b87a9dccdfa7fd9f16e83",
+      "bytes": 20024195,
+      "digest": "sha256:1948136ca94047c05b5b5990138ea79c860cace58392a91e97e8a48f52532920",
+      "qualifiedHead": "75848fd26639c1aa675b87a9dccdfa7fd9f16e83"
+    },
+    {
+      "id": 10608639885,
+      "name": "maven-product-verification",
+      "bytes": 3113691,
+      "digest": "sha256:82f329024d31bb6210c13841237d62b6b5b012eb57aa0142bea17e8630702076",
+      "qualifiedHead": "75848fd26639c1aa675b87a9dccdfa7fd9f16e83"
+    },
+    {
+      "id": 10608582764,
+      "name": "sympy-runtime-verification",
+      "bytes": 376050,
+      "digest": "sha256:06138339cee832e8b63d56de47bce233d5484711b7062a12df50fbfc507d6a09",
+      "qualifiedHead": "75848fd26639c1aa675b87a9dccdfa7fd9f16e83"
+    },
+    {
+      "id": 10608499949,
+      "name": "repository-verification",
+      "bytes": 396102385,
+      "digest": "sha256:cc7beaf13fb4f3af4b3a96e5320a06d0a39cffde716cfbe4058851270860dcb5",
+      "qualifiedHead": "75848fd26639c1aa675b87a9dccdfa7fd9f16e83"
+    }
+  ],
+  "notes": [
+    "Main ref and merge tree were independently reread after merge; tree equals the qualified PR tree.",
+    "No economic learning advantage is claimed by P01.",
+    "The subsequent main workflow is separate from this successful exact-head PR qualification."
+  ]
+}

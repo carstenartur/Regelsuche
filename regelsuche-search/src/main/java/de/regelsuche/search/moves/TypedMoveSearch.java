@@ -33,6 +33,12 @@ public final class TypedMoveSearch {
     /** Marker for providers that consume the canonical tagged AST transport used by this adapter. */
     public interface TypedProvider extends MoveProvider {}
 
+    /** Shared transport admission for the typed frontier and its policy-selection adapters. */
+    public static boolean isTypedProvider(MoveProvider provider) {
+        return provider instanceof TypedProvider || (provider instanceof RegisteredIncrementalMoveProvider registered
+            && registered.contractDefinition().transport() == IncrementalProviderContract.Transport.TYPED_AST_JSON);
+    }
+
     /** Opt-in policy whose expression features consume canonical tagged ASTs, never parser text. */
     public interface TypedPolicy extends MovePriorityPolicy {}
 
@@ -105,7 +111,7 @@ public final class TypedMoveSearch {
             if (policy != Policy.INVENTORY_ORDER && !(policy instanceof TypedPolicy)) {
                 throw new IllegalArgumentException("typed move search requires an explicitly typed policy");
             }
-            if (providers.stream().anyMatch(provider -> !(provider instanceof TypedProvider))) {
+            if (providers.stream().anyMatch(provider -> !isTypedProvider(provider))) {
                 throw new IllegalArgumentException("typed move search requires typed providers");
             }
         }
@@ -127,6 +133,7 @@ public final class TypedMoveSearch {
             Objects.requireNonNull(encodedResult, "encodedResult");
         }
         public boolean reached() { return outcome == MoveSearch.Outcome.TARGET_REACHED; }
+        public boolean accountingComplete() { return encodedResult.accountingComplete(); }
 
         /** Root including the assessed capabilities, even when its work exhausts the budget. */
         public State initialState() {
