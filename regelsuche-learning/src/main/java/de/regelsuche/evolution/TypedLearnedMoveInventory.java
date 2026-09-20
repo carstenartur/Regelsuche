@@ -19,8 +19,16 @@ public final class TypedLearnedMoveInventory {
     private final Map<String, TypedMoveSearch.Verifier> primitiveVerifiers;
 
     TypedLearnedMoveInventory(TraceRewriteStrategyLearner.FrozenStrategy formation) {
+        this(formation.inventory(), formation);
+    }
+
+    /** Fixed primitive control: no unused learner, histories or learned programs. */
+    static TypedLearnedMoveInventory primitives(EvolutionGenome inventory) {
+        return new TypedLearnedMoveInventory(java.util.Objects.requireNonNull(inventory), null);
+    }
+
+    private TypedLearnedMoveInventory(EvolutionGenome inventory, TraceRewriteStrategyLearner.FrozenStrategy formation) {
         this.formation = formation;
-        var inventory = formation.inventory();
         var bounds = inventory.budget();
         if (bounds.maxCandidatesPerState() > 128) {
             throw new IllegalArgumentException("typed compiled inventory supports at most 128 candidates per stage");
@@ -42,7 +50,7 @@ public final class TypedLearnedMoveInventory {
         primitives = List.copyOf(providers);
         primitiveVerifiers = Map.copyOf(verifiers);
         var programs = new TreeMap<String, TypedProgramMoveProvider>();
-        for (var observation : formation.observations()) {
+        if (formation != null) for (var observation : formation.observations()) {
             if (observation.geneSequence().size() < 2 || observation.minimality().isEmpty()
                     || !observation.minimality().orElseThrow().observedReplayVerified()) continue;
             String id = "typed-learned:" + SchematicProofPlan.hash(String.join("/", observation.geneSequence()));
@@ -79,6 +87,7 @@ public final class TypedLearnedMoveInventory {
      * learner's supplementary primitive-application receipts.
      */
     public long formationWork() {
+        if (formation == null) return 0;
         return java.util.stream.LongStream.of(formation.trainingSearchWorkUnits(), formation.trainingPrimitiveWorkUnits(),
             formation.trainingReplayWorkUnits(), formation.trainingReplayPrimitiveWorkUnits(), formation.trainingExactWorkUnits(),
             formation.trainingMinimalityWorkUnits(), formation.trainingReferenceSupplementaryWorkUnits()).reduce(0, Math::addExact);
