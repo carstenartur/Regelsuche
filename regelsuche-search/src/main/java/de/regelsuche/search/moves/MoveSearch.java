@@ -150,77 +150,139 @@ public final class MoveSearch {
         if (contract != SearchContinuationContract.PATH_SENSITIVE && problem.mode() != Mode.FAST) {
             throw new IllegalArgumentException("continuation dominance requires FAST mode");
         }
-        var budget = problem.budget();
-        var ledger = new Ledger();
-        ledger.objective = objective;
-        var events = new ArrayList<Event>();
-        var deadEnds = new ArrayList<MoveState>();
-        var reached = new HashSet<MoveState>();
-        var visited = new MoveSearchVisits(contract, work -> ledger.search = Math.addExact(ledger.search, work));
-        var assessments = new java.util.HashMap<MoveState, StateValue.Assessment>();
-        var root = new MoveState(problem.source(), 0, 0, "", problem.context().initialAssumptions(), Set.of(), 0);
-        var rootValue = inspect(problem, root, ledger);
-        root = new MoveState(root.expression(), 0, 0, "", root.assumptions(), rootValue.capabilities().keySet(), 0);
-        assessments.put(root, rootValue);
-        ledger.observe(root, MoveWitnessPath.ROOT);
-        var frontier = new PriorityQueue<Ticket>(Comparator.comparingDouble(Ticket::priority).thenComparingLong(Ticket::serial));
-        long[] serial = {0};
-        frontier.add(new Ticket(new Node(root, 0, MoveWitnessPath.ROOT, rootValue), 0, serial[0]++)); visited.add(root, 0);
-        boolean complete = contract == SearchContinuationContract.PATH_SENSITIVE;
-        var outcome = Outcome.BOUNDED_EXHAUSTED;
-        List<WitnessStep> witness = List.of();
-        int hit = -1, primitiveHit = -1;
-        var opened = new ArrayList<Node>();
-        try {
-            while (!frontier.isEmpty()) {
-                if (ledger.qualityReached()) {
-                    outcome = ledger.total() <= budget.totalWork() ? Outcome.QUALITY_REACHED : Outcome.WORK_EXHAUSTED;
-                    complete = false;
-                    break;
-                }
-                if (ledger.total() >= budget.totalWork()) { outcome = Outcome.WORK_EXHAUSTED; complete = false; break; }
-                var node = frontier.remove().node(); ledger.search++;
-                boolean current = visited.current(node.state, node.theoryWork);
-                if (contract != SearchContinuationContract.PATH_SENSITIVE && ledger.total() > budget.totalWork()) {
-                    outcome = Outcome.WORK_EXHAUSTED; complete = false; break;
-                }
-                if (!current) continue;
-                if (node.picker == null) {
-                    if (ledger.explored >= budget.maxStates()) { outcome = Outcome.STATE_LIMIT; complete = false; break; }
-                    ledger.explored++; reached.add(node.state);
-                    if (node.state.expression().equals(problem.context().goal())) {
-                        outcome = Outcome.TARGET_REACHED; witness = node.path.steps();
-                        hit = node.state.searchDepth(); primitiveHit = node.state.primitiveDepth(); complete = false; break;
-                    }
-                    if (node.state.searchDepth() == budget.maxSearchDepth()) continue;
-                    ledger.expanded++;
-                    node.picker = picker(problem, node.state);
-                    retainIncremental(node, opened);
-                }
-                var expansion = expand(problem, node, ledger, events, visited, frontier, serial, assessments);
-                if (expansion == Expansion.WORK_LIMIT) { outcome = Outcome.WORK_EXHAUSTED; complete = false; break; }
-                if (expansion == Expansion.REJECTED_PROOF) complete = false;
-                if (expansion == Expansion.EXHAUSTED) {
-                    complete &= node.picker.complete();
-                    if (node.enqueued == 0 && node.picker.complete()) { ledger.deadEnds++; deadEnds.add(node.state);  }
+        return new SearchRun(problem, contract, objective).run();
+    }
+
+    /** Mutable state of one invocation of the existing frontier, never shared between searches. */
+    private static final class SearchRun {
+        private final Problem problem;
+        private final SearchContinuationContract contract;
+        private final Budget budget;
+        private final Ledger ledger = new Ledger();
+        private final List<Event> events = new ArrayList<>();
+        private final List<MoveState> deadEnds = new ArrayList<>();
+        private final Set<MoveState> reached = new HashSet<>();
+        private final MoveSearchVisits visited;
+        private final Map<MoveState, StateValue.Assessment> assessments = new java.util.HashMap<>();
+        private final PriorityQueue<Ticket> frontier = new PriorityQueue<>(
+            Comparator.comparingDouble(Ticket::priority).thenComparingLong(Ticket::serial));
+        private final long[] serial = {0};
+        private final List<Node> opened = new ArrayList<>();
+        private boolean complete;
+        private boolean stopped;
+        private Outcome outcome = Outcome.BOUNDED_EXHAUSTED;
+        private List<WitnessStep> witness = List.of();
+        private int hit = -1;
+        private int primitiveHit = -1;
+
+        SearchRun(Problem problem, SearchContinuationContract contract, MoveSearchObjective objective) {
+            this.problem = problem;
+            this.contract = contract;
+            budget = problem.budget();
+            ledger.objective = objective;
+            visited = new MoveSearchVisits(contract, work -> ledger.search = Math.addExact(ledger.search, work));
+            var root = new MoveState(problem.source(), 0, 0, "", problem.context().initialAssumptions(), Set.of(), 0);
+            var rootValue = inspect(problem, root, ledger);
+            root = new MoveState(root.expression(), 0, 0, "", root.assumptions(), rootValue.capabilities().keySet(), 0);
+            assessments.put(root, rootValue);
+            ledger.observe(root, MoveWitnessPath.ROOT);
+            frontier.add(new Ticket(new Node(root, 0, MoveWitnessPath.ROOT, rootValue), 0, serial[0]++));
+            visited.add(root, 0);
+            complete = contract == SearchContinuationContract.PATH_SENSITIVE;
+        }
+
+        Result run() {
+            try {
+                while (!stopped && !frontier.isEmpty()) advance();
+            } finally {
+                closeIncremental(opened, ledger);
+            }
+            return finish();
+        }
+
+        /** Preserve the ordering of quality, work, dominance and state-limit checks. */
+        private void advance() {
+            if (ledger.qualityReached()) {
+                stop(ledger.total() <= budget.totalWork() ? Outcome.QUALITY_REACHED : Outcome.WORK_EXHAUSTED);
+                return;
+            }
+            if (ledger.total() >= budget.totalWork()) {
+                stop(Outcome.WORK_EXHAUSTED);
+                return;
+            }
+            var node = frontier.remove().node();
+            ledger.search++;
+            boolean current = visited.current(node.state, node.theoryWork);
+            if (contract != SearchContinuationContract.PATH_SENSITIVE && ledger.total() > budget.totalWork()) {
+                stop(Outcome.WORK_EXHAUSTED);
+                return;
+            }
+            if (!current) return;
+            if (node.picker == null && !open(node)) return;
+            recordExpansion(node, expand(problem, node, ledger, events, visited, frontier, serial, assessments));
+        }
+
+        /** False also covers a depth-bound leaf; only terminal outcomes stop the whole run. */
+        private boolean open(Node node) {
+            if (ledger.explored >= budget.maxStates()) {
+                stop(Outcome.STATE_LIMIT);
+                return false;
+            }
+            ledger.explored++;
+            reached.add(node.state);
+            if (node.state.expression().equals(problem.context().goal())) {
+                stop(Outcome.TARGET_REACHED);
+                witness = node.path.steps();
+                hit = node.state.searchDepth();
+                primitiveHit = node.state.primitiveDepth();
+                return false;
+            }
+            if (node.state.searchDepth() == budget.maxSearchDepth()) return false;
+            ledger.expanded++;
+            node.picker = picker(problem, node.state);
+            retainIncremental(node, opened);
+            return true;
+        }
+
+        private void recordExpansion(Node node, Expansion expansion) {
+            if (expansion == Expansion.WORK_LIMIT) {
+                stop(Outcome.WORK_EXHAUSTED);
+                return;
+            }
+            if (expansion == Expansion.REJECTED_PROOF) complete = false;
+            if (expansion == Expansion.EXHAUSTED) {
+                complete &= node.picker.complete();
+                if (node.enqueued == 0 && node.picker.complete()) {
+                    ledger.deadEnds++;
+                    deadEnds.add(node.state);
                 }
             }
-        } finally {
-            closeIncremental(opened, ledger);
         }
-        if (objective != null) {
-            ledger.search = Math.addExact(ledger.search, objective.finish());
-            if (outcome == Outcome.QUALITY_REACHED) witness = objective.witness();
+
+        private void stop(Outcome terminalOutcome) {
+            outcome = terminalOutcome;
+            complete = false;
+            stopped = true;
         }
-        if (cleanupOverrun(problem, ledger) || (objective != null && ledger.total() > budget.totalWork())) {
-            outcome = Outcome.WORK_EXHAUSTED; complete = false;
-            witness = List.of(); hit = -1; primitiveHit = -1;
+
+        private Result finish() {
+            var objective = ledger.objective;
+            if (objective != null) {
+                ledger.search = Math.addExact(ledger.search, objective.finish());
+                if (outcome == Outcome.QUALITY_REACHED) witness = objective.witness();
+            }
+            if (cleanupOverrun(problem, ledger) || (objective != null && ledger.total() > budget.totalWork())) {
+                stop(Outcome.WORK_EXHAUSTED);
+                witness = List.of();
+                hit = -1;
+                primitiveHit = -1;
+            }
+            if (outcome == Outcome.BOUNDED_EXHAUSTED && !complete) outcome = Outcome.INCONCLUSIVE;
+            return new Result(outcome, witness, events, reached, deadEnds, new Metrics(ledger.generated, ledger.consumed, ledger.discarded,
+                ledger.generated - ledger.consumed, ledger.duplicates, ledger.deadEnds, ledger.explored, ledger.expanded,
+                ledger.primitive, ledger.search, ledger.verification, hit, primitiveHit, ledger.matches), complete, assessments,
+                incrementalExecution(problem, opened));
         }
-        if (outcome == Outcome.BOUNDED_EXHAUSTED && !complete) outcome = Outcome.INCONCLUSIVE;
-        return new Result(outcome, witness, events, reached, deadEnds, new Metrics(ledger.generated, ledger.consumed, ledger.discarded,
-            ledger.generated - ledger.consumed, ledger.duplicates, ledger.deadEnds, ledger.explored, ledger.expanded,
-            ledger.primitive, ledger.search, ledger.verification, hit, primitiveHit, ledger.matches), complete, assessments,
-            incrementalExecution(problem, opened));
     }
 
     private static MovePicker picker(Problem problem, MoveState state) {
@@ -297,28 +359,33 @@ public final class MoveSearch {
         long debt = Math.max(0L, (long) node.state.complexityDebt() + value.complexity() - node.value.complexity());
         child = new MoveState(child.expression(), child.searchDepth(), child.primitiveDepth(), child.previousRule(), child.assumptions(),
             value.capabilities().keySet(), (int) Math.min(Integer.MAX_VALUE, debt));
-        Decision decision;
-        MoveVerifier.Verification verification = null;
+        Decision decision = rejectBounds(problem, node, move, depth, theory, debt, ledger);
+        if (decision != null) return new Admission(child, theory, decision, null, value);
+
+        decision = visited.rejection(child, theory);
+        if (decision == Decision.DUPLICATE) ledger.duplicates++;
         if (ledger.total() > problem.budget().totalWork()) decision = Decision.WORK_LIMIT;
-        else if (debt > problem.budget().maxComplexityDebt()) decision = Decision.COMPLEXITY_BOUND;
-        else if (depth > problem.budget().maxPrimitiveSteps() || theory > problem.budget().maxTheoryWork()) decision = Decision.PATH_BOUND;
-        else if (!problem.context().carries(move.assumptions(), node.state)) decision = Decision.ASSUMPTION_REJECTED;
-        else {
-            decision = visited.rejection(child, theory);
-            if (decision == Decision.DUPLICATE) ledger.duplicates++;
-            if (ledger.total() > problem.budget().totalWork()) decision = Decision.WORK_LIMIT;
-            else if (decision == null) {
-                if (ledger.total() >= problem.budget().totalWork()) decision = Decision.WORK_LIMIT;
-                else {
-                    verification = problem.verifier().verify(node.state, move, problem.context());
-                    ledger.verification = Math.addExact(ledger.verification, verification.work());
-                    decision = ledger.total() > problem.budget().totalWork() ? Decision.WORK_LIMIT
-                        : verification.accepted() ? Decision.ENQUEUED : Decision.PROOF_REJECTED;
-                }
-            }
+        if (decision != null) return new Admission(child, theory, decision, null, value);
+        if (ledger.total() >= problem.budget().totalWork()) {
+            return new Admission(child, theory, Decision.WORK_LIMIT, null, value);
         }
+        var verification = problem.verifier().verify(node.state, move, problem.context());
+        ledger.verification = Math.addExact(ledger.verification, verification.work());
+        decision = ledger.total() > problem.budget().totalWork() ? Decision.WORK_LIMIT
+            : verification.accepted() ? Decision.ENQUEUED : Decision.PROOF_REJECTED;
         return new Admission(child, theory, decision, verification, value);
     }
+
+    /** A rejected bound must not trigger a paid visited lookup or a proof attempt. */
+    private static Decision rejectBounds(Problem problem, Node node, SearchMove move,
+            long depth, long theory, long debt, Ledger ledger) {
+        if (ledger.total() > problem.budget().totalWork()) return Decision.WORK_LIMIT;
+        if (debt > problem.budget().maxComplexityDebt()) return Decision.COMPLEXITY_BOUND;
+        if (depth > problem.budget().maxPrimitiveSteps() || theory > problem.budget().maxTheoryWork()) return Decision.PATH_BOUND;
+        if (!problem.context().carries(move.assumptions(), node.state)) return Decision.ASSUMPTION_REJECTED;
+        return null;
+    }
+
     private static StateValue.Assessment inspect(Problem problem, MoveState state, Ledger ledger) {
         var value = problem.stateValue().evaluate(state, problem.context());
         if (value.capabilities().values().stream().anyMatch(capability -> !capability.sourceExpression().equals(state.expression())))
