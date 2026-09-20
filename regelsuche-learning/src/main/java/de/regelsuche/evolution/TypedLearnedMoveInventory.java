@@ -4,6 +4,7 @@ import de.regelsuche.inventory.RuleUtilityEvidence;
 import de.regelsuche.search.moves.*;
 import de.regelsuche.search.program.CompiledLinearRewriteEngine;
 import de.regelsuche.search.program.RewriteProgram;
+import de.regelsuche.transform.AstRewriteTransport;
 import de.regelsuche.transform.PreparedAstRewriteTransformationEngine;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -14,7 +15,9 @@ import java.util.TreeMap;
 /** Opt-in live typed execution of admitted traces from the existing target-free TRAIN learner. */
 public final class TypedLearnedMoveInventory {
     private final TraceRewriteStrategyLearner.FrozenStrategy formation;
+    private final String inventoryHash;
     private final List<MoveProvider> primitives;
+    private final List<AstRewriteTransport> primitiveTransports;
     private final List<TypedProgramMoveProvider> learned;
     private final Map<String, TypedMoveSearch.Verifier> primitiveVerifiers;
 
@@ -23,12 +26,13 @@ public final class TypedLearnedMoveInventory {
     }
 
     /** Fixed primitive control: no unused learner, histories or learned programs. */
-    static TypedLearnedMoveInventory primitives(EvolutionGenome inventory) {
+    public static TypedLearnedMoveInventory primitives(EvolutionGenome inventory) {
         return new TypedLearnedMoveInventory(java.util.Objects.requireNonNull(inventory), null);
     }
 
     private TypedLearnedMoveInventory(EvolutionGenome inventory, TraceRewriteStrategyLearner.FrozenStrategy formation) {
         this.formation = formation;
+        inventoryHash = inventory.contentHash();
         var bounds = inventory.budget();
         if (bounds.maxCandidatesPerState() > 128) {
             throw new IllegalArgumentException("typed compiled inventory supports at most 128 candidates per stage");
@@ -36,18 +40,21 @@ public final class TypedLearnedMoveInventory {
         var rules = new EvolutionGenomeCompiler().compile(inventory).rules();
         var engines = new HashMap<String, PreparedAstRewriteTransformationEngine>();
         var providers = new ArrayList<MoveProvider>();
+        var transports = new ArrayList<AstRewriteTransport>();
         var verifiers = new HashMap<String, TypedMoveSearch.Verifier>();
         for (int i = 0; i < rules.size(); i++) {
             var rule = rules.get(i);
             var engine = new PreparedAstRewriteTransformationEngine(List.of(rule), bounds.maxAstGrowthPerStep(), bounds.maxCandidatesPerState());
             engines.put(inventory.rewrites().get(i).geneId(), engine);
             var transport = engine.astTransport();
+            transports.add(transport);
             providers.add(TypedMoveSearch.primitiveProvider(new MoveProvider.Descriptor(rule.id(), rule.id(),
                 SearchMove.SourceKind.PRIMITIVE, SearchMove.ProofStrength.REPLAYABLE, List.of(),
                 SearchMove.ValueEvidence.UNKNOWN, inventory.contentHash()), transport));
             verifiers.put(rule.id(), TypedMoveSearch.primitiveReplay(transport));
         }
         primitives = List.copyOf(providers);
+        primitiveTransports = List.copyOf(transports);
         primitiveVerifiers = Map.copyOf(verifiers);
         var programs = new TreeMap<String, TypedProgramMoveProvider>();
         if (formation != null) for (var observation : formation.observations()) {
@@ -61,11 +68,70 @@ public final class TypedLearnedMoveInventory {
     }
 
     public List<MoveProvider> primitiveProviders() { return primitives; }
+
+    /** Generalizes actual successful observations, then proves each symbolic statement. */
+    public CheckedLearnedSchemaModel checkedSchemas() {
+        if (formation == null) throw new IllegalStateException("training observations required");
+        return CheckedLearnedSchemaModel.learn(formation);
+    }
+
+    /** Direct schema execution shares the primitive inventory and the existing typed frontier. */
+    public SearchSession newSchemaSearchSession(CheckedLearnedSchemaModel model, int maximumSchemasPerOccurrence,
+            Map<String, Double> utilityBySchemaId) {
+        return newSchemaSearchSession(model, model.providers(maximumSchemasPerOccurrence, utilityBySchemaId));
+    }
+
+    public SearchSession newSchemaSearchSession(CheckedLearnedSchemaModel model, List<MoveProvider> schemaProviders) {
+        java.util.Objects.requireNonNull(model, "model");
+        if (!inventoryHash.equals(model.inventoryHash())) throw new IllegalArgumentException("schema inventory mismatch");
+        var selected = new ArrayList<>(primitives);
+        selected.addAll(schemaProviders);
+        var schemas = model.verifier();
+        var primitive = verifier();
+        return new SearchSession(selected, List.of(), (source, move, context) ->
+            move.sourceKind() == SearchMove.SourceKind.PRIMITIVE ? primitive.verify(source, move, context)
+                : schemas.verify(source, move, context));
+    }
     public List<TypedProgramMoveProvider> learnedPrograms() { return learned; }
     public List<MoveProvider> providers() {
         var providers = new ArrayList<>(primitives);
         providers.addAll(learned);
         return List.copyOf(providers);
+    }
+
+    /** Caller-owned provider inventory; proof regeneration remains independent of generation reuse. */
+    public record SearchSession(List<MoveProvider> providers, List<TypedPrimitiveCandidateCache> primitiveCaches,
+            TypedMoveSearch.Verifier verifier) {
+        public SearchSession {
+            providers = List.copyOf(providers);
+            primitiveCaches = List.copyOf(primitiveCaches);
+            java.util.Objects.requireNonNull(verifier, "verifier");
+        }
+    }
+
+    /**
+     * Create fresh bounded caches for one search, without changing the default inventory.
+     * Limits are PER primitive provider. Include this construction in measured setup time.
+     * Zero limits select the original provider instances without cache bookkeeping.
+     */
+    public SearchSession newSearchSession(boolean includeLearned, int maximumEntriesPerProvider,
+            long maximumCharactersPerProvider) {
+        if (maximumEntriesPerProvider < 0 || maximumCharactersPerProvider < 0) {
+            throw new IllegalArgumentException("negative session retention bound");
+        }
+        if (maximumEntriesPerProvider == 0 || maximumCharactersPerProvider == 0) {
+            return new SearchSession(includeLearned ? providers() : primitiveProviders(), List.of(), verifier());
+        }
+        var caches = new ArrayList<TypedPrimitiveCandidateCache>();
+        for (int i = 0; i < primitives.size(); i++) {
+            // EvolutionGenomeCompiler creates private final rules with immutable
+            // genome/pattern fields. No external rule subclass enters this inventory.
+            caches.add(TypedPrimitiveCandidateCache.forDeterministicTransport(primitives.get(i).descriptor(),
+                primitiveTransports.get(i), maximumEntriesPerProvider, maximumCharactersPerProvider));
+        }
+        var selected = new ArrayList<MoveProvider>(caches);
+        if (includeLearned) selected.addAll(learned);
+        return new SearchSession(selected, caches, verifier());
     }
 
     /** Regeneration uses the registered inventory; a learned identifier alone never authorizes an edge. */

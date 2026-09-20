@@ -33,7 +33,7 @@ public final class TypedSourceOnlySearch {
         if (!problem.context().sourceOnly()) throw new IllegalArgumentException("source-only context required");
         var search = new TypedMoveSearch().search(problem);
         if (search.reached()) throw new IllegalStateException("source-only search reported a target hit");
-        var root = new TypedMoveSearch.State(problem.source(), 0, 0, "", problem.context().initialAssumptions(), Set.of(), 0);
+        var root = search.initialState();
         var initial = Objects.requireNonNull(objective.evaluate(root), "initial objective");
         var incumbent = root;
         long best = initial.value(), selectionWork = initial.work();

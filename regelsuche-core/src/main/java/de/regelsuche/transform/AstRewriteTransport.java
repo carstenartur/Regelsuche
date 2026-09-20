@@ -34,8 +34,12 @@ public final class AstRewriteTransport {
     private final PreparedAstRewriteTransformationEngine engine;
 
     public AstRewriteTransport(List<RewriteRule> rules, int maximumGrowth, int maximumCandidates) {
+        this(rules, maximumGrowth, maximumCandidates, false);
+    }
+
+    AstRewriteTransport(List<RewriteRule> rules, int maximumGrowth, int maximumCandidates, boolean indexed) {
         if (maximumCandidates < 1) throw new IllegalArgumentException("positive candidate bound required");
-        engine = new PreparedAstRewriteTransformationEngine(rules, maximumGrowth, maximumCandidates);
+        engine = new PreparedAstRewriteTransformationEngine(rules, maximumGrowth, maximumCandidates, indexed);
     }
 
     /** Generate with actual producer ASTs. Neither source nor result is formatted and reparsed here. */

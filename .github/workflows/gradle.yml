@@ -249,6 +249,8 @@ jobs:
         with: { cache-cleanup: on-success }
       - name: Run typed comparison and independent verification
         run: bash gradle/run-typed-external-polynomial-comparison.sh
+      - name: Run checked-schema fresh-process lifecycle comparison
+        run: bash gradle/run-checked-schema-comparison.sh
       - name: Retain every outcome and test receipt
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -256,6 +258,7 @@ jobs:
           name: typed-external-polynomial-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             build/reports/typed-external-polynomial-comparison/**
+            build/reports/learned-schema-efficiency-v2/**
             regelsuche-search/build/test-results/**
             regelsuche-learning/build/test-results/**
           if-no-files-found: error

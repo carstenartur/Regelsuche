@@ -1,0 +1,772 @@
+[
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "de.regelsuche.research.RuleShapeSearchBenchmarks.indexed",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 2,
+        "jvm" : "/workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10/bin/java",
+        "jvmArgs" : [
+            "-Xms256m",
+            "-Xmx256m"
+        ],
+        "jdkVersion" : "25.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.2+10-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "shape" : "SPARSE_FUNCTIONS",
+            "unrelatedRules" : "16"
+        },
+        "primaryMetric" : {
+            "score" : 8880.233877711478,
+            "scoreError" : 14237.157687974583,
+            "scoreConfidence" : [
+                -5356.923810263104,
+                23117.391565686063
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1764.6662250859106,
+                "50.0" : 2740.6636310878976,
+                "90.0" : 25010.700767093025,
+                "95.0" : 25178.53855,
+                "99.0" : 25178.53855,
+                "99.9" : 25178.53855,
+                "99.99" : 25178.53855,
+                "99.999" : 25178.53855,
+                "99.9999" : 25178.53855,
+                "100.0" : 25178.53855
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    25178.53855,
+                    23500.16072093023,
+                    2934.037216374269,
+                    2457.4921029411767,
+                    1764.6662250859106
+                ],
+                [
+                    15880.1321875,
+                    10823.516752688172,
+                    2547.2900458015265,
+                    1902.9726977186313,
+                    1813.5322780748663
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "de.regelsuche.research.RuleShapeSearchBenchmarks.indexed",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 2,
+        "jvm" : "/workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10/bin/java",
+        "jvmArgs" : [
+            "-Xms256m",
+            "-Xmx256m"
+        ],
+        "jdkVersion" : "25.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.2+10-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "shape" : "SPARSE_FUNCTIONS",
+            "unrelatedRules" : "256"
+        },
+        "primaryMetric" : {
+            "score" : 2423.5998478759866,
+            "scoreError" : 3059.356581046002,
+            "scoreConfidence" : [
+                -635.7567331700152,
+                5482.956428921989
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1310.7029934895834,
+                "50.0" : 1812.952258123953,
+                "90.0" : 7525.580070994834,
+                "95.0" : 8073.21125,
+                "99.0" : 8073.21125,
+                "99.9" : 8073.21125,
+                "99.99" : 8073.21125,
+                "99.999" : 8073.21125,
+                "99.9999" : 8073.21125,
+                "100.0" : 8073.21125
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    8073.21125,
+                    2596.8994599483203,
+                    1947.4914058252427,
+                    1852.5469333333333,
+                    2189.10161487965
+                ],
+                [
+                    1486.1999034175335,
+                    1324.9118584415585,
+                    1773.357582914573,
+                    1681.5754765100671,
+                    1310.7029934895834
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "de.regelsuche.research.RuleShapeSearchBenchmarks.indexed",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 2,
+        "jvm" : "/workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10/bin/java",
+        "jvmArgs" : [
+            "-Xms256m",
+            "-Xmx256m"
+        ],
+        "jdkVersion" : "25.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.2+10-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "shape" : "SPARSE_FUNCTIONS",
+            "unrelatedRules" : "4096"
+        },
+        "primaryMetric" : {
+            "score" : 735.0792424496834,
+            "scoreError" : 495.8420450220392,
+            "scoreConfidence" : [
+                239.23719742764422,
+                1230.9212874717227
+            ],
+            "scorePercentiles" : {
+                "0.0" : 481.8821233140655,
+                "50.0" : 641.2187089495155,
+                "90.0" : 1507.5158870389657,
+                "95.0" : 1563.0925652173912,
+                "99.0" : 1563.0925652173912,
+                "99.9" : 1563.0925652173912,
+                "99.99" : 1563.0925652173912,
+                "99.999" : 1563.0925652173912,
+                "99.9999" : 1563.0925652173912,
+                "100.0" : 1563.0925652173912
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    544.0841032608696,
+                    523.4556017791732,
+                    481.8821233140655,
+                    620.6605475896168,
+                    661.7768703094141
+                ],
+                [
+                    699.0063052264809,
+                    1563.0925652173912,
+                    721.8774047619048,
+                    527.6311196047842,
+                    1007.3257834331338
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "de.regelsuche.research.RuleShapeSearchBenchmarks.indexed",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 2,
+        "jvm" : "/workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10/bin/java",
+        "jvmArgs" : [
+            "-Xms256m",
+            "-Xmx256m"
+        ],
+        "jdkVersion" : "25.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.2+10-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "shape" : "SAME_OPERATOR",
+            "unrelatedRules" : "16"
+        },
+        "primaryMetric" : {
+            "score" : 1147.9075332772168,
+            "scoreError" : 741.6968360727598,
+            "scoreConfidence" : [
+                406.210697204457,
+                1889.6043693499764
+            ],
+            "scorePercentiles" : {
+                "0.0" : 525.1784284965951,
+                "50.0" : 957.3515554797303,
+                "90.0" : 2126.326922838702,
+                "95.0" : 2184.1959978165937,
+                "99.0" : 2184.1959978165937,
+                "99.9" : 2184.1959978165937,
+                "99.99" : 2184.1959978165937,
+                "99.999" : 2184.1959978165937,
+                "99.9999" : 2184.1959978165937,
+                "100.0" : 2184.1959978165937
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    875.2098582677165,
+                    797.6988071146245,
+                    525.1784284965951,
+                    1010.4092818455366,
+                    896.4712980427046
+                ],
+                [
+                    1136.7470602272726,
+                    904.2938291139241,
+                    1543.365523809524,
+                    2184.1959978165937,
+                    1605.5052480376767
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "de.regelsuche.research.RuleShapeSearchBenchmarks.indexed",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 2,
+        "jvm" : "/workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10/bin/java",
+        "jvmArgs" : [
+            "-Xms256m",
+            "-Xmx256m"
+        ],
+        "jdkVersion" : "25.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.2+10-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "shape" : "SAME_OPERATOR",
+            "unrelatedRules" : "256"
+        },
+        "primaryMetric" : {
+            "score" : 5816.328714024168,
+            "scoreError" : 3266.3950270223722,
+            "scoreConfidence" : [
+                2549.933687001796,
+                9082.72374104654
+            ],
+            "scorePercentiles" : {
+                "0.0" : 2745.8815698630137,
+                "50.0" : 5234.827740437158,
+                "90.0" : 9913.31161380122,
+                "95.0" : 10147.860946428571,
+                "99.0" : 10147.860946428571,
+                "99.9" : 10147.860946428571,
+                "99.99" : 10147.860946428571,
+                "99.999" : 10147.860946428571,
+                "99.9999" : 10147.860946428571,
+                "100.0" : 10147.860946428571
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    7802.367620155039,
+                    5482.137147540983,
+                    7262.648170212766,
+                    4643.126120370371,
+                    4520.733662162163
+                ],
+                [
+                    10147.860946428571,
+                    3987.929833333333,
+                    2745.8815698630137,
+                    6583.083736842105,
+                    4987.518333333333
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "de.regelsuche.research.RuleShapeSearchBenchmarks.indexed",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 2,
+        "jvm" : "/workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10/bin/java",
+        "jvmArgs" : [
+            "-Xms256m",
+            "-Xmx256m"
+        ],
+        "jdkVersion" : "25.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.2+10-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "shape" : "SAME_OPERATOR",
+            "unrelatedRules" : "4096"
+        },
+        "primaryMetric" : {
+            "score" : 58171.2409206626,
+            "scoreError" : 38562.59013661011,
+            "scoreConfidence" : [
+                19608.650784052494,
+                96733.8310572727
+            ],
+            "scorePercentiles" : {
+                "0.0" : 33838.9713,
+                "50.0" : 50743.85515037594,
+                "90.0" : 112818.9102922078,
+                "95.0" : 116522.09818181818,
+                "99.0" : 116522.09818181818,
+                "99.9" : 116522.09818181818,
+                "99.99" : 116522.09818181818,
+                "99.999" : 116522.09818181818,
+                "99.9999" : 116522.09818181818,
+                "100.0" : 116522.09818181818
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    71830.90892857143,
+                    36851.706896551725,
+                    46808.30941666666,
+                    33838.9713,
+                    35556.70389655173
+                ],
+                [
+                    116522.09818181818,
+                    79490.21928571428,
+                    59325.781,
+                    48434.36214285714,
+                    53053.34815789474
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "de.regelsuche.research.RuleShapeSearchBenchmarks.scan",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 2,
+        "jvm" : "/workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10/bin/java",
+        "jvmArgs" : [
+            "-Xms256m",
+            "-Xmx256m"
+        ],
+        "jdkVersion" : "25.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.2+10-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "shape" : "SPARSE_FUNCTIONS",
+            "unrelatedRules" : "16"
+        },
+        "primaryMetric" : {
+            "score" : 2642.5928612868756,
+            "scoreError" : 2908.566307711,
+            "scoreConfidence" : [
+                -265.9734464241242,
+                5551.159168997876
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1605.6451319554849,
+                "50.0" : 1999.8686903030846,
+                "90.0" : 7509.424269602275,
+                "95.0" : 8023.096625,
+                "99.0" : 8023.096625,
+                "99.9" : 8023.096625,
+                "99.99" : 8023.096625,
+                "99.999" : 8023.096625,
+                "99.9999" : 8023.096625,
+                "100.0" : 8023.096625
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    8023.096625,
+                    2886.3730710227273,
+                    1793.6814928315412,
+                    2284.994227790433,
+                    2172.9483909287255
+                ],
+                [
+                    1935.0660038240917,
+                    1605.6451319554849,
+                    2064.6713767820775,
+                    1847.4369412844037,
+                    1812.0153514492754
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "de.regelsuche.research.RuleShapeSearchBenchmarks.scan",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 2,
+        "jvm" : "/workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10/bin/java",
+        "jvmArgs" : [
+            "-Xms256m",
+            "-Xmx256m"
+        ],
+        "jdkVersion" : "25.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.2+10-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "shape" : "SPARSE_FUNCTIONS",
+            "unrelatedRules" : "256"
+        },
+        "primaryMetric" : {
+            "score" : 8509.512077548856,
+            "scoreError" : 2745.268599482148,
+            "scoreConfidence" : [
+                5764.243478066708,
+                11254.780677031004
+            ],
+            "scorePercentiles" : {
+                "0.0" : 6232.846518518519,
+                "50.0" : 8162.454880156002,
+                "90.0" : 11691.530445017099,
+                "95.0" : 11754.406719101124,
+                "99.0" : 11754.406719101124,
+                "99.9" : 11754.406719101124,
+                "99.99" : 11754.406719101124,
+                "99.999" : 11754.406719101124,
+                "99.9999" : 11754.406719101124,
+                "100.0" : 11754.406719101124
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    11125.64397826087,
+                    8095.977120967742,
+                    7497.251488888889,
+                    6763.1585324675325,
+                    6232.846518518519
+                ],
+                [
+                    9336.221175925926,
+                    11754.406719101124,
+                    8228.932639344262,
+                    8939.044133928572,
+                    7121.638468085106
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "de.regelsuche.research.RuleShapeSearchBenchmarks.scan",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 2,
+        "jvm" : "/workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10/bin/java",
+        "jvmArgs" : [
+            "-Xms256m",
+            "-Xmx256m"
+        ],
+        "jdkVersion" : "25.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.2+10-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "shape" : "SPARSE_FUNCTIONS",
+            "unrelatedRules" : "4096"
+        },
+        "primaryMetric" : {
+            "score" : 103484.29166881312,
+            "scoreError" : 27369.950585811395,
+            "scoreConfidence" : [
+                76114.34108300172,
+                130854.24225462452
+            ],
+            "scorePercentiles" : {
+                "0.0" : 90226.22716666666,
+                "50.0" : 96259.61854545455,
+                "90.0" : 140985.67083750002,
+                "95.0" : 142404.65988888888,
+                "99.0" : 142404.65988888888,
+                "99.9" : 142404.65988888888,
+                "99.99" : 142404.65988888888,
+                "99.999" : 142404.65988888888,
+                "99.9999" : 142404.65988888888,
+                "100.0" : 142404.65988888888
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    100038.7546,
+                    90481.10183333333,
+                    90636.60525,
+                    90840.60408333334,
+                    95472.46981818182
+                ],
+                [
+                    142404.65988888888,
+                    128214.769375,
+                    109480.9574,
+                    97046.76727272727,
+                    90226.22716666666
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "de.regelsuche.research.RuleShapeSearchBenchmarks.scan",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 2,
+        "jvm" : "/workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10/bin/java",
+        "jvmArgs" : [
+            "-Xms256m",
+            "-Xmx256m"
+        ],
+        "jdkVersion" : "25.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.2+10-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "shape" : "SAME_OPERATOR",
+            "unrelatedRules" : "16"
+        },
+        "primaryMetric" : {
+            "score" : 2341.7941716697546,
+            "scoreError" : 2229.4878299418583,
+            "scoreConfidence" : [
+                112.30634172789632,
+                4571.282001611613
+            ],
+            "scorePercentiles" : {
+                "0.0" : 588.7066427310183,
+                "50.0" : 2235.7829564515087,
+                "90.0" : 4838.8665162220705,
+                "95.0" : 4943.098151960784,
+                "99.0" : 4943.098151960784,
+                "99.9" : 4943.098151960784,
+                "99.99" : 4943.098151960784,
+                "99.999" : 4943.098151960784,
+                "99.9999" : 4943.098151960784,
+                "100.0" : 4943.098151960784
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    4943.098151960784,
+                    2979.5668635014836,
+                    3427.284909620991,
+                    2139.2030341151385,
+                    2332.362878787879
+                ],
+                [
+                    3900.7817945736433,
+                    1627.3909544715448,
+                    865.8378538062284,
+                    613.7086331288343,
+                    588.7066427310183
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "de.regelsuche.research.RuleShapeSearchBenchmarks.scan",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 2,
+        "jvm" : "/workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10/bin/java",
+        "jvmArgs" : [
+            "-Xms256m",
+            "-Xmx256m"
+        ],
+        "jdkVersion" : "25.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.2+10-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "shape" : "SAME_OPERATOR",
+            "unrelatedRules" : "256"
+        },
+        "primaryMetric" : {
+            "score" : 2463.0935488301275,
+            "scoreError" : 498.73331618912556,
+            "scoreConfidence" : [
+                1964.3602326410019,
+                2961.826865019253
+            ],
+            "scorePercentiles" : {
+                "0.0" : 2089.75435908142,
+                "50.0" : 2329.438367173091,
+                "90.0" : 3110.7513992163013,
+                "95.0" : 3137.812943573668,
+                "99.0" : 3137.812943573668,
+                "99.9" : 3137.812943573668,
+                "99.99" : 3137.812943573668,
+                "99.999" : 3137.812943573668,
+                "99.9999" : 3137.812943573668,
+                "100.0" : 3137.812943573668
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    2368.390033096927,
+                    2089.75435908142,
+                    2867.1975,
+                    2305.4848732718892,
+                    2215.4948915929203
+                ],
+                [
+                    2310.847739030023,
+                    2348.028995316159,
+                    2284.1676803652967,
+                    2703.756472972973,
+                    3137.812943573668
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "de.regelsuche.research.RuleShapeSearchBenchmarks.scan",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 2,
+        "jvm" : "/workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10/bin/java",
+        "jvmArgs" : [
+            "-Xms256m",
+            "-Xmx256m"
+        ],
+        "jdkVersion" : "25.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.2+10-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "shape" : "SAME_OPERATOR",
+            "unrelatedRules" : "4096"
+        },
+        "primaryMetric" : {
+            "score" : 39326.385489264634,
+            "scoreError" : 15838.7810180106,
+            "scoreConfidence" : [
+                23487.60447125403,
+                55165.16650727524
+            ],
+            "scorePercentiles" : {
+                "0.0" : 30422.17675757576,
+                "50.0" : 35184.28267241379,
+                "90.0" : 61596.60756625001,
+                "95.0" : 62854.0035625,
+                "99.0" : 62854.0035625,
+                "99.9" : 62854.0035625,
+                "99.99" : 62854.0035625,
+                "99.999" : 62854.0035625,
+                "99.9999" : 62854.0035625,
+                "100.0" : 62854.0035625
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    31340.40325,
+                    30422.17675757576,
+                    34869.391517241376,
+                    35506.33479310345,
+                    31859.21681818182
+                ],
+                [
+                    45989.85331818182,
+                    35499.17382758621,
+                    34643.257448275865,
+                    62854.0035625,
+                    50280.0436
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    }
+]
+
+

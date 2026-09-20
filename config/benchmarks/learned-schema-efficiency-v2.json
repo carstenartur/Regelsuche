@@ -1,0 +1,34 @@
+{
+  "schema": "regelsuche.learned-schema-efficiency/v2",
+  "status": "PRE_EXECUTION_REGISTRATION",
+  "scope": "Public development and new family probes; not independently blinded",
+  "profiles": ["BASE", "LEARNED_SCHEMA", "LEARNED_SELECTED", "SYMPY_PORTFOLIO"],
+  "sequenceLengths": [1, 8, 32],
+  "repetitions": 3,
+  "workBudget": 16384,
+  "maxStates": 48,
+  "maxDepth": 9,
+  "maximumSchemasPerOccurrence": 4,
+  "queryTimeoutSeconds": 10,
+  "setupTimeoutSeconds": 120,
+  "selectionSources": [
+    "((m+n)*(m-n)+n*n)*(m+3)",
+    "((p+q)*(p-q)+q*q)+(p+5)",
+    "(r+s)*(r-s)+s*(s+2)",
+    "t+17"
+  ],
+  "cases": [
+    {"id": "nested-invariant", "family": "nested quadratic substitution", "source": "(((a+b)*(a-b)+b*b)+c)*(((a+b)*(a-b)+b*b)-c)+c*c"},
+    {"id": "quadratic-cross-substitution", "family": "nested quadratic substitution", "source": "((a*a+b)*(a*a-b)+b*b)+((b*b+a)*(b*b-a)+a*a)"},
+    {"id": "determinant-residual", "family": "difference of quadratic invariants", "source": "((a+b)*(a-b)+b*b)-((a+c)*(a-c)+c*c)"},
+    {"id": "geometric-telescope", "family": "geometric telescoping product", "source": "(a-1)*(a*a*a+a*a+a+1)"},
+    {"id": "geometric-shift", "family": "geometric telescoping product", "source": "(a+1)*(a*a-a+1)"},
+    {"id": "compound-near-miss", "family": "negative control", "source": "((a*b+c)*(a*b-c)+c*(c+1))*(a+2)"},
+    {"id": "wrong-repeated-binding", "family": "negative control", "source": "(a+b)*(a-b)+c*c"},
+    {"id": "simple", "family": "negative control", "source": "a+29"}
+  ],
+  "objective": "Existing TypedPolynomialSurfaceCost and independent polynomial judge",
+  "accounting": "Actual train, policy selection, persistence, fresh-process restore/reproof, requests, verification and serialization; wall, process CPU, allocations and logical work separately",
+  "acceptance": "At equal output quality, at least 3x full measured search effort reduction on preregistered new family, or substantial verified ability gain at equal total budget; otherwise unmet",
+  "changesAfterResults": "Prohibited for this version; retain failures and all raw rows"
+}

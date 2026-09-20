@@ -77,9 +77,20 @@ public final class TypedMoveSearch {
         MoveVerifier.Verification verify(State source, SearchMove move, Context context);
     }
 
+    /** Measured structural valuation; it never grants mathematical authority. */
+    @FunctionalInterface public interface StateEvaluator {
+        StateValue.Assessment evaluate(State state, Context context);
+    }
+
     public record Problem(Expr source, Context context, List<MoveProvider> providers, MovePriorityPolicy policy,
             Verifier verifier, ToDoubleFunction<State> stateScore, MoveSearch.Mode mode,
-            MoveSearch.Scheduling scheduling, MoveSearch.Budget budget) {
+            MoveSearch.Scheduling scheduling, MoveSearch.Budget budget, StateEvaluator stateValue) {
+        public Problem(Expr source, Context context, List<MoveProvider> providers, MovePriorityPolicy policy,
+                Verifier verifier, ToDoubleFunction<State> stateScore, MoveSearch.Mode mode,
+                MoveSearch.Scheduling scheduling, MoveSearch.Budget budget) {
+            this(source, context, providers, policy, verifier, stateScore, mode, scheduling, budget,
+                (state, ignored) -> StateValue.Assessment.EMPTY);
+        }
         public Problem {
             Objects.requireNonNull(source, "source");
             Objects.requireNonNull(context, "context");
@@ -90,6 +101,7 @@ public final class TypedMoveSearch {
             Objects.requireNonNull(mode, "mode");
             Objects.requireNonNull(scheduling, "scheduling");
             Objects.requireNonNull(budget, "budget");
+            Objects.requireNonNull(stateValue, "stateValue");
             if (policy != Policy.INVENTORY_ORDER && !(policy instanceof TypedPolicy)) {
                 throw new IllegalArgumentException("typed move search requires an explicitly typed policy");
             }
@@ -116,6 +128,12 @@ public final class TypedMoveSearch {
         }
         public boolean reached() { return outcome == MoveSearch.Outcome.TARGET_REACHED; }
 
+        /** Root including the assessed capabilities, even when its work exhausts the budget. */
+        public State initialState() {
+            return encodedResult.stateAssessments().keySet().stream()
+                .filter(state -> state.searchDepth() == 0).map(State::decode).findFirst().orElseThrow();
+        }
+
         /** Includes rejected proposals; absence of verification means it was not performed. */
         public List<Event> events() {
             return encodedResult.events().stream().map(event -> new Event(State.decode(event.source()),
@@ -131,7 +149,8 @@ public final class TypedMoveSearch {
         ToDoubleFunction<MoveState> score = state -> problem.stateScore().applyAsDouble(State.decode(state));
         var encoded = new MoveSearch().search(new MoveSearch.Problem(CODEC.encodeExpression(problem.source()),
             encodedContext, problem.providers(), problem.policy(), verifier, score, problem.mode(),
-            problem.scheduling(), problem.budget()));
+            problem.scheduling(), problem.budget(),
+            (state, ignored) -> problem.stateValue().evaluate(State.decode(state), problem.context())));
         var witness = encoded.witness().stream()
             .map(step -> new WitnessStep(State.decode(step.source()), State.decode(step.target()),
                 step.move(), step.verification())).toList();
@@ -177,10 +196,17 @@ public final class TypedMoveSearch {
         };
     }
 
-    /** Replays the claimed primitive against the retained producer AST and exact metadata. */
+    /** Checks carried premises, then replays against the retained producer AST and exact metadata. */
     public static Verifier primitiveReplay(AstRewriteTransport transport) {
         Objects.requireNonNull(transport, "transport");
         return (source, move, context) -> {
+            if (!move.assumptions().isEmpty()) {
+                var available = new java.util.HashSet<>(context.initialAssumptions());
+                available.addAll(AssumptionSignature.ofExpressions(source.assumptions()).normalizedAssumptions());
+                if (!available.containsAll(move.assumptions())) {
+                    return new MoveVerifier.Verification(false, 1, List.of(), "TYPED_PRIMITIVE_ASSUMPTIONS_MISSING");
+                }
+            }
             Expr target;
             try {
                 target = CODEC.decodeExpression(move.transformation().transformedExpression());
