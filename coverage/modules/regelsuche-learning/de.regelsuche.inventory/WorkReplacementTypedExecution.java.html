@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WorkReplacementTypedExecution.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.inventory</a> &gt; <span class="el_source">WorkReplacementTypedExecution.java</span></div><h1>WorkReplacementTypedExecution.java</h1><pre class="source lang-java linenums">package de.regelsuche.inventory;
+
+import static de.regelsuche.inventory.LifecycleWorkAccount.Phase.*;
+import static de.regelsuche.inventory.WorkReplacementManifest.*;
+import de.regelsuche.evolution.LearnedSchedulingArtifacts;
+import de.regelsuche.search.moves.*;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Objects;
+
+/** Both B1 and L1 use this adapter over the existing frontier and selected-path checker. */
+public final class WorkReplacementTypedExecution implements WorkReplacementExperiment.Session {
+    private final TypedSourcePolicySelection.Profile profile;
+    private final boolean historical;
+    private final List&lt;String&gt; excludedTrainingSources;
+<span class="fc" id="L16">    public WorkReplacementTypedExecution(TypedSourcePolicySelection.Profile profile, boolean historical, List&lt;String&gt; excludedTrainingSources) {</span>
+<span class="fc" id="L17">        this.profile = Objects.requireNonNull(profile); this.historical = historical;</span>
+<span class="fc" id="L18">        this.excludedTrainingSources = List.copyOf(excludedTrainingSources);</span>
+<span class="fc" id="L19">    }</span>
+    @Override public WorkReplacementExperiment.Evaluation execute(WorkReplacementExperiment.Query query, long allocatedWork,
+            Quality quality, WorkReplacementExperiment.Journal journal, String prefix) {
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        if (excludedTrainingSources.contains(query.sourceIdentity())) throw new IllegalArgumentException(&quot;training source reused for query&quot;);</span>
+<span class="fc" id="L23">        var p = query.problem(); var b = p.budget();</span>
+<span class="fc" id="L24">        var problem = new TypedMoveSearch.Problem(p.source(), p.context(), profile.providers(), profile.policy(), p.verifier(),</span>
+<span class="fc" id="L25">            p.stateScore(), p.mode(), p.scheduling(), new MoveSearch.Budget(b.maxPrimitiveSteps(), b.maxSearchDepth(),</span>
+<span class="fc" id="L26">                b.maxTheoryWork(), b.maxStates(), allocatedWork, b.maxComplexityDebt()), p.stateValue());</span>
+<span class="fc" id="L27">        var search = new TypedSourceOnlySearch();</span>
+        TypedSourceOnlySearch.Result result;
+<span class="fc" id="L29">        boolean validProof = true;</span>
+<span class="fc" id="L30">        String failedCheck = null;</span>
+        try {
+<span class="pc bpc" id="L32" title="1 of 4 branches missed.">            result = historical || quality.mode() == QualityMode.BEST_QUALITY_FIXED_BUDGET</span>
+<span class="fc" id="L33">                ? search.search(problem, query.objective())</span>
+<span class="fc" id="L34">                : search.searchUntil(problem, query.objective(), quality.maximumScore(), quality.continuation());</span>
+<span class="fc" id="L35">        } catch (TypedSourceOnlySearch.FinalCheckFailure failure) {</span>
+<span class="fc" id="L36">            result = failure.attempted(); validProof = false;</span>
+<span class="fc" id="L37">            failedCheck = LearnedSchedulingArtifacts.json(failure.rejected());</span>
+<span class="fc" id="L38">        }</span>
+<span class="fc" id="L39">        String raw = LearnedSchedulingArtifacts.resultJson(result.search().encodedResult());</span>
+<span class="fc" id="L40">        var queryAccount = queryAccount(prefix, result, raw);</span>
+<span class="fc" id="L41">        journal.append(queryAccount);</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        String finalCheck = failedCheck == null ? result.witness().toString() : failedCheck;</span>
+<span class="fc" id="L43">        charge(journal, prefix + &quot;/check&quot;, FINAL_CHECK, result.replayWork(), &quot;typed-source-final-replay/v3&quot;, finalCheck);</span>
+<span class="fc" id="L44">        String output = new de.regelsuche.search.program.CompiledAstReplayCodec().encodeExpression(result.incumbent().expression());</span>
+        // Logical output units are UTF-8 bytes materialized, distinct from CPU time and disk IO.
+<span class="fc" id="L46">        long queryBytes = queryAccount.receipts().stream().mapToLong(receipt -&gt; receipt.rawReceipt().getBytes(StandardCharsets.UTF_8).length)</span>
+<span class="fc" id="L47">            .reduce(0, Math::addExact);</span>
+<span class="fc" id="L48">        long outputBytes = Math.addExact(queryBytes, Math.addExact((long) finalCheck.getBytes(StandardCharsets.UTF_8).length,</span>
+<span class="fc" id="L49">            output.getBytes(StandardCharsets.UTF_8).length));</span>
+<span class="fc" id="L50">        charge(journal, prefix + &quot;/output&quot;, OUTPUT, outputBytes, &quot;utf8-materialized-bytes/v1&quot;, &quot;&quot;);</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        return new WorkReplacementExperiment.Evaluation(result.outputScore() &lt;= quality.maximumScore(), validProof,</span>
+<span class="fc" id="L52">            result.inputScore(), result.outputScore(), output, raw,</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            result.witness().stream().filter(step -&gt; step.move().sourceKind() == SearchMove.SourceKind.LEARNED)</span>
+<span class="fc" id="L54">                .map(step -&gt; step.move().ruleId()).distinct().toList());</span>
+    }
+    private static LifecycleWorkAccount queryAccount(String prefix, TypedSourceOnlySearch.Result result, String raw) {
+<span class="fc" id="L57">        var receipts = new java.util.ArrayList&lt;LifecycleWorkAccount.Receipt&gt;();</span>
+<span class="fc" id="L58">        var children = new java.util.ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (var entry : new java.util.TreeMap&lt;&gt;(result.search().metrics().chargedComponents()).entrySet()) {</span>
+<span class="fc" id="L60">            String id = prefix + &quot;/query/&quot; + entry.getKey(); children.add(id);</span>
+<span class="fc" id="L61">            receipts.add(new LifecycleWorkAccount.Receipt(id, QUERY, entry.getValue(), entry.getValue(), List.of(),</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                &quot;move-search-components/v3&quot;, entry.getValue().toString(), entry.getValue() == 0 ? &quot;no charged operations&quot; : &quot;&quot;));</span>
+<span class="fc" id="L63">        }</span>
+<span class="fc" id="L64">        String root = prefix + &quot;/query&quot;;</span>
+<span class="fc" id="L65">        receipts.add(new LifecycleWorkAccount.Receipt(root, QUERY, result.selectionWork(), result.queryWork(), children,</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            &quot;typed-source-query/v3&quot;, raw, result.queryWork() == 0 ? &quot;no charged operations&quot; : &quot;&quot;));</span>
+<span class="fc" id="L67">        return new LifecycleWorkAccount(receipts, List.of(root));</span>
+    }
+    public static void charge(WorkReplacementExperiment.Journal journal, String id, LifecycleWorkAccount.Phase phase,
+            long work, String revision, String raw) {
+<span class="fc" id="L71">        var receipt = new LifecycleWorkAccount.Receipt(id, phase, work, work, List.of(), revision, raw,</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            work == 0 ? &quot;no operations reported by this phase&quot; : &quot;&quot;);</span>
+<span class="fc" id="L73">        journal.append(LifecycleWorkAccount.of(receipt));</span>
+<span class="fc" id="L74">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

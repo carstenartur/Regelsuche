@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WorkReplacementArtifacts.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.inventory</a> &gt; <span class="el_source">WorkReplacementArtifacts.java</span></div><h1>WorkReplacementArtifacts.java</h1><pre class="source lang-java linenums">package de.regelsuche.inventory;
+
+import de.regelsuche.json.JsonWriter;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.io.Writer;
+
+/** v3 envelope retains raw artifacts verbatim as strings; no historical artifact is rewritten. */
+public final class WorkReplacementArtifacts {
+    private WorkReplacementArtifacts() {}
+    public static String json(WorkReplacementExperiment.Report report) {
+<span class="fc" id="L12">        var writer = new JsonWriter().beginObject().property(&quot;schema&quot;, WorkReplacementExperiment.REVISION)</span>
+<span class="fc" id="L13">            .property(&quot;claim&quot;, &quot;BOUNDED_DEVELOPMENT_LOGICAL_WORK;NO_GENERAL_OR_CPU_SPEEDUP_CLAIM&quot;)</span>
+<span class="fc" id="L14">            .property(&quot;manifest&quot;, report.manifest().toCanonicalJson())</span>
+<span class="fc" id="L15">            .array(&quot;arms&quot;, arms -&gt; {</span>
+<span class="fc bfc" id="L16" title="All 2 branches covered.">                for (var arm : WorkReplacementManifest.Arm.values()) {</span>
+<span class="fc" id="L17">                    var result = report.arms().get(arm);</span>
+<span class="fc" id="L18">                    arms.objectValue(out -&gt; out.property(&quot;arm&quot;, arm.name()).property(&quot;account&quot;, result.account().toCanonicalJson())</span>
+<span class="fc" id="L19">                        .property(&quot;accountingComplete&quot;, result.accountingComplete()).property(&quot;elapsedNanos&quot;, result.elapsedNanos())</span>
+<span class="fc" id="L20">                        .property(&quot;withinBudget&quot;, result.withinBudget(report.manifest().resources().totalWork()))</span>
+<span class="fc" id="L21">                        .array(&quot;rows&quot;, rows -&gt; result.rows().forEach(row -&gt; rows.objectValue(item -&gt; writeRow(item, row)))));</span>
+                }
+<span class="fc" id="L23">            });</span>
+<span class="fc" id="L24">        return writer.endObject().toString();</span>
+    }
+    private static void writeRow(JsonWriter out, WorkReplacementExperiment.Row row) {
+<span class="fc" id="L27">        out.property(&quot;query&quot;, row.queryId()).property(&quot;status&quot;, row.status().name()).property(&quot;allocatedWork&quot;, row.allocatedWork())</span>
+<span class="fc" id="L28">            .property(&quot;elapsedNanos&quot;, row.elapsedNanos()).property(&quot;processId&quot;, row.processId()).property(&quot;detail&quot;, row.detail());</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        if (row.evaluation() == null) out.nullProperty(&quot;evaluation&quot;);</span>
+<span class="fc" id="L30">        else out.object(&quot;evaluation&quot;, value -&gt; value.property(&quot;qualityReached&quot;, row.evaluation().qualityReached())</span>
+<span class="fc" id="L31">            .property(&quot;validProof&quot;, row.evaluation().validProof()).property(&quot;inputScore&quot;, row.evaluation().inputScore())</span>
+<span class="fc" id="L32">            .property(&quot;outputScore&quot;, row.evaluation().outputScore()).property(&quot;outputIdentity&quot;, row.evaluation().outputIdentity())</span>
+<span class="fc" id="L33">            .property(&quot;rawReceipt&quot;, row.evaluation().rawReceipt())</span>
+<span class="fc" id="L34">            .stringArray(&quot;learnedWitnessIds&quot;, row.evaluation().learnedWitnessIds()));</span>
+<span class="fc" id="L35">    }</span>
+    /** Counts attempted UTF-16 writes, including the write that fails; materialization is a separate receipt. */
+    public static void stream(String text, Writer sink, WorkReplacementExperiment.Journal journal, String prefix) {
+<span class="fc" id="L38">        long attempted = 0;</span>
+        try {
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">            for (int i = 0; i &lt; text.length(); i++) { attempted = Math.addExact(attempted, 1); sink.write(text.charAt(i)); }</span>
+<span class="fc" id="L41">        } catch (IOException failure) { throw new UncheckedIOException(failure); }</span>
+        finally {
+<span class="fc" id="L43">            WorkReplacementTypedExecution.charge(journal, prefix + &quot;/io&quot;, LifecycleWorkAccount.Phase.OUTPUT,</span>
+                attempted, &quot;attempted-utf16-writes/v1&quot;, &quot;&quot;);
+        }
+<span class="nc" id="L46">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

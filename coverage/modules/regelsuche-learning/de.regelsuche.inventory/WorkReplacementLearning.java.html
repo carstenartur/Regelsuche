@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WorkReplacementLearning.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.inventory</a> &gt; <span class="el_source">WorkReplacementLearning.java</span></div><h1>WorkReplacementLearning.java</h1><pre class="source lang-java linenums">package de.regelsuche.inventory;
+
+import static de.regelsuche.inventory.LifecycleWorkAccount.Phase.*;
+import static de.regelsuche.inventory.WorkReplacementTypedExecution.charge;
+import de.regelsuche.evolution.*;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.moves.TypedSourceOnlySearch;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import java.util.List;
+
+/** Audited adapters to the existing learner, policy selector and theorem restore. */
+public final class WorkReplacementLearning {
+<span class="fc" id="L13">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+    private WorkReplacementLearning() {}
+<span class="fc" id="L15">    public record Acquired(TraceRewriteStrategyLearner.FrozenStrategy formation, TypedLearnedMoveInventory inventory,</span>
+            CheckedLearnedSchemaModel model) {}
+    public static Acquired acquire(WorkReplacementManifest manifest, EvolutionGenome genome,
+            List&lt;TraceRewriteStrategyLearner.Input&gt; inputs, TraceRewriteStrategyLearner.Limits limits,
+            WorkReplacementExperiment.Journal journal, String prefix) {
+<span class="fc" id="L20">        manifest.requireTrainingSources(inputs.stream().map(input -&gt; identity(input.expression())).toList());</span>
+<span class="fc" id="L21">        var formation = new TraceRewriteStrategyLearner().learn(genome, inputs, limits);</span>
+<span class="fc" id="L22">        String formationJson = formation.toCanonicalJson();</span>
+<span class="fc" id="L23">        long search = Math.addExact(formation.trainingSearchWorkUnits(), formation.trainingPrimitiveWorkUnits());</span>
+<span class="fc" id="L24">        charge(journal, prefix + &quot;/train&quot;, TRAINING_SEARCH, search, TraceRewriteStrategyLearner.REVISION, formationJson);</span>
+<span class="fc" id="L25">        long proof = java.util.stream.LongStream.of(formation.trainingReplayWorkUnits(), formation.trainingReplayPrimitiveWorkUnits(),</span>
+<span class="fc" id="L26">            formation.trainingExactWorkUnits(), formation.trainingMinimalityWorkUnits(), formation.trainingReferenceSupplementaryWorkUnits())</span>
+<span class="fc" id="L27">            .reduce(0, Math::addExact);</span>
+<span class="fc" id="L28">        charge(journal, prefix + &quot;/formation&quot;, RULE_FORMATION_PROOF, proof, TraceRewriteStrategyLearner.REVISION, formationJson);</span>
+<span class="fc" id="L29">        var inventory = formation.typedMoves();</span>
+<span class="fc" id="L30">        String genomeJson = genome.toCanonicalJson();</span>
+<span class="fc" id="L31">        charge(journal, prefix + &quot;/compile&quot;, COMPILATION, inventory.providers().size(), &quot;compiled-provider-count/v1&quot;, genomeJson);</span>
+<span class="fc" id="L32">        var model = inventory.checkedSchemas();</span>
+<span class="fc" id="L33">        String modelJson = model.toCanonicalJson();</span>
+<span class="fc" id="L34">        charge(journal, prefix + &quot;/schemas&quot;, RULE_FORMATION_PROOF, model.formationWork(), CheckedLearnedSchemaModel.REVISION, modelJson);</span>
+<span class="fc" id="L35">        materialized(journal, prefix + &quot;/formation-output&quot;, formationJson);</span>
+<span class="fc" id="L36">        materialized(journal, prefix + &quot;/genome-output&quot;, genomeJson);</span>
+<span class="fc" id="L37">        materialized(journal, prefix + &quot;/model-output&quot;, modelJson);</span>
+<span class="fc" id="L38">        return new Acquired(formation, inventory, model);</span>
+    }
+    public static TypedSourcePolicySelection.Frozen select(WorkReplacementManifest manifest,
+            List&lt;TypedPolicySelection.TrainingTask&gt; tasks, List&lt;TypedSourcePolicySelection.Profile&gt; profiles,
+            TypedSourceOnlySearch.Objective objective, WorkReplacementExperiment.Journal journal, String prefix) {
+<span class="fc" id="L43">        manifest.requireTrainingSources(tasks.stream().map(task -&gt; CODEC.encodeExpression(task.problem().source())).toList());</span>
+<span class="fc" id="L44">        var quality = manifest.quality();</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        var selected = quality.mode() == WorkReplacementManifest.QualityMode.SUFFICIENT_QUALITY_MIN_WORK</span>
+<span class="fc" id="L46">            ? TypedSourcePolicySelection.trainUntil(tasks, profiles, objective, quality.maximumScore(), quality.continuation())</span>
+<span class="pc" id="L47">            : new TypedPolicySelection().trainSourceOnly(tasks, profiles, objective);</span>
+<span class="fc" id="L48">        String raw = selected.toCanonicalJson();</span>
+<span class="fc" id="L49">        charge(journal, prefix + &quot;/selection&quot;, SELECTION_TRAINING, selected.trainingWork(),</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            selected.qualityGoal() == null ? TypedSourcePolicySelection.REVISION : TypedSourcePolicySelection.QUALITY_REVISION, raw);</span>
+<span class="fc" id="L51">        materialized(journal, prefix + &quot;/selection-output&quot;, raw);</span>
+<span class="fc" id="L52">        return selected;</span>
+    }
+    public static CheckedLearnedSchemaModel restore(String json, String inventoryHash,
+            WorkReplacementExperiment.Journal journal, String prefix) {
+<span class="fc" id="L56">        var restored = CheckedLearnedSchemaModel.load(json, inventoryHash);</span>
+<span class="fc" id="L57">        charge(journal, prefix + &quot;/restore&quot;, RESTORE_REPROOF, restored.loadWork(), CheckedLearnedSchemaModel.REVISION, json);</span>
+<span class="fc" id="L58">        return restored;</span>
+    }
+    public static TypedLearnedMoveInventory primitives(EvolutionGenome genome, WorkReplacementExperiment.Journal journal, String prefix) {
+<span class="fc" id="L61">        var inventory = TypedLearnedMoveInventory.primitives(genome);</span>
+<span class="fc" id="L62">        String genomeJson = genome.toCanonicalJson();</span>
+<span class="fc" id="L63">        charge(journal, prefix + &quot;/compile&quot;, COMPILATION, inventory.primitiveProviders().size(), &quot;compiled-provider-count/v1&quot;, genomeJson);</span>
+<span class="fc" id="L64">        materialized(journal, prefix + &quot;/genome-output&quot;, genomeJson);</span>
+<span class="fc" id="L65">        return inventory;</span>
+    }
+    private static void materialized(WorkReplacementExperiment.Journal journal, String prefix, String text) {
+<span class="fc" id="L68">        charge(journal, prefix, OUTPUT, text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length, &quot;utf8-materialized-bytes/v1&quot;, &quot;&quot;);</span>
+<span class="fc" id="L69">    }</span>
+<span class="fc" id="L70">    public static String identity(String expression) { return CODEC.encodeExpression(new ExpressionParser().parseTerm(expression)); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

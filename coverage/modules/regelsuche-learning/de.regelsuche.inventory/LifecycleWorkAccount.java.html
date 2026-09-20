@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LifecycleWorkAccount.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.inventory</a> &gt; <span class="el_source">LifecycleWorkAccount.java</span></div><h1>LifecycleWorkAccount.java</h1><pre class="source lang-java linenums">package de.regelsuche.inventory;
+
+import de.regelsuche.json.JsonWriter;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/** Separate v3 accounting: historical receipts remain opaque and unchanged. */
+public final class LifecycleWorkAccount {
+    public static final String REVISION = &quot;regelsuche.lifecycle-work/v3&quot;;
+<span class="fc" id="L16">    public enum Phase { TRAINING_SEARCH, RULE_FORMATION_PROOF, SELECTION_TRAINING, COMPILATION, RESTORE_REPROOF, QUERY, FINAL_CHECK, OUTPUT }</span>
+    public record Receipt(String id, Phase phase, long exclusiveWork, long inclusiveWork,
+            List&lt;String&gt; children, String rawRevision, String rawReceipt, String zeroReason) {
+<span class="fc" id="L19">        public Receipt {</span>
+<span class="fc" id="L20">            requireText(id); Objects.requireNonNull(phase); requireText(rawRevision);</span>
+<span class="fc" id="L21">            Objects.requireNonNull(rawReceipt); Objects.requireNonNull(zeroReason);</span>
+<span class="fc" id="L22">            children = List.copyOf(children);</span>
+<span class="pc bpc" id="L23" title="1 of 8 branches missed.">            if (exclusiveWork &lt; 0 || inclusiveWork &lt; exclusiveWork || (inclusiveWork == 0 &amp;&amp; zeroReason.isBlank()))</span>
+<span class="fc" id="L24">                throw new IllegalArgumentException(&quot;negative or unexplained zero work&quot;);</span>
+<span class="fc" id="L25">        }</span>
+        public static Receipt measured(String id, Phase phase, long work, String revision, String raw) {
+<span class="fc" id="L27">            return new Receipt(id, phase, work, work, List.of(), revision, raw, &quot;&quot;);</span>
+        }
+        public static Receipt skipped(String id, Phase phase, String reason) {
+<span class="fc" id="L30">            requireText(reason);</span>
+<span class="fc" id="L31">            return new Receipt(id, phase, 0, 0, List.of(), REVISION, &quot;&quot;, reason);</span>
+        }
+    }
+    private final List&lt;Receipt&gt; receipts;
+    private final List&lt;String&gt; roots;
+    private final Map&lt;Phase, Long&gt; byPhase;
+    private final long totalWork;
+
+<span class="fc" id="L39">    public LifecycleWorkAccount(List&lt;Receipt&gt; receipts, List&lt;String&gt; roots) {</span>
+<span class="fc" id="L40">        this.receipts = List.copyOf(receipts); this.roots = List.copyOf(roots);</span>
+<span class="fc" id="L41">        var index = new HashMap&lt;String, Receipt&gt;();</span>
+<span class="fc bfc" id="L42" title="All 4 branches covered.">        for (var receipt : receipts) if (index.put(receipt.id(), receipt) != null)</span>
+<span class="fc" id="L43">            throw new IllegalArgumentException(&quot;duplicate receipt: &quot; + receipt.id());</span>
+<span class="fc" id="L44">        var visited = new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L45">        long total = 0;</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        for (String root : roots) total = Math.addExact(total, visit(root, index, visited));</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (visited.size() != receipts.size()) throw new IllegalArgumentException(&quot;unowned receipt&quot;);</span>
+<span class="fc" id="L48">        var phases = new EnumMap&lt;Phase, Long&gt;(Phase.class);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        for (var phase : Phase.values()) phases.put(phase, 0L);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        for (var receipt : receipts) phases.merge(receipt.phase(), receipt.exclusiveWork(), Math::addExact);</span>
+<span class="fc" id="L51">        byPhase = Map.copyOf(phases); totalWork = total;</span>
+<span class="fc" id="L52">    }</span>
+    private static long visit(String id, Map&lt;String, Receipt&gt; index, Set&lt;String&gt; visited) {
+<span class="fc" id="L54">        var receipt = index.get(id);</span>
+<span class="fc bfc" id="L55" title="All 4 branches covered.">        if (receipt == null || !visited.add(id)) throw new IllegalArgumentException(&quot;missing or doubled delegate: &quot; + id);</span>
+<span class="fc" id="L56">        long total = receipt.exclusiveWork();</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        for (var child : receipt.children()) total = Math.addExact(total, visit(child, index, visited));</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (total != receipt.inclusiveWork()) throw new IllegalArgumentException(&quot;delegate total mismatch: &quot; + id);</span>
+<span class="fc" id="L59">        return total;</span>
+    }
+<span class="fc" id="L61">    public static LifecycleWorkAccount empty() { return new LifecycleWorkAccount(List.of(), List.of()); }</span>
+<span class="fc" id="L62">    public static LifecycleWorkAccount of(Receipt receipt) { return new LifecycleWorkAccount(List.of(receipt), List.of(receipt.id())); }</span>
+    public LifecycleWorkAccount plus(LifecycleWorkAccount other) {
+<span class="fc" id="L64">        var combined = new ArrayList&lt;&gt;(receipts); combined.addAll(other.receipts);</span>
+<span class="fc" id="L65">        var combinedRoots = new ArrayList&lt;&gt;(roots); combinedRoots.addAll(other.roots);</span>
+<span class="fc" id="L66">        return new LifecycleWorkAccount(combined, combinedRoots);</span>
+    }
+<span class="fc" id="L68">    public List&lt;Receipt&gt; receipts() { return receipts; }</span>
+<span class="nc" id="L69">    public List&lt;String&gt; roots() { return roots; }</span>
+<span class="fc" id="L70">    public Map&lt;Phase, Long&gt; byPhase() { return byPhase; }</span>
+<span class="fc" id="L71">    public long work(Phase phase) { return byPhase.get(phase); }</span>
+<span class="fc" id="L72">    public long totalWork() { return totalWork; }</span>
+    public String toCanonicalJson() {
+<span class="fc" id="L74">        return new JsonWriter().beginObject().property(&quot;schema&quot;, REVISION).property(&quot;totalWork&quot;, totalWork)</span>
+<span class="fc" id="L75">            .stringArray(&quot;roots&quot;, roots).object(&quot;phases&quot;, out -&gt; {</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">                for (var phase : Phase.values()) out.property(phase.name(), work(phase));</span>
+<span class="fc" id="L77">            }).array(&quot;receipts&quot;, out -&gt; receipts.forEach(receipt -&gt; out.objectValue(value -&gt; value</span>
+<span class="fc" id="L78">                .property(&quot;id&quot;, receipt.id()).property(&quot;phase&quot;, receipt.phase().name())</span>
+<span class="fc" id="L79">                .property(&quot;exclusiveWork&quot;, receipt.exclusiveWork()).property(&quot;inclusiveWork&quot;, receipt.inclusiveWork())</span>
+<span class="fc" id="L80">                .stringArray(&quot;children&quot;, receipt.children()).property(&quot;rawRevision&quot;, receipt.rawRevision())</span>
+<span class="fc" id="L81">                .property(&quot;rawReceipt&quot;, receipt.rawReceipt()).property(&quot;zeroReason&quot;, receipt.zeroReason())))).endObject().toString();</span>
+    }
+    static void requireText(String text) {
+<span class="pc bpc" id="L84" title="2 of 4 branches missed.">        if (text == null || text.isBlank()) throw new IllegalArgumentException(&quot;nonblank binding required&quot;);</span>
+<span class="fc" id="L85">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

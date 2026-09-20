@@ -23,9 +23,27 @@ import java.util.Set;
             List&lt;TypedMoveSearch.WitnessStep&gt; witness, TypedMoveSearch.Result search,
             long selectionWork, long replayWork, long workBudget) {
 <span class="fc" id="L25">        public Result { witness = List.copyOf(witness); }</span>
-<span class="fc" id="L26">        public long totalWork() { return Math.addExact(search.metrics().totalWork(), Math.addExact(selectionWork, replayWork)); }</span>
-<span class="fc bfc" id="L27" title="All 2 branches covered.">        public boolean withinBudget() { return totalWork() &lt;= workBudget; }</span>
-<span class="fc bfc" id="L28" title="All 2 branches covered.">        public boolean improved() { return outputScore &lt; inputScore; }</span>
+<span class="fc" id="L26">        public long queryWork() { return Math.addExact(search.metrics().totalWork(), selectionWork); }</span>
+<span class="fc" id="L27">        public long totalWork() { return Math.addExact(queryWork(), replayWork); }</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        public boolean withinBudget() { return totalWork() &lt;= workBudget; }</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        public boolean improved() { return outputScore &lt; inputScore; }</span>
+    }
+    /** Failed independent checking still owns the completed search and attempted replay work. */
+    public static final class FinalCheckFailure extends IllegalStateException {
+        private final Result attempted;
+        private final MoveVerifier.Verification rejected;
+        private FinalCheckFailure(Result attempted, ReplayFailure cause) {
+<span class="nc" id="L36">            super(&quot;independent selected-path replay differs&quot;, cause); this.attempted = attempted; rejected = cause.rejected;</span>
+<span class="nc" id="L37">        }</span>
+<span class="nc" id="L38">        public Result attempted() { return attempted; }</span>
+<span class="nc" id="L39">        public MoveVerifier.Verification rejected() { return rejected; }</span>
+    }
+    private static final class ReplayFailure extends IllegalStateException {
+        private final long work;
+        private final MoveVerifier.Verification rejected;
+        private ReplayFailure(long work, MoveVerifier.Verification rejected) {
+<span class="nc" id="L45">            super(&quot;independent selected-path replay differs&quot;); this.work = work; this.rejected = rejected;</span>
+<span class="nc" id="L46">        }</span>
     }
     /**
      * Online quality control in the same frontier. Objective and path materialization work is
@@ -34,72 +52,78 @@ import java.util.Set;
      */
     public Result searchUntil(TypedMoveSearch.Problem problem, Objective objective, long maximumOutputScore,
             SearchContinuationContract contract) {
-<span class="fc" id="L37">        var online = new TypedMoveSearch().searchUntil(problem, objective, maximumOutputScore, contract);</span>
-<span class="fc" id="L38">        long replayWork = replay(problem, online.search().initialState(), online.incumbent(), online.witness());</span>
-<span class="fc" id="L39">        return new Result(online.incumbent(), online.inputScore(), online.outputScore(), online.witness(),</span>
-<span class="fc" id="L40">            online.search(), 0, replayWork, problem.budget().totalWork());</span>
+<span class="fc" id="L55">        var online = new TypedMoveSearch().searchUntil(problem, objective, maximumOutputScore, contract);</span>
+<span class="fc" id="L56">        return finish(problem, online.incumbent(), online.inputScore(), online.outputScore(), online.witness(), online.search(), 0);</span>
     }
 
     public Result search(TypedMoveSearch.Problem problem, Objective objective) {
-<span class="fc" id="L44">        Objects.requireNonNull(problem, &quot;problem&quot;);</span>
-<span class="fc" id="L45">        Objects.requireNonNull(objective, &quot;objective&quot;);</span>
-<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (!problem.context().sourceOnly()) throw new IllegalArgumentException(&quot;source-only context required&quot;);</span>
-<span class="fc" id="L47">        var search = new TypedMoveSearch().search(problem);</span>
-<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (search.reached()) throw new IllegalStateException(&quot;source-only search reported a target hit&quot;);</span>
-<span class="fc" id="L49">        var root = search.initialState();</span>
-<span class="fc" id="L50">        var initial = Objects.requireNonNull(objective.evaluate(root), &quot;initial objective&quot;);</span>
-<span class="fc" id="L51">        var incumbent = root;</span>
-<span class="fc" id="L52">        long best = initial.value(), selectionWork = initial.work();</span>
-<span class="fc" id="L53">        var parents = new HashMap&lt;TypedMoveSearch.State, TypedMoveSearch.Event&gt;();</span>
-<span class="fc bfc" id="L54" title="All 2 branches covered.">        for (var event : search.events()) {</span>
-<span class="fc" id="L55">            selectionWork = Math.addExact(selectionWork, 1);</span>
-<span class="fc bfc" id="L56" title="All 2 branches covered.">            if (event.decision() != MoveSearch.Decision.ENQUEUED) continue;</span>
-<span class="pc bpc" id="L57" title="2 of 4 branches missed.">            if (event.verification() == null || !event.verification().accepted()) {</span>
-<span class="nc" id="L58">                throw new IllegalStateException(&quot;unverified state admitted to typed frontier&quot;);</span>
+<span class="fc" id="L60">        Objects.requireNonNull(problem, &quot;problem&quot;);</span>
+<span class="fc" id="L61">        Objects.requireNonNull(objective, &quot;objective&quot;);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (!problem.context().sourceOnly()) throw new IllegalArgumentException(&quot;source-only context required&quot;);</span>
+<span class="fc" id="L63">        var search = new TypedMoveSearch().search(problem);</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (search.reached()) throw new IllegalStateException(&quot;source-only search reported a target hit&quot;);</span>
+<span class="fc" id="L65">        var root = search.initialState();</span>
+<span class="fc" id="L66">        var initial = Objects.requireNonNull(objective.evaluate(root), &quot;initial objective&quot;);</span>
+<span class="fc" id="L67">        var incumbent = root;</span>
+<span class="fc" id="L68">        long best = initial.value(), selectionWork = initial.work();</span>
+<span class="fc" id="L69">        var parents = new HashMap&lt;TypedMoveSearch.State, TypedMoveSearch.Event&gt;();</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (var event : search.events()) {</span>
+<span class="fc" id="L71">            selectionWork = Math.addExact(selectionWork, 1);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            if (event.decision() != MoveSearch.Decision.ENQUEUED) continue;</span>
+<span class="pc bpc" id="L73" title="2 of 4 branches missed.">            if (event.verification() == null || !event.verification().accepted()) {</span>
+<span class="nc" id="L74">                throw new IllegalStateException(&quot;unverified state admitted to typed frontier&quot;);</span>
             }
-<span class="fc" id="L60">            parents.putIfAbsent(event.target(), event);</span>
-<span class="fc" id="L61">            var score = Objects.requireNonNull(objective.evaluate(event.target()), &quot;candidate objective&quot;);</span>
-<span class="fc" id="L62">            selectionWork = Math.addExact(selectionWork, score.work());</span>
+<span class="fc" id="L76">            parents.putIfAbsent(event.target(), event);</span>
+<span class="fc" id="L77">            var score = Objects.requireNonNull(objective.evaluate(event.target()), &quot;candidate objective&quot;);</span>
+<span class="fc" id="L78">            selectionWork = Math.addExact(selectionWork, score.work());</span>
             // Stable first-minimum selection: an equally good path never displaces the input.
-<span class="fc bfc" id="L64" title="All 2 branches covered.">            if (score.value() &lt; best) {</span>
-<span class="fc" id="L65">                incumbent = event.target();</span>
-<span class="fc" id="L66">                best = score.value();</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (score.value() &lt; best) {</span>
+<span class="fc" id="L81">                incumbent = event.target();</span>
+<span class="fc" id="L82">                best = score.value();</span>
             }
-<span class="fc" id="L68">        }</span>
-<span class="fc" id="L69">        var witness = new ArrayList&lt;TypedMoveSearch.WitnessStep&gt;();</span>
-<span class="fc" id="L70">        var cursor = incumbent;</span>
-<span class="fc bfc" id="L71" title="All 2 branches covered.">        while (cursor.searchDepth() &gt; 0) {</span>
-<span class="fc" id="L72">            selectionWork = Math.addExact(selectionWork, 1);</span>
-<span class="fc" id="L73">            var edge = parents.get(cursor);</span>
-<span class="pc bpc" id="L74" title="2 of 4 branches missed.">            if (edge == null || edge.source().searchDepth() &gt;= cursor.searchDepth()) {</span>
-<span class="nc" id="L75">                throw new IllegalStateException(&quot;incumbent has no acyclic retained lineage&quot;);</span>
+<span class="fc" id="L84">        }</span>
+<span class="fc" id="L85">        var witness = new ArrayList&lt;TypedMoveSearch.WitnessStep&gt;();</span>
+<span class="fc" id="L86">        var cursor = incumbent;</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        while (cursor.searchDepth() &gt; 0) {</span>
+<span class="fc" id="L88">            selectionWork = Math.addExact(selectionWork, 1);</span>
+<span class="fc" id="L89">            var edge = parents.get(cursor);</span>
+<span class="pc bpc" id="L90" title="2 of 4 branches missed.">            if (edge == null || edge.source().searchDepth() &gt;= cursor.searchDepth()) {</span>
+<span class="nc" id="L91">                throw new IllegalStateException(&quot;incumbent has no acyclic retained lineage&quot;);</span>
             }
-<span class="fc" id="L77">            witness.add(new TypedMoveSearch.WitnessStep(edge.source(), edge.target(), edge.move(), edge.verification()));</span>
-<span class="fc" id="L78">            cursor = edge.source();</span>
-<span class="fc" id="L79">        }</span>
-<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (!cursor.equals(root)) throw new IllegalStateException(&quot;incumbent lineage does not start at the input&quot;);</span>
-<span class="fc" id="L81">        Collections.reverse(witness);</span>
-<span class="fc" id="L82">        long replayWork = replay(problem, root, incumbent, witness);</span>
-        // Extra inspections and replay can exceed the search budget. Retain that overrun,
-        // never clamp it or convert an over-budget anytime candidate into a success.
-<span class="fc" id="L85">        return new Result(incumbent, initial.value(), best, witness, search, selectionWork, replayWork, problem.budget().totalWork());</span>
+<span class="fc" id="L93">            witness.add(new TypedMoveSearch.WitnessStep(edge.source(), edge.target(), edge.move(), edge.verification()));</span>
+<span class="fc" id="L94">            cursor = edge.source();</span>
+<span class="fc" id="L95">        }</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (!cursor.equals(root)) throw new IllegalStateException(&quot;incumbent lineage does not start at the input&quot;);</span>
+<span class="fc" id="L97">        Collections.reverse(witness);</span>
+<span class="fc" id="L98">        return finish(problem, incumbent, initial.value(), best, witness, search, selectionWork);</span>
+    }
+
+    private static Result finish(TypedMoveSearch.Problem problem, TypedMoveSearch.State incumbent, long inputScore,
+            long outputScore, List&lt;TypedMoveSearch.WitnessStep&gt; witness, TypedMoveSearch.Result search, long selectionWork) {
+        try {
+<span class="fc" id="L104">            long work = replay(problem, search.initialState(), incumbent, witness);</span>
+<span class="fc" id="L105">            return new Result(incumbent, inputScore, outputScore, witness, search, selectionWork, work, problem.budget().totalWork());</span>
+<span class="nc" id="L106">        } catch (ReplayFailure failure) {</span>
+<span class="nc" id="L107">            throw new FinalCheckFailure(new Result(incumbent, inputScore, outputScore, witness, search, selectionWork,</span>
+<span class="nc" id="L108">                failure.work, problem.budget().totalWork()), failure);</span>
+        }
     }
 
     private static long replay(TypedMoveSearch.Problem problem, TypedMoveSearch.State root,
             TypedMoveSearch.State incumbent, List&lt;TypedMoveSearch.WitnessStep&gt; witness) {
-<span class="fc" id="L90">        long replayWork = 0;</span>
-<span class="fc" id="L91">        var cursor = root;</span>
-<span class="fc bfc" id="L92" title="All 2 branches covered.">        for (var step : witness) {</span>
-<span class="pc bpc" id="L93" title="1 of 2 branches missed.">            if (!cursor.equals(step.source())) throw new IllegalStateException(&quot;broken incumbent lineage&quot;);</span>
-<span class="fc" id="L94">            var replay = problem.verifier().verify(cursor, step.move(), problem.context());</span>
-<span class="fc" id="L95">            replayWork = Math.addExact(replayWork, replay.work());</span>
-<span class="pc bpc" id="L96" title="2 of 4 branches missed.">            if (!replay.accepted() || !replay.equals(step.verification())) {</span>
-<span class="nc" id="L97">                throw new IllegalStateException(&quot;independent selected-path replay differs&quot;);</span>
+<span class="fc" id="L114">        long replayWork = 0;</span>
+<span class="fc" id="L115">        var cursor = root;</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        for (var step : witness) {</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">            if (!cursor.equals(step.source())) throw new IllegalStateException(&quot;broken incumbent lineage&quot;);</span>
+<span class="fc" id="L118">            var replay = problem.verifier().verify(cursor, step.move(), problem.context());</span>
+<span class="fc" id="L119">            replayWork = Math.addExact(replayWork, replay.work());</span>
+<span class="pc bpc" id="L120" title="2 of 4 branches missed.">            if (!replay.accepted() || !replay.equals(step.verification())) {</span>
+<span class="nc" id="L121">                throw new ReplayFailure(replayWork, replay);</span>
             }
-<span class="fc" id="L99">            cursor = step.target();</span>
-<span class="fc" id="L100">        }</span>
-<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (!cursor.equals(incumbent)) throw new IllegalStateException(&quot;incumbent replay endpoint differs&quot;);</span>
-<span class="fc" id="L102">        return replayWork;</span>
+<span class="fc" id="L123">            cursor = step.target();</span>
+<span class="fc" id="L124">        }</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (!cursor.equals(incumbent)) throw new IllegalStateException(&quot;incumbent replay endpoint differs&quot;);</span>
+<span class="fc" id="L126">        return replayWork;</span>
     }
 
 }

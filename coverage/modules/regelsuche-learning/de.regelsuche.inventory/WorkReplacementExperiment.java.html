@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WorkReplacementExperiment.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.inventory</a> &gt; <span class="el_source">WorkReplacementExperiment.java</span></div><h1>WorkReplacementExperiment.java</h1><pre class="source lang-java linenums">package de.regelsuche.inventory;
+
+import static de.regelsuche.inventory.WorkReplacementManifest.*;
+import de.regelsuche.search.moves.TypedMoveSearch;
+import de.regelsuche.search.moves.TypedSourceOnlySearch;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+/** Orchestrates existing execution services. No search, learner or proof algorithm lives here. */
+<span class="fc" id="L17">public final class WorkReplacementExperiment {</span>
+    public static final String REVISION = &quot;regelsuche.work-replacement-experiment/v3&quot;;
+<span class="fc" id="L19">    public enum Status { QUALITY_REACHED, QUALITY_UNREACHED, OVER_BUDGET, TIMEOUT, INVALID_PROOF, ERROR, NOT_RUN }</span>
+    public record Query(String id, String sourceIdentity, TypedMoveSearch.Problem problem, TypedSourceOnlySearch.Objective objective) {
+<span class="fc" id="L21">        public Query {</span>
+<span class="fc" id="L22">            LifecycleWorkAccount.requireText(id); LifecycleWorkAccount.requireText(sourceIdentity);</span>
+<span class="fc" id="L23">            Objects.requireNonNull(problem); Objects.requireNonNull(objective);</span>
+<span class="fc" id="L24">        }</span>
+    }
+    public record Evaluation(boolean qualityReached, boolean validProof, long inputScore, long outputScore,
+            String outputIdentity, String rawReceipt, List&lt;String&gt; learnedWitnessIds) {
+<span class="fc" id="L28">        public Evaluation {</span>
+<span class="fc" id="L29">            LifecycleWorkAccount.requireText(outputIdentity); Objects.requireNonNull(rawReceipt);</span>
+<span class="fc" id="L30">            learnedWitnessIds = List.copyOf(learnedWitnessIds);</span>
+<span class="fc" id="L31">        }</span>
+    }
+    /** Callbacks append completed work before throwing. Unknown work explicitly invalidates the account. */
+<span class="fc" id="L34">    public static final class Journal {</span>
+<span class="fc" id="L35">        private LifecycleWorkAccount account = LifecycleWorkAccount.empty();</span>
+<span class="fc" id="L36">        private boolean complete = true;</span>
+<span class="fc" id="L37">        public void append(LifecycleWorkAccount work) { account = account.plus(work); }</span>
+<span class="fc" id="L38">        public void incomplete() { complete = false; }</span>
+<span class="fc" id="L39">        public LifecycleWorkAccount account() { return account; }</span>
+<span class="fc" id="L40">        public boolean complete() { return complete; }</span>
+    }
+    /** A process-backed query exceeded its deadline; killed work may be unobservable. */
+    public static final class QueryTimeoutException extends RuntimeException {
+<span class="fc" id="L44">        public QueryTimeoutException(String message, Throwable cause) { super(message, cause); }</span>
+    }
+    @FunctionalInterface public interface Acquisition { void acquire(Journal journal); }
+    @FunctionalInterface public interface SessionFactory { Session open(Journal journal, String receiptPrefix); }
+    public interface Session extends AutoCloseable {
+        Evaluation execute(Query query, long allocatedWork, Quality quality, Journal journal, String receiptPrefix);
+<span class="fc" id="L50">        default Optional&lt;Process&gt; process() { return Optional.empty(); }</span>
+<span class="fc" id="L51">        @Override default void close() {}</span>
+    }
+    public record Plan(Binding binding, Acquisition acquisition, LifecycleWorkAccount provisionedAcquisition, SessionFactory sessions) {
+<span class="fc" id="L54">        public Plan { Objects.requireNonNull(binding); Objects.requireNonNull(acquisition); Objects.requireNonNull(sessions); }</span>
+    }
+<span class="fc" id="L56">    public record Row(Arm arm, String queryId, Status status, long allocatedWork, long elapsedNanos,</span>
+            long processId, Evaluation evaluation, String detail) {}
+    public record ArmResult(Arm arm, LifecycleWorkAccount account, boolean accountingComplete, long elapsedNanos, List&lt;Row&gt; rows) {
+<span class="fc" id="L59">        public ArmResult { rows = List.copyOf(rows); }</span>
+<span class="fc bfc" id="L60" title="All 4 branches covered.">        public boolean withinBudget(long budget) { return accountingComplete &amp;&amp; account.totalWork() &lt;= budget; }</span>
+    }
+    public record Report(WorkReplacementManifest manifest, List&lt;Query&gt; queries, Map&lt;Arm, ArmResult&gt; arms) {
+<span class="fc" id="L63">        public Report {</span>
+<span class="fc" id="L64">            queries = List.copyOf(queries); arms = Map.copyOf(arms);</span>
+<span class="fc" id="L65">            validateRows(queries, arms);</span>
+<span class="fc" id="L66">        }</span>
+        public long successes(Arm arm) {
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            if (arm == Arm.L_ORACLE) throw new IllegalArgumentException(&quot;oracle is diagnostic, never a learning success&quot;);</span>
+<span class="fc" id="L69">            var result = arms.get(arm);</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            if (!result.withinBudget(manifest.resources().totalWork())) return 0;</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">            return result.rows().stream().filter(row -&gt; row.status() == Status.QUALITY_REACHED).count();</span>
+        }
+        public double runtimeRatio(Arm numerator, Arm denominator) {
+<span class="pc bpc" id="L74" title="1 of 4 branches missed.">            if (numerator == Arm.L_ORACLE || denominator == Arm.L_ORACLE) throw new IllegalArgumentException(&quot;oracle ratio excluded&quot;);</span>
+<span class="pc bpc" id="L75" title="1 of 4 branches missed.">            if (manifest.profile() == Profile.PROVISIONED_MODEL || !arms.get(numerator).accountingComplete()</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">                    || !arms.get(denominator).accountingComplete())</span>
+<span class="fc" id="L77">                throw new IllegalStateException(&quot;unmeasured acquisition time or incomplete accounting prevents a lifecycle ratio&quot;);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            if (manifest.unsolvedPolicy() != UnsolvedPolicy.PENALIZE_AT_TIMEOUT)</span>
+<span class="fc" id="L79">                throw new IllegalStateException(&quot;runtime ratio needs declared unsolved-task treatment&quot;);</span>
+<span class="fc" id="L80">            return (double) penalized(arms.get(numerator)) / Math.max(1L, penalized(arms.get(denominator)));</span>
+        }
+        private long penalized(ArmResult result) {
+<span class="fc" id="L83">            long nanos = result.elapsedNanos();</span>
+<span class="pc bpc" id="L84" title="1 of 4 branches missed.">            for (var row : result.rows()) if (row.status() != Status.QUALITY_REACHED)</span>
+<span class="fc" id="L85">                nanos = Math.addExact(nanos, Math.max(0, manifest.resources().queryTimeoutNanos() - row.elapsedNanos()));</span>
+<span class="fc" id="L86">            return nanos;</span>
+        }
+    }
+<span class="fc" id="L89">    private final Set&lt;Session&gt; usedSessions = Collections.newSetFromMap(new IdentityHashMap&lt;&gt;());</span>
+<span class="fc" id="L90">    private final Set&lt;Long&gt; usedProcesses = new java.util.HashSet&lt;&gt;();</span>
+
+    public Report run(WorkReplacementManifest manifest, List&lt;Query&gt; queries, Map&lt;Arm, Plan&gt; plans) {
+<span class="fc" id="L93">        validateInputs(manifest, queries, plans);</span>
+<span class="fc" id="L94">        var arms = new EnumMap&lt;Arm, ArmResult&gt;(Arm.class);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        for (var arm : Arm.values()) arms.put(arm, runArm(manifest, queries, arm, plans.get(arm)));</span>
+<span class="fc" id="L96">        return new Report(manifest, queries, arms);</span>
+    }
+    private ArmResult runArm(WorkReplacementManifest manifest, List&lt;Query&gt; queries, Arm arm, Plan plan) {
+<span class="fc" id="L99">        long start = System.nanoTime(); var journal = new Journal(); var rows = new ArrayList&lt;Row&gt;();</span>
+        try {
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            if (manifest.profile() == Profile.PROVISIONED_MODEL) {</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">                if (plan.provisionedAcquisition() == null) throw new IllegalArgumentException(&quot;provisioned acquisition receipts required&quot;);</span>
+<span class="fc" id="L103">                journal.append(plan.provisionedAcquisition());</span>
+<span class="fc" id="L104">            } else plan.acquisition().acquire(journal);</span>
+<span class="fc" id="L105">            executeStream(manifest, queries, arm, plan, journal, rows);</span>
+<span class="fc" id="L106">        } catch (RuntimeException failure) {</span>
+<span class="fc" id="L107">            journal.incomplete();</span>
+<span class="fc" id="L108">            fillMissing(queries, arm, rows, failure.toString());</span>
+<span class="fc" id="L109">        }</span>
+<span class="fc" id="L110">        return new ArmResult(arm, journal.account(), journal.complete(), System.nanoTime() - start, rows);</span>
+    }
+    private void executeStream(WorkReplacementManifest manifest, List&lt;Query&gt; queries, Arm arm, Plan plan,
+            Journal journal, List&lt;Row&gt; rows) {
+<span class="fc" id="L114">        Session session = null;</span>
+        try {
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            for (int i = 0; i &lt; queries.size(); i++) {</span>
+<span class="fc" id="L117">                var query = queries.get(i); String prefix = arm + &quot;/&quot; + i;</span>
+<span class="fc" id="L118">                long remaining = Math.max(0, manifest.resources().totalWork() - journal.account().totalWork());</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">                if (remaining == 0) { rows.add(notRun(arm, query, &quot;total lifecycle budget exhausted&quot;)); continue; }</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">                if (session == null) session = open(manifest.profile(), plan, journal, prefix);</span>
+<span class="fc" id="L121">                remaining = Math.max(0, manifest.resources().totalWork() - journal.account().totalWork());</span>
+<span class="fc" id="L122">                long share = remaining / (queries.size() - i);</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">                rows.add(share == 0 ? notRun(arm, query, &quot;no query share after restore&quot;)</span>
+<span class="fc" id="L124">                    : execute(manifest, arm, query, share, session, journal, prefix));</span>
+<span class="fc bfc" id="L125" title="All 4 branches covered.">                if (rows.getLast().status() == Status.TIMEOUT &amp;&amp; !journal.complete()) {</span>
+<span class="fc" id="L126">                    fillMissing(queries, arm, rows, &quot;query timeout left unobservable work; stream stopped&quot;);</span>
+<span class="fc" id="L127">                    return;</span>
+                }
+<span class="fc bfc" id="L129" title="All 2 branches covered.">                if (manifest.profile() == Profile.FRESH_PROCESS_PER_QUERY) { session.close(); session = null; }</span>
+            }
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        } finally { if (session != null) session.close(); }</span>
+<span class="fc" id="L132">    }</span>
+    private Session open(Profile profile, Plan plan, Journal journal, String prefix) {
+<span class="fc" id="L134">        var session = Objects.requireNonNull(plan.sessions().open(journal, prefix), &quot;session&quot;);</span>
+        try {
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            if (!usedSessions.add(session)) throw new IllegalArgumentException(&quot;fresh execution session required&quot;);</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            if (profile == Profile.FRESH_PROCESS_PER_QUERY) requireFreshProcess(session);</span>
+<span class="fc" id="L138">            return session;</span>
+<span class="fc" id="L139">        } catch (RuntimeException failure) { session.close(); throw failure; }</span>
+    }
+    private void requireFreshProcess(Session session) {
+<span class="fc" id="L142">        var process = session.process().orElseThrow(() -&gt; new IllegalArgumentException(&quot;fresh profile requires a live child process&quot;));</span>
+<span class="pc bpc" id="L143" title="3 of 6 branches missed.">        if (!process.isAlive() || process.pid() == ProcessHandle.current().pid() || !usedProcesses.add(process.pid()))</span>
+<span class="nc" id="L144">            throw new IllegalArgumentException(&quot;fresh child process required per query&quot;);</span>
+<span class="fc" id="L145">    }</span>
+    private static Row execute(WorkReplacementManifest manifest, Arm arm, Query query, long share, Session session,
+            Journal journal, String prefix) {
+<span class="fc" id="L148">        long start = System.nanoTime(), before = journal.account().totalWork();</span>
+        try {
+<span class="fc" id="L150">            var result = session.execute(query, share, manifest.quality(), journal, prefix);</span>
+<span class="fc" id="L151">            long elapsed = System.nanoTime() - start;</span>
+<span class="fc" id="L152">            long spent = Math.subtractExact(journal.account().totalWork(), before);</span>
+<span class="fc bfc" id="L153" title="All 4 branches covered.">            var status = status(result, spent &gt; share, elapsed &gt; manifest.resources().queryTimeoutNanos());</span>
+<span class="fc" id="L154">            return new Row(arm, query.id(), status, share, elapsed, session.process().map(Process::pid).orElse(ProcessHandle.current().pid()), result, &quot;&quot;);</span>
+<span class="fc" id="L155">        } catch (QueryTimeoutException failure) {</span>
+<span class="fc" id="L156">            journal.incomplete();</span>
+<span class="fc" id="L157">            return new Row(arm, query.id(), Status.TIMEOUT, share, System.nanoTime() - start,</span>
+<span class="fc" id="L158">                session.process().map(Process::pid).orElse(-1L), null, failure.toString());</span>
+<span class="fc" id="L159">        } catch (RuntimeException failure) {</span>
+<span class="fc" id="L160">            journal.incomplete();</span>
+<span class="fc" id="L161">            return new Row(arm, query.id(), Status.ERROR, share, System.nanoTime() - start, -1, null, failure.toString());</span>
+        }
+    }
+    private static Status status(Evaluation result, boolean overBudget, boolean timeout) {
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (!result.validProof()) return Status.INVALID_PROOF;</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        if (timeout) return Status.TIMEOUT;</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (overBudget) return Status.OVER_BUDGET;</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        return result.qualityReached() ? Status.QUALITY_REACHED : Status.QUALITY_UNREACHED;</span>
+    }
+    private static void validateInputs(WorkReplacementManifest manifest, List&lt;Query&gt; queries, Map&lt;Arm, Plan&gt; plans) {
+<span class="pc bpc" id="L171" title="2 of 4 branches missed.">        if (queries.isEmpty() || queries.stream().map(Query::id).distinct().count() != queries.size())</span>
+<span class="nc" id="L172">            throw new IllegalArgumentException(&quot;distinct nonempty query stream required&quot;);</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        for (var arm : Arm.values()) manifest.validateBinding(arm, Objects.requireNonNull(plans.get(arm), &quot;missing arm&quot;).binding());</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        for (var query : queries) {</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            if (query.problem().context().phase() != de.regelsuche.search.moves.MoveContext.Phase.FROZEN_EVALUATION)</span>
+<span class="fc" id="L176">                throw new IllegalArgumentException(&quot;evaluation requires FROZEN_EVALUATION context&quot;);</span>
+<span class="fc" id="L177">            var partition = manifest.partitions().stream().filter(value -&gt; value.id().equals(query.id())).findFirst().orElseThrow();</span>
+<span class="pc bpc" id="L178" title="2 of 4 branches missed.">            if (partition.split() == Split.TRAIN || !partition.sourceIdentity().equals(query.sourceIdentity())</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">                    || !query.sourceIdentity().equals(new de.regelsuche.search.program.CompiledAstReplayCodec().encodeExpression(query.problem().source())))</span>
+<span class="nc" id="L180">                throw new IllegalArgumentException(&quot;query partition mismatch&quot;);</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">            if (query.problem().budget().maxStates() &gt; manifest.resources().maxStates()</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">                    || query.problem().budget().maxSearchDepth() &gt; manifest.resources().maxDepth())</span>
+<span class="nc" id="L183">                throw new IllegalArgumentException(&quot;query resource mismatch&quot;);</span>
+<span class="fc" id="L184">        }</span>
+<span class="fc" id="L185">    }</span>
+    private static void validateRows(List&lt;Query&gt; queries, Map&lt;Arm, ArmResult&gt; arms) {
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        for (var arm : Arm.values()) {</span>
+<span class="fc" id="L188">            var result = Objects.requireNonNull(arms.get(arm), &quot;missing arm rows&quot;);</span>
+<span class="pc bpc" id="L189" title="2 of 4 branches missed.">            if (result.arm() != arm || result.rows().size() != queries.size()) throw new IllegalArgumentException(&quot;incomplete result matrix&quot;);</span>
+<span class="pc bpc" id="L190" title="1 of 4 branches missed.">            for (int i = 0; i &lt; queries.size(); i++) if (result.rows().get(i).arm() != arm</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">                    || !result.rows().get(i).queryId().equals(queries.get(i).id())) throw new IllegalArgumentException(&quot;missing or reordered row&quot;);</span>
+        }
+<span class="fc" id="L193">    }</span>
+<span class="fc" id="L194">    private static Row notRun(Arm arm, Query query, String reason) { return new Row(arm, query.id(), Status.NOT_RUN, 0, 0, -1, null, reason); }</span>
+    private static void fillMissing(List&lt;Query&gt; queries, Arm arm, List&lt;Row&gt; rows, String reason) {
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        for (int i = rows.size(); i &lt; queries.size(); i++) rows.add(notRun(arm, queries.get(i), reason));</span>
+<span class="fc" id="L197">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

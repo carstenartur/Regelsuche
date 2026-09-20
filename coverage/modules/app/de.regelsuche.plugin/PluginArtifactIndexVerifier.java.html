@@ -215,8 +215,8 @@ public final class PluginArtifactIndexVerifier {
 <span class="fc" id="L215">            verifier.update(manifest.signedPayload());</span>
 <span class="fc" id="L216">            return verifier.verify(</span>
 <span class="fc" id="L217">                Base64.getDecoder().decode(manifest.signatureBase64()));</span>
-<span class="fc" id="L218">        } catch (GeneralSecurityException | IllegalArgumentException exception) {</span>
-<span class="fc" id="L219">            return false;</span>
+<span class="nc" id="L218">        } catch (GeneralSecurityException | IllegalArgumentException exception) {</span>
+<span class="nc" id="L219">            return false;</span>
         }
     }
 
