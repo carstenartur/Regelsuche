@@ -33,31 +33,34 @@ import java.util.function.ToDoubleFunction;
     /** Marker for providers that consume the canonical tagged AST transport used by this adapter. */
     public interface TypedProvider extends MoveProvider {}
 
+    /** Opt-in policy whose expression features consume canonical tagged ASTs, never parser text. */
+    public interface TypedPolicy extends MovePriorityPolicy {}
+
     public record Context(Expr goal, List&lt;String&gt; initialAssumptions, MoveContext.Phase phase) {
-<span class="fc" id="L37">        public Context {</span>
-<span class="fc" id="L38">            Objects.requireNonNull(goal, &quot;goal&quot;);</span>
-<span class="fc" id="L39">            initialAssumptions = AssumptionSignature.ofExpressions(</span>
-<span class="fc" id="L40">                Objects.requireNonNull(initialAssumptions, &quot;initialAssumptions&quot;)).normalizedAssumptions();</span>
-<span class="fc" id="L41">            Objects.requireNonNull(phase, &quot;phase&quot;);</span>
-<span class="fc" id="L42">        }</span>
+<span class="fc" id="L40">        public Context {</span>
+<span class="fc" id="L41">            Objects.requireNonNull(goal, &quot;goal&quot;);</span>
+<span class="fc" id="L42">            initialAssumptions = AssumptionSignature.ofExpressions(</span>
+<span class="fc" id="L43">                Objects.requireNonNull(initialAssumptions, &quot;initialAssumptions&quot;)).normalizedAssumptions();</span>
+<span class="fc" id="L44">            Objects.requireNonNull(phase, &quot;phase&quot;);</span>
+<span class="fc" id="L45">        }</span>
         public static Context frozen(Expr goal) {
-<span class="fc" id="L44">            return new Context(goal, List.of(), MoveContext.Phase.FROZEN_EVALUATION);</span>
+<span class="fc" id="L47">            return new Context(goal, List.of(), MoveContext.Phase.FROZEN_EVALUATION);</span>
         }
         private MoveContext encoded() {
-<span class="fc" id="L47">            return new MoveContext(CODEC.encodeExpression(goal), initialAssumptions, phase);</span>
+<span class="fc" id="L50">            return new MoveContext(CODEC.encodeExpression(goal), initialAssumptions, phase);</span>
         }
     }
 
     public record State(Expr expression, int searchDepth, int primitiveDepth, String previousRule,
             List&lt;String&gt; assumptions, Set&lt;String&gt; capabilities, int complexityDebt) {
-<span class="fc" id="L53">        public State {</span>
-<span class="fc" id="L54">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
-<span class="fc" id="L55">            assumptions = List.copyOf(assumptions);</span>
-<span class="fc" id="L56">            capabilities = Set.copyOf(capabilities);</span>
-<span class="fc" id="L57">        }</span>
+<span class="fc" id="L56">        public State {</span>
+<span class="fc" id="L57">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L58">            assumptions = List.copyOf(assumptions);</span>
+<span class="fc" id="L59">            capabilities = Set.copyOf(capabilities);</span>
+<span class="fc" id="L60">        }</span>
         private static State decode(MoveState state) {
-<span class="fc" id="L59">            return new State(CODEC.decodeExpression(state.expression()), state.searchDepth(), state.primitiveDepth(),</span>
-<span class="fc" id="L60">                state.previousRule(), state.assumptions(), state.capabilities(), state.complexityDebt());</span>
+<span class="fc" id="L62">            return new State(CODEC.decodeExpression(state.expression()), state.searchDepth(), state.primitiveDepth(),</span>
+<span class="fc" id="L63">                state.previousRule(), state.assumptions(), state.capabilities(), state.complexityDebt());</span>
         }
     }
 
@@ -69,57 +72,66 @@ import java.util.function.ToDoubleFunction;
     public record Problem(Expr source, Context context, List&lt;MoveProvider&gt; providers, MovePriorityPolicy policy,
             Verifier verifier, ToDoubleFunction&lt;State&gt; stateScore, MoveSearch.Mode mode,
             MoveSearch.Scheduling scheduling, MoveSearch.Budget budget) {
-<span class="fc" id="L72">        public Problem {</span>
-<span class="fc" id="L73">            Objects.requireNonNull(source, &quot;source&quot;);</span>
-<span class="fc" id="L74">            Objects.requireNonNull(context, &quot;context&quot;);</span>
-<span class="fc" id="L75">            providers = List.copyOf(Objects.requireNonNull(providers, &quot;providers&quot;));</span>
-<span class="fc" id="L76">            Objects.requireNonNull(policy, &quot;policy&quot;);</span>
-<span class="fc" id="L77">            Objects.requireNonNull(verifier, &quot;verifier&quot;);</span>
-<span class="fc" id="L78">            Objects.requireNonNull(stateScore, &quot;stateScore&quot;);</span>
-<span class="fc" id="L79">            Objects.requireNonNull(mode, &quot;mode&quot;);</span>
-<span class="fc" id="L80">            Objects.requireNonNull(scheduling, &quot;scheduling&quot;);</span>
-<span class="fc" id="L81">            Objects.requireNonNull(budget, &quot;budget&quot;);</span>
-<span class="pc bpc" id="L82" title="1 of 2 branches missed.">            if (policy != Policy.INVENTORY_ORDER) {</span>
-<span class="nc" id="L83">                throw new IllegalArgumentException(&quot;typed move search v1 supports inventory-order policy only&quot;);</span>
+<span class="fc" id="L75">        public Problem {</span>
+<span class="fc" id="L76">            Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L77">            Objects.requireNonNull(context, &quot;context&quot;);</span>
+<span class="fc" id="L78">            providers = List.copyOf(Objects.requireNonNull(providers, &quot;providers&quot;));</span>
+<span class="fc" id="L79">            Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L80">            Objects.requireNonNull(verifier, &quot;verifier&quot;);</span>
+<span class="fc" id="L81">            Objects.requireNonNull(stateScore, &quot;stateScore&quot;);</span>
+<span class="fc" id="L82">            Objects.requireNonNull(mode, &quot;mode&quot;);</span>
+<span class="fc" id="L83">            Objects.requireNonNull(scheduling, &quot;scheduling&quot;);</span>
+<span class="fc" id="L84">            Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="pc bpc" id="L85" title="3 of 4 branches missed.">            if (policy != Policy.INVENTORY_ORDER &amp;&amp; !(policy instanceof TypedPolicy)) {</span>
+<span class="nc" id="L86">                throw new IllegalArgumentException(&quot;typed move search requires an explicitly typed policy&quot;);</span>
             }
-<span class="fc bfc" id="L85" title="All 4 branches covered.">            if (providers.stream().anyMatch(provider -&gt; !(provider instanceof TypedProvider))) {</span>
-<span class="fc" id="L86">                throw new IllegalArgumentException(&quot;typed move search requires typed providers&quot;);</span>
+<span class="fc bfc" id="L88" title="All 4 branches covered.">            if (providers.stream().anyMatch(provider -&gt; !(provider instanceof TypedProvider))) {</span>
+<span class="fc" id="L89">                throw new IllegalArgumentException(&quot;typed move search requires typed providers&quot;);</span>
             }
-<span class="fc" id="L88">        }</span>
+<span class="fc" id="L91">        }</span>
     }
 
-<span class="fc" id="L91">    public record WitnessStep(State source, State target, SearchMove move, MoveVerifier.Verification verification) {}</span>
+<span class="fc" id="L94">    public record WitnessStep(State source, State target, SearchMove move, MoveVerifier.Verification verification) {}</span>
+
+<span class="fc" id="L96">    public record Event(State source, State target, SearchMove move, MoveSearch.Decision decision,</span>
+            MoveVerifier.Verification verification) {}
 
     public record Result(MoveSearch.Outcome outcome, List&lt;WitnessStep&gt; witness, Set&lt;State&gt; reachedStates,
             List&lt;State&gt; deadEndStates, MoveSearch.Metrics metrics, boolean completeBoundedRelation,
             MoveSearch.Result encodedResult) {
-<span class="fc" id="L96">        public Result {</span>
-<span class="fc" id="L97">            witness = List.copyOf(witness);</span>
-<span class="fc" id="L98">            reachedStates = Set.copyOf(reachedStates);</span>
-<span class="fc" id="L99">            deadEndStates = List.copyOf(deadEndStates);</span>
-<span class="fc" id="L100">            Objects.requireNonNull(metrics, &quot;metrics&quot;);</span>
-<span class="fc" id="L101">            Objects.requireNonNull(encodedResult, &quot;encodedResult&quot;);</span>
-<span class="fc" id="L102">        }</span>
-<span class="fc bfc" id="L103" title="All 2 branches covered.">        public boolean reached() { return outcome == MoveSearch.Outcome.TARGET_REACHED; }</span>
+<span class="fc" id="L102">        public Result {</span>
+<span class="fc" id="L103">            witness = List.copyOf(witness);</span>
+<span class="fc" id="L104">            reachedStates = Set.copyOf(reachedStates);</span>
+<span class="fc" id="L105">            deadEndStates = List.copyOf(deadEndStates);</span>
+<span class="fc" id="L106">            Objects.requireNonNull(metrics, &quot;metrics&quot;);</span>
+<span class="fc" id="L107">            Objects.requireNonNull(encodedResult, &quot;encodedResult&quot;);</span>
+<span class="fc" id="L108">        }</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        public boolean reached() { return outcome == MoveSearch.Outcome.TARGET_REACHED; }</span>
+
+        /** Includes rejected proposals; absence of verification means it was not performed. */
+        public List&lt;Event&gt; events() {
+<span class="fc" id="L113">            return encodedResult.events().stream().map(event -&gt; new Event(State.decode(event.source()),</span>
+<span class="fc" id="L114">                State.decode(event.target()), event.move(), event.decision(), event.verification())).toList();</span>
+        }
     }
 
     public Result search(Problem problem) {
-<span class="fc" id="L107">        Objects.requireNonNull(problem, &quot;problem&quot;);</span>
-<span class="fc" id="L108">        MoveContext encodedContext = problem.context().encoded();</span>
-<span class="fc" id="L109">        MoveVerifier verifier = (source, move, ignored) -&gt;</span>
-<span class="fc" id="L110">            problem.verifier().verify(State.decode(source), move, problem.context());</span>
-<span class="fc" id="L111">        ToDoubleFunction&lt;MoveState&gt; score = state -&gt; problem.stateScore().applyAsDouble(State.decode(state));</span>
-<span class="fc" id="L112">        var encoded = new MoveSearch().search(new MoveSearch.Problem(CODEC.encodeExpression(problem.source()),</span>
-<span class="fc" id="L113">            encodedContext, problem.providers(), problem.policy(), verifier, score, problem.mode(),</span>
-<span class="fc" id="L114">            problem.scheduling(), problem.budget()));</span>
-<span class="fc" id="L115">        var witness = encoded.witness().stream()</span>
-<span class="fc" id="L116">            .map(step -&gt; new WitnessStep(State.decode(step.source()), State.decode(step.target()),</span>
-<span class="fc" id="L117">                step.move(), step.verification())).toList();</span>
-<span class="fc" id="L118">        var reached = new LinkedHashSet&lt;State&gt;();</span>
-<span class="fc" id="L119">        encoded.reachedStates().forEach(state -&gt; reached.add(State.decode(state)));</span>
-<span class="fc" id="L120">        var deadEnds = encoded.deadEndStates().stream().map(State::decode).toList();</span>
-<span class="fc" id="L121">        return new Result(encoded.outcome(), witness, reached, deadEnds, encoded.metrics(),</span>
-<span class="fc" id="L122">            encoded.completeBoundedRelation(), encoded);</span>
+<span class="fc" id="L119">        Objects.requireNonNull(problem, &quot;problem&quot;);</span>
+<span class="fc" id="L120">        MoveContext encodedContext = problem.context().encoded();</span>
+<span class="fc" id="L121">        MoveVerifier verifier = (source, move, ignored) -&gt;</span>
+<span class="fc" id="L122">            problem.verifier().verify(State.decode(source), move, problem.context());</span>
+<span class="fc" id="L123">        ToDoubleFunction&lt;MoveState&gt; score = state -&gt; problem.stateScore().applyAsDouble(State.decode(state));</span>
+<span class="fc" id="L124">        var encoded = new MoveSearch().search(new MoveSearch.Problem(CODEC.encodeExpression(problem.source()),</span>
+<span class="fc" id="L125">            encodedContext, problem.providers(), problem.policy(), verifier, score, problem.mode(),</span>
+<span class="fc" id="L126">            problem.scheduling(), problem.budget()));</span>
+<span class="fc" id="L127">        var witness = encoded.witness().stream()</span>
+<span class="fc" id="L128">            .map(step -&gt; new WitnessStep(State.decode(step.source()), State.decode(step.target()),</span>
+<span class="fc" id="L129">                step.move(), step.verification())).toList();</span>
+<span class="fc" id="L130">        var reached = new LinkedHashSet&lt;State&gt;();</span>
+<span class="fc" id="L131">        encoded.reachedStates().forEach(state -&gt; reached.add(State.decode(state)));</span>
+<span class="fc" id="L132">        var deadEnds = encoded.deadEndStates().stream().map(State::decode).toList();</span>
+<span class="fc" id="L133">        return new Result(encoded.outcome(), witness, reached, deadEnds, encoded.metrics(),</span>
+<span class="fc" id="L134">            encoded.completeBoundedRelation(), encoded);</span>
     }
 
     /**
@@ -127,85 +139,85 @@ import java.util.function.ToDoubleFunction;
      * AstRewriteTransport has a finite candidate cap but no explicit truncation receipt.
      */
     public static TypedProvider primitiveProvider(MoveProvider.Descriptor descriptor, AstRewriteTransport transport) {
-<span class="fc" id="L130">        Objects.requireNonNull(descriptor, &quot;descriptor&quot;);</span>
-<span class="fc" id="L131">        Objects.requireNonNull(transport, &quot;transport&quot;);</span>
-<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (descriptor.sourceKind() != SearchMove.SourceKind.PRIMITIVE) {</span>
-<span class="nc" id="L133">            throw new IllegalArgumentException(&quot;typed primitive provider requires PRIMITIVE source kind&quot;);</span>
+<span class="fc" id="L142">        Objects.requireNonNull(descriptor, &quot;descriptor&quot;);</span>
+<span class="fc" id="L143">        Objects.requireNonNull(transport, &quot;transport&quot;);</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (descriptor.sourceKind() != SearchMove.SourceKind.PRIMITIVE) {</span>
+<span class="nc" id="L145">            throw new IllegalArgumentException(&quot;typed primitive provider requires PRIMITIVE source kind&quot;);</span>
         }
-<span class="fc" id="L135">        return new TypedProvider() {</span>
-<span class="fc" id="L136">            @Override public Descriptor descriptor() { return descriptor; }</span>
+<span class="fc" id="L147">        return new TypedProvider() {</span>
+<span class="fc" id="L148">            @Override public Descriptor descriptor() { return descriptor; }</span>
 
             @Override public Batch candidates(MoveState state, MoveContext context) {
-<span class="pc bpc" id="L139" title="1 of 2 branches missed.">                if (!context.carries(descriptor.requiredAssumptions(), state)) {</span>
-<span class="nc" id="L140">                    return new Batch(List.of(),</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">                if (!context.carries(descriptor.requiredAssumptions(), state)) {</span>
+<span class="nc" id="L152">                    return new Batch(List.of(),</span>
                         new TransformationWorkMetrics(0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0), true);
                 }
-<span class="fc" id="L143">                Expr source = CODEC.decodeExpression(state.expression());</span>
-<span class="fc" id="L144">                var generated = transport.generate(source);</span>
-<span class="fc" id="L145">                var work = TransformationWorkMetrics.flatEngine(generated.size());</span>
-<span class="fc" id="L146">                var moves = new ArrayList&lt;SearchMove&gt;(generated.size());</span>
-<span class="fc bfc" id="L147" title="All 2 branches covered.">                for (var step : generated) {</span>
-<span class="fc" id="L148">                    String target = CODEC.encodeExpression(step.target());</span>
-<span class="fc" id="L149">                    String applicationKey = applicationKey(state.expression(), target, step.rule());</span>
-<span class="fc" id="L150">                    var transformation = new Transformation(step.rule(), target, step.kind(), step.mayIncreaseComplexity(),</span>
-<span class="fc" id="L151">                        step.estimatedCostDelta(), step.equivalencePreservingByConstruction(), applicationKey,</span>
-<span class="fc" id="L152">                        step.assumptions(), step.packId(), step.license());</span>
-<span class="fc" id="L153">                    moves.add(SearchMove.from(transformation, descriptor, work.totalWorkUnits()));</span>
-<span class="fc" id="L154">                }</span>
-<span class="fc" id="L155">                return new Batch(moves, work, false);</span>
+<span class="fc" id="L155">                Expr source = CODEC.decodeExpression(state.expression());</span>
+<span class="fc" id="L156">                var generated = transport.generate(source);</span>
+<span class="fc" id="L157">                var work = TransformationWorkMetrics.flatEngine(generated.size());</span>
+<span class="fc" id="L158">                var moves = new ArrayList&lt;SearchMove&gt;(generated.size());</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">                for (var step : generated) {</span>
+<span class="fc" id="L160">                    String target = CODEC.encodeExpression(step.target());</span>
+<span class="fc" id="L161">                    String applicationKey = applicationKey(state.expression(), target, step.rule());</span>
+<span class="fc" id="L162">                    var transformation = new Transformation(step.rule(), target, step.kind(), step.mayIncreaseComplexity(),</span>
+<span class="fc" id="L163">                        step.estimatedCostDelta(), step.equivalencePreservingByConstruction(), applicationKey,</span>
+<span class="fc" id="L164">                        step.assumptions(), step.packId(), step.license());</span>
+<span class="fc" id="L165">                    moves.add(SearchMove.from(transformation, descriptor, work.totalWorkUnits()));</span>
+<span class="fc" id="L166">                }</span>
+<span class="fc" id="L167">                return new Batch(moves, work, false);</span>
             }
         };
     }
 
     /** Replays the claimed primitive against the retained producer AST and exact metadata. */
     public static Verifier primitiveReplay(AstRewriteTransport transport) {
-<span class="fc" id="L162">        Objects.requireNonNull(transport, &quot;transport&quot;);</span>
-<span class="fc" id="L163">        return (source, move, context) -&gt; {</span>
+<span class="fc" id="L174">        Objects.requireNonNull(transport, &quot;transport&quot;);</span>
+<span class="fc" id="L175">        return (source, move, context) -&gt; {</span>
             Expr target;
             try {
-<span class="fc" id="L166">                target = CODEC.decodeExpression(move.transformation().transformedExpression());</span>
-<span class="nc" id="L167">            } catch (IllegalArgumentException exception) {</span>
-<span class="nc" id="L168">                return new MoveVerifier.Verification(false, 1, List.of(), &quot;TYPED_TARGET_DECODE_REJECTED&quot;);</span>
-<span class="fc" id="L169">            }</span>
-<span class="fc" id="L170">            String encodedSource = CODEC.encodeExpression(source.expression());</span>
-<span class="fc" id="L171">            String encodedTarget = CODEC.encodeExpression(target);</span>
-<span class="fc" id="L172">            String expectedApplicationKey = applicationKey(encodedSource, encodedTarget, move.transformation().rule());</span>
-<span class="fc" id="L173">            var generated = transport.generate(source.expression());</span>
-<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            boolean primitiveProvenance = move.transformation().provenance()</span>
+<span class="fc" id="L178">                target = CODEC.decodeExpression(move.transformation().transformedExpression());</span>
+<span class="nc" id="L179">            } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L180">                return new MoveVerifier.Verification(false, 1, List.of(), &quot;TYPED_TARGET_DECODE_REJECTED&quot;);</span>
+<span class="fc" id="L181">            }</span>
+<span class="fc" id="L182">            String encodedSource = CODEC.encodeExpression(source.expression());</span>
+<span class="fc" id="L183">            String encodedTarget = CODEC.encodeExpression(target);</span>
+<span class="fc" id="L184">            String expectedApplicationKey = applicationKey(encodedSource, encodedTarget, move.transformation().rule());</span>
+<span class="fc" id="L185">            var generated = transport.generate(source.expression());</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">            boolean primitiveProvenance = move.transformation().provenance()</span>
                     instanceof de.regelsuche.transform.TransformationProvenance.PrimitiveRewriteSequence
-<span class="fc bfc" id="L176" title="All 2 branches covered.">                &amp;&amp; move.transformation().primitiveRuleIds().equals(List.of(move.transformation().rule()))</span>
-<span class="pc bpc" id="L177" title="1 of 2 branches missed.">                &amp;&amp; move.transformation().primitiveStepCount() == 1;</span>
-<span class="fc bfc" id="L178" title="All 2 branches covered.">            boolean accepted = primitiveProvenance</span>
-<span class="fc bfc" id="L179" title="All 2 branches covered.">                &amp;&amp; move.transformation().applicationKey().equals(expectedApplicationKey)</span>
-<span class="pc bpc" id="L180" title="1 of 2 branches missed.">                &amp;&amp; generated.stream().anyMatch(step -&gt;</span>
-<span class="pc bpc" id="L181" title="1 of 2 branches missed.">                step.target().equals(target)</span>
-<span class="pc bpc" id="L182" title="1 of 2 branches missed.">                    &amp;&amp; step.rule().equals(move.transformation().rule())</span>
-<span class="pc bpc" id="L183" title="1 of 2 branches missed.">                    &amp;&amp; step.kind() == move.transformation().kind()</span>
-<span class="pc bpc" id="L184" title="1 of 2 branches missed.">                    &amp;&amp; step.mayIncreaseComplexity() == move.transformation().mayIncreaseComplexity()</span>
-<span class="pc bpc" id="L185" title="1 of 2 branches missed.">                    &amp;&amp; step.estimatedCostDelta() == move.transformation().estimatedCostDelta()</span>
-<span class="fc" id="L186">                    &amp;&amp; step.equivalencePreservingByConstruction()</span>
-<span class="pc bpc" id="L187" title="1 of 2 branches missed.">                        == move.transformation().equivalencePreservingByConstruction()</span>
-<span class="pc bpc" id="L188" title="1 of 2 branches missed.">                    &amp;&amp; step.assumptions().equals(move.transformation().assumptions())</span>
-<span class="pc bpc" id="L189" title="1 of 2 branches missed.">                    &amp;&amp; step.packId().equals(move.transformation().packId())</span>
-<span class="pc bpc" id="L190" title="1 of 2 branches missed.">                    &amp;&amp; step.license().equals(move.transformation().license()));</span>
-<span class="fc" id="L191">            long work = TransformationWorkMetrics.flatEngine(generated.size()).totalWorkUnits();</span>
-<span class="fc" id="L192">            return new MoveVerifier.Verification(accepted, work,</span>
-<span class="fc bfc" id="L193" title="All 2 branches covered.">                accepted ? List.of(&quot;typed-primitive-replay:&quot; + sha256(encodedSource</span>
-<span class="fc" id="L194">                    + &quot;\n&quot; + encodedTarget + &quot;\n&quot; + move.ruleId())) : List.of(),</span>
-<span class="fc bfc" id="L195" title="All 2 branches covered.">                accepted ? &quot;TYPED_PRIMITIVE_REPLAYED&quot; : &quot;TYPED_PRIMITIVE_REPLAY_REJECTED&quot;);</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">                &amp;&amp; move.transformation().primitiveRuleIds().equals(List.of(move.transformation().rule()))</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">                &amp;&amp; move.transformation().primitiveStepCount() == 1;</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            boolean accepted = primitiveProvenance</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">                &amp;&amp; move.transformation().applicationKey().equals(expectedApplicationKey)</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">                &amp;&amp; generated.stream().anyMatch(step -&gt;</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">                step.target().equals(target)</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">                    &amp;&amp; step.rule().equals(move.transformation().rule())</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">                    &amp;&amp; step.kind() == move.transformation().kind()</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">                    &amp;&amp; step.mayIncreaseComplexity() == move.transformation().mayIncreaseComplexity()</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">                    &amp;&amp; step.estimatedCostDelta() == move.transformation().estimatedCostDelta()</span>
+<span class="fc" id="L198">                    &amp;&amp; step.equivalencePreservingByConstruction()</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">                        == move.transformation().equivalencePreservingByConstruction()</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">                    &amp;&amp; step.assumptions().equals(move.transformation().assumptions())</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">                    &amp;&amp; step.packId().equals(move.transformation().packId())</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">                    &amp;&amp; step.license().equals(move.transformation().license()));</span>
+<span class="fc" id="L203">            long work = TransformationWorkMetrics.flatEngine(generated.size()).totalWorkUnits();</span>
+<span class="fc" id="L204">            return new MoveVerifier.Verification(accepted, work,</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">                accepted ? List.of(&quot;typed-primitive-replay:&quot; + sha256(encodedSource</span>
+<span class="fc" id="L206">                    + &quot;\n&quot; + encodedTarget + &quot;\n&quot; + move.ruleId())) : List.of(),</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">                accepted ? &quot;TYPED_PRIMITIVE_REPLAYED&quot; : &quot;TYPED_PRIMITIVE_REPLAY_REJECTED&quot;);</span>
         };
     }
 
     private static String applicationKey(String encodedSource, String encodedTarget, String rule) {
-<span class="fc" id="L200">        return &quot;typed:&quot; + sha256(encodedSource + &quot;\n&quot; + encodedTarget + &quot;\n&quot; + rule);</span>
+<span class="fc" id="L212">        return &quot;typed:&quot; + sha256(encodedSource + &quot;\n&quot; + encodedTarget + &quot;\n&quot; + rule);</span>
     }
 
     private static String sha256(String value) {
         try {
-<span class="fc" id="L205">            return java.util.HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
-<span class="fc" id="L206">                .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
-<span class="nc" id="L207">        } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L208">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+<span class="fc" id="L217">            return java.util.HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L218">                .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L219">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L220">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
         }
     }
 }

@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ModPowFrozenTransfer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">ModPowFrozenTransfer.java</span></div><h1>ModPowFrozenTransfer.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import static de.regelsuche.benchmark.ModPowTransferFiles.*;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.mining.TypedOutputPattern;
+import de.regelsuche.mining.TypedPatternGeneralizer;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import de.regelsuche.transform.AstRewriteTransport;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RewriteKind;
+import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Process-separated TRAIN/freeze/TEST research; no executable learned rule is promoted.
+ * The public v1 command accepts only the originally committed corpus bytes.
+ * A changed corpus requires a separately versioned experiment, not a v1 verdict.
+ */
+public final class ModPowFrozenTransfer {
+<span class="fc" id="L34">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+    // Content identities from corpus commit cbf07fda; independent of caller-supplied paths.
+    private static final String TRAIN_SHA256 =
+        &quot;c2932bb1a8a4412a819da52fb0b75ec62dae768b9e2261f19b1e7c6b6725c978&quot;;
+    private static final String TEST_SHA256 =
+        &quot;0ae4cdc2fc7335d672dfdadc99fb6b8c58b880e72605db9d74e155e21121472f&quot;;
+    private ModPowFrozenTransfer() {}
+
+    public static void main(String[] args) throws IOException {
+<span class="pc bpc" id="L43" title="3 of 8 branches missed.">        require(args.length == 3 &amp;&amp; args[0].equals(&quot;train&quot;) || args.length == 5 &amp;&amp; args[0].equals(&quot;test&quot;),</span>
+            &quot;usage: train TRAIN.json model.json | test model.json SHA256 TEST.json result.json&quot;);
+<span class="fc" id="L45">        Path destination = Path.of(args[args.length - 1]);</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (Files.exists(destination)) throw new FileAlreadyExistsException(destination.toString());</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        ObjectNode result = args[0].equals(&quot;train&quot;) ? train(Path.of(args[1]), TRAIN_SHA256)</span>
+<span class="fc" id="L48">            : evaluate(Path.of(args[1]), args[2], Path.of(args[3]), TEST_SHA256);</span>
+<span class="fc" id="L49">        Files.write(destination, JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(result),</span>
+            StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+<span class="fc" id="L51">    }</span>
+
+    /** Development-fixture helper; official v1 execution goes through main. */
+    static ObjectNode train(Path corpus) throws IOException {
+<span class="fc" id="L55">        return train(corpus, null);</span>
+    }
+
+    private static ObjectNode train(Path corpus, String expectedCorpusHash) throws IOException {
+<span class="fc" id="L59">        byte[] bytes = readCorpus(corpus, expectedCorpusHash, &quot;TRAIN&quot;);</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        var rows = rows(bytes, &quot;TRAIN&quot;); require(rows.size() == 2, &quot;v1 fixes exactly two TRAIN observations&quot;);</span>
+<span class="fc" id="L61">        var examples = new ArrayList&lt;TypedPatternGeneralizer.Example&gt;();</span>
+<span class="fc" id="L62">        var model = JSON.createObjectNode().put(&quot;schema&quot;, MODEL_SCHEMA).put(&quot;trainSha256&quot;, hash(bytes));</span>
+<span class="fc" id="L63">        var witnesses = model.putArray(&quot;witnesses&quot;); int shuffled = 0;</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (var row : rows) {</span>
+<span class="fc" id="L65">            Baseline run = baseline(row);</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            require(run.approved().size() == 2, &quot;TRAIN primitive replay did not approve both alternatives&quot;);</span>
+<span class="fc" id="L67">            Expr best = best(row, run.approved());</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">            require(cost(row, best).dag() &lt; cost(row, row.source()).dag(), &quot;TRAIN has no target-blind saving&quot;);</span>
+<span class="fc" id="L69">            examples.add(new TypedPatternGeneralizer.Example(row.source(), best, row.assumptions()));</span>
+<span class="fc" id="L70">            var witness = witnesses.addObject().put(&quot;id&quot;, row.id())</span>
+<span class="fc" id="L71">                .put(&quot;sourceAst&quot;, CODEC.encodeExpression(row.source())).put(&quot;selectedAst&quot;, CODEC.encodeExpression(best))</span>
+<span class="fc" id="L72">                .put(&quot;sourceDag&quot;, cost(row, row.source()).dag()).put(&quot;selectedDag&quot;, cost(row, best).dag())</span>
+<span class="fc" id="L73">                .put(&quot;primitiveGenerated&quot;, run.generated());</span>
+<span class="fc" id="L74">            witness.set(&quot;assumptions&quot;, JSON.valueToTree(row.assumptions()));</span>
+<span class="fc" id="L75">            witness.put(&quot;primitiveRule&quot;, ModPowCompositionReplay.verify(row.source(), best, row.assumptions()).orElseThrow().primitiveRule());</span>
+<span class="fc" id="L76">            Row broken = shuffled(row); Baseline control = baseline(broken);</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            require(control.approved().size() == 2, &quot;SHUFFLED replay failed&quot;);</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">            if (cost(broken, best(broken, control.approved())).dag() &lt; cost(broken, broken.source()).dag()) shuffled++;</span>
+<span class="fc" id="L79">        }</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        require(shuffled == 0, &quot;relationship-breaking control gained unexpectedly&quot;);</span>
+<span class="fc" id="L81">        var learned = new TypedPatternGeneralizer().generalize(examples).orElseThrow();</span>
+<span class="fc" id="L82">        model.set(&quot;sourceTemplate&quot;, template(learned.source())); model.set(&quot;targetTemplate&quot;, template(learned.target()));</span>
+<span class="fc" id="L83">        model.put(&quot;shuffledWitnessCount&quot;, shuffled);</span>
+        // Decode the exact format as an untrusted syntax proposal before recording the artifact.
+<span class="fc" id="L85">        new TypedOutputPattern(candidate(model));</span>
+<span class="fc" id="L86">        return model;</span>
+    }
+
+    /** Development-fixture helper; its arbitrary corpora do not qualify as the frozen study. */
+    static ObjectNode evaluate(Path frozen, String expectedHash, Path test) throws IOException {
+<span class="fc" id="L91">        return evaluate(frozen, expectedHash, test, null);</span>
+    }
+
+    private static ObjectNode evaluate(Path frozen, String expectedHash, Path test,
+            String expectedCorpusHash) throws IOException {
+<span class="fc" id="L96">        byte[] bytes = read(frozen);</span>
+<span class="pc bpc" id="L97" title="2 of 6 branches missed.">        require(expectedHash != null &amp;&amp; expectedHash.matches(&quot;[0-9a-f]{64}&quot;) &amp;&amp; hash(bytes).equals(expectedHash),</span>
+            &quot;frozen model checksum mismatch&quot;); // Must precede all TEST access.
+<span class="fc" id="L99">        ObjectNode model = (ObjectNode) JSON.readTree(bytes);</span>
+<span class="fc" id="L100">        var learned = new TypedOutputPattern(candidate(model));</span>
+<span class="fc" id="L101">        byte[] testBytes = readCorpus(test, expectedCorpusHash, &quot;TEST&quot;); var rows = rows(testBytes, &quot;TEST&quot;);</span>
+<span class="fc" id="L102">        var report = JSON.createObjectNode().put(&quot;schema&quot;, &quot;regelsuche.modpow-transfer-result/v1&quot;)</span>
+<span class="fc" id="L103">            .put(&quot;modelSha256&quot;, expectedHash).put(&quot;testSha256&quot;, hash(testBytes));</span>
+<span class="fc" id="L104">        var results = report.putArray(&quot;cases&quot;); int positives = 0, transferred = 0; boolean controls = true;</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        for (Row row : rows) {</span>
+<span class="fc" id="L106">            Baseline baseline = baseline(row); Expr primitiveBest = best(row, baseline.approved());</span>
+<span class="fc" id="L107">            var proposals = learned.find(row.source(), TypedOutputPattern.MAXIMUM_ASSIGNMENTS);</span>
+<span class="fc" id="L108">            var checked = new ArrayList&lt;Expr&gt;(); boolean unchanged = true;</span>
+<span class="fc" id="L109">            var result = results.addObject().put(&quot;id&quot;, row.id()).put(&quot;positive&quot;, row.positive())</span>
+<span class="fc" id="L110">                .put(&quot;sourceAst&quot;, CODEC.encodeExpression(row.source()));</span>
+<span class="fc" id="L111">            var receipts = result.putArray(&quot;checkedApplications&quot;);</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            for (var proposal : proposals.applications()) {</span>
+<span class="fc" id="L113">                var replay = ModPowCompositionReplay.verify(row.source(), proposal.target(), row.assumptions());</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">                if (replay.isEmpty()) continue;</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                for (int i = 0; i &lt; row.source().arguments().size(); i++) {</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">                    if (!proposal.positions().contains(i)</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">                            &amp;&amp; row.source().arguments().get(i) != proposal.target().arguments().get(i)) unchanged = false;</span>
+                }
+<span class="fc" id="L119">                checked.add(proposal.target());</span>
+<span class="fc" id="L120">                var receipt = receipts.addObject().put(&quot;targetAst&quot;, CODEC.encodeExpression(proposal.target()))</span>
+<span class="fc" id="L121">                    .put(&quot;primitiveRule&quot;, replay.orElseThrow().primitiveRule());</span>
+<span class="fc" id="L122">                receipt.set(&quot;assumptions&quot;, JSON.valueToTree(replay.orElseThrow().assumptions()));</span>
+<span class="fc" id="L123">                receipt.set(&quot;positions&quot;, JSON.valueToTree(proposal.positions()));</span>
+<span class="fc" id="L124">            }</span>
+<span class="fc" id="L125">            Expr selected = best(row, checked);</span>
+<span class="fc" id="L126">            long original = cost(row, row.source()).dag(), primitiveCost = cost(row, primitiveBest).dag(), selectedCost = cost(row, selected).dag();</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            boolean parity = selectedCost == primitiveCost;</span>
+<span class="pc bpc" id="L128" title="4 of 10 branches missed.">            boolean success = proposals.complete() &amp;&amp; !checked.isEmpty() &amp;&amp; selectedCost &lt; original &amp;&amp; parity &amp;&amp; unchanged;</span>
+<span class="fc bfc" id="L129" title="All 4 branches covered.">            if (row.positive()) { positives++; if (success) transferred++; }</span>
+<span class="pc bpc" id="L130" title="3 of 6 branches missed.">            else controls &amp;= proposals.complete() &amp;&amp; checked.isEmpty() &amp;&amp; selectedCost == original;</span>
+<span class="fc" id="L131">            result.put(&quot;sourceDag&quot;, original).put(&quot;primitiveOptimumDag&quot;, primitiveCost).put(&quot;learnedDag&quot;, selectedCost)</span>
+<span class="fc" id="L132">                .put(&quot;sourceTree&quot;, cost(row, row.source()).tree()).put(&quot;learnedTree&quot;, cost(row, selected).tree())</span>
+<span class="fc" id="L133">                .put(&quot;primitiveOptimumParity&quot;, parity).put(&quot;transferSucceeded&quot;, success)</span>
+<span class="fc" id="L134">                .put(&quot;primitiveGenerated&quot;, baseline.generated()).put(&quot;primitiveApproved&quot;, baseline.approved().size())</span>
+<span class="fc" id="L135">                .put(&quot;learnedProposed&quot;, proposals.applications().size()).put(&quot;learnedApproved&quot;, checked.size())</span>
+<span class="fc" id="L136">                .put(&quot;assignmentAttempts&quot;, proposals.assignmentAttempts()).put(&quot;matcherSteps&quot;, proposals.matcherSteps())</span>
+<span class="fc" id="L137">                .put(&quot;proposalEnumerationComplete&quot;, proposals.complete()).put(&quot;untouchedOutputsPreserved&quot;, unchanged)</span>
+<span class="fc" id="L138">                .put(&quot;selectedAst&quot;, CODEC.encodeExpression(selected));</span>
+<span class="fc" id="L139">        }</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        require(positives &gt; 0, &quot;no positive TEST cases&quot;);</span>
+<span class="pc bpc" id="L141" title="1 of 6 branches missed.">        String verdict = !controls || transferred == 0 ? &quot;RED&quot; : transferred == positives ? &quot;GREEN&quot; : &quot;YELLOW&quot;;</span>
+<span class="fc" id="L142">        report.put(&quot;positiveCases&quot;, positives).put(&quot;positiveTransfers&quot;, transferred).put(&quot;controlsClean&quot;, controls).put(&quot;verdict&quot;, verdict);</span>
+<span class="fc" id="L143">        report.put(&quot;scope&quot;, &quot;Structural transfer only; no runtime or fixed-budget speed claim. NO_LEARNING is the complete one-step primitive optimum.&quot;);</span>
+<span class="fc" id="L144">        return report;</span>
+    }
+
+    /** Hash and parse the same bounded byte array: there is no second, unchecked file read. */
+    private static byte[] readCorpus(Path corpus, String expectedHash, String split) throws IOException {
+<span class="fc" id="L149">        byte[] bytes = read(corpus);</span>
+<span class="fc bfc" id="L150" title="All 4 branches covered.">        require(expectedHash == null || hash(bytes).equals(expectedHash), split + &quot; corpus checksum mismatch&quot;);</span>
+<span class="fc" id="L151">        return bytes;</span>
+    }
+
+<span class="fc" id="L154">    private record Baseline(int generated, List&lt;Expr&gt; approved) {}</span>
+
+    private static Baseline baseline(Row row) {
+        // This preflight also bounds role-renaming/cost recursion independently of matching.
+<span class="fc" id="L158">        requireBounded(row.source());</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        require(productSites(row.source()) == 1, &quot;v1 requires exactly one product-exponent site&quot;);</span>
+<span class="fc" id="L160">        PatternExpr a = PatternExpr.var(&quot;A&quot;), u = PatternExpr.var(&quot;U&quot;), v = PatternExpr.var(&quot;V&quot;), n = PatternExpr.var(&quot;N&quot;);</span>
+<span class="fc" id="L161">        PatternExpr source = PatternExpr.fn(&quot;modpow&quot;, a, PatternExpr.op(BinaryOperator.MUL, u, v), n);</span>
+<span class="fc" id="L162">        var rules = List.&lt;de.regelsuche.transform.RewriteRule&gt;of(</span>
+            new PatternRewriteRule(ModPowDagRediscoveryStudy.RULE_LEFT, source,
+<span class="fc" id="L164">                PatternExpr.fn(&quot;modpow&quot;, PatternExpr.fn(&quot;modpow&quot;, a, u, n), v, n), RewriteKind.NORMALIZE, true, 0, false),</span>
+            new PatternRewriteRule(ModPowDagRediscoveryStudy.RULE_RIGHT, source,
+<span class="fc" id="L166">                PatternExpr.fn(&quot;modpow&quot;, PatternExpr.fn(&quot;modpow&quot;, a, v, n), u, n), RewriteKind.NORMALIZE, true, 0, false));</span>
+<span class="fc" id="L167">        var steps = new AstRewriteTransport(rules, 1024, 4096).generate(row.source());</span>
+<span class="pc bpc" id="L168" title="2 of 4 branches missed.">        require(steps.size() == 2 &amp;&amp; steps.stream().map(AstRewriteTransport.Step::rule).distinct().count() == 2,</span>
+            &quot;primitive enumeration did not expose both factor orders; no completeness claim&quot;);
+<span class="fc" id="L170">        var approved = new ArrayList&lt;Expr&gt;();</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        for (var step : steps) {</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">            if (ModPowCompositionReplay.verify(row.source(), step.target(), row.assumptions()).isPresent()) approved.add(step.target());</span>
+<span class="fc" id="L173">        }</span>
+<span class="fc" id="L174">        return new Baseline(steps.size(), List.copyOf(approved));</span>
+    }
+
+    private static Expr best(Row row, List&lt;Expr&gt; alternatives) {
+<span class="fc" id="L178">        var candidates = new ArrayList&lt;Expr&gt;(); candidates.add(row.source()); candidates.addAll(alternatives);</span>
+<span class="fc" id="L179">        return candidates.stream().min(Comparator.comparingLong((Expr e) -&gt; cost(row, e).dag())</span>
+<span class="fc" id="L180">            .thenComparingLong(e -&gt; cost(row, e).tree()).thenComparing(CODEC::encodeExpression)).orElseThrow();</span>
+    }
+
+    private static ModPowDagRediscoveryStudy.ProgramCost cost(Row row, Expr program) {
+<span class="fc" id="L184">        var names = new HashMap&lt;String, String&gt;(); row.roles().forEach((role, name) -&gt; names.put(name, role));</span>
+<span class="fc" id="L185">        return ModPowDagRediscoveryStudy.cost(rename(program, names),</span>
+<span class="fc" id="L186">            new ModPowDagRediscoveryStudy.BitProfile(row.id(), row.qBits(), row.eBits(), row.rBits()));</span>
+    }
+
+    private static Expr rename(Expr expression, Map&lt;String, String&gt; names) {
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        if (expression instanceof VariableExpr v) {</span>
+<span class="fc" id="L191">            require(names.containsKey(v.name()), &quot;undeclared program variable&quot;); return new VariableExpr(names.get(v.name()));</span>
+        }
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        if (expression instanceof BinaryExpr b) return new BinaryExpr(rename(b.left(), names), b.operator(), rename(b.right(), names));</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (expression instanceof FunctionExpr f) return new FunctionExpr(f.name(), f.arguments().stream().map(e -&gt; rename(e, names)).toList());</span>
+<span class="fc" id="L195">        return expression;</span>
+    }
+
+    private static Row shuffled(Row row) {
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">        require(row.source().arguments().size() == 2, &quot;TRAIN must have two outputs&quot;);</span>
+<span class="fc" id="L200">        var outputs = new ArrayList&lt;&gt;(row.source().arguments());</span>
+<span class="fc" id="L201">        require(outputs.get(1) instanceof FunctionExpr, &quot;TRAIN retained residue required&quot;);</span>
+<span class="fc" id="L202">        FunctionExpr residue = (FunctionExpr) outputs.get(1);</span>
+<span class="pc bpc" id="L203" title="2 of 4 branches missed.">        require(residue.name().equals(&quot;modpow&quot;) &amp;&amp; residue.arguments().size() == 3, &quot;TRAIN retained residue required&quot;);</span>
+<span class="fc" id="L204">        var arguments = new ArrayList&lt;&gt;(residue.arguments()); arguments.set(1, new VariableExpr(row.roles().get(&quot;r&quot;)));</span>
+<span class="fc" id="L205">        outputs.set(1, new FunctionExpr(residue.name(), arguments));</span>
+<span class="fc" id="L206">        return row.withSource(new FunctionExpr(row.source().name(), outputs));</span>
+    }
+
+    private static int productSites(Expr expression) {
+<span class="pc bpc" id="L210" title="1 of 4 branches missed.">        int count = expression instanceof FunctionExpr f &amp;&amp; f.name().equals(&quot;modpow&quot;) &amp;&amp; f.arguments().size() == 3</span>
+<span class="pc bpc" id="L211" title="1 of 6 branches missed.">            &amp;&amp; f.arguments().get(1) instanceof BinaryExpr b &amp;&amp; b.operator() == BinaryOperator.MUL ? 1 : 0;</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (expression instanceof BinaryExpr b) count += productSites(b.left()) + productSites(b.right());</span>
+<span class="fc bfc" id="L213" title="All 4 branches covered.">        if (expression instanceof FunctionExpr f) for (Expr arg : f.arguments()) count += productSites(arg);</span>
+<span class="fc" id="L214">        return count;</span>
+    }
+
+<span class="fc" id="L217">    private record Pending(Expr node, int depth) {}</span>
+    private static void requireBounded(Expr expression) {
+<span class="fc" id="L219">        var pending = new java.util.ArrayDeque&lt;Pending&gt;(); pending.push(new Pending(expression, 0)); int nodes = 0;</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="pc bpc" id="L221" title="2 of 4 branches missed.">            var current = pending.pop(); require(++nodes &lt;= 512 &amp;&amp; current.depth() &lt;= 48, &quot;v1 program structural bound exceeded&quot;);</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">            if (current.node() instanceof BinaryExpr b) {</span>
+<span class="fc" id="L223">                pending.push(new Pending(b.left(), current.depth() + 1)); pending.push(new Pending(b.right(), current.depth() + 1));</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">            } else if (current.node() instanceof FunctionExpr f) {</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">                require(f.arguments().size() &lt;= 512 - nodes, &quot;v1 program arity bound exceeded&quot;);</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">                for (Expr arg : f.arguments()) pending.push(new Pending(arg, current.depth() + 1));</span>
+            }
+<span class="fc" id="L228">        }</span>
+<span class="fc" id="L229">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

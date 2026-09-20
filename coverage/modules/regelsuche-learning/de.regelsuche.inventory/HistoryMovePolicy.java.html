@@ -16,41 +16,68 @@ public final class HistoryMovePolicy implements MovePriorityPolicy {
             double branching, double failure, double verification) {}
     private final RuleHistoryMemory.Snapshot history;
     private final Weights weights;
+    private final boolean typed;
     // A read-through source-feature cache, never a learning update. Recreate the policy for each run.
-<span class="fc" id="L20">    private final java.util.Map&lt;MoveState, StructuralMoveContext&gt; contexts = new java.util.HashMap&lt;&gt;();</span>
-<span class="fc" id="L21">    public HistoryMovePolicy(RuleHistoryMemory.Snapshot history, Weights weights) { this.history = history; this.weights = weights; }</span>
-<span class="nc" id="L22">    public RuleHistoryMemory.Snapshot history() { return history; }</span>
-<span class="nc" id="L23">    public Weights weights() { return weights; }</span>
-<span class="fc" id="L24">    private StructuralMoveContext context(MoveState state) { return contexts.computeIfAbsent(state, StructuralMoveContext::of); }</span>
-<span class="fc" id="L25">    @Override public long contextWork(MoveState state, MoveContext context) { return 2L * context(state).visitedNodes(); }</span>
+<span class="fc" id="L21">    private final java.util.Map&lt;MoveState, StructuralMoveContext&gt; contexts = new java.util.HashMap&lt;&gt;();</span>
+<span class="fc" id="L22">    public HistoryMovePolicy(RuleHistoryMemory.Snapshot history, Weights weights) { this(history, weights, false); }</span>
+<span class="fc" id="L23">    private HistoryMovePolicy(RuleHistoryMemory.Snapshot history, Weights weights, boolean typed) {</span>
+<span class="fc" id="L24">        this.history = java.util.Objects.requireNonNull(history);</span>
+<span class="fc" id="L25">        this.weights = java.util.Objects.requireNonNull(weights);</span>
+<span class="fc" id="L26">        this.typed = typed;</span>
+<span class="fc" id="L27">    }</span>
+    /** Fresh read-through cache for one typed run; the TRAIN snapshot is immutable. */
+    public static TypedMoveSearch.TypedPolicy typed(RuleHistoryMemory.Snapshot history, Weights weights) {
+<span class="fc" id="L30">        var policy = new HistoryMovePolicy(history, weights, true);</span>
+<span class="fc" id="L31">        return new TypedMoveSearch.TypedPolicy() {</span>
+            @Override public double score(SearchMove move, MoveState state, MoveContext context) {
+<span class="fc" id="L33">                return policy.score(move, state, context);</span>
+            }
+            @Override public double providerScore(MoveProvider.Descriptor provider, MoveState state, MoveContext context) {
+<span class="fc" id="L36">                return policy.providerScore(provider, state, context);</span>
+            }
+            @Override public Stage stage(MoveProvider.Descriptor provider, MoveState state, MoveContext context) {
+<span class="fc" id="L39">                return policy.stage(provider, state, context);</span>
+            }
+            @Override public long contextWork(MoveState state, MoveContext context) {
+<span class="fc" id="L42">                return policy.contextWork(state, context);</span>
+            }
+        };
+    }
+<span class="nc" id="L46">    public RuleHistoryMemory.Snapshot history() { return history; }</span>
+<span class="nc" id="L47">    public Weights weights() { return weights; }</span>
+    private StructuralMoveContext context(MoveState state) {
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        return contexts.computeIfAbsent(state, typed ? StructuralMoveContext::fromTyped : StructuralMoveContext::of);</span>
+    }
+<span class="fc bfc" id="L51" title="All 2 branches covered.">    private String contextKey(MoveState state) { return typed ? context(state).typedKey() : context(state).key(); }</span>
+<span class="fc" id="L52">    @Override public long contextWork(MoveState state, MoveContext context) { return 2L * context(state).visitedNodes(); }</span>
     public Features features(SearchMove move, MoveState state, MoveContext context) {
-<span class="fc" id="L27">        String key = context(state).key(); var family = history.family(key, move.ruleFamily());</span>
-<span class="fc" id="L28">        var continuation = history.continuation(key, state.previousRule(), move.ruleId());</span>
-<span class="fc bfc" id="L29" title="All 2 branches covered.">        double verification = family.applications() == 0 ? move.applicationCost() : (double) family.verificationWork() / family.applications();</span>
-<span class="fc" id="L30">        return new Features(move.valueEvidence().knownDepthCompression() * move.valueEvidence().confidence(),</span>
-<span class="fc" id="L31">            family.successValue() + continuation.successValue() + Math.log1p(family.averageWorkSaved()), move.capabilityDelta().size(),</span>
-<span class="fc bfc" id="L32" title="All 2 branches covered.">            move.transformation().transformedExpression().equals(context.goal()) ? 1 : 0,</span>
-<span class="pc bpc" id="L33" title="2 of 4 branches missed.">            move.proofStrength() == SearchMove.ProofStrength.VERIFIED ? 2 : move.proofStrength() == SearchMove.ProofStrength.REPLAYABLE ? 1 : 0,</span>
-<span class="fc" id="L34">            Math.log1p(move.generationCost()) + family.duplicateRate(), family.failureRate(), verification);</span>
+<span class="fc" id="L54">        String key = contextKey(state); var family = history.family(key, move.ruleFamily());</span>
+<span class="fc" id="L55">        var continuation = history.continuation(key, state.previousRule(), move.ruleId());</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        double verification = family.applications() == 0 ? move.applicationCost() : (double) family.verificationWork() / family.applications();</span>
+<span class="fc" id="L57">        return new Features(move.valueEvidence().knownDepthCompression() * move.valueEvidence().confidence(),</span>
+<span class="fc" id="L58">            family.successValue() + continuation.successValue() + Math.log1p(family.averageWorkSaved()), move.capabilityDelta().size(),</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            move.transformation().transformedExpression().equals(context.goal()) ? 1 : 0,</span>
+<span class="pc bpc" id="L60" title="2 of 4 branches missed.">            move.proofStrength() == SearchMove.ProofStrength.VERIFIED ? 2 : move.proofStrength() == SearchMove.ProofStrength.REPLAYABLE ? 1 : 0,</span>
+<span class="fc" id="L61">            Math.log1p(move.generationCost()) + family.duplicateRate(), family.failureRate(), verification);</span>
     }
     @Override public double score(SearchMove move, MoveState state, MoveContext context) {
-<span class="fc" id="L37">        var f = features(move, state, context);</span>
-<span class="fc" id="L38">        return weights.compression() * f.compression() + weights.history() * f.history() + weights.capability() * f.capability()</span>
-<span class="fc" id="L39">            + weights.goal() * f.goal() + weights.proof() * f.proof() - weights.branching() * f.branching()</span>
-<span class="fc" id="L40">            - weights.failure() * f.failure() - weights.verification() * f.verification();</span>
+<span class="fc" id="L64">        var f = features(move, state, context);</span>
+<span class="fc" id="L65">        return weights.compression() * f.compression() + weights.history() * f.history() + weights.capability() * f.capability()</span>
+<span class="fc" id="L66">            + weights.goal() * f.goal() + weights.proof() * f.proof() - weights.branching() * f.branching()</span>
+<span class="fc" id="L67">            - weights.failure() * f.failure() - weights.verification() * f.verification();</span>
     }
     @Override public double providerScore(MoveProvider.Descriptor provider, MoveState state, MoveContext ignored) {
-<span class="fc" id="L43">        String key = context(state).key(); var family = history.family(key, provider.ruleFamily());</span>
-<span class="fc" id="L44">        return weights.compression() * provider.valueEvidence().knownDepthCompression() * provider.valueEvidence().confidence()</span>
-<span class="fc" id="L45">            + weights.history() * (family.successValue() + history.continuation(key, state.previousRule(), provider.id()).successValue())</span>
-<span class="fc" id="L46">            - weights.branching() * family.duplicateRate() - weights.failure() * family.failureRate();</span>
+<span class="fc" id="L70">        String key = contextKey(state); var family = history.family(key, provider.ruleFamily());</span>
+<span class="fc" id="L71">        return weights.compression() * provider.valueEvidence().knownDepthCompression() * provider.valueEvidence().confidence()</span>
+<span class="fc" id="L72">            + weights.history() * (family.successValue() + history.continuation(key, state.previousRule(), provider.id()).successValue())</span>
+<span class="fc" id="L73">            - weights.branching() * family.duplicateRate() - weights.failure() * family.failureRate();</span>
     }
     @Override public Stage stage(MoveProvider.Descriptor provider, MoveState state, MoveContext context) {
         // Expensive/bridge lanes do not become cheap simply because they were useful before.
-<span class="fc" id="L50">        var ordinary = MovePriorityPolicy.super.stage(provider, state, context);</span>
-<span class="pc bpc" id="L51" title="1 of 4 branches missed.">        if (ordinary == Stage.EXPENSIVE || ordinary == Stage.EXPLORATION) return ordinary;</span>
-<span class="fc" id="L52">        var continuation = history.continuation(context(state).key(), state.previousRule(), provider.id());</span>
-<span class="pc bpc" id="L53" title="1 of 4 branches missed.">        return continuation.success() &gt;= 2 &amp;&amp; continuation.failure() == 0 ? Stage.PRINCIPAL_HISTORY : ordinary;</span>
+<span class="fc" id="L77">        var ordinary = MovePriorityPolicy.super.stage(provider, state, context);</span>
+<span class="pc bpc" id="L78" title="1 of 4 branches missed.">        if (ordinary == Stage.EXPENSIVE || ordinary == Stage.EXPLORATION) return ordinary;</span>
+<span class="fc" id="L79">        var continuation = history.continuation(contextKey(state), state.previousRule(), provider.id());</span>
+<span class="pc bpc" id="L80" title="1 of 4 branches missed.">        return continuation.success() &gt;= 2 &amp;&amp; continuation.failure() == 0 ? Stage.PRINCIPAL_HISTORY : ordinary;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ModPowTransferFiles.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">ModPowTransferFiles.java</span></div><h1>ModPowTransferFiles.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.StreamReadConstraints;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.mining.TypedPatternGeneralizer;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.PatternExpr;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/** Small bounded research wire format; decoding never authorizes an arithmetic rule. */
+final class ModPowTransferFiles {
+    static final int MAX_BYTES = 1_048_576;
+    static final String CORPUS_SCHEMA = &quot;regelsuche.modpow-transfer-corpus/v1&quot;;
+    static final String MODEL_SCHEMA = &quot;regelsuche.modpow-transfer-model/v1&quot;;
+<span class="fc" id="L34">    static final ObjectMapper JSON = new ObjectMapper(JsonFactory.builder()</span>
+<span class="fc" id="L35">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L36">        .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(150)</span>
+<span class="fc" id="L37">            .maxStringLength(16_384).maxNumberLength(32).build()).build())</span>
+<span class="fc" id="L38">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+
+    record Row(String id, FunctionExpr source, Map&lt;String, String&gt; roles,
+            int qBits, int eBits, int rBits, boolean positive, List&lt;String&gt; assumptions) {
+<span class="fc" id="L42">        Row { roles = Map.copyOf(roles); assumptions = List.copyOf(assumptions); }</span>
+        Row withSource(FunctionExpr replacement) {
+<span class="fc" id="L44">            return new Row(id, replacement, roles, qBits, eBits, rBits, positive, assumptions);</span>
+        }
+    }
+
+    private ModPowTransferFiles() {}
+
+    static byte[] read(Path file) throws IOException {
+<span class="fc" id="L51">        try (var input = Files.newInputStream(file)) {</span>
+<span class="fc" id="L52">            byte[] bytes = input.readNBytes(MAX_BYTES + 1);</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">            require(bytes.length &lt;= MAX_BYTES, &quot;research input too large&quot;);</span>
+<span class="fc" id="L54">            return bytes;</span>
+        }
+    }
+
+    static String hash(byte[] bytes) {
+<span class="fc" id="L59">        try { return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes)); }</span>
+<span class="nc" id="L60">        catch (NoSuchAlgorithmException exception) { throw new IllegalStateException(exception); }</span>
+    }
+
+    static List&lt;Row&gt; rows(byte[] bytes, String split) throws IOException {
+<span class="fc" id="L64">        JsonNode root = JSON.readTree(bytes);</span>
+<span class="fc" id="L65">        fields(root, Set.of(&quot;schema&quot;, &quot;split&quot;, &quot;cases&quot;));</span>
+<span class="pc bpc" id="L66" title="2 of 4 branches missed.">        require(CORPUS_SCHEMA.equals(text(root, &quot;schema&quot;)) &amp;&amp; split.equals(text(root, &quot;split&quot;)), &quot;wrong corpus split/schema&quot;);</span>
+<span class="fc" id="L67">        JsonNode cases = root.get(&quot;cases&quot;);</span>
+<span class="pc bpc" id="L68" title="3 of 6 branches missed.">        require(cases.isArray() &amp;&amp; cases.size() &gt;= 1 &amp;&amp; cases.size() &lt;= 32, &quot;require 1 through 32 cases&quot;);</span>
+<span class="fc" id="L69">        var result = new ArrayList&lt;Row&gt;(); var ids = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (var row : cases) {</span>
+<span class="fc" id="L71">            fields(row, Set.of(&quot;id&quot;, &quot;source&quot;, &quot;roles&quot;, &quot;qBits&quot;, &quot;eBits&quot;, &quot;rBits&quot;, &quot;positive&quot;, &quot;assumptions&quot;));</span>
+<span class="fc" id="L72">            String id = text(row, &quot;id&quot;);</span>
+<span class="pc bpc" id="L73" title="2 of 4 branches missed.">            require(id.length() &lt;= 64 &amp;&amp; ids.add(id), &quot;duplicate/oversized case id&quot;);</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">            String source = text(row, &quot;source&quot;); require(source.length() &lt;= 4096, &quot;source too long&quot;);</span>
+<span class="fc" id="L75">            fields(row.get(&quot;roles&quot;), Set.of(&quot;a&quot;, &quot;q&quot;, &quot;e&quot;, &quot;n&quot;, &quot;r&quot;));</span>
+<span class="fc" id="L76">            var roles = new LinkedHashMap&lt;String, String&gt;();</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            for (String role : List.of(&quot;a&quot;, &quot;q&quot;, &quot;e&quot;, &quot;n&quot;, &quot;r&quot;)) {</span>
+<span class="fc" id="L78">                String name = text(row.get(&quot;roles&quot;), role);</span>
+<span class="fc" id="L79">                require(name.matches(&quot;[a-zA-Z][a-zA-Z0-9_]*&quot;), &quot;simple named role required&quot;); roles.put(role, name);</span>
+<span class="fc" id="L80">            }</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">            require(new HashSet&lt;&gt;(roles.values()).size() == roles.size(), &quot;role renaming must be injective&quot;);</span>
+<span class="fc" id="L82">            Expr parsed = new ExpressionParser().parseTerm(source);</span>
+<span class="fc" id="L83">            require(parsed instanceof FunctionExpr, &quot;output program required&quot;);</span>
+<span class="fc" id="L84">            FunctionExpr program = (FunctionExpr) parsed;</span>
+<span class="pc bpc" id="L85" title="3 of 6 branches missed.">            require(program.name().equals(&quot;program&quot;) &amp;&amp; program.arguments().size() &gt;= 2 &amp;&amp; program.arguments().size() &lt;= 8,</span>
+                &quot;require 2 through 8 ordered program outputs&quot;);
+<span class="fc" id="L87">            require(row.get(&quot;positive&quot;).isBoolean(), &quot;boolean classification required&quot;);</span>
+<span class="pc bpc" id="L88" title="2 of 4 branches missed.">            require(row.get(&quot;assumptions&quot;).isArray() &amp;&amp; row.get(&quot;assumptions&quot;).size() &lt;= 32, &quot;bounded assumptions required&quot;);</span>
+<span class="fc" id="L89">            var assumptions = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            for (var assumption : row.get(&quot;assumptions&quot;)) {</span>
+<span class="pc bpc" id="L91" title="2 of 4 branches missed.">                require(assumption.isTextual() &amp;&amp; assumption.textValue().length() &lt;= 256, &quot;textual assumption required&quot;);</span>
+<span class="fc" id="L92">                assumptions.add(assumption.textValue());</span>
+<span class="fc" id="L93">            }</span>
+<span class="fc" id="L94">            result.add(new Row(id, program, roles, bits(row, &quot;qBits&quot;), bits(row, &quot;eBits&quot;), bits(row, &quot;rBits&quot;),</span>
+<span class="fc" id="L95">                row.get(&quot;positive&quot;).booleanValue(), assumptions));</span>
+<span class="fc" id="L96">        }</span>
+<span class="fc" id="L97">        return List.copyOf(result);</span>
+    }
+
+    static ObjectNode template(PatternExpr pattern) {
+<span class="fc" id="L101">        var node = JSON.createObjectNode();</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Placeholder hole) return node.put(&quot;kind&quot;, &quot;hole&quot;).put(&quot;name&quot;, hole.name());</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (pattern instanceof PatternExpr.LiteralNumber number) return node.put(&quot;kind&quot;, &quot;number&quot;).put(&quot;value&quot;, number.value().canonicalText());</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Operation op) {</span>
+<span class="fc" id="L105">            node.put(&quot;kind&quot;, &quot;operation&quot;).put(&quot;operator&quot;, op.operator().name());</span>
+<span class="fc" id="L106">            node.set(&quot;left&quot;, template(op.left())); node.set(&quot;right&quot;, template(op.right())); return node;</span>
+        }
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (pattern instanceof PatternExpr.Function function) {</span>
+<span class="fc" id="L109">            node.put(&quot;kind&quot;, &quot;function&quot;).put(&quot;name&quot;, function.name());</span>
+<span class="fc" id="L110">            var arguments = node.putArray(&quot;arguments&quot;); function.arguments().forEach(arg -&gt; arguments.add(template(arg))); return node;</span>
+        }
+<span class="nc" id="L112">        throw new IllegalArgumentException(&quot;unexpected literal variable in typed hypothesis&quot;);</span>
+    }
+
+    static TypedPatternGeneralizer.Candidate candidate(JsonNode model) {
+<span class="fc" id="L116">        fields(model, Set.of(&quot;schema&quot;, &quot;trainSha256&quot;, &quot;sourceTemplate&quot;, &quot;targetTemplate&quot;, &quot;witnesses&quot;, &quot;shuffledWitnessCount&quot;));</span>
+<span class="fc" id="L117">        require(MODEL_SCHEMA.equals(text(model, &quot;schema&quot;)), &quot;wrong model schema&quot;);</span>
+<span class="fc" id="L118">        require(text(model, &quot;trainSha256&quot;).matches(&quot;[0-9a-f]{64}&quot;), &quot;invalid training digest&quot;);</span>
+<span class="pc bpc" id="L119" title="2 of 4 branches missed.">        require(model.get(&quot;witnesses&quot;).isArray() &amp;&amp; model.get(&quot;witnesses&quot;).size() == 2, &quot;exactly two retained witnesses required&quot;);</span>
+<span class="pc bpc" id="L120" title="2 of 4 branches missed.">        require(model.get(&quot;shuffledWitnessCount&quot;).isIntegralNumber() &amp;&amp; model.get(&quot;shuffledWitnessCount&quot;).intValue() == 0,</span>
+            &quot;shuffled control not clean&quot;);
+        // Observations remain in the wire artifact. This syntax-only candidate has no proof authority.
+<span class="fc" id="L123">        return new TypedPatternGeneralizer.Candidate(pattern(model.get(&quot;sourceTemplate&quot;), 0, new int[1]),</span>
+<span class="fc" id="L124">            pattern(model.get(&quot;targetTemplate&quot;), 0, new int[1]), List.of(), List.of());</span>
+    }
+
+    private static PatternExpr pattern(JsonNode node, int depth, int[] count) {
+<span class="pc bpc" id="L128" title="2 of 4 branches missed.">        require(depth &lt;= 64 &amp;&amp; ++count[0] &lt;= 1024, &quot;template structural limit&quot;);</span>
+<span class="fc" id="L129">        String kind = text(node, &quot;kind&quot;);</span>
+<span class="pc bpc" id="L130" title="2 of 5 branches missed.">        return switch (kind) {</span>
+            case &quot;hole&quot; -&gt; {
+<span class="fc" id="L132">                fields(node, Set.of(&quot;kind&quot;, &quot;name&quot;)); String name = text(node, &quot;name&quot;);</span>
+<span class="fc" id="L133">                require(name.matches(&quot;P[0-9]{1,4}&quot;), &quot;invalid hole&quot;); yield PatternExpr.var(name);</span>
+            }
+<span class="nc" id="L135">            case &quot;number&quot; -&gt; { fields(node, Set.of(&quot;kind&quot;, &quot;value&quot;)); yield PatternExpr.num(text(node, &quot;value&quot;)); }</span>
+            case &quot;operation&quot; -&gt; {
+<span class="fc" id="L137">                fields(node, Set.of(&quot;kind&quot;, &quot;operator&quot;, &quot;left&quot;, &quot;right&quot;));</span>
+<span class="fc" id="L138">                yield PatternExpr.op(BinaryOperator.valueOf(text(node, &quot;operator&quot;)),</span>
+<span class="fc" id="L139">                    pattern(node.get(&quot;left&quot;), depth + 1, count), pattern(node.get(&quot;right&quot;), depth + 1, count));</span>
+            }
+            case &quot;function&quot; -&gt; {
+<span class="fc" id="L142">                fields(node, Set.of(&quot;kind&quot;, &quot;name&quot;, &quot;arguments&quot;));</span>
+<span class="pc bpc" id="L143" title="2 of 4 branches missed.">                require(node.get(&quot;arguments&quot;).isArray() &amp;&amp; node.get(&quot;arguments&quot;).size() &lt;= 1024, &quot;bounded arguments required&quot;);</span>
+<span class="fc" id="L144">                var arguments = new ArrayList&lt;PatternExpr&gt;();</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">                for (var arg : node.get(&quot;arguments&quot;)) arguments.add(pattern(arg, depth + 1, count));</span>
+<span class="fc" id="L146">                yield new PatternExpr.Function(text(node, &quot;name&quot;), arguments);</span>
+            }
+<span class="nc" id="L148">            default -&gt; throw new IllegalArgumentException(&quot;unknown template kind&quot;);</span>
+        };
+    }
+
+    private static int bits(JsonNode row, String key) {
+<span class="fc" id="L153">        JsonNode node = row.get(key);</span>
+<span class="pc bpc" id="L154" title="4 of 8 branches missed.">        require(node.isIntegralNumber() &amp;&amp; node.canConvertToInt() &amp;&amp; node.intValue() &gt; 0 &amp;&amp; node.intValue() &lt;= 4096, &quot;invalid bit profile&quot;);</span>
+<span class="fc" id="L155">        return node.intValue();</span>
+    }
+    static String text(JsonNode node, String key) {
+<span class="pc bpc" id="L158" title="4 of 8 branches missed.">        require(node != null &amp;&amp; node.isObject() &amp;&amp; node.has(key) &amp;&amp; node.get(key).isTextual()</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">            &amp;&amp; !node.get(key).textValue().isBlank(), &quot;missing text: &quot; + key);</span>
+<span class="fc" id="L160">        return node.get(key).textValue();</span>
+    }
+    static void fields(JsonNode node, Set&lt;String&gt; expected) {
+<span class="pc bpc" id="L163" title="2 of 4 branches missed.">        require(node != null &amp;&amp; node.isObject(), &quot;object required&quot;);</span>
+<span class="fc" id="L164">        var actual = new HashSet&lt;String&gt;(); node.fieldNames().forEachRemaining(actual::add);</span>
+<span class="fc" id="L165">        require(actual.equals(expected), &quot;unexpected/missing fields: &quot; + actual);</span>
+<span class="fc" id="L166">    }</span>
+    static void require(boolean condition, String reason) {
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        if (!condition) throw new IllegalArgumentException(reason);</span>
+<span class="fc" id="L169">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

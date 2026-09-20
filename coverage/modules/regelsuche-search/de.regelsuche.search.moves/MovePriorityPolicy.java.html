@@ -9,7 +9,7 @@ public interface MovePriorityPolicy {
 <span class="pc bpc" id="L9" title="1 of 4 branches missed.">        return switch (provider.sourceKind()) {</span>
 <span class="fc" id="L10">            case PREPARATION, SOLVER -&gt; Stage.EXPENSIVE;</span>
 <span class="nc" id="L11">            case BRIDGE, HYPOTHESIS -&gt; Stage.EXPLORATION;</span>
-<span class="pc bpc" id="L12" title="1 of 2 branches missed.">            case LEARNED -&gt; provider.valueEvidence().confidence() &gt;= 0.75</span>
+<span class="fc bfc" id="L12" title="All 2 branches covered.">            case LEARNED -&gt; provider.valueEvidence().confidence() &gt;= 0.75</span>
 <span class="pc bpc" id="L13" title="1 of 2 branches missed.">                &amp;&amp; provider.valueEvidence().knownDepthCompression() &gt; 0 ? Stage.VALUABLE_LEARNED : Stage.EXPLORATION;</span>
 <span class="fc" id="L14">            case PRIMITIVE, EXPERT -&gt; Stage.NORMAL_PRIMITIVE;</span>
         };

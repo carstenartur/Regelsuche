@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TypedLearningWorkStudy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">TypedLearningWorkStudy.java</span></div><h1>TypedLearningWorkStudy.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import static de.regelsuche.ast.BinaryOperator.*;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.inventory.HistoryMovePolicy;
+import de.regelsuche.inventory.RuleHistoryMemory;
+import de.regelsuche.inventory.TypedPolicySelection;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.moves.*;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import de.regelsuche.symbol.SymbolId;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.UUID;
+
+/** Public development diagnostics; profile selection sees TRAIN only, never these evaluation outcomes. */
+public final class TypedLearningWorkStudy {
+    public static final String REVISION = &quot;regelsuche.typed-learning-work-development/v1&quot;;
+<span class="fc" id="L26">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+<span class="fc" id="L27">    private static final List&lt;Long&gt; WORK_BUDGETS = List.of(50L, 150L, 500L, 2000L);</span>
+    private static final long TRAIN_BUDGET = 10_000;
+<span class="fc" id="L29">    private enum Selection { INVENTORY, DEFAULT, TRAIN_SELECTED }</span>
+<span class="fc" id="L30">    public enum Configuration {</span>
+<span class="fc" id="L31">        PRIMITIVE_INVENTORY(false, Selection.INVENTORY), PRIMITIVE_DEFAULT(false, Selection.DEFAULT),</span>
+<span class="fc" id="L32">        PRIMITIVE_SELECTED(false, Selection.TRAIN_SELECTED), LEARNED_INVENTORY(true, Selection.INVENTORY),</span>
+<span class="fc" id="L33">        LEARNED_DEFAULT(true, Selection.DEFAULT), LEARNED_SELECTED(true, Selection.TRAIN_SELECTED);</span>
+        private final boolean learned;
+        private final Selection selection;
+<span class="fc" id="L36">        Configuration(boolean learned, Selection selection) { this.learned = learned; this.selection = selection; }</span>
+    }
+<span class="fc" id="L38">    private record Case(String id, Expr source, Expr goal) {}</span>
+<span class="fc" id="L39">    public record Row(String caseId, Configuration configuration, long budget, TypedMoveSearch.Result result) {}</span>
+<span class="fc" id="L40">    public record TrainingRun(String id, String source, String goal, TypedMoveSearch.Result result) {}</span>
+    public record Training(TypedPolicySelection.FrozenPolicy policy, List&lt;TrainingRun&gt; historyRuns, long memoryWork) {
+<span class="fc" id="L42">        public Training { historyRuns = List.copyOf(historyRuns); }</span>
+        public long historySearchWork() {
+<span class="fc" id="L44">            return historyRuns.stream().mapToLong(run -&gt; run.result().metrics().totalWork()).reduce(0, Math::addExact);</span>
+        }
+    }
+    public record Report(String protocol, TraceRewriteStrategyLearner.FrozenStrategy formation, long formationWork,
+            Training primitive, Training learned, List&lt;Row&gt; rows) {
+<span class="fc" id="L49">        public Report { rows = List.copyOf(rows); }</span>
+<span class="fc" id="L50">        public String modelJson() { return TypedLearningWorkStudy.modelJson(formation, formationWork, primitive, learned); }</span>
+        public String summaryJson() {
+<span class="fc" id="L52">            return LearnedSchedulingArtifacts.json(Map.of(&quot;schema&quot;, REVISION,</span>
+                &quot;claim&quot;, &quot;PUBLIC_DEVELOPMENT_ONLY;NOT_CPU_OR_GENERAL_SUPERIORITY&quot;,
+<span class="fc" id="L54">                &quot;protocolHash&quot;, SchematicProofPlan.hash(protocol), &quot;modelHash&quot;, SchematicProofPlan.hash(modelJson()),</span>
+<span class="fc" id="L55">                &quot;formationWork&quot;, formationWork, &quot;training&quot;, trainingSummary(primitive, learned),</span>
+<span class="fc" id="L56">                &quot;rows&quot;, rows.stream().map(TypedLearningWorkStudy::rowSummary).toList()));</span>
+        }
+    }
+    private TypedLearningWorkStudy() {}
+
+    public static Report run() {
+<span class="fc" id="L62">        String protocol = protocol();</span>
+<span class="fc" id="L63">        var formation = new TraceRewriteStrategyLearner().learn(TraceStrategyTransferExample.inventory(),</span>
+<span class="fc" id="L64">            TraceStrategyTransferExample.trainingInputs(), TraceStrategyTransferExample.limits());</span>
+<span class="fc" id="L65">        var inventory = formation.typedMoves();</span>
+<span class="fc" id="L66">        var primitive = train(formation, inventory, false);</span>
+<span class="fc" id="L67">        var learned = train(formation, inventory, true);</span>
+<span class="fc" id="L68">        long formationWork = inventory.formationWork();</span>
+<span class="fc" id="L69">        String frozen = modelJson(formation, formationWork, primitive, learned);</span>
+<span class="fc" id="L70">        var rows = new ArrayList&lt;Row&gt;();</span>
+<span class="fc bfc" id="L71" title="All 6 branches covered.">        for (var example : cases()) for (long budget : WORK_BUDGETS) for (var configuration : Configuration.values()) {</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            var training = configuration.learned ? learned : primitive;</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            var policy = configuration.selection == Selection.DEFAULT</span>
+<span class="fc" id="L74">                ? HistoryMovePolicy.typed(training.policy().history(), HistoryMovePolicy.Weights.DEFAULT)</span>
+<span class="fc" id="L75">                : MovePriorityPolicy.INVENTORY_ORDER;</span>
+<span class="fc" id="L76">            var problem = problem(inventory, configuration.learned, example, MoveContext.Phase.FROZEN_EVALUATION, budget, policy);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            var result = configuration.selection == Selection.TRAIN_SELECTED</span>
+<span class="fc" id="L78">                ? training.policy().evaluate(problem) : new TypedMoveSearch().search(problem);</span>
+<span class="pc bpc" id="L79" title="1 of 4 branches missed.">            if (result.reached() &amp;&amp; result.metrics().totalWork() &gt; budget) throw new IllegalStateException(&quot;over-budget success&quot;);</span>
+<span class="fc" id="L80">            rows.add(new Row(example.id(), configuration, budget, result));</span>
+        }
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (!frozen.equals(modelJson(formation, formationWork, primitive, learned))) {</span>
+<span class="nc" id="L83">            throw new IllegalStateException(&quot;evaluation changed the frozen model&quot;);</span>
+        }
+<span class="fc" id="L85">        return new Report(protocol, formation, formationWork, primitive, learned, rows);</span>
+    }
+
+    private static Training train(TraceRewriteStrategyLearner.FrozenStrategy formation,
+            TypedLearnedMoveInventory inventory, boolean learned) {
+<span class="fc" id="L90">        var history = new RuleHistoryMemory();</span>
+<span class="fc" id="L91">        var runs = new ArrayList&lt;TrainingRun&gt;();</span>
+<span class="fc" id="L92">        var tasks = new ArrayList&lt;TypedPolicySelection.TrainingTask&gt;();</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        for (var observation : formation.observations()) {</span>
+<span class="fc" id="L94">            var example = new Case(observation.input().id(), parseInput(observation.input().expression()),</span>
+<span class="fc" id="L95">                parseInput(observation.search().bestState().expression()));</span>
+<span class="fc" id="L96">            var problem = problem(inventory, learned, example, MoveContext.Phase.TRAIN, TRAIN_BUDGET,</span>
+                MovePriorityPolicy.INVENTORY_ORDER);
+<span class="fc" id="L98">            var result = new TypedMoveSearch().search(problem);</span>
+<span class="fc" id="L99">            history.observe(result, MoveContext.Phase.TRAIN, Map.of());</span>
+<span class="fc" id="L100">            runs.add(new TrainingRun(example.id(), CODEC.encodeExpression(example.source()), CODEC.encodeExpression(example.goal()), result));</span>
+<span class="fc" id="L101">            tasks.add(new TypedPolicySelection.TrainingTask(example.id(), problem));</span>
+<span class="fc" id="L102">        }</span>
+<span class="fc" id="L103">        return new Training(new TypedPolicySelection().train(history.freeze(), tasks, profiles()), runs, history.measuredWork());</span>
+    }
+
+    private static List&lt;TypedPolicySelection.Profile&gt; profiles() {
+<span class="fc" id="L107">        return List.of(TypedPolicySelection.Profile.inventoryOrder(&quot;inventory&quot;),</span>
+            new TypedPolicySelection.Profile(&quot;default&quot;, HistoryMovePolicy.Weights.DEFAULT),
+            new TypedPolicySelection.Profile(&quot;goal&quot;, new HistoryMovePolicy.Weights(0, 0, 0, 20, 0, 0, 0, 0)));
+    }
+
+    private static TypedMoveSearch.Problem problem(TypedLearnedMoveInventory inventory, boolean learned,
+            Case example, MoveContext.Phase phase, long work, MovePriorityPolicy policy) {
+<span class="fc" id="L114">        return new TypedMoveSearch.Problem(example.source(), new TypedMoveSearch.Context(example.goal(), List.of(), phase),</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            learned ? inventory.providers() : inventory.primitiveProviders(), policy, inventory.verifier(), state -&gt; 0,</span>
+            MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED, new MoveSearch.Budget(12, 12, 0, 256, work));
+    }
+
+    /** Parsing happens only at the existing learner's text-input boundary, never inside typed dispatch. */
+    private static Expr parseInput(String input) {
+<span class="fc" id="L121">        return new ExpressionParser().parse(new InputRequest(InputType.TERM, input)).terms().getFirst();</span>
+    }
+
+    private static List&lt;Case&gt; cases() {
+<span class="fc" id="L125">        var examples = new ArrayList&lt;Case&gt;();</span>
+<span class="fc" id="L126">        var ids = List.of(&quot;one-site&quot;, &quot;two-sites&quot;, &quot;three-sites&quot;);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        for (int count = 1; count &lt;= 3; count++) {</span>
+<span class="fc" id="L128">            var sources = new ArrayList&lt;Expr&gt;(); var goals = new ArrayList&lt;Expr&gt;();</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L130">                Expr a = base(i), b = variable(2 * i + 1);</span>
+<span class="fc" id="L131">                sources.add(add(mul(add(a, b), new BinaryExpr(a, SUB, b)), mul(b, b)));</span>
+<span class="fc" id="L132">                goals.add(square(a));</span>
+            }
+<span class="fc" id="L134">            examples.add(new Case(ids.get(count - 1), new FunctionExpr(&quot;context&quot;, sources), new FunctionExpr(&quot;context&quot;, goals)));</span>
+        }
+<span class="fc" id="L136">        Expr a = base(10), b = variable(21);</span>
+<span class="fc" id="L137">        examples.add(new Case(&quot;near-miss&quot;, add(mul(add(a, b), new BinaryExpr(a, SUB, b)), mul(b, add(b, new NumberExpr(1)))), square(a)));</span>
+<span class="fc" id="L138">        examples.add(new Case(&quot;simple-zero&quot;, add(base(20), new NumberExpr(0)), base(20)));</span>
+<span class="fc" id="L139">        return List.copyOf(examples);</span>
+    }
+
+<span class="fc" id="L142">    private static Expr base(int index) { return new FunctionExpr(&quot;f&quot;, List.of(variable(2 * index), NumberExpr.exact(&quot;1/3&quot;))); }</span>
+<span class="fc" id="L143">    private static Expr variable(int index) { return VariableExpr.scoped(new SymbolId(new UUID(0, 901), index + 1)); }</span>
+<span class="fc" id="L144">    private static Expr add(Expr a, Expr b) { return new BinaryExpr(a, ADD, b); }</span>
+<span class="fc" id="L145">    private static Expr mul(Expr a, Expr b) { return new BinaryExpr(a, MUL, b); }</span>
+<span class="fc" id="L146">    private static Expr square(Expr a) { return new BinaryExpr(a, POW, new NumberExpr(2)); }</span>
+
+    private static String protocol() {
+<span class="fc" id="L149">        return LearnedSchedulingArtifacts.json(Map.of(&quot;schema&quot;, REVISION,</span>
+            &quot;information&quot;, &quot;SHARED_EXPLICIT_EVALUATION_GOALS;TRAIN_TARGETS_FROM_TARGET_FREE_LEARNER_ENDPOINTS&quot;,
+            &quot;split&quot;, &quot;PUBLIC_DEVELOPMENT_AFTER_EXPLORATION;NOT_INDEPENDENT_FAMILY_HOLDOUT&quot;,
+<span class="fc" id="L152">            &quot;inventory&quot;, TraceStrategyTransferExample.inventory().toCanonicalJson(),</span>
+<span class="fc" id="L153">            &quot;formation&quot;, Map.of(&quot;inputs&quot;, TraceStrategyTransferExample.trainingInputs(), &quot;limits&quot;, TraceStrategyTransferExample.limits()),</span>
+<span class="fc" id="L154">            &quot;profiles&quot;, profiles(), &quot;configurations&quot;, List.of(Configuration.values()),</span>
+<span class="fc" id="L155">            &quot;budgets&quot;, Map.of(&quot;evaluation&quot;, WORK_BUDGETS, &quot;train&quot;, TRAIN_BUDGET, &quot;primitiveDepth&quot;, 12, &quot;searchDepth&quot;, 12, &quot;states&quot;, 256),</span>
+<span class="fc" id="L156">            &quot;evaluation&quot;, cases().stream().map(example -&gt; Map.of(&quot;id&quot;, example.id(), &quot;source&quot;, CODEC.encodeExpression(example.source()),</span>
+<span class="fc" id="L157">                &quot;goal&quot;, CODEC.encodeExpression(example.goal()))).toList()));</span>
+    }
+
+    private static String modelJson(TraceRewriteStrategyLearner.FrozenStrategy formation, long formationWork,
+            Training primitive, Training learned) {
+<span class="fc" id="L162">        return LearnedSchedulingArtifacts.json(Map.of(&quot;formation&quot;, formation.toCanonicalJson(), &quot;formationWork&quot;, formationWork,</span>
+<span class="fc" id="L163">            &quot;primitivePolicy&quot;, primitive.policy().toCanonicalJson(), &quot;learnedPolicy&quot;, learned.policy().toCanonicalJson(),</span>
+<span class="fc" id="L164">            &quot;training&quot;, trainingSummary(primitive, learned),</span>
+            &quot;workScope&quot;, &quot;CHARGED_MECHANICS_AND_REPLAY;EXCLUDES_COMPILATION_SERIALIZATION_AND_COMPLETE_CPU_BIT_COST&quot;));
+    }
+
+    private static Map&lt;String, Object&gt; trainingSummary(Training primitive, Training learned) {
+<span class="fc" id="L169">        return Map.of(&quot;primitive&quot;, trainingSummary(primitive), &quot;learned&quot;, trainingSummary(learned));</span>
+    }
+    private static Map&lt;String, Object&gt; trainingSummary(Training training) {
+<span class="fc" id="L172">        return Map.of(&quot;selected&quot;, training.policy().selected().id(), &quot;historySearchWork&quot;, training.historySearchWork(),</span>
+<span class="fc" id="L173">            &quot;historyMemoryWork&quot;, training.memoryWork(), &quot;profileSelectionWork&quot;, training.policy().trainingWork());</span>
+    }
+
+    private static Map&lt;String, Object&gt; rowSummary(Row row) {
+<span class="fc" id="L177">        var metrics = row.result().metrics();</span>
+<span class="fc" id="L178">        var data = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L179">        data.put(&quot;case&quot;, row.caseId()); data.put(&quot;configuration&quot;, row.configuration()); data.put(&quot;budget&quot;, row.budget());</span>
+<span class="fc" id="L180">        data.put(&quot;outcome&quot;, row.result().outcome()); data.put(&quot;totalWork&quot;, metrics.totalWork());</span>
+<span class="fc" id="L181">        data.put(&quot;primitiveWork&quot;, metrics.primitiveWork()); data.put(&quot;searchWork&quot;, metrics.searchWork());</span>
+<span class="fc" id="L182">        data.put(&quot;verificationWork&quot;, metrics.verificationWork()); data.put(&quot;exploredStates&quot;, metrics.exploredStates());</span>
+<span class="fc" id="L183">        data.put(&quot;primitiveDepth&quot;, metrics.firstHitPrimitiveDepth());</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        data.put(&quot;learnedWitness&quot;, row.result().witness().stream().anyMatch(step -&gt; step.move().sourceKind() == SearchMove.SourceKind.LEARNED));</span>
+<span class="fc" id="L185">        return data;</span>
+    }
+
+    public static Path write(Report report, Path output) throws IOException {
+<span class="fc" id="L189">        var files = new TreeMap&lt;String, String&gt;();</span>
+<span class="fc" id="L190">        files.put(&quot;protocol.json&quot;, report.protocol()); files.put(&quot;model.json&quot;, report.modelJson()); files.put(&quot;summary.json&quot;, report.summaryJson());</span>
+<span class="fc" id="L191">        writeTraining(files, &quot;primitive&quot;, report.primitive()); writeTraining(files, &quot;learned&quot;, report.learned());</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        for (var row : report.rows()) files.put(&quot;run-&quot; + row.caseId() + &quot;-&quot; + row.configuration() + &quot;-&quot; + row.budget() + &quot;.json&quot;,</span>
+<span class="fc" id="L193">            LearnedSchedulingArtifacts.resultJson(row.result().encodedResult()));</span>
+<span class="fc" id="L194">        return TraceStrategyTransferExample.writeArtifacts(SchematicProofPlan.hash(report.summaryJson()), files, output, REVISION);</span>
+    }
+    private static void writeTraining(Map&lt;String, String&gt; files, String inventory, Training training) {
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        for (var run : training.historyRuns()) files.put(&quot;train-&quot; + inventory + &quot;-&quot; + run.id() + &quot;.json&quot;, LearnedSchedulingArtifacts.json(</span>
+<span class="fc" id="L198">            Map.of(&quot;source&quot;, run.source(), &quot;goal&quot;, run.goal(), &quot;search&quot;, LearnedSchedulingArtifacts.resultJson(run.result().encodedResult()))));</span>
+<span class="fc" id="L199">    }</span>
+
+    public static void main(String[] args) throws IOException {
+<span class="nc" id="L202">        var report = run();</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        System.out.println(write(report, Path.of(args.length == 0 ? &quot;build/reports/typed-learning-work&quot; : args[0])));</span>
+<span class="nc" id="L204">        System.out.println(report.summaryJson());</span>
+<span class="nc" id="L205">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

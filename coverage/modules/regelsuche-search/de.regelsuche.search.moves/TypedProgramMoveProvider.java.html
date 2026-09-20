@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TypedProgramMoveProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">TypedProgramMoveProvider.java</span></div><h1>TypedProgramMoveProvider.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import de.regelsuche.search.program.CompiledAstRewriteProgram;
+import de.regelsuche.search.program.RewriteCandidate;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Registered compiled continuations on the typed frontier. Persisted histories are proposals;
+ * the verifier regenerates the registered program, including every intermediate state.
+ * Accounting covers mechanical work and emitted primitives, not total CPU/AST equality costs.
+ */
+public final class TypedProgramMoveProvider implements TypedMoveSearch.TypedProvider {
+<span class="fc" id="L20">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+    private final Descriptor descriptor;
+    private final CompiledAstRewriteProgram program;
+
+<span class="fc" id="L24">    public TypedProgramMoveProvider(Descriptor descriptor, CompiledAstRewriteProgram program) {</span>
+<span class="fc" id="L25">        this.descriptor = Objects.requireNonNull(descriptor, &quot;descriptor&quot;);</span>
+<span class="fc" id="L26">        this.program = Objects.requireNonNull(program, &quot;program&quot;);</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (descriptor.sourceKind() != SearchMove.SourceKind.LEARNED</span>
+<span class="nc bnc" id="L28" title="All 2 branches missed.">                &amp;&amp; descriptor.sourceKind() != SearchMove.SourceKind.EXPERT) {</span>
+<span class="nc" id="L29">            throw new IllegalArgumentException(&quot;compiled typed programs require LEARNED or EXPERT source kind&quot;);</span>
+        }
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (descriptor.proofStrength() != SearchMove.ProofStrength.REPLAYABLE) {</span>
+<span class="nc" id="L32">            throw new IllegalArgumentException(&quot;compiled regeneration requires REPLAYABLE evidence, not proof promotion&quot;);</span>
+        }
+<span class="fc" id="L34">    }</span>
+
+<span class="fc" id="L36">    @Override public Descriptor descriptor() { return descriptor; }</span>
+
+    @Override public Batch candidates(MoveState state, MoveContext context) {
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (!context.carries(descriptor.requiredAssumptions(), state)) {</span>
+<span class="fc" id="L40">            return new Batch(List.of(),</span>
+                new TransformationWorkMetrics(0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0), true);
+        }
+        CompiledAstRewriteProgram.Batch batch;
+        try {
+<span class="fc" id="L45">            batch = program.transformMeasured(CODEC.decodeExpression(state.expression()));</span>
+<span class="fc" id="L46">        } catch (CompiledAstRewriteProgram.CandidateLimitExceeded limit) {</span>
+<span class="fc" id="L47">            return new Batch(List.of(), limit.workMetrics(), false);</span>
+<span class="fc" id="L48">        }</span>
+<span class="fc" id="L49">        long work = batch.workMetrics().totalWorkUnits();</span>
+<span class="fc" id="L50">        return new Batch(batch.candidates().stream().map(candidate -&gt; move(candidate, work)).toList(),</span>
+<span class="fc" id="L51">            batch.workMetrics(), false);</span>
+        // The underlying primitive transport has no truncation receipt. Do not claim completeness.
+    }
+
+    /** Decoded data grants no authority. A receiving search must still use verifier(). */
+    public SearchMove proposal(CompiledAstRewriteProgram.Candidate history) {
+<span class="fc" id="L57">        return move(Objects.requireNonNull(history, &quot;history&quot;), 0);</span>
+    }
+
+    private SearchMove move(CompiledAstRewriteProgram.Candidate history, long generationWork) {
+<span class="fc" id="L61">        String identity = CODEC.contentHash(history);</span>
+<span class="fc" id="L62">        var steps = new ArrayList&lt;Transformation&gt;();</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (int index = 0; index &lt; history.steps().size(); index++) {</span>
+<span class="fc" id="L64">            var step = history.steps().get(index);</span>
+<span class="fc" id="L65">            steps.add(new Transformation(step.rule(), CODEC.encodeExpression(step.target()), step.kind(),</span>
+<span class="fc" id="L66">                step.mayIncreaseComplexity(), step.estimatedCostDelta(), step.equivalencePreservingByConstruction(),</span>
+<span class="fc" id="L67">                &quot;typed-program:&quot; + identity + &quot;:&quot; + index, step.assumptions(), step.packId(), step.license()));</span>
+        }
+<span class="fc" id="L69">        var candidate = new RewriteCandidate(history.programId(), CODEC.encodeExpression(history.source()),</span>
+<span class="fc" id="L70">            CODEC.encodeExpression(history.target()), steps);</span>
+<span class="fc" id="L71">        return SearchMove.from(candidate.toTransformation(), descriptor, generationWork);</span>
+    }
+
+    /** A score or a decoded history cannot bypass source, stage, metadata, or premise checks. */
+    public TypedMoveSearch.Verifier verifier() {
+<span class="fc" id="L76">        return (source, proposal, context) -&gt; {</span>
+<span class="fc" id="L77">            var available = new HashSet&lt;&gt;(context.initialAssumptions());</span>
+<span class="fc" id="L78">            available.addAll(AssumptionSignature.ofExpressions(source.assumptions()).normalizedAssumptions());</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            if (!available.containsAll(proposal.assumptions())</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">                    || !available.containsAll(descriptor.requiredAssumptions())) {</span>
+<span class="fc" id="L81">                return new MoveVerifier.Verification(false, 1, List.of(), &quot;TYPED_PROGRAM_ASSUMPTIONS_MISSING&quot;);</span>
+            }
+            CompiledAstRewriteProgram.Batch regenerated;
+            try {
+<span class="fc" id="L85">                regenerated = program.transformMeasured(source.expression());</span>
+<span class="fc" id="L86">            } catch (CompiledAstRewriteProgram.CandidateLimitExceeded limit) {</span>
+<span class="fc" id="L87">                return new MoveVerifier.Verification(false, verificationWork(limit.workMetrics()), List.of(),</span>
+                    &quot;TYPED_PROGRAM_CANDIDATE_LIMIT&quot;);
+<span class="fc" id="L89">            }</span>
+<span class="fc" id="L90">            long work = verificationWork(regenerated.workMetrics());</span>
+<span class="fc" id="L91">            work = Math.addExact(work, regenerated.candidates().size());</span>
+<span class="fc" id="L92">            boolean accepted = regenerated.candidates().stream()</span>
+<span class="fc" id="L93">                .map(candidate -&gt; move(candidate, proposal.generationCost())).anyMatch(proposal::equals);</span>
+<span class="fc" id="L94">            return new MoveVerifier.Verification(accepted, work,</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">                accepted ? List.of(&quot;typed-program-replay:&quot; + proposal.transformation().applicationKey()) : List.of(),</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">                accepted ? &quot;TYPED_PROGRAM_REPLAYED&quot; : &quot;TYPED_PROGRAM_REPLAY_REJECTED&quot;);</span>
+        };
+    }
+
+    private static long verificationWork(TransformationWorkMetrics work) {
+<span class="fc" id="L101">        return Math.addExact(work.totalWorkUnits(), work.candidateWork().canonicalWorkUnits());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

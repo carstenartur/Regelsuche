@@ -1,0 +1,8 @@
+{
+  "schema": "regelsuche.modpow-transfer-corpus/v1",
+  "split": "TRAIN",
+  "cases": [
+    {"id":"TRAIN_A","source":"program(modpow(a0,q0*e0,n0),modpow(a0,e0,n0))","roles":{"a":"a0","q":"q0","e":"e0","n":"n0","r":"r0"},"qBits":5,"eBits":3,"rBits":3,"positive":true,"assumptions":["a0 integer","q0 integer","q0 >= 0","e0 integer","e0 >= 0","r0 integer","r0 >= 0","n0 integer","n0 > 0"]},
+    {"id":"TRAIN_B","source":"program(modpow(base,outer*inner,modulus),modpow(base,inner,modulus))","roles":{"a":"base","q":"outer","e":"inner","n":"modulus","r":"noise"},"qBits":21,"eBits":8,"rBits":8,"positive":true,"assumptions":["base integer","outer integer","outer >= 0","inner integer","inner >= 0","noise integer","noise >= 0","modulus integer","modulus > 0"]}
+  ]
+}

@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TypedOutputPattern.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">TypedOutputPattern.java</span></div><h1>TypedOutputPattern.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
 
 import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.transform.ExprMatcher;
 import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.RecognitionProfile;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -17,13 +19,15 @@ import java.util.Set;
  * Opt-in application of a structural hypothesis to selected ordered outputs.
  *
  * &lt;p&gt;Pattern slot i is written back to the physical slot matched by source i.
- * Unmatched outputs remain in place. The existing exact ExprMatcher binds the
- * entire selected tuple at once, so repeated placeholders share one binding.
- * No text round-trip, arithmetic normalization or domain-specific rule is used.&lt;/p&gt;
+ * Unchanged outputs remain in place with their original objects. The existing
+ * ExprMatcher binds the entire selected tuple at once, so repeated placeholders
+ * share one binding. Recognition is exact unless structural arithmetic
+ * associativity/commutativity is explicitly requested; no text round-trip or
+ * domain-specific rule is used.&lt;/p&gt;
  *
  * &lt;p&gt;Applications are untrusted syntax proposals, NOT proved Transformations.
- * Retained sample assumptions do not become general premises. A caller must
- * independently verify every concrete application before promotion/execution.&lt;/p&gt;
+ * Retained sample assumptions and recognition traces do not become proof
+ * premises. Every concrete application requires independent verification.&lt;/p&gt;
  */
 public final class TypedOutputPattern {
     public static final int MAXIMUM_OUTPUTS = 8;
@@ -31,73 +35,93 @@ public final class TypedOutputPattern {
     private final TypedPatternGeneralizer.Candidate hypothesis;
     private final PatternExpr.Function sourcePattern;
     private final PatternExpr.Function targetPattern;
+    private final RecognitionProfile recognitionProfile;
     private final ExprMatcher matcher;
 
-<span class="fc" id="L36">    public TypedOutputPattern(TypedPatternGeneralizer.Candidate hypothesis) {</span>
-<span class="fc" id="L37">        this.hypothesis = Objects.requireNonNull(hypothesis, &quot;hypothesis&quot;);</span>
-<span class="fc" id="L38">        requireBounded(hypothesis.source(), null);</span>
-<span class="fc" id="L39">        requireBounded(hypothesis.target(), null);</span>
-<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (!(hypothesis.source() instanceof PatternExpr.Function source)</span>
-<span class="pc bpc" id="L41" title="1 of 2 branches missed.">                || !(hypothesis.target() instanceof PatternExpr.Function target)</span>
-<span class="fc bfc" id="L42" title="All 2 branches covered.">                || !source.name().equals(target.name())</span>
-<span class="pc bpc" id="L43" title="1 of 2 branches missed.">                || source.arguments().isEmpty()</span>
-<span class="pc bpc" id="L44" title="1 of 2 branches missed.">                || source.arguments().size() &gt; MAXIMUM_OUTPUTS</span>
-<span class="fc bfc" id="L45" title="All 2 branches covered.">                || source.arguments().size() != target.arguments().size()) {</span>
-<span class="fc" id="L46">            throw new IllegalArgumentException(&quot;same function envelope and corresponding output slots required&quot;);</span>
-        }
-<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (!placeholders(source).containsAll(placeholders(target))) {</span>
-<span class="fc" id="L49">            throw new IllegalArgumentException(&quot;target-only output-pattern placeholder&quot;);</span>
-        }
-<span class="fc" id="L51">        sourcePattern = source;</span>
-<span class="fc" id="L52">        targetPattern = target;</span>
-<span class="fc" id="L53">        matcher = ExprMatcher.pattern(sourcePattern);</span>
-<span class="fc" id="L54">    }</span>
+    public TypedOutputPattern(TypedPatternGeneralizer.Candidate hypothesis) {
+<span class="fc" id="L42">        this(hypothesis, RecognitionProfile.exact());</span>
+<span class="fc" id="L43">    }</span>
 
-<span class="fc" id="L56">    public TypedPatternGeneralizer.Candidate hypothesis() { return hypothesis; }</span>
+    /**
+     * The profile requests recognition, not mathematical authority. Only the
+     * existing structural ADD/MUL profiles are supported: no inferred algebraic
+     * bindings or external equivalence exploration is performed here.
+     */
+<span class="fc" id="L50">    public TypedOutputPattern(TypedPatternGeneralizer.Candidate hypothesis, RecognitionProfile recognitionProfile) {</span>
+<span class="fc" id="L51">        this.hypothesis = Objects.requireNonNull(hypothesis, &quot;hypothesis&quot;);</span>
+<span class="fc" id="L52">        this.recognitionProfile = requireSupported(recognitionProfile);</span>
+<span class="fc" id="L53">        requireBounded(hypothesis.source(), null);</span>
+<span class="fc" id="L54">        requireBounded(hypothesis.target(), null);</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (!(hypothesis.source() instanceof PatternExpr.Function source)</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">                || !(hypothesis.target() instanceof PatternExpr.Function target)</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">                || !source.name().equals(target.name())</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">                || source.arguments().isEmpty()</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">                || source.arguments().size() &gt; MAXIMUM_OUTPUTS</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">                || source.arguments().size() != target.arguments().size()) {</span>
+<span class="fc" id="L61">            throw new IllegalArgumentException(&quot;same function envelope and corresponding output slots required&quot;);</span>
+        }
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (!placeholders(source).containsAll(placeholders(target))) {</span>
+<span class="fc" id="L64">            throw new IllegalArgumentException(&quot;target-only output-pattern placeholder&quot;);</span>
+        }
+<span class="fc" id="L66">        sourcePattern = source;</span>
+<span class="fc" id="L67">        targetPattern = target;</span>
+<span class="fc" id="L68">        matcher = ExprMatcher.pattern(sourcePattern, recognitionProfile);</span>
+<span class="fc" id="L69">    }</span>
 
-    /** Physical positions and bindings permit independent checking; they grant no authority. */
+<span class="fc" id="L71">    public TypedPatternGeneralizer.Candidate hypothesis() { return hypothesis; }</span>
+
+    /** Positions, bindings and recognition metadata permit checking but grant no authority. */
     public record Application(FunctionExpr source, FunctionExpr target,
-            List&lt;Integer&gt; positions, Map&lt;String, Expr&gt; bindings) {
-<span class="fc" id="L61">        public Application {</span>
-<span class="fc" id="L62">            Objects.requireNonNull(source, &quot;source&quot;);</span>
-<span class="fc" id="L63">            Objects.requireNonNull(target, &quot;target&quot;);</span>
-<span class="fc" id="L64">            positions = List.copyOf(positions);</span>
-<span class="fc" id="L65">            bindings = Map.copyOf(bindings);</span>
-<span class="fc" id="L66">        }</span>
+            List&lt;Integer&gt; positions, Map&lt;String, Expr&gt; bindings,
+            RecognitionProfile recognitionProfile, List&lt;String&gt; recognitionTrace) {
+        /** Retain the original exact structural construction contract. */
+        public Application(FunctionExpr source, FunctionExpr target,
+                List&lt;Integer&gt; positions, Map&lt;String, Expr&gt; bindings) {
+<span class="nc" id="L80">            this(source, target, positions, bindings, RecognitionProfile.exact(), List.of());</span>
+<span class="nc" id="L81">        }</span>
+
+<span class="fc" id="L83">        public Application {</span>
+<span class="fc" id="L84">            Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L85">            Objects.requireNonNull(target, &quot;target&quot;);</span>
+<span class="fc" id="L86">            positions = List.copyOf(positions);</span>
+<span class="fc" id="L87">            bindings = Map.copyOf(bindings);</span>
+<span class="fc" id="L88">            recognitionProfile = requireSupported(recognitionProfile);</span>
+<span class="fc" id="L89">            recognitionTrace = List.copyOf(recognitionTrace);</span>
+<span class="fc" id="L90">        }</span>
     }
 
     /** Counters describe tuple attempts and matcher steps, not complete CPU/memory costs. */
     public record Result(List&lt;Application&gt; applications, boolean complete,
             int assignmentAttempts, long matcherSteps) {
-<span class="fc" id="L72">        public Result {</span>
-<span class="fc" id="L73">            applications = List.copyOf(applications);</span>
-<span class="pc bpc" id="L74" title="2 of 4 branches missed.">            if (assignmentAttempts &lt; 0 || matcherSteps &lt; 0) {</span>
-<span class="nc" id="L75">                throw new IllegalArgumentException(&quot;negative matching counter&quot;);</span>
+<span class="fc" id="L96">        public Result {</span>
+<span class="fc" id="L97">            applications = List.copyOf(applications);</span>
+<span class="pc bpc" id="L98" title="2 of 4 branches missed.">            if (assignmentAttempts &lt; 0 || matcherSteps &lt; 0) {</span>
+<span class="nc" id="L99">                throw new IllegalArgumentException(&quot;negative matching counter&quot;);</span>
             }
-<span class="fc" id="L77">        }</span>
+<span class="fc" id="L101">        }</span>
     }
 
     public Result find(FunctionExpr program, int maximumAssignments) {
-<span class="fc" id="L81">        Objects.requireNonNull(program, &quot;program&quot;);</span>
-<span class="fc bfc" id="L82" title="All 4 branches covered.">        if (maximumAssignments &lt; 1 || maximumAssignments &gt; MAXIMUM_ASSIGNMENTS) {</span>
-<span class="fc" id="L83">            throw new IllegalArgumentException(&quot;assignment budget outside supported bounds&quot;);</span>
+<span class="fc" id="L105">        Objects.requireNonNull(program, &quot;program&quot;);</span>
+<span class="fc bfc" id="L106" title="All 4 branches covered.">        if (maximumAssignments &lt; 1 || maximumAssignments &gt; MAXIMUM_ASSIGNMENTS) {</span>
+<span class="fc" id="L107">            throw new IllegalArgumentException(&quot;assignment budget outside supported bounds&quot;);</span>
         }
-<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (program.arguments().size() &gt; MAXIMUM_OUTPUTS) {</span>
-<span class="fc" id="L86">            throw new IllegalArgumentException(&quot;too many program outputs&quot;);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (program.arguments().size() &gt; MAXIMUM_OUTPUTS) {</span>
+<span class="fc" id="L110">            throw new IllegalArgumentException(&quot;too many program outputs&quot;);</span>
         }
-<span class="fc" id="L88">        requireBounded(program, null);</span>
-<span class="fc" id="L89">        var run = new Run();</span>
-<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (program.name().equals(sourcePattern.name())</span>
-<span class="fc bfc" id="L91" title="All 2 branches covered.">                &amp;&amp; program.arguments().size() &gt;= sourcePattern.arguments().size()) {</span>
-<span class="fc" id="L92">            enumerate(program, maximumAssignments, new ArrayList&lt;&gt;(),</span>
-<span class="fc" id="L93">                new boolean[program.arguments().size()], run);</span>
+<span class="fc" id="L112">        requireBounded(program, null);</span>
+<span class="fc" id="L113">        var run = new Run();</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (program.name().equals(sourcePattern.name())</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                &amp;&amp; program.arguments().size() &gt;= sourcePattern.arguments().size()) {</span>
+<span class="fc" id="L116">            enumerate(program, maximumAssignments, new ArrayList&lt;&gt;(),</span>
+<span class="fc" id="L117">                new boolean[program.arguments().size()], run);</span>
         }
-<span class="fc" id="L95">        return new Result(run.applications, run.complete, run.attempts, run.matcherSteps);</span>
+<span class="fc" id="L119">        return new Result(run.applications, run.complete, run.attempts, run.matcherSteps);</span>
     }
 
-<span class="fc" id="L98">    private static final class Run {</span>
-<span class="fc" id="L99">        final List&lt;Application&gt; applications = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L100">        boolean complete = true;</span>
+<span class="fc" id="L122">    private static final class Run {</span>
+<span class="fc" id="L123">        final List&lt;Application&gt; applications = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L124">        boolean complete = true;</span>
         boolean stopped;
         int attempts;
         long matcherSteps;
@@ -105,96 +129,113 @@ public final class TypedOutputPattern {
 
     private void enumerate(FunctionExpr program, int maximumAssignments,
             List&lt;Integer&gt; positions, boolean[] used, Run run) {
-<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (run.stopped) return;</span>
-<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (positions.size() == sourcePattern.arguments().size()) {</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (run.stopped) return;</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        if (positions.size() == sourcePattern.arguments().size()) {</span>
             // Only an untried assignment makes an exactly consumed budget incomplete.
-<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (run.attempts == maximumAssignments) {</span>
-<span class="fc" id="L112">                run.complete = false;</span>
-<span class="fc" id="L113">                run.stopped = true;</span>
-<span class="fc" id="L114">                return;</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (run.attempts == maximumAssignments) {</span>
+<span class="fc" id="L136">                run.complete = false;</span>
+<span class="fc" id="L137">                run.stopped = true;</span>
+<span class="fc" id="L138">                return;</span>
             }
-<span class="fc" id="L116">            run.attempts++;</span>
-<span class="fc" id="L117">            var selected = new FunctionExpr(program.name(), positions.stream()</span>
-<span class="fc" id="L118">                .map(index -&gt; program.arguments().get(index)).toList());</span>
-<span class="fc" id="L119">            var outcome = matcher.match(selected);</span>
-<span class="fc" id="L120">            run.matcherSteps = Math.addExact(run.matcherSteps, outcome.evaluatedSteps());</span>
-<span class="fc" id="L121">            run.complete &amp;= outcome.complete();</span>
-<span class="fc bfc" id="L122" title="All 2 branches covered.">            for (var match : outcome.matches()) {</span>
-<span class="fc" id="L123">                var bindings = match.bindings();</span>
-                // Defensive replay of the actual exact match, not its display text.
-<span class="pc bpc" id="L125" title="1 of 2 branches missed.">                if (!sourcePattern.instantiate(bindings).equals(selected)) {</span>
-<span class="nc" id="L126">                    throw new IllegalStateException(&quot;exact output match does not reconstruct its source&quot;);</span>
-                }
+<span class="fc" id="L140">            run.attempts++;</span>
+<span class="fc" id="L141">            var selected = new FunctionExpr(program.name(), positions.stream()</span>
+<span class="fc" id="L142">                .map(index -&gt; program.arguments().get(index)).toList());</span>
+<span class="fc" id="L143">            var outcome = matcher.match(selected);</span>
+<span class="fc" id="L144">            run.matcherSteps = Math.addExact(run.matcherSteps, outcome.evaluatedSteps());</span>
+<span class="fc" id="L145">            run.complete &amp;= outcome.complete();</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            for (var match : outcome.matches()) {</span>
+<span class="fc" id="L147">                var bindings = match.bindings();</span>
                 try {
-                    // Preflight substitution expansion before allocating the target tree.
-<span class="fc" id="L130">                    requireBounded(targetPattern, bindings);</span>
-<span class="fc" id="L131">                    var replacement = (FunctionExpr) targetPattern.instantiate(bindings);</span>
-<span class="fc" id="L132">                    var outputs = new ArrayList&lt;&gt;(program.arguments());</span>
-<span class="fc bfc" id="L133" title="All 2 branches covered.">                    for (int i = 0; i &lt; positions.size(); i++) {</span>
-<span class="fc" id="L134">                        outputs.set(positions.get(i), replacement.arguments().get(i));</span>
+                    // Bound substitution before allocating a reconstruction or target.
+<span class="fc" id="L150">                    requireBounded(sourcePattern, bindings);</span>
+<span class="fc" id="L151">                    requireBounded(targetPattern, bindings);</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">                    if (recognitionProfile.equals(RecognitionProfile.exact())</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">                            &amp;&amp; !sourcePattern.instantiate(bindings).equals(selected)) {</span>
+<span class="nc" id="L154">                        throw new IllegalStateException(&quot;exact output match does not reconstruct its source&quot;);</span>
                     }
-<span class="fc" id="L136">                    var target = new FunctionExpr(program.name(), outputs);</span>
-<span class="fc" id="L137">                    requireBounded(target, null);</span>
-<span class="fc" id="L138">                    run.applications.add(new Application(program, target, positions, bindings));</span>
-<span class="fc" id="L139">                } catch (StructuralLimit exception) {</span>
-<span class="fc" id="L140">                    run.complete = false;</span>
-<span class="fc" id="L141">                }</span>
-<span class="fc" id="L142">            }</span>
-<span class="fc" id="L143">            return;</span>
+<span class="fc" id="L156">                    var replacement = (FunctionExpr) targetPattern.instantiate(bindings);</span>
+<span class="fc" id="L157">                    var outputs = new ArrayList&lt;&gt;(program.arguments());</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">                    for (int i = 0; i &lt; positions.size(); i++) {</span>
+                        // Recognition must not reorder or rebuild an unchanged output.
+<span class="fc bfc" id="L160" title="All 2 branches covered.">                        if (!sourcePattern.arguments().get(i).equals(targetPattern.arguments().get(i))) {</span>
+<span class="fc" id="L161">                            outputs.set(positions.get(i), replacement.arguments().get(i));</span>
+                        }
+                    }
+<span class="fc" id="L164">                    var target = new FunctionExpr(program.name(), outputs);</span>
+<span class="fc" id="L165">                    requireBounded(target, null);</span>
+<span class="fc" id="L166">                    run.applications.add(new Application(program, target, positions, bindings,</span>
+<span class="fc" id="L167">                        recognitionProfile, match.trace()));</span>
+<span class="fc" id="L168">                } catch (StructuralLimit exception) {</span>
+<span class="fc" id="L169">                    run.complete = false;</span>
+<span class="fc" id="L170">                }</span>
+<span class="fc" id="L171">            }</span>
+<span class="fc" id="L172">            return;</span>
         }
-<span class="fc bfc" id="L145" title="All 4 branches covered.">        for (int index = 0; index &lt; used.length &amp;&amp; !run.stopped; index++) {</span>
-<span class="fc bfc" id="L146" title="All 2 branches covered.">            if (used[index]) continue;</span>
-<span class="fc" id="L147">            used[index] = true;</span>
-<span class="fc" id="L148">            positions.add(index);</span>
-<span class="fc" id="L149">            enumerate(program, maximumAssignments, positions, used, run);</span>
-<span class="fc" id="L150">            positions.removeLast();</span>
-<span class="fc" id="L151">            used[index] = false;</span>
+<span class="fc bfc" id="L174" title="All 4 branches covered.">        for (int index = 0; index &lt; used.length &amp;&amp; !run.stopped; index++) {</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            if (used[index]) continue;</span>
+<span class="fc" id="L176">            used[index] = true;</span>
+<span class="fc" id="L177">            positions.add(index);</span>
+<span class="fc" id="L178">            enumerate(program, maximumAssignments, positions, used, run);</span>
+<span class="fc" id="L179">            positions.removeLast();</span>
+<span class="fc" id="L180">            used[index] = false;</span>
         }
-<span class="fc" id="L153">    }</span>
+<span class="fc" id="L182">    }</span>
 
-    private static Set&lt;String&gt; placeholders(PatternExpr root) {
-<span class="fc" id="L156">        var names = new HashSet&lt;String&gt;();</span>
-<span class="fc" id="L157">        var pending = new ArrayDeque&lt;Object&gt;();</span>
-<span class="fc" id="L158">        pending.push(root);</span>
-<span class="fc bfc" id="L159" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
-<span class="fc" id="L160">            Object node = pending.pop();</span>
-<span class="fc bfc" id="L161" title="All 2 branches covered.">            if (node instanceof PatternExpr.Placeholder placeholder) names.add(placeholder.name());</span>
-<span class="fc bfc" id="L162" title="All 2 branches covered.">            for (Object child : children(node)) pending.push(child);</span>
-<span class="fc" id="L163">        }</span>
-<span class="fc" id="L164">        return Set.copyOf(names);</span>
+    private static RecognitionProfile requireSupported(RecognitionProfile profile) {
+<span class="fc" id="L185">        Objects.requireNonNull(profile, &quot;recognitionProfile&quot;);</span>
+<span class="fc" id="L186">        var supported = Set.of(BinaryOperator.ADD, BinaryOperator.MUL);</span>
+<span class="pc bpc" id="L187" title="2 of 4 branches missed.">        if (profile.inferAlgebraicBindings() || !profile.recognitionRuleIds().isEmpty()</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">                || profile.maxEquivalenceDepth() != 0</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">                || !supported.containsAll(profile.associativeOperators())</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">                || !supported.containsAll(profile.commutativeOperators())) {</span>
+<span class="nc" id="L191">            throw new IllegalArgumentException(&quot;only structural ADD/MUL recognition is supported&quot;);</span>
+        }
+<span class="fc" id="L193">        return profile;</span>
     }
 
-<span class="fc" id="L167">    private record Pending(Object node, int depth) {}</span>
+    private static Set&lt;String&gt; placeholders(PatternExpr root) {
+<span class="fc" id="L197">        var names = new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L198">        var pending = new ArrayDeque&lt;Object&gt;();</span>
+<span class="fc" id="L199">        pending.push(root);</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L201">            Object node = pending.pop();</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            if (node instanceof PatternExpr.Placeholder placeholder) names.add(placeholder.name());</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">            for (Object child : children(node)) pending.push(child);</span>
+<span class="fc" id="L204">        }</span>
+<span class="fc" id="L205">        return Set.copyOf(names);</span>
+    }
+
+<span class="fc" id="L208">    private record Pending(Object node, int depth) {}</span>
     private static final class StructuralLimit extends IllegalArgumentException {
         private static final long serialVersionUID = 1L;
-<span class="fc" id="L170">        StructuralLimit() { super(&quot;typed output-pattern structural limit exceeded&quot;); }</span>
+<span class="fc" id="L211">        StructuralLimit() { super(&quot;typed output-pattern structural limit exceeded&quot;); }</span>
     }
 
     /** Count occurrences, not unique Java objects; optional bindings preflight expansion. */
     private static void requireBounded(Object root, Map&lt;String, Expr&gt; bindings) {
-<span class="fc" id="L175">        var pending = new ArrayDeque&lt;Pending&gt;();</span>
-<span class="fc" id="L176">        pending.push(new Pending(root, 0));</span>
-<span class="fc" id="L177">        int visited = 0;</span>
-<span class="fc bfc" id="L178" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
-<span class="fc" id="L179">            var next = pending.pop();</span>
-<span class="fc" id="L180">            Object node = next.node();</span>
-<span class="fc bfc" id="L181" title="All 4 branches covered.">            if (bindings != null &amp;&amp; node instanceof PatternExpr.Placeholder placeholder) {</span>
-<span class="fc" id="L182">                node = Objects.requireNonNull(bindings.get(placeholder.name()), &quot;unbound target placeholder&quot;);</span>
+<span class="fc" id="L216">        var pending = new ArrayDeque&lt;Pending&gt;();</span>
+<span class="fc" id="L217">        pending.push(new Pending(root, 0));</span>
+<span class="fc" id="L218">        int visited = 0;</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L220">            var next = pending.pop();</span>
+<span class="fc" id="L221">            Object node = next.node();</span>
+<span class="fc bfc" id="L222" title="All 4 branches covered.">            if (bindings != null &amp;&amp; node instanceof PatternExpr.Placeholder placeholder) {</span>
+<span class="fc" id="L223">                node = Objects.requireNonNull(bindings.get(placeholder.name()), &quot;unbound target placeholder&quot;);</span>
             }
-<span class="pc bpc" id="L184" title="1 of 2 branches missed.">            if (++visited &gt; TypedPatternGeneralizer.MAXIMUM_NODES</span>
-<span class="fc bfc" id="L185" title="All 2 branches covered.">                    || next.depth() &gt; TypedPatternGeneralizer.MAXIMUM_DEPTH) throw new StructuralLimit();</span>
-<span class="fc" id="L186">            var children = children(node);</span>
-<span class="fc bfc" id="L187" title="All 2 branches covered.">            if (children.size() &gt; TypedPatternGeneralizer.MAXIMUM_NODES - visited) throw new StructuralLimit();</span>
-<span class="fc bfc" id="L188" title="All 2 branches covered.">            for (Object child : children) pending.push(new Pending(child, next.depth() + 1));</span>
-<span class="fc" id="L189">        }</span>
-<span class="fc" id="L190">    }</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">            if (++visited &gt; TypedPatternGeneralizer.MAXIMUM_NODES</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">                    || next.depth() &gt; TypedPatternGeneralizer.MAXIMUM_DEPTH) throw new StructuralLimit();</span>
+<span class="fc" id="L227">            var children = children(node);</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">            if (children.size() &gt; TypedPatternGeneralizer.MAXIMUM_NODES - visited) throw new StructuralLimit();</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            for (Object child : children) pending.push(new Pending(child, next.depth() + 1));</span>
+<span class="fc" id="L230">        }</span>
+<span class="fc" id="L231">    }</span>
 
     private static List&lt;?&gt; children(Object node) {
-<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        if (node instanceof BinaryExpr binary) return List.of(binary.left(), binary.right());</span>
-<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (node instanceof FunctionExpr function) return function.arguments();</span>
-<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (node instanceof PatternExpr.Operation binary) return List.of(binary.left(), binary.right());</span>
-<span class="fc bfc" id="L196" title="All 2 branches covered.">        if (node instanceof PatternExpr.Function function) return function.arguments();</span>
-<span class="fc" id="L197">        return List.of();</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">        if (node instanceof BinaryExpr binary) return List.of(binary.left(), binary.right());</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        if (node instanceof FunctionExpr function) return function.arguments();</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">        if (node instanceof PatternExpr.Operation binary) return List.of(binary.left(), binary.right());</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        if (node instanceof PatternExpr.Function function) return function.arguments();</span>
+<span class="fc" id="L238">        return List.of();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

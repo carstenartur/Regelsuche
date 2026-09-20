@@ -210,7 +210,7 @@ import java.util.function.ToDoubleFunction;
 <span class="fc" id="L210">        var child = admission.child();</span>
 <span class="fc" id="L211">        var delta = new HashSet&lt;&gt;(child.capabilities()); delta.removeAll(node.state.capabilities());</span>
 <span class="fc" id="L212">        move = move.withCapabilityDelta(delta);</span>
-<span class="pc bpc" id="L213" title="1 of 4 branches missed.">        boolean proofRejected = decision == Decision.PROOF_REJECTED || decision == Decision.ASSUMPTION_REJECTED;</span>
+<span class="fc bfc" id="L213" title="All 4 branches covered.">        boolean proofRejected = decision == Decision.PROOF_REJECTED || decision == Decision.ASSUMPTION_REJECTED;</span>
 <span class="fc bfc" id="L214" title="All 2 branches covered.">        if (decision == Decision.ENQUEUED) {</span>
 <span class="fc" id="L215">            visited.add(new Identity(child, admission.theoryWork())); node.enqueued++; assessments.put(child, admission.value());</span>
 <span class="fc" id="L216">            var path = new ArrayList&lt;&gt;(node.path); path.add(new WitnessStep(node.state, child, move, verification));</span>
@@ -219,7 +219,7 @@ import java.util.function.ToDoubleFunction;
         }
 <span class="fc bfc" id="L220" title="All 2 branches covered.">        if (decision != Decision.ENQUEUED) ledger.discarded++;</span>
 <span class="fc" id="L221">        events.add(new Event(node.state, child, move, decision, verification));</span>
-<span class="pc bpc" id="L222" title="1 of 2 branches missed.">        if (decision == Decision.WORK_LIMIT) return Expansion.WORK_LIMIT;</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (decision == Decision.WORK_LIMIT) return Expansion.WORK_LIMIT;</span>
 <span class="fc bfc" id="L223" title="All 2 branches covered.">        int stage = node.picker instanceof StagedMovePicker staged ? staged.nextStage() : 0;</span>
         // Parent widening stays on the frontier, so promising children can finish before later stages open.
 <span class="fc bfc" id="L225" title="All 2 branches covered.">        double continuation = problem.mode() == Mode.COMPLETE_BOUNDED_REFERENCE ? node.state.searchDepth()</span>
@@ -242,14 +242,14 @@ import java.util.function.ToDoubleFunction;
 <span class="fc" id="L242">        MoveVerifier.Verification verification = null;</span>
 <span class="pc bpc" id="L243" title="1 of 2 branches missed.">        if (ledger.total() &gt; problem.budget().totalWork()) decision = Decision.WORK_LIMIT;</span>
 <span class="pc bpc" id="L244" title="1 of 2 branches missed.">        else if (debt &gt; problem.budget().maxComplexityDebt()) decision = Decision.COMPLEXITY_BOUND;</span>
-<span class="pc bpc" id="L245" title="2 of 4 branches missed.">        else if (depth &gt; problem.budget().maxPrimitiveSteps() || theory &gt; problem.budget().maxTheoryWork()) decision = Decision.PATH_BOUND;</span>
-<span class="pc bpc" id="L246" title="1 of 2 branches missed.">        else if (!problem.context().carries(move.assumptions(), node.state)) decision = Decision.ASSUMPTION_REJECTED;</span>
+<span class="pc bpc" id="L245" title="1 of 4 branches missed.">        else if (depth &gt; problem.budget().maxPrimitiveSteps() || theory &gt; problem.budget().maxTheoryWork()) decision = Decision.PATH_BOUND;</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        else if (!problem.context().carries(move.assumptions(), node.state)) decision = Decision.ASSUMPTION_REJECTED;</span>
 <span class="fc bfc" id="L247" title="All 2 branches covered.">        else if (visited.contains(new Identity(child, theory))) { decision = Decision.DUPLICATE; ledger.duplicates++; }</span>
 <span class="pc bpc" id="L248" title="1 of 2 branches missed.">        else if (ledger.total() &gt;= problem.budget().totalWork()) decision = Decision.WORK_LIMIT;</span>
         else {
 <span class="fc" id="L250">            verification = problem.verifier().verify(node.state, move, problem.context());</span>
 <span class="fc" id="L251">            ledger.verification = Math.addExact(ledger.verification, verification.work());</span>
-<span class="pc bpc" id="L252" title="1 of 2 branches missed.">            decision = ledger.total() &gt; problem.budget().totalWork() ? Decision.WORK_LIMIT</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">            decision = ledger.total() &gt; problem.budget().totalWork() ? Decision.WORK_LIMIT</span>
 <span class="fc bfc" id="L253" title="All 2 branches covered.">                : verification.accepted() ? Decision.ENQUEUED : Decision.PROOF_REJECTED;</span>
         }
 <span class="fc" id="L255">        return new Admission(child, theory, decision, verification, value);</span>
