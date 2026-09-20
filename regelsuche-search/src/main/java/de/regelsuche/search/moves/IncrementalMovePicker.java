@@ -14,6 +14,7 @@ public final class IncrementalMovePicker implements MovePicker, AutoCloseable {
         boolean checked, rejected;
         Lane(IncrementalMoveProvider provider) { this.provider = provider; }
     }
+    private final StagedIncrementalLanes staged;
     private final List<Lane> lanes;
     private final MoveState state;
     private final MoveContext context;
@@ -22,17 +23,25 @@ public final class IncrementalMovePicker implements MovePicker, AutoCloseable {
     private boolean closed, workExhausted;
 
     public IncrementalMovePicker(List<MoveProvider> providers, MoveState state, MoveContext context) {
+        staged = null;
         lanes = List.copyOf(providers).stream().map(provider -> {
-            if (!(provider instanceof IncrementalMoveProvider incremental))
+            if (!(provider instanceof NativeIncrementalMoveProvider incremental))
                 throw new IllegalArgumentException("native ordering requires incremental providers");
             return new Lane(incremental);
         }).toList();
         this.state = state; this.context = context;
     }
 
+    /** Explicit staged v2 contract; the three-argument constructor stays native-only v1. */
+    public IncrementalMovePicker(List<MoveProvider> providers, MovePriorityPolicy policy, MoveState state, MoveContext context) {
+        this.state = state; this.context = context; lanes = List.of();
+        staged = new StagedIncrementalLanes(providers, policy, state, context);
+    }
+
     @Override public Optional<SearchMove> next() { return next(Long.MAX_VALUE); }
 
     public Optional<SearchMove> next(long allowance) {
+        if (staged != null) return staged.next(allowance);
         if (allowance < 0) throw new IllegalArgumentException("negative move allowance");
         if (closed || workExhausted) return Optional.empty();
         long before = workMetrics().totalWorkUnitsV2();
@@ -68,19 +77,27 @@ public final class IncrementalMovePicker implements MovePicker, AutoCloseable {
         }
     }
     @Override public TransformationWorkMetrics workMetrics() {
+        if (staged != null) return staged.workMetrics();
         long checked = lanes.stream().filter(lane -> lane.checked).count();
         long rejected = lanes.stream().filter(lane -> lane.rejected).count();
         var work = new TransformationWorkMetrics(0, 0, 0, 0, 0, checked, rejected, 0, 0, 0, 0, 0, 0, 0);
         for (var lane : lanes) if (lane.cursor != null) work = work.plus(lane.cursor.work().metrics());
         return work;
     }
-    @Override public List<SearchMove> generatedMoves() { return List.copyOf(generated); }
+    @Override public List<SearchMove> generatedMoves() { return staged == null ? List.copyOf(generated) : staged.generatedMoves(); }
     @Override public boolean complete() {
+        if (staged != null) return staged.complete();
         return index == lanes.size() && !workExhausted
             && lanes.stream().allMatch(lane -> lane.rejected || lane.cursor.snapshot().complete());
     }
-    public boolean workExhausted() { return workExhausted; }
+    public boolean workExhausted() { return staged == null ? workExhausted : staged.workExhausted(); }
+    public int nextStage() { return staged == null ? 0 : staged.nextStage(); }
+    public StagedIncrementalMoveExecution.Expansion stagedReceipt() {
+        if (staged == null) throw new IllegalStateException("native v1 picker has no staged receipt");
+        return staged.receipt();
+    }
     public IncrementalMoveExecution.Expansion receipt() {
+        if (staged != null) throw new IllegalStateException("staged v2 picker has no native receipt");
         var receipts = new ArrayList<IncrementalMoveExecution.Lane>();
         for (int i = 0; i < lanes.size(); i++) {
             var lane = lanes.get(i);
@@ -90,6 +107,7 @@ public final class IncrementalMovePicker implements MovePicker, AutoCloseable {
         return new IncrementalMoveExecution.Expansion(state, closed, receipts);
     }
     @Override public void close() {
+        if (staged != null) { staged.close(); return; }
         if (closed) return;
         closed = true;
         for (var lane : lanes) if (lane.cursor != null) lane.cursor.close();

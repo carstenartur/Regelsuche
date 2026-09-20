@@ -48,7 +48,8 @@ public final class WorkReplacementTypedExecution implements WorkReplacementExper
         long outputBytes = Math.addExact(queryBytes, Math.addExact((long) finalCheck.getBytes(StandardCharsets.UTF_8).length,
             output.getBytes(StandardCharsets.UTF_8).length));
         charge(journal, prefix + "/output", OUTPUT, outputBytes, "utf8-materialized-bytes/v1", "");
-        return new WorkReplacementExperiment.Evaluation(result.outputScore() <= quality.maximumScore(), validProof,
+        if (!result.accountingComplete()) journal.incomplete();
+        return new WorkReplacementExperiment.Evaluation(result.accountingComplete() && result.outputScore() <= quality.maximumScore(), validProof,
             result.inputScore(), result.outputScore(), output, raw,
             result.witness().stream().filter(step -> step.move().sourceKind() == SearchMove.SourceKind.LEARNED)
                 .map(step -> step.move().ruleId()).distinct().toList());

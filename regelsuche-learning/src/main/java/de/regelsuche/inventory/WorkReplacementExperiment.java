@@ -16,7 +16,8 @@ import java.util.Set;
 /** Orchestrates existing execution services. No search, learner or proof algorithm lives here. */
 public final class WorkReplacementExperiment {
     public static final String REVISION = "regelsuche.work-replacement-experiment/v3";
-    public enum Status { QUALITY_REACHED, QUALITY_UNREACHED, OVER_BUDGET, TIMEOUT, INVALID_PROOF, ERROR, NOT_RUN }
+    public static final String ACCOUNTING_REVISION = "regelsuche.work-replacement-experiment/v4-accounting";
+    public enum Status { QUALITY_REACHED, QUALITY_UNREACHED, OVER_BUDGET, TIMEOUT, INVALID_PROOF, ERROR, NOT_RUN, ACCOUNTING_INCOMPLETE }
     public record Query(String id, String sourceIdentity, TypedMoveSearch.Problem problem, TypedSourceOnlySearch.Objective objective) {
         public Query {
             LifecycleWorkAccount.requireText(id); LifecycleWorkAccount.requireText(sourceIdentity);
@@ -63,6 +64,10 @@ public final class WorkReplacementExperiment {
         public Report {
             queries = List.copyOf(queries); arms = Map.copyOf(arms);
             validateRows(queries, arms);
+        }
+        public String revision() {
+            return arms.values().stream().flatMap(arm -> arm.rows().stream())
+                .anyMatch(row -> row.status() == Status.ACCOUNTING_INCOMPLETE) ? ACCOUNTING_REVISION : REVISION;
         }
         public long successes(Arm arm) {
             if (arm == Arm.L_ORACLE) throw new IllegalArgumentException("oracle is diagnostic, never a learning success");
@@ -114,21 +119,25 @@ public final class WorkReplacementExperiment {
         Session session = null;
         try {
             for (int i = 0; i < queries.size(); i++) {
+                if (stopIncomplete(queries, arm, journal, rows)) return;
                 var query = queries.get(i); String prefix = arm + "/" + i;
                 long remaining = Math.max(0, manifest.resources().totalWork() - journal.account().totalWork());
                 if (remaining == 0) { rows.add(notRun(arm, query, "total lifecycle budget exhausted")); continue; }
                 if (session == null) session = open(manifest.profile(), plan, journal, prefix);
+                if (stopIncomplete(queries, arm, journal, rows)) return;
                 remaining = Math.max(0, manifest.resources().totalWork() - journal.account().totalWork());
                 long share = remaining / (queries.size() - i);
                 rows.add(share == 0 ? notRun(arm, query, "no query share after restore")
                     : execute(manifest, arm, query, share, session, journal, prefix));
-                if (rows.getLast().status() == Status.TIMEOUT && !journal.complete()) {
-                    fillMissing(queries, arm, rows, "query timeout left unobservable work; stream stopped");
-                    return;
-                }
+                if (stopIncomplete(queries, arm, journal, rows)) return;
                 if (manifest.profile() == Profile.FRESH_PROCESS_PER_QUERY) { session.close(); session = null; }
             }
         } finally { if (session != null) session.close(); }
+    }
+    private static boolean stopIncomplete(List<Query> queries, Arm arm, Journal journal, List<Row> rows) {
+        if (journal.complete()) return false;
+        fillMissing(queries, arm, rows, "unobservable work; lifecycle stream stopped");
+        return true;
     }
     private Session open(Profile profile, Plan plan, Journal journal, String prefix) {
         var session = Objects.requireNonNull(plan.sessions().open(journal, prefix), "session");
@@ -150,7 +159,8 @@ public final class WorkReplacementExperiment {
             var result = session.execute(query, share, manifest.quality(), journal, prefix);
             long elapsed = System.nanoTime() - start;
             long spent = Math.subtractExact(journal.account().totalWork(), before);
-            var status = status(result, spent > share, elapsed > manifest.resources().queryTimeoutNanos());
+            var status = journal.complete() ? status(result, spent > share, elapsed > manifest.resources().queryTimeoutNanos())
+                : Status.ACCOUNTING_INCOMPLETE;
             return new Row(arm, query.id(), status, share, elapsed, session.process().map(Process::pid).orElse(ProcessHandle.current().pid()), result, "");
         } catch (QueryTimeoutException failure) {
             journal.incomplete();

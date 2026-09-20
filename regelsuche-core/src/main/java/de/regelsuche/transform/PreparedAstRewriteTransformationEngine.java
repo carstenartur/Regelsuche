@@ -109,6 +109,11 @@ public final class PreparedAstRewriteTransformationEngine
         return new PreparedTransformationCursor(this, expression, cursorDefinition(matcherBranchLimit));
     }
 
+    /** Explicit v2 suspension: WORK_EXHAUSTED resumes the same traversal on the next positive pull. */
+    public TransformationCursor openResumableCursor(String expression, int matcherBranchLimit) {
+        return new PreparedTransformationCursor(this, expression, cursorDefinition(matcherBranchLimit), true);
+    }
+
     /** Preflight rejects custom dispatch rather than silently materializing an unsupported provider. */
     public TransformationCursor.Definition cursorDefinition(int matcherBranchLimit) {
         if (maxCandidatesPerState < 1 || matcherBranchLimit < 1)

@@ -25,7 +25,8 @@ public final class TypedSourceOnlySearch {
         public Result { witness = List.copyOf(witness); }
         public long queryWork() { return Math.addExact(search.metrics().totalWork(), selectionWork); }
         public long totalWork() { return Math.addExact(queryWork(), replayWork); }
-        public boolean withinBudget() { return totalWork() <= workBudget; }
+        public boolean accountingComplete() { return search.accountingComplete(); }
+        public boolean withinBudget() { return accountingComplete() && totalWork() <= workBudget; }
         public boolean improved() { return outputScore < inputScore; }
     }
     /** Failed independent checking still owns the completed search and attempted replay work. */

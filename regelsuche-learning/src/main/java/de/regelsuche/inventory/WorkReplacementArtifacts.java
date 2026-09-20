@@ -5,11 +5,11 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.io.Writer;
 
-/** v3 envelope retains raw artifacts verbatim as strings; no historical artifact is rewritten. */
+/** Versioned envelope retains raw artifacts verbatim; accounting-incomplete rows require v4. */
 public final class WorkReplacementArtifacts {
     private WorkReplacementArtifacts() {}
     public static String json(WorkReplacementExperiment.Report report) {
-        var writer = new JsonWriter().beginObject().property("schema", WorkReplacementExperiment.REVISION)
+        var writer = new JsonWriter().beginObject().property("schema", report.revision())
             .property("claim", "BOUNDED_DEVELOPMENT_LOGICAL_WORK;NO_GENERAL_OR_CPU_SPEEDUP_CLAIM")
             .property("manifest", report.manifest().toCanonicalJson())
             .array("arms", arms -> {

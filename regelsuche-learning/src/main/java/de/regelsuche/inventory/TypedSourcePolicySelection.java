@@ -15,6 +15,7 @@ import java.util.Objects;
 public final class TypedSourcePolicySelection {
     public static final String REVISION = "regelsuche.typed-source-policy-selection/v1";
     public static final String QUALITY_REVISION = "regelsuche.typed-source-policy-selection/v2-quality";
+    public static final String ACCOUNTING_REVISION = "regelsuche.typed-source-policy-selection/v3-accounting";
     private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();
     private TypedSourcePolicySelection() {}
     public record Profile(String id, List<MoveProvider> providers, MovePriorityPolicy policy) {
@@ -22,15 +23,25 @@ public final class TypedSourcePolicySelection {
             if (id == null || id.isBlank()) throw new IllegalArgumentException("profile ID required");
             providers = List.copyOf(providers);
             Objects.requireNonNull(policy, "policy");
-            if (providers.stream().anyMatch(provider -> !(provider instanceof TypedMoveSearch.TypedProvider)))
+            if (providers.stream().anyMatch(provider -> !TypedMoveSearch.isTypedProvider(provider)))
                 throw new IllegalArgumentException("typed providers required");
         }
     }
     public record Observation(String taskId, long inputScore, long outputScore, long totalWork,
-            boolean withinBudget, MoveSearch.Outcome outcome, long wallNanos, long cpuNanos, long allocatedBytes) {}
+            boolean withinBudget, MoveSearch.Outcome outcome, long wallNanos, long cpuNanos, long allocatedBytes,
+            boolean accountingComplete, String executionRevision) {
+        public Observation(String taskId, long inputScore, long outputScore, long totalWork, boolean withinBudget,
+                MoveSearch.Outcome outcome, long wallNanos, long cpuNanos, long allocatedBytes) {
+            this(taskId, inputScore, outputScore, totalWork, withinBudget, outcome, wallNanos, cpuNanos, allocatedBytes, true, null);
+        }
+    }
     public record Trial(Profile profile, List<Observation> observations) {
         public Trial { observations = List.copyOf(observations); }
         public long totalWork() { return observations.stream().mapToLong(Observation::totalWork).reduce(0, Math::addExact); }
+        public boolean accountingComplete() { return observations.stream().allMatch(Observation::accountingComplete); }
+        public boolean explicitAccounting() {
+            return observations.stream().anyMatch(o -> o.executionRevision() != null || !o.accountingComplete());
+        }
         public long violations() { return observations.stream().filter(o -> !o.withinBudget()).count(); }
         public BigInteger exactOutputCost() {
             return observations.stream().map(value -> BigInteger.valueOf(value.outputScore()))
@@ -64,7 +75,13 @@ public final class TypedSourcePolicySelection {
             this(selected, trials, trainingSources, null);
         }
         public Frozen { trials = List.copyOf(trials); trainingSources = List.copyOf(trainingSources); }
+        /** Known work from every trial; a total-work claim also requires accountingComplete(). */
         public long trainingWork() { return trials.stream().mapToLong(Trial::totalWork).reduce(0, Math::addExact); }
+        public boolean accountingComplete() { return trials.stream().allMatch(Trial::accountingComplete); }
+        public String revision() {
+            return trials.stream().anyMatch(Trial::explicitAccounting) ? ACCOUNTING_REVISION
+                : qualityGoal == null ? REVISION : QUALITY_REVISION;
+        }
         public TypedSourceOnlySearch.Result evaluate(TypedMoveSearch.Problem problem, TypedSourceOnlySearch.Objective objective) {
             if (!problem.context().sourceOnly() || problem.mode() != MoveSearch.Mode.FAST
                     || problem.context().phase() != MoveContext.Phase.FROZEN_EVALUATION
@@ -73,7 +90,9 @@ public final class TypedSourcePolicySelection {
             return execute(problem, selected, objective, qualityGoal);
         }
         public String toCanonicalJson() {
-            var writer = new JsonWriter().beginObject().property("schema", qualityGoal == null ? REVISION : QUALITY_REVISION)
+            String schema = revision();
+            boolean explicitAccounting = schema.equals(ACCOUNTING_REVISION);
+            var writer = new JsonWriter().beginObject().property("schema", schema)
                 .property("selected", selected.id()).property("trainingWork", trainingWork())
                 .property("selection", qualityGoal == null
                     ? "MIN_BUDGET_VIOLATIONS_THEN_OUTPUT_COST_THEN_FULL_CONTINUATION_WORK"
@@ -83,16 +102,28 @@ public final class TypedSourcePolicySelection {
                 .property("mode", "BUDGETED_HEURISTIC;COMPLETE_REFERENCE_UNCHANGED")
                 .property("measurement", "WALL_AND_PROCESS_CPU;REQUEST_THREAD_ALLOCATIONS;LOGICAL_WORK_IS_NOT_TIME")
                 .stringArray("trainingSources", trainingSources);
+            if (explicitAccounting) writer.property("accountingComplete", accountingComplete())
+                .property("workScope", "KNOWN_REPORTED_WORK;ACCOUNTING_COMPLETE_REQUIRED_FOR_TOTAL")
+                .property("objectiveRevision", qualityGoal == null ? REVISION : QUALITY_REVISION);
             if (qualityGoal != null) writer.object("qualityGoal", out -> out
                 .property("maximumOutputScore", qualityGoal.maximumOutputScore())
                 .property("continuationContract", qualityGoal.continuationContract().name()));
-            return writer.array("trials", out -> trials.forEach(trial -> out.objectValue(item -> trialHeader(item, trial)
-                    .property("budgetViolations", trial.violations())
-                    .array("observations", observations -> trial.observations().forEach(o -> observations.objectValue(v -> v
-                        .property("task", o.taskId()).property("inputScore", o.inputScore()).property("outputScore", o.outputScore())
-                        .property("totalWork", o.totalWork()).property("withinBudget", o.withinBudget()).property("outcome", o.outcome().name())
-                        .property("wallNanos", o.wallNanos()).property("cpuNanos", o.cpuNanos()).property("allocatedBytes", o.allocatedBytes())))))))
+            return writer.array("trials", out -> trials.forEach(trial -> out.objectValue(item -> writeTrial(item, trial, explicitAccounting))))
                 .endObject().toString();
+        }
+        private void writeTrial(JsonWriter writer, Trial trial, boolean explicitAccounting) {
+            trialHeader(writer, trial).property("budgetViolations", trial.violations());
+            if (explicitAccounting) writer.property("accountingComplete", trial.accountingComplete());
+            writer.array("observations", out -> trial.observations().forEach(o -> out.objectValue(item -> writeObservation(item, o, explicitAccounting))));
+        }
+        private void writeObservation(JsonWriter writer, Observation o, boolean explicitAccounting) {
+            writer.property("task", o.taskId()).property("inputScore", o.inputScore()).property("outputScore", o.outputScore())
+                .property("totalWork", o.totalWork()).property("withinBudget", o.withinBudget()).property("outcome", o.outcome().name())
+                .property("wallNanos", o.wallNanos()).property("cpuNanos", o.cpuNanos()).property("allocatedBytes", o.allocatedBytes());
+            if (explicitAccounting) {
+                writer.property("accountingComplete", o.accountingComplete());
+                if (o.executionRevision() != null) writer.property("executionRevision", o.executionRevision());
+            }
         }
         private JsonWriter trialHeader(JsonWriter writer, Trial trial) {
             writer.property("profile", trial.profile().id()).property("work", trial.totalWork());
@@ -140,7 +171,8 @@ public final class TypedSourcePolicySelection {
                 var result = execute(task.problem(), profile, objective, qualityGoal);
                 observations.add(new Observation(task.id(), result.inputScore(), result.outputScore(), result.totalWork(),
                     result.withinBudget(), result.search().outcome(), System.nanoTime() - start,
-                    delta(cpu, cpu()), delta(allocation, allocated())));
+                    delta(cpu, cpu()), delta(allocation, allocated()), result.accountingComplete(),
+                    TypedPolicySelection.executionRevision(result.search())));
             }
             trials.add(new Trial(profile, observations));
         }

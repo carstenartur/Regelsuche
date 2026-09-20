@@ -26,6 +26,7 @@ final class PreparedTransformationCursor implements TransformationCursor {
         String hash;
         Frame(Expr expression, List<Integer> path) { this.expression = expression; this.path = path; }
     }
+    private final boolean resumable;
     private final PreparedAstRewriteTransformationEngine engine;
     private final String source;
     private final Definition definition;
@@ -42,12 +43,17 @@ final class PreparedTransformationCursor implements TransformationCursor {
     private String detail = "";
 
     PreparedTransformationCursor(PreparedAstRewriteTransformationEngine engine, String source, Definition definition) {
+        this(engine, source, definition, false);
+    }
+    PreparedTransformationCursor(PreparedAstRewriteTransformationEngine engine, String source, Definition definition, boolean resumable) {
+        this.resumable = resumable;
         this.engine = engine; this.source = source; this.definition = definition;
         charge(Operation.OPEN, 1);
     }
 
     @Override public Optional<Transformation> next(long allowance) {
         if (allowance < 0) throw new IllegalArgumentException("negative cursor allowance");
+        if (resumable && !closed && status == Status.WORK_EXHAUSTED && allowance > 0) status = Status.READY;
         if (closed || status != Status.READY) return Optional.empty();
         long before = work().totalUnits();
         if (!available(before, allowance)) return Optional.empty();
@@ -165,8 +171,9 @@ final class PreparedTransformationCursor implements TransformationCursor {
         operations.forEach((operation, units) -> named.put(operation.name(), units));
         return new Work(named, primitiveRewrites);
     }
+    @Override public Status status() { return status; }
     @Override public Snapshot snapshot() {
-        return new Snapshot(WORK_REVISION, definition, source, status, closed, work(), attempts, emitted.size(), detail);
+        return new Snapshot(resumable ? "regelsuche.resumable-native-transformation-cursor-work/v2" : WORK_REVISION, definition, source, status, closed, work(), attempts, emitted.size(), detail);
     }
     @Override public void close() {
         if (closed) return;

@@ -11,9 +11,9 @@ Baseline: `7aec9ae0a1619dda98f859d1277ac8b287471423`. Its tree equals reviewed/t
 - Post-merge main CI [35517882778](https://github.com/carstenartur/Regelsuche/actions/runs/35517882778) passed every required authority and `ciCheck` at that baseline. Main artifact 10607464502 has API-reported SHA256 `24a5bbc5882338c48cd2a4c5692281bd8f7715e38fc01c42487aa5c9daa90e06`; its ZIP was not downloaded.
 - Existing negative learning results and all quality thresholds remain unchanged.
 
-## P01 — implemented, qualification in progress
+## P01 — integrated
 
-[Draft PR #1049](https://github.com/carstenartur/Regelsuche/pull/1049) adds the v3
+[PR #1049](https://github.com/carstenartur/Regelsuche/pull/1049) adds the v3
 lifecycle account and comparison contract. Local implementation commits are
 `2ea17e71a69824272cf132a45c76c374a628f322` and
 `5784d1c7e0f2fa5be701049cb5d40ecdf645b5f2`.
@@ -28,7 +28,7 @@ lifecycle account and comparison contract. Local implementation commits are
   an oracle fixture that duplicated L1. Corrections charge all declared adapter
   output and require a supplied learned schema in the chosen oracle witness;
   focused RED/GREEN and the learning suite pass. Scoped independent re-review
-  approved both corrections without further findings; full hosted CI remains pending.
+  approved both corrections without further findings; full hosted CI passed.
 - Regular GitHub review identified three additional boundaries: evaluation could
   carry a TRAIN context, unknown information-regime strings could bypass family
   isolation, and child queries used a hardcoded deadline and reported ERROR.
@@ -39,8 +39,8 @@ lifecycle account and comparison contract. Local implementation commits are
   and remaining rows survive, preventing economic claims. The startup/restore
   deadline remains separate. All 20 focused tests pass, including a real hanging
   JVM with a 50ms query deadline and the existing three-profile integration.
-  Scoped independent review and hosted qualification of these corrections remain
-  pending; earlier approvals do not cover the new code.
+  Scoped independent review approved these corrections at local `5e6963ad`
+  without findings; the corresponding published head passed full hosted CI.
 - Actual pre-fix regressions also cover extreme numeric export, failed final
   replay and missing output evidence. For the new accounting/orchestration APIs,
   tests were written first but behavioral RED was not executed before filling the
@@ -50,6 +50,23 @@ lifecycle account and comparison contract. Local implementation commits are
   baseline. The existing accepted-predecessor procedure independently qualified
   M0 and retained both accepted and rejected reports; see
   [the provenance](../../ai-knowledge/baseline-history/2026-09-20-main7aec9ae0-provenance.json).
-  No threshold, selector or exception changed. P01 still needs its full current-head CI.
+  No threshold, selector or exception changed. P01 passed its own full current-head CI.
 
-No economic learning advantage is asserted by P01. P02–P12 are pending.
+Qualified head: `75848fd26639c1aa675b87a9dccdfa7fd9f16e83`, full CI
+[35523215069](https://github.com/carstenartur/Regelsuche/actions/runs/35523215069).
+All six authorities, `Checkout-local ciCheck` and CodeQL passed. All three GitHub
+review threads were resolved after their fixes and independent scoped review.
+Merge/main: `3deeb519357cdd6e67184d8104c0d925a0cf19d7`; the reread tree
+`1f54ebfc29986396cc1db530829234f708a617c6` exactly matches the qualified head.
+Commit bindings and API-reported artifact digests are retained in
+[the integration receipt](evidence/work-replacement/p01-integration.json).
+
+No economic learning advantage is asserted by P01.
+
+## P02 — in progress
+
+Starts from qualified integrated main `3deeb519357cdd6e67184d8104c0d925a0cf19d7`.
+Native v1 reference output was captured before any P02 edits for early success,
+complete enumeration, atomic generation overrun and state limits. The new
+registered contract must preserve those historical bytes and the existing
+mathematical checker boundary. P03–P12 remain pending.
