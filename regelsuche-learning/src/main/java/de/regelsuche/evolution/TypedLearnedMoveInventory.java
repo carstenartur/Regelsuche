@@ -68,6 +68,25 @@ public final class TypedLearnedMoveInventory {
         return List.copyOf(providers);
     }
 
+    /** Caller-owned provider inventory; proof regeneration remains independent of generation reuse. */
+    public record SearchSession(List<MoveProvider> providers, List<TypedPrimitiveCandidateCache> primitiveCaches,
+            TypedMoveSearch.Verifier verifier) {
+        public SearchSession {
+            providers = List.copyOf(providers);
+            primitiveCaches = List.copyOf(primitiveCaches);
+            java.util.Objects.requireNonNull(verifier, "verifier");
+        }
+    }
+
+    /** Initial uncached integration control; positive limits specify requested per-provider retention. */
+    public SearchSession newSearchSession(boolean includeLearned, int maximumEntriesPerProvider,
+            long maximumCharactersPerProvider) {
+        if (maximumEntriesPerProvider < 0 || maximumCharactersPerProvider < 0) {
+            throw new IllegalArgumentException("negative session retention bound");
+        }
+        return new SearchSession(includeLearned ? providers() : primitiveProviders(), List.of(), verifier());
+    }
+
     /** Regeneration uses the registered inventory; a learned identifier alone never authorizes an edge. */
     public TypedMoveSearch.Verifier verifier() {
         var programs = new HashMap<String, TypedMoveSearch.Verifier>();

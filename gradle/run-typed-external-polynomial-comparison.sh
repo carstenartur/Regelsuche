@@ -19,6 +19,7 @@ env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache --max-workers=2
   --tests de.regelsuche.evolution.TypedPolynomialSurfaceCostTest \
   --tests de.regelsuche.evolution.TypedLearnedMoveInventoryTest \
   --tests de.regelsuche.evolution.TypedLearningWorkStudyTest \
+  --tests de.regelsuche.evolution.TypedPrimitiveReuseSessionTest \
   --console=plain --stacktrace
 
 "$pilot_python" -m external_polynomial_comparison.run_typed \
