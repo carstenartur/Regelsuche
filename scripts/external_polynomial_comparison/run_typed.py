@@ -70,7 +70,7 @@ def check_setup(protocol: dict, profile: str, setup: dict) -> str:
         raise ValueError('typed profile initialization failed')
     if setup.get('settings') != {key: protocol[key] for key in SETTING_KEYS}:
         raise ValueError('typed settings differ from the frozen protocol')
-    model_hash = hashlib.sha256(setup['model'].encode('utf-8')).hexdigest()
+    model_hash = 'sha256:' + hashlib.sha256(setup['model'].encode('utf-8')).hexdigest()
     if model_hash != setup.get('modelHash') or json.loads(setup['model']).get('profile') != profile:
         raise ValueError('frozen model/profile hash mismatch')
     costs = setup['trainingWorkComponents']

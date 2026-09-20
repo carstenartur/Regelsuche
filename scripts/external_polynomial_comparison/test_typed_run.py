@@ -16,7 +16,7 @@ class TypedRunnerTest(unittest.TestCase):
     def setup(self, profile='BASE'):
         model = json.dumps({'profile': profile})
         return {'status': 'INITIALIZED', 'profile': profile, 'model': model,
-                'modelHash': hashlib.sha256(model.encode()).hexdigest(),
+                'modelHash': 'sha256:' + hashlib.sha256(model.encode()).hexdigest(),
                 'settings': {k: self.protocol()[k] for k in typed.SETTING_KEYS},
                 'trainingWork': 0, 'trainingWorkComponents': {'formation': 0, 'historySearch': 0, 'historyMemory': 0, 'policyTrials': 0},
                 'learnedPrograms': 0}
@@ -42,6 +42,15 @@ class TypedRunnerTest(unittest.TestCase):
             with self.assertRaises(ValueError): typed.check_setup(self.protocol(), 'BASE', bad)
         bad = dict(setup, trainingWork=1, trainingWorkComponents=dict(setup['trainingWorkComponents'], formation=1))
         with self.assertRaises(ValueError): typed.check_setup(self.protocol(), 'BASE', bad)
+
+    def test_java_prefixed_digest_contract_and_model_byte_integrity(self):
+        setup = self.setup()
+        setup['modelHash'] = 'sha256:' + hashlib.sha256(setup['model'].encode('utf-8')).hexdigest()
+        self.assertEqual(setup['modelHash'], typed.check_setup(self.protocol(), 'BASE', setup))
+        with self.assertRaises(ValueError):
+            typed.check_setup(self.protocol(), 'BASE', dict(setup, model=setup['model'] + ' '))
+        with self.assertRaises(ValueError):
+            typed.check_setup(self.protocol(), 'BASE', dict(setup, modelHash=setup['modelHash'][7:]))
 
     def test_query_binding_rejects_targets_profile_switch_and_unbilled_replay(self):
         candidate = self.candidate()
