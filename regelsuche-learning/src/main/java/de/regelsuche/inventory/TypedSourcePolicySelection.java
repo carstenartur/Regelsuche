@@ -97,6 +97,12 @@ public final class TypedSourcePolicySelection {
             .thenComparingLong(Trial::outputCost).thenComparingLong(Trial::totalWork)).orElseThrow().profile();
         return new Frozen(selected, trials, sources);
     }
+    /** Compile-time seam for the RED quality-control regression; not merge-qualified. */
+    public static Frozen trainUntil(List<TypedPolicySelection.TrainingTask> tasks, List<Profile> profiles,
+            TypedSourceOnlySearch.Objective objective, long maximumOutputScore, SearchContinuationContract contract) {
+        Objects.requireNonNull(contract, "contract");
+        return train(tasks, profiles, objective);
+    }
     private static TypedSourceOnlySearch.Result execute(TypedMoveSearch.Problem p, Profile profile,
             TypedSourceOnlySearch.Objective objective) {
         return new TypedSourceOnlySearch().search(new TypedMoveSearch.Problem(p.source(), p.context(), profile.providers(),
