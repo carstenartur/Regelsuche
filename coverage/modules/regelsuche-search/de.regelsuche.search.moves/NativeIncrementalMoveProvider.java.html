@@ -22,10 +22,13 @@ public final class NativeIncrementalMoveProvider implements IncrementalMoveProvi
 <span class="fc" id="L22">    }</span>
 <span class="fc" id="L23">    @Override public Descriptor descriptor() { return descriptor; }</span>
 <span class="fc" id="L24">    @Override public TransformationCursor.Definition definition() { return definition; }</span>
+    TransformationCursor openResumableCursor(String expression) {
+<span class="fc" id="L26">        return engine.openResumableCursor(expression, definition.matcherBranchLimit());</span>
+    }
     @Override public TransformationCursor openCursor(MoveState state, MoveContext context) {
-<span class="fc bfc" id="L26" title="All 2 branches covered.">        if (!context.carries(descriptor.requiredAssumptions(), state))</span>
-<span class="fc" id="L27">            throw new AssumptionsNotCarried();</span>
-<span class="fc" id="L28">        return engine.openCursor(state.expression(), definition.matcherBranchLimit());</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        if (!context.carries(descriptor.requiredAssumptions(), state))</span>
+<span class="fc" id="L30">            throw new AssumptionsNotCarried();</span>
+<span class="fc" id="L31">        return engine.openCursor(state.expression(), definition.matcherBranchLimit());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

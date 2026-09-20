@@ -2,21 +2,28 @@
 
 import de.regelsuche.transform.TransformationCursor;
 
-/** Explicit native capability. This first revision does not admit opaque, learned or plugin providers. */
-public sealed interface IncrementalMoveProvider extends MoveProvider permits NativeIncrementalMoveProvider {
+/** Sealed incremental admission: native v1 or explicit registered v2. No arbitrary implementation admission. */
+public sealed interface IncrementalMoveProvider extends MoveProvider permits NativeIncrementalMoveProvider, RegisteredIncrementalMoveProvider {
     TransformationCursor.Definition definition();
+    /** General v2 metadata; a registered schema is never represented as a native rule. */
+    default IncrementalProviderContract.Definition contractDefinition() {
+<span class="fc" id="L10">        return StagedIncrementalSources.definition(this);</span>
+    }
+    default IncrementalProviderContract.Cursor openSession(MoveState state, MoveContext context) {
+<span class="pc" id="L13">        return StagedIncrementalSources.open(this, state, context, ignored -&gt; {});</span>
+    }
     /** Checks provider admission once, before opening/charging a transformation cursor. */
     TransformationCursor openCursor(MoveState state, MoveContext context);
 
     /** Typed admission rejection so the picker retains the check without treating it as a generation failure. */
     final class AssumptionsNotCarried extends IllegalArgumentException {
         private static final long serialVersionUID = 1L;
-<span class="fc" id="L14">        AssumptionsNotCarried() { super(&quot;native provider assumptions are not carried by the source context&quot;); }</span>
+<span class="fc" id="L21">        AssumptionsNotCarried() { super(&quot;native provider assumptions are not carried by the source context&quot;); }</span>
     }
 
     /** A batch adapter would discard this revision's suspension and work contract. */
     @Override default Batch candidates(MoveState state, MoveContext context) {
-<span class="fc" id="L19">        throw new UnsupportedOperationException(&quot;incremental providers require INCREMENTAL_NATIVE_ORDER scheduling&quot;);</span>
+<span class="fc" id="L26">        throw new UnsupportedOperationException(&quot;incremental providers require their explicit incremental scheduling contract&quot;);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

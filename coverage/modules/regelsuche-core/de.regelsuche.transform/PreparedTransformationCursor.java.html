@@ -26,152 +26,159 @@ final class PreparedTransformationCursor implements TransformationCursor {
         String hash;
 <span class="fc" id="L27">        Frame(Expr expression, List&lt;Integer&gt; path) { this.expression = expression; this.path = path; }</span>
     }
+    private final boolean resumable;
     private final PreparedAstRewriteTransformationEngine engine;
     private final String source;
     private final Definition definition;
-<span class="fc" id="L32">    private final ArrayDeque&lt;Frame&gt; stack = new ArrayDeque&lt;&gt;();</span>
-<span class="fc" id="L33">    private final EnumMap&lt;Operation, Long&gt; operations = new EnumMap&lt;&gt;(Operation.class);</span>
-<span class="fc" id="L34">    private final List&lt;Attempt&gt; attempts = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L35">    private final LinkedHashSet&lt;Transformation&gt; emitted = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L33">    private final ArrayDeque&lt;Frame&gt; stack = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L34">    private final EnumMap&lt;Operation, Long&gt; operations = new EnumMap&lt;&gt;(Operation.class);</span>
+<span class="fc" id="L35">    private final List&lt;Attempt&gt; attempts = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L36">    private final LinkedHashSet&lt;Transformation&gt; emitted = new LinkedHashSet&lt;&gt;();</span>
     private Expr root;
     private String formattedSource;
     private int originalSize;
     private long primitiveRewrites;
     private boolean initialized, closed;
-<span class="fc" id="L41">    private Status status = Status.READY;</span>
-<span class="fc" id="L42">    private String detail = &quot;&quot;;</span>
+<span class="fc" id="L42">    private Status status = Status.READY;</span>
+<span class="fc" id="L43">    private String detail = &quot;&quot;;</span>
 
-<span class="fc" id="L44">    PreparedTransformationCursor(PreparedAstRewriteTransformationEngine engine, String source, Definition definition) {</span>
-<span class="fc" id="L45">        this.engine = engine; this.source = source; this.definition = definition;</span>
-<span class="fc" id="L46">        charge(Operation.OPEN, 1);</span>
+    PreparedTransformationCursor(PreparedAstRewriteTransformationEngine engine, String source, Definition definition) {
+<span class="fc" id="L46">        this(engine, source, definition, false);</span>
 <span class="fc" id="L47">    }</span>
+<span class="fc" id="L48">    PreparedTransformationCursor(PreparedAstRewriteTransformationEngine engine, String source, Definition definition, boolean resumable) {</span>
+<span class="fc" id="L49">        this.resumable = resumable;</span>
+<span class="fc" id="L50">        this.engine = engine; this.source = source; this.definition = definition;</span>
+<span class="fc" id="L51">        charge(Operation.OPEN, 1);</span>
+<span class="fc" id="L52">    }</span>
 
     @Override public Optional&lt;Transformation&gt; next(long allowance) {
-<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (allowance &lt; 0) throw new IllegalArgumentException(&quot;negative cursor allowance&quot;);</span>
-<span class="fc bfc" id="L51" title="All 4 branches covered.">        if (closed || status != Status.READY) return Optional.empty();</span>
-<span class="fc" id="L52">        long before = work().totalUnits();</span>
-<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if (!available(before, allowance)) return Optional.empty();</span>
-<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (!initialized) initialize();</span>
-<span class="fc bfc" id="L55" title="All 4 branches covered.">        while (status == Status.READY &amp;&amp; available(before, allowance)) {</span>
-<span class="fc" id="L56">            Frame frame = nextFrame(before, allowance);</span>
-<span class="fc bfc" id="L57" title="All 2 branches covered.">            if (frame == null) return Optional.empty();</span>
-<span class="fc" id="L58">            var result = executeRule(frame);</span>
-<span class="fc bfc" id="L59" title="All 2 branches covered.">            if (result.isPresent()) return result;</span>
-<span class="fc" id="L60">        }</span>
-<span class="fc" id="L61">        return Optional.empty();</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (allowance &lt; 0) throw new IllegalArgumentException(&quot;negative cursor allowance&quot;);</span>
+<span class="pc bpc" id="L56" title="2 of 8 branches missed.">        if (resumable &amp;&amp; !closed &amp;&amp; status == Status.WORK_EXHAUSTED &amp;&amp; allowance &gt; 0) status = Status.READY;</span>
+<span class="fc bfc" id="L57" title="All 4 branches covered.">        if (closed || status != Status.READY) return Optional.empty();</span>
+<span class="fc" id="L58">        long before = work().totalUnits();</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (!available(before, allowance)) return Optional.empty();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (!initialized) initialize();</span>
+<span class="fc bfc" id="L61" title="All 4 branches covered.">        while (status == Status.READY &amp;&amp; available(before, allowance)) {</span>
+<span class="fc" id="L62">            Frame frame = nextFrame(before, allowance);</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            if (frame == null) return Optional.empty();</span>
+<span class="fc" id="L64">            var result = executeRule(frame);</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">            if (result.isPresent()) return result;</span>
+<span class="fc" id="L66">        }</span>
+<span class="fc" id="L67">        return Optional.empty();</span>
     }
 
     private boolean available(long before, long allowance) {
-<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (work().totalUnits() - before &lt; allowance) return true;</span>
-<span class="fc" id="L66">        status = Status.WORK_EXHAUSTED;</span>
-<span class="fc" id="L67">        return false;</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (work().totalUnits() - before &lt; allowance) return true;</span>
+<span class="fc" id="L72">        status = Status.WORK_EXHAUSTED;</span>
+<span class="fc" id="L73">        return false;</span>
     }
 
     private void initialize() {
-<span class="fc" id="L71">        initialized = true;</span>
-<span class="fc" id="L72">        charge(Operation.PARSE, 1);</span>
+<span class="fc" id="L77">        initialized = true;</span>
+<span class="fc" id="L78">        charge(Operation.PARSE, 1);</span>
         try {
-<span class="fc" id="L74">            root = new ExpressionParser().parse(new InputRequest(InputType.TERM, source)).terms().getFirst();</span>
-<span class="fc" id="L75">        } catch (IllegalArgumentException failure) {</span>
-<span class="fc" id="L76">            status = Status.INVALID_INPUT; detail = failure.getMessage(); return;</span>
-<span class="fc" id="L77">        }</span>
-<span class="fc" id="L78">        charge(Operation.FORMAT, 1); formattedSource = ExpressionFormatter.format(root);</span>
-<span class="fc" id="L79">        charge(Operation.CANONICAL_SIZE, 1); originalSize = engine.canonicalAstNodeCount(root);</span>
-<span class="fc" id="L80">        stack.push(new Frame(root, List.of()));</span>
-<span class="fc" id="L81">    }</span>
+<span class="fc" id="L80">            root = new ExpressionParser().parse(new InputRequest(InputType.TERM, source)).terms().getFirst();</span>
+<span class="fc" id="L81">        } catch (IllegalArgumentException failure) {</span>
+<span class="fc" id="L82">            status = Status.INVALID_INPUT; detail = failure.getMessage(); return;</span>
+<span class="fc" id="L83">        }</span>
+<span class="fc" id="L84">        charge(Operation.FORMAT, 1); formattedSource = ExpressionFormatter.format(root);</span>
+<span class="fc" id="L85">        charge(Operation.CANONICAL_SIZE, 1); originalSize = engine.canonicalAstNodeCount(root);</span>
+<span class="fc" id="L86">        stack.push(new Frame(root, List.of()));</span>
+<span class="fc" id="L87">    }</span>
 
     private Frame nextFrame(long before, long allowance) {
-<span class="pc bpc" id="L84" title="1 of 4 branches missed.">        while (!stack.isEmpty() &amp;&amp; available(before, allowance)) {</span>
-<span class="fc" id="L85">            var frame = stack.peek();</span>
-<span class="fc bfc" id="L86" title="All 2 branches covered.">            if (!frame.entered) { frame.entered = true; charge(Operation.OCCURRENCE_VISIT, 1); }</span>
-<span class="pc bpc" id="L87" title="1 of 2 branches missed.">            if (!available(before, allowance)) return null;</span>
-<span class="fc bfc" id="L88" title="All 2 branches covered.">            if (frame.ruleIndex &lt; engine.rules().size()) return frame;</span>
-<span class="fc" id="L89">            Expr child = child(frame.expression, frame.childIndex);</span>
-<span class="fc bfc" id="L90" title="All 2 branches covered.">            if (child == null) { stack.pop(); continue; }</span>
-<span class="fc" id="L91">            var path = new ArrayList&lt;&gt;(frame.path); path.add(frame.childIndex++);</span>
-<span class="fc" id="L92">            stack.push(new Frame(child, List.copyOf(path)));</span>
-<span class="fc" id="L93">        }</span>
-<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (stack.isEmpty()) status = Status.EXHAUSTED;</span>
-<span class="fc" id="L95">        return null;</span>
+<span class="pc bpc" id="L90" title="1 of 4 branches missed.">        while (!stack.isEmpty() &amp;&amp; available(before, allowance)) {</span>
+<span class="fc" id="L91">            var frame = stack.peek();</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (!frame.entered) { frame.entered = true; charge(Operation.OCCURRENCE_VISIT, 1); }</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">            if (!available(before, allowance)) return null;</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            if (frame.ruleIndex &lt; engine.rules().size()) return frame;</span>
+<span class="fc" id="L95">            Expr child = child(frame.expression, frame.childIndex);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            if (child == null) { stack.pop(); continue; }</span>
+<span class="fc" id="L97">            var path = new ArrayList&lt;&gt;(frame.path); path.add(frame.childIndex++);</span>
+<span class="fc" id="L98">            stack.push(new Frame(child, List.copyOf(path)));</span>
+<span class="fc" id="L99">        }</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (stack.isEmpty()) status = Status.EXHAUSTED;</span>
+<span class="fc" id="L101">        return null;</span>
     }
 
     private static Expr child(Expr expression, int index) {
-<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
-<span class="fc bfc" id="L100" title="All 3 branches covered.">            return switch (index) { case 0 -&gt; binary.left(); case 1 -&gt; binary.right(); default -&gt; null; };</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L106" title="All 3 branches covered.">            return switch (index) { case 0 -&gt; binary.left(); case 1 -&gt; binary.right(); default -&gt; null; };</span>
         }
-<span class="fc bfc" id="L102" title="All 4 branches covered.">        if (expression instanceof FunctionExpr function &amp;&amp; index &lt; function.arguments().size())</span>
-<span class="fc" id="L103">            return function.arguments().get(index);</span>
-<span class="fc" id="L104">        return null;</span>
+<span class="fc bfc" id="L108" title="All 4 branches covered.">        if (expression instanceof FunctionExpr function &amp;&amp; index &lt; function.arguments().size())</span>
+<span class="fc" id="L109">            return function.arguments().get(index);</span>
+<span class="fc" id="L110">        return null;</span>
     }
 
     private Optional&lt;Transformation&gt; executeRule(Frame frame) {
-<span class="fc" id="L108">        int index = frame.ruleIndex++;</span>
-<span class="fc" id="L109">        var rule = (PatternRewriteRule) engine.rules().get(index);</span>
-<span class="fc" id="L110">        charge(Operation.RULE_MATCH, 1);</span>
-<span class="fc" id="L111">        var match = EquivalenceAwarePatternMatcher.matchDetailed(rule.source(), frame.expression, new HashMap&lt;&gt;(),</span>
-<span class="fc" id="L112">            rule.recognitionProfile(), definition.matcherBranchLimit());</span>
-<span class="fc" id="L113">        charge(Operation.MATCHER_BRANCH, match.visitedBranches());</span>
-<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (!match.matched()) {</span>
-<span class="fc bfc" id="L115" title="All 2 branches covered.">            record(frame, index, match.inconclusive() ? AttemptOutcome.MATCH_INCONCLUSIVE : AttemptOutcome.NOT_MATCHED,</span>
-<span class="fc" id="L116">                match.visitedBranches(), match.limitCode());</span>
-<span class="fc" id="L117">            return Optional.empty();</span>
+<span class="fc" id="L114">        int index = frame.ruleIndex++;</span>
+<span class="fc" id="L115">        var rule = (PatternRewriteRule) engine.rules().get(index);</span>
+<span class="fc" id="L116">        charge(Operation.RULE_MATCH, 1);</span>
+<span class="fc" id="L117">        var match = EquivalenceAwarePatternMatcher.matchDetailed(rule.source(), frame.expression, new HashMap&lt;&gt;(),</span>
+<span class="fc" id="L118">            rule.recognitionProfile(), definition.matcherBranchLimit());</span>
+<span class="fc" id="L119">        charge(Operation.MATCHER_BRANCH, match.visitedBranches());</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (!match.matched()) {</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            record(frame, index, match.inconclusive() ? AttemptOutcome.MATCH_INCONCLUSIVE : AttemptOutcome.NOT_MATCHED,</span>
+<span class="fc" id="L122">                match.visitedBranches(), match.limitCode());</span>
+<span class="fc" id="L123">            return Optional.empty();</span>
         }
         try {
-<span class="fc" id="L120">            return materialize(frame, index, rule, match);</span>
-<span class="fc" id="L121">        } catch (IllegalArgumentException failure) {</span>
-<span class="fc" id="L122">            record(frame, index, AttemptOutcome.FAILED, match.visitedBranches(), failure.getMessage());</span>
-<span class="fc" id="L123">            status = Status.FAILED; detail = failure.getMessage();</span>
-<span class="fc" id="L124">            return Optional.empty();</span>
+<span class="fc" id="L126">            return materialize(frame, index, rule, match);</span>
+<span class="fc" id="L127">        } catch (IllegalArgumentException failure) {</span>
+<span class="fc" id="L128">            record(frame, index, AttemptOutcome.FAILED, match.visitedBranches(), failure.getMessage());</span>
+<span class="fc" id="L129">            status = Status.FAILED; detail = failure.getMessage();</span>
+<span class="fc" id="L130">            return Optional.empty();</span>
         }
     }
 
     private Optional&lt;Transformation&gt; materialize(Frame frame, int index, PatternRewriteRule rule,
             EquivalenceAwarePatternMatcher.MatchAttempt match) {
-<span class="fc" id="L130">        charge(Operation.INSTANTIATE, 1);</span>
-<span class="fc" id="L131">        Expr replacement = rule.target().instantiate(match.bindings());</span>
-<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (replacement.equals(frame.expression)) return filtered(frame, index, match, AttemptOutcome.UNCHANGED);</span>
-<span class="fc" id="L133">        primitiveRewrites = Math.addExact(primitiveRewrites, 1);</span>
-<span class="fc" id="L134">        var rebuilt = new TreePosition(frame.path, &quot;cursor-bound-source&quot;).replaceAt(root, replacement);</span>
-<span class="fc" id="L135">        charge(Operation.ANCESTOR_COPY, rebuilt.copiedAncestors());</span>
-<span class="fc" id="L136">        Expr rewritten = rebuilt.rewrittenRoot().orElseThrow();</span>
-<span class="fc" id="L137">        charge(Operation.FORMAT, 1); String formatted = ExpressionFormatter.format(rewritten);</span>
-<span class="fc" id="L138">        charge(Operation.FILTER, 1);</span>
-<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (formatted.equals(formattedSource)) return filtered(frame, index, match, AttemptOutcome.UNCHANGED);</span>
-<span class="fc" id="L140">        charge(Operation.CANONICAL_SIZE, 1);</span>
-<span class="fc bfc" id="L141" title="All 2 branches covered.">        if ((long) engine.canonicalAstNodeCount(rewritten) - originalSize &gt; definition.maxAstSizeIncrease())</span>
-<span class="fc" id="L142">            return filtered(frame, index, match, AttemptOutcome.GROWTH_REJECTED);</span>
-<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (frame.hash == null) { charge(Operation.SOURCE_HASH, 1); frame.hash = engine.stableHash(frame.expression); }</span>
-<span class="fc" id="L144">        var transformation = new Transformation(rule.id(), formatted, rule.kind(), rule.mayIncreaseComplexity(),</span>
-<span class="fc" id="L145">            rule.estimatedCostDelta(), rule.isEquivalencePreservingByConstruction(), rule.id() + &quot;:&quot; + frame.hash,</span>
-<span class="fc" id="L146">            List.of(), rule.descriptor().packId(), rule.descriptor().license());</span>
-<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (!emitted.add(transformation)) return filtered(frame, index, match, AttemptOutcome.DUPLICATE);</span>
-<span class="fc" id="L148">        charge(Operation.EMIT, 1); record(frame, index, AttemptOutcome.EMITTED, match.visitedBranches(), &quot;&quot;);</span>
-<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (emitted.size() &gt;= definition.maxCandidates()) status = Status.CANDIDATE_LIMIT;</span>
-<span class="fc" id="L150">        return Optional.of(transformation);</span>
+<span class="fc" id="L136">        charge(Operation.INSTANTIATE, 1);</span>
+<span class="fc" id="L137">        Expr replacement = rule.target().instantiate(match.bindings());</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (replacement.equals(frame.expression)) return filtered(frame, index, match, AttemptOutcome.UNCHANGED);</span>
+<span class="fc" id="L139">        primitiveRewrites = Math.addExact(primitiveRewrites, 1);</span>
+<span class="fc" id="L140">        var rebuilt = new TreePosition(frame.path, &quot;cursor-bound-source&quot;).replaceAt(root, replacement);</span>
+<span class="fc" id="L141">        charge(Operation.ANCESTOR_COPY, rebuilt.copiedAncestors());</span>
+<span class="fc" id="L142">        Expr rewritten = rebuilt.rewrittenRoot().orElseThrow();</span>
+<span class="fc" id="L143">        charge(Operation.FORMAT, 1); String formatted = ExpressionFormatter.format(rewritten);</span>
+<span class="fc" id="L144">        charge(Operation.FILTER, 1);</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        if (formatted.equals(formattedSource)) return filtered(frame, index, match, AttemptOutcome.UNCHANGED);</span>
+<span class="fc" id="L146">        charge(Operation.CANONICAL_SIZE, 1);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if ((long) engine.canonicalAstNodeCount(rewritten) - originalSize &gt; definition.maxAstSizeIncrease())</span>
+<span class="fc" id="L148">            return filtered(frame, index, match, AttemptOutcome.GROWTH_REJECTED);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (frame.hash == null) { charge(Operation.SOURCE_HASH, 1); frame.hash = engine.stableHash(frame.expression); }</span>
+<span class="fc" id="L150">        var transformation = new Transformation(rule.id(), formatted, rule.kind(), rule.mayIncreaseComplexity(),</span>
+<span class="fc" id="L151">            rule.estimatedCostDelta(), rule.isEquivalencePreservingByConstruction(), rule.id() + &quot;:&quot; + frame.hash,</span>
+<span class="fc" id="L152">            List.of(), rule.descriptor().packId(), rule.descriptor().license());</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (!emitted.add(transformation)) return filtered(frame, index, match, AttemptOutcome.DUPLICATE);</span>
+<span class="fc" id="L154">        charge(Operation.EMIT, 1); record(frame, index, AttemptOutcome.EMITTED, match.visitedBranches(), &quot;&quot;);</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (emitted.size() &gt;= definition.maxCandidates()) status = Status.CANDIDATE_LIMIT;</span>
+<span class="fc" id="L156">        return Optional.of(transformation);</span>
     }
 
     private Optional&lt;Transformation&gt; filtered(Frame frame, int index,
             EquivalenceAwarePatternMatcher.MatchAttempt match, AttemptOutcome outcome) {
-<span class="fc" id="L155">        record(frame, index, outcome, match.visitedBranches(), &quot;&quot;);</span>
-<span class="fc" id="L156">        return Optional.empty();</span>
+<span class="fc" id="L161">        record(frame, index, outcome, match.visitedBranches(), &quot;&quot;);</span>
+<span class="fc" id="L162">        return Optional.empty();</span>
     }
 
     private void record(Frame frame, int index, AttemptOutcome outcome, int branches, String code) {
-<span class="fc" id="L160">        attempts.add(new Attempt(frame.path, index, engine.rules().get(index).id(), outcome, branches, code));</span>
-<span class="fc" id="L161">    }</span>
-<span class="fc" id="L162">    private void charge(Operation operation, long units) { operations.merge(operation, units, Math::addExact); }</span>
+<span class="fc" id="L166">        attempts.add(new Attempt(frame.path, index, engine.rules().get(index).id(), outcome, branches, code));</span>
+<span class="fc" id="L167">    }</span>
+<span class="fc" id="L168">    private void charge(Operation operation, long units) { operations.merge(operation, units, Math::addExact); }</span>
     @Override public Work work() {
-<span class="fc" id="L164">        var named = new java.util.TreeMap&lt;String, Long&gt;();</span>
-<span class="fc" id="L165">        operations.forEach((operation, units) -&gt; named.put(operation.name(), units));</span>
-<span class="fc" id="L166">        return new Work(named, primitiveRewrites);</span>
+<span class="fc" id="L170">        var named = new java.util.TreeMap&lt;String, Long&gt;();</span>
+<span class="fc" id="L171">        operations.forEach((operation, units) -&gt; named.put(operation.name(), units));</span>
+<span class="fc" id="L172">        return new Work(named, primitiveRewrites);</span>
     }
+<span class="fc" id="L174">    @Override public Status status() { return status; }</span>
     @Override public Snapshot snapshot() {
-<span class="fc" id="L169">        return new Snapshot(WORK_REVISION, definition, source, status, closed, work(), attempts, emitted.size(), detail);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        return new Snapshot(resumable ? &quot;regelsuche.resumable-native-transformation-cursor-work/v2&quot; : WORK_REVISION, definition, source, status, closed, work(), attempts, emitted.size(), detail);</span>
     }
     @Override public void close() {
-<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (closed) return;</span>
-<span class="fc" id="L173">        closed = true; charge(Operation.CLOSE, 1); stack.clear();</span>
-<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (status == Status.READY) status = Status.CLOSED;</span>
-<span class="fc" id="L175">    }</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        if (closed) return;</span>
+<span class="fc" id="L180">        closed = true; charge(Operation.CLOSE, 1); stack.clear();</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (status == Status.READY) status = Status.CLOSED;</span>
+<span class="fc" id="L182">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

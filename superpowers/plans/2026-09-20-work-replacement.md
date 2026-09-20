@@ -244,11 +244,11 @@ Ein Meilenstein enthält einen Nachweis, nicht nur neue Klassen oder grüne Unit
 
 **Schnittstelle:** Die vorhandene Operation `next(long workAllowance)` bleibt der gemeinsame Pull-Vertrag. Die neue Vertragsrevision unterscheidet native Regeldefinitionen und registrierte geprüfte Schemaanwendungen. Die zulassende Hülle liegt im Suchmodul; es entsteht keine Abhängigkeit des Suchmoduls auf den Lerner. Öffentliche Kandidatenbeschreibungen sind weiterhin untrusted und verleihen keine Proof-Autorität.
 
-- [ ] Den aktuellen Ausschluss gelernter Anbieter als Referenztest bewahren. Ein neuer Test verlangt die explizit registrierte, versionierte Variante, nicht eine pauschale Freigabe beliebiger Implementierungen.
-- [ ] Definitionen und Quittungen um eine deklarierte Anbieterart, Modell-/Semantikrevision und tatsächliche Anwendungskosten erweitern. Gelernte Schemata nicht als erfundene native Regeln kodieren.
-- [ ] Einen neuen, expliziten Schedulingvertrag für gestufte inkrementelle Anbieter im vorhandenen Picker einführen. Alte `STAGED`- und `INCREMENTAL_NATIVE_ORDER`-Aufrufe behalten ihren bisherigen Vertrag.
-- [ ] Native und gelernte Stufen kombinieren, ohne späteren Stufen schon beim Öffnen Kandidatenlisten abzunehmen. Parent-Fortsetzungen bleiben suspendierbar.
-- [ ] Zustände OPEN, READY, EXHAUSTED, LIMIT/INCONCLUSIVE, FAILED und CLOSED inklusive Restbudget und Abschlusskosten prüfen. Schließen darf idempotent sein, aber tatsächlich ausgeführte Arbeit nicht rückwirkend löschen.
+- [x] Den aktuellen Ausschluss gelernter Anbieter als Referenztest bewahren. Ein neuer Test verlangt die explizit registrierte, versionierte Variante, nicht eine pauschale Freigabe beliebiger Implementierungen.
+- [x] Definitionen und Quittungen um eine deklarierte Anbieterart, Modell-/Semantikrevision und tatsächliche Anwendungskosten erweitern. Gelernte Schemata nicht als erfundene native Regeln kodieren.
+- [x] Einen neuen, expliziten Schedulingvertrag für gestufte inkrementelle Anbieter im vorhandenen Picker einführen. Alte `STAGED`- und `INCREMENTAL_NATIVE_ORDER`-Aufrufe behalten ihren bisherigen Vertrag.
+- [x] Native und gelernte Stufen kombinieren, ohne späteren Stufen schon beim Öffnen Kandidatenlisten abzunehmen. Parent-Fortsetzungen bleiben suspendierbar.
+- [x] Zustände OPEN, READY, EXHAUSTED, LIMIT/INCONCLUSIVE, FAILED und CLOSED inklusive Restbudget und Abschlusskosten prüfen. Schließen darf idempotent sein, aber tatsächlich ausgeführte Arbeit nicht rückwirkend löschen.
 
 **Konkrete Regressionen:** Öffnen mit Budget null erzeugt keinen Kandidaten; ein Pull gibt höchstens einen Kandidaten; erneuter Pull setzt fort und startet nicht neu; verzögerte native Stufe wird nach frühem Erfolg nicht geöffnet; falsche Modellrevision wird abgewiesen; atomarer Overrun bleibt sichtbar; alte native Resultate bleiben unverändert.
 

@@ -18,50 +18,59 @@ import java.util.Objects;
  */
 <span class="fc" id="L19">public final class TypedPolicySelection {</span>
     public static final String REVISION = &quot;regelsuche.typed-policy-selection/v2&quot;;
-<span class="fc" id="L21">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
-<span class="fc" id="L22">    private static final HistoryMovePolicy.Weights ZERO = new HistoryMovePolicy.Weights(0, 0, 0, 0, 0, 0, 0, 0);</span>
-<span class="fc" id="L23">    public enum PolicyKind { INVENTORY_ORDER, HISTORY_RANKED }</span>
+    public static final String ACCOUNTING_REVISION = &quot;regelsuche.typed-policy-selection/v3-accounting&quot;;
+<span class="fc" id="L22">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+<span class="fc" id="L23">    private static final HistoryMovePolicy.Weights ZERO = new HistoryMovePolicy.Weights(0, 0, 0, 0, 0, 0, 0, 0);</span>
+<span class="fc" id="L24">    public enum PolicyKind { INVENTORY_ORDER, HISTORY_RANKED }</span>
 
     /** Same selector lifecycle for optimization tasks with no manufactured endpoint. */
     public TypedSourcePolicySelection.Frozen trainSourceOnly(List&lt;TrainingTask&gt; tasks,
             List&lt;TypedSourcePolicySelection.Profile&gt; profiles,
             de.regelsuche.search.moves.TypedSourceOnlySearch.Objective objective) {
-<span class="fc" id="L29">        return TypedSourcePolicySelection.train(tasks, profiles, objective);</span>
+<span class="fc" id="L30">        return TypedSourcePolicySelection.train(tasks, profiles, objective);</span>
     }
 
     public record Profile(String id, PolicyKind kind, HistoryMovePolicy.Weights weights) {
-<span class="fc" id="L33">        public Profile(String id, HistoryMovePolicy.Weights weights) { this(id, PolicyKind.HISTORY_RANKED, weights); }</span>
-<span class="fc" id="L34">        public Profile {</span>
-<span class="pc bpc" id="L35" title="2 of 4 branches missed.">            if (id == null || id.isBlank()) throw new IllegalArgumentException(&quot;profile ID required&quot;);</span>
-<span class="fc" id="L36">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
-<span class="fc" id="L37">            Objects.requireNonNull(weights, &quot;weights&quot;);</span>
-<span class="fc bfc" id="L38" title="All 4 branches covered.">            if (kind == PolicyKind.INVENTORY_ORDER &amp;&amp; !ZERO.equals(weights)) {</span>
-<span class="fc" id="L39">                throw new IllegalArgumentException(&quot;inventory order does not apply ranking weights&quot;);</span>
+<span class="fc" id="L34">        public Profile(String id, HistoryMovePolicy.Weights weights) { this(id, PolicyKind.HISTORY_RANKED, weights); }</span>
+<span class="fc" id="L35">        public Profile {</span>
+<span class="pc bpc" id="L36" title="2 of 4 branches missed.">            if (id == null || id.isBlank()) throw new IllegalArgumentException(&quot;profile ID required&quot;);</span>
+<span class="fc" id="L37">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L38">            Objects.requireNonNull(weights, &quot;weights&quot;);</span>
+<span class="fc bfc" id="L39" title="All 4 branches covered.">            if (kind == PolicyKind.INVENTORY_ORDER &amp;&amp; !ZERO.equals(weights)) {</span>
+<span class="fc" id="L40">                throw new IllegalArgumentException(&quot;inventory order does not apply ranking weights&quot;);</span>
             }
-<span class="fc" id="L41">        }</span>
-<span class="fc" id="L42">        public static Profile inventoryOrder(String id) { return new Profile(id, PolicyKind.INVENTORY_ORDER, ZERO); }</span>
+<span class="fc" id="L42">        }</span>
+<span class="fc" id="L43">        public static Profile inventoryOrder(String id) { return new Profile(id, PolicyKind.INVENTORY_ORDER, ZERO); }</span>
     }
 
     public record TrainingTask(String id, TypedMoveSearch.Problem problem) {
-<span class="fc" id="L46">        public TrainingTask {</span>
-<span class="pc bpc" id="L47" title="2 of 4 branches missed.">            if (id == null || id.isBlank()) throw new IllegalArgumentException(&quot;training task ID required&quot;);</span>
-<span class="fc" id="L48">            Objects.requireNonNull(problem, &quot;problem&quot;);</span>
-<span class="fc" id="L49">        }</span>
+<span class="fc" id="L47">        public TrainingTask {</span>
+<span class="pc bpc" id="L48" title="2 of 4 branches missed.">            if (id == null || id.isBlank()) throw new IllegalArgumentException(&quot;training task ID required&quot;);</span>
+<span class="fc" id="L49">            Objects.requireNonNull(problem, &quot;problem&quot;);</span>
+<span class="fc" id="L50">        }</span>
     }
 
-    public record Observation(String taskId, MoveSearch.Outcome outcome, MoveSearch.Metrics metrics) {
-<span class="fc" id="L53">        public Observation {</span>
-<span class="fc" id="L54">            Objects.requireNonNull(taskId); Objects.requireNonNull(outcome); Objects.requireNonNull(metrics);</span>
-<span class="fc" id="L55">        }</span>
+    public record Observation(String taskId, MoveSearch.Outcome outcome, MoveSearch.Metrics metrics,
+            boolean accountingComplete, String executionRevision) {
+        public Observation(String taskId, MoveSearch.Outcome outcome, MoveSearch.Metrics metrics) {
+<span class="nc" id="L56">            this(taskId, outcome, metrics, true, null);</span>
+<span class="nc" id="L57">        }</span>
+<span class="fc" id="L58">        public Observation {</span>
+<span class="fc" id="L59">            Objects.requireNonNull(taskId); Objects.requireNonNull(outcome); Objects.requireNonNull(metrics);</span>
+<span class="fc" id="L60">        }</span>
     }
 
     public record Trial(Profile profile, List&lt;Observation&gt; observations) {
-<span class="fc" id="L59">        public Trial { Objects.requireNonNull(profile); observations = List.copyOf(observations); }</span>
+<span class="fc" id="L64">        public Trial { Objects.requireNonNull(profile); observations = List.copyOf(observations); }</span>
         public long totalWork() {
-<span class="fc" id="L61">            return observations.stream().mapToLong(observation -&gt; observation.metrics().totalWork()).reduce(0, Math::addExact);</span>
+<span class="fc" id="L66">            return observations.stream().mapToLong(observation -&gt; observation.metrics().totalWork()).reduce(0, Math::addExact);</span>
+        }
+<span class="fc" id="L68">        public boolean accountingComplete() { return observations.stream().allMatch(Observation::accountingComplete); }</span>
+        public boolean explicitAccounting() {
+<span class="pc bpc" id="L70" title="1 of 4 branches missed.">            return observations.stream().anyMatch(o -&gt; o.executionRevision() != null || !o.accountingComplete());</span>
         }
         public long solved() {
-<span class="pc bpc" id="L64" title="1 of 2 branches missed.">            return observations.stream().filter(observation -&gt; observation.outcome() == MoveSearch.Outcome.TARGET_REACHED).count();</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            return observations.stream().filter(observation -&gt; observation.outcome() == MoveSearch.Outcome.TARGET_REACHED).count();</span>
         }
     }
 
@@ -73,114 +82,132 @@ import java.util.Objects;
         private final String json;
 
         private FrozenPolicy(RuleHistoryMemory.Snapshot history, Profile selected, List&lt;Trial&gt; trials,
-<span class="fc" id="L76">                List&lt;String&gt; trainingSources) {</span>
-<span class="fc" id="L77">            this.history = history;</span>
-<span class="fc" id="L78">            this.selected = selected;</span>
-<span class="fc" id="L79">            this.trials = List.copyOf(trials);</span>
-<span class="fc" id="L80">            this.trainingSources = List.copyOf(trainingSources);</span>
-<span class="fc" id="L81">            this.json = render();</span>
-<span class="fc" id="L82">        }</span>
-<span class="fc" id="L83">        public RuleHistoryMemory.Snapshot history() { return history; }</span>
-<span class="fc" id="L84">        public Profile selected() { return selected; }</span>
-<span class="fc" id="L85">        public List&lt;Trial&gt; trials() { return trials; }</span>
-        /** Includes every trial, including unsuccessful or work-exhausted searches. */
-<span class="fc" id="L87">        public long trainingWork() { return trials.stream().mapToLong(Trial::totalWork).reduce(0, Math::addExact); }</span>
-<span class="fc" id="L88">        public String toCanonicalJson() { return json; }</span>
+<span class="fc" id="L85">                List&lt;String&gt; trainingSources) {</span>
+<span class="fc" id="L86">            this.history = history;</span>
+<span class="fc" id="L87">            this.selected = selected;</span>
+<span class="fc" id="L88">            this.trials = List.copyOf(trials);</span>
+<span class="fc" id="L89">            this.trainingSources = List.copyOf(trainingSources);</span>
+<span class="fc" id="L90">            this.json = render();</span>
+<span class="fc" id="L91">        }</span>
+<span class="fc" id="L92">        public RuleHistoryMemory.Snapshot history() { return history; }</span>
+<span class="fc" id="L93">        public Profile selected() { return selected; }</span>
+<span class="fc" id="L94">        public List&lt;Trial&gt; trials() { return trials; }</span>
+        /** Known work from every trial; a total-work claim also requires accountingComplete(). */
+<span class="fc" id="L96">        public long trainingWork() { return trials.stream().mapToLong(Trial::totalWork).reduce(0, Math::addExact); }</span>
+<span class="fc" id="L97">        public boolean accountingComplete() { return trials.stream().allMatch(Trial::accountingComplete); }</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        public String revision() { return trials.stream().anyMatch(Trial::explicitAccounting) ? ACCOUNTING_REVISION : REVISION; }</span>
+<span class="fc" id="L99">        public String toCanonicalJson() { return json; }</span>
 
         /** Exact-source exclusion only; disjoint mathematical families require an external protocol. */
         public TypedMoveSearch.Result evaluate(TypedMoveSearch.Problem problem) {
-<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (problem.context().phase() != MoveContext.Phase.FROZEN_EVALUATION) {</span>
-<span class="fc" id="L93">                throw new IllegalArgumentException(&quot;frozen policy evaluation requires FROZEN_EVALUATION&quot;);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if (problem.context().phase() != MoveContext.Phase.FROZEN_EVALUATION) {</span>
+<span class="fc" id="L104">                throw new IllegalArgumentException(&quot;frozen policy evaluation requires FROZEN_EVALUATION&quot;);</span>
             }
-<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (trainingSources.contains(CODEC.encodeExpression(problem.source()))) {</span>
-<span class="fc" id="L96">                throw new IllegalArgumentException(&quot;evaluation source was used during TRAIN&quot;);</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            if (trainingSources.contains(CODEC.encodeExpression(problem.source()))) {</span>
+<span class="fc" id="L107">                throw new IllegalArgumentException(&quot;evaluation source was used during TRAIN&quot;);</span>
             }
-<span class="fc" id="L98">            return execute(problem, history, selected);</span>
+<span class="fc" id="L109">            return execute(problem, history, selected);</span>
         }
 
         private String render() {
-<span class="fc" id="L102">            var writer = new JsonWriter().beginObject().property(&quot;schema&quot;, REVISION)</span>
-<span class="fc" id="L103">                .property(&quot;authority&quot;, &quot;EXPERIMENTAL_NO_PROMOTION&quot;)</span>
-<span class="fc" id="L104">                .property(&quot;selection&quot;, &quot;MAX_SOLVED_THEN_MIN_TOTAL_WORK_THEN_DECLARED_ORDER&quot;)</span>
-<span class="fc" id="L105">                .property(&quot;workScope&quot;, &quot;CHARGED_SEARCH_MECHANICS_AND_REPLAY;NOT_TOTAL_CPU_OR_FIT_SERIALIZATION&quot;)</span>
-<span class="fc" id="L106">                .property(&quot;selected&quot;, selected.id()).property(&quot;trainingWork&quot;, trainingWork())</span>
-<span class="fc" id="L107">                .stringArray(&quot;trainingSources&quot;, trainingSources)</span>
-<span class="fc" id="L108">                .property(&quot;history&quot;, historyJson(history))</span>
-<span class="fc" id="L109">                .array(&quot;trials&quot;, values -&gt; trials.forEach(trial -&gt; values.objectValue(value -&gt; value</span>
-<span class="fc" id="L110">                    .property(&quot;profile&quot;, trial.profile().id()).property(&quot;kind&quot;, trial.profile().kind().name())</span>
-<span class="fc" id="L111">                    .property(&quot;weights&quot;, weightsJson(trial.profile().weights()))</span>
-<span class="fc" id="L112">                    .property(&quot;solved&quot;, trial.solved()).property(&quot;totalWork&quot;, trial.totalWork())</span>
-<span class="fc" id="L113">                    .array(&quot;observations&quot;, observations -&gt; trial.observations().forEach(observation -&gt; observations.objectValue(item -&gt; item</span>
-<span class="fc" id="L114">                        .property(&quot;task&quot;, observation.taskId()).property(&quot;outcome&quot;, observation.outcome().name())</span>
-<span class="fc" id="L115">                        .property(&quot;primitiveWork&quot;, observation.metrics().primitiveWork())</span>
-<span class="fc" id="L116">                        .property(&quot;searchWork&quot;, observation.metrics().searchWork())</span>
-<span class="fc" id="L117">                        .property(&quot;verificationWork&quot;, observation.metrics().verificationWork())</span>
-<span class="fc" id="L118">                        .property(&quot;totalWork&quot;, observation.metrics().totalWork())))))));</span>
-<span class="fc" id="L119">            return writer.endObject().toString();</span>
+<span class="fc" id="L113">            String schema = revision();</span>
+<span class="fc" id="L114">            boolean explicitAccounting = schema.equals(ACCOUNTING_REVISION);</span>
+<span class="fc" id="L115">            var writer = new JsonWriter().beginObject().property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L116">                .property(&quot;authority&quot;, &quot;EXPERIMENTAL_NO_PROMOTION&quot;)</span>
+<span class="fc" id="L117">                .property(&quot;selection&quot;, &quot;MAX_SOLVED_THEN_MIN_TOTAL_WORK_THEN_DECLARED_ORDER&quot;)</span>
+<span class="fc" id="L118">                .property(&quot;workScope&quot;, &quot;CHARGED_SEARCH_MECHANICS_AND_REPLAY;NOT_TOTAL_CPU_OR_FIT_SERIALIZATION&quot;)</span>
+<span class="fc" id="L119">                .property(&quot;selected&quot;, selected.id()).property(&quot;trainingWork&quot;, trainingWork())</span>
+<span class="fc" id="L120">                .stringArray(&quot;trainingSources&quot;, trainingSources)</span>
+<span class="fc" id="L121">                .property(&quot;history&quot;, historyJson(history));</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            if (explicitAccounting) writer.property(&quot;accountingComplete&quot;, accountingComplete())</span>
+<span class="fc" id="L123">                .property(&quot;accountingScope&quot;, &quot;KNOWN_REPORTED_WORK;ACCOUNTING_COMPLETE_REQUIRED_FOR_TOTAL&quot;);</span>
+<span class="fc" id="L124">            writer.array(&quot;trials&quot;, values -&gt; trials.forEach(trial -&gt; values.objectValue(value -&gt; writeTrial(value, trial, explicitAccounting))));</span>
+<span class="fc" id="L125">            return writer.endObject().toString();</span>
         }
+        private void writeTrial(JsonWriter writer, Trial trial, boolean explicitAccounting) {
+<span class="fc" id="L128">            writer.property(&quot;profile&quot;, trial.profile().id()).property(&quot;kind&quot;, trial.profile().kind().name())</span>
+<span class="fc" id="L129">                .property(&quot;weights&quot;, weightsJson(trial.profile().weights()))</span>
+<span class="fc" id="L130">                .property(&quot;solved&quot;, trial.solved()).property(&quot;totalWork&quot;, trial.totalWork());</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            if (explicitAccounting) writer.property(&quot;accountingComplete&quot;, trial.accountingComplete());</span>
+<span class="fc" id="L132">            writer.array(&quot;observations&quot;, out -&gt; trial.observations().forEach(o -&gt; out.objectValue(item -&gt; writeObservation(item, o, explicitAccounting))));</span>
+<span class="fc" id="L133">        }</span>
+        private void writeObservation(JsonWriter writer, Observation o, boolean explicitAccounting) {
+<span class="fc" id="L135">            writer.property(&quot;task&quot;, o.taskId()).property(&quot;outcome&quot;, o.outcome().name())</span>
+<span class="fc" id="L136">                .property(&quot;primitiveWork&quot;, o.metrics().primitiveWork()).property(&quot;searchWork&quot;, o.metrics().searchWork())</span>
+<span class="fc" id="L137">                .property(&quot;verificationWork&quot;, o.metrics().verificationWork()).property(&quot;totalWork&quot;, o.metrics().totalWork());</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            if (explicitAccounting) {</span>
+<span class="fc" id="L139">                writer.property(&quot;accountingComplete&quot;, o.accountingComplete());</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">                if (o.executionRevision() != null) writer.property(&quot;executionRevision&quot;, o.executionRevision());</span>
+            }
+<span class="fc" id="L142">        }</span>
+    }
+    static String executionRevision(TypedMoveSearch.Result result) {
+<span class="fc" id="L145">        var receipt = result.encodedResult().stagedIncrementalExecution();</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        return receipt == null ? null : receipt.workRevision();</span>
     }
 
     public FrozenPolicy train(RuleHistoryMemory.Snapshot history, List&lt;TrainingTask&gt; tasks, List&lt;Profile&gt; profiles) {
-<span class="fc" id="L124">        Objects.requireNonNull(history, &quot;history&quot;);</span>
-<span class="fc" id="L125">        tasks = List.copyOf(tasks);</span>
-<span class="fc" id="L126">        profiles = List.copyOf(profiles);</span>
-<span class="fc" id="L127">        var trainingSources = validate(tasks, profiles);</span>
-<span class="fc" id="L128">        var trials = new ArrayList&lt;Trial&gt;();</span>
-<span class="fc bfc" id="L129" title="All 2 branches covered.">        for (var profile : profiles) {</span>
-<span class="fc" id="L130">            var observations = new ArrayList&lt;Observation&gt;();</span>
-<span class="fc bfc" id="L131" title="All 2 branches covered.">            for (var task : tasks) {</span>
-<span class="fc" id="L132">                var result = execute(task.problem(), history, profile);</span>
-<span class="fc" id="L133">                observations.add(new Observation(task.id(), result.outcome(), result.metrics()));</span>
-<span class="fc" id="L134">            }</span>
-<span class="fc" id="L135">            trials.add(new Trial(profile, observations));</span>
-<span class="fc" id="L136">        }</span>
-<span class="fc" id="L137">        var best = trials.stream().min(Comparator.comparingLong(Trial::solved).reversed()</span>
-<span class="fc" id="L138">            .thenComparingLong(Trial::totalWork)).orElseThrow();</span>
-<span class="fc" id="L139">        return new FrozenPolicy(history, best.profile(), trials, trainingSources);</span>
+<span class="fc" id="L150">        Objects.requireNonNull(history, &quot;history&quot;);</span>
+<span class="fc" id="L151">        tasks = List.copyOf(tasks);</span>
+<span class="fc" id="L152">        profiles = List.copyOf(profiles);</span>
+<span class="fc" id="L153">        var trainingSources = validate(tasks, profiles);</span>
+<span class="fc" id="L154">        var trials = new ArrayList&lt;Trial&gt;();</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        for (var profile : profiles) {</span>
+<span class="fc" id="L156">            var observations = new ArrayList&lt;Observation&gt;();</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            for (var task : tasks) {</span>
+<span class="fc" id="L158">                var result = execute(task.problem(), history, profile);</span>
+<span class="fc" id="L159">                observations.add(new Observation(task.id(), result.outcome(), result.metrics(),</span>
+<span class="fc" id="L160">                    result.accountingComplete(), executionRevision(result)));</span>
+<span class="fc" id="L161">            }</span>
+<span class="fc" id="L162">            trials.add(new Trial(profile, observations));</span>
+<span class="fc" id="L163">        }</span>
+<span class="fc" id="L164">        var best = trials.stream().min(Comparator.comparingLong(Trial::solved).reversed()</span>
+<span class="fc" id="L165">            .thenComparingLong(Trial::totalWork)).orElseThrow();</span>
+<span class="fc" id="L166">        return new FrozenPolicy(history, best.profile(), trials, trainingSources);</span>
     }
 
     private static List&lt;String&gt; validate(List&lt;TrainingTask&gt; tasks, List&lt;Profile&gt; profiles) {
-<span class="pc bpc" id="L143" title="3 of 8 branches missed.">        if (tasks.size() &lt; 2 || tasks.size() &gt; 32 || profiles.isEmpty() || profiles.size() &gt; 16) {</span>
-<span class="fc" id="L144">            throw new IllegalArgumentException(&quot;require 2..32 TRAIN tasks and 1..16 profiles&quot;);</span>
+<span class="pc bpc" id="L170" title="3 of 8 branches missed.">        if (tasks.size() &lt; 2 || tasks.size() &gt; 32 || profiles.isEmpty() || profiles.size() &gt; 16) {</span>
+<span class="fc" id="L171">            throw new IllegalArgumentException(&quot;require 2..32 TRAIN tasks and 1..16 profiles&quot;);</span>
         }
-<span class="fc" id="L146">        var ids = new HashSet&lt;String&gt;();</span>
-<span class="fc" id="L147">        var sources = new ArrayList&lt;String&gt;();</span>
-<span class="fc bfc" id="L148" title="All 2 branches covered.">        for (var task : tasks) {</span>
-<span class="fc" id="L149">            var budget = task.problem().budget();</span>
-<span class="fc" id="L150">            String source = CODEC.encodeExpression(task.problem().source());</span>
-<span class="fc bfc" id="L151" title="All 6 branches covered.">            if (task.problem().context().phase() != MoveContext.Phase.TRAIN || !ids.add(task.id()) || sources.contains(source)</span>
-<span class="pc bpc" id="L152" title="3 of 6 branches missed.">                    || budget.totalWork() &gt; 1_000_000 || budget.maxStates() &gt; 4096 || budget.maxSearchDepth() &gt; 32) {</span>
-<span class="fc" id="L153">                throw new IllegalArgumentException(&quot;distinct bounded TRAIN tasks required&quot;);</span>
+<span class="fc" id="L173">        var ids = new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L174">        var sources = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        for (var task : tasks) {</span>
+<span class="fc" id="L176">            var budget = task.problem().budget();</span>
+<span class="fc" id="L177">            String source = CODEC.encodeExpression(task.problem().source());</span>
+<span class="fc bfc" id="L178" title="All 6 branches covered.">            if (task.problem().context().phase() != MoveContext.Phase.TRAIN || !ids.add(task.id()) || sources.contains(source)</span>
+<span class="pc bpc" id="L179" title="3 of 6 branches missed.">                    || budget.totalWork() &gt; 1_000_000 || budget.maxStates() &gt; 4096 || budget.maxSearchDepth() &gt; 32) {</span>
+<span class="fc" id="L180">                throw new IllegalArgumentException(&quot;distinct bounded TRAIN tasks required&quot;);</span>
             }
-<span class="fc" id="L155">            sources.add(source);</span>
-<span class="fc" id="L156">        }</span>
-<span class="fc" id="L157">        ids.clear();</span>
-<span class="fc bfc" id="L158" title="All 4 branches covered.">        if (profiles.stream().anyMatch(profile -&gt; !ids.add(profile.id()))) {</span>
-<span class="fc" id="L159">            throw new IllegalArgumentException(&quot;distinct profile IDs required&quot;);</span>
+<span class="fc" id="L182">            sources.add(source);</span>
+<span class="fc" id="L183">        }</span>
+<span class="fc" id="L184">        ids.clear();</span>
+<span class="fc bfc" id="L185" title="All 4 branches covered.">        if (profiles.stream().anyMatch(profile -&gt; !ids.add(profile.id()))) {</span>
+<span class="fc" id="L186">            throw new IllegalArgumentException(&quot;distinct profile IDs required&quot;);</span>
         }
-<span class="fc" id="L161">        return List.copyOf(sources);</span>
+<span class="fc" id="L188">        return List.copyOf(sources);</span>
     }
 
     private static TypedMoveSearch.Result execute(TypedMoveSearch.Problem problem, RuleHistoryMemory.Snapshot history,
             Profile profile) {
-<span class="fc" id="L166">        return new TypedMoveSearch().search(new TypedMoveSearch.Problem(problem.source(), problem.context(), problem.providers(),</span>
-<span class="fc bfc" id="L167" title="All 2 branches covered.">            profile.kind() == PolicyKind.INVENTORY_ORDER ? MovePriorityPolicy.INVENTORY_ORDER</span>
-<span class="fc" id="L168">                : HistoryMovePolicy.typed(history, profile.weights()), problem.verifier(), problem.stateScore(),</span>
-<span class="fc" id="L169">            problem.mode(), problem.scheduling(), problem.budget(), problem.stateValue()));</span>
+<span class="fc" id="L193">        return new TypedMoveSearch().search(new TypedMoveSearch.Problem(problem.source(), problem.context(), problem.providers(),</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">            profile.kind() == PolicyKind.INVENTORY_ORDER ? MovePriorityPolicy.INVENTORY_ORDER</span>
+<span class="fc" id="L195">                : HistoryMovePolicy.typed(history, profile.weights()), problem.verifier(), problem.stateScore(),</span>
+<span class="fc" id="L196">            problem.mode(), problem.scheduling(), problem.budget(), problem.stateValue()));</span>
     }
 
     private static String weightsJson(HistoryMovePolicy.Weights weights) {
-<span class="fc" id="L173">        return new JsonWriter().beginObject().property(&quot;compression&quot;, weights.compression()).property(&quot;history&quot;, weights.history())</span>
-<span class="fc" id="L174">            .property(&quot;capability&quot;, weights.capability()).property(&quot;goal&quot;, weights.goal()).property(&quot;proof&quot;, weights.proof())</span>
-<span class="fc" id="L175">            .property(&quot;branching&quot;, weights.branching()).property(&quot;failure&quot;, weights.failure()).property(&quot;verification&quot;, weights.verification())</span>
-<span class="fc" id="L176">            .endObject().toString();</span>
+<span class="fc" id="L200">        return new JsonWriter().beginObject().property(&quot;compression&quot;, weights.compression()).property(&quot;history&quot;, weights.history())</span>
+<span class="fc" id="L201">            .property(&quot;capability&quot;, weights.capability()).property(&quot;goal&quot;, weights.goal()).property(&quot;proof&quot;, weights.proof())</span>
+<span class="fc" id="L202">            .property(&quot;branching&quot;, weights.branching()).property(&quot;failure&quot;, weights.failure()).property(&quot;verification&quot;, weights.verification())</span>
+<span class="fc" id="L203">            .endObject().toString();</span>
     }
 
     private static String historyJson(RuleHistoryMemory.Snapshot history) {
         try {
-<span class="fc" id="L181">            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(history);</span>
-<span class="nc" id="L182">        } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {</span>
-<span class="nc" id="L183">            throw new IllegalStateException(&quot;cannot freeze history&quot;, exception);</span>
+<span class="fc" id="L208">            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(history);</span>
+<span class="nc" id="L209">        } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {</span>
+<span class="nc" id="L210">            throw new IllegalStateException(&quot;cannot freeze history&quot;, exception);</span>
         }
     }
 }

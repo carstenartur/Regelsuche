@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StagedIncrementalMoveExecution.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">StagedIncrementalMoveExecution.java</span></div><h1>StagedIncrementalMoveExecution.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import java.util.List;
+
+/** Distinct v2 receipt: no fields are added to the frozen native v1 serialization. */
+public record StagedIncrementalMoveExecution(String workRevision, String orderRevision,
+        List&lt;Provider&gt; providers, List&lt;Expansion&gt; expansions) {
+    public static final String WORK_REVISION = &quot;regelsuche.staged-incremental-move-search-work/v2&quot;;
+    public static final String ORDER_REVISION = &quot;regelsuche.stage-provider-score-native-order-two-learned-burst/v2&quot;;
+<span class="fc" id="L10">    public StagedIncrementalMoveExecution { providers = List.copyOf(providers); expansions = List.copyOf(expansions); }</span>
+    public boolean accountingComplete() {
+<span class="fc" id="L12">        return expansions.stream().flatMap(expansion -&gt; expansion.lanes().stream())</span>
+<span class="fc bfc" id="L13" title="All 4 branches covered.">            .allMatch(lane -&gt; lane.cursor() == null || lane.cursor().accountingComplete());</span>
+    }
+<span class="fc" id="L15">    public record Provider(MoveProvider.Descriptor descriptor, IncrementalProviderContract.Definition definition) {}</span>
+<span class="fc" id="L16">    public record Lane(int providerIndex, int stage, IncrementalProviderContract.Snapshot cursor) {}</span>
+    public record Expansion(MoveState source, boolean closed, List&lt;Lane&gt; lanes) {
+<span class="fc" id="L18">        public Expansion { lanes = List.copyOf(lanes); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

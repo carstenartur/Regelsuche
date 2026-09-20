@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RegisteredIncrementalMoveProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">RegisteredIncrementalMoveProvider.java</span></div><h1>RegisteredIncrementalMoveProvider.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.transform.TransformationCursor;
+import java.util.Objects;
+
+/** Search-owned allowlisted wrapper; candidate descriptions confer no proof authority. */
+public final class RegisteredIncrementalMoveProvider implements IncrementalMoveProvider {
+    private final Descriptor descriptor;
+    private final IncrementalProviderContract.Definition definition;
+    private final IncrementalProviderContract.Factory factory;
+    public RegisteredIncrementalMoveProvider(Descriptor descriptor, IncrementalProviderContract.Definition definition,
+<span class="fc" id="L12">            IncrementalProviderContract.Registry registry) {</span>
+<span class="fc" id="L13">        this.descriptor = Objects.requireNonNull(descriptor);</span>
+<span class="fc" id="L14">        this.definition = Objects.requireNonNull(definition);</span>
+<span class="pc bpc" id="L15" title="2 of 4 branches missed.">        if (!descriptor.id().equals(definition.providerId()) || definition.kind() != IncrementalProviderContract.Kind.REGISTERED_SCHEMA)</span>
+<span class="nc" id="L16">            throw new IllegalArgumentException(&quot;registration differs from provider descriptor&quot;);</span>
+<span class="fc" id="L17">        factory = Objects.requireNonNull(registry).require(definition);</span>
+<span class="fc" id="L18">    }</span>
+<span class="fc" id="L19">    @Override public Descriptor descriptor() { return descriptor; }</span>
+    /** Registered schemas have no invented native rule inventory. */
+    @Override public TransformationCursor.Definition definition() {
+<span class="nc" id="L22">        throw new UnsupportedOperationException(&quot;registered schemas use contractDefinition&quot;);</span>
+    }
+    @Override public TransformationCursor openCursor(MoveState state, MoveContext context) {
+<span class="nc" id="L25">        throw new UnsupportedOperationException(&quot;registered schemas require staged v2 sessions&quot;);</span>
+    }
+<span class="fc" id="L27">    @Override public IncrementalProviderContract.Definition contractDefinition() { return definition; }</span>
+    @Override public IncrementalProviderContract.Cursor openSession(MoveState state, MoveContext context) {
+<span class="fc" id="L29">        return new ManagedIncrementalCursor(descriptor, definition, factory, state, context);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

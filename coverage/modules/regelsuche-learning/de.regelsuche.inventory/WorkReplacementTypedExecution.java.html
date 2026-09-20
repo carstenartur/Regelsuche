@@ -29,7 +29,7 @@ public final class WorkReplacementTypedExecution implements WorkReplacementExper
 <span class="fc" id="L29">        boolean validProof = true;</span>
 <span class="fc" id="L30">        String failedCheck = null;</span>
         try {
-<span class="pc bpc" id="L32" title="1 of 4 branches missed.">            result = historical || quality.mode() == QualityMode.BEST_QUALITY_FIXED_BUDGET</span>
+<span class="fc bfc" id="L32" title="All 4 branches covered.">            result = historical || quality.mode() == QualityMode.BEST_QUALITY_FIXED_BUDGET</span>
 <span class="fc" id="L33">                ? search.search(problem, query.objective())</span>
 <span class="fc" id="L34">                : search.searchUntil(problem, query.objective(), quality.maximumScore(), quality.continuation());</span>
 <span class="fc" id="L35">        } catch (TypedSourceOnlySearch.FinalCheckFailure failure) {</span>
@@ -48,29 +48,30 @@ public final class WorkReplacementTypedExecution implements WorkReplacementExper
 <span class="fc" id="L48">        long outputBytes = Math.addExact(queryBytes, Math.addExact((long) finalCheck.getBytes(StandardCharsets.UTF_8).length,</span>
 <span class="fc" id="L49">            output.getBytes(StandardCharsets.UTF_8).length));</span>
 <span class="fc" id="L50">        charge(journal, prefix + &quot;/output&quot;, OUTPUT, outputBytes, &quot;utf8-materialized-bytes/v1&quot;, &quot;&quot;);</span>
-<span class="fc bfc" id="L51" title="All 2 branches covered.">        return new WorkReplacementExperiment.Evaluation(result.outputScore() &lt;= quality.maximumScore(), validProof,</span>
-<span class="fc" id="L52">            result.inputScore(), result.outputScore(), output, raw,</span>
-<span class="fc bfc" id="L53" title="All 2 branches covered.">            result.witness().stream().filter(step -&gt; step.move().sourceKind() == SearchMove.SourceKind.LEARNED)</span>
-<span class="fc" id="L54">                .map(step -&gt; step.move().ruleId()).distinct().toList());</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (!result.accountingComplete()) journal.incomplete();</span>
+<span class="fc bfc" id="L52" title="All 4 branches covered.">        return new WorkReplacementExperiment.Evaluation(result.accountingComplete() &amp;&amp; result.outputScore() &lt;= quality.maximumScore(), validProof,</span>
+<span class="fc" id="L53">            result.inputScore(), result.outputScore(), output, raw,</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            result.witness().stream().filter(step -&gt; step.move().sourceKind() == SearchMove.SourceKind.LEARNED)</span>
+<span class="fc" id="L55">                .map(step -&gt; step.move().ruleId()).distinct().toList());</span>
     }
     private static LifecycleWorkAccount queryAccount(String prefix, TypedSourceOnlySearch.Result result, String raw) {
-<span class="fc" id="L57">        var receipts = new java.util.ArrayList&lt;LifecycleWorkAccount.Receipt&gt;();</span>
-<span class="fc" id="L58">        var children = new java.util.ArrayList&lt;String&gt;();</span>
-<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (var entry : new java.util.TreeMap&lt;&gt;(result.search().metrics().chargedComponents()).entrySet()) {</span>
-<span class="fc" id="L60">            String id = prefix + &quot;/query/&quot; + entry.getKey(); children.add(id);</span>
-<span class="fc" id="L61">            receipts.add(new LifecycleWorkAccount.Receipt(id, QUERY, entry.getValue(), entry.getValue(), List.of(),</span>
-<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                &quot;move-search-components/v3&quot;, entry.getValue().toString(), entry.getValue() == 0 ? &quot;no charged operations&quot; : &quot;&quot;));</span>
-<span class="fc" id="L63">        }</span>
-<span class="fc" id="L64">        String root = prefix + &quot;/query&quot;;</span>
-<span class="fc" id="L65">        receipts.add(new LifecycleWorkAccount.Receipt(root, QUERY, result.selectionWork(), result.queryWork(), children,</span>
-<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            &quot;typed-source-query/v3&quot;, raw, result.queryWork() == 0 ? &quot;no charged operations&quot; : &quot;&quot;));</span>
-<span class="fc" id="L67">        return new LifecycleWorkAccount(receipts, List.of(root));</span>
+<span class="fc" id="L58">        var receipts = new java.util.ArrayList&lt;LifecycleWorkAccount.Receipt&gt;();</span>
+<span class="fc" id="L59">        var children = new java.util.ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for (var entry : new java.util.TreeMap&lt;&gt;(result.search().metrics().chargedComponents()).entrySet()) {</span>
+<span class="fc" id="L61">            String id = prefix + &quot;/query/&quot; + entry.getKey(); children.add(id);</span>
+<span class="fc" id="L62">            receipts.add(new LifecycleWorkAccount.Receipt(id, QUERY, entry.getValue(), entry.getValue(), List.of(),</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">                &quot;move-search-components/v3&quot;, entry.getValue().toString(), entry.getValue() == 0 ? &quot;no charged operations&quot; : &quot;&quot;));</span>
+<span class="fc" id="L64">        }</span>
+<span class="fc" id="L65">        String root = prefix + &quot;/query&quot;;</span>
+<span class="fc" id="L66">        receipts.add(new LifecycleWorkAccount.Receipt(root, QUERY, result.selectionWork(), result.queryWork(), children,</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">            &quot;typed-source-query/v3&quot;, raw, result.queryWork() == 0 ? &quot;no charged operations&quot; : &quot;&quot;));</span>
+<span class="fc" id="L68">        return new LifecycleWorkAccount(receipts, List.of(root));</span>
     }
     public static void charge(WorkReplacementExperiment.Journal journal, String id, LifecycleWorkAccount.Phase phase,
             long work, String revision, String raw) {
-<span class="fc" id="L71">        var receipt = new LifecycleWorkAccount.Receipt(id, phase, work, work, List.of(), revision, raw,</span>
-<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            work == 0 ? &quot;no operations reported by this phase&quot; : &quot;&quot;);</span>
-<span class="fc" id="L73">        journal.append(LifecycleWorkAccount.of(receipt));</span>
-<span class="fc" id="L74">    }</span>
+<span class="fc" id="L72">        var receipt = new LifecycleWorkAccount.Receipt(id, phase, work, work, List.of(), revision, raw,</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">            work == 0 ? &quot;no operations reported by this phase&quot; : &quot;&quot;);</span>
+<span class="fc" id="L74">        journal.append(LifecycleWorkAccount.of(receipt));</span>
+<span class="fc" id="L75">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

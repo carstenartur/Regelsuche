@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StagedIncrementalSources.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">StagedIncrementalSources.java</span></div><h1>StagedIncrementalSources.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import static de.regelsuche.search.moves.IncrementalProviderContract.*;
+
+import de.regelsuche.transform.ExecutionWork;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationCursor;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Consumer;
+
+/** Explicit adapters for native text and existing typed primitive batches. No learning dependency. */
+final class StagedIncrementalSources {
+    private StagedIncrementalSources() {}
+    static boolean supported(MoveProvider provider) {
+<span class="fc bfc" id="L16" title="All 4 branches covered.">        return provider instanceof IncrementalMoveProvider || typedBatch(provider);</span>
+    }
+    static boolean typedBatch(MoveProvider provider) {
+<span class="pc bpc" id="L19" title="1 of 4 branches missed.">        return provider instanceof TypedMoveSearch.TypedProvider &amp;&amp; provider.descriptor().sourceKind() == SearchMove.SourceKind.PRIMITIVE;</span>
+    }
+    static Definition definition(MoveProvider provider) {
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        if (provider instanceof RegisteredIncrementalMoveProvider registered) return registered.contractDefinition();</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        if (provider instanceof NativeIncrementalMoveProvider nativeProvider)</span>
+<span class="fc" id="L24">            return new Definition(REVISION, provider.descriptor().id(), Kind.NATIVE_RULES, provider.descriptor().provenanceId(),</span>
+<span class="fc" id="L25">                TransformationCursor.ORDER_REVISION, Transport.PARSER_TEXT, Mathematics.PRIMITIVE, nativeProvider.definition());</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (typedBatch(provider)) return new Definition(REVISION, provider.descriptor().id(), Kind.TYPED_PRIMITIVE_BATCH,</span>
+<span class="fc" id="L27">            provider.descriptor().provenanceId(), TypedMoveSearch.REVISION, Transport.TYPED_AST_JSON, Mathematics.PRIMITIVE, null);</span>
+<span class="nc" id="L28">        throw new IllegalArgumentException(&quot;unsupported staged incremental provider&quot;);</span>
+    }
+    static Cursor open(MoveProvider provider, MoveState state, MoveContext context, Consumer&lt;List&lt;SearchMove&gt;&gt; generatedBatch) {
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        if (provider instanceof RegisteredIncrementalMoveProvider registered) return registered.openSession(state, context);</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        Factory factory = provider instanceof NativeIncrementalMoveProvider nativeProvider</span>
+<span class="fc" id="L33">            ? (s, c, meter) -&gt; new NativeSource(nativeProvider.openResumableCursor(s.expression()), meter)</span>
+<span class="fc" id="L34">            : (s, c, meter) -&gt; new BatchSource(provider.candidates(s, c), s.expression(), meter, generatedBatch);</span>
+<span class="fc" id="L35">        return new ManagedIncrementalCursor(provider.descriptor(), definition(provider), factory, state, context);</span>
+    }
+    private static final class NativeSource implements Source {
+        private final TransformationCursor cursor;
+        private final Meter meter;
+        private long mechanics, primitives;
+<span class="fc" id="L41">        NativeSource(TransformationCursor cursor, Meter meter) { this.cursor = cursor; this.meter = meter; collect(); }</span>
+        @Override public Optional&lt;Transformation&gt; next(long allowance) {
+<span class="fc" id="L43">            try { return cursor.next(allowance); } finally { collect(); }</span>
+        }
+        private void collect() {
+<span class="fc" id="L46">            var work = cursor.work();</span>
+<span class="fc" id="L47">            meter.charge(Operation.MATCH, work.mechanicalUnits() - mechanics);</span>
+<span class="fc" id="L48">            meter.charge(new ExecutionWork(work.primitiveRewrites() - primitives, 0, 0));</span>
+<span class="fc" id="L49">            mechanics = work.mechanicalUnits(); primitives = work.primitiveRewrites();</span>
+<span class="fc" id="L50">        }</span>
+        @Override public Status status() {
+<span class="pc bpc" id="L52" title="4 of 5 branches missed.">            return switch (cursor.status()) {</span>
+<span class="fc" id="L53">                case READY -&gt; Status.READY;</span>
+<span class="nc" id="L54">                case WORK_EXHAUSTED -&gt; Status.LIMIT;</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">                case EXHAUSTED -&gt; cursor.snapshot().complete() ? Status.EXHAUSTED : Status.INCONCLUSIVE;</span>
+<span class="nc" id="L56">                case FAILED -&gt; Status.FAILED;</span>
+<span class="nc" id="L57">                default -&gt; Status.INCONCLUSIVE;</span>
+            };
+        }
+<span class="fc" id="L60">        @Override public void close() { try { cursor.close(); } finally { collect(); } }</span>
+    }
+    private static final class BatchSource implements Source {
+        private final MoveProvider.Batch batch;
+        private int index;
+<span class="fc" id="L65">        BatchSource(MoveProvider.Batch batch, String source, Meter meter, Consumer&lt;List&lt;SearchMove&gt;&gt; generated) {</span>
+<span class="fc" id="L66">            this.batch = batch;</span>
+<span class="fc" id="L67">            meter.charge(Operation.LOAD, batch.work().totalWorkUnits());</span>
+<span class="fc" id="L68">            meter.charge(batch.work().candidateWork());</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            for (var move : batch.moves()) {</span>
+<span class="fc" id="L70">                meter.charge(Operation.ADMISSION, 1);</span>
+<span class="fc" id="L71">                move.provenance().requireSource(source);</span>
+<span class="fc" id="L72">            }</span>
+<span class="fc" id="L73">            generated.accept(batch.moves());</span>
+<span class="fc" id="L74">        }</span>
+        @Override public Optional&lt;Transformation&gt; next(long allowance) {
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            return index &lt; batch.moves().size() ? Optional.of(batch.moves().get(index++).transformation()) : Optional.empty();</span>
+        }
+        @Override public Status status() {
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            if (index &lt; batch.moves().size()) return Status.READY;</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">            return batch.complete() ? Status.EXHAUSTED : Status.INCONCLUSIVE;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

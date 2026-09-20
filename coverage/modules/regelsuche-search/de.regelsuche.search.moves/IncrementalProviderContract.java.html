@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IncrementalProviderContract.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">IncrementalProviderContract.java</span></div><h1>IncrementalProviderContract.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.transform.ExecutionWork;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationCursor;
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.TreeMap;
+
+/** Versioned execution admission, never mathematical authority. Native v1 records remain frozen. */
+public final class IncrementalProviderContract {
+    private IncrementalProviderContract() {}
+    public static final String REVISION = &quot;regelsuche.incremental-provider/v2&quot;;
+<span class="fc" id="L17">    public enum Kind { NATIVE_RULES, REGISTERED_SCHEMA, TYPED_PRIMITIVE_BATCH }</span>
+<span class="fc" id="L18">    public enum Transport { PARSER_TEXT, TYPED_AST_JSON }</span>
+<span class="fc" id="L19">    public enum Mathematics { PRIMITIVE, EXACT, MIXED }</span>
+<span class="fc" id="L20">    public enum Status { OPEN, READY, EXHAUSTED, LIMIT, INCONCLUSIVE, FAILED, CLOSED }</span>
+<span class="fc" id="L21">    public enum Operation { OPEN, ADMISSION, PULL, MATCH, LOAD, ABORT, CLOSE }</span>
+
+    public record Definition(String revision, String providerId, Kind kind, String modelRevision,
+            String semanticsRevision, Transport transport, Mathematics mathematics,
+            TransformationCursor.Definition nativeDefinition) {
+<span class="fc" id="L26">        public Definition {</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">            if (!REVISION.equals(revision)) throw new IllegalArgumentException(&quot;unsupported provider revision&quot;);</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">            for (var text : List.of(providerId, modelRevision, semanticsRevision))</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">                if (text.isBlank()) throw new IllegalArgumentException(&quot;blank provider binding&quot;);</span>
+<span class="fc" id="L30">            Objects.requireNonNull(kind); Objects.requireNonNull(transport); Objects.requireNonNull(mathematics);</span>
+<span class="fc bfc" id="L31" title="All 6 branches covered.">            if ((kind == Kind.NATIVE_RULES) != (nativeDefinition != null))</span>
+<span class="fc" id="L32">                throw new IllegalArgumentException(&quot;only native providers carry native rule definitions&quot;);</span>
+<span class="fc" id="L33">        }</span>
+    }
+
+    /** Actual cumulative mechanics and mathematics, including failed or unconsumed applications. */
+    public record Work(Map&lt;String, Long&gt; operations, ExecutionWork mathematics) {
+<span class="fc" id="L38">        public Work {</span>
+<span class="fc" id="L39">            operations = java.util.Collections.unmodifiableMap(new TreeMap&lt;&gt;(operations));</span>
+<span class="fc" id="L40">            Objects.requireNonNull(mathematics);</span>
+<span class="fc" id="L41">            operations.forEach((name, units) -&gt; {</span>
+<span class="fc" id="L42">                Operation.valueOf(name);</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">                if (units &lt; 0) throw new IllegalArgumentException(&quot;negative incremental work&quot;);</span>
+<span class="fc" id="L44">            });</span>
+<span class="fc" id="L45">        }</span>
+<span class="fc" id="L46">        public long units(Operation operation) { return operations.getOrDefault(operation.name(), 0L); }</span>
+        public TransformationWorkMetrics metrics() {
+<span class="fc" id="L48">            long mechanical = operations.values().stream().reduce(0L, Math::addExact);</span>
+<span class="fc" id="L49">            return TransformationWorkMetrics.ZERO.withDelegatedMechanicalWork(mechanical).withCandidateWork(mathematics);</span>
+        }
+    }
+<span class="fc" id="L52">    public record Snapshot(Definition definition, Status status, boolean closed, boolean resumable,</span>
+            boolean accountingComplete, Work work, long emittedCandidates, String detailCode) {
+<span class="pc bpc" id="L54" title="1 of 4 branches missed.">        public boolean complete() { return status == Status.EXHAUSTED &amp;&amp; accountingComplete; }</span>
+    }
+    public interface Cursor extends AutoCloseable {
+        /** One candidate at most. LIMIT is resumable on the same cursor; all atomic overruns remain paid. */
+        Optional&lt;Transformation&gt; next(long allowance);
+        Snapshot snapshot();
+        @Override void close();
+    }
+    /** A registered implementation must charge delegated work before returning OR throwing. */
+    public interface Source extends AutoCloseable {
+        Optional&lt;Transformation&gt; next(long allowance);
+        Status status();
+<span class="fc" id="L66">        @Override default void close() {}</span>
+    }
+<span class="fc" id="L68">    public static final class Meter {</span>
+<span class="fc" id="L69">        private final Map&lt;String, Long&gt; operations = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L70">        private ExecutionWork mathematics = ExecutionWork.ZERO;</span>
+        public void charge(Operation operation, long units) {
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            if (units &lt; 0) throw new IllegalArgumentException(&quot;negative incremental work&quot;);</span>
+<span class="fc" id="L73">            operations.merge(Objects.requireNonNull(operation).name(), units, Math::addExact);</span>
+<span class="fc" id="L74">        }</span>
+<span class="fc" id="L75">        public void charge(ExecutionWork work) { mathematics = mathematics.plus(Objects.requireNonNull(work)); }</span>
+<span class="fc" id="L76">        public Work work() { return new Work(operations, mathematics); }</span>
+    }
+    @FunctionalInterface public interface Factory {
+        Source open(MoveState state, MoveContext context, Meter meter);
+    }
+    public record Registration(Definition definition, Factory factory) {
+<span class="fc" id="L82">        public Registration {</span>
+<span class="fc" id="L83">            Objects.requireNonNull(definition); Objects.requireNonNull(factory);</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            if (definition.kind() != Kind.REGISTERED_SCHEMA) throw new IllegalArgumentException(&quot;registration requires schema kind&quot;);</span>
+<span class="fc" id="L85">        }</span>
+    }
+    /** Immutable explicit allowlist. Matching a registration binds code/configuration, not a proof. */
+    public static final class Registry {
+        private final Map&lt;String, Registration&gt; registrations;
+<span class="fc" id="L90">        public Registry(List&lt;Registration&gt; registrations) {</span>
+<span class="fc" id="L91">            var entries = new TreeMap&lt;String, Registration&gt;();</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            for (var entry : List.copyOf(registrations)) {</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">                if (entries.putIfAbsent(entry.definition().providerId(), entry) != null)</span>
+<span class="fc" id="L94">                    throw new IllegalArgumentException(&quot;duplicate provider registration&quot;);</span>
+<span class="fc" id="L95">            }</span>
+<span class="fc" id="L96">            this.registrations = Map.copyOf(entries);</span>
+<span class="fc" id="L97">        }</span>
+        Factory require(Definition definition) {
+<span class="fc" id="L99">            var entry = registrations.get(definition.providerId());</span>
+<span class="fc bfc" id="L100" title="All 4 branches covered.">            if (entry == null || !entry.definition().equals(definition))</span>
+<span class="fc" id="L101">                throw new IllegalArgumentException(&quot;provider model/semantics/transport is not explicitly registered&quot;);</span>
+<span class="fc" id="L102">            return entry.factory();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

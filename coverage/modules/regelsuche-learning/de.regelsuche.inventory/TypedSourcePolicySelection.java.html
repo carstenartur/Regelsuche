@@ -15,161 +15,193 @@ import java.util.Objects;
 public final class TypedSourcePolicySelection {
     public static final String REVISION = &quot;regelsuche.typed-source-policy-selection/v1&quot;;
     public static final String QUALITY_REVISION = &quot;regelsuche.typed-source-policy-selection/v2-quality&quot;;
-<span class="fc" id="L18">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+    public static final String ACCOUNTING_REVISION = &quot;regelsuche.typed-source-policy-selection/v3-accounting&quot;;
+<span class="fc" id="L19">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
     private TypedSourcePolicySelection() {}
     public record Profile(String id, List&lt;MoveProvider&gt; providers, MovePriorityPolicy policy) {
-<span class="fc" id="L21">        public Profile {</span>
-<span class="pc bpc" id="L22" title="2 of 4 branches missed.">            if (id == null || id.isBlank()) throw new IllegalArgumentException(&quot;profile ID required&quot;);</span>
-<span class="fc" id="L23">            providers = List.copyOf(providers);</span>
-<span class="fc" id="L24">            Objects.requireNonNull(policy, &quot;policy&quot;);</span>
-<span class="pc bpc" id="L25" title="2 of 4 branches missed.">            if (providers.stream().anyMatch(provider -&gt; !(provider instanceof TypedMoveSearch.TypedProvider)))</span>
-<span class="nc" id="L26">                throw new IllegalArgumentException(&quot;typed providers required&quot;);</span>
-<span class="fc" id="L27">        }</span>
+<span class="fc" id="L22">        public Profile {</span>
+<span class="pc bpc" id="L23" title="2 of 4 branches missed.">            if (id == null || id.isBlank()) throw new IllegalArgumentException(&quot;profile ID required&quot;);</span>
+<span class="fc" id="L24">            providers = List.copyOf(providers);</span>
+<span class="fc" id="L25">            Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="pc bpc" id="L26" title="2 of 4 branches missed.">            if (providers.stream().anyMatch(provider -&gt; !TypedMoveSearch.isTypedProvider(provider)))</span>
+<span class="nc" id="L27">                throw new IllegalArgumentException(&quot;typed providers required&quot;);</span>
+<span class="fc" id="L28">        }</span>
     }
-<span class="fc" id="L29">    public record Observation(String taskId, long inputScore, long outputScore, long totalWork,</span>
-            boolean withinBudget, MoveSearch.Outcome outcome, long wallNanos, long cpuNanos, long allocatedBytes) {}
+<span class="fc" id="L30">    public record Observation(String taskId, long inputScore, long outputScore, long totalWork,</span>
+            boolean withinBudget, MoveSearch.Outcome outcome, long wallNanos, long cpuNanos, long allocatedBytes,
+            boolean accountingComplete, String executionRevision) {
+        public Observation(String taskId, long inputScore, long outputScore, long totalWork, boolean withinBudget,
+                MoveSearch.Outcome outcome, long wallNanos, long cpuNanos, long allocatedBytes) {
+<span class="fc" id="L35">            this(taskId, inputScore, outputScore, totalWork, withinBudget, outcome, wallNanos, cpuNanos, allocatedBytes, true, null);</span>
+<span class="fc" id="L36">        }</span>
+    }
     public record Trial(Profile profile, List&lt;Observation&gt; observations) {
-<span class="fc" id="L32">        public Trial { observations = List.copyOf(observations); }</span>
-<span class="fc" id="L33">        public long totalWork() { return observations.stream().mapToLong(Observation::totalWork).reduce(0, Math::addExact); }</span>
-<span class="fc bfc" id="L34" title="All 2 branches covered.">        public long violations() { return observations.stream().filter(o -&gt; !o.withinBudget()).count(); }</span>
-        public BigInteger exactOutputCost() {
-<span class="fc" id="L36">            return observations.stream().map(value -&gt; BigInteger.valueOf(value.outputScore()))</span>
-<span class="fc" id="L37">                .reduce(BigInteger.ZERO, BigInteger::add);</span>
+<span class="fc" id="L39">        public Trial { observations = List.copyOf(observations); }</span>
+<span class="fc" id="L40">        public long totalWork() { return observations.stream().mapToLong(Observation::totalWork).reduce(0, Math::addExact); }</span>
+<span class="fc" id="L41">        public boolean accountingComplete() { return observations.stream().allMatch(Observation::accountingComplete); }</span>
+        public boolean explicitAccounting() {
+<span class="pc bpc" id="L43" title="1 of 4 branches missed.">            return observations.stream().anyMatch(o -&gt; o.executionRevision() != null || !o.accountingComplete());</span>
         }
-<span class="fc" id="L39">        public long outputCost() { return observations.stream().mapToLong(Observation::outputScore).reduce(0, Math::addExact); }</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        public long violations() { return observations.stream().filter(o -&gt; !o.withinBudget()).count(); }</span>
+        public BigInteger exactOutputCost() {
+<span class="fc" id="L47">            return observations.stream().map(value -&gt; BigInteger.valueOf(value.outputScore()))</span>
+<span class="fc" id="L48">                .reduce(BigInteger.ZERO, BigInteger::add);</span>
+        }
+<span class="fc" id="L50">        public long outputCost() { return observations.stream().mapToLong(Observation::outputScore).reduce(0, Math::addExact); }</span>
     }
     /** Caller-defined sufficient quality; neither a target expression nor proof authority.
      * The objective supplied during evaluation must retain its training semantics.
      */
     public record QualityGoal(long maximumOutputScore, SearchContinuationContract continuationContract) {
-<span class="fc" id="L45">        public QualityGoal { Objects.requireNonNull(continuationContract, &quot;continuationContract&quot;); }</span>
+<span class="fc" id="L56">        public QualityGoal { Objects.requireNonNull(continuationContract, &quot;continuationContract&quot;); }</span>
         private boolean achieved(Observation observation) {
-<span class="pc bpc" id="L47" title="1 of 4 branches missed.">            return observation.withinBudget() &amp;&amp; observation.outcome() == MoveSearch.Outcome.QUALITY_REACHED</span>
-<span class="pc bpc" id="L48" title="1 of 2 branches missed.">                &amp;&amp; observation.outputScore() &lt;= maximumOutputScore;</span>
+<span class="pc bpc" id="L58" title="1 of 4 branches missed.">            return observation.withinBudget() &amp;&amp; observation.outcome() == MoveSearch.Outcome.QUALITY_REACHED</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">                &amp;&amp; observation.outputScore() &lt;= maximumOutputScore;</span>
         }
         private long misses(Trial trial) {
-<span class="fc bfc" id="L51" title="All 2 branches covered.">            return trial.observations().stream().filter(observation -&gt; !achieved(observation)).count();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            return trial.observations().stream().filter(observation -&gt; !achieved(observation)).count();</span>
         }
         private BigInteger deficit(Trial trial) {
-<span class="fc" id="L54">            var threshold = BigInteger.valueOf(maximumOutputScore);</span>
-<span class="fc" id="L55">            return trial.observations().stream()</span>
-<span class="fc" id="L56">                .map(observation -&gt; BigInteger.valueOf(observation.outputScore()).subtract(threshold).max(BigInteger.ZERO))</span>
-<span class="fc" id="L57">                .reduce(BigInteger.ZERO, BigInteger::add);</span>
+<span class="fc" id="L65">            var threshold = BigInteger.valueOf(maximumOutputScore);</span>
+<span class="fc" id="L66">            return trial.observations().stream()</span>
+<span class="fc" id="L67">                .map(observation -&gt; BigInteger.valueOf(observation.outputScore()).subtract(threshold).max(BigInteger.ZERO))</span>
+<span class="fc" id="L68">                .reduce(BigInteger.ZERO, BigInteger::add);</span>
         }
     }
 
     /** A null qualityGoal retains the historical full-continuation execution and artifact. */
     public record Frozen(Profile selected, List&lt;Trial&gt; trials, List&lt;String&gt; trainingSources, QualityGoal qualityGoal) {
         public Frozen(Profile selected, List&lt;Trial&gt; trials, List&lt;String&gt; trainingSources) {
-<span class="fc" id="L64">            this(selected, trials, trainingSources, null);</span>
-<span class="fc" id="L65">        }</span>
-<span class="fc" id="L66">        public Frozen { trials = List.copyOf(trials); trainingSources = List.copyOf(trainingSources); }</span>
-<span class="fc" id="L67">        public long trainingWork() { return trials.stream().mapToLong(Trial::totalWork).reduce(0, Math::addExact); }</span>
+<span class="fc" id="L75">            this(selected, trials, trainingSources, null);</span>
+<span class="fc" id="L76">        }</span>
+<span class="fc" id="L77">        public Frozen { trials = List.copyOf(trials); trainingSources = List.copyOf(trainingSources); }</span>
+        /** Known work from every trial; a total-work claim also requires accountingComplete(). */
+<span class="fc" id="L79">        public long trainingWork() { return trials.stream().mapToLong(Trial::totalWork).reduce(0, Math::addExact); }</span>
+<span class="fc" id="L80">        public boolean accountingComplete() { return trials.stream().allMatch(Trial::accountingComplete); }</span>
+        public String revision() {
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            return trials.stream().anyMatch(Trial::explicitAccounting) ? ACCOUNTING_REVISION</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">                : qualityGoal == null ? REVISION : QUALITY_REVISION;</span>
+        }
         public TypedSourceOnlySearch.Result evaluate(TypedMoveSearch.Problem problem, TypedSourceOnlySearch.Objective objective) {
-<span class="pc bpc" id="L69" title="1 of 4 branches missed.">            if (!problem.context().sourceOnly() || problem.mode() != MoveSearch.Mode.FAST</span>
-<span class="fc bfc" id="L70" title="All 2 branches covered.">                    || problem.context().phase() != MoveContext.Phase.FROZEN_EVALUATION</span>
-<span class="fc bfc" id="L71" title="All 2 branches covered.">                    || trainingSources.contains(CODEC.encodeExpression(problem.source())))</span>
-<span class="fc" id="L72">                throw new IllegalArgumentException(&quot;distinct frozen source-only evaluation required&quot;);</span>
-<span class="fc" id="L73">            return execute(problem, selected, objective, qualityGoal);</span>
+<span class="pc bpc" id="L86" title="1 of 4 branches missed.">            if (!problem.context().sourceOnly() || problem.mode() != MoveSearch.Mode.FAST</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">                    || problem.context().phase() != MoveContext.Phase.FROZEN_EVALUATION</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">                    || trainingSources.contains(CODEC.encodeExpression(problem.source())))</span>
+<span class="fc" id="L89">                throw new IllegalArgumentException(&quot;distinct frozen source-only evaluation required&quot;);</span>
+<span class="fc" id="L90">            return execute(problem, selected, objective, qualityGoal);</span>
         }
         public String toCanonicalJson() {
-<span class="fc bfc" id="L76" title="All 2 branches covered.">            var writer = new JsonWriter().beginObject().property(&quot;schema&quot;, qualityGoal == null ? REVISION : QUALITY_REVISION)</span>
-<span class="fc" id="L77">                .property(&quot;selected&quot;, selected.id()).property(&quot;trainingWork&quot;, trainingWork())</span>
-<span class="fc bfc" id="L78" title="All 2 branches covered.">                .property(&quot;selection&quot;, qualityGoal == null</span>
-<span class="fc" id="L79">                    ? &quot;MIN_BUDGET_VIOLATIONS_THEN_OUTPUT_COST_THEN_FULL_CONTINUATION_WORK&quot;</span>
-<span class="fc" id="L80">                    : &quot;MIN_BUDGET_VIOLATIONS_THEN_QUALITY_MISSES_THEN_DEFICIT_THEN_PAID_WORK&quot;)</span>
-<span class="fc bfc" id="L81" title="All 2 branches covered.">                .property(&quot;authority&quot;, qualityGoal == null ? &quot;EMPIRICAL_SCHEDULING_ONLY;NO_MATHEMATICAL_PRUNING&quot;</span>
-<span class="fc" id="L82">                    : &quot;EMPIRICAL_SCHEDULING_ONLY;EXPLICIT_CONTINUATION_CONTRACT;NO_PROOF_AUTHORITY&quot;)</span>
-<span class="fc" id="L83">                .property(&quot;mode&quot;, &quot;BUDGETED_HEURISTIC;COMPLETE_REFERENCE_UNCHANGED&quot;)</span>
-<span class="fc" id="L84">                .property(&quot;measurement&quot;, &quot;WALL_AND_PROCESS_CPU;REQUEST_THREAD_ALLOCATIONS;LOGICAL_WORK_IS_NOT_TIME&quot;)</span>
-<span class="fc" id="L85">                .stringArray(&quot;trainingSources&quot;, trainingSources);</span>
-<span class="fc bfc" id="L86" title="All 2 branches covered.">            if (qualityGoal != null) writer.object(&quot;qualityGoal&quot;, out -&gt; out</span>
-<span class="fc" id="L87">                .property(&quot;maximumOutputScore&quot;, qualityGoal.maximumOutputScore())</span>
-<span class="fc" id="L88">                .property(&quot;continuationContract&quot;, qualityGoal.continuationContract().name()));</span>
-<span class="fc" id="L89">            return writer.array(&quot;trials&quot;, out -&gt; trials.forEach(trial -&gt; out.objectValue(item -&gt; trialHeader(item, trial)</span>
-<span class="fc" id="L90">                    .property(&quot;budgetViolations&quot;, trial.violations())</span>
-<span class="fc" id="L91">                    .array(&quot;observations&quot;, observations -&gt; trial.observations().forEach(o -&gt; observations.objectValue(v -&gt; v</span>
-<span class="fc" id="L92">                        .property(&quot;task&quot;, o.taskId()).property(&quot;inputScore&quot;, o.inputScore()).property(&quot;outputScore&quot;, o.outputScore())</span>
-<span class="fc" id="L93">                        .property(&quot;totalWork&quot;, o.totalWork()).property(&quot;withinBudget&quot;, o.withinBudget()).property(&quot;outcome&quot;, o.outcome().name())</span>
-<span class="fc" id="L94">                        .property(&quot;wallNanos&quot;, o.wallNanos()).property(&quot;cpuNanos&quot;, o.cpuNanos()).property(&quot;allocatedBytes&quot;, o.allocatedBytes())))))))</span>
-<span class="fc" id="L95">                .endObject().toString();</span>
+<span class="fc" id="L93">            String schema = revision();</span>
+<span class="fc" id="L94">            boolean explicitAccounting = schema.equals(ACCOUNTING_REVISION);</span>
+<span class="fc" id="L95">            var writer = new JsonWriter().beginObject().property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L96">                .property(&quot;selected&quot;, selected.id()).property(&quot;trainingWork&quot;, trainingWork())</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">                .property(&quot;selection&quot;, qualityGoal == null</span>
+<span class="fc" id="L98">                    ? &quot;MIN_BUDGET_VIOLATIONS_THEN_OUTPUT_COST_THEN_FULL_CONTINUATION_WORK&quot;</span>
+<span class="fc" id="L99">                    : &quot;MIN_BUDGET_VIOLATIONS_THEN_QUALITY_MISSES_THEN_DEFICIT_THEN_PAID_WORK&quot;)</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">                .property(&quot;authority&quot;, qualityGoal == null ? &quot;EMPIRICAL_SCHEDULING_ONLY;NO_MATHEMATICAL_PRUNING&quot;</span>
+<span class="fc" id="L101">                    : &quot;EMPIRICAL_SCHEDULING_ONLY;EXPLICIT_CONTINUATION_CONTRACT;NO_PROOF_AUTHORITY&quot;)</span>
+<span class="fc" id="L102">                .property(&quot;mode&quot;, &quot;BUDGETED_HEURISTIC;COMPLETE_REFERENCE_UNCHANGED&quot;)</span>
+<span class="fc" id="L103">                .property(&quot;measurement&quot;, &quot;WALL_AND_PROCESS_CPU;REQUEST_THREAD_ALLOCATIONS;LOGICAL_WORK_IS_NOT_TIME&quot;)</span>
+<span class="fc" id="L104">                .stringArray(&quot;trainingSources&quot;, trainingSources);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            if (explicitAccounting) writer.property(&quot;accountingComplete&quot;, accountingComplete())</span>
+<span class="fc" id="L106">                .property(&quot;workScope&quot;, &quot;KNOWN_REPORTED_WORK;ACCOUNTING_COMPLETE_REQUIRED_FOR_TOTAL&quot;)</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">                .property(&quot;objectiveRevision&quot;, qualityGoal == null ? REVISION : QUALITY_REVISION);</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            if (qualityGoal != null) writer.object(&quot;qualityGoal&quot;, out -&gt; out</span>
+<span class="fc" id="L109">                .property(&quot;maximumOutputScore&quot;, qualityGoal.maximumOutputScore())</span>
+<span class="fc" id="L110">                .property(&quot;continuationContract&quot;, qualityGoal.continuationContract().name()));</span>
+<span class="fc" id="L111">            return writer.array(&quot;trials&quot;, out -&gt; trials.forEach(trial -&gt; out.objectValue(item -&gt; writeTrial(item, trial, explicitAccounting))))</span>
+<span class="fc" id="L112">                .endObject().toString();</span>
         }
+        private void writeTrial(JsonWriter writer, Trial trial, boolean explicitAccounting) {
+<span class="fc" id="L115">            trialHeader(writer, trial).property(&quot;budgetViolations&quot;, trial.violations());</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (explicitAccounting) writer.property(&quot;accountingComplete&quot;, trial.accountingComplete());</span>
+<span class="fc" id="L117">            writer.array(&quot;observations&quot;, out -&gt; trial.observations().forEach(o -&gt; out.objectValue(item -&gt; writeObservation(item, o, explicitAccounting))));</span>
+<span class="fc" id="L118">        }</span>
+        private void writeObservation(JsonWriter writer, Observation o, boolean explicitAccounting) {
+<span class="fc" id="L120">            writer.property(&quot;task&quot;, o.taskId()).property(&quot;inputScore&quot;, o.inputScore()).property(&quot;outputScore&quot;, o.outputScore())</span>
+<span class="fc" id="L121">                .property(&quot;totalWork&quot;, o.totalWork()).property(&quot;withinBudget&quot;, o.withinBudget()).property(&quot;outcome&quot;, o.outcome().name())</span>
+<span class="fc" id="L122">                .property(&quot;wallNanos&quot;, o.wallNanos()).property(&quot;cpuNanos&quot;, o.cpuNanos()).property(&quot;allocatedBytes&quot;, o.allocatedBytes());</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (explicitAccounting) {</span>
+<span class="fc" id="L124">                writer.property(&quot;accountingComplete&quot;, o.accountingComplete());</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">                if (o.executionRevision() != null) writer.property(&quot;executionRevision&quot;, o.executionRevision());</span>
+            }
+<span class="fc" id="L127">        }</span>
         private JsonWriter trialHeader(JsonWriter writer, Trial trial) {
-<span class="fc" id="L98">            writer.property(&quot;profile&quot;, trial.profile().id()).property(&quot;work&quot;, trial.totalWork());</span>
-<span class="fc bfc" id="L99" title="All 2 branches covered.">            return qualityGoal == null ? writer.property(&quot;outputCost&quot;, trial.outputCost())</span>
-<span class="fc" id="L100">                : writer.integerProperty(&quot;outputCost&quot;, trial.exactOutputCost());</span>
+<span class="fc" id="L129">            writer.property(&quot;profile&quot;, trial.profile().id()).property(&quot;work&quot;, trial.totalWork());</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            return qualityGoal == null ? writer.property(&quot;outputCost&quot;, trial.outputCost())</span>
+<span class="fc" id="L131">                : writer.integerProperty(&quot;outputCost&quot;, trial.exactOutputCost());</span>
         }
     }
     static Frozen train(List&lt;TypedPolicySelection.TrainingTask&gt; tasks, List&lt;Profile&gt; profiles,
             TypedSourceOnlySearch.Objective objective) {
-<span class="fc" id="L105">        return train(tasks, profiles, objective, null);</span>
+<span class="fc" id="L136">        return train(tasks, profiles, objective, null);</span>
     }
 
     /** Price every profile using the same paid quality control retained by frozen evaluation. */
     public static Frozen trainUntil(List&lt;TypedPolicySelection.TrainingTask&gt; tasks, List&lt;Profile&gt; profiles,
             TypedSourceOnlySearch.Objective objective, long maximumOutputScore, SearchContinuationContract contract) {
-<span class="fc" id="L111">        return train(tasks, profiles, objective, new QualityGoal(maximumOutputScore, contract));</span>
+<span class="fc" id="L142">        return train(tasks, profiles, objective, new QualityGoal(maximumOutputScore, contract));</span>
     }
 
     private static Frozen train(List&lt;TypedPolicySelection.TrainingTask&gt; tasks, List&lt;Profile&gt; profiles,
             TypedSourceOnlySearch.Objective objective, QualityGoal qualityGoal) {
-<span class="fc" id="L116">        tasks = List.copyOf(tasks); profiles = List.copyOf(profiles);</span>
-<span class="fc" id="L117">        Objects.requireNonNull(objective, &quot;objective&quot;);</span>
-<span class="pc bpc" id="L118" title="4 of 8 branches missed.">        if (tasks.size() &lt; 2 || tasks.size() &gt; 32 || profiles.isEmpty() || profiles.size() &gt; 16)</span>
-<span class="nc" id="L119">            throw new IllegalArgumentException(&quot;require 2..32 selection tasks and 1..16 profiles&quot;);</span>
-<span class="fc" id="L120">        var sources = new ArrayList&lt;String&gt;();</span>
-<span class="fc" id="L121">        var ids = new HashSet&lt;String&gt;();</span>
-<span class="fc bfc" id="L122" title="All 2 branches covered.">        for (var task : tasks) {</span>
-<span class="fc" id="L123">            var p = task.problem();</span>
-<span class="fc" id="L124">            String source = CODEC.encodeExpression(p.source());</span>
-<span class="pc bpc" id="L125" title="1 of 4 branches missed.">            if (!p.context().sourceOnly() || p.mode() != MoveSearch.Mode.FAST</span>
-<span class="pc bpc" id="L126" title="2 of 4 branches missed.">                    || p.context().phase() != MoveContext.Phase.TRAIN || !ids.add(task.id())</span>
-<span class="pc bpc" id="L127" title="2 of 4 branches missed.">                    || sources.contains(source) || p.budget().totalWork() &gt; 1_000_000</span>
-<span class="pc bpc" id="L128" title="2 of 4 branches missed.">                    || p.budget().maxStates() &gt; 4096 || p.budget().maxSearchDepth() &gt; 32)</span>
-<span class="fc" id="L129">                throw new IllegalArgumentException(&quot;distinct bounded source-only TRAIN tasks required&quot;);</span>
-<span class="fc" id="L130">            sources.add(source);</span>
-<span class="fc" id="L131">        }</span>
-<span class="fc" id="L132">        ids.clear();</span>
-<span class="pc bpc" id="L133" title="2 of 4 branches missed.">        if (profiles.stream().anyMatch(profile -&gt; !ids.add(profile.id())))</span>
-<span class="nc" id="L134">            throw new IllegalArgumentException(&quot;duplicate source policy profile&quot;);</span>
-<span class="fc" id="L135">        var trials = new ArrayList&lt;Trial&gt;();</span>
-<span class="fc bfc" id="L136" title="All 2 branches covered.">        for (var profile : profiles) {</span>
-<span class="fc" id="L137">            var observations = new ArrayList&lt;Observation&gt;();</span>
-<span class="fc bfc" id="L138" title="All 2 branches covered.">            for (var task : tasks) {</span>
-<span class="fc" id="L139">                long start = System.nanoTime(), cpu = cpu(), allocation = allocated();</span>
-<span class="fc" id="L140">                var result = execute(task.problem(), profile, objective, qualityGoal);</span>
-<span class="fc" id="L141">                observations.add(new Observation(task.id(), result.inputScore(), result.outputScore(), result.totalWork(),</span>
-<span class="fc" id="L142">                    result.withinBudget(), result.search().outcome(), System.nanoTime() - start,</span>
-<span class="fc" id="L143">                    delta(cpu, cpu()), delta(allocation, allocated())));</span>
-<span class="fc" id="L144">            }</span>
-<span class="fc" id="L145">            trials.add(new Trial(profile, observations));</span>
-<span class="fc" id="L146">        }</span>
-<span class="fc" id="L147">        var selected = trials.stream().min(order(qualityGoal)).orElseThrow().profile();</span>
-<span class="fc" id="L148">        return new Frozen(selected, trials, sources, qualityGoal);</span>
+<span class="fc" id="L147">        tasks = List.copyOf(tasks); profiles = List.copyOf(profiles);</span>
+<span class="fc" id="L148">        Objects.requireNonNull(objective, &quot;objective&quot;);</span>
+<span class="pc bpc" id="L149" title="4 of 8 branches missed.">        if (tasks.size() &lt; 2 || tasks.size() &gt; 32 || profiles.isEmpty() || profiles.size() &gt; 16)</span>
+<span class="nc" id="L150">            throw new IllegalArgumentException(&quot;require 2..32 selection tasks and 1..16 profiles&quot;);</span>
+<span class="fc" id="L151">        var sources = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L152">        var ids = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        for (var task : tasks) {</span>
+<span class="fc" id="L154">            var p = task.problem();</span>
+<span class="fc" id="L155">            String source = CODEC.encodeExpression(p.source());</span>
+<span class="pc bpc" id="L156" title="1 of 4 branches missed.">            if (!p.context().sourceOnly() || p.mode() != MoveSearch.Mode.FAST</span>
+<span class="pc bpc" id="L157" title="2 of 4 branches missed.">                    || p.context().phase() != MoveContext.Phase.TRAIN || !ids.add(task.id())</span>
+<span class="pc bpc" id="L158" title="2 of 4 branches missed.">                    || sources.contains(source) || p.budget().totalWork() &gt; 1_000_000</span>
+<span class="pc bpc" id="L159" title="2 of 4 branches missed.">                    || p.budget().maxStates() &gt; 4096 || p.budget().maxSearchDepth() &gt; 32)</span>
+<span class="fc" id="L160">                throw new IllegalArgumentException(&quot;distinct bounded source-only TRAIN tasks required&quot;);</span>
+<span class="fc" id="L161">            sources.add(source);</span>
+<span class="fc" id="L162">        }</span>
+<span class="fc" id="L163">        ids.clear();</span>
+<span class="pc bpc" id="L164" title="2 of 4 branches missed.">        if (profiles.stream().anyMatch(profile -&gt; !ids.add(profile.id())))</span>
+<span class="nc" id="L165">            throw new IllegalArgumentException(&quot;duplicate source policy profile&quot;);</span>
+<span class="fc" id="L166">        var trials = new ArrayList&lt;Trial&gt;();</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (var profile : profiles) {</span>
+<span class="fc" id="L168">            var observations = new ArrayList&lt;Observation&gt;();</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            for (var task : tasks) {</span>
+<span class="fc" id="L170">                long start = System.nanoTime(), cpu = cpu(), allocation = allocated();</span>
+<span class="fc" id="L171">                var result = execute(task.problem(), profile, objective, qualityGoal);</span>
+<span class="fc" id="L172">                observations.add(new Observation(task.id(), result.inputScore(), result.outputScore(), result.totalWork(),</span>
+<span class="fc" id="L173">                    result.withinBudget(), result.search().outcome(), System.nanoTime() - start,</span>
+<span class="fc" id="L174">                    delta(cpu, cpu()), delta(allocation, allocated()), result.accountingComplete(),</span>
+<span class="fc" id="L175">                    TypedPolicySelection.executionRevision(result.search())));</span>
+<span class="fc" id="L176">            }</span>
+<span class="fc" id="L177">            trials.add(new Trial(profile, observations));</span>
+<span class="fc" id="L178">        }</span>
+<span class="fc" id="L179">        var selected = trials.stream().min(order(qualityGoal)).orElseThrow().profile();</span>
+<span class="fc" id="L180">        return new Frozen(selected, trials, sources, qualityGoal);</span>
     }
     private static Comparator&lt;Trial&gt; order(QualityGoal goal) {
-<span class="fc" id="L151">        var budgetFirst = Comparator.comparingLong(Trial::violations);</span>
-<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (goal == null) return budgetFirst.thenComparingLong(Trial::outputCost).thenComparingLong(Trial::totalWork);</span>
-<span class="fc" id="L153">        return budgetFirst.thenComparingLong(goal::misses).thenComparing(goal::deficit).thenComparingLong(Trial::totalWork);</span>
+<span class="fc" id="L183">        var budgetFirst = Comparator.comparingLong(Trial::violations);</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        if (goal == null) return budgetFirst.thenComparingLong(Trial::outputCost).thenComparingLong(Trial::totalWork);</span>
+<span class="fc" id="L185">        return budgetFirst.thenComparingLong(goal::misses).thenComparing(goal::deficit).thenComparingLong(Trial::totalWork);</span>
     }
 
     private static TypedSourceOnlySearch.Result execute(TypedMoveSearch.Problem p, Profile profile,
             TypedSourceOnlySearch.Objective objective, QualityGoal qualityGoal) {
-<span class="fc" id="L158">        var problem = new TypedMoveSearch.Problem(p.source(), p.context(), profile.providers(),</span>
-<span class="fc" id="L159">            profile.policy(), p.verifier(), p.stateScore(), p.mode(), p.scheduling(), p.budget(), p.stateValue());</span>
-<span class="fc" id="L160">        var search = new TypedSourceOnlySearch();</span>
-<span class="fc bfc" id="L161" title="All 2 branches covered.">        return qualityGoal == null ? search.search(problem, objective)</span>
-<span class="fc" id="L162">            : search.searchUntil(problem, objective, qualityGoal.maximumOutputScore(), qualityGoal.continuationContract());</span>
+<span class="fc" id="L190">        var problem = new TypedMoveSearch.Problem(p.source(), p.context(), profile.providers(),</span>
+<span class="fc" id="L191">            profile.policy(), p.verifier(), p.stateScore(), p.mode(), p.scheduling(), p.budget(), p.stateValue());</span>
+<span class="fc" id="L192">        var search = new TypedSourceOnlySearch();</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        return qualityGoal == null ? search.search(problem, objective)</span>
+<span class="fc" id="L194">            : search.searchUntil(problem, objective, qualityGoal.maximumOutputScore(), qualityGoal.continuationContract());</span>
     }
     private static long cpu() {
-<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        return ManagementFactory.getOperatingSystemMXBean() instanceof com.sun.management.OperatingSystemMXBean bean</span>
-<span class="pc" id="L166">            ? bean.getProcessCpuTime() : -1;</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        return ManagementFactory.getOperatingSystemMXBean() instanceof com.sun.management.OperatingSystemMXBean bean</span>
+<span class="pc" id="L198">            ? bean.getProcessCpuTime() : -1;</span>
     }
     private static long allocated() {
-<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        return ManagementFactory.getThreadMXBean() instanceof com.sun.management.ThreadMXBean bean</span>
-<span class="pc bpc" id="L170" title="2 of 4 branches missed.">                &amp;&amp; bean.isThreadAllocatedMemorySupported() &amp;&amp; bean.isThreadAllocatedMemoryEnabled()</span>
-<span class="pc" id="L171">            ? bean.getThreadAllocatedBytes(Thread.currentThread().threadId()) : -1;</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        return ManagementFactory.getThreadMXBean() instanceof com.sun.management.ThreadMXBean bean</span>
+<span class="pc bpc" id="L202" title="2 of 4 branches missed.">                &amp;&amp; bean.isThreadAllocatedMemorySupported() &amp;&amp; bean.isThreadAllocatedMemoryEnabled()</span>
+<span class="pc" id="L203">            ? bean.getThreadAllocatedBytes(Thread.currentThread().threadId()) : -1;</span>
     }
-<span class="pc bpc" id="L173" title="2 of 4 branches missed.">    private static long delta(long before, long after) { return before &lt; 0 || after &lt; 0 ? -1 : Math.max(0, after - before); }</span>
+<span class="pc bpc" id="L205" title="2 of 4 branches missed.">    private static long delta(long before, long after) { return before &lt; 0 || after &lt; 0 ? -1 : Math.max(0, after - before); }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

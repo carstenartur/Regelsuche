@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ManagedIncrementalCursor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">ManagedIncrementalCursor.java</span></div><h1>ManagedIncrementalCursor.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import static de.regelsuche.search.moves.IncrementalProviderContract.*;
+
+import de.regelsuche.transform.ExecutionWork;
+import de.regelsuche.transform.Transformation;
+import java.util.Objects;
+import java.util.Optional;
+
+/** Owns admission/lifecycle and keeps its meter even if a delegated open, pull or close throws. */
+final class ManagedIncrementalCursor implements Cursor {
+    private final MoveProvider.Descriptor descriptor;
+    private final Definition definition;
+    private final Factory factory;
+    private final MoveState state;
+    private final MoveContext context;
+<span class="fc" id="L17">    private final Meter meter = new Meter();</span>
+    private Source source;
+<span class="fc" id="L19">    private Status status = Status.OPEN;</span>
+<span class="fc" id="L20">    private boolean admitted, closed, accountingComplete = true;</span>
+    private long emitted;
+<span class="fc" id="L22">    private ExecutionWork emittedWork = ExecutionWork.ZERO;</span>
+<span class="fc" id="L23">    private String detail = &quot;&quot;;</span>
+
+    ManagedIncrementalCursor(MoveProvider.Descriptor descriptor, Definition definition, Factory factory,
+<span class="fc" id="L26">            MoveState state, MoveContext context) {</span>
+<span class="fc" id="L27">        this.descriptor = descriptor; this.definition = definition; this.factory = factory;</span>
+<span class="fc" id="L28">        this.state = Objects.requireNonNull(state); this.context = Objects.requireNonNull(context);</span>
+<span class="fc" id="L29">    }</span>
+    @Override public Optional&lt;Transformation&gt; next(long allowance) {
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (allowance &lt; 0) throw new IllegalArgumentException(&quot;negative cursor allowance&quot;);</span>
+<span class="fc bfc" id="L32" title="All 4 branches covered.">        if (closed || terminal()) return Optional.empty();</span>
+<span class="fc" id="L33">        long before = total();</span>
+        try {
+<span class="fc bfc" id="L35" title="All 2 branches covered.">            if (!available(before, allowance)) return Optional.empty();</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">            if (!admitted) admit();</span>
+<span class="fc bfc" id="L37" title="All 4 branches covered.">            if (terminal() || !available(before, allowance)) return Optional.empty();</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">            if (source == null) open();</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">            if (!available(before, allowance)) return Optional.empty();</span>
+<span class="fc" id="L40">            meter.charge(Operation.PULL, 1);</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">            if (!available(before, allowance)) return Optional.empty();</span>
+<span class="fc" id="L42">            var candidate = Objects.requireNonNull(source.next(remaining(before, allowance)));</span>
+<span class="fc" id="L43">            status = Objects.requireNonNull(source.status());</span>
+<span class="pc bpc" id="L44" title="3 of 6 branches missed.">            if (status == Status.OPEN || status == Status.CLOSED || status == Status.FAILED)</span>
+<span class="nc" id="L45">                throw new IllegalStateException(&quot;invalid delegated lifecycle state&quot;);</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            if (candidate.isPresent()) retain(candidate.orElseThrow());</span>
+<span class="fc" id="L47">            validateMathematics();</span>
+<span class="fc" id="L48">            return candidate;</span>
+<span class="fc" id="L49">        } catch (RuntimeException failure) {</span>
+<span class="fc" id="L50">            fail(failure);</span>
+<span class="fc" id="L51">            return Optional.empty();</span>
+        }
+    }
+    private void admit() {
+<span class="fc" id="L55">        meter.charge(Operation.ADMISSION, 1); admitted = true;</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (!context.carries(descriptor.requiredAssumptions(), state)) {</span>
+<span class="fc" id="L57">            status = Status.EXHAUSTED; detail = &quot;ASSUMPTIONS_NOT_CARRIED&quot;;</span>
+        }
+<span class="fc" id="L59">    }</span>
+    private void open() {
+<span class="fc" id="L61">        meter.charge(Operation.OPEN, 1);</span>
+<span class="fc" id="L62">        source = Objects.requireNonNull(factory.open(state, context, meter));</span>
+<span class="fc" id="L63">        status = Status.READY;</span>
+<span class="fc" id="L64">    }</span>
+    private void retain(Transformation candidate) {
+<span class="fc" id="L66">        candidate.provenance().requireSource(state.expression());</span>
+<span class="fc" id="L67">        emittedWork = emittedWork.plus(candidate.executionWork());</span>
+<span class="fc" id="L68">        var paid = meter.work().mathematics();</span>
+<span class="pc bpc" id="L69" title="2 of 4 branches missed.">        if (paid.primitiveRewrites() &lt; emittedWork.primitiveRewrites() || paid.exactTheorySteps() &lt; emittedWork.exactTheorySteps()</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">                || paid.exactTheoryWorkUnits() &lt; emittedWork.exactTheoryWorkUnits())</span>
+<span class="nc" id="L71">            throw new IllegalStateException(&quot;candidate mathematics missing from cumulative receipt&quot;);</span>
+<span class="fc" id="L72">        emitted = Math.addExact(emitted, 1);</span>
+<span class="fc" id="L73">    }</span>
+    private void validateMathematics() {
+<span class="fc" id="L75">        var work = meter.work().mathematics();</span>
+<span class="pc bpc" id="L76" title="1 of 4 branches missed.">        if ((definition.mathematics() == Mathematics.PRIMITIVE &amp;&amp; work.exactTheorySteps() != 0)</span>
+<span class="pc bpc" id="L77" title="3 of 4 branches missed.">                || (definition.mathematics() == Mathematics.EXACT &amp;&amp; work.primitiveRewrites() != 0))</span>
+<span class="nc" id="L78">            throw new IllegalStateException(&quot;work differs from declared mathematical kind&quot;);</span>
+<span class="fc" id="L79">    }</span>
+    private boolean terminal() {
+<span class="pc bpc" id="L81" title="1 of 8 branches missed.">        return status == Status.EXHAUSTED || status == Status.INCONCLUSIVE || status == Status.FAILED || status == Status.CLOSED;</span>
+    }
+<span class="fc" id="L83">    private long total() { return meter.work().metrics().totalWorkUnitsV2(); }</span>
+<span class="fc" id="L84">    private long remaining(long before, long allowance) { return Math.max(0, allowance - (total() - before)); }</span>
+    private boolean available(long before, long allowance) {
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (remaining(before, allowance) &gt; 0) return true;</span>
+<span class="fc" id="L87">        status = Status.LIMIT; return false;</span>
+    }
+    private void fail(RuntimeException failure) {
+<span class="fc" id="L90">        meter.charge(Operation.ABORT, 1);</span>
+<span class="fc" id="L91">        status = Status.FAILED; accountingComplete = false;</span>
+<span class="fc" id="L92">        detail = failure.getClass().getSimpleName() + &quot;:&quot; + String.valueOf(failure.getMessage());</span>
+<span class="fc" id="L93">    }</span>
+    @Override public Snapshot snapshot() {
+<span class="fc bfc" id="L95" title="All 4 branches covered.">        return new Snapshot(definition, status, closed, !closed &amp;&amp; status == Status.LIMIT, accountingComplete,</span>
+<span class="fc" id="L96">            meter.work(), emitted, detail);</span>
+    }
+    @Override public void close() {
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (closed) return;</span>
+<span class="fc" id="L100">        closed = true; meter.charge(Operation.CLOSE, 1);</span>
+        try {
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            if (source != null) source.close();</span>
+<span class="fc" id="L103">            validateMathematics();</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            if (!terminal()) status = Status.CLOSED;</span>
+<span class="fc" id="L105">        } catch (RuntimeException failure) { fail(failure); }</span>
+<span class="fc" id="L106">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

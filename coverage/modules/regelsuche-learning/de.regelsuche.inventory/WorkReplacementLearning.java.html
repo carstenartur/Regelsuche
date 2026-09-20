@@ -42,31 +42,32 @@ public final class WorkReplacementLearning {
             TypedSourceOnlySearch.Objective objective, WorkReplacementExperiment.Journal journal, String prefix) {
 <span class="fc" id="L43">        manifest.requireTrainingSources(tasks.stream().map(task -&gt; CODEC.encodeExpression(task.problem().source())).toList());</span>
 <span class="fc" id="L44">        var quality = manifest.quality();</span>
-<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        var selected = quality.mode() == WorkReplacementManifest.QualityMode.SUFFICIENT_QUALITY_MIN_WORK</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        var selected = quality.mode() == WorkReplacementManifest.QualityMode.SUFFICIENT_QUALITY_MIN_WORK</span>
 <span class="fc" id="L46">            ? TypedSourcePolicySelection.trainUntil(tasks, profiles, objective, quality.maximumScore(), quality.continuation())</span>
-<span class="pc" id="L47">            : new TypedPolicySelection().trainSourceOnly(tasks, profiles, objective);</span>
+<span class="fc" id="L47">            : new TypedPolicySelection().trainSourceOnly(tasks, profiles, objective);</span>
 <span class="fc" id="L48">        String raw = selected.toCanonicalJson();</span>
 <span class="fc" id="L49">        charge(journal, prefix + &quot;/selection&quot;, SELECTION_TRAINING, selected.trainingWork(),</span>
-<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            selected.qualityGoal() == null ? TypedSourcePolicySelection.REVISION : TypedSourcePolicySelection.QUALITY_REVISION, raw);</span>
+<span class="fc" id="L50">            selected.revision(), raw);</span>
 <span class="fc" id="L51">        materialized(journal, prefix + &quot;/selection-output&quot;, raw);</span>
-<span class="fc" id="L52">        return selected;</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (!selected.accountingComplete()) journal.incomplete();</span>
+<span class="fc" id="L53">        return selected;</span>
     }
     public static CheckedLearnedSchemaModel restore(String json, String inventoryHash,
             WorkReplacementExperiment.Journal journal, String prefix) {
-<span class="fc" id="L56">        var restored = CheckedLearnedSchemaModel.load(json, inventoryHash);</span>
-<span class="fc" id="L57">        charge(journal, prefix + &quot;/restore&quot;, RESTORE_REPROOF, restored.loadWork(), CheckedLearnedSchemaModel.REVISION, json);</span>
-<span class="fc" id="L58">        return restored;</span>
+<span class="fc" id="L57">        var restored = CheckedLearnedSchemaModel.load(json, inventoryHash);</span>
+<span class="fc" id="L58">        charge(journal, prefix + &quot;/restore&quot;, RESTORE_REPROOF, restored.loadWork(), CheckedLearnedSchemaModel.REVISION, json);</span>
+<span class="fc" id="L59">        return restored;</span>
     }
     public static TypedLearnedMoveInventory primitives(EvolutionGenome genome, WorkReplacementExperiment.Journal journal, String prefix) {
-<span class="fc" id="L61">        var inventory = TypedLearnedMoveInventory.primitives(genome);</span>
-<span class="fc" id="L62">        String genomeJson = genome.toCanonicalJson();</span>
-<span class="fc" id="L63">        charge(journal, prefix + &quot;/compile&quot;, COMPILATION, inventory.primitiveProviders().size(), &quot;compiled-provider-count/v1&quot;, genomeJson);</span>
-<span class="fc" id="L64">        materialized(journal, prefix + &quot;/genome-output&quot;, genomeJson);</span>
-<span class="fc" id="L65">        return inventory;</span>
+<span class="fc" id="L62">        var inventory = TypedLearnedMoveInventory.primitives(genome);</span>
+<span class="fc" id="L63">        String genomeJson = genome.toCanonicalJson();</span>
+<span class="fc" id="L64">        charge(journal, prefix + &quot;/compile&quot;, COMPILATION, inventory.primitiveProviders().size(), &quot;compiled-provider-count/v1&quot;, genomeJson);</span>
+<span class="fc" id="L65">        materialized(journal, prefix + &quot;/genome-output&quot;, genomeJson);</span>
+<span class="fc" id="L66">        return inventory;</span>
     }
     private static void materialized(WorkReplacementExperiment.Journal journal, String prefix, String text) {
-<span class="fc" id="L68">        charge(journal, prefix, OUTPUT, text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length, &quot;utf8-materialized-bytes/v1&quot;, &quot;&quot;);</span>
-<span class="fc" id="L69">    }</span>
-<span class="fc" id="L70">    public static String identity(String expression) { return CODEC.encodeExpression(new ExpressionParser().parseTerm(expression)); }</span>
+<span class="fc" id="L69">        charge(journal, prefix, OUTPUT, text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length, &quot;utf8-materialized-bytes/v1&quot;, &quot;&quot;);</span>
+<span class="fc" id="L70">    }</span>
+<span class="fc" id="L71">    public static String identity(String expression) { return CODEC.encodeExpression(new ExpressionParser().parseTerm(expression)); }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
