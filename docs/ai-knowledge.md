@@ -157,9 +157,41 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
+### Accepted predecessor for work-replacement P01 (2026-09-20)
+
+The current baseline is the exact freshly generated snapshot of integrated M0
+main `7aec9ae0a1619dda98f859d1277ac8b287471423`, tree
+`56b841cf704a8db32b1c7c7420faff653087cc0f`, after #1047 and #1048.
+Both [the source-head CI](https://github.com/carstenartur/Regelsuche/actions/runs/35514858944)
+and [the post-merge main CI](https://github.com/carstenartur/Regelsuche/actions/runs/35517882778)
+passed all mandatory authorities and `ciCheck`.
+
+A clean detached reproduction of the complete unchanged `aiKnowledgeCheck`
+measured 648025 tokens, an increase of 13580 against the previous 634445 baseline,
+below the unchanged 15000 allowance. Eight coverage controls, 17 hotspot checks,
+and all absolute/trend limits passed. The clean pinned v0.1.10 extractor and
+existing Java 25 initializer retain the original `--release 17` target.
+
+The active file is a byte-for-byte copy of
+[the accepted snapshot](../ai-knowledge/baseline-history/2026-09-20-main7aec9ae0-metrics-snapshot.json),
+SHA256 `b2d65ffe25f98ebbac0ca4e493d1b056d8e521cecb034d6b320277eb4e6d584b`.
+[Provenance](../ai-knowledge/baseline-history/2026-09-20-main7aec9ae0-provenance.json)
+and [independent review](../ai-knowledge/baseline-history/2026-09-20-main7aec9ae0-independent-review.md)
+bind clean source/tool identities, unchanged policy, successful CI, commands and
+original report hashes. The main artifact ZIP digest is API-reported; its bytes
+were not downloaded. Baseline values come from the retained local reproduction.
+
+The initial P01 head `6f59849a63db364b9665ae00f04eca9f09017812` failed the old
+trend limit at 650825 tokens (+16380). Its
+[rejected report](../ai-knowledge/baseline-history/2026-09-20-p01-6f59849a-rejected-trend.json)
+and old baseline remain unchanged. The rejected artifact ZIP was downloaded and
+its reported SHA256 independently verified. No failing candidate supplies baseline
+values. P01 must pass its own complete current-head CI; this qualification is no
+learning or performance acceptance. Thresholds, selectors and exceptions are unchanged.
+
 ### Accepted predecessor for learned-schema v2 (2026-09-20)
 
-The current baseline is the exact freshly generated snapshot of accepted main
+For learned-schema v2, the baseline advanced to the freshly generated snapshot of accepted main
 `81ea9ac7dc46f310f68a071b944ea144e581c2ed` after merged PR #1038, tree
 `e3a2a95e4ecd91cc9d0091995bbe66cc2c7f67b2`. Its PR and post-merge CI runs
 [35474041553](https://github.com/carstenartur/Regelsuche/actions/runs/35474041553)

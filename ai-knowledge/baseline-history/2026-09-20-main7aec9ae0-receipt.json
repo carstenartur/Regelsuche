@@ -1,0 +1,42 @@
+{
+  "sourceRoot": "/workspace/scratch/7ff736a22947/regelsuche-m0-evidence",
+  "sourceCommit": "7aec9ae0a1619dda98f859d1277ac8b287471423",
+  "sourceTree": "56b841cf704a8db32b1c7c7420faff653087cc0f",
+  "sourceStatusBefore": "",
+  "extractorCommit": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+  "extractorTree": "0cb8e41b91c831705f9c86633580181372da6e14",
+  "extractorTag": "v0.1.10",
+  "extractorStatusBefore": "",
+  "command": [
+    "/workspace/scratch/7ff736a22947/regelsuche-m0-evidence/gradlew",
+    "--offline",
+    "--no-daemon",
+    "--no-configuration-cache",
+    "--max-workers=2",
+    "-I",
+    "/workspace/scratch/7ff736a22947/regelsuche-m0-evidence/ai-knowledge/baseline-history/2026-09-20-main81ea9ac7-java25-extractor.init.gradle",
+    "-PuseLocalAiKnowledgeExtractor=true",
+    "-PaiKnowledgeExtractorCheckout=/workspace/scratch/7ff736a22947/ai-knowledge-extractor",
+    "-Porg.gradle.java.installations.paths=/tmp/taxonomy-toolchain/jdk-25.0.2+10",
+    "aiKnowledgeCheck"
+  ],
+  "baselineSha256Before": "2928c6dabe73e410e8c50e584cfaa21b9e17eabc59f53c85985ea233fb217af9",
+  "gateBuildSha256": "2aaf02538386418eeb3a5de354942514ba697cedd5cd658edf0cd44e2cdbfdd5",
+  "initScriptSha256": "35f1944def395ee7ecbe79a629640ddf5a86eb400dacdee3261469d197e79c54",
+  "runnerSha256": "da30a8de3507492d4ae491fff9d4f10ac1bd745c8f76280ed80e3ce23056e669",
+  "javaHome": "/tmp/taxonomy-toolchain/jdk-25.0.2+10",
+  "javaReleaseSha256": "10442d5ef7930f4220a3336d65f020b24812660824ea995a51ba29f278aed30b",
+  "javaExecutableSha256": "d421a502734dc104789424d68b147cbeeca4e9b6ea786ec50d48967e3389993e",
+  "javaVersion": "openjdk version \"25.0.2\" 2026-01-20 LTS\nOpenJDK Runtime Environment Temurin-25.0.2+10 (build 25.0.2+10-LTS)\nOpenJDK 64-Bit Server VM Temurin-25.0.2+10 (build 25.0.2+10-LTS, mixed mode, sharing)",
+  "compilerNote": "Unchanged extractor sources compiled with JDK 25; original --release 17 retained.",
+  "exitCode": 0,
+  "sourceStatusAfter": "",
+  "baselineSha256After": "2928c6dabe73e410e8c50e584cfaa21b9e17eabc59f53c85985ea233fb217af9",
+  "artifacts": {
+    "metrics-snapshot.json": "b2d65ffe25f98ebbac0ca4e493d1b056d8e521cecb034d6b320277eb4e6d584b",
+    "check.json": "3953c448b31f867070a77e1ea369eb346dd29d96a7760515c58c3df5a911b648",
+    "trend.json": "95147642955f9958f9a6d0b936e001f1c9e7f0d31cd510ca0ceaf3e9e64d9822",
+    "complexity.json": "d214e25086481baa51e2545e64966e73080bdb93b7f469511e3e26422dfa0251"
+  },
+  "logSha256": "a92b603363705ddc251c3d43f326815cbae27e834f169220dd19bde699a43f94"
+}

@@ -32,6 +32,10 @@ public final class TypedSourcePolicySelection {
         public Trial { observations = List.copyOf(observations); }
         public long totalWork() { return observations.stream().mapToLong(Observation::totalWork).reduce(0, Math::addExact); }
         public long violations() { return observations.stream().filter(o -> !o.withinBudget()).count(); }
+        public BigInteger exactOutputCost() {
+            return observations.stream().map(value -> BigInteger.valueOf(value.outputScore()))
+                .reduce(BigInteger.ZERO, BigInteger::add);
+        }
         public long outputCost() { return observations.stream().mapToLong(Observation::outputScore).reduce(0, Math::addExact); }
     }
     /** Caller-defined sufficient quality; neither a target expression nor proof authority.
@@ -82,14 +86,18 @@ public final class TypedSourcePolicySelection {
             if (qualityGoal != null) writer.object("qualityGoal", out -> out
                 .property("maximumOutputScore", qualityGoal.maximumOutputScore())
                 .property("continuationContract", qualityGoal.continuationContract().name()));
-            return writer.array("trials", out -> trials.forEach(trial -> out.objectValue(item -> item
-                    .property("profile", trial.profile().id()).property("work", trial.totalWork())
-                    .property("outputCost", trial.outputCost()).property("budgetViolations", trial.violations())
+            return writer.array("trials", out -> trials.forEach(trial -> out.objectValue(item -> trialHeader(item, trial)
+                    .property("budgetViolations", trial.violations())
                     .array("observations", observations -> trial.observations().forEach(o -> observations.objectValue(v -> v
                         .property("task", o.taskId()).property("inputScore", o.inputScore()).property("outputScore", o.outputScore())
                         .property("totalWork", o.totalWork()).property("withinBudget", o.withinBudget()).property("outcome", o.outcome().name())
                         .property("wallNanos", o.wallNanos()).property("cpuNanos", o.cpuNanos()).property("allocatedBytes", o.allocatedBytes())))))))
                 .endObject().toString();
+        }
+        private JsonWriter trialHeader(JsonWriter writer, Trial trial) {
+            writer.property("profile", trial.profile().id()).property("work", trial.totalWork());
+            return qualityGoal == null ? writer.property("outputCost", trial.outputCost())
+                : writer.integerProperty("outputCost", trial.exactOutputCost());
         }
     }
     static Frozen train(List<TypedPolicySelection.TrainingTask> tasks, List<Profile> profiles,

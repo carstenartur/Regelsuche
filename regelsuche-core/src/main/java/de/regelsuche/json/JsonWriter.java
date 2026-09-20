@@ -122,6 +122,15 @@ public final class JsonWriter {
         return this;
     }
 
+    /** Emits an exact JSON integer beyond the long range without changing existing overload resolution. */
+    public JsonWriter integerProperty(String key, java.math.BigInteger value) {
+        Objects.requireNonNull(value, "value");
+        comma();
+        appendKey(key);
+        builder.append(value);
+        return this;
+    }
+
     public JsonWriter property(String key, double value) {
         comma();
         appendKey(key);

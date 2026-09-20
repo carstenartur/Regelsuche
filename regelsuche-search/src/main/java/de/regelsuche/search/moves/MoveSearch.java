@@ -61,6 +61,10 @@ public final class MoveSearch {
             long verificationWork, int firstHitDepth, int firstHitPrimitiveDepth, Map<String, Long> familyMatches) {
         public Metrics { familyMatches = java.util.Collections.unmodifiableMap(new TreeMap<>(familyMatches)); }
         public long totalWork() { return Math.addExact(Math.addExact(primitiveWork, searchWork), verificationWork); }
+        /** Explicit nonoverlapping charged dimensions; historical totals and serializers are unchanged. */
+        public Map<String, Long> chargedComponents() {
+            return Map.of("primitive", primitiveWork, "search", searchWork, "verification", verificationWork);
+        }
         public double effectiveBranchingFactor() { return expandedStates == 0 ? 0 : (double) (consumedSuccessors - discardedSuccessors) / expandedStates; }
     }
     public record Result(Outcome outcome, List<WitnessStep> witness, List<Event> events, Set<MoveState> reachedStates, List<MoveState> deadEndStates,

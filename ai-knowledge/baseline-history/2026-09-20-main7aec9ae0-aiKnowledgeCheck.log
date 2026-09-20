@@ -1,0 +1,120 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.7.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+Problem in daemon expiration check
+org.gradle.internal.jvm.JavaHomeException: The supplied javaHome seems to be invalid. I cannot find the java executable. Tried location: /workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10/bin/java
+	at org.gradle.internal.jvm.Jvm.findExecutable(Jvm.java:191)
+	at org.gradle.internal.jvm.Jvm.getJavaExecutable(Jvm.java:216)
+	at org.gradle.internal.jvm.Jvm.forHome(Jvm.java:119)
+	at org.gradle.launcher.daemon.context.DaemonCompatibilitySpec.jvmCompatible(DaemonCompatibilitySpec.java:93)
+	at org.gradle.launcher.daemon.context.DaemonCompatibilitySpec.whyUnsatisfied(DaemonCompatibilitySpec.java:43)
+	at org.gradle.launcher.daemon.context.DaemonCompatibilitySpec.isSatisfiedBy(DaemonCompatibilitySpec.java:38)
+	at org.gradle.launcher.daemon.context.DaemonCompatibilitySpec.isSatisfiedBy(DaemonCompatibilitySpec.java:28)
+	at org.gradle.launcher.daemon.server.CompatibleDaemonExpirationStrategy.lambda$checkExpiration$0(CompatibleDaemonExpirationStrategy.java:48)
+	at org.gradle.util.internal.CollectionUtils.filter(CollectionUtils.java:138)
+	at org.gradle.util.internal.CollectionUtils.filter(CollectionUtils.java:111)
+	at org.gradle.launcher.daemon.server.CompatibleDaemonExpirationStrategy.checkExpiration(CompatibleDaemonExpirationStrategy.java:47)
+	at org.gradle.launcher.daemon.server.expiry.AllDaemonExpirationStrategy.checkExpiration(AllDaemonExpirationStrategy.java:47)
+	at org.gradle.launcher.daemon.server.expiry.AnyDaemonExpirationStrategy.checkExpiration(AnyDaemonExpirationStrategy.java:44)
+	at org.gradle.launcher.daemon.server.MasterExpirationStrategy.checkExpiration(MasterExpirationStrategy.java:80)
+	at org.gradle.launcher.daemon.server.Daemon$DaemonExpirationPeriodicCheck.run(Daemon.java:273)
+	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:65)
+	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545)
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369)
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+
+> Task :ai-knowledge-extractor:core:compileJava
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :ai-knowledge-extractor:gradle-plugin:compileJava
+> Task :ai-knowledge-extractor:gradle-plugin:pluginDescriptors
+> Task :ai-knowledge-extractor:gradle-plugin:processResources
+> Task :ai-knowledge-extractor:gradle-plugin:classes
+> Task :ai-knowledge-extractor:gradle-plugin:jar
+> Task :ai-knowledge-extractor:core:processResources
+> Task :ai-knowledge-extractor:core:classes
+> Task :ai-knowledge-extractor:core:jar
+Problem in daemon expiration check
+org.gradle.internal.jvm.JavaHomeException: The supplied javaHome seems to be invalid. I cannot find the java executable. Tried location: /workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10/bin/java
+	at org.gradle.internal.jvm.Jvm.findExecutable(Jvm.java:191)
+	at org.gradle.internal.jvm.Jvm.getJavaExecutable(Jvm.java:216)
+	at org.gradle.internal.jvm.Jvm.forHome(Jvm.java:119)
+	at org.gradle.launcher.daemon.context.DaemonCompatibilitySpec.jvmCompatible(DaemonCompatibilitySpec.java:93)
+	at org.gradle.launcher.daemon.context.DaemonCompatibilitySpec.whyUnsatisfied(DaemonCompatibilitySpec.java:43)
+	at org.gradle.launcher.daemon.context.DaemonCompatibilitySpec.isSatisfiedBy(DaemonCompatibilitySpec.java:38)
+	at org.gradle.launcher.daemon.context.DaemonCompatibilitySpec.isSatisfiedBy(DaemonCompatibilitySpec.java:28)
+	at org.gradle.launcher.daemon.server.CompatibleDaemonExpirationStrategy.lambda$checkExpiration$0(CompatibleDaemonExpirationStrategy.java:48)
+	at org.gradle.util.internal.CollectionUtils.filter(CollectionUtils.java:138)
+	at org.gradle.util.internal.CollectionUtils.filter(CollectionUtils.java:111)
+	at org.gradle.launcher.daemon.server.CompatibleDaemonExpirationStrategy.checkExpiration(CompatibleDaemonExpirationStrategy.java:47)
+	at org.gradle.launcher.daemon.server.expiry.AllDaemonExpirationStrategy.checkExpiration(AllDaemonExpirationStrategy.java:47)
+	at org.gradle.launcher.daemon.server.expiry.AnyDaemonExpirationStrategy.checkExpiration(AnyDaemonExpirationStrategy.java:44)
+	at org.gradle.launcher.daemon.server.MasterExpirationStrategy.checkExpiration(MasterExpirationStrategy.java:80)
+	at org.gradle.launcher.daemon.server.Daemon$DaemonExpirationPeriodicCheck.run(Daemon.java:273)
+	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:65)
+	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545)
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369)
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+Problem in daemon expiration check
+org.gradle.internal.jvm.JavaHomeException: The supplied javaHome seems to be invalid. I cannot find the java executable. Tried location: /workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10/bin/java
+	at org.gradle.internal.jvm.Jvm.findExecutable(Jvm.java:191)
+	at org.gradle.internal.jvm.Jvm.getJavaExecutable(Jvm.java:216)
+	at org.gradle.internal.jvm.Jvm.forHome(Jvm.java:119)
+	at org.gradle.launcher.daemon.context.DaemonCompatibilitySpec.jvmCompatible(DaemonCompatibilitySpec.java:93)
+	at org.gradle.launcher.daemon.context.DaemonCompatibilitySpec.whyUnsatisfied(DaemonCompatibilitySpec.java:43)
+	at org.gradle.launcher.daemon.context.DaemonCompatibilitySpec.isSatisfiedBy(DaemonCompatibilitySpec.java:38)
+	at org.gradle.launcher.daemon.context.DaemonCompatibilitySpec.isSatisfiedBy(DaemonCompatibilitySpec.java:28)
+	at org.gradle.launcher.daemon.server.CompatibleDaemonExpirationStrategy.lambda$checkExpiration$0(CompatibleDaemonExpirationStrategy.java:48)
+	at org.gradle.util.internal.CollectionUtils.filter(CollectionUtils.java:138)
+	at org.gradle.util.internal.CollectionUtils.filter(CollectionUtils.java:111)
+	at org.gradle.launcher.daemon.server.CompatibleDaemonExpirationStrategy.checkExpiration(CompatibleDaemonExpirationStrategy.java:47)
+	at org.gradle.launcher.daemon.server.expiry.AllDaemonExpirationStrategy.checkExpiration(AllDaemonExpirationStrategy.java:47)
+	at org.gradle.launcher.daemon.server.expiry.AnyDaemonExpirationStrategy.checkExpiration(AnyDaemonExpirationStrategy.java:44)
+	at org.gradle.launcher.daemon.server.MasterExpirationStrategy.checkExpiration(MasterExpirationStrategy.java:80)
+	at org.gradle.launcher.daemon.server.Daemon$DaemonExpirationPeriodicCheck.run(Daemon.java:273)
+	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:65)
+	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545)
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369)
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+> Task :ai-knowledge-verification:aiKnowledgeCheck
+> Task :ai-knowledge-verification:verifyAiKnowledgeArtifacts
+
+> Task :ai-knowledge-verification:verifyAiKnowledgeCoverageControls
+........
+----------------------------------------------------------------------
+Ran 8 tests in 0.043s
+
+OK
+
+> Task :ai-knowledge-verification:verifyRegelsucheAiKnowledgeArtifacts
+AI knowledge artifacts passed required-file, evidence and schema-v3 and semantic capability-coverage checks.
+
+> Task :ai-knowledge-verification:verifyComplexityHotspots
+complexityHotspotStatus=PASSED
+complexityHotspotCount=17
+
+> Task :ai-knowledge-verification:verifyRegelsucheAiKnowledgeLifecycle
+> Task :aiKnowledgeCheck
+
+[Incubating] Problems report is available at: file:///workspace/scratch/7ff736a22947/regelsuche-m0-evidence/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.7.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 38s
+12 actionable tasks: 12 executed
