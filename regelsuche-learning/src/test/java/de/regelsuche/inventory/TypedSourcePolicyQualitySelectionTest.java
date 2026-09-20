@@ -83,11 +83,49 @@ class TypedSourcePolicyQualitySelectionTest {
     }
 
     @Test void unreachableQualityFallsBackToTheBestAttainableOutput() {
-        var selected = train(tasks(10000), List.of(profile("empty", List.of()), profile("reduce", List.of(PROVIDER))),
-            -1, SearchContinuationContract.PATH_SENSITIVE);
-        assertEquals("reduce", selected.selected().id());
-        assertTrue(selected.trials().stream().flatMap(t -> t.observations().stream())
-            .noneMatch(o -> o.outcome() == MoveSearch.Outcome.QUALITY_REACHED));
+        for (long threshold : List.of(-1L, Long.MIN_VALUE)) {
+            var selected = train(tasks(10000), List.of(profile("empty", List.of()), profile("reduce", List.of(PROVIDER))),
+                threshold, SearchContinuationContract.PATH_SENSITIVE);
+            assertEquals("reduce", selected.selected().id());
+            assertTrue(selected.trials().stream().flatMap(t -> t.observations().stream())
+                .noneMatch(o -> o.outcome() == MoveSearch.Outcome.QUALITY_REACHED));
+        }
+    }
+
+    @Test void oneSuccessfulTaskCannotCompensateForAnotherTasksBudgetViolation() {
+        var calls = new AtomicInteger();
+        var mixed = new TypedMoveSearch.TypedProvider() {
+            @Override public Descriptor descriptor() { return PROVIDER.descriptor(); }
+            @Override public Batch candidates(MoveState state, MoveContext context) {
+                var batch = PROVIDER.candidates(state, context);
+                long extra = calls.getAndIncrement() == 0 ? 100000 : 0;
+                return new Batch(batch.moves(), batch.work().plus(TransformationWorkMetrics.ZERO.withDelegatedMechanicalWork(extra)),
+                    batch.complete());
+            }
+        };
+        var selected = train(tasks(1000), List.of(profile("mixed", List.of(mixed)), profile("valid", List.of())),
+            0, SearchContinuationContract.PATH_SENSITIVE);
+        var trial = selected.trials().getFirst();
+        assertEquals(1, trial.violations());
+        assertTrue(trial.observations().getLast().withinBudget());
+        assertEquals(0, trial.observations().getLast().outputScore());
+        assertEquals("valid", selected.selected().id(), "budget authority remains the primary selection criterion");
+    }
+
+    @Test void historicalThreeArgumentFrozenConstructorKeepsTheExactV1Json() {
+        var plain = profile("plain", List.of());
+        var observation = new TypedSourcePolicySelection.Observation("t", 3, 2, 9, true,
+            MoveSearch.Outcome.INCONCLUSIVE, 11, 12, 13);
+        var frozen = new TypedSourcePolicySelection.Frozen(plain,
+            List.of(new TypedSourcePolicySelection.Trial(plain, List.of(observation))), List.of("source"));
+        assertEquals("{\"schema\":\"regelsuche.typed-source-policy-selection/v1\",\"selected\":\"plain\",\"trainingWork\":9,"
+            + "\"selection\":\"MIN_BUDGET_VIOLATIONS_THEN_OUTPUT_COST_THEN_FULL_CONTINUATION_WORK\","
+            + "\"authority\":\"EMPIRICAL_SCHEDULING_ONLY;NO_MATHEMATICAL_PRUNING\","
+            + "\"mode\":\"BUDGETED_HEURISTIC;COMPLETE_REFERENCE_UNCHANGED\","
+            + "\"measurement\":\"WALL_AND_PROCESS_CPU;REQUEST_THREAD_ALLOCATIONS;LOGICAL_WORK_IS_NOT_TIME\","
+            + "\"trainingSources\":[\"source\"],\"trials\":[{\"profile\":\"plain\",\"work\":9,\"outputCost\":2,\"budgetViolations\":0,"
+            + "\"observations\":[{\"task\":\"t\",\"inputScore\":3,\"outputScore\":2,\"totalWork\":9,\"withinBudget\":true,"
+            + "\"outcome\":\"INCONCLUSIVE\",\"wallNanos\":11,\"cpuNanos\":12,\"allocatedBytes\":13}]}]}", frozen.toCanonicalJson());
     }
 
     @Test void qualityControlIsRetainedButDoesNotRewriteTheLegacyArtifact() throws Exception {
