@@ -14,6 +14,18 @@ import org.junit.jupiter.api.Test;
 
 class StreamingJsonWriterTest {
     @Test
+    void exactIntegerPropertiesPreserveNumericEncodingAndNullStringCompatibility() {
+        var huge = new java.math.BigInteger("18446744073709551614");
+        var sink = new StringWriter();
+        var streamed = new JsonWriter(sink);
+        streamed.beginObject().integerProperty("large", huge).integerProperty("small", java.math.BigInteger.TWO)
+            .property("unchangedNull", null).endObject();
+        streamed.flush();
+        assertEquals("{\"large\":18446744073709551614,\"small\":2,\"unchangedNull\":null}", sink.toString());
+        assertThrows(NullPointerException.class, () -> new JsonWriter().beginObject().integerProperty("invalid", null));
+    }
+
+    @Test
     void boundedChunksPreserveUnicodeEscapesNumbersAndNestedValues() {
         var sink = new TrackingWriter();
         var streamed = new JsonWriter(sink);

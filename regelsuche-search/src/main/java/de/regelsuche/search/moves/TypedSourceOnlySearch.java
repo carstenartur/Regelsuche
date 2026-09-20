@@ -23,9 +23,27 @@ public final class TypedSourceOnlySearch {
             List<TypedMoveSearch.WitnessStep> witness, TypedMoveSearch.Result search,
             long selectionWork, long replayWork, long workBudget) {
         public Result { witness = List.copyOf(witness); }
-        public long totalWork() { return Math.addExact(search.metrics().totalWork(), Math.addExact(selectionWork, replayWork)); }
+        public long queryWork() { return Math.addExact(search.metrics().totalWork(), selectionWork); }
+        public long totalWork() { return Math.addExact(queryWork(), replayWork); }
         public boolean withinBudget() { return totalWork() <= workBudget; }
         public boolean improved() { return outputScore < inputScore; }
+    }
+    /** Failed independent checking still owns the completed search and attempted replay work. */
+    public static final class FinalCheckFailure extends IllegalStateException {
+        private final Result attempted;
+        private final MoveVerifier.Verification rejected;
+        private FinalCheckFailure(Result attempted, ReplayFailure cause) {
+            super("independent selected-path replay differs", cause); this.attempted = attempted; rejected = cause.rejected;
+        }
+        public Result attempted() { return attempted; }
+        public MoveVerifier.Verification rejected() { return rejected; }
+    }
+    private static final class ReplayFailure extends IllegalStateException {
+        private final long work;
+        private final MoveVerifier.Verification rejected;
+        private ReplayFailure(long work, MoveVerifier.Verification rejected) {
+            super("independent selected-path replay differs"); this.work = work; this.rejected = rejected;
+        }
     }
     /**
      * Online quality control in the same frontier. Objective and path materialization work is
@@ -35,9 +53,7 @@ public final class TypedSourceOnlySearch {
     public Result searchUntil(TypedMoveSearch.Problem problem, Objective objective, long maximumOutputScore,
             SearchContinuationContract contract) {
         var online = new TypedMoveSearch().searchUntil(problem, objective, maximumOutputScore, contract);
-        long replayWork = replay(problem, online.search().initialState(), online.incumbent(), online.witness());
-        return new Result(online.incumbent(), online.inputScore(), online.outputScore(), online.witness(),
-            online.search(), 0, replayWork, problem.budget().totalWork());
+        return finish(problem, online.incumbent(), online.inputScore(), online.outputScore(), online.witness(), online.search(), 0);
     }
 
     public Result search(TypedMoveSearch.Problem problem, Objective objective) {
@@ -79,10 +95,18 @@ public final class TypedSourceOnlySearch {
         }
         if (!cursor.equals(root)) throw new IllegalStateException("incumbent lineage does not start at the input");
         Collections.reverse(witness);
-        long replayWork = replay(problem, root, incumbent, witness);
-        // Extra inspections and replay can exceed the search budget. Retain that overrun,
-        // never clamp it or convert an over-budget anytime candidate into a success.
-        return new Result(incumbent, initial.value(), best, witness, search, selectionWork, replayWork, problem.budget().totalWork());
+        return finish(problem, incumbent, initial.value(), best, witness, search, selectionWork);
+    }
+
+    private static Result finish(TypedMoveSearch.Problem problem, TypedMoveSearch.State incumbent, long inputScore,
+            long outputScore, List<TypedMoveSearch.WitnessStep> witness, TypedMoveSearch.Result search, long selectionWork) {
+        try {
+            long work = replay(problem, search.initialState(), incumbent, witness);
+            return new Result(incumbent, inputScore, outputScore, witness, search, selectionWork, work, problem.budget().totalWork());
+        } catch (ReplayFailure failure) {
+            throw new FinalCheckFailure(new Result(incumbent, inputScore, outputScore, witness, search, selectionWork,
+                failure.work, problem.budget().totalWork()), failure);
+        }
     }
 
     private static long replay(TypedMoveSearch.Problem problem, TypedMoveSearch.State root,
@@ -94,7 +118,7 @@ public final class TypedSourceOnlySearch {
             var replay = problem.verifier().verify(cursor, step.move(), problem.context());
             replayWork = Math.addExact(replayWork, replay.work());
             if (!replay.accepted() || !replay.equals(step.verification())) {
-                throw new IllegalStateException("independent selected-path replay differs");
+                throw new ReplayFailure(replayWork, replay);
             }
             cursor = step.target();
         }

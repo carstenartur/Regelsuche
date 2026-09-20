@@ -112,6 +112,19 @@ class TypedSourcePolicyQualitySelectionTest {
         assertEquals("valid", selected.selected().id(), "budget authority remains the primary selection criterion");
     }
 
+    @Test void qualityV2ExportsAnExactAggregateBeyondLongWithoutChangingWorkOverflow() throws Exception {
+        var selected = TypedSourcePolicySelection.trainUntil(tasks(10000), List.of(profile("empty", List.of())),
+            state -> new TypedSourceOnlySearch.Score(Long.MAX_VALUE, 1), Long.MAX_VALUE,
+            SearchContinuationContract.PATH_SENSITIVE);
+        var json = new ObjectMapper().readTree(selected.toCanonicalJson());
+        assertEquals("18446744073709551614", json.path("trials").get(0).path("outputCost").asText());
+        assertTrue(json.path("trials").get(0).path("outputCost").isIntegralNumber(), "v2 outputCost must stay numeric");
+        var observation = new TypedSourcePolicySelection.Observation("overflow", 0, 0, Long.MAX_VALUE,
+            true, MoveSearch.Outcome.INCONCLUSIVE, 0, 0, 0);
+        var trial = new TypedSourcePolicySelection.Trial(profile("overflow", List.of()), List.of(observation, observation));
+        assertThrows(ArithmeticException.class, trial::totalWork);
+    }
+
     @Test void historicalThreeArgumentFrozenConstructorKeepsTheExactV1Json() {
         var plain = profile("plain", List.of());
         var observation = new TypedSourcePolicySelection.Observation("t", 3, 2, 9, true,
