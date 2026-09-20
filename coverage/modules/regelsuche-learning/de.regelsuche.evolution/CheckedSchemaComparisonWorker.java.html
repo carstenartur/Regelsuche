@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CheckedSchemaComparisonWorker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">CheckedSchemaComparisonWorker.java</span></div><h1>CheckedSchemaComparisonWorker.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.inventory.TypedPolicySelection;
+import de.regelsuche.inventory.TypedSourcePolicySelection;
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.moves.*;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.lang.management.ManagementFactory;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.function.Supplier;
+
+/**
+ * Paid train/persist/restore lifecycle for the separately registered v2 experiment.
+ * All search, learning, mathematical checking and policy selection use existing services.
+ * The same scoped codec reuse and state valuation are available to every Java profile.
+ */
+<span class="fc" id="L31">public final class CheckedSchemaComparisonWorker {</span>
+    static final String REVISION = &quot;regelsuche.checked-schema-comparison-profile/v2&quot;;
+<span class="fc" id="L33">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L34">        .enable(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L35">        .enable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+<span class="fc" id="L36">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+<span class="fc" id="L37">    private static final Set&lt;String&gt; PROFILES = Set.of(&quot;BASE&quot;, &quot;LEARNED_SCHEMA&quot;, &quot;LEARNED_SELECTED&quot;);</span>
+<span class="fc" id="L38">    static final List&lt;String&gt; SELECTION_SOURCES = List.of(&quot;((m+n)*(m-n)+n*n)*(m+3)&quot;,</span>
+        &quot;((p+q)*(p-q)+q*q)+(p+5)&quot;, &quot;(r+s)*(r-s)+s*(s+2)&quot;, &quot;t+17&quot;);
+<span class="fc" id="L40">    private static final Map&lt;String, Integer&gt; SETTINGS = Map.of(&quot;workBudget&quot;, 16384, &quot;maxDepth&quot;, 9,</span>
+<span class="fc" id="L41">        &quot;maxStates&quot;, 48, &quot;maximumSchemasPerOccurrence&quot;, 4, &quot;complexityDebt&quot;, 24,</span>
+<span class="fc" id="L42">        &quot;codecEntries&quot;, 256, &quot;codecCharacters&quot;, 2_000_000);</span>
+<span class="fc" id="L43">    private static final TypedSourceOnlySearch.Objective OBJECTIVE = state -&gt; TypedPolynomialSurfaceCost.evaluate(state.expression());</span>
+<span class="fc" id="L44">    private static final MovePriorityPolicy SCHEMA_FIRST = new TypedMoveSearch.TypedPolicy() {</span>
+<span class="fc" id="L45">        @Override public double score(SearchMove move, MoveState state, MoveContext context) { return 0; }</span>
+        @Override public Stage stage(MoveProvider.Descriptor provider, MoveState state, MoveContext context) {
+<span class="fc bfc" id="L47" title="All 2 branches covered.">            return provider.sourceKind() == SearchMove.SourceKind.LEARNED ? Stage.VALUABLE_LEARNED</span>
+<span class="fc" id="L48">                : MovePriorityPolicy.INVENTORY_ORDER.stage(provider, state, context);</span>
+        }
+    };
+    private String profile, frozen, frozenHash;
+    private Set&lt;String&gt; exclusions;
+    private TypedLearnedMoveInventory inventory;
+    private CheckedLearnedSchemaModel model;
+    private TypedLearnedMoveInventory.SearchSession session;
+    private TypedSourcePolicySelection.Profile selected;
+
+    public Map&lt;String, Object&gt; initialize(String requestedProfile) {
+<span class="fc" id="L59">        requireNew(requestedProfile);</span>
+<span class="fc" id="L60">        var measurement = Measurement.start();</span>
+<span class="fc" id="L61">        var genome = TraceStrategyTransferExample.inventory();</span>
+<span class="fc" id="L62">        exclusions = exclusions();</span>
+<span class="fc" id="L63">        long trainingWork = 0;</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (requestedProfile.equals(&quot;BASE&quot;)) inventory = TypedLearnedMoveInventory.primitives(genome);</span>
+        else {
+<span class="fc" id="L66">            var formation = scoped(() -&gt; new TraceRewriteStrategyLearner().learn(genome,</span>
+<span class="fc" id="L67">                TraceStrategyTransferExample.trainingInputs(), TraceStrategyTransferExample.limits()));</span>
+<span class="fc" id="L68">            inventory = formation.typedMoves();</span>
+<span class="fc" id="L69">            model = inventory.checkedSchemas();</span>
+<span class="fc" id="L70">            trainingWork = Math.addExact(inventory.formationWork(), model.formationWork());</span>
+        }
+<span class="fc" id="L72">        var utilities = new TreeMap&lt;String, Double&gt;();</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        List&lt;String&gt; included = model == null ? List.of() : model.schemas().stream().map(CheckedLearnedSchemaModel.Schema::id).toList();</span>
+<span class="fc" id="L74">        String policyEvidence = &quot;FIXED_PROFILE;NO_FITTING&quot;;</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (requestedProfile.equals(&quot;LEARNED_SELECTED&quot;)) {</span>
+<span class="fc" id="L76">            var trained = scoped(() -&gt; selectPolicy(utilities));</span>
+<span class="fc" id="L77">            selected = trained.selected();</span>
+<span class="fc" id="L78">            trainingWork = Math.addExact(trainingWork, trained.trainingWork());</span>
+<span class="fc" id="L79">            policyEvidence = trained.toCanonicalJson();</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">            included = selected.id().equals(&quot;BASE&quot;) ? List.of()</span>
+<span class="pc bnc" id="L81" title="All 2 branches missed.">                : selected.id().startsWith(&quot;SINGLE:&quot;) ? List.of(selected.id().substring(&quot;SINGLE:&quot;.length())) : included;</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        } else selected = new TypedSourcePolicySelection.Profile(requestedProfile.equals(&quot;BASE&quot;) ? &quot;BASE&quot; : &quot;ALL&quot;,</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            requestedProfile.equals(&quot;BASE&quot;) ? inventory.primitiveProviders() : inventory.newSchemaSearchSession(model, 4, Map.of()).providers(),</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            requestedProfile.equals(&quot;BASE&quot;) ? MovePriorityPolicy.INVENTORY_ORDER : SCHEMA_FIRST);</span>
+<span class="fc" id="L85">        profile = requestedProfile;</span>
+<span class="fc" id="L86">        prepare(selected.id(), included, utilities);</span>
+<span class="fc" id="L87">        var envelope = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L88">        envelope.put(&quot;schema&quot;, REVISION); envelope.put(&quot;profile&quot;, profile); envelope.put(&quot;inventoryHash&quot;, genome.contentHash());</span>
+<span class="fc" id="L89">        envelope.put(&quot;settings&quot;, SETTINGS); envelope.put(&quot;excludedIdentities&quot;, new TreeSet&lt;&gt;(exclusions));</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        envelope.put(&quot;checkedSchemas&quot;, model == null ? &quot;&quot; : model.toCanonicalJson());</span>
+<span class="fc" id="L91">        envelope.put(&quot;selected&quot;, selected.id()); envelope.put(&quot;includedSchemaIds&quot;, included);</span>
+<span class="fc" id="L92">        envelope.put(&quot;schemaUtilities&quot;, utilities); envelope.put(&quot;selectionEvidence&quot;, policyEvidence);</span>
+<span class="fc" id="L93">        envelope.put(&quot;trainingWork&quot;, trainingWork);</span>
+<span class="fc" id="L94">        frozen = LearnedSchedulingArtifacts.json(envelope);</span>
+<span class="fc" id="L95">        frozenHash = SchematicProofPlan.hash(frozen);</span>
+<span class="fc" id="L96">        var response = initialized(); response.put(&quot;trainingWork&quot;, trainingWork);</span>
+<span class="fc" id="L97">        return measurement.finish(response);</span>
+    }
+
+    /** The serialized theorem is re-proved; no process-local learned capability is required. */
+    public Map&lt;String, Object&gt; restore(String requestedProfile, String json) {
+<span class="fc" id="L102">        requireNew(requestedProfile);</span>
+<span class="fc" id="L103">        var measurement = Measurement.start();</span>
+<span class="pc bpc" id="L104" title="2 of 4 branches missed.">        if (json == null || json.length() &gt; 2_000_000) throw new IllegalArgumentException(&quot;model size limit&quot;);</span>
+<span class="fc" id="L105">        JsonNode root = read(json);</span>
+<span class="fc" id="L106">        fields(root, Set.of(&quot;schema&quot;, &quot;profile&quot;, &quot;inventoryHash&quot;, &quot;settings&quot;, &quot;excludedIdentities&quot;, &quot;checkedSchemas&quot;,</span>
+            &quot;selected&quot;, &quot;includedSchemaIds&quot;, &quot;schemaUtilities&quot;, &quot;selectionEvidence&quot;, &quot;trainingWork&quot;));
+<span class="fc" id="L108">        var genome = TraceStrategyTransferExample.inventory();</span>
+<span class="fc bfc" id="L109" title="All 4 branches covered.">        if (!REVISION.equals(text(root, &quot;schema&quot;)) || !requestedProfile.equals(text(root, &quot;profile&quot;))</span>
+<span class="pc bpc" id="L110" title="2 of 4 branches missed.">                || !genome.contentHash().equals(text(root, &quot;inventoryHash&quot;)) || !JSON.valueToTree(SETTINGS).equals(root.get(&quot;settings&quot;))</span>
+<span class="pc bpc" id="L111" title="2 of 4 branches missed.">                || !root.path(&quot;trainingWork&quot;).canConvertToLong() || root.path(&quot;trainingWork&quot;).longValue() &lt; 0)</span>
+<span class="fc" id="L112">            throw new IllegalArgumentException(&quot;incompatible profile semantics&quot;);</span>
+<span class="fc" id="L113">        exclusions = exclusions();</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if (!new TreeSet&lt;&gt;(strings(root.get(&quot;excludedIdentities&quot;), 64)).equals(new TreeSet&lt;&gt;(exclusions)))</span>
+<span class="nc" id="L115">            throw new IllegalArgumentException(&quot;changed TRAIN/selection exclusion set&quot;);</span>
+<span class="fc" id="L116">        inventory = TypedLearnedMoveInventory.primitives(genome);</span>
+<span class="fc" id="L117">        String schemas = text(root, &quot;checkedSchemas&quot;);</span>
+<span class="pc bpc" id="L118" title="2 of 8 branches missed.">        if (requestedProfile.equals(&quot;BASE&quot;) &amp;&amp; !schemas.isEmpty() || !requestedProfile.equals(&quot;BASE&quot;) &amp;&amp; schemas.isEmpty())</span>
+<span class="nc" id="L119">            throw new IllegalArgumentException(&quot;profile knowledge mismatch&quot;);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        model = schemas.isEmpty() ? null : CheckedLearnedSchemaModel.load(schemas, genome.contentHash());</span>
+<span class="fc" id="L121">        var utilities = new TreeMap&lt;String, Double&gt;();</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (!root.path(&quot;schemaUtilities&quot;).isObject()) throw new IllegalArgumentException(&quot;utilities required&quot;);</span>
+<span class="fc" id="L123">        root.get(&quot;schemaUtilities&quot;).properties().forEach(entry -&gt; {</span>
+<span class="pc bpc" id="L124" title="2 of 4 branches missed.">            if (!entry.getValue().isNumber() || !Double.isFinite(entry.getValue().doubleValue()))</span>
+<span class="nc" id="L125">                throw new IllegalArgumentException(&quot;finite utility required&quot;);</span>
+<span class="fc" id="L126">            utilities.put(entry.getKey(), entry.getValue().doubleValue());</span>
+<span class="fc" id="L127">        });</span>
+<span class="fc" id="L128">        String choice = text(root, &quot;selected&quot;);</span>
+<span class="fc" id="L129">        List&lt;String&gt; included = strings(root.get(&quot;includedSchemaIds&quot;), 32);</span>
+<span class="pc bpc" id="L130" title="2 of 8 branches missed.">        if (requestedProfile.equals(&quot;BASE&quot;) &amp;&amp; !choice.equals(&quot;BASE&quot;) || requestedProfile.equals(&quot;LEARNED_SCHEMA&quot;) &amp;&amp; !choice.equals(&quot;ALL&quot;))</span>
+<span class="nc" id="L131">            throw new IllegalArgumentException(&quot;fixed profile selection changed&quot;);</span>
+<span class="fc" id="L132">        prepare(choice, included, utilities);</span>
+<span class="fc" id="L133">        text(root, &quot;selectionEvidence&quot;); // Descriptive scheduling evidence never authorizes a theorem.</span>
+<span class="fc" id="L134">        profile = requestedProfile; frozen = json; frozenHash = SchematicProofPlan.hash(json);</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        var response = initialized(); response.put(&quot;restoreWork&quot;, model == null ? 0L : model.loadWork());</span>
+<span class="fc" id="L136">        return measurement.finish(response);</span>
+    }
+
+    private TypedSourcePolicySelection.Frozen selectPolicy(Map&lt;String, Double&gt; utility) {
+<span class="fc" id="L140">        var all = inventory.newSchemaSearchSession(model, 4, Map.of());</span>
+<span class="fc" id="L141">        var tasks = new ArrayList&lt;TypedPolicySelection.TrainingTask&gt;();</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        for (int i = 0; i &lt; SELECTION_SOURCES.size(); i++) tasks.add(new TypedPolicySelection.TrainingTask(&quot;selection-&quot; + i,</span>
+<span class="fc" id="L143">            problem(SELECTION_SOURCES.get(i), MoveContext.Phase.TRAIN, all, MovePriorityPolicy.INVENTORY_ORDER)));</span>
+<span class="fc" id="L144">        var profiles = new ArrayList&lt;TypedSourcePolicySelection.Profile&gt;();</span>
+<span class="fc" id="L145">        profiles.add(new TypedSourcePolicySelection.Profile(&quot;BASE&quot;, inventory.primitiveProviders(), MovePriorityPolicy.INVENTORY_ORDER));</span>
+<span class="fc" id="L146">        profiles.add(new TypedSourcePolicySelection.Profile(&quot;ALL&quot;, all.providers(), SCHEMA_FIRST));</span>
+        // Bounded ablations use the model's stable order, never the final evaluation cases.
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        for (var schema : model.schemas().stream().limit(12).toList()) profiles.add(new TypedSourcePolicySelection.Profile(&quot;SINGLE:&quot; + schema.id(),</span>
+<span class="fc" id="L149">            inventory.newSchemaSearchSession(model, model.providers(4, Map.of(), Set.of(schema.id()))).providers(), SCHEMA_FIRST));</span>
+<span class="fc" id="L150">        var trained = new TypedPolicySelection().trainSourceOnly(tasks, profiles, OBJECTIVE);</span>
+<span class="fc" id="L151">        var baseline = trained.trials().getFirst();</span>
+<span class="fc bfc" id="L152" title="All 4 branches covered.">        for (var trial : trained.trials()) if (trial.profile().id().startsWith(&quot;SINGLE:&quot;)) {</span>
+<span class="fc" id="L153">            double value = (baseline.outputCost() - trial.outputCost()) * (double) (16384L * tasks.size() + baseline.totalWork())</span>
+<span class="fc" id="L154">                + baseline.totalWork() - trial.totalWork() - trial.violations() * 1_000_000.0;</span>
+<span class="fc" id="L155">            utility.put(trial.profile().id().substring(&quot;SINGLE:&quot;.length()), value);</span>
+        }
+<span class="fc" id="L157">        var ranked = new TypedSourcePolicySelection.Profile(&quot;RANKED&quot;, inventory.newSchemaSearchSession(model, 4, utility).providers(), SCHEMA_FIRST);</span>
+<span class="fc" id="L158">        var confirmation = new TypedPolicySelection().trainSourceOnly(tasks, List.of(ranked), OBJECTIVE);</span>
+<span class="fc" id="L159">        var trials = new ArrayList&lt;&gt;(trained.trials()); trials.addAll(confirmation.trials());</span>
+<span class="fc" id="L160">        var winner = trials.stream().min(Comparator.comparingLong(TypedSourcePolicySelection.Trial::violations)</span>
+<span class="fc" id="L161">            .thenComparingLong(TypedSourcePolicySelection.Trial::outputCost).thenComparingLong(TypedSourcePolicySelection.Trial::totalWork)).orElseThrow();</span>
+<span class="fc" id="L162">        return new TypedSourcePolicySelection.Frozen(winner.profile(), trials, trained.trainingSources());</span>
+    }
+
+    private void prepare(String choice, List&lt;String&gt; included, Map&lt;String, Double&gt; utilities) {
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        if (choice.equals(&quot;BASE&quot;)) {</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">            if (!included.isEmpty()) throw new IllegalArgumentException(&quot;primitive selection contains schemas&quot;);</span>
+<span class="fc" id="L168">            session = inventory.newSearchSession(false, 0, 0);</span>
+        } else {
+<span class="pc bpc" id="L170" title="6 of 8 branches missed.">            if (model == null || !(choice.equals(&quot;ALL&quot;) || choice.equals(&quot;RANKED&quot;) || choice.startsWith(&quot;SINGLE:&quot;)))</span>
+<span class="nc" id="L171">                throw new IllegalArgumentException(&quot;unknown schema selection&quot;);</span>
+<span class="pc bpc" id="L172" title="3 of 4 branches missed.">            if (choice.startsWith(&quot;SINGLE:&quot;) &amp;&amp; !included.equals(List.of(choice.substring(&quot;SINGLE:&quot;.length()))))</span>
+<span class="nc" id="L173">                throw new IllegalArgumentException(&quot;single schema selection mismatch&quot;);</span>
+<span class="fc" id="L174">            Set&lt;String&gt; all = new HashSet&lt;&gt;(model.schemas().stream().map(CheckedLearnedSchemaModel.Schema::id).toList());</span>
+<span class="pc bpc" id="L175" title="4 of 6 branches missed.">            if ((choice.equals(&quot;ALL&quot;) || choice.equals(&quot;RANKED&quot;)) &amp;&amp; !new HashSet&lt;&gt;(included).equals(all))</span>
+<span class="nc" id="L176">                throw new IllegalArgumentException(&quot;schema selection incomplete&quot;);</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">            session = inventory.newSchemaSearchSession(model, model.providers(4, choice.equals(&quot;RANKED&quot;) ? utilities : Map.of(), Set.copyOf(included)));</span>
+        }
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        selected = new TypedSourcePolicySelection.Profile(choice, session.providers(), choice.equals(&quot;BASE&quot;) ? MovePriorityPolicy.INVENTORY_ORDER : SCHEMA_FIRST);</span>
+<span class="fc" id="L180">    }</span>
+
+    public Map&lt;String, Object&gt; run(String requestedProfile, String source) {
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        if (profile == null) throw new IllegalStateException(&quot;initialize or restore before querying&quot;);</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if (!profile.equals(requestedProfile)) throw new IllegalArgumentException(&quot;cannot switch frozen profile&quot;);</span>
+<span class="pc bpc" id="L185" title="3 of 6 branches missed.">        if (source == null || source.isBlank() || source.length() &gt; 2048) throw new IllegalArgumentException(&quot;invalid source&quot;);</span>
+<span class="fc" id="L186">        var measurement = Measurement.start();</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        if (exclusions.contains(new ExactPolynomialAnalysis().alphaIdentity(source))) throw new IllegalArgumentException(&quot;TRAIN/selection overlap&quot;);</span>
+<span class="fc" id="L188">        var result = scoped(() -&gt; {</span>
+<span class="fc" id="L189">            var problem = problem(source, MoveContext.Phase.FROZEN_EVALUATION, session, selected.policy());</span>
+<span class="fc" id="L190">            var best = new TypedSourceOnlySearch().search(problem, OBJECTIVE);</span>
+<span class="fc" id="L191">            var response = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L192">            response.put(&quot;status&quot;, &quot;CANDIDATE&quot;); response.put(&quot;profile&quot;, profile); response.put(&quot;input&quot;, source);</span>
+<span class="fc" id="L193">            response.put(&quot;output&quot;, ExpressionFormatter.format(best.incumbent().expression()));</span>
+<span class="fc" id="L194">            response.put(&quot;typedInput&quot;, CODEC.encodeExpression(problem.source()));</span>
+<span class="fc" id="L195">            response.put(&quot;typedOutput&quot;, CODEC.encodeExpression(best.incumbent().expression()));</span>
+<span class="fc" id="L196">            response.put(&quot;target&quot;, &quot;&quot;); response.put(&quot;targetReached&quot;, best.search().reached());</span>
+<span class="fc" id="L197">            response.put(&quot;inputCost&quot;, best.inputScore()); response.put(&quot;outputCost&quot;, best.outputScore());</span>
+<span class="fc" id="L198">            response.put(&quot;witness&quot;, best.witness().stream().map(step -&gt; Map.of(&quot;source&quot;, CODEC.encodeExpression(step.source().expression()),</span>
+<span class="fc" id="L199">                &quot;target&quot;, CODEC.encodeExpression(step.target().expression()), &quot;move&quot;, step.move(), &quot;verification&quot;, step.verification())).toList());</span>
+<span class="fc" id="L200">            response.put(&quot;search&quot;, LearnedSchedulingArtifacts.resultJson(best.search().encodedResult()));</span>
+<span class="fc" id="L201">            response.put(&quot;selectionWork&quot;, best.selectionWork()); response.put(&quot;selectedReplayWork&quot;, best.replayWork());</span>
+<span class="fc" id="L202">            response.put(&quot;totalWork&quot;, best.totalWork()); response.put(&quot;internalWorkWithinBudget&quot;, best.withinBudget());</span>
+<span class="fc" id="L203">            response.put(&quot;modelHash&quot;, frozenHash);</span>
+<span class="fc" id="L204">            return response;</span>
+        });
+<span class="fc" id="L206">        return measurement.finish(result);</span>
+    }
+
+    private static TypedMoveSearch.Problem problem(String source, MoveContext.Phase phase,
+            TypedLearnedMoveInventory.SearchSession session, MovePriorityPolicy policy) {
+<span class="fc" id="L211">        return new TypedMoveSearch.Problem(new ExpressionParser().parseTerm(source), TypedMoveSearch.Context.sourceOnly(List.of(), phase),</span>
+<span class="fc" id="L212">            session.providers(), policy, session.verifier(), state -&gt; 0, MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED,</span>
+            new MoveSearch.Budget(9, 9, 16384, 48, 16384, 24), (state, context) -&gt; {
+<span class="fc" id="L214">                var score = OBJECTIVE.evaluate(state);</span>
+<span class="fc" id="L215">                return new StateValue.Assessment(Math.toIntExact(score.value()), -score.value(), score.work(), 0, Map.of());</span>
+            });
+    }
+<span class="fc" id="L218">    private static &lt;T&gt; T scoped(Supplier&lt;T&gt; work) { return CompiledAstReplayCodec.withExpressionCache(256, 2_000_000, work); }</span>
+    private static Set&lt;String&gt; exclusions() {
+<span class="fc" id="L220">        var exact = new ExactPolynomialAnalysis();</span>
+<span class="fc" id="L221">        var values = new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L222">        TraceStrategyTransferExample.trainingInputs().forEach(input -&gt; values.add(exact.alphaIdentity(input.expression())));</span>
+<span class="fc" id="L223">        SELECTION_SOURCES.forEach(source -&gt; values.add(exact.alphaIdentity(source)));</span>
+<span class="fc" id="L224">        return Set.copyOf(values);</span>
+    }
+    private void requireNew(String requestedProfile) {
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (profile != null) throw new IllegalStateException(&quot;already initialized&quot;);</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">        if (!PROFILES.contains(requestedProfile)) throw new IllegalArgumentException(&quot;unknown profile&quot;);</span>
+<span class="fc" id="L229">    }</span>
+    private TreeMap&lt;String, Object&gt; initialized() {
+<span class="fc" id="L231">        var response = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L232">        response.put(&quot;status&quot;, &quot;INITIALIZED&quot;); response.put(&quot;profile&quot;, profile); response.put(&quot;model&quot;, frozen);</span>
+<span class="fc" id="L233">        response.put(&quot;modelHash&quot;, frozenHash); response.put(&quot;settings&quot;, SETTINGS);</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        response.put(&quot;learnedSchemas&quot;, model == null ? 0 : model.schemas().size()); response.put(&quot;selected&quot;, selected.id());</span>
+<span class="fc" id="L235">        return response;</span>
+    }
+
+    /** Unknown request fields cannot introduce a hidden target into selection or evaluation. */
+    public Map&lt;String, Object&gt; handle(String line) throws java.io.IOException {
+<span class="pc bpc" id="L240" title="2 of 4 branches missed.">        if (line == null || line.length() &gt; 4_000_000) throw new IllegalArgumentException(&quot;request size limit&quot;);</span>
+<span class="fc" id="L241">        JsonNode request = JSON.readTree(line);</span>
+<span class="pc bpc" id="L242" title="2 of 4 branches missed.">        if (request == null || !request.isObject()) throw new IllegalArgumentException(&quot;object request required&quot;);</span>
+<span class="fc" id="L243">        String op = text(request, &quot;op&quot;), requested = text(request, &quot;profile&quot;);</span>
+<span class="nc bnc" id="L244" title="All 2 branches missed.">        if (op.equals(&quot;initialize&quot;)) { fields(request, Set.of(&quot;op&quot;, &quot;profile&quot;)); return initialize(requested); }</span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">        if (op.equals(&quot;restore&quot;)) { fields(request, Set.of(&quot;op&quot;, &quot;profile&quot;, &quot;model&quot;)); return restore(requested, text(request, &quot;model&quot;)); }</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        if (op.equals(&quot;run&quot;)) { fields(request, Set.of(&quot;op&quot;, &quot;profile&quot;, &quot;source&quot;)); return run(requested, text(request, &quot;source&quot;)); }</span>
+<span class="nc" id="L247">        throw new IllegalArgumentException(&quot;unknown operation&quot;);</span>
+    }
+    private static JsonNode read(String json) {
+<span class="fc" id="L250">        try { return JSON.readTree(json); }</span>
+<span class="nc" id="L251">        catch (java.io.IOException bad) { throw new IllegalArgumentException(&quot;invalid model&quot;, bad); }</span>
+    }
+    private static void fields(JsonNode node, Set&lt;String&gt; expected) {
+<span class="pc bpc" id="L254" title="2 of 4 branches missed.">        if (node == null || !node.isObject()) throw new IllegalArgumentException(&quot;object required&quot;);</span>
+<span class="fc" id="L255">        var actual = new HashSet&lt;String&gt;(); node.fieldNames().forEachRemaining(actual::add);</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        if (!actual.equals(expected)) throw new IllegalArgumentException(&quot;unexpected fields&quot;);</span>
+<span class="fc" id="L257">    }</span>
+    private static String text(JsonNode node, String field) {
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">        if (!node.path(field).isTextual()) throw new IllegalArgumentException(&quot;text field required: &quot; + field);</span>
+<span class="fc" id="L260">        return node.get(field).textValue();</span>
+    }
+    private static List&lt;String&gt; strings(JsonNode node, int maximum) {
+<span class="pc bpc" id="L263" title="3 of 6 branches missed.">        if (node == null || !node.isArray() || node.size() &gt; maximum) throw new IllegalArgumentException(&quot;bounded list required&quot;);</span>
+<span class="fc" id="L264">        var values = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        for (var item : node) {</span>
+<span class="pc bpc" id="L266" title="2 of 4 branches missed.">            if (!item.isTextual() || item.textValue().length() &gt; 512) throw new IllegalArgumentException(&quot;short text required&quot;);</span>
+<span class="fc" id="L267">            values.add(item.textValue());</span>
+<span class="fc" id="L268">        }</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">        if (values.size() != new HashSet&lt;&gt;(values).size()) throw new IllegalArgumentException(&quot;duplicate list item&quot;);</span>
+<span class="fc" id="L270">        return List.copyOf(values);</span>
+    }
+<span class="fc" id="L272">    private record Measurement(long wall, long cpu, long allocated) {</span>
+<span class="fc" id="L273">        static Measurement start() { return new Measurement(System.nanoTime(), cpuNow(), allocatedNow()); }</span>
+        Map&lt;String, Object&gt; finish(TreeMap&lt;String, Object&gt; response) {
+<span class="fc" id="L275">            response.put(&quot;nativeWallNanos&quot;, System.nanoTime() - wall);</span>
+<span class="fc" id="L276">            response.put(&quot;nativeCpuNanos&quot;, delta(cpu, cpuNow()));</span>
+<span class="fc" id="L277">            response.put(&quot;nativeAllocatedBytes&quot;, delta(allocated, allocatedNow()));</span>
+<span class="fc" id="L278">            return response;</span>
+        }
+<span class="pc bpc" id="L280" title="2 of 4 branches missed.">        private static long delta(long before, long after) { return before &lt; 0 || after &lt; 0 ? -1 : Math.max(0, after - before); }</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">        private static long cpuNow() { return ManagementFactory.getOperatingSystemMXBean() instanceof com.sun.management.OperatingSystemMXBean bean ? bean.getProcessCpuTime() : -1; }</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">        private static long allocatedNow() { return ManagementFactory.getThreadMXBean() instanceof com.sun.management.ThreadMXBean bean</span>
+<span class="pc bpc" id="L283" title="2 of 4 branches missed.">            &amp;&amp; bean.isThreadAllocatedMemorySupported() &amp;&amp; bean.isThreadAllocatedMemoryEnabled() ? bean.getThreadAllocatedBytes(Thread.currentThread().threadId()) : -1; }</span>
+    }
+    public static void main(String[] args) throws Exception {
+<span class="nc" id="L286">        var worker = new CheckedSchemaComparisonWorker();</span>
+<span class="nc" id="L287">        System.out.println(&quot;{\&quot;status\&quot;:\&quot;READY\&quot;,\&quot;java\&quot;:\&quot;&quot; + Runtime.version() + &quot;\&quot;}&quot;);</span>
+<span class="nc" id="L288">        try (var reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8))) {</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">            for (String line; (line = reader.readLine()) != null;) {</span>
+<span class="nc" id="L290">                try { System.out.println(LearnedSchedulingArtifacts.json(worker.handle(line))); }</span>
+<span class="nc" id="L291">                catch (RuntimeException | java.io.IOException failure) { System.out.println(LearnedSchedulingArtifacts.json(Map.of(&quot;status&quot;, &quot;ERROR&quot;, &quot;error&quot;, failure.toString()))); }</span>
+<span class="nc" id="L292">                System.out.flush();</span>
+            }
+        }
+<span class="nc" id="L295">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

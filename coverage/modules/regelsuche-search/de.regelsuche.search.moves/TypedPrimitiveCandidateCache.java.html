@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TypedPrimitiveCandidateCache.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">TypedPrimitiveCandidateCache.java</span></div><h1>TypedPrimitiveCandidateCache.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import de.regelsuche.transform.AstRewriteTransport;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Opt-in, caller-owned primitive candidate reuse. Create a fresh instance for each
+ * independently measured search. This caches generation, never proof authorization.
+ * The descriptor, rule inventory and transport bounds must remain fixed per instance.
+ */
+public final class TypedPrimitiveCandidateCache implements TypedMoveSearch.TypedProvider {
+<span class="fc" id="L16">    public record Statistics(long hits, long misses, long bypasses, int entries, long retainedCharacters) {}</span>
+    private record Key(String expression, List&lt;String&gt; assumptions, MoveContext context) {
+<span class="fc" id="L18">        private Key { assumptions = List.copyOf(assumptions); }</span>
+    }
+<span class="fc" id="L20">    private record Entry(Batch batch, long characters) {}</span>
+<span class="fc" id="L21">    private record Footprint(long characters, long inspections) {}</span>
+
+    private final TypedMoveSearch.TypedProvider delegate;
+    private final int capacity;
+    private final long maximumCharacters;
+<span class="fc" id="L26">    private final LinkedHashMap&lt;Key, Entry&gt; entries = new LinkedHashMap&lt;&gt;();</span>
+    private long hits;
+    private long misses;
+    private long bypasses;
+    private long retainedCharacters;
+
+    /** Checked convenience constructor for concrete immutable pattern rules. */
+    public TypedPrimitiveCandidateCache(Descriptor descriptor, List&lt;PatternRewriteRule&gt; rules,
+            int maximumGrowth, int maximumCandidates, int capacity, long maximumCharacters) {
+<span class="fc" id="L35">        this(descriptor, patternTransport(rules, maximumGrowth, maximumCandidates), capacity, maximumCharacters);</span>
+<span class="fc" id="L36">    }</span>
+
+    /**
+     * Explicit integration boundary for a caller-owned deterministic transport.
+     * The caller must guarantee identical complete step metadata and order for
+     * equal source ASTs throughout the session. Mutable, random, history-dependent
+     * or externally reconfigured rules violate this contract and must not use it.
+     * No proof is trusted through this factory: verification still regenerates.
+     */
+    public static TypedPrimitiveCandidateCache forDeterministicTransport(Descriptor descriptor,
+            AstRewriteTransport transport, int capacity, long maximumCharacters) {
+<span class="fc" id="L47">        return new TypedPrimitiveCandidateCache(descriptor, transport, capacity, maximumCharacters);</span>
+    }
+
+    private TypedPrimitiveCandidateCache(Descriptor descriptor, AstRewriteTransport transport,
+<span class="fc" id="L51">            int capacity, long maximumCharacters) {</span>
+<span class="fc bfc" id="L52" title="All 4 branches covered.">        if (capacity &lt; 0 || maximumCharacters &lt; 0) throw new IllegalArgumentException(&quot;negative retention bound&quot;);</span>
+<span class="fc" id="L53">        delegate = TypedMoveSearch.primitiveProvider(descriptor, Objects.requireNonNull(transport, &quot;transport&quot;));</span>
+<span class="fc" id="L54">        this.capacity = capacity;</span>
+<span class="fc" id="L55">        this.maximumCharacters = maximumCharacters;</span>
+<span class="fc" id="L56">    }</span>
+
+    private static AstRewriteTransport patternTransport(List&lt;PatternRewriteRule&gt; rules, int growth, int candidates) {
+<span class="fc" id="L59">        var retainedRules = List.copyOf(Objects.requireNonNull(rules, &quot;rules&quot;));</span>
+<span class="fc bfc" id="L60" title="All 4 branches covered.">        if (retainedRules.stream().anyMatch(rule -&gt; rule.getClass() != PatternRewriteRule.class)) {</span>
+<span class="fc" id="L61">            throw new IllegalArgumentException(&quot;only immutable concrete pattern rules are cacheable&quot;);</span>
+        }
+<span class="fc" id="L63">        return new AstRewriteTransport(List.copyOf(retainedRules), growth, candidates);</span>
+    }
+
+<span class="fc" id="L66">    @Override public Descriptor descriptor() { return delegate.descriptor(); }</span>
+
+    @Override public synchronized Batch candidates(MoveState state, MoveContext context) {
+<span class="fc" id="L69">        Objects.requireNonNull(state, &quot;state&quot;);</span>
+<span class="fc" id="L70">        Objects.requireNonNull(context, &quot;context&quot;);</span>
+<span class="pc bpc" id="L71" title="1 of 4 branches missed.">        if (capacity == 0 || maximumCharacters == 0) {</span>
+<span class="fc" id="L72">            bypasses++;</span>
+<span class="fc" id="L73">            return delegate.candidates(state, context);</span>
+        }
+        // This primitive delegate reads only the expression and these premises.
+        // Keep phase/goal as additional isolation. Depth/history/capabilities remain
+        // untouched in MoveSearch state identity, scheduling and edge admission.
+<span class="fc" id="L78">        var key = new Key(state.expression(), state.assumptions(), context);</span>
+<span class="fc" id="L79">        var retained = entries.get(key);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (retained != null) {</span>
+<span class="fc" id="L81">            hits++;</span>
+<span class="fc" id="L82">            var original = retained.batch();</span>
+<span class="fc" id="L83">            var work = TransformationWorkMetrics.ZERO</span>
+<span class="fc" id="L84">                .withCandidateWork(original.work().candidateWork())</span>
+<span class="fc" id="L85">                .withDelegatedMechanicalWork(1L + original.moves().size());</span>
+<span class="fc" id="L86">            return new Batch(original.moves(), work, original.complete());</span>
+        }
+<span class="fc" id="L88">        misses++;</span>
+<span class="fc" id="L89">        var generated = delegate.candidates(state, context);</span>
+<span class="fc" id="L90">        var footprint = footprint(key, generated);</span>
+<span class="fc" id="L91">        long overhead = Math.addExact(1, footprint.inspections());</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (footprint.characters() &gt; maximumCharacters) {</span>
+<span class="fc" id="L93">            bypasses++;</span>
+<span class="fc" id="L94">            return charged(generated, overhead);</span>
+        }
+        // FIFO is deterministic. Eviction affects reuse only, never candidate admission.
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">        while (entries.size() &gt;= capacity || footprint.characters() &gt; maximumCharacters - retainedCharacters) {</span>
+<span class="fc" id="L98">            var iterator = entries.entrySet().iterator();</span>
+<span class="fc" id="L99">            var oldest = iterator.next();</span>
+<span class="fc" id="L100">            retainedCharacters -= oldest.getValue().characters();</span>
+<span class="fc" id="L101">            iterator.remove();</span>
+<span class="fc" id="L102">            overhead = Math.addExact(overhead, 1);</span>
+<span class="fc" id="L103">        }</span>
+<span class="fc" id="L104">        entries.put(key, new Entry(generated, footprint.characters()));</span>
+<span class="fc" id="L105">        retainedCharacters = Math.addExact(retainedCharacters, footprint.characters());</span>
+<span class="fc" id="L106">        return charged(generated, Math.addExact(overhead, 1));</span>
+    }
+
+    public synchronized Statistics statistics() {
+<span class="fc" id="L110">        return new Statistics(hits, misses, bypasses, entries.size(), retainedCharacters);</span>
+    }
+
+    private static Batch charged(Batch original, long overhead) {
+<span class="fc" id="L114">        return new Batch(original.moves(), original.work().plus(</span>
+<span class="fc" id="L115">            TransformationWorkMetrics.ZERO.withDelegatedMechanicalWork(overhead)), original.complete());</span>
+    }
+
+    /** Bound retained variable text, not JVM heap bytes. Fixed inventory metadata is shared. */
+    private static Footprint footprint(Key key, Batch batch) {
+<span class="fc" id="L120">        long characters = Math.addExact(key.expression().length(), key.context().goal().length());</span>
+<span class="fc" id="L121">        long inspections = 2;</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        for (var premise : key.assumptions()) {</span>
+<span class="fc" id="L123">            characters = Math.addExact(characters, premise.length());</span>
+<span class="fc" id="L124">            inspections++;</span>
+<span class="fc" id="L125">        }</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        for (var premise : key.context().initialAssumptions()) {</span>
+<span class="fc" id="L127">            characters = Math.addExact(characters, premise.length());</span>
+<span class="fc" id="L128">            inspections++;</span>
+<span class="fc" id="L129">        }</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        for (var move : batch.moves()) {</span>
+<span class="fc" id="L131">            var step = move.transformation();</span>
+<span class="fc" id="L132">            characters = Math.addExact(characters, step.transformedExpression().length());</span>
+<span class="fc" id="L133">            characters = Math.addExact(characters, step.applicationKey().length());</span>
+<span class="fc" id="L134">            inspections = Math.addExact(inspections, 2);</span>
+            // Generated premises are variable retained text too. Count both the
+            // producer and normalized move forms conservatively, even if shared.
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            for (var premise : step.assumptions()) {</span>
+<span class="fc" id="L138">                characters = Math.addExact(characters, premise.length());</span>
+<span class="fc" id="L139">                inspections = Math.addExact(inspections, 1);</span>
+<span class="fc" id="L140">            }</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            for (var premise : move.assumptions()) {</span>
+<span class="fc" id="L142">                characters = Math.addExact(characters, premise.length());</span>
+<span class="fc" id="L143">                inspections = Math.addExact(inspections, 1);</span>
+<span class="fc" id="L144">            }</span>
+<span class="fc" id="L145">        }</span>
+<span class="fc" id="L146">        return new Footprint(characters, inspections);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

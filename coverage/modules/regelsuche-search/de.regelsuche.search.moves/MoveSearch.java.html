@@ -130,7 +130,7 @@ import java.util.function.ToDoubleFunction;
 <span class="fc" id="L130">        var opened = new ArrayList&lt;Node&gt;();</span>
         try {
 <span class="fc bfc" id="L132" title="All 2 branches covered.">            while (!frontier.isEmpty()) {</span>
-<span class="pc bpc" id="L133" title="1 of 2 branches missed.">                if (ledger.total() &gt;= budget.totalWork()) { outcome = Outcome.WORK_EXHAUSTED; complete = false; break; }</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">                if (ledger.total() &gt;= budget.totalWork()) { outcome = Outcome.WORK_EXHAUSTED; complete = false; break; }</span>
 <span class="fc" id="L134">                var node = frontier.remove().node(); ledger.search++;</span>
 <span class="fc bfc" id="L135" title="All 2 branches covered.">                if (node.picker == null) {</span>
 <span class="pc bpc" id="L136" title="1 of 2 branches missed.">                    if (ledger.explored &gt;= budget.maxStates()) { outcome = Outcome.STATE_LIMIT; complete = false; break; }</span>
@@ -256,7 +256,7 @@ import java.util.function.ToDoubleFunction;
     }
     private static StateValue.Assessment inspect(Problem problem, MoveState state, Ledger ledger) {
 <span class="fc" id="L258">        var value = problem.stateValue().evaluate(state, problem.context());</span>
-<span class="pc bpc" id="L259" title="3 of 4 branches missed.">        if (value.capabilities().values().stream().anyMatch(capability -&gt; !capability.sourceExpression().equals(state.expression())))</span>
+<span class="pc bpc" id="L259" title="2 of 4 branches missed.">        if (value.capabilities().values().stream().anyMatch(capability -&gt; !capability.sourceExpression().equals(state.expression())))</span>
 <span class="nc" id="L260">            throw new IllegalArgumentException(&quot;capability evidence differs from source state&quot;);</span>
 <span class="fc" id="L261">        ledger.search = Math.addExact(ledger.search, value.searchWork());</span>
 <span class="fc" id="L262">        ledger.primitive = Math.addExact(ledger.primitive, value.primitiveWork());</span>

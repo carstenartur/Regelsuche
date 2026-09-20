@@ -18,7 +18,7 @@ public interface StateValue {
 <span class="fc" id="L18">        public static final Assessment EMPTY = new Assessment(0, 0, 0, 0, Map.of());</span>
 <span class="fc" id="L19">        public Assessment {</span>
 <span class="pc bpc" id="L20" title="4 of 10 branches missed.">            if (complexity &lt; 0 || !Double.isFinite(value) || searchWork &lt; 0 || primitiveWork &lt; 0 || capabilities == null</span>
-<span class="pc bpc" id="L21" title="2 of 8 branches missed.">                    || capabilities.entrySet().stream().anyMatch(entry -&gt; entry.getKey() == null || entry.getKey().isBlank() || entry.getValue() == null))</span>
+<span class="pc bpc" id="L21" title="1 of 8 branches missed.">                    || capabilities.entrySet().stream().anyMatch(entry -&gt; entry.getKey() == null || entry.getKey().isBlank() || entry.getValue() == null))</span>
 <span class="fc" id="L22">                throw new IllegalArgumentException(&quot;invalid state assessment&quot;);</span>
 <span class="fc" id="L23">            capabilities = java.util.Collections.unmodifiableMap(new TreeMap&lt;&gt;(capabilities));</span>
 <span class="fc" id="L24">        }</span>

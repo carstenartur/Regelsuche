@@ -108,11 +108,11 @@ import java.util.Optional;
 <span class="fc bfc" id="L108" title="All 2 branches covered.">        if (nodes.stream().allMatch(VariableExpr.class::isInstance)) {</span>
 <span class="fc" id="L109">            return state.placeholder(nodes, source);</span>
         }
-<span class="pc bpc" id="L111" title="1 of 4 branches missed.">        if (first instanceof NumberExpr number &amp;&amp; nodes.stream().allMatch(first::equals)) {</span>
+<span class="fc bfc" id="L111" title="All 4 branches covered.">        if (first instanceof NumberExpr number &amp;&amp; nodes.stream().allMatch(first::equals)) {</span>
 <span class="fc" id="L112">            return PatternExpr.num(number.value());</span>
         }
 <span class="fc bfc" id="L114" title="All 4 branches covered.">        if (first instanceof BinaryExpr binary &amp;&amp; nodes.stream().allMatch(node -&gt;</span>
-<span class="pc bpc" id="L115" title="1 of 4 branches missed.">                node instanceof BinaryExpr other &amp;&amp; other.operator() == binary.operator())) {</span>
+<span class="fc bfc" id="L115" title="All 4 branches covered.">                node instanceof BinaryExpr other &amp;&amp; other.operator() == binary.operator())) {</span>
 <span class="fc" id="L116">            var left = nodes.stream().map(node -&gt; ((BinaryExpr) node).left()).toList();</span>
 <span class="fc" id="L117">            var right = nodes.stream().map(node -&gt; ((BinaryExpr) node).right()).toList();</span>
 <span class="fc" id="L118">            return PatternExpr.op(binary.operator(), column(left, state, source), column(right, state, source));</span>

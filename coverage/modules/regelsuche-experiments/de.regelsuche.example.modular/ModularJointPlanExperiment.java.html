@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ModularJointPlanExperiment.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.example.modular</a> &gt; <span class="el_source">ModularJointPlanExperiment.java</span></div><h1>ModularJointPlanExperiment.java</h1><pre class="source lang-java linenums">package de.regelsuche.example.modular;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.math.algorithms.modular.ModularComputationDomain;
+import de.regelsuche.search.moves.MoveSearch;
+import de.regelsuche.search.program.*;
+import java.lang.management.ManagementFactory;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
+import java.util.*;
+import java.util.function.Function;
+import java.util.function.Supplier;
+
+/** Paid modular architecture/execution diagnostic, not a learned-rule comparison.
+ * Every row executes its full sequence and uses the same independently recomputed audit.
+ * No warmup or trial is discarded. All one-time setup is charged to each scenario.
+ */
+<span class="fc" id="L23">public final class ModularJointPlanExperiment {</span>
+    public record Config(List&lt;Integer&gt; sequenceLengths, int repeats, int modulusBits, int exponentBits) {
+<span class="fc" id="L25">        public Config {</span>
+<span class="fc" id="L26">            sequenceLengths = List.copyOf(sequenceLengths);</span>
+<span class="pc bpc" id="L27" title="10 of 20 branches missed.">            if (sequenceLengths.isEmpty() || sequenceLengths.stream().anyMatch(n -&gt; n &lt; 1 || n &gt; 100_000)</span>
+                    || repeats &lt; 1 || repeats &gt; 100 || modulusBits &lt; 32 || modulusBits &gt; 16_384
+<span class="nc" id="L29">                    || exponentBits &lt; 1 || exponentBits &gt; 16_384) throw new IllegalArgumentException(&quot;invalid experiment bounds&quot;);</span>
+<span class="fc" id="L30">        }</span>
+    }
+<span class="fc" id="L32">    public record Measurement(long wallNanos, long processCpuNanos, long threadAllocatedBytes,</span>
+            long heapBeforeBytes, long heapAfterBytes) {
+        Measurement plus(Measurement other) {
+<span class="fc" id="L35">            return new Measurement(wallNanos + other.wallNanos, availableSum(processCpuNanos, other.processCpuNanos),</span>
+<span class="fc" id="L36">                availableSum(threadAllocatedBytes, other.threadAllocatedBytes), heapBeforeBytes, other.heapAfterBytes);</span>
+        }
+        void json(JsonWriter json) {
+<span class="fc" id="L39">            json.property(&quot;wallNanos&quot;, wallNanos).property(&quot;processCpuNanos&quot;, processCpuNanos)</span>
+<span class="fc" id="L40">                .property(&quot;currentThreadAllocatedBytes&quot;, threadAllocatedBytes).property(&quot;heapBeforeBytes&quot;, heapBeforeBytes)</span>
+<span class="fc" id="L41">                .property(&quot;heapAfterBytes&quot;, heapAfterBytes);</span>
+<span class="fc" id="L42">        }</span>
+    }
+<span class="fc" id="L44">    public record Row(int length, int repetition, String route, int executedInputs, int auditedInputs,</span>
+            String checksum, Measurement commonSetup, Measurement routeSetup, Measurement execution, Measurement audit) {
+<span class="fc" id="L46">        public long paidWallNanos() { return paid().wallNanos(); }</span>
+<span class="fc" id="L47">        public Measurement paid() { return commonSetup.plus(routeSetup).plus(execution).plus(audit); }</span>
+        void json(JsonWriter json) {
+<span class="fc" id="L49">            json.property(&quot;length&quot;, length).property(&quot;repetition&quot;, repetition).property(&quot;route&quot;, route)</span>
+<span class="fc" id="L50">                .property(&quot;executedInputs&quot;, executedInputs).property(&quot;auditedInputs&quot;, auditedInputs).property(&quot;checksum&quot;, checksum)</span>
+<span class="fc" id="L51">                .object(&quot;commonSetup&quot;, commonSetup::json).object(&quot;routeSetup&quot;, routeSetup::json)</span>
+<span class="fc" id="L52">                .object(&quot;execution&quot;, execution::json).object(&quot;audit&quot;, audit::json).object(&quot;fullyPaid&quot;, paid()::json);</span>
+<span class="fc" id="L53">        }</span>
+    }
+    public record Report(Config config, List&lt;Row&gt; rows, long searchWork, long preparationWork,
+            long inputCost, long outputCost, String outcome, long exploredStates, List&lt;String&gt; witnessRules,
+            String source, String selected) {
+<span class="fc" id="L58">        public Report { rows = List.copyOf(rows); witnessRules = List.copyOf(witnessRules); }</span>
+        public String toJson() {
+<span class="fc" id="L60">            var json = new JsonWriter().beginObject().property(&quot;schema&quot;, &quot;regelsuche.joint-modular-execution/v1&quot;)</span>
+<span class="fc" id="L61">                .property(&quot;purpose&quot;, &quot;architecture-and-execution-only&quot;).property(&quot;learnedGainClaim&quot;, false)</span>
+<span class="fc" id="L62">                .property(&quot;timestamp&quot;, Instant.now().toString()).property(&quot;javaVersion&quot;, System.getProperty(&quot;java.version&quot;))</span>
+<span class="fc" id="L63">                .property(&quot;availableProcessors&quot;, Runtime.getRuntime().availableProcessors())</span>
+<span class="fc" id="L64">                .property(&quot;warmupIterations&quot;, 0).property(&quot;discardedTrials&quot;, 0)</span>
+<span class="fc" id="L65">                .property(&quot;modulusBits&quot;, config.modulusBits()).property(&quot;exponentBits&quot;, config.exponentBits())</span>
+<span class="fc" id="L66">                .property(&quot;repetitions&quot;, config.repeats()).property(&quot;searchWork&quot;, searchWork)</span>
+<span class="fc" id="L67">                .property(&quot;preparationWork&quot;, preparationWork).property(&quot;predictedInputCost&quot;, inputCost)</span>
+<span class="fc" id="L68">                .property(&quot;predictedOutputCost&quot;, outputCost).property(&quot;searchOutcome&quot;, outcome)</span>
+<span class="fc" id="L69">                .property(&quot;exploredStates&quot;, exploredStates).stringArray(&quot;witnessRules&quot;, witnessRules)</span>
+<span class="fc" id="L70">                .property(&quot;sourceAst&quot;, source).property(&quot;selectedAst&quot;, selected)</span>
+<span class="fc" id="L71">                .property(&quot;measurementLimitations&quot;, &quot;Process CPU includes JIT/GC; allocation covers the current Java thread; heap values are absolute samples, not per-route peaks. External process accounting includes JVM startup and report serialization. Each scenario pays complete setup; setup is actually performed once per report. No warmup, confidence interval, or global optimum claim.&quot;)</span>
+<span class="fc" id="L72">                .array(&quot;rows&quot;, writer -&gt; rows.forEach(row -&gt; writer.objectValue(row::json))).endObject();</span>
+<span class="fc" id="L73">            return json.toString();</span>
+        }
+    }
+<span class="fc" id="L76">    private record Measured&lt;T&gt;(T value, Measurement measurement) {}</span>
+<span class="fc" id="L77">    private record Bootstrap(ModularJointPlans domain, JointComputationPlan source) {}</span>
+<span class="fc" id="L78">    private record Input(BigInteger a, BigInteger x, BigInteger n, Map&lt;String, Object&gt; values) {}</span>
+<span class="fc" id="L79">    private final com.sun.management.OperatingSystemMXBean operatingSystem =</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        ManagementFactory.getOperatingSystemMXBean() instanceof com.sun.management.OperatingSystemMXBean bean ? bean : null;</span>
+<span class="fc" id="L81">    private final com.sun.management.ThreadMXBean threads =</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        ManagementFactory.getThreadMXBean() instanceof com.sun.management.ThreadMXBean bean ? bean : null;</span>
+
+    public Report run(Config config) {
+<span class="fc" id="L85">        var bootstrap = measure(ModularJointPlanExperiment::bootstrap);</span>
+<span class="fc" id="L86">        var directSetup = measure(() -&gt; (Function&lt;Input, Map&lt;String, Object&gt;&gt;) input -&gt; direct(bootstrap.value().domain(), input));</span>
+<span class="fc" id="L87">        var optimizedSetup = measure(() -&gt; bootstrap.value().domain().optimizer(64).optimize(bootstrap.value().source(),</span>
+            new MoveSearch.Budget(5, 5, 0, 512, 1_000_000)));
+<span class="fc" id="L89">        var optimized = optimizedSetup.value();</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (!optimized.withinBudget()) throw new IllegalStateException(&quot;plan search exceeded declared budget&quot;);</span>
+<span class="fc" id="L91">        var rows = new ArrayList&lt;Row&gt;();</span>
+<span class="fc" id="L92">        int sequence = 0;</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        for (int length : config.sequenceLengths()) {</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            for (int repetition = 0; repetition &lt; config.repeats(); repetition++) {</span>
+<span class="fc" id="L95">                int seed = repetition;</span>
+<span class="fc" id="L96">                var inputs = measure(() -&gt; inputs(length, seed, config));</span>
+<span class="fc" id="L97">                Measurement common = bootstrap.measurement().plus(inputs.measurement());</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">                var order = (sequence + repetition) % 2 == 0 ? List.of(&quot;DIRECT&quot;, &quot;PREPARED&quot;) : List.of(&quot;PREPARED&quot;, &quot;DIRECT&quot;);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                for (String route : order) {</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">                    Function&lt;Input, Map&lt;String, Object&gt;&gt; evaluate = route.equals(&quot;DIRECT&quot;) ? directSetup.value()</span>
+<span class="fc" id="L101">                        : input -&gt; optimized.prepared().execute(input.values());</span>
+<span class="fc" id="L102">                    var execution = measure(() -&gt; inputs.value().stream().map(evaluate).toList());</span>
+<span class="fc" id="L103">                    var audit = measure(() -&gt; audit(inputs.value(), execution.value()));</span>
+<span class="fc" id="L104">                    rows.add(new Row(length, repetition, route, execution.value().size(), inputs.value().size(), audit.value(),</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                        common, route.equals(&quot;DIRECT&quot;) ? directSetup.measurement() : optimizedSetup.measurement(),</span>
+<span class="fc" id="L106">                        execution.measurement(), audit.measurement()));</span>
+<span class="fc" id="L107">                }</span>
+            }
+<span class="fc" id="L109">            sequence++;</span>
+<span class="fc" id="L110">        }</span>
+<span class="fc" id="L111">        var codec = new CompiledAstReplayCodec();</span>
+<span class="fc" id="L112">        return new Report(config, rows, optimized.search().totalWork(), optimized.setupWork(), optimized.search().inputScore(),</span>
+<span class="fc" id="L113">            optimized.search().outputScore(), optimized.search().search().outcome().name(),</span>
+<span class="fc" id="L114">            optimized.search().search().metrics().exploredStates(), optimized.search().witness().stream().map(step -&gt; step.move().ruleId()).toList(),</span>
+<span class="fc" id="L115">            codec.encodeExpression(bootstrap.value().source().expression()), codec.encodeExpression(optimized.plan().expression()));</span>
+    }
+    private static Bootstrap bootstrap() {
+<span class="fc" id="L118">        var domain = new ModularJointPlans(new ModularComputationDomain(Set.of(&quot;x&quot;), Set.of(&quot;N&quot;),</span>
+<span class="fc" id="L119">            Set.of(new ModularComputationDomain.NormalizedInput(&quot;a&quot;, &quot;N&quot;))));</span>
+<span class="fc" id="L120">        Expr a = new VariableExpr(&quot;a&quot;), x = new VariableExpr(&quot;x&quot;), n = new VariableExpr(&quot;N&quot;);</span>
+<span class="fc" id="L121">        Expr firstExponent = new BinaryExpr(x, BinaryOperator.ADD, new NumberExpr(1));</span>
+<span class="fc" id="L122">        Expr secondExponent = new BinaryExpr(new BinaryExpr(new NumberExpr(2), BinaryOperator.MUL, x), BinaryOperator.ADD, new NumberExpr(1));</span>
+<span class="fc" id="L123">        var outputs = new LinkedHashMap&lt;String, Expr&gt;();</span>
+<span class="fc" id="L124">        outputs.put(&quot;u&quot;, new FunctionExpr(&quot;modpow&quot;, List.of(a, firstExponent, n)));</span>
+<span class="fc" id="L125">        outputs.put(&quot;v&quot;, new FunctionExpr(&quot;modpow&quot;, List.of(a, secondExponent, n)));</span>
+<span class="fc" id="L126">        return new Bootstrap(domain, domain.plan(outputs, Set.of(&quot;a&quot;, &quot;x&quot;, &quot;N&quot;)));</span>
+    }
+    private static List&lt;Input&gt; inputs(int length, int repetition, Config config) {
+<span class="fc" id="L129">        BigInteger n = BigInteger.ONE.shiftLeft(config.modulusBits()).subtract(BigInteger.valueOf(159));</span>
+<span class="fc" id="L130">        BigInteger initialExponent = BigInteger.ONE.shiftLeft(config.exponentBits() - 1);</span>
+<span class="fc" id="L131">        var result = new ArrayList&lt;Input&gt;(length);</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L133">            BigInteger a = BigInteger.valueOf(2L + i + 13L * repetition).mod(n);</span>
+<span class="fc" id="L134">            BigInteger x = initialExponent.add(BigInteger.valueOf(7_919L * i + 104_729L * repetition + length));</span>
+<span class="fc" id="L135">            result.add(new Input(a, x, n, Map.of(&quot;a&quot;, a, &quot;x&quot;, x, &quot;N&quot;, n)));</span>
+        }
+<span class="fc" id="L137">        return List.copyOf(result);</span>
+    }
+    private static Map&lt;String, Object&gt; direct(ModularJointPlans domain, Input input) {
+<span class="fc" id="L140">        domain.validateInputs(input.values());</span>
+<span class="fc" id="L141">        BigInteger u = input.a().modPow(input.x().add(BigInteger.ONE), input.n());</span>
+<span class="fc" id="L142">        BigInteger v = input.a().modPow(input.x().multiply(BigInteger.TWO).add(BigInteger.ONE), input.n());</span>
+<span class="fc" id="L143">        return Map.of(&quot;u&quot;, u, &quot;v&quot;, v);</span>
+    }
+    private static String audit(List&lt;Input&gt; inputs, List&lt;Map&lt;String, Object&gt;&gt; results) {
+        try {
+<span class="fc" id="L147">            var digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            if (inputs.size() != results.size()) throw new IllegalStateException(&quot;result cardinality differs&quot;);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            for (int i = 0; i &lt; inputs.size(); i++) {</span>
+<span class="fc" id="L150">                Input input = inputs.get(i);</span>
+<span class="fc" id="L151">                var actual = results.get(i);</span>
+<span class="fc" id="L152">                BigInteger u = input.a().modPow(input.x().add(BigInteger.ONE), input.n());</span>
+<span class="fc" id="L153">                BigInteger v = input.a().modPow(input.x().shiftLeft(1).add(BigInteger.ONE), input.n());</span>
+<span class="pc bpc" id="L154" title="3 of 6 branches missed.">                if (!actual.keySet().equals(Set.of(&quot;u&quot;, &quot;v&quot;)) || !u.equals(actual.get(&quot;u&quot;)) || !v.equals(actual.get(&quot;v&quot;)))</span>
+<span class="nc" id="L155">                    throw new IllegalStateException(&quot;independent output audit failed at input &quot; + i);</span>
+<span class="fc" id="L156">                digest.update((u + &quot;/&quot; + v + &quot;;&quot;).getBytes(StandardCharsets.UTF_8));</span>
+            }
+<span class="fc" id="L158">            return HexFormat.of().formatHex(digest.digest());</span>
+<span class="nc" id="L159">        } catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }</span>
+    }
+    private &lt;T&gt; Measured&lt;T&gt; measure(Supplier&lt;T&gt; operation) {
+<span class="fc" id="L162">        long heapBefore = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getUsed();</span>
+<span class="fc" id="L163">        long allocatedBefore = allocated(), cpuBefore = cpu(), wallBefore = System.nanoTime();</span>
+<span class="fc" id="L164">        T result = operation.get();</span>
+<span class="fc" id="L165">        long wall = System.nanoTime() - wallBefore, cpuAfter = cpu(), allocatedAfter = allocated();</span>
+<span class="fc" id="L166">        long heapAfter = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getUsed();</span>
+<span class="fc" id="L167">        return new Measured&lt;&gt;(result, new Measurement(wall, difference(cpuBefore, cpuAfter), difference(allocatedBefore, allocatedAfter), heapBefore, heapAfter));</span>
+    }
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">    private long cpu() { return operatingSystem == null ? -1 : operatingSystem.getProcessCpuTime(); }</span>
+    private long allocated() {
+<span class="pc bpc" id="L171" title="3 of 6 branches missed.">        return threads == null || !threads.isThreadAllocatedMemorySupported() || !threads.isThreadAllocatedMemoryEnabled()</span>
+<span class="pc" id="L172">            ? -1 : threads.getThreadAllocatedBytes(Thread.currentThread().threadId());</span>
+    }
+<span class="pc bpc" id="L174" title="2 of 4 branches missed.">    private static long difference(long before, long after) { return before &lt; 0 || after &lt; 0 ? -1 : after - before; }</span>
+<span class="fc bfc" id="L175" title="All 4 branches covered.">    private static long availableSum(long left, long right) { return left &lt; 0 || right &lt; 0 ? -1 : left + right; }</span>
+    public static void main(String[] arguments) throws Exception {
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        if (arguments.length != 1) throw new IllegalArgumentException(&quot;usage: ModularJointPlanExperiment OUTPUT_JSON&quot;);</span>
+<span class="nc" id="L178">        var report = new ModularJointPlanExperiment().run(new Config(List.of(1, 10, 100, 1_000), 3, 1_024, 256));</span>
+<span class="nc" id="L179">        Path output = Path.of(arguments[0]).toAbsolutePath();</span>
+<span class="nc" id="L180">        Files.createDirectories(output.getParent());</span>
+<span class="nc" id="L181">        Files.writeString(output, report.toJson() + &quot;\n&quot;, StandardCharsets.UTF_8, StandardOpenOption.CREATE_NEW);</span>
+<span class="nc" id="L182">        System.out.println(&quot;Wrote &quot; + output);</span>
+<span class="nc" id="L183">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

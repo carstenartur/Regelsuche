@@ -151,20 +151,23 @@ public final class LearnedSchedulingArtifacts {
     private static Object normalize(Object value) throws ReflectiveOperationException, IOException {
 <span class="fc bfc" id="L152" title="All 8 branches covered.">        if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean) return value;</span>
 <span class="fc bfc" id="L153" title="All 2 branches covered.">        if (value instanceof Enum&lt;?&gt; enumeration) return enumeration.name();</span>
-<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (value instanceof Map&lt;?, ?&gt; map) {</span>
-<span class="fc" id="L155">            var result = new TreeMap&lt;String, Object&gt;();</span>
-<span class="fc bfc" id="L156" title="All 2 branches covered.">            for (var entry : map.entrySet()) result.put((String) entry.getKey(), normalize(entry.getValue())); return result;</span>
+        // An observational binding may be serialized; it cannot reconstruct the private capability.
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (value instanceof de.regelsuche.transform.ExactTheoryEvidence evidence)</span>
+<span class="fc" id="L156">            return Map.of(&quot;binding&quot;, normalize(evidence.binding()));</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (value instanceof Map&lt;?, ?&gt; map) {</span>
+<span class="fc" id="L158">            var result = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            for (var entry : map.entrySet()) result.put((String) entry.getKey(), normalize(entry.getValue())); return result;</span>
         }
-<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (value instanceof Collection&lt;?&gt; collection) {</span>
-<span class="fc bfc" id="L159" title="All 2 branches covered.">            var result = new ArrayList&lt;Object&gt;(); for (Object element : collection) result.add(normalize(element));</span>
-<span class="fc bfc" id="L160" title="All 2 branches covered.">            if (value instanceof Set&lt;?&gt;) result.sort(java.util.Comparator.comparing(LearnedSchedulingArtifacts::json)); return result;</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (value instanceof Collection&lt;?&gt; collection) {</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            var result = new ArrayList&lt;Object&gt;(); for (Object element : collection) result.add(normalize(element));</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            if (value instanceof Set&lt;?&gt;) result.sort(java.util.Comparator.comparing(LearnedSchedulingArtifacts::json)); return result;</span>
         }
-<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (value.getClass().isRecord()) {</span>
-<span class="fc" id="L163">            var result = new TreeMap&lt;String, Object&gt;();</span>
-<span class="fc bfc" id="L164" title="All 2 branches covered.">            for (RecordComponent component : value.getClass().getRecordComponents()) result.put(component.getName(), normalize(component.getAccessor().invoke(value)));</span>
-<span class="fc" id="L165">            return result;</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (value.getClass().isRecord()) {</span>
+<span class="fc" id="L166">            var result = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">            for (RecordComponent component : value.getClass().getRecordComponents()) result.put(component.getName(), normalize(component.getAccessor().invoke(value)));</span>
+<span class="fc" id="L168">            return result;</span>
         }
-<span class="nc" id="L167">        throw new IllegalArgumentException(&quot;unsupported evidence value: &quot; + value.getClass());</span>
+<span class="nc" id="L170">        throw new IllegalArgumentException(&quot;unsupported evidence value: &quot; + value.getClass());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

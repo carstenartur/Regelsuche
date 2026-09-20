@@ -25,7 +25,7 @@ import java.util.List;
 <span class="fc" id="L25">        var seen = new HashMap&lt;Expr, Integer&gt;(); var variables = new HashSet&lt;String&gt;();</span>
 <span class="fc" id="L26">        int[] counts = new int[3]; collect(root, seen, variables, counts);</span>
 <span class="fc bfc" id="L27" title="All 2 branches covered.">        String operator = root instanceof BinaryExpr binary ? binary.operator().name()</span>
-<span class="pc bpc" id="L28" title="1 of 4 branches missed.">            : root instanceof FunctionExpr function ? &quot;FUNCTION:&quot; + function.name() : root instanceof VariableExpr ? &quot;VARIABLE&quot; : &quot;NUMBER&quot;;</span>
+<span class="fc bfc" id="L28" title="All 4 branches covered.">            : root instanceof FunctionExpr function ? &quot;FUNCTION:&quot; + function.name() : root instanceof VariableExpr ? &quot;VARIABLE&quot; : &quot;NUMBER&quot;;</span>
 <span class="fc" id="L29">        return new StructuralMoveContext(operator, degree(root), variables.size(), counts[1], counts[2],</span>
 <span class="fc" id="L30">            seen.values().stream().mapToInt(count -&gt; Math.max(0, count - 1)).sum(), state.assumptions(),</span>
 <span class="fc" id="L31">            state.capabilities().stream().sorted().toList(), counts[0]);</span>

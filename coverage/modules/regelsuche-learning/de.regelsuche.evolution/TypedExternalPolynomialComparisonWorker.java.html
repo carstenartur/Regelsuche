@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TypedExternalPolynomialComparisonWorker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">TypedExternalPolynomialComparisonWorker.java</span></div><h1>TypedExternalPolynomialComparisonWorker.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.inventory.HistoryMovePolicy;
+import de.regelsuche.inventory.RuleHistoryMemory;
+import de.regelsuche.inventory.TypedPolicySelection;
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.moves.*;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.lang.management.ManagementFactory;
+import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+
+/** Opt-in source-only development worker. Each process owns exactly one frozen profile. */
+<span class="fc" id="L24">public final class TypedExternalPolynomialComparisonWorker {</span>
+<span class="fc" id="L25">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L26">        .enable(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L27">        .enable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+<span class="fc" id="L28">    private static final Set&lt;String&gt; PROFILES = Set.of(&quot;BASE&quot;, &quot;EXPERT&quot;, &quot;PRIMITIVE_SELECTED&quot;, &quot;LEARNED_NAIVE&quot;, &quot;LEARNED_RANKED&quot;);</span>
+<span class="fc" id="L29">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+<span class="fc" id="L30">    private static final Map&lt;String, Integer&gt; SETTINGS = Map.of(&quot;workBudget&quot;, 16384, &quot;primitiveDepth&quot;, 9,</span>
+<span class="fc" id="L31">        &quot;searchDepth&quot;, 9, &quot;maxStates&quot;, 256, &quot;complexityDebt&quot;, 24);</span>
+<span class="fc" id="L32">    private final Set&lt;String&gt; exclusions = new HashSet&lt;&gt;();</span>
+    private String profile;
+    private TypedLearnedMoveInventory inventory;
+    private TraceRewriteStrategyLearner.FrozenStrategy formation;
+    private TypedLearningWorkStudy.Training training;
+    private String frozen;
+
+    public Map&lt;String, Object&gt; initialize(String requestedProfile) {
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (profile != null) throw new IllegalStateException(&quot;already initialized&quot;);</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        if (!PROFILES.contains(requestedProfile)) throw new IllegalArgumentException(&quot;unknown profile&quot;);</span>
+<span class="fc" id="L42">        long start = System.nanoTime(), cpu = cpu();</span>
+<span class="fc" id="L43">        var genome = TraceStrategyTransferExample.inventory();</span>
+<span class="fc" id="L44">        var exact = new ExactPolynomialAnalysis();</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (var input : TraceStrategyTransferExample.trainingInputs()) exclusions.add(exact.alphaIdentity(input.expression()));</span>
+<span class="fc bfc" id="L46" title="All 4 branches covered.">        if (requestedProfile.equals(&quot;BASE&quot;) || requestedProfile.equals(&quot;EXPERT&quot;)) {</span>
+<span class="fc" id="L47">            inventory = TypedLearnedMoveInventory.primitives(genome);</span>
+        } else {
+<span class="fc" id="L49">            formation = new TraceRewriteStrategyLearner().learn(genome,</span>
+<span class="fc" id="L50">                TraceStrategyTransferExample.trainingInputs(), TraceStrategyTransferExample.limits());</span>
+<span class="fc" id="L51">            inventory = formation.typedMoves();</span>
+<span class="fc" id="L52">            exclusions.addAll(formation.excludedIdentities());</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">            if (!requestedProfile.equals(&quot;LEARNED_NAIVE&quot;)) {</span>
+<span class="fc" id="L54">                training = TypedLearningWorkStudy.train(formation, inventory, requestedProfile.equals(&quot;LEARNED_RANKED&quot;));</span>
+            }
+        }
+<span class="fc" id="L57">        profile = requestedProfile;</span>
+<span class="fc" id="L58">        frozen = modelJson();</span>
+<span class="fc" id="L59">        var costs = new TreeMap&lt;String, Long&gt;();</span>
+<span class="fc" id="L60">        costs.put(&quot;formation&quot;, inventory.formationWork());</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        costs.put(&quot;historySearch&quot;, training == null ? 0 : training.historySearchWork());</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        costs.put(&quot;historyMemory&quot;, training == null ? 0 : training.memoryWork());</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        costs.put(&quot;policyTrials&quot;, training == null ? 0 : training.policy().trainingWork());</span>
+<span class="fc" id="L64">        var result = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L65">        result.put(&quot;status&quot;, &quot;INITIALIZED&quot;); result.put(&quot;profile&quot;, profile);</span>
+<span class="fc" id="L66">        result.put(&quot;model&quot;, frozen); result.put(&quot;modelHash&quot;, SchematicProofPlan.hash(frozen));</span>
+<span class="fc" id="L67">        result.put(&quot;settings&quot;, SETTINGS); result.put(&quot;trainingWorkComponents&quot;, costs);</span>
+<span class="fc" id="L68">        result.put(&quot;trainingWork&quot;, costs.values().stream().mapToLong(Long::longValue).reduce(0, Math::addExact));</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        result.put(&quot;learnedPrograms&quot;, profile.startsWith(&quot;LEARNED_&quot;) ? inventory.learnedPrograms().size() : 0);</span>
+<span class="fc" id="L70">        result.put(&quot;nativeWallNanos&quot;, System.nanoTime() - start); result.put(&quot;nativeCpuNanos&quot;, elapsedCpu(cpu));</span>
+<span class="fc" id="L71">        return result;</span>
+    }
+
+    public Map&lt;String, Object&gt; run(String requestedProfile, String source) {
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (profile == null) throw new IllegalStateException(&quot;initialize before querying&quot;);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (!profile.equals(requestedProfile)) throw new IllegalArgumentException(&quot;cannot switch frozen profile&quot;);</span>
+<span class="pc bpc" id="L77" title="3 of 6 branches missed.">        if (source == null || source.isBlank() || source.length() &gt; 2048) throw new IllegalArgumentException(&quot;invalid source&quot;);</span>
+<span class="fc" id="L78">        long start = System.nanoTime(), cpu = cpu();</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (exclusions.contains(new ExactPolynomialAnalysis().alphaIdentity(source))) throw new IllegalArgumentException(&quot;TRAIN overlap&quot;);</span>
+<span class="fc" id="L80">        var expression = new ExpressionParser().parseTerm(source);</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        var providers = profile.startsWith(&quot;LEARNED_&quot;) ? inventory.providers() : inventory.primitiveProviders();</span>
+<span class="fc" id="L82">        var problem = new TypedMoveSearch.Problem(expression,</span>
+<span class="fc" id="L83">            TypedMoveSearch.Context.sourceOnly(List.of(), MoveContext.Phase.FROZEN_EVALUATION),</span>
+<span class="fc" id="L84">            providers, policy(), inventory.verifier(), state -&gt; 0, MoveSearch.Mode.FAST,</span>
+            MoveSearch.Scheduling.STAGED, new MoveSearch.Budget(9, 9, 0, 256, 16384, 24));
+<span class="fc" id="L86">        var selected = new TypedSourceOnlySearch().search(problem,</span>
+<span class="fc" id="L87">            state -&gt; TypedPolynomialSurfaceCost.evaluate(state.expression()));</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (!frozen.equals(modelJson())) throw new IllegalStateException(&quot;evaluation changed frozen knowledge&quot;);</span>
+<span class="fc" id="L89">        var result = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L90">        result.put(&quot;status&quot;, &quot;CANDIDATE&quot;); result.put(&quot;profile&quot;, profile); result.put(&quot;input&quot;, source);</span>
+<span class="fc" id="L91">        result.put(&quot;output&quot;, ExpressionFormatter.format(selected.incumbent().expression()));</span>
+<span class="fc" id="L92">        result.put(&quot;typedInput&quot;, CODEC.encodeExpression(expression));</span>
+<span class="fc" id="L93">        result.put(&quot;typedOutput&quot;, CODEC.encodeExpression(selected.incumbent().expression()));</span>
+<span class="fc" id="L94">        result.put(&quot;target&quot;, &quot;&quot;); result.put(&quot;targetReached&quot;, selected.search().reached());</span>
+<span class="fc" id="L95">        result.put(&quot;inputCost&quot;, selected.inputScore()); result.put(&quot;outputCost&quot;, selected.outputScore());</span>
+<span class="fc" id="L96">        result.put(&quot;witness&quot;, selected.witness().stream().map(step -&gt; Map.of(</span>
+<span class="fc" id="L97">            &quot;source&quot;, CODEC.encodeExpression(step.source().expression()), &quot;target&quot;, CODEC.encodeExpression(step.target().expression()),</span>
+<span class="fc" id="L98">            &quot;move&quot;, step.move(), &quot;verification&quot;, step.verification())).toList());</span>
+<span class="fc" id="L99">        result.put(&quot;search&quot;, LearnedSchedulingArtifacts.resultJson(selected.search().encodedResult()));</span>
+<span class="fc" id="L100">        result.put(&quot;selectionWork&quot;, selected.selectionWork()); result.put(&quot;selectedReplayWork&quot;, selected.replayWork());</span>
+<span class="fc" id="L101">        result.put(&quot;totalWork&quot;, selected.totalWork()); result.put(&quot;internalWorkWithinBudget&quot;, selected.withinBudget());</span>
+<span class="fc" id="L102">        result.put(&quot;modelHash&quot;, SchematicProofPlan.hash(frozen));</span>
+<span class="fc" id="L103">        result.put(&quot;nativeWallNanos&quot;, System.nanoTime() - start); result.put(&quot;nativeCpuNanos&quot;, elapsedCpu(cpu));</span>
+<span class="fc" id="L104">        return result;</span>
+    }
+
+    private MovePriorityPolicy policy() {
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (training != null) {</span>
+<span class="fc" id="L109">            var selected = training.policy().selected();</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            return selected.kind() == TypedPolicySelection.PolicyKind.INVENTORY_ORDER ? MovePriorityPolicy.INVENTORY_ORDER</span>
+<span class="nc" id="L111">                : HistoryMovePolicy.typed(training.policy().history(), selected.weights());</span>
+        }
+        // EXPERT is the pre-existing fixed default weighting, not an oracle or a fitted policy.
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        return profile.equals(&quot;EXPERT&quot;) ? HistoryMovePolicy.typed(new RuleHistoryMemory().freeze(), HistoryMovePolicy.Weights.DEFAULT)</span>
+<span class="fc" id="L115">            : MovePriorityPolicy.INVENTORY_ORDER;</span>
+    }
+
+    private String modelJson() {
+<span class="fc" id="L119">        var model = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L120">        model.put(&quot;schema&quot;, &quot;regelsuche.typed-external-frozen-profile/v1&quot;); model.put(&quot;profile&quot;, profile);</span>
+<span class="fc" id="L121">        model.put(&quot;inventory&quot;, TraceStrategyTransferExample.inventory().toCanonicalJson());</span>
+<span class="fc" id="L122">        model.put(&quot;settings&quot;, SETTINGS); model.put(&quot;excludedIdentities&quot;, exclusions);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        model.put(&quot;formation&quot;, formation == null ? &quot;&quot; : formation.toCanonicalJson());</span>
+<span class="fc bfc" id="L124" title="All 4 branches covered.">        model.put(&quot;policy&quot;, training == null ? (profile.equals(&quot;EXPERT&quot;) ? &quot;FIXED_DEFAULT_WEIGHTS&quot; : &quot;INVENTORY_ORDER&quot;)</span>
+<span class="fc" id="L125">            : training.policy().toCanonicalJson());</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        model.put(&quot;historyRuns&quot;, training == null ? List.of() : training.historyRuns().stream().map(run -&gt; Map.of(</span>
+<span class="fc" id="L127">            &quot;id&quot;, run.id(), &quot;source&quot;, run.source(), &quot;goal&quot;, run.goal(),</span>
+<span class="fc" id="L128">            &quot;search&quot;, LearnedSchedulingArtifacts.resultJson(run.result().encodedResult()))).toList());</span>
+<span class="fc" id="L129">        return LearnedSchedulingArtifacts.json(model);</span>
+    }
+
+    /** Strict source-only boundary; unknown fields cannot smuggle targets into evaluation. */
+    public Map&lt;String, Object&gt; handle(String line) throws java.io.IOException {
+<span class="pc bpc" id="L134" title="2 of 4 branches missed.">        if (line == null || line.length() &gt; 8192) throw new IllegalArgumentException(&quot;request size limit&quot;);</span>
+<span class="fc" id="L135">        JsonNode request = JSON.readTree(line);</span>
+<span class="pc bpc" id="L136" title="4 of 8 branches missed.">        if (request == null || !request.isObject() || !request.path(&quot;op&quot;).isTextual() || !request.path(&quot;profile&quot;).isTextual()) {</span>
+<span class="nc" id="L137">            throw new IllegalArgumentException(&quot;invalid request&quot;);</span>
+        }
+<span class="fc" id="L139">        var fields = new HashSet&lt;String&gt;(); request.fieldNames().forEachRemaining(fields::add);</span>
+<span class="fc" id="L140">        String op = request.get(&quot;op&quot;).textValue(), selected = request.get(&quot;profile&quot;).textValue();</span>
+<span class="pc bpc" id="L141" title="1 of 4 branches missed.">        if (op.equals(&quot;initialize&quot;) &amp;&amp; fields.equals(Set.of(&quot;op&quot;, &quot;profile&quot;))) return initialize(selected);</span>
+<span class="pc bpc" id="L142" title="4 of 6 branches missed.">        if (op.equals(&quot;run&quot;) &amp;&amp; fields.equals(Set.of(&quot;op&quot;, &quot;profile&quot;, &quot;source&quot;)) &amp;&amp; request.get(&quot;source&quot;).isTextual()) {</span>
+<span class="nc" id="L143">            return run(selected, request.get(&quot;source&quot;).textValue());</span>
+        }
+<span class="fc" id="L145">        throw new IllegalArgumentException(&quot;unsupported fields or operation&quot;);</span>
+    }
+    private static long cpu() {
+<span class="fc" id="L148">        var bean = ManagementFactory.getOperatingSystemMXBean();</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        return bean instanceof com.sun.management.OperatingSystemMXBean operatingSystem ? operatingSystem.getProcessCpuTime() : -1;</span>
+    }
+<span class="pc bpc" id="L151" title="2 of 4 branches missed.">    private static Long elapsedCpu(long before) { long after = cpu(); return before &lt; 0 || after &lt; 0 ? null : after - before; }</span>
+    public static void main(String[] args) throws Exception {
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        if (args.length != 0) throw new IllegalArgumentException(&quot;worker accepts source-only stdin requests&quot;);</span>
+<span class="nc" id="L154">        var worker = new TypedExternalPolynomialComparisonWorker();</span>
+<span class="nc" id="L155">        System.out.println(&quot;{\&quot;status\&quot;:\&quot;READY\&quot;,\&quot;java\&quot;:\&quot;&quot; + Runtime.version() + &quot;\&quot;}&quot;);</span>
+<span class="nc" id="L156">        try (var reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8))) {</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">            for (String line; (line = reader.readLine()) != null;) {</span>
+<span class="nc" id="L158">                try { System.out.println(LearnedSchedulingArtifacts.json(worker.handle(line))); }</span>
+<span class="nc" id="L159">                catch (RuntimeException | java.io.IOException failure) {</span>
+<span class="nc" id="L160">                    System.out.println(LearnedSchedulingArtifacts.json(Map.of(&quot;status&quot;, &quot;ERROR&quot;, &quot;error&quot;, failure.toString())));</span>
+<span class="nc" id="L161">                }</span>
+<span class="nc" id="L162">                System.out.flush();</span>
+            }
+        }
+<span class="nc" id="L165">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

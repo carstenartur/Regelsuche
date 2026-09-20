@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JointComputationPlan.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.program</a> &gt; <span class="el_source">JointComputationPlan.java</span></div><h1>JointComputationPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.program;
+
+import de.regelsuche.ast.*;
+import java.util.*;
+
+/** Immutable typed definitions and explicitly named outputs over the existing AST.
+ * Repeated structural subexpressions become one node when prepared, including across outputs.
+ * Definitions are ordinary AST variable references, resolved before entering the existing frontier.
+ */
+public final class JointComputationPlan {
+    public static final String OUTPUTS = &quot;jointoutputs&quot;;
+    public static final String OUTPUT = &quot;jointoutput&quot;;
+    public static final int MAX_NODES = 10_000;
+    public static final int MAX_DEPTH = 128;
+
+    public record Output(String name, ComputationBackend.Type type, Expr expression) {
+<span class="fc" id="L17">        public Output {</span>
+<span class="fc" id="L18">            requireName(name);</span>
+<span class="fc" id="L19">            Objects.requireNonNull(type, &quot;type&quot;);</span>
+<span class="fc" id="L20">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L21">        }</span>
+    }
+    private final Map&lt;String, ComputationBackend.Type&gt; inputs;
+    private final Map&lt;String, Expr&gt; definitions;
+    private final List&lt;Output&gt; outputs;
+
+    public JointComputationPlan(Map&lt;String, ComputationBackend.Type&gt; inputs,
+<span class="fc" id="L28">            Map&lt;String, Expr&gt; definitions, List&lt;Output&gt; outputs) {</span>
+<span class="fc" id="L29">        this.inputs = Map.copyOf(inputs);</span>
+<span class="fc" id="L30">        this.definitions = Map.copyOf(definitions);</span>
+<span class="fc" id="L31">        this.outputs = List.copyOf(outputs);</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if (outputs.isEmpty()) throw new IllegalArgumentException(&quot;at least one output required&quot;);</span>
+<span class="fc" id="L33">        this.inputs.keySet().forEach(JointComputationPlan::requireName);</span>
+<span class="fc" id="L34">        this.definitions.keySet().forEach(JointComputationPlan::requireName);</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (!Collections.disjoint(this.inputs.keySet(), this.definitions.keySet()))</span>
+<span class="nc" id="L36">            throw new IllegalArgumentException(&quot;definition shadows input&quot;);</span>
+<span class="fc" id="L37">        var names = new HashSet&lt;String&gt;();</span>
+<span class="pc bpc" id="L38" title="1 of 4 branches missed.">        for (var output : this.outputs) if (!names.add(output.name())) throw new IllegalArgumentException(&quot;duplicate output&quot;);</span>
+<span class="fc" id="L39">    }</span>
+<span class="fc" id="L40">    public Map&lt;String, ComputationBackend.Type&gt; inputs() { return inputs; }</span>
+<span class="fc" id="L41">    public List&lt;Output&gt; outputs() { return outputs; }</span>
+    public PreparedJointComputation prepare(ComputationBackend backend) {
+<span class="fc" id="L43">        return PreparedJointComputation.prepare(this, backend);</span>
+    }
+    public List&lt;Expr&gt; outputExpressions() {
+<span class="nc" id="L46">        return resolveOutputs().expressions();</span>
+    }
+    /** Tree size is saturated at MAX_NODES + 1, computed from DAG edges without expanding them. */
+    public record Resolution(List&lt;Expr&gt; expressions, long work, int expandedNodes, int height) {
+<span class="fc" id="L50">        public Resolution { expressions = List.copyOf(expressions); }</span>
+    }
+    public Resolution resolveOutputs() {
+<span class="fc" id="L53">        var resolver = new Resolver();</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        for (var name : definitions.keySet()) resolver.resolve(new VariableExpr(name), 0);</span>
+<span class="fc" id="L55">        var expressions = new ArrayList&lt;Expr&gt;();</span>
+<span class="fc" id="L56">        int expandedNodes = 0, height = 0;</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        for (var output : outputs) {</span>
+<span class="fc" id="L58">            var resolved = resolver.resolve(output.expression(), 0);</span>
+<span class="fc" id="L59">            expressions.add(resolved.expression());</span>
+<span class="fc" id="L60">            expandedNodes = saturatedAdd(expandedNodes, resolved.expandedNodes());</span>
+<span class="fc" id="L61">            height = Math.max(height, resolved.height());</span>
+<span class="fc" id="L62">        }</span>
+<span class="fc" id="L63">        return new Resolution(expressions, resolver.visits + outputs.size(), expandedNodes, height);</span>
+    }
+    /** Canonical envelope for TypedMoveSearch. Names are data; only output values are computations. */
+    public Expr expression() {
+<span class="fc" id="L67">        return searchExpression().expression();</span>
+    }
+<span class="fc" id="L69">    public record SearchExpression(Expr expression, long work) {}</span>
+    public SearchExpression searchExpression() {
+<span class="fc" id="L71">        var resolved = resolveOutputs();</span>
+<span class="pc bpc" id="L72" title="1 of 4 branches missed.">        if ((long) resolved.expandedNodes() + 2L * outputs.size() + 1 &gt; MAX_NODES || resolved.height() + 2 &gt; MAX_DEPTH)</span>
+<span class="fc" id="L73">            throw new IllegalArgumentException(&quot;expanded frontier AST exceeds transport bound&quot;);</span>
+<span class="fc" id="L74">        var expressions = resolved.expressions();</span>
+<span class="fc" id="L75">        var bindings = new ArrayList&lt;Expr&gt;();</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        for (int i = 0; i &lt; outputs.size(); i++) bindings.add(new FunctionExpr(OUTPUT,</span>
+<span class="fc" id="L77">            List.of(new VariableExpr(outputs.get(i).name()), expressions.get(i))));</span>
+<span class="fc" id="L78">        return new SearchExpression(new FunctionExpr(OUTPUTS, bindings), resolved.work() + 2L * outputs.size() + 1);</span>
+    }
+    public JointComputationPlan withExpression(Expr expression) {
+<span class="pc bpc" id="L81" title="2 of 4 branches missed.">        if (!(expression instanceof FunctionExpr all) || !all.name().equals(OUTPUTS)</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">                || all.arguments().size() != outputs.size()) throw new IllegalArgumentException(&quot;output envelope differs&quot;);</span>
+<span class="fc" id="L83">        var next = new ArrayList&lt;Output&gt;();</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (int i = 0; i &lt; outputs.size(); i++) {</span>
+<span class="pc bpc" id="L85" title="2 of 4 branches missed.">            if (!(all.arguments().get(i) instanceof FunctionExpr binding) || !binding.name().equals(OUTPUT)</span>
+<span class="pc bpc" id="L86" title="2 of 4 branches missed.">                    || binding.arguments().size() != 2 || !(binding.arguments().getFirst() instanceof VariableExpr name)</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                    || !name.name().equals(outputs.get(i).name())) throw new IllegalArgumentException(&quot;output binding differs&quot;);</span>
+<span class="fc" id="L88">            next.add(new Output(name.name(), outputs.get(i).type(), binding.arguments().get(1)));</span>
+        }
+<span class="fc" id="L90">        return new JointComputationPlan(inputs, Map.of(), next);</span>
+    }
+    public JointComputationPlan withOutputs(List&lt;Expr&gt; expressions) {
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        if (expressions.size() != outputs.size()) throw new IllegalArgumentException(&quot;output count differs&quot;);</span>
+<span class="nc" id="L94">        var next = new ArrayList&lt;Output&gt;();</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        for (int i = 0; i &lt; outputs.size(); i++) next.add(new Output(outputs.get(i).name(), outputs.get(i).type(), expressions.get(i)));</span>
+<span class="nc" id="L96">        return new JointComputationPlan(inputs, Map.of(), next);</span>
+    }
+    static List&lt;Expr&gt; children(Expr expression) {
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary) return List.of(binary.left(), binary.right());</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (expression instanceof FunctionExpr function) return function.arguments();</span>
+<span class="fc" id="L101">        return List.of();</span>
+    }
+    private static void requireName(String name) {
+<span class="pc bpc" id="L104" title="2 of 4 branches missed.">        if (name == null || name.isBlank()) throw new IllegalArgumentException(&quot;binding name required&quot;);</span>
+<span class="fc" id="L105">    }</span>
+<span class="fc" id="L106">    private static int saturatedAdd(int left, int right) { return Math.min(MAX_NODES + 1, left + right); }</span>
+<span class="fc" id="L107">    private record Resolved(Expr expression, int height, int expandedNodes) {}</span>
+<span class="fc" id="L108">    private final class Resolver {</span>
+<span class="fc" id="L109">        private final Map&lt;String, Resolved&gt; resolved = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L110">        private final Map&lt;Expr, Resolved&gt; byIdentity = new IdentityHashMap&lt;&gt;();</span>
+<span class="fc" id="L111">        private final Set&lt;String&gt; visiting = new HashSet&lt;&gt;();</span>
+        private int visits;
+        Resolved resolve(Expr expression, int depth) {
+<span class="pc bpc" id="L114" title="1 of 4 branches missed.">            if (++visits &gt; MAX_NODES || depth &gt; MAX_DEPTH) throw new IllegalArgumentException(&quot;plan structural limit exceeded&quot;);</span>
+<span class="fc" id="L115">            var cached = byIdentity.get(expression);</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (cached != null) return bounded(cached, depth);</span>
+            Resolved result;
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L119">                String name = variable.name();</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">                if (inputs.containsKey(name)) result = new Resolved(variable, 0, 1);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">                else if (resolved.containsKey(name)) result = resolved.get(name);</span>
+                else {
+<span class="fc bfc" id="L123" title="All 2 branches covered.">                    if (!definitions.containsKey(name)) throw new IllegalArgumentException(&quot;unbound reference: &quot; + name);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">                    if (!visiting.add(name)) throw new IllegalArgumentException(&quot;cyclic definition: &quot; + name);</span>
+<span class="fc" id="L125">                    result = resolve(definitions.get(name), depth + 1);</span>
+<span class="fc" id="L126">                    visiting.remove(name);</span>
+<span class="fc" id="L127">                    resolved.put(name, result);</span>
+                }
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            } else if (expression instanceof BinaryExpr binary) {</span>
+<span class="nc" id="L130">                var left = resolve(binary.left(), depth + 1);</span>
+<span class="nc" id="L131">                var right = resolve(binary.right(), depth + 1);</span>
+<span class="nc" id="L132">                result = new Resolved(new BinaryExpr(left.expression(), binary.operator(), right.expression()),</span>
+<span class="nc" id="L133">                    1 + Math.max(left.height(), right.height()), saturatedAdd(1, saturatedAdd(left.expandedNodes(), right.expandedNodes())));</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">            } else if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L135">                var arguments = new ArrayList&lt;Expr&gt;();</span>
+<span class="fc" id="L136">                int height = 0, expandedNodes = 1;</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">                for (Expr argument : function.arguments()) {</span>
+<span class="fc" id="L138">                    var child = resolve(argument, depth + 1);</span>
+<span class="fc" id="L139">                    arguments.add(child.expression());</span>
+<span class="fc" id="L140">                    height = Math.max(height, child.height() + 1);</span>
+<span class="fc" id="L141">                    expandedNodes = saturatedAdd(expandedNodes, child.expandedNodes());</span>
+<span class="fc" id="L142">                }</span>
+<span class="fc" id="L143">                result = new Resolved(new FunctionExpr(function.name(), arguments), height, expandedNodes);</span>
+<span class="fc" id="L144">            } else {</span>
+<span class="nc" id="L145">                result = new Resolved(expression, 0, 1);</span>
+            }
+<span class="fc" id="L147">            bounded(result, depth);</span>
+<span class="fc" id="L148">            byIdentity.put(expression, result);</span>
+<span class="fc" id="L149">            return result;</span>
+        }
+        private Resolved bounded(Resolved result, int depth) {
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            if (depth + result.height() &gt; MAX_DEPTH) throw new IllegalArgumentException(&quot;plan structural depth exceeded&quot;);</span>
+<span class="fc" id="L153">            return result;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

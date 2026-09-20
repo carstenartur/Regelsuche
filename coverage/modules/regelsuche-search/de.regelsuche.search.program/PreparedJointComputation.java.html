@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PreparedJointComputation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.program</a> &gt; <span class="el_source">PreparedJointComputation.java</span></div><h1>PreparedJointComputation.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.program;
+
+import de.regelsuche.ast.*;
+import java.util.*;
+
+/** Validated immutable topological schedule. Execution values are local to each call. */
+public final class PreparedJointComputation {
+<span class="fc" id="L8">    public record Cost(long operationWork, long peakLiveStorage, long retainedOutputStorage,</span>
+            int outputBindings, int operationCount, long inspectionWork) {
+        public long weighted(long workWeight, long liveWeight, long retainedWeight, long outputWeight) {
+<span class="nc bnc" id="L11" title="All 8 branches missed.">            if (workWeight &lt; 0 || liveWeight &lt; 0 || retainedWeight &lt; 0 || outputWeight &lt; 0)</span>
+<span class="nc" id="L12">                throw new IllegalArgumentException(&quot;cost weights must be nonnegative&quot;);</span>
+<span class="nc" id="L13">            return Math.addExact(Math.addExact(Math.multiplyExact(operationWork, workWeight), Math.multiplyExact(peakLiveStorage, liveWeight)),</span>
+<span class="nc" id="L14">                Math.addExact(Math.multiplyExact(retainedOutputStorage, retainedWeight), Math.multiplyExact(outputBindings, outputWeight)));</span>
+        }
+    }
+    public record Node(Expr expression, ComputationBackend.Type type, ComputationBackend.Operation operation,
+            List&lt;Integer&gt; arguments, long storage) {
+<span class="fc" id="L19">        public Node { arguments = List.copyOf(arguments); }</span>
+    }
+    private final ComputationBackend backend;
+    private final Map&lt;String, ComputationBackend.Type&gt; inputs;
+    private final List&lt;Node&gt; nodes;
+    private final Map&lt;String, Integer&gt; outputs;
+    private final int[] lastUse;
+    private final Cost cost;
+
+    private PreparedJointComputation(ComputationBackend backend, Map&lt;String, ComputationBackend.Type&gt; inputs,
+<span class="fc" id="L29">            List&lt;Node&gt; nodes, Map&lt;String, Integer&gt; outputs, long inspections) {</span>
+<span class="fc" id="L30">        this.backend = backend;</span>
+<span class="fc" id="L31">        this.inputs = Map.copyOf(inputs);</span>
+<span class="fc" id="L32">        this.nodes = List.copyOf(nodes);</span>
+<span class="fc" id="L33">        this.outputs = Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(outputs));</span>
+<span class="fc" id="L34">        lastUse = new int[nodes.size()];</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        for (int i = 0; i &lt; nodes.size(); i++) lastUse[i] = i;</span>
+<span class="fc" id="L36">        long edges = 0;</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        for (int i = 0; i &lt; nodes.size(); i++) {</span>
+<span class="fc" id="L38">            edges += nodes.get(i).arguments().size();</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            for (int argument : nodes.get(i).arguments()) lastUse[argument] = i;</span>
+        }
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (int output : outputs.values()) lastUse[output] = nodes.size();</span>
+<span class="fc" id="L42">        long live = 0, peak = 0, work = 0;</span>
+<span class="fc" id="L43">        int operations = 0;</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        for (int i = 0; i &lt; nodes.size(); i++) {</span>
+<span class="fc" id="L45">            Node node = nodes.get(i);</span>
+<span class="fc" id="L46">            live = Math.addExact(live, node.storage());</span>
+<span class="fc" id="L47">            peak = Math.max(peak, live);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            if (node.operation() != null) { work = Math.addExact(work, node.operation().work()); operations++; }</span>
+<span class="fc bfc" id="L49" title="All 4 branches covered.">            for (int argument : new HashSet&lt;&gt;(node.arguments())) if (lastUse[argument] == i) live -= nodes.get(argument).storage();</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            if (lastUse[i] == i) live -= node.storage();</span>
+        }
+        // Includes schedule initialization, edge use counts, liveness inspection, and output retention.
+<span class="fc" id="L53">        cost = new Cost(work, peak, live, outputs.size(), operations, inspections + 3L * nodes.size() + 3L * edges + 2L * outputs.size());</span>
+<span class="fc" id="L54">    }</span>
+    static PreparedJointComputation prepare(JointComputationPlan plan, ComputationBackend backend) {
+<span class="fc" id="L56">        Objects.requireNonNull(backend, &quot;backend&quot;);</span>
+<span class="fc" id="L57">        var builder = new Builder(plan.inputs(), backend);</span>
+<span class="fc" id="L58">        var outputs = new LinkedHashMap&lt;String, Integer&gt;();</span>
+<span class="fc" id="L59">        var resolved = plan.resolveOutputs();</span>
+<span class="fc" id="L60">        var expressions = resolved.expressions();</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        for (int i = 0; i &lt; plan.outputs().size(); i++) {</span>
+<span class="fc" id="L62">            var output = plan.outputs().get(i);</span>
+<span class="fc" id="L63">            int index = builder.intern(expressions.get(i), 0);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            if (!builder.nodes.get(index).type().equals(output.type())) throw new IllegalArgumentException(&quot;output type differs: &quot; + output.name());</span>
+<span class="fc" id="L65">            outputs.put(output.name(), index);</span>
+        }
+<span class="fc" id="L67">        return new PreparedJointComputation(backend, plan.inputs(), builder.nodes, outputs, Math.addExact(builder.inspections, resolved.work()));</span>
+    }
+<span class="fc" id="L69">    public Cost cost() { return cost; }</span>
+<span class="nc" id="L70">    public List&lt;Node&gt; nodes() { return nodes; }</span>
+<span class="nc" id="L71">    public Map&lt;String, Integer&gt; outputBindings() { return outputs; }</span>
+    public Map&lt;String, Object&gt; execute(Map&lt;String, ?&gt; supplied) {
+<span class="fc" id="L73">        var actual = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        for (var input : inputs.entrySet()) {</span>
+<span class="fc" id="L75">            Object value = supplied.get(input.getKey());</span>
+<span class="fc" id="L76">            input.getValue().requireValue(value);</span>
+<span class="fc" id="L77">            actual.put(input.getKey(), value);</span>
+<span class="fc" id="L78">        }</span>
+<span class="fc" id="L79">        backend.validateInputs(Collections.unmodifiableMap(actual));</span>
+<span class="fc" id="L80">        var values = new Object[nodes.size()];</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        for (int i = 0; i &lt; nodes.size(); i++) {</span>
+<span class="fc" id="L82">            var node = nodes.get(i);</span>
+            Object value;
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            if (node.expression() instanceof VariableExpr variable) value = actual.get(variable.name());</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">            else if (node.expression() instanceof NumberExpr number) value = backend.literal(number);</span>
+<span class="fc" id="L86">            else value = backend.apply(node.operation(), node.arguments().stream().map(index -&gt; values[index]).toList());</span>
+<span class="fc" id="L87">            node.type().requireValue(value);</span>
+<span class="fc" id="L88">            values[i] = value;</span>
+<span class="fc bfc" id="L89" title="All 4 branches covered.">            for (int argument : node.arguments()) if (lastUse[argument] == i) values[argument] = null;</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            if (lastUse[i] == i) values[i] = null;</span>
+        }
+<span class="fc" id="L92">        var result = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L93">        outputs.forEach((name, index) -&gt; result.put(name, values[index]));</span>
+<span class="fc" id="L94">        return Collections.unmodifiableMap(result);</span>
+    }
+    private static final class Builder {
+        private final Map&lt;String, ComputationBackend.Type&gt; inputs;
+        private final ComputationBackend backend;
+<span class="fc" id="L99">        private final Map&lt;Expr, Integer&gt; byIdentity = new IdentityHashMap&lt;&gt;();</span>
+<span class="fc" id="L100">        private final Map&lt;StructuralKey, Integer&gt; indices = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L101">        private final List&lt;Node&gt; nodes = new ArrayList&lt;&gt;();</span>
+        private long inspections;
+<span class="fc" id="L103">        Builder(Map&lt;String, ComputationBackend.Type&gt; inputs, ComputationBackend backend) { this.inputs = inputs; this.backend = backend; }</span>
+        int intern(Expr expression, int depth) {
+<span class="fc" id="L105">            charge(1);</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">            if (depth &gt; JointComputationPlan.MAX_DEPTH) throw new IllegalArgumentException(&quot;plan structural limit exceeded&quot;);</span>
+<span class="fc" id="L107">            Integer existing = byIdentity.get(expression);</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            if (existing != null) return existing;</span>
+<span class="fc" id="L109">            var arguments = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            for (var child : JointComputationPlan.children(expression)) arguments.add(intern(child, depth + 1));</span>
+            // No recursive Expr.hashCode/equals is invoked: parents only refer to already interned integer IDs.
+            // Charge construction, lookup, and insertion key-field/edge work before any structural-key hashing.
+<span class="fc" id="L113">            charge(3L * (2 + arguments.size()));</span>
+<span class="fc" id="L114">            var key = StructuralKey.of(expression, arguments);</span>
+<span class="fc" id="L115">            existing = indices.get(key);</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (existing != null) {</span>
+<span class="fc" id="L117">                byIdentity.put(expression, existing);</span>
+<span class="fc" id="L118">                return existing;</span>
+            }
+            ComputationBackend.Type type;
+<span class="fc" id="L121">            ComputationBackend.Operation operation = null;</span>
+            long storage;
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (expression instanceof VariableExpr variable) type = Objects.requireNonNull(inputs.get(variable.name()), &quot;unbound input&quot;);</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            else if (expression instanceof NumberExpr number) type = backend.literalType(number);</span>
+            else {
+<span class="fc" id="L126">                operation = Objects.requireNonNull(backend.operation(expression), &quot;operation&quot;);</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">                if (arguments.size() != operation.arguments().size()) throw new IllegalArgumentException(&quot;operator arity differs&quot;);</span>
+<span class="fc bfc" id="L128" title="All 4 branches covered.">                for (int i = 0; i &lt; arguments.size(); i++) if (!nodes.get(arguments.get(i)).type().equals(operation.arguments().get(i)))</span>
+<span class="fc" id="L129">                    throw new IllegalArgumentException(&quot;operator argument type differs&quot;);</span>
+<span class="fc" id="L130">                type = operation.result();</span>
+            }
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            storage = operation == null ? backend.leafStorage(type) : operation.storage();</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            if (storage &lt; 0) throw new IllegalArgumentException(&quot;negative storage&quot;);</span>
+<span class="fc" id="L134">            int index = nodes.size();</span>
+<span class="fc" id="L135">            nodes.add(new Node(expression, type, operation, arguments, storage));</span>
+<span class="fc" id="L136">            indices.put(key, index);</span>
+<span class="fc" id="L137">            byIdentity.put(expression, index);</span>
+<span class="fc" id="L138">            return index;</span>
+        }
+        private void charge(long work) {
+<span class="fc" id="L141">            inspections = Math.addExact(inspections, work);</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">            if (inspections &gt; JointComputationPlan.MAX_NODES) throw new IllegalArgumentException(&quot;plan preparation work bound exceeded&quot;);</span>
+<span class="fc" id="L143">        }</span>
+        private record StructuralKey(String kind, Object value, List&lt;Integer&gt; arguments) {
+<span class="fc" id="L145">            StructuralKey { arguments = List.copyOf(arguments); }</span>
+            static StructuralKey of(Expr expression, List&lt;Integer&gt; arguments) {
+<span class="fc bfc" id="L147" title="All 2 branches covered.">                if (expression instanceof VariableExpr v) return new StructuralKey(&quot;variable&quot;, v.name(), arguments);</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                if (expression instanceof NumberExpr n) return new StructuralKey(&quot;number&quot;, n.value(), arguments);</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                if (expression instanceof BinaryExpr b) return new StructuralKey(&quot;binary&quot;, b.operator(), arguments);</span>
+<span class="fc" id="L150">                return new StructuralKey(&quot;function&quot;, ((FunctionExpr) expression).name(), arguments);</span>
+            }
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

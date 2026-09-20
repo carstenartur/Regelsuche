@@ -4,6 +4,7 @@ import de.regelsuche.inventory.RuleUtilityEvidence;
 import de.regelsuche.search.moves.*;
 import de.regelsuche.search.program.CompiledLinearRewriteEngine;
 import de.regelsuche.search.program.RewriteProgram;
+import de.regelsuche.transform.AstRewriteTransport;
 import de.regelsuche.transform.PreparedAstRewriteTransformationEngine;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -14,60 +15,133 @@ import java.util.TreeMap;
 /** Opt-in live typed execution of admitted traces from the existing target-free TRAIN learner. */
 public final class TypedLearnedMoveInventory {
     private final TraceRewriteStrategyLearner.FrozenStrategy formation;
+    private final String inventoryHash;
     private final List&lt;MoveProvider&gt; primitives;
+    private final List&lt;AstRewriteTransport&gt; primitiveTransports;
     private final List&lt;TypedProgramMoveProvider&gt; learned;
     private final Map&lt;String, TypedMoveSearch.Verifier&gt; primitiveVerifiers;
 
-<span class="fc" id="L21">    TypedLearnedMoveInventory(TraceRewriteStrategyLearner.FrozenStrategy formation) {</span>
-<span class="fc" id="L22">        this.formation = formation;</span>
-<span class="fc" id="L23">        var inventory = formation.inventory();</span>
-<span class="fc" id="L24">        var bounds = inventory.budget();</span>
-<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        if (bounds.maxCandidatesPerState() &gt; 128) {</span>
-<span class="nc" id="L26">            throw new IllegalArgumentException(&quot;typed compiled inventory supports at most 128 candidates per stage&quot;);</span>
-        }
-<span class="fc" id="L28">        var rules = new EvolutionGenomeCompiler().compile(inventory).rules();</span>
-<span class="fc" id="L29">        var engines = new HashMap&lt;String, PreparedAstRewriteTransformationEngine&gt;();</span>
-<span class="fc" id="L30">        var providers = new ArrayList&lt;MoveProvider&gt;();</span>
-<span class="fc" id="L31">        var verifiers = new HashMap&lt;String, TypedMoveSearch.Verifier&gt;();</span>
-<span class="fc bfc" id="L32" title="All 2 branches covered.">        for (int i = 0; i &lt; rules.size(); i++) {</span>
-<span class="fc" id="L33">            var rule = rules.get(i);</span>
-<span class="fc" id="L34">            var engine = new PreparedAstRewriteTransformationEngine(List.of(rule), bounds.maxAstGrowthPerStep(), bounds.maxCandidatesPerState());</span>
-<span class="fc" id="L35">            engines.put(inventory.rewrites().get(i).geneId(), engine);</span>
-<span class="fc" id="L36">            var transport = engine.astTransport();</span>
-<span class="fc" id="L37">            providers.add(TypedMoveSearch.primitiveProvider(new MoveProvider.Descriptor(rule.id(), rule.id(),</span>
-<span class="fc" id="L38">                SearchMove.SourceKind.PRIMITIVE, SearchMove.ProofStrength.REPLAYABLE, List.of(),</span>
-<span class="fc" id="L39">                SearchMove.ValueEvidence.UNKNOWN, inventory.contentHash()), transport));</span>
-<span class="fc" id="L40">            verifiers.put(rule.id(), TypedMoveSearch.primitiveReplay(transport));</span>
-        }
-<span class="fc" id="L42">        primitives = List.copyOf(providers);</span>
-<span class="fc" id="L43">        primitiveVerifiers = Map.copyOf(verifiers);</span>
-<span class="fc" id="L44">        var programs = new TreeMap&lt;String, TypedProgramMoveProvider&gt;();</span>
-<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (var observation : formation.observations()) {</span>
-<span class="pc bpc" id="L46" title="1 of 4 branches missed.">            if (observation.geneSequence().size() &lt; 2 || observation.minimality().isEmpty()</span>
-<span class="pc bpc" id="L47" title="1 of 2 branches missed.">                    || !observation.minimality().orElseThrow().observedReplayVerified()) continue;</span>
-<span class="fc" id="L48">            String id = &quot;typed-learned:&quot; + SchematicProofPlan.hash(String.join(&quot;/&quot;, observation.geneSequence()));</span>
-<span class="fc" id="L49">            programs.computeIfAbsent(id, ignored -&gt; compile(id, observation.geneSequence(), engines,</span>
-<span class="fc" id="L50">                new RuleUtilityAssessor().fromReference(observation.minimality().orElseThrow(), -1), bounds.maxCandidatesPerState()));</span>
-<span class="fc" id="L51">        }</span>
-<span class="fc" id="L52">        learned = List.copyOf(programs.values());</span>
-<span class="fc" id="L53">    }</span>
+    TypedLearnedMoveInventory(TraceRewriteStrategyLearner.FrozenStrategy formation) {
+<span class="fc" id="L25">        this(formation.inventory(), formation);</span>
+<span class="fc" id="L26">    }</span>
 
-<span class="fc" id="L55">    public List&lt;MoveProvider&gt; primitiveProviders() { return primitives; }</span>
-<span class="fc" id="L56">    public List&lt;TypedProgramMoveProvider&gt; learnedPrograms() { return learned; }</span>
+    /** Fixed primitive control: no unused learner, histories or learned programs. */
+    public static TypedLearnedMoveInventory primitives(EvolutionGenome inventory) {
+<span class="fc" id="L30">        return new TypedLearnedMoveInventory(java.util.Objects.requireNonNull(inventory), null);</span>
+    }
+
+<span class="fc" id="L33">    private TypedLearnedMoveInventory(EvolutionGenome inventory, TraceRewriteStrategyLearner.FrozenStrategy formation) {</span>
+<span class="fc" id="L34">        this.formation = formation;</span>
+<span class="fc" id="L35">        inventoryHash = inventory.contentHash();</span>
+<span class="fc" id="L36">        var bounds = inventory.budget();</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        if (bounds.maxCandidatesPerState() &gt; 128) {</span>
+<span class="nc" id="L38">            throw new IllegalArgumentException(&quot;typed compiled inventory supports at most 128 candidates per stage&quot;);</span>
+        }
+<span class="fc" id="L40">        var rules = new EvolutionGenomeCompiler().compile(inventory).rules();</span>
+<span class="fc" id="L41">        var engines = new HashMap&lt;String, PreparedAstRewriteTransformationEngine&gt;();</span>
+<span class="fc" id="L42">        var providers = new ArrayList&lt;MoveProvider&gt;();</span>
+<span class="fc" id="L43">        var transports = new ArrayList&lt;AstRewriteTransport&gt;();</span>
+<span class="fc" id="L44">        var verifiers = new HashMap&lt;String, TypedMoveSearch.Verifier&gt;();</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (int i = 0; i &lt; rules.size(); i++) {</span>
+<span class="fc" id="L46">            var rule = rules.get(i);</span>
+<span class="fc" id="L47">            var engine = new PreparedAstRewriteTransformationEngine(List.of(rule), bounds.maxAstGrowthPerStep(), bounds.maxCandidatesPerState());</span>
+<span class="fc" id="L48">            engines.put(inventory.rewrites().get(i).geneId(), engine);</span>
+<span class="fc" id="L49">            var transport = engine.astTransport();</span>
+<span class="fc" id="L50">            transports.add(transport);</span>
+<span class="fc" id="L51">            providers.add(TypedMoveSearch.primitiveProvider(new MoveProvider.Descriptor(rule.id(), rule.id(),</span>
+<span class="fc" id="L52">                SearchMove.SourceKind.PRIMITIVE, SearchMove.ProofStrength.REPLAYABLE, List.of(),</span>
+<span class="fc" id="L53">                SearchMove.ValueEvidence.UNKNOWN, inventory.contentHash()), transport));</span>
+<span class="fc" id="L54">            verifiers.put(rule.id(), TypedMoveSearch.primitiveReplay(transport));</span>
+        }
+<span class="fc" id="L56">        primitives = List.copyOf(providers);</span>
+<span class="fc" id="L57">        primitiveTransports = List.copyOf(transports);</span>
+<span class="fc" id="L58">        primitiveVerifiers = Map.copyOf(verifiers);</span>
+<span class="fc" id="L59">        var programs = new TreeMap&lt;String, TypedProgramMoveProvider&gt;();</span>
+<span class="fc bfc" id="L60" title="All 4 branches covered.">        if (formation != null) for (var observation : formation.observations()) {</span>
+<span class="pc bpc" id="L61" title="1 of 4 branches missed.">            if (observation.geneSequence().size() &lt; 2 || observation.minimality().isEmpty()</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                    || !observation.minimality().orElseThrow().observedReplayVerified()) continue;</span>
+<span class="fc" id="L63">            String id = &quot;typed-learned:&quot; + SchematicProofPlan.hash(String.join(&quot;/&quot;, observation.geneSequence()));</span>
+<span class="fc" id="L64">            programs.computeIfAbsent(id, ignored -&gt; compile(id, observation.geneSequence(), engines,</span>
+<span class="fc" id="L65">                new RuleUtilityAssessor().fromReference(observation.minimality().orElseThrow(), -1), bounds.maxCandidatesPerState()));</span>
+<span class="fc" id="L66">        }</span>
+<span class="fc" id="L67">        learned = List.copyOf(programs.values());</span>
+<span class="fc" id="L68">    }</span>
+
+<span class="fc" id="L70">    public List&lt;MoveProvider&gt; primitiveProviders() { return primitives; }</span>
+
+    /** Generalizes actual successful observations, then proves each symbolic statement. */
+    public CheckedLearnedSchemaModel checkedSchemas() {
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (formation == null) throw new IllegalStateException(&quot;training observations required&quot;);</span>
+<span class="fc" id="L75">        return CheckedLearnedSchemaModel.learn(formation);</span>
+    }
+
+    /** Direct schema execution shares the primitive inventory and the existing typed frontier. */
+    public SearchSession newSchemaSearchSession(CheckedLearnedSchemaModel model, int maximumSchemasPerOccurrence,
+            Map&lt;String, Double&gt; utilityBySchemaId) {
+<span class="fc" id="L81">        return newSchemaSearchSession(model, model.providers(maximumSchemasPerOccurrence, utilityBySchemaId));</span>
+    }
+
+    public SearchSession newSchemaSearchSession(CheckedLearnedSchemaModel model, List&lt;MoveProvider&gt; schemaProviders) {
+<span class="fc" id="L85">        java.util.Objects.requireNonNull(model, &quot;model&quot;);</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (!inventoryHash.equals(model.inventoryHash())) throw new IllegalArgumentException(&quot;schema inventory mismatch&quot;);</span>
+<span class="fc" id="L87">        var selected = new ArrayList&lt;&gt;(primitives);</span>
+<span class="fc" id="L88">        selected.addAll(schemaProviders);</span>
+<span class="fc" id="L89">        var schemas = model.verifier();</span>
+<span class="fc" id="L90">        var primitive = verifier();</span>
+<span class="fc" id="L91">        return new SearchSession(selected, List.of(), (source, move, context) -&gt;</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            move.sourceKind() == SearchMove.SourceKind.PRIMITIVE ? primitive.verify(source, move, context)</span>
+<span class="fc" id="L93">                : schemas.verify(source, move, context));</span>
+    }
+<span class="fc" id="L95">    public List&lt;TypedProgramMoveProvider&gt; learnedPrograms() { return learned; }</span>
     public List&lt;MoveProvider&gt; providers() {
-<span class="fc" id="L58">        var providers = new ArrayList&lt;&gt;(primitives);</span>
-<span class="fc" id="L59">        providers.addAll(learned);</span>
-<span class="fc" id="L60">        return List.copyOf(providers);</span>
+<span class="fc" id="L97">        var providers = new ArrayList&lt;&gt;(primitives);</span>
+<span class="fc" id="L98">        providers.addAll(learned);</span>
+<span class="fc" id="L99">        return List.copyOf(providers);</span>
+    }
+
+    /** Caller-owned provider inventory; proof regeneration remains independent of generation reuse. */
+    public record SearchSession(List&lt;MoveProvider&gt; providers, List&lt;TypedPrimitiveCandidateCache&gt; primitiveCaches,
+            TypedMoveSearch.Verifier verifier) {
+<span class="fc" id="L105">        public SearchSession {</span>
+<span class="fc" id="L106">            providers = List.copyOf(providers);</span>
+<span class="fc" id="L107">            primitiveCaches = List.copyOf(primitiveCaches);</span>
+<span class="fc" id="L108">            java.util.Objects.requireNonNull(verifier, &quot;verifier&quot;);</span>
+<span class="fc" id="L109">        }</span>
+    }
+
+    /**
+     * Create fresh bounded caches for one search, without changing the default inventory.
+     * Limits are PER primitive provider. Include this construction in measured setup time.
+     * Zero limits select the original provider instances without cache bookkeeping.
+     */
+    public SearchSession newSearchSession(boolean includeLearned, int maximumEntriesPerProvider,
+            long maximumCharactersPerProvider) {
+<span class="fc bfc" id="L119" title="All 4 branches covered.">        if (maximumEntriesPerProvider &lt; 0 || maximumCharactersPerProvider &lt; 0) {</span>
+<span class="fc" id="L120">            throw new IllegalArgumentException(&quot;negative session retention bound&quot;);</span>
+        }
+<span class="pc bpc" id="L122" title="1 of 4 branches missed.">        if (maximumEntriesPerProvider == 0 || maximumCharactersPerProvider == 0) {</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            return new SearchSession(includeLearned ? providers() : primitiveProviders(), List.of(), verifier());</span>
+        }
+<span class="fc" id="L125">        var caches = new ArrayList&lt;TypedPrimitiveCandidateCache&gt;();</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        for (int i = 0; i &lt; primitives.size(); i++) {</span>
+            // EvolutionGenomeCompiler creates private final rules with immutable
+            // genome/pattern fields. No external rule subclass enters this inventory.
+<span class="fc" id="L129">            caches.add(TypedPrimitiveCandidateCache.forDeterministicTransport(primitives.get(i).descriptor(),</span>
+<span class="fc" id="L130">                primitiveTransports.get(i), maximumEntriesPerProvider, maximumCharactersPerProvider));</span>
+        }
+<span class="fc" id="L132">        var selected = new ArrayList&lt;MoveProvider&gt;(caches);</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        if (includeLearned) selected.addAll(learned);</span>
+<span class="fc" id="L134">        return new SearchSession(selected, caches, verifier());</span>
     }
 
     /** Regeneration uses the registered inventory; a learned identifier alone never authorizes an edge. */
     public TypedMoveSearch.Verifier verifier() {
-<span class="fc" id="L65">        var programs = new HashMap&lt;String, TypedMoveSearch.Verifier&gt;();</span>
-<span class="fc" id="L66">        learned.forEach(provider -&gt; programs.put(provider.descriptor().id(), provider.verifier()));</span>
-<span class="fc" id="L67">        return (source, move, context) -&gt; {</span>
-<span class="fc bfc" id="L68" title="All 2 branches covered.">            var verifier = (move.sourceKind() == SearchMove.SourceKind.PRIMITIVE ? primitiveVerifiers : programs).get(move.ruleId());</span>
-<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            return verifier == null ? new MoveVerifier.Verification(false, 1, List.of(), &quot;UNKNOWN_TYPED_PROGRAM&quot;)</span>
-<span class="fc" id="L70">                : verifier.verify(source, move, context);</span>
+<span class="fc" id="L139">        var programs = new HashMap&lt;String, TypedMoveSearch.Verifier&gt;();</span>
+<span class="fc" id="L140">        learned.forEach(provider -&gt; programs.put(provider.descriptor().id(), provider.verifier()));</span>
+<span class="fc" id="L141">        return (source, move, context) -&gt; {</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            var verifier = (move.sourceKind() == SearchMove.SourceKind.PRIMITIVE ? primitiveVerifiers : programs).get(move.ruleId());</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">            return verifier == null ? new MoveVerifier.Verification(false, 1, List.of(), &quot;UNKNOWN_TYPED_PROGRAM&quot;)</span>
+<span class="fc" id="L144">                : verifier.verify(source, move, context);</span>
         };
     }
 
@@ -79,26 +153,27 @@ public final class TypedLearnedMoveInventory {
      * learner's supplementary primitive-application receipts.
      */
     public long formationWork() {
-<span class="fc" id="L82">        return java.util.stream.LongStream.of(formation.trainingSearchWorkUnits(), formation.trainingPrimitiveWorkUnits(),</span>
-<span class="fc" id="L83">            formation.trainingReplayWorkUnits(), formation.trainingReplayPrimitiveWorkUnits(), formation.trainingExactWorkUnits(),</span>
-<span class="fc" id="L84">            formation.trainingMinimalityWorkUnits(), formation.trainingReferenceSupplementaryWorkUnits()).reduce(0, Math::addExact);</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (formation == null) return 0;</span>
+<span class="fc" id="L157">        return java.util.stream.LongStream.of(formation.trainingSearchWorkUnits(), formation.trainingPrimitiveWorkUnits(),</span>
+<span class="fc" id="L158">            formation.trainingReplayWorkUnits(), formation.trainingReplayPrimitiveWorkUnits(), formation.trainingExactWorkUnits(),</span>
+<span class="fc" id="L159">            formation.trainingMinimalityWorkUnits(), formation.trainingReferenceSupplementaryWorkUnits()).reduce(0, Math::addExact);</span>
     }
 
     private static TypedProgramMoveProvider compile(String id, List&lt;String&gt; genes,
             Map&lt;String, PreparedAstRewriteTransformationEngine&gt; engines, RuleUtilityEvidence utility, int maximumCandidates) {
-<span class="fc" id="L89">        var stages = new ArrayList&lt;RewriteProgram&gt;();</span>
-<span class="fc bfc" id="L90" title="All 2 branches covered.">        for (int i = 0; i &lt; genes.size(); i++) {</span>
-<span class="fc" id="L91">            var engine = engines.get(genes.get(i));</span>
-<span class="pc bpc" id="L92" title="1 of 2 branches missed.">            if (engine == null) throw new IllegalArgumentException(&quot;TRAIN trace contains an unregistered gene&quot;);</span>
-<span class="fc" id="L93">            stages.add(new RewriteProgram.Source(RewriteProgram.NodeMetadata.named(&quot;stage-&quot; + i + &quot;:&quot; + genes.get(i)), engine));</span>
+<span class="fc" id="L164">        var stages = new ArrayList&lt;RewriteProgram&gt;();</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (int i = 0; i &lt; genes.size(); i++) {</span>
+<span class="fc" id="L166">            var engine = engines.get(genes.get(i));</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">            if (engine == null) throw new IllegalArgumentException(&quot;TRAIN trace contains an unregistered gene&quot;);</span>
+<span class="fc" id="L168">            stages.add(new RewriteProgram.Source(RewriteProgram.NodeMetadata.named(&quot;stage-&quot; + i + &quot;:&quot; + genes.get(i)), engine));</span>
         }
-<span class="fc" id="L95">        var evidence = new SearchMove.ValueEvidence(utility.confidence(), 0, utility.evidenceCount(),</span>
-<span class="fc" id="L96">            utility.bestKnownPrimitiveSteps(), 1, utility.boundedMinimumProved(),</span>
-<span class="pc bpc" id="L97" title="1 of 2 branches missed.">            utility.reference() == null ? &quot;&quot; : utility.reference().assessmentHash());</span>
-<span class="fc" id="L98">        var descriptor = new MoveProvider.Descriptor(id, &quot;sequence:&quot; + String.join(&quot;/&quot;, genes), SearchMove.SourceKind.LEARNED,</span>
-<span class="fc" id="L99">            SearchMove.ProofStrength.REPLAYABLE, List.of(), evidence, id);</span>
-<span class="fc" id="L100">        var program = new RewriteProgram.Sequence(RewriteProgram.NodeMetadata.named(id), stages);</span>
-<span class="fc" id="L101">        return new TypedProgramMoveProvider(descriptor, new CompiledLinearRewriteEngine(program, maximumCandidates).compileAst());</span>
+<span class="fc" id="L170">        var evidence = new SearchMove.ValueEvidence(utility.confidence(), 0, utility.evidenceCount(),</span>
+<span class="fc" id="L171">            utility.bestKnownPrimitiveSteps(), 1, utility.boundedMinimumProved(),</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            utility.reference() == null ? &quot;&quot; : utility.reference().assessmentHash());</span>
+<span class="fc" id="L173">        var descriptor = new MoveProvider.Descriptor(id, &quot;sequence:&quot; + String.join(&quot;/&quot;, genes), SearchMove.SourceKind.LEARNED,</span>
+<span class="fc" id="L174">            SearchMove.ProofStrength.REPLAYABLE, List.of(), evidence, id);</span>
+<span class="fc" id="L175">        var program = new RewriteProgram.Sequence(RewriteProgram.NodeMetadata.named(id), stages);</span>
+<span class="fc" id="L176">        return new TypedProgramMoveProvider(descriptor, new CompiledLinearRewriteEngine(program, maximumCandidates).compileAst());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

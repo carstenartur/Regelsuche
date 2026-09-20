@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ModularJointPlans.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.example.modular</a> &gt; <span class="el_source">ModularJointPlans.java</span></div><h1>ModularJointPlans.java</h1><pre class="source lang-java linenums">package de.regelsuche.example.modular;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.math.algorithms.modular.ModularComputationDomain;
+import de.regelsuche.search.program.*;
+import java.math.BigInteger;
+import java.util.*;
+
+/** Wiring only: the general plan/frontier is in search and modular semantics in math-algorithms. */
+public final class ModularJointPlans implements ComputationBackend, JointPlanSearch.Domain {
+<span class="fc" id="L11">    public static final Type INTEGER = new Type(&quot;integer&quot;, BigInteger.class);</span>
+    private final ModularComputationDomain semantics;
+<span class="fc" id="L13">    public ModularJointPlans(ModularComputationDomain semantics) { this.semantics = Objects.requireNonNull(semantics); }</span>
+    public JointComputationPlan plan(Map&lt;String, Expr&gt; outputs, Set&lt;String&gt; inputNames) {
+<span class="fc" id="L15">        var inputs = new LinkedHashMap&lt;String, Type&gt;();</span>
+<span class="fc" id="L16">        inputNames.stream().sorted().forEach(name -&gt; inputs.put(name, INTEGER));</span>
+<span class="fc" id="L17">        return new JointComputationPlan(inputs, Map.of(), outputs.entrySet().stream()</span>
+<span class="fc" id="L18">            .map(entry -&gt; new JointComputationPlan.Output(entry.getKey(), INTEGER, entry.getValue())).toList());</span>
+    }
+    public JointPlanSearch optimizer(int maximumCandidates) {
+<span class="fc" id="L21">        return new JointPlanSearch(this, this, JointPlanSearch.Weights.DEFAULT, maximumCandidates);</span>
+    }
+    @Override public Type literalType(NumberExpr literal) {
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        if (!literal.value().isInteger()) throw new IllegalArgumentException(&quot;integer literal required&quot;);</span>
+<span class="fc" id="L25">        return INTEGER;</span>
+    }
+<span class="fc" id="L27">    @Override public Object literal(NumberExpr literal) { literalType(literal); return literal.value().numerator(); }</span>
+    @Override public Operation operation(Expr expression) {
+        String id;
+<span class="fc" id="L30">        long work = 1;</span>
+<span class="fc" id="L31">        int arity = 2;</span>
+<span class="pc bpc" id="L32" title="2 of 6 branches missed.">        if (expression instanceof BinaryExpr binary) id = switch (binary.operator()) {</span>
+<span class="pc" id="L33">            case ADD -&gt; &quot;add&quot;; case SUB -&gt; &quot;sub&quot;; case MUL -&gt; &quot;mul&quot;;</span>
+<span class="nc" id="L34">            default -&gt; throw new IllegalArgumentException(&quot;unsupported integer operation&quot;);</span>
+        };
+<span class="pc bpc" id="L36" title="2 of 6 branches missed.">        else if (expression instanceof FunctionExpr function &amp;&amp; (function.name().equals(&quot;modpow&quot;) || function.name().equals(&quot;modmul&quot;))) {</span>
+<span class="fc" id="L37">            id = function.name(); arity = 3;</span>
+            // Declared static estimates, not timing claims. Small literal exponents have a bounded bit-cost.
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            work = id.equals(&quot;modmul&quot;) ? 10 : 1_000;</span>
+<span class="pc bpc" id="L40" title="1 of 6 branches missed.">            if (id.equals(&quot;modpow&quot;) &amp;&amp; function.arguments().size() == 3 &amp;&amp; function.arguments().get(1) instanceof NumberExpr n</span>
+<span class="pc bpc" id="L41" title="2 of 4 branches missed.">                    &amp;&amp; n.value().isInteger() &amp;&amp; n.value().signum() &gt;= 0) work = Math.max(1, 2L * n.value().numerator().bitLength());</span>
+<span class="nc" id="L42">        } else throw new IllegalArgumentException(&quot;unsupported modular operation&quot;);</span>
+<span class="fc" id="L43">        return new Operation(id, Collections.nCopies(arity, INTEGER), INTEGER, work, 1);</span>
+    }
+    @Override public Object apply(Operation operation, List&lt;Object&gt; arguments) {
+<span class="fc" id="L46">        return semantics.evaluate(operation.id(), arguments.stream().map(BigInteger.class::cast).toList());</span>
+    }
+<span class="fc" id="L48">    @Override public void validateInputs(Map&lt;String, Object&gt; inputs) { semantics.validateInputs(inputs); }</span>
+<span class="fc" id="L49">    @Override public String revision() { return ModularComputationDomain.REVISION; }</span>
+    @Override public JointPlanSearch.Generation generate(JointComputationPlan source, int maximumCandidates) {
+<span class="fc" id="L51">        var resolved = source.resolveOutputs();</span>
+<span class="fc" id="L52">        var generated = semantics.generate(resolved.expressions(), maximumCandidates);</span>
+<span class="fc" id="L53">        long work = Math.addExact(resolved.work(), generated.work());</span>
+<span class="fc" id="L54">        var proposals = new ArrayList&lt;JointPlanSearch.Proposal&gt;();</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        for (var rewrite : generated.rewrites()) {</span>
+<span class="fc" id="L56">            var target = source.withOutputs(rewrite.outputs()).searchExpression();</span>
+<span class="fc" id="L57">            work = Math.addExact(work, target.work());</span>
+<span class="fc" id="L58">            proposals.add(new JointPlanSearch.Proposal(rewrite.rule(), target.expression()));</span>
+<span class="fc" id="L59">        }</span>
+<span class="fc" id="L60">        return new JointPlanSearch.Generation(proposals, work, generated.complete());</span>
+    }
+    @Override public JointPlanSearch.Verification verify(JointComputationPlan source, JointComputationPlan target) {
+<span class="fc" id="L63">        var left = source.resolveOutputs();</span>
+<span class="fc" id="L64">        var right = target.resolveOutputs();</span>
+<span class="fc" id="L65">        var verified = semantics.verifyEquivalent(left.expressions(), right.expressions());</span>
+<span class="fc" id="L66">        return new JointPlanSearch.Verification(verified.accepted(), Math.addExact(verified.work(), Math.addExact(left.work(), right.work())));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -219,7 +219,7 @@ public final class EquivalenceAwarePatternMatcher {
 <span class="fc" id="L219">                return matchNumber(number, candidate);</span>
             }
 <span class="fc bfc" id="L221" title="All 2 branches covered.">            if (node instanceof PatternExpr.LiteralVariable variable) {</span>
-<span class="pc bpc" id="L222" title="1 of 4 branches missed.">                return candidate instanceof VariableExpr literal &amp;&amp; literal.name().equals(variable.name());</span>
+<span class="fc bfc" id="L222" title="All 4 branches covered.">                return candidate instanceof VariableExpr literal &amp;&amp; literal.name().equals(variable.name());</span>
             }
 <span class="fc bfc" id="L224" title="All 2 branches covered.">            if (node instanceof PatternExpr.Function function) {</span>
 <span class="fc" id="L225">                return matchFunction(function, candidate);</span>
@@ -247,7 +247,7 @@ public final class EquivalenceAwarePatternMatcher {
         private boolean matchFunction(PatternExpr.Function function, Expr candidate) {
 <span class="fc bfc" id="L248" title="All 2 branches covered.">            if (!(candidate instanceof FunctionExpr concrete)</span>
 <span class="fc bfc" id="L249" title="All 2 branches covered.">                    || !concrete.name().equals(function.name())</span>
-<span class="pc bpc" id="L250" title="1 of 2 branches missed.">                    || concrete.arguments().size() != function.arguments().size()) {</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">                    || concrete.arguments().size() != function.arguments().size()) {</span>
 <span class="fc" id="L251">                return false;</span>
             }
 <span class="fc" id="L253">            prependPairs(function.arguments(), concrete.arguments());</span>

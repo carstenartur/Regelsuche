@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TypedSourceOnlySearch.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.moves</a> &gt; <span class="el_source">TypedSourceOnlySearch.java</span></div><h1>TypedSourceOnlySearch.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.moves;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Source-only incumbent selection over the existing typed frontier; no second search algorithm.
+ * Charges objective inspections, event/path scans and an additional full selected-path replay.
+ * The caller supplies the measured objective; these logical units do not represent total CPU.
+ */
+<span class="fc" id="L15">public final class TypedSourceOnlySearch {</span>
+    public record Score(long value, long work) {
+<span class="fc" id="L17">        public Score {</span>
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">            if (work &lt; 1) throw new IllegalArgumentException(&quot;objective inspection must report positive work&quot;);</span>
+<span class="fc" id="L19">        }</span>
+    }
+    @FunctionalInterface public interface Objective { Score evaluate(TypedMoveSearch.State state); }
+    public record Result(TypedMoveSearch.State incumbent, long inputScore, long outputScore,
+            List&lt;TypedMoveSearch.WitnessStep&gt; witness, TypedMoveSearch.Result search,
+            long selectionWork, long replayWork, long workBudget) {
+<span class="fc" id="L25">        public Result { witness = List.copyOf(witness); }</span>
+<span class="fc" id="L26">        public long totalWork() { return Math.addExact(search.metrics().totalWork(), Math.addExact(selectionWork, replayWork)); }</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        public boolean withinBudget() { return totalWork() &lt;= workBudget; }</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        public boolean improved() { return outputScore &lt; inputScore; }</span>
+    }
+    public Result search(TypedMoveSearch.Problem problem, Objective objective) {
+<span class="fc" id="L31">        Objects.requireNonNull(problem, &quot;problem&quot;);</span>
+<span class="fc" id="L32">        Objects.requireNonNull(objective, &quot;objective&quot;);</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        if (!problem.context().sourceOnly()) throw new IllegalArgumentException(&quot;source-only context required&quot;);</span>
+<span class="fc" id="L34">        var search = new TypedMoveSearch().search(problem);</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (search.reached()) throw new IllegalStateException(&quot;source-only search reported a target hit&quot;);</span>
+<span class="fc" id="L36">        var root = search.initialState();</span>
+<span class="fc" id="L37">        var initial = Objects.requireNonNull(objective.evaluate(root), &quot;initial objective&quot;);</span>
+<span class="fc" id="L38">        var incumbent = root;</span>
+<span class="fc" id="L39">        long best = initial.value(), selectionWork = initial.work();</span>
+<span class="fc" id="L40">        var parents = new HashMap&lt;TypedMoveSearch.State, TypedMoveSearch.Event&gt;();</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (var event : search.events()) {</span>
+<span class="fc" id="L42">            selectionWork = Math.addExact(selectionWork, 1);</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            if (event.decision() != MoveSearch.Decision.ENQUEUED) continue;</span>
+<span class="pc bpc" id="L44" title="2 of 4 branches missed.">            if (event.verification() == null || !event.verification().accepted()) {</span>
+<span class="nc" id="L45">                throw new IllegalStateException(&quot;unverified state admitted to typed frontier&quot;);</span>
+            }
+<span class="fc" id="L47">            parents.putIfAbsent(event.target(), event);</span>
+<span class="fc" id="L48">            var score = Objects.requireNonNull(objective.evaluate(event.target()), &quot;candidate objective&quot;);</span>
+<span class="fc" id="L49">            selectionWork = Math.addExact(selectionWork, score.work());</span>
+            // Stable first-minimum selection: an equally good path never displaces the input.
+<span class="fc bfc" id="L51" title="All 2 branches covered.">            if (score.value() &lt; best) {</span>
+<span class="fc" id="L52">                incumbent = event.target();</span>
+<span class="fc" id="L53">                best = score.value();</span>
+            }
+<span class="fc" id="L55">        }</span>
+<span class="fc" id="L56">        var witness = new ArrayList&lt;TypedMoveSearch.WitnessStep&gt;();</span>
+<span class="fc" id="L57">        var cursor = incumbent;</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        while (cursor.searchDepth() &gt; 0) {</span>
+<span class="fc" id="L59">            selectionWork = Math.addExact(selectionWork, 1);</span>
+<span class="fc" id="L60">            var edge = parents.get(cursor);</span>
+<span class="pc bpc" id="L61" title="2 of 4 branches missed.">            if (edge == null || edge.source().searchDepth() &gt;= cursor.searchDepth()) {</span>
+<span class="nc" id="L62">                throw new IllegalStateException(&quot;incumbent has no acyclic retained lineage&quot;);</span>
+            }
+<span class="fc" id="L64">            witness.add(new TypedMoveSearch.WitnessStep(edge.source(), edge.target(), edge.move(), edge.verification()));</span>
+<span class="fc" id="L65">            cursor = edge.source();</span>
+<span class="fc" id="L66">        }</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (!cursor.equals(root)) throw new IllegalStateException(&quot;incumbent lineage does not start at the input&quot;);</span>
+<span class="fc" id="L68">        Collections.reverse(witness);</span>
+<span class="fc" id="L69">        long replayWork = 0;</span>
+<span class="fc" id="L70">        cursor = root;</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (var step : witness) {</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            if (!cursor.equals(step.source())) throw new IllegalStateException(&quot;broken incumbent lineage&quot;);</span>
+<span class="fc" id="L73">            var replay = problem.verifier().verify(cursor, step.move(), problem.context());</span>
+<span class="fc" id="L74">            replayWork = Math.addExact(replayWork, replay.work());</span>
+<span class="pc bpc" id="L75" title="2 of 4 branches missed.">            if (!replay.accepted() || !replay.equals(step.verification())) {</span>
+<span class="nc" id="L76">                throw new IllegalStateException(&quot;independent selected-path replay differs&quot;);</span>
+            }
+<span class="fc" id="L78">            cursor = step.target();</span>
+<span class="fc" id="L79">        }</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (!cursor.equals(incumbent)) throw new IllegalStateException(&quot;incumbent replay endpoint differs&quot;);</span>
+        // Extra inspections and replay can exceed the search budget. Retain that overrun,
+        // never clamp it or convert an over-budget anytime candidate into a success.
+<span class="fc" id="L83">        return new Result(incumbent, initial.value(), best, witness, search, selectionWork, replayWork, problem.budget().totalWork());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

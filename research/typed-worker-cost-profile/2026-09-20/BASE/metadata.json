@@ -1,0 +1,264 @@
+{
+  "cacheMode": "BASELINE_UNCACHED",
+  "cases": {
+    "compound-base": {
+      "distinctTotalWork": [
+        349
+      ],
+      "medianRequestWallNanos": 10810408,
+      "outputCosts": {
+        "4": 97
+      },
+      "rows": 97,
+      "valid": 97,
+      "verdicts": {
+        "IMPROVED": 97
+      }
+    },
+    "double-factor": {
+      "distinctTotalWork": [
+        507
+      ],
+      "medianRequestWallNanos": 15063190,
+      "outputCosts": {
+        "3": 97
+      },
+      "rows": 97,
+      "valid": 97,
+      "verdicts": {
+        "IMPROVED": 97
+      }
+    },
+    "near-miss": {
+      "distinctTotalWork": [
+        94
+      ],
+      "medianRequestWallNanos": 3199397,
+      "outputCosts": {
+        "6": 97
+      },
+      "rows": 97,
+      "valid": 97,
+      "verdicts": {
+        "UNCHANGED": 97
+      }
+    },
+    "negative-site": {
+      "distinctTotalWork": [
+        357
+      ],
+      "medianRequestWallNanos": 9253515,
+      "outputCosts": {
+        "3": 97
+      },
+      "rows": 97,
+      "valid": 97,
+      "verdicts": {
+        "IMPROVED": 97
+      }
+    },
+    "nested-factor": {
+      "distinctTotalWork": [
+        394
+      ],
+      "medianRequestWallNanos": 12577447,
+      "outputCosts": {
+        "4": 97
+      },
+      "rows": 97,
+      "valid": 97,
+      "verdicts": {
+        "IMPROVED": 97
+      }
+    },
+    "offset": {
+      "distinctTotalWork": [
+        333
+      ],
+      "medianRequestWallNanos": 9229191,
+      "outputCosts": {
+        "2": 97
+      },
+      "rows": 97,
+      "valid": 97,
+      "verdicts": {
+        "IMPROVED": 97
+      }
+    },
+    "outer-product": {
+      "distinctTotalWork": [
+        333
+      ],
+      "medianRequestWallNanos": 9513963,
+      "outputCosts": {
+        "3": 97
+      },
+      "rows": 97,
+      "valid": 97,
+      "verdicts": {
+        "IMPROVED": 97
+      }
+    },
+    "scaled-site": {
+      "distinctTotalWork": [
+        333
+      ],
+      "medianRequestWallNanos": 10487947,
+      "outputCosts": {
+        "2": 97
+      },
+      "rows": 97,
+      "valid": 97,
+      "verdicts": {
+        "IMPROVED": 97
+      }
+    },
+    "simple-control": {
+      "distinctTotalWork": [
+        32
+      ],
+      "medianRequestWallNanos": 2358954,
+      "outputCosts": {
+        "1": 97
+      },
+      "rows": 97,
+      "valid": 97,
+      "verdicts": {
+        "UNCHANGED": 97
+      }
+    },
+    "sum-composition": {
+      "distinctTotalWork": [
+        936
+      ],
+      "medianRequestWallNanos": 29187129,
+      "outputCosts": {
+        "3": 97
+      },
+      "rows": 97,
+      "valid": 97,
+      "verdicts": {
+        "IMPROVED": 97
+      }
+    },
+    "two-near-misses": {
+      "distinctTotalWork": [
+        279
+      ],
+      "medianRequestWallNanos": 9077183,
+      "outputCosts": {
+        "13": 97
+      },
+      "rows": 97,
+      "valid": 97,
+      "verdicts": {
+        "UNCHANGED": 97
+      }
+    },
+    "two-sites": {
+      "distinctTotalWork": [
+        2849
+      ],
+      "medianRequestWallNanos": 109167822,
+      "outputCosts": {
+        "3": 97
+      },
+      "rows": 97,
+      "valid": 97,
+      "verdicts": {
+        "IMPROVED": 97
+      }
+    }
+  },
+  "command": [
+    "/workspace/scratch/fcfe4cbdbc35/runtime/jdk-25.0.2+10/bin/java",
+    "-Xmx512m",
+    "-Xlog:jfr=warning",
+    "-Xlog:jfr+startup=off:stdout",
+    "-XX:FlightRecorderOptions=stackdepth=128",
+    "-XX:StartFlightRecording=settings=/workspace/scratch/6b23a1484cae/typed-worker-profile-baseline/diagnostic.jfc,filename=/workspace/scratch/6b23a1484cae/typed-worker-profile-baseline/BASE/worker.jfr,dumponexit=true",
+    "-cp",
+    "/workspace/scratch/6b23a1484cae/typed-worker-profile-baseline/classpath/00-main:/workspace/scratch/6b23a1484cae/typed-worker-profile-baseline/classpath/01-main:/workspace/scratch/6b23a1484cae/typed-worker-profile-baseline/classpath/02-regelsuche-solver-ir.jar:/workspace/scratch/6b23a1484cae/typed-worker-profile-baseline/classpath/03-regelsuche-search-0.5.0-SNAPSHOT.jar:/workspace/scratch/6b23a1484cae/typed-worker-profile-baseline/classpath/04-regelsuche-math-algorithms.jar:/workspace/scratch/6b23a1484cae/typed-worker-profile-baseline/classpath/05-regelsuche-validation-0.5.0-SNAPSHOT.jar:/workspace/scratch/6b23a1484cae/typed-worker-profile-baseline/classpath/06-regelsuche-egraph-0.5.0-SNAPSHOT.jar:/workspace/scratch/6b23a1484cae/typed-worker-profile-baseline/classpath/07-regelsuche-core-0.5.0-SNAPSHOT.jar:/workspace/scratch/6b23a1484cae/typed-worker-profile-baseline/classpath/08-jackson-dataformat-yaml-2.22.2.jar:/workspace/scratch/6b23a1484cae/typed-worker-profile-baseline/classpath/09-jackson-core-2.22.2.jar:/workspace/scratch/6b23a1484cae/typed-worker-profile-baseline/classpath/10-jackson-datatype-jsr310-2.22.2.jar:/workspace/scratch/6b23a1484cae/typed-worker-profile-baseline/classpath/11-jackson-databind-2.22.2.jar:/workspace/scratch/6b23a1484cae/typed-worker-profile-baseline/classpath/12-jackson-annotations-2.22.jar:/workspace/scratch/6b23a1484cae/typed-worker-profile-baseline/classpath/13-snakeyaml-2.5.jar",
+    "de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker"
+  ],
+  "controllerCpuNanos": 5648523517,
+  "cycles": 97,
+  "diagnosticOnly": true,
+  "hostContentionPossible": true,
+  "improvedRows": 873,
+  "independentVerificationCpuNanos": 542178964,
+  "independentVerificationWallNanos": 555366267,
+  "internalWorkOverrunRows": 0,
+  "lifecycleWallNanos": 31420128058,
+  "medianRequestWallNanos": 10757574.0,
+  "phases": [
+    {
+      "endEpochNanos": 1789887114677685758,
+      "phase": "startup",
+      "startEpochNanos": 1789887113727307515
+    },
+    {
+      "endEpochNanos": 1789887114995757707,
+      "phase": "initialize",
+      "startEpochNanos": 1789887114678847613
+    },
+    {
+      "endEpochNanos": 1789887145085821950,
+      "phase": "queries",
+      "startEpochNanos": 1789887114996186846
+    },
+    {
+      "endEpochNanos": 1789887145147102938,
+      "phase": "shutdown",
+      "startEpochNanos": 1789887145085959902
+    }
+  ],
+  "pid": 27,
+  "processReceipt": {
+    "exitCode": 0,
+    "involuntaryContextSwitches": 7173,
+    "majorFaults": 0,
+    "maxResidentBytes": 456687616,
+    "minorFaults": 208970,
+    "systemCpuNanos": 2789658000,
+    "userCpuNanos": 38445454000,
+    "voluntaryContextSwitches": 27804
+  },
+  "profile": "BASE",
+  "queriesElapsedNanos": 30089635675,
+  "ready": {
+    "java": "25.0.2+10-LTS",
+    "status": "READY"
+  },
+  "reportedNativeQueryCpuNanos": 32440000000,
+  "reportedNativeQueryWallNanos": 21305248485,
+  "rows": 1164,
+  "startEpochNanos": 1789887113727307515,
+  "startupNanos": 950168303,
+  "totalRequestWallNanos": 26380405909,
+  "training": {
+    "learnedPrograms": 0,
+    "model": "{\"excludedIdentities\":[\"regelsuche.exact-polynomial-analysis/v1:5*v0^2\",\"regelsuche.exact-polynomial-analysis/v1:v0*v1 + v1^2\",\"regelsuche.exact-polynomial-analysis/v1:v0*v1*v2 + v0*v2^2 + v1*v2 + v2^2\",\"regelsuche.exact-polynomial-analysis/v1:v0^2 + 3\"],\"formation\":\"\",\"historyRuns\":[],\"inventory\":\"{\\\"schema\\\":\\\"regelsuche.evolution-genome/v1\\\",\\\"objective\\\":\\\"OPEN_TARGET_OPERATOR\\\",\\\"trainingScope\\\":{\\\"sourceSplit\\\":\\\"TRAIN\\\",\\\"corpusHash\\\":\\\"sha256:f9190d60b7cc58bb0916904c96e5097e1912dc59beadee2b9bf1755fb03481e9\\\",\\\"familyPartitionHash\\\":\\\"sha256:ada9cd4f0e0538bf76b95b2c853ac2f171034eb9f491c3f724eaffcce708aadc\\\",\\\"signaturePartitionHash\\\":\\\"sha256:0c757b0b5c33c053cbfb8f94ba0bc7e5a58af909277c43c266e036d37d57ea39\\\",\\\"featureSchemaHash\\\":\\\"sha256:3352dadbfb56abe084066f26d50d2da48824c575c75ccc942ae212ca596516f5\\\"},\\\"rewrites\\\":[{\\\"geneId\\\":\\\"add-zero\\\",\\\"sourcePattern\\\":\\\"?A+0\\\",\\\"targetPattern\\\":\\\"?A\\\",\\\"kind\\\":\\\"SIMPLIFY\\\",\\\"reversible\\\":false,\\\"estimatedCostDelta\\\":-2,\\\"maxApplicationsPerPath\\\":8,\\\"maxAstGrowth\\\":32,\\\"assumptions\\\":[],\\\"evidenceObligations\\\":[\\\"COUNTEREXAMPLE_SEARCH\\\",\\\"HOLDOUT_EVALUATION\\\",\\\"NOVELTY_REVIEW\\\",\\\"PROOF_OR_CERTIFICATE\\\",\\\"SEMANTIC_VALIDATION\\\"]},{\\\"geneId\\\":\\\"cancel-addend\\\",\\\"sourcePattern\\\":\\\"(?A-?B)+?B\\\",\\\"targetPattern\\\":\\\"?A\\\",\\\"kind\\\":\\\"SIMPLIFY\\\",\\\"reversible\\\":false,\\\"estimatedCostDelta\\\":-2,\\\"maxApplicationsPerPath\\\":8,\\\"maxAstGrowth\\\":32,\\\"assumptions\\\":[],\\\"evidenceObligations\\\":[\\\"COUNTEREXAMPLE_SEARCH\\\",\\\"HOLDOUT_EVALUATION\\\",\\\"NOVELTY_REVIEW\\\",\\\"PROOF_OR_CERTIFICATE\\\",\\\"SEMANTIC_VALIDATION\\\"]},{\\\"geneId\\\":\\\"difference-product\\\",\\\"sourcePattern\\\":\\\"(?A+?B)*(?A-?B)\\\",\\\"targetPattern\\\":\\\"?A^2-?B^2\\\",\\\"kind\\\":\\\"SIMPLIFY\\\",\\\"reversible\\\":false,\\\"estimatedCostDelta\\\":-2,\\\"maxApplicationsPerPath\\\":8,\\\"maxAstGrowth\\\":32,\\\"assumptions\\\":[],\\\"evidenceObligations\\\":[\\\"COUNTEREXAMPLE_SEARCH\\\",\\\"HOLDOUT_EVALUATION\\\",\\\"NOVELTY_REVIEW\\\",\\\"PROOF_OR_CERTIFICATE\\\",\\\"SEMANTIC_VALIDATION\\\"]},{\\\"geneId\\\":\\\"double-term\\\",\\\"sourcePattern\\\":\\\"?A+?A\\\",\\\"targetPattern\\\":\\\"2*?A\\\",\\\"kind\\\":\\\"SIMPLIFY\\\",\\\"reversible\\\":false,\\\"estimatedCostDelta\\\":-2,\\\"maxApplicationsPerPath\\\":8,\\\"maxAstGrowth\\\":32,\\\"assumptions\\\":[],\\\"evidenceObligations\\\":[\\\"COUNTEREXAMPLE_SEARCH\\\",\\\"HOLDOUT_EVALUATION\\\",\\\"NOVELTY_REVIEW\\\",\\\"PROOF_OR_CERTIFICATE\\\",\\\"SEMANTIC_VALIDATION\\\"]},{\\\"geneId\\\":\\\"factor-left\\\",\\\"sourcePattern\\\":\\\"?A*?B+?A*?C\\\",\\\"targetPattern\\\":\\\"?A*(?B+?C)\\\",\\\"kind\\\":\\\"SIMPLIFY\\\",\\\"reversible\\\":false,\\\"estimatedCostDelta\\\":-2,\\\"maxApplicationsPerPath\\\":8,\\\"maxAstGrowth\\\":32,\\\"assumptions\\\":[],\\\"evidenceObligations\\\":[\\\"COUNTEREXAMPLE_SEARCH\\\",\\\"HOLDOUT_EVALUATION\\\",\\\"NOVELTY_REVIEW\\\",\\\"PROOF_OR_CERTIFICATE\\\",\\\"SEMANTIC_VALIDATION\\\"]},{\\\"geneId\\\":\\\"factor-right\\\",\\\"sourcePattern\\\":\\\"?A*?C+?B*?C\\\",\\\"targetPattern\\\":\\\"(?A+?B)*?C\\\",\\\"kind\\\":\\\"SIMPLIFY\\\",\\\"reversible\\\":false,\\\"estimatedCostDelta\\\":-2,\\\"maxApplicationsPerPath\\\":8,\\\"maxAstGrowth\\\":32,\\\"assumptions\\\":[],\\\"evidenceObligations\\\":[\\\"COUNTEREXAMPLE_SEARCH\\\",\\\"HOLDOUT_EVALUATION\\\",\\\"NOVELTY_REVIEW\\\",\\\"PROOF_OR_CERTIFICATE\\\",\\\"SEMANTIC_VALIDATION\\\"]},{\\\"geneId\\\":\\\"multiply-one\\\",\\\"sourcePattern\\\":\\\"?A*1\\\",\\\"targetPattern\\\":\\\"?A\\\",\\\"kind\\\":\\\"SIMPLIFY\\\",\\\"reversible\\\":false,\\\"estimatedCostDelta\\\":-2,\\\"maxApplicationsPerPath\\\":8,\\\"maxAstGrowth\\\":32,\\\"assumptions\\\":[],\\\"evidenceObligations\\\":[\\\"COUNTEREXAMPLE_SEARCH\\\",\\\"HOLDOUT_EVALUATION\\\",\\\"NOVELTY_REVIEW\\\",\\\"PROOF_OR_CERTIFICATE\\\",\\\"SEMANTIC_VALIDATION\\\"]},{\\\"geneId\\\":\\\"square-product\\\",\\\"sourcePattern\\\":\\\"?A*?A\\\",\\\"targetPattern\\\":\\\"?A^2\\\",\\\"kind\\\":\\\"SIMPLIFY\\\",\\\"reversible\\\":false,\\\"estimatedCostDelta\\\":-2,\\\"maxApplicationsPerPath\\\":8,\\\"maxAstGrowth\\\":32,\\\"assumptions\\\":[],\\\"evidenceObligations\\\":[\\\"COUNTEREXAMPLE_SEARCH\\\",\\\"HOLDOUT_EVALUATION\\\",\\\"NOVELTY_REVIEW\\\",\\\"PROOF_OR_CERTIFICATE\\\",\\\"SEMANTIC_VALIDATION\\\"]}],\\\"rankingFeatures\\\":[{\\\"signal\\\":\\\"CANDIDATE_COMPLEXITY\\\",\\\"weightPermille\\\":-1000}],\\\"guardPolicy\\\":{\\\"rejectCycles\\\":true,\\\"rejectUnboundedGrowth\\\":true,\\\"requireApplicabilityChecks\\\":true,\\\"enforceDuplicateSuppression\\\":true,\\\"deterministicTieBreaking\\\":true},\\\"budget\\\":{\\\"maxProgramLength\\\":64,\\\"maxAstNodes\\\":256,\\\"maxAstGrowthPerStep\\\":32,\\\"maxApplicationsPerPath\\\":8,\\\"maxCandidatesPerState\\\":32},\\\"requiredCapabilities\\\":[\\\"core.ast-rewrite\\\"],\\\"seedGenomeHashes\\\":[],\\\"alphaStructuralHash\\\":\\\"sha256:3601297f9f7d85d0ad07ba7149cae2148e18ae20a5392af52aac8f52e551d711\\\",\\\"contentHash\\\":\\\"sha256:1aac0f47aa0c28953ca4424741a62a84fb7a6234d684e2230b0dd0a8fc75d733\\\"}\",\"policy\":\"INVENTORY_ORDER\",\"profile\":\"BASE\",\"schema\":\"regelsuche.typed-external-frozen-profile/v1\",\"settings\":{\"complexityDebt\":24,\"maxStates\":256,\"primitiveDepth\":9,\"searchDepth\":9,\"workBudget\":16384}}",
+    "modelHash": "sha256:c165a32e581800a6dc27f409cd35ff75ef0d8e397a1d9f702e5820d162cf55e3",
+    "nativeCpuNanos": 750000000,
+    "nativeWallNanos": 256986004,
+    "profile": "BASE",
+    "settings": {
+      "complexityDebt": 24,
+      "maxStates": 256,
+      "primitiveDepth": 9,
+      "searchDepth": 9,
+      "workBudget": 16384
+    },
+    "status": "INITIALIZED",
+    "trainingWork": 0,
+    "trainingWorkComponents": {
+      "formation": 0,
+      "historyMemory": 0,
+      "historySearch": 0,
+      "policyTrials": 0
+    }
+  },
+  "trainingRequestNanos": 316901616,
+  "validRows": 1164
+}

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleShapeIndex.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">RuleShapeIndex.java</span></div><h1>RuleShapeIndex.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+
+/** Necessary root-shape conditions only; matching and proof authority stay with the rule. */
+final class RuleShapeIndex {
+<span class="fc" id="L13">    private record FunctionShape(String name, int arity) {}</span>
+<span class="fc" id="L14">    private record VariableShape(String name) {}</span>
+<span class="fc" id="L15">    private record Entry(int ordinal, RewriteRule rule) {}</span>
+    private final Map&lt;Object, List&lt;Entry&gt;&gt; buckets;
+    private final List&lt;Entry&gt; fallback;
+
+<span class="fc" id="L19">    RuleShapeIndex(List&lt;RewriteRule&gt; rules) {</span>
+<span class="fc" id="L20">        var grouped = new HashMap&lt;Object, List&lt;Entry&gt;&gt;();</span>
+<span class="fc" id="L21">        var unfiltered = new ArrayList&lt;Entry&gt;();</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        for (int i = 0; i &lt; rules.size(); i++) {</span>
+<span class="fc" id="L23">            var entry = new Entry(i, rules.get(i));</span>
+<span class="fc" id="L24">            Object key = key(entry.rule());</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">            if (key == null) unfiltered.add(entry);</span>
+<span class="fc" id="L26">            else grouped.computeIfAbsent(key, ignored -&gt; new ArrayList&lt;&gt;()).add(entry);</span>
+        }
+<span class="fc" id="L28">        grouped.replaceAll((key, entries) -&gt; List.copyOf(entries));</span>
+<span class="fc" id="L29">        buckets = Map.copyOf(grouped);</span>
+<span class="fc" id="L30">        fallback = List.copyOf(unfiltered);</span>
+<span class="fc" id="L31">    }</span>
+
+    Iterable&lt;RewriteRule&gt; candidates(Expr expression) {
+<span class="fc" id="L34">        Object key = key(expression);</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        List&lt;Entry&gt; selected = key == null ? List.of() : buckets.getOrDefault(key, List.of());</span>
+        // Merge two ordered lists lazily: no per-shape duplication of wildcard rules.
+<span class="fc" id="L37">        return () -&gt; new Iterator&lt;&gt;() {</span>
+            private int bucketPosition;
+            private int fallbackPosition;
+            @Override public boolean hasNext() {
+<span class="fc bfc" id="L41" title="All 4 branches covered.">                return bucketPosition &lt; selected.size() || fallbackPosition &lt; fallback.size();</span>
+            }
+            @Override public RewriteRule next() {
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">                if (!hasNext()) throw new NoSuchElementException();</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">                if (bucketPosition == selected.size()) return fallback.get(fallbackPosition++).rule();</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">                if (fallbackPosition == fallback.size()) return selected.get(bucketPosition++).rule();</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">                return selected.get(bucketPosition).ordinal() &lt; fallback.get(fallbackPosition).ordinal()</span>
+<span class="fc" id="L48">                    ? selected.get(bucketPosition++).rule() : fallback.get(fallbackPosition++).rule();</span>
+            }
+        };
+    }
+
+    private static Object key(RewriteRule rule) {
+        // Subclasses can override matching independently of their declared source pattern.
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (rule.getClass() != PatternRewriteRule.class) return null;</span>
+<span class="fc" id="L56">        var pattern = (PatternRewriteRule) rule;</span>
+<span class="fc" id="L57">        var profile = pattern.recognitionProfile();</span>
+<span class="fc bfc" id="L58" title="All 4 branches covered.">        if (profile.inferAlgebraicBindings() || profile.maxEquivalenceDepth() != 0</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">                || !profile.recognitionRuleIds().isEmpty()) return null;</span>
+<span class="fc bfc" id="L60" title="All 5 branches covered.">        return switch (pattern.source()) {</span>
+<span class="fc" id="L61">            case PatternExpr.Operation operation -&gt; operation.operator();</span>
+<span class="fc" id="L62">            case PatternExpr.Function function -&gt; new FunctionShape(function.name(), function.arguments().size());</span>
+<span class="fc" id="L63">            case PatternExpr.LiteralNumber number -&gt; number.value();</span>
+<span class="fc" id="L64">            case PatternExpr.LiteralVariable variable -&gt; new VariableShape(variable.name());</span>
+<span class="fc" id="L65">            case PatternExpr.Placeholder ignored -&gt; null;</span>
+        };
+    }
+
+    private static Object key(Expr expression) {
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) return binary.operator();</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (expression instanceof FunctionExpr function) return new FunctionShape(function.name(), function.arguments().size());</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) return number.value();</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (expression instanceof VariableExpr variable) return new VariableShape(variable.name());</span>
+<span class="nc" id="L74">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

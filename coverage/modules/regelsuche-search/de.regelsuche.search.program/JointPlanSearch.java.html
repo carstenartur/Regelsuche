@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JointPlanSearch.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.program</a> &gt; <span class="el_source">JointPlanSearch.java</span></div><h1>JointPlanSearch.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.program;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.search.moves.*;
+import de.regelsuche.transform.*;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.*;
+
+/** Domain adapter into TypedSourceOnlySearch, not another frontier/search implementation.
+ * The domain supplies candidates and independent semantics; the shared DAG cost is assessed
+ * and charged while the existing queue is expanded, and again for incumbent selection.
+ */
+public final class JointPlanSearch {
+    public record Proposal(String rule, Expr expression) {
+<span class="nc" id="L17">        public Proposal {</span>
+<span class="nc bnc" id="L18" title="All 4 branches missed.">            if (rule == null || rule.isBlank()) throw new IllegalArgumentException(&quot;rule required&quot;);</span>
+<span class="nc" id="L19">            Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="nc" id="L20">        }</span>
+    }
+    public record Generation(List&lt;Proposal&gt; proposals, long work, boolean complete) {
+<span class="nc" id="L23">        public Generation {</span>
+<span class="nc" id="L24">            proposals = List.copyOf(proposals);</span>
+<span class="nc bnc" id="L25" title="All 2 branches missed.">            if (work &lt; 1) throw new IllegalArgumentException(&quot;positive generation work required&quot;);</span>
+<span class="nc" id="L26">        }</span>
+    }
+    public record Verification(boolean accepted, long work) {
+<span class="nc bnc" id="L29" title="All 2 branches missed.">        public Verification { if (work &lt; 1) throw new IllegalArgumentException(&quot;positive verification work required&quot;); }</span>
+    }
+    public interface Domain {
+        String revision();
+        Generation generate(JointComputationPlan source, int maximumCandidates);
+        Verification verify(JointComputationPlan source, JointComputationPlan target);
+    }
+    public record Weights(long operation, long liveStorage, long retainedStorage, long outputBindings) {
+<span class="nc" id="L37">        public static final Weights DEFAULT = new Weights(1, 1, 1, 1);</span>
+<span class="nc" id="L38">        public Weights {</span>
+<span class="nc bnc" id="L39" title="All 8 branches missed.">            if (operation &lt; 0 || liveStorage &lt; 0 || retainedStorage &lt; 0 || outputBindings &lt; 0)</span>
+<span class="nc" id="L40">                throw new IllegalArgumentException(&quot;negative cost weight&quot;);</span>
+<span class="nc" id="L41">        }</span>
+<span class="nc" id="L42">        long score(PreparedJointComputation.Cost cost) { return cost.weighted(operation, liveStorage, retainedStorage, outputBindings); }</span>
+    }
+<span class="nc" id="L44">    public record Result(JointComputationPlan plan, PreparedJointComputation prepared,</span>
+            TypedSourceOnlySearch.Result search, long setupWork, long workBudget) {
+<span class="nc" id="L46">        public long totalWork() { return Math.addExact(search.totalWork(), setupWork); }</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        public boolean withinBudget() { return totalWork() &lt;= workBudget; }</span>
+    }
+<span class="nc" id="L49">    private record Preparation(PreparedJointComputation plan, long work) {}</span>
+<span class="nc" id="L50">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+    private final ComputationBackend backend;
+    private final Domain domain;
+    private final Weights weights;
+    private final int maximumCandidates;
+
+<span class="nc" id="L56">    public JointPlanSearch(ComputationBackend backend, Domain domain, Weights weights, int maximumCandidates) {</span>
+<span class="nc" id="L57">        this.backend = Objects.requireNonNull(backend, &quot;backend&quot;);</span>
+<span class="nc" id="L58">        this.domain = Objects.requireNonNull(domain, &quot;domain&quot;);</span>
+<span class="nc" id="L59">        this.weights = Objects.requireNonNull(weights, &quot;weights&quot;);</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (maximumCandidates &lt; 1) throw new IllegalArgumentException(&quot;positive candidate cap required&quot;);</span>
+<span class="nc" id="L61">        this.maximumCandidates = maximumCandidates;</span>
+<span class="nc" id="L62">    }</span>
+    public PreparedJointComputation prepareVerified(JointComputationPlan source, JointComputationPlan candidate) {
+<span class="nc" id="L64">        return prepare(source, candidate).plan();</span>
+    }
+    private Preparation prepare(JointComputationPlan source, JointComputationPlan candidate) {
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (!source.inputs().equals(candidate.inputs()) || !source.outputs().stream().map(o -&gt; List.of(o.name(), o.type())).toList()</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">                .equals(candidate.outputs().stream().map(o -&gt; List.of(o.name(), o.type())).toList()))</span>
+<span class="nc" id="L69">            throw new IllegalArgumentException(&quot;input/output bindings differ&quot;);</span>
+<span class="nc" id="L70">        var verified = domain.verify(source, candidate);</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        if (!verified.accepted()) throw new IllegalArgumentException(&quot;domain did not prove joint outputs equivalent&quot;);</span>
+<span class="nc" id="L72">        var prepared = candidate.prepare(backend);</span>
+<span class="nc" id="L73">        return new Preparation(prepared, Math.addExact(verified.work(), prepared.cost().inspectionWork()));</span>
+    }
+    public Result optimize(JointComputationPlan source, MoveSearch.Budget budget) {
+<span class="nc" id="L76">        var sourceExpression = source.searchExpression();</span>
+<span class="nc" id="L77">        var initialCheck = prepare(source, source);</span>
+<span class="nc" id="L78">        var initial = new Preparation(initialCheck.plan(), Math.addExact(initialCheck.work(), sourceExpression.work()));</span>
+<span class="nc" id="L79">        long remaining = Math.max(1, budget.totalWork() - initial.work());</span>
+<span class="nc" id="L80">        var searchBudget = new MoveSearch.Budget(budget.maxPrimitiveSteps(), budget.maxSearchDepth(), budget.maxTheoryWork(),</span>
+<span class="nc" id="L81">            budget.maxStates(), remaining, budget.maxComplexityDebt());</span>
+<span class="nc" id="L82">        var descriptor = new MoveProvider.Descriptor(&quot;joint-plan-domain&quot;, &quot;joint-plan-domain&quot;, SearchMove.SourceKind.PRIMITIVE,</span>
+<span class="nc" id="L83">            SearchMove.ProofStrength.REPLAYABLE, List.of(), SearchMove.ValueEvidence.UNKNOWN, domain.revision());</span>
+<span class="nc" id="L84">        TypedMoveSearch.TypedProvider provider = new TypedMoveSearch.TypedProvider() {</span>
+<span class="nc" id="L85">            @Override public Descriptor descriptor() { return descriptor; }</span>
+            @Override public Batch candidates(MoveState state, MoveContext context) {
+<span class="nc" id="L87">                var current = source.withExpression(CODEC.decodeExpression(state.expression()));</span>
+<span class="nc" id="L88">                var generated = domain.generate(current, maximumCandidates);</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                if (generated.proposals().size() &gt; maximumCandidates) throw new IllegalArgumentException(&quot;domain exceeded candidate cap&quot;);</span>
+<span class="nc" id="L90">                var moves = new ArrayList&lt;SearchMove&gt;();</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">                for (var proposal : generated.proposals()) {</span>
+<span class="nc" id="L92">                    String target = CODEC.encodeExpression(proposal.expression());</span>
+<span class="nc" id="L93">                    var transformation = new Transformation(proposal.rule(), target, RewriteKind.SIMPLIFY, true, 0, false,</span>
+<span class="nc" id="L94">                        key(state.expression(), target, proposal.rule()), List.of(), domain.revision(), &quot;Apache-2.0&quot;);</span>
+<span class="nc" id="L95">                    moves.add(SearchMove.from(transformation, descriptor, generated.work()));</span>
+<span class="nc" id="L96">                }</span>
+<span class="nc" id="L97">                return new Batch(moves, TransformationWorkMetrics.flatEngine(moves.size()).withDelegatedMechanicalWork(generated.work()), generated.complete());</span>
+            }
+        };
+<span class="nc" id="L100">        TypedMoveSearch.Verifier verifier = (state, move, context) -&gt; {</span>
+<span class="nc" id="L101">            long work = 1;</span>
+            try {
+<span class="nc" id="L103">                var current = source.withExpression(state.expression());</span>
+<span class="nc" id="L104">                var candidate = source.withExpression(CODEC.decodeExpression(move.transformation().transformedExpression()));</span>
+<span class="nc" id="L105">                var proof = domain.verify(current, candidate);</span>
+<span class="nc" id="L106">                work = proof.work();</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">                if (proof.accepted()) work = Math.addExact(work, candidate.prepare(backend).cost().inspectionWork());</span>
+<span class="nc" id="L108">                return new MoveVerifier.Verification(proof.accepted(), work,</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">                    proof.accepted() ? List.of(domain.revision() + &quot;:&quot; + key(CODEC.encodeExpression(state.expression()),</span>
+<span class="nc" id="L110">                        move.transformation().transformedExpression(), move.ruleId())) : List.of(),</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">                    proof.accepted() ? &quot;JOINT_OUTPUTS_PROVED&quot; : &quot;JOINT_OUTPUTS_REJECTED&quot;);</span>
+<span class="nc" id="L112">            } catch (IllegalArgumentException malformed) {</span>
+<span class="nc" id="L113">                return new MoveVerifier.Verification(false, work, List.of(), &quot;JOINT_PLAN_REJECTED&quot;);</span>
+            }
+        };
+<span class="nc" id="L116">        var problem = new TypedMoveSearch.Problem(sourceExpression.expression(),</span>
+<span class="nc" id="L117">            TypedMoveSearch.Context.sourceOnly(List.of(), MoveContext.Phase.FROZEN_EVALUATION), List.of(provider),</span>
+<span class="nc" id="L118">            MovePriorityPolicy.INVENTORY_ORDER, verifier, state -&gt; 0, MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED,</span>
+            searchBudget, (state, context) -&gt; {
+<span class="nc" id="L120">                var cost = source.withExpression(state.expression()).prepare(backend).cost();</span>
+<span class="nc" id="L121">                return new StateValue.Assessment(cost.operationCount(), -weights.score(cost), cost.inspectionWork(), 0, Map.of());</span>
+            });
+<span class="nc" id="L123">        var search = new TypedSourceOnlySearch().search(problem, state -&gt; {</span>
+<span class="nc" id="L124">            var cost = source.withExpression(state.expression()).prepare(backend).cost();</span>
+<span class="nc" id="L125">            return new TypedSourceOnlySearch.Score(weights.score(cost), cost.inspectionWork());</span>
+        });
+<span class="nc" id="L127">        var candidate = source.withExpression(search.incumbent().expression());</span>
+<span class="nc" id="L128">        var checked = prepare(source, candidate);</span>
+<span class="nc" id="L129">        return new Result(candidate, checked.plan(), search, Math.addExact(initial.work(), checked.work()), budget.totalWork());</span>
+    }
+    private static String key(String source, String target, String rule) {
+        try {
+<span class="nc" id="L133">            return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="nc" id="L134">                .digest((source + &quot;\n&quot; + target + &quot;\n&quot; + rule).getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L135">        } catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

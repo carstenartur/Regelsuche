@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TypedSourcePolicySelection.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.inventory</a> &gt; <span class="el_source">TypedSourcePolicySelection.java</span></div><h1>TypedSourcePolicySelection.java</h1><pre class="source lang-java linenums">package de.regelsuche.inventory;
+
+import de.regelsuche.search.moves.*;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import de.regelsuche.json.JsonWriter;
+import java.lang.management.ManagementFactory;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+
+/** Source-only continuation utility integrated with {@link TypedPolicySelection}. */
+public final class TypedSourcePolicySelection {
+    public static final String REVISION = &quot;regelsuche.typed-source-policy-selection/v1&quot;;
+<span class="fc" id="L16">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+    private TypedSourcePolicySelection() {}
+    public record Profile(String id, List&lt;MoveProvider&gt; providers, MovePriorityPolicy policy) {
+<span class="fc" id="L19">        public Profile {</span>
+<span class="pc bpc" id="L20" title="2 of 4 branches missed.">            if (id == null || id.isBlank()) throw new IllegalArgumentException(&quot;profile ID required&quot;);</span>
+<span class="fc" id="L21">            providers = List.copyOf(providers);</span>
+<span class="fc" id="L22">            Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="pc bpc" id="L23" title="2 of 4 branches missed.">            if (providers.stream().anyMatch(provider -&gt; !(provider instanceof TypedMoveSearch.TypedProvider)))</span>
+<span class="nc" id="L24">                throw new IllegalArgumentException(&quot;typed providers required&quot;);</span>
+<span class="fc" id="L25">        }</span>
+    }
+<span class="fc" id="L27">    public record Observation(String taskId, long inputScore, long outputScore, long totalWork,</span>
+            boolean withinBudget, MoveSearch.Outcome outcome, long wallNanos, long cpuNanos, long allocatedBytes) {}
+    public record Trial(Profile profile, List&lt;Observation&gt; observations) {
+<span class="fc" id="L30">        public Trial { observations = List.copyOf(observations); }</span>
+<span class="fc" id="L31">        public long totalWork() { return observations.stream().mapToLong(Observation::totalWork).reduce(0, Math::addExact); }</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        public long violations() { return observations.stream().filter(o -&gt; !o.withinBudget()).count(); }</span>
+<span class="fc" id="L33">        public long outputCost() { return observations.stream().mapToLong(Observation::outputScore).reduce(0, Math::addExact); }</span>
+    }
+    public record Frozen(Profile selected, List&lt;Trial&gt; trials, List&lt;String&gt; trainingSources) {
+<span class="fc" id="L36">        public Frozen { trials = List.copyOf(trials); trainingSources = List.copyOf(trainingSources); }</span>
+<span class="fc" id="L37">        public long trainingWork() { return trials.stream().mapToLong(Trial::totalWork).reduce(0, Math::addExact); }</span>
+        public TypedSourceOnlySearch.Result evaluate(TypedMoveSearch.Problem problem, TypedSourceOnlySearch.Objective objective) {
+<span class="pc bpc" id="L39" title="1 of 4 branches missed.">            if (!problem.context().sourceOnly() || problem.mode() != MoveSearch.Mode.FAST</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">                    || problem.context().phase() != MoveContext.Phase.FROZEN_EVALUATION</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">                    || trainingSources.contains(CODEC.encodeExpression(problem.source())))</span>
+<span class="fc" id="L42">                throw new IllegalArgumentException(&quot;distinct frozen source-only evaluation required&quot;);</span>
+<span class="nc" id="L43">            return execute(problem, selected, objective);</span>
+        }
+        public String toCanonicalJson() {
+<span class="fc" id="L46">            return new JsonWriter().beginObject().property(&quot;schema&quot;, REVISION)</span>
+<span class="fc" id="L47">                .property(&quot;selected&quot;, selected.id()).property(&quot;trainingWork&quot;, trainingWork())</span>
+<span class="fc" id="L48">                .property(&quot;selection&quot;, &quot;MIN_BUDGET_VIOLATIONS_THEN_OUTPUT_COST_THEN_FULL_CONTINUATION_WORK&quot;)</span>
+<span class="fc" id="L49">                .property(&quot;authority&quot;, &quot;EMPIRICAL_SCHEDULING_ONLY;NO_MATHEMATICAL_PRUNING&quot;)</span>
+<span class="fc" id="L50">                .property(&quot;mode&quot;, &quot;BUDGETED_HEURISTIC;COMPLETE_REFERENCE_UNCHANGED&quot;)</span>
+<span class="fc" id="L51">                .property(&quot;measurement&quot;, &quot;WALL_AND_PROCESS_CPU;REQUEST_THREAD_ALLOCATIONS;LOGICAL_WORK_IS_NOT_TIME&quot;)</span>
+<span class="fc" id="L52">                .stringArray(&quot;trainingSources&quot;, trainingSources)</span>
+<span class="fc" id="L53">                .array(&quot;trials&quot;, out -&gt; trials.forEach(trial -&gt; out.objectValue(item -&gt; item</span>
+<span class="fc" id="L54">                    .property(&quot;profile&quot;, trial.profile().id()).property(&quot;work&quot;, trial.totalWork())</span>
+<span class="fc" id="L55">                    .property(&quot;outputCost&quot;, trial.outputCost()).property(&quot;budgetViolations&quot;, trial.violations())</span>
+<span class="fc" id="L56">                    .array(&quot;observations&quot;, observations -&gt; trial.observations().forEach(o -&gt; observations.objectValue(v -&gt; v</span>
+<span class="fc" id="L57">                        .property(&quot;task&quot;, o.taskId()).property(&quot;inputScore&quot;, o.inputScore()).property(&quot;outputScore&quot;, o.outputScore())</span>
+<span class="fc" id="L58">                        .property(&quot;totalWork&quot;, o.totalWork()).property(&quot;withinBudget&quot;, o.withinBudget()).property(&quot;outcome&quot;, o.outcome().name())</span>
+<span class="fc" id="L59">                        .property(&quot;wallNanos&quot;, o.wallNanos()).property(&quot;cpuNanos&quot;, o.cpuNanos()).property(&quot;allocatedBytes&quot;, o.allocatedBytes())))))))</span>
+<span class="fc" id="L60">                .endObject().toString();</span>
+        }
+    }
+    static Frozen train(List&lt;TypedPolicySelection.TrainingTask&gt; tasks, List&lt;Profile&gt; profiles,
+            TypedSourceOnlySearch.Objective objective) {
+<span class="fc" id="L65">        tasks = List.copyOf(tasks); profiles = List.copyOf(profiles);</span>
+<span class="fc" id="L66">        Objects.requireNonNull(objective, &quot;objective&quot;);</span>
+<span class="pc bpc" id="L67" title="4 of 8 branches missed.">        if (tasks.size() &lt; 2 || tasks.size() &gt; 32 || profiles.isEmpty() || profiles.size() &gt; 16)</span>
+<span class="nc" id="L68">            throw new IllegalArgumentException(&quot;require 2..32 selection tasks and 1..16 profiles&quot;);</span>
+<span class="fc" id="L69">        var sources = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L70">        var ids = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (var task : tasks) {</span>
+<span class="fc" id="L72">            var p = task.problem();</span>
+<span class="fc" id="L73">            String source = CODEC.encodeExpression(p.source());</span>
+<span class="pc bpc" id="L74" title="1 of 4 branches missed.">            if (!p.context().sourceOnly() || p.mode() != MoveSearch.Mode.FAST</span>
+<span class="pc bpc" id="L75" title="2 of 4 branches missed.">                    || p.context().phase() != MoveContext.Phase.TRAIN || !ids.add(task.id())</span>
+<span class="pc bpc" id="L76" title="2 of 4 branches missed.">                    || sources.contains(source) || p.budget().totalWork() &gt; 1_000_000</span>
+<span class="pc bpc" id="L77" title="2 of 4 branches missed.">                    || p.budget().maxStates() &gt; 4096 || p.budget().maxSearchDepth() &gt; 32)</span>
+<span class="fc" id="L78">                throw new IllegalArgumentException(&quot;distinct bounded source-only TRAIN tasks required&quot;);</span>
+<span class="fc" id="L79">            sources.add(source);</span>
+<span class="fc" id="L80">        }</span>
+<span class="fc" id="L81">        ids.clear();</span>
+<span class="pc bpc" id="L82" title="2 of 4 branches missed.">        if (profiles.stream().anyMatch(profile -&gt; !ids.add(profile.id())))</span>
+<span class="nc" id="L83">            throw new IllegalArgumentException(&quot;duplicate source policy profile&quot;);</span>
+<span class="fc" id="L84">        var trials = new ArrayList&lt;Trial&gt;();</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        for (var profile : profiles) {</span>
+<span class="fc" id="L86">            var observations = new ArrayList&lt;Observation&gt;();</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            for (var task : tasks) {</span>
+<span class="fc" id="L88">                long start = System.nanoTime(), cpu = cpu(), allocation = allocated();</span>
+<span class="fc" id="L89">                var result = execute(task.problem(), profile, objective);</span>
+<span class="fc" id="L90">                observations.add(new Observation(task.id(), result.inputScore(), result.outputScore(), result.totalWork(),</span>
+<span class="fc" id="L91">                    result.withinBudget(), result.search().outcome(), System.nanoTime() - start,</span>
+<span class="fc" id="L92">                    delta(cpu, cpu()), delta(allocation, allocated())));</span>
+<span class="fc" id="L93">            }</span>
+<span class="fc" id="L94">            trials.add(new Trial(profile, observations));</span>
+<span class="fc" id="L95">        }</span>
+<span class="fc" id="L96">        var selected = trials.stream().min(Comparator.comparingLong(Trial::violations)</span>
+<span class="fc" id="L97">            .thenComparingLong(Trial::outputCost).thenComparingLong(Trial::totalWork)).orElseThrow().profile();</span>
+<span class="fc" id="L98">        return new Frozen(selected, trials, sources);</span>
+    }
+    private static TypedSourceOnlySearch.Result execute(TypedMoveSearch.Problem p, Profile profile,
+            TypedSourceOnlySearch.Objective objective) {
+<span class="fc" id="L102">        return new TypedSourceOnlySearch().search(new TypedMoveSearch.Problem(p.source(), p.context(), profile.providers(),</span>
+<span class="fc" id="L103">            profile.policy(), p.verifier(), p.stateScore(), p.mode(), p.scheduling(), p.budget(), p.stateValue()), objective);</span>
+    }
+    private static long cpu() {
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        return ManagementFactory.getOperatingSystemMXBean() instanceof com.sun.management.OperatingSystemMXBean bean</span>
+<span class="pc" id="L107">            ? bean.getProcessCpuTime() : -1;</span>
+    }
+    private static long allocated() {
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        return ManagementFactory.getThreadMXBean() instanceof com.sun.management.ThreadMXBean bean</span>
+<span class="pc bpc" id="L111" title="2 of 4 branches missed.">                &amp;&amp; bean.isThreadAllocatedMemorySupported() &amp;&amp; bean.isThreadAllocatedMemoryEnabled()</span>
+<span class="pc" id="L112">            ? bean.getThreadAllocatedBytes(Thread.currentThread().threadId()) : -1;</span>
+    }
+<span class="pc bpc" id="L114" title="2 of 4 branches missed.">    private static long delta(long before, long after) { return before &lt; 0 || after &lt; 0 ? -1 : Math.max(0, after - before); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

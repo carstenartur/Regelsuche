@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CheckedSchemaSupport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">CheckedSchemaSupport.java</span></div><h1>CheckedSchemaSupport.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadConstraints;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.transform.PatternExpr;
+import java.util.ArrayDeque;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+
+/** Shared bounded representation checks. None of the public JSON is an authority. */
+final class CheckedSchemaSupport {
+<span class="fc" id="L27">    static final ObjectMapper JSON = new ObjectMapper(JsonFactory.builder()</span>
+<span class="fc" id="L28">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L29">        .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(140)</span>
+<span class="fc" id="L30">            .maxStringLength(262_144).maxNameLength(128).maxNumberLength(20).build()).build())</span>
+<span class="fc" id="L31">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+    static final int MAXIMUM_JSON_CHARACTERS = 1_048_576;
+
+    private CheckedSchemaSupport() {}
+
+<span class="fc" id="L36">    static final class Work {</span>
+        long units;
+<span class="fc" id="L38">        void add(long count) { units = Math.addExact(units, count); }</span>
+    }
+
+    static JsonNode read(String value) {
+<span class="pc bpc" id="L42" title="3 of 6 branches missed.">        if (value == null || value.isEmpty() || value.length() &gt; MAXIMUM_JSON_CHARACTERS) {</span>
+<span class="nc" id="L43">            throw new IllegalArgumentException(&quot;checked schema JSON size limit&quot;);</span>
+        }
+<span class="fc" id="L45">        try { return JSON.readTree(value); }</span>
+<span class="fc" id="L46">        catch (JsonProcessingException exception) { throw new IllegalArgumentException(&quot;invalid checked schema JSON&quot;, exception); }</span>
+    }
+
+    static String write(JsonNode value) {
+<span class="fc" id="L50">        try { return JSON.writeValueAsString(value); }</span>
+<span class="nc" id="L51">        catch (JsonProcessingException exception) { throw new IllegalArgumentException(&quot;cannot encode checked schema&quot;, exception); }</span>
+    }
+
+    static void fields(JsonNode value, String... expected) {
+<span class="pc bpc" id="L55" title="2 of 4 branches missed.">        if (value == null || !value.isObject()) throw new IllegalArgumentException(&quot;checked schema object required&quot;);</span>
+<span class="fc" id="L56">        var found = new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L57">        value.fieldNames().forEachRemaining(found::add);</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (!found.equals(Set.of(expected))) throw new IllegalArgumentException(&quot;unknown or missing checked schema fields&quot;);</span>
+<span class="fc" id="L59">    }</span>
+
+    static String text(JsonNode value, String name) {
+<span class="fc" id="L62">        JsonNode field = value.get(name);</span>
+<span class="pc bpc" id="L63" title="3 of 6 branches missed.">        if (field == null || !field.isTextual() || field.textValue().length() &gt; 262_144) {</span>
+<span class="nc" id="L64">            throw new IllegalArgumentException(&quot;invalid checked schema text: &quot; + name);</span>
+        }
+<span class="fc" id="L66">        return field.textValue();</span>
+    }
+
+    static long number(JsonNode value, String name) {
+<span class="fc" id="L70">        JsonNode field = value.get(name);</span>
+<span class="pc bpc" id="L71" title="4 of 8 branches missed.">        if (field == null || !field.isIntegralNumber() || !field.canConvertToLong() || field.longValue() &lt; 0) {</span>
+<span class="nc" id="L72">            throw new IllegalArgumentException(&quot;invalid checked schema count: &quot; + name);</span>
+        }
+<span class="fc" id="L74">        return field.longValue();</span>
+    }
+
+    static void array(JsonNode value, int maximum) {
+<span class="pc bpc" id="L78" title="3 of 6 branches missed.">        if (value == null || !value.isArray() || value.size() &gt; maximum) {</span>
+<span class="nc" id="L79">            throw new IllegalArgumentException(&quot;checked schema array limit&quot;);</span>
+        }
+<span class="fc" id="L81">    }</span>
+
+    static void hash(String value) {
+<span class="pc bpc" id="L84" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L85">            throw new IllegalArgumentException(&quot;checked schema inventory/proof hash required&quot;);</span>
+        }
+<span class="fc" id="L87">    }</span>
+
+    static ArrayNode pattern(PatternExpr value) {
+<span class="fc" id="L90">        var node = JSON.createArrayNode();</span>
+<span class="pc bpc" id="L91" title="1 of 4 branches missed.">        switch (value) {</span>
+<span class="fc" id="L92">            case PatternExpr.Placeholder placeholder -&gt; node.add(&quot;P&quot;).add(placeholder.name());</span>
+<span class="fc" id="L93">            case PatternExpr.LiteralNumber number -&gt; node.add(&quot;N&quot;).add(number.value().canonicalText());</span>
+<span class="fc" id="L94">            case PatternExpr.Operation operation -&gt; {</span>
+<span class="fc" id="L95">                node.add(operation.operator().name());</span>
+<span class="fc" id="L96">                node.add(pattern(operation.left()));</span>
+<span class="fc" id="L97">                node.add(pattern(operation.right()));</span>
+<span class="fc" id="L98">            }</span>
+<span class="nc" id="L99">            default -&gt; throw new IllegalArgumentException(&quot;schema must use scalar polynomial placeholders&quot;);</span>
+        }
+<span class="fc" id="L101">        return node;</span>
+    }
+
+    static PatternExpr pattern(JsonNode value, CheckedLearnedSchemaModel.Bounds bounds, Work work) {
+<span class="fc" id="L105">        return pattern(value, bounds, work, 0, new int[1]);</span>
+    }
+
+    private static PatternExpr pattern(JsonNode value, CheckedLearnedSchemaModel.Bounds bounds, Work work,
+            int depth, int[] nodes) {
+<span class="fc" id="L110">        work.add(1);</span>
+<span class="pc bpc" id="L111" title="2 of 4 branches missed.">        if (++nodes[0] &gt; bounds.maximumPatternNodes() || depth &gt; bounds.maximumDepth()) {</span>
+<span class="nc" id="L112">            throw new IllegalArgumentException(&quot;checked pattern structure limit&quot;);</span>
+        }
+<span class="fc" id="L114">        array(value, 3);</span>
+<span class="pc bpc" id="L115" title="2 of 4 branches missed.">        if (value.isEmpty() || !value.get(0).isTextual()) throw new IllegalArgumentException(&quot;invalid checked pattern tag&quot;);</span>
+<span class="fc" id="L116">        String tag = value.get(0).textValue();</span>
+<span class="pc bpc" id="L117" title="2 of 8 branches missed.">        if ((tag.equals(&quot;P&quot;) || tag.equals(&quot;N&quot;)) &amp;&amp; value.size() == 2 &amp;&amp; value.get(1).isTextual()) {</span>
+<span class="fc" id="L118">            String leaf = value.get(1).textValue();</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">            if (leaf.length() &gt; 256) throw new IllegalArgumentException(&quot;checked pattern leaf limit&quot;);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            if (tag.equals(&quot;P&quot;)) {</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">                if (!leaf.matches(&quot;P[0-9]{1,2}&quot;)) throw new IllegalArgumentException(&quot;noncanonical schema placeholder&quot;);</span>
+<span class="fc" id="L122">                return PatternExpr.var(leaf);</span>
+            }
+<span class="fc" id="L124">            return PatternExpr.num(leaf);</span>
+        }
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (value.size() != 3) throw new IllegalArgumentException(&quot;invalid checked pattern operation&quot;);</span>
+<span class="fc" id="L127">        return PatternExpr.op(BinaryOperator.valueOf(tag), pattern(value.get(1), bounds, work, depth + 1, nodes),</span>
+<span class="fc" id="L128">            pattern(value.get(2), bounds, work, depth + 1, nodes));</span>
+    }
+
+    /** Distinct polynomial indeterminates prove the universal statement, never a training substitution. */
+    static String prove(PatternExpr source, PatternExpr target, CheckedLearnedSchemaModel.Bounds bounds, Work work) {
+<span class="fc" id="L133">        var symbols = new TreeMap&lt;String, Expr&gt;();</span>
+<span class="fc" id="L134">        collect(source, symbols, bounds, work);</span>
+<span class="fc" id="L135">        var targetSymbols = new TreeMap&lt;String, Expr&gt;();</span>
+<span class="fc" id="L136">        collect(target, targetSymbols, bounds, work);</span>
+<span class="pc bpc" id="L137" title="4 of 8 branches missed.">        if (symbols.isEmpty() || symbols.size() &gt; 16 || !symbols.keySet().containsAll(targetSymbols.keySet()) || source.equals(target)) {</span>
+<span class="nc" id="L138">            throw new IllegalArgumentException(&quot;nontrivial source-bound polynomial schema required&quot;);</span>
+        }
+<span class="fc" id="L140">        int index = 0;</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        for (var name : symbols.keySet()) symbols.put(name, new VariableExpr(&quot;schemavar&quot; + index++));</span>
+<span class="fc" id="L142">        Expr left = source.instantiate(symbols);</span>
+<span class="fc" id="L143">        Expr right = target.instantiate(symbols);</span>
+<span class="fc" id="L144">        domain(left, bounds, work);</span>
+<span class="fc" id="L145">        domain(right, bounds, work);</span>
+<span class="fc" id="L146">        String sourceText = polynomialText(left);</span>
+<span class="fc" id="L147">        String targetText = polynomialText(right);</span>
+<span class="fc" id="L148">        work.add(sourceText.length() + targetText.length());</span>
+<span class="fc" id="L149">        new ExactPolynomialAnalysis(work::add).requireEquivalent(sourceText, targetText);</span>
+<span class="fc" id="L150">        return CheckedLearnedSchemaModel.CHECKER_REVISION + &quot;:&quot; + sourceText + &quot;=&quot; + targetText;</span>
+    }
+
+<span class="fc" id="L153">    private record PatternNode(PatternExpr value, int depth) {}</span>
+    private static void collect(PatternExpr root, Map&lt;String, Expr&gt; symbols,
+            CheckedLearnedSchemaModel.Bounds bounds, Work work) {
+<span class="fc" id="L156">        var pending = new ArrayDeque&lt;PatternNode&gt;();</span>
+<span class="fc" id="L157">        pending.push(new PatternNode(root, 0));</span>
+<span class="fc" id="L158">        int count = 0;</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L160">            var node = pending.pop();</span>
+<span class="fc" id="L161">            work.add(1);</span>
+<span class="pc bpc" id="L162" title="2 of 4 branches missed.">            if (++count &gt; bounds.maximumPatternNodes() || node.depth() &gt; bounds.maximumDepth()) {</span>
+<span class="nc" id="L163">                throw new IllegalArgumentException(&quot;checked pattern structure limit&quot;);</span>
+            }
+<span class="fc bfc" id="L165" title="All 4 branches covered.">            switch (node.value()) {</span>
+<span class="fc" id="L166">                case PatternExpr.Placeholder placeholder -&gt; {</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                    if (!placeholder.name().matches(&quot;P[0-9]{1,2}&quot;)) throw new IllegalArgumentException(&quot;noncanonical schema placeholder&quot;);</span>
+<span class="fc" id="L168">                    symbols.putIfAbsent(placeholder.name(), new VariableExpr(&quot;placeholder&quot;));</span>
+<span class="fc" id="L169">                }</span>
+<span class="fc" id="L170">                case PatternExpr.LiteralNumber number -&gt; literal(number.value(), bounds);</span>
+<span class="fc" id="L171">                case PatternExpr.Operation operation -&gt; {</span>
+<span class="fc" id="L172">                    pending.push(new PatternNode(operation.right(), node.depth() + 1));</span>
+<span class="fc" id="L173">                    pending.push(new PatternNode(operation.left(), node.depth() + 1));</span>
+<span class="fc" id="L174">                }</span>
+<span class="fc" id="L175">                default -&gt; throw new IllegalArgumentException(&quot;schema must use scalar polynomial placeholders&quot;);</span>
+            }
+<span class="fc" id="L177">        }</span>
+<span class="fc" id="L178">    }</span>
+
+<span class="fc" id="L180">    private record Node(Expr value, int depth) {}</span>
+    /** Total rational polynomial syntax: no functions, variable denominators or variable/negative powers. */
+    static void domain(Expr root, CheckedLearnedSchemaModel.Bounds bounds, Work work) {
+<span class="fc" id="L183">        var pending = new ArrayDeque&lt;Node&gt;();</span>
+<span class="fc" id="L184">        pending.push(new Node(root, 0));</span>
+<span class="fc" id="L185">        int count = 0;</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L187">            var node = pending.pop();</span>
+<span class="fc" id="L188">            work.add(1);</span>
+<span class="fc bfc" id="L189" title="All 4 branches covered.">            if (++count &gt; bounds.maximumExpressionNodes() || node.depth() &gt; bounds.maximumDepth()) {</span>
+<span class="fc" id="L190">                throw new IllegalArgumentException(&quot;checked scalar polynomial structure limit&quot;);</span>
+            }
+<span class="fc bfc" id="L192" title="All 4 branches covered.">            switch (node.value()) {</span>
+<span class="fc" id="L193">                case NumberExpr number -&gt; literal(number.value(), bounds);</span>
+<span class="fc" id="L194">                case VariableExpr variable -&gt; {</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">                    if (variable.name().length() &gt; 128) throw new IllegalArgumentException(&quot;checked symbol size limit&quot;);</span>
+                }
+<span class="fc" id="L197">                case BinaryExpr binary -&gt; {</span>
+<span class="pc bpc" id="L198" title="1 of 4 branches missed.">                    if (binary.operator() == BinaryOperator.DIV &amp;&amp; (!(binary.right() instanceof NumberExpr number)</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">                            || number.value().numerator().signum() == 0)) {</span>
+<span class="fc" id="L200">                        throw new IllegalArgumentException(&quot;checked scalar division needs nonzero literal denominator&quot;);</span>
+                    }
+<span class="pc bpc" id="L202" title="1 of 4 branches missed.">                    if (binary.operator() == BinaryOperator.POW &amp;&amp; (!(binary.right() instanceof NumberExpr number)</span>
+<span class="pc bpc" id="L203" title="1 of 4 branches missed.">                            || !number.value().isInteger() || number.value().numerator().signum() &lt; 0</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">                            || number.value().numerator().compareTo(java.math.BigInteger.valueOf(bounds.maximumExponent())) &gt; 0)) {</span>
+<span class="fc" id="L205">                        throw new IllegalArgumentException(&quot;checked scalar power needs bounded nonnegative literal exponent&quot;);</span>
+                    }
+<span class="fc" id="L207">                    pending.push(new Node(binary.right(), node.depth() + 1));</span>
+<span class="fc" id="L208">                    pending.push(new Node(binary.left(), node.depth() + 1));</span>
+<span class="fc" id="L209">                }</span>
+<span class="fc" id="L210">                default -&gt; throw new IllegalArgumentException(&quot;outside checked scalar rational polynomial domain&quot;);</span>
+            }
+<span class="fc" id="L212">        }</span>
+<span class="fc" id="L213">    }</span>
+
+    private static void literal(ExactRational value, CheckedLearnedSchemaModel.Bounds bounds) {
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        if (value.numerator().abs().bitLength() &gt; bounds.maximumCoefficientBits()</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">                || value.denominator().bitLength() &gt; bounds.maximumCoefficientBits()) {</span>
+<span class="fc" id="L218">            throw new IllegalArgumentException(&quot;checked rational literal size limit&quot;);</span>
+        }
+<span class="fc" id="L220">    }</span>
+
+    private static String polynomialText(Expr expression) {
+<span class="pc bpc" id="L223" title="1 of 4 branches missed.">        return switch (expression) {</span>
+<span class="fc" id="L224">            case NumberExpr number -&gt; &quot;(&quot; + number.value().canonicalText() + &quot;)&quot;;</span>
+<span class="fc" id="L225">            case VariableExpr variable -&gt; variable.name();</span>
+<span class="fc" id="L226">            case BinaryExpr binary -&gt; &quot;(&quot; + polynomialText(binary.left()) + binary.operator().symbol()</span>
+<span class="fc" id="L227">                + polynomialText(binary.right()) + &quot;)&quot;;</span>
+<span class="nc" id="L228">            default -&gt; throw new IllegalArgumentException(&quot;not a symbolic polynomial&quot;);</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

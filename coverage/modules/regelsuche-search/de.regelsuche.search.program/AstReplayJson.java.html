@@ -126,7 +126,7 @@ final class AstReplayJson {
 <span class="fc" id="L126">            throw new IllegalArgumentException(&quot;missing or unexpected AST replay fields&quot;);</span>
         }
 <span class="fc bfc" id="L128" title="All 2 branches covered.">        for (var entry : node.properties()) {</span>
-<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (!names.contains(entry.getKey())) throw new IllegalArgumentException(&quot;unknown AST replay field&quot;);</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            if (!names.contains(entry.getKey())) throw new IllegalArgumentException(&quot;unknown AST replay field&quot;);</span>
 <span class="fc" id="L130">        }</span>
 <span class="fc" id="L131">    }</span>
 
