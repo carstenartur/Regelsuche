@@ -141,19 +141,49 @@ public final class TypedMoveSearch {
         }
     }
 
+    public record QualityResult(Result search, State incumbent, long inputScore, long outputScore,
+            List<WitnessStep> witness, long objectiveWork) {
+        public QualityResult { witness = List.copyOf(witness); }
+    }
+
     public Result search(Problem problem) {
+        return search(problem, SearchContinuationContract.PATH_SENSITIVE);
+    }
+
+    public Result search(Problem problem, SearchContinuationContract contract) {
+        return decode(new MoveSearch().search(encode(problem), contract));
+    }
+
+    public QualityResult searchUntil(Problem problem, TypedSourceOnlySearch.Objective objective,
+            long maximumOutputScore, SearchContinuationContract contract) {
+        Objects.requireNonNull(objective, "objective");
+        if (!problem.context().sourceOnly()) throw new IllegalArgumentException("source-only context required");
+        var result = new MoveSearch().searchUntil(encode(problem), state -> {
+            var score = Objects.requireNonNull(objective.evaluate(State.decode(state)), "objective assessment");
+            return new MoveSearch.ObjectiveScore(score.value(), score.work());
+        }, maximumOutputScore, contract);
+        return new QualityResult(decode(result.search()), State.decode(result.incumbent()), result.inputScore(),
+            result.outputScore(), result.witness().stream().map(TypedMoveSearch::decode).toList(), result.objectiveWork());
+    }
+
+    private static MoveSearch.Problem encode(Problem problem) {
         Objects.requireNonNull(problem, "problem");
         MoveContext encodedContext = problem.context().encoded();
         MoveVerifier verifier = (source, move, ignored) ->
             problem.verifier().verify(State.decode(source), move, problem.context());
         ToDoubleFunction<MoveState> score = state -> problem.stateScore().applyAsDouble(State.decode(state));
-        var encoded = new MoveSearch().search(new MoveSearch.Problem(CODEC.encodeExpression(problem.source()),
+        return new MoveSearch.Problem(CODEC.encodeExpression(problem.source()),
             encodedContext, problem.providers(), problem.policy(), verifier, score, problem.mode(),
             problem.scheduling(), problem.budget(),
-            (state, ignored) -> problem.stateValue().evaluate(State.decode(state), problem.context())));
-        var witness = encoded.witness().stream()
-            .map(step -> new WitnessStep(State.decode(step.source()), State.decode(step.target()),
-                step.move(), step.verification())).toList();
+            (state, ignored) -> problem.stateValue().evaluate(State.decode(state), problem.context()));
+    }
+
+    private static WitnessStep decode(MoveSearch.WitnessStep step) {
+        return new WitnessStep(State.decode(step.source()), State.decode(step.target()), step.move(), step.verification());
+    }
+
+    private static Result decode(MoveSearch.Result encoded) {
+        var witness = encoded.witness().stream().map(TypedMoveSearch::decode).toList();
         var reached = new LinkedHashSet<State>();
         encoded.reachedStates().forEach(state -> reached.add(State.decode(state)));
         var deadEnds = encoded.deadEndStates().stream().map(State::decode).toList();
