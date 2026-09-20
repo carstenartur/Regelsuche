@@ -185,3 +185,21 @@ identity-shared raw ASTs including `withExpression`, early frontier-expansion
 rejection, and structural depth rejection. A clean rebuild was needed after an
 incremental build left stale existing class files beside newly emitted nested
 classes. The final combined seventeen targeted tests passed together in 37 s.
+
+## Report-accounting coverage correction
+
+Hosted run [35499633095](https://github.com/carstenartur/Regelsuche/actions/runs/35499633095)
+passed all six execution authorities at `71fbd22f`, but its aggregate coverage
+gate rejected experiments line coverage of 86.9747% against the existing 87%
+minimum. The correction changes tests only: a real run's JSON export must retain
+the selected/source programs, witness rules, audit checksums, execution counts
+and paid time. A separate known-cost fixture checks that all four phases are
+charged, unavailable CPU/allocation values remain `-1`, heap endpoints are
+preserved, and quoted rule IDs survive JSON encoding.
+
+`./gradlew :regelsuche-experiments:test` passes all 264 tests without failures,
+errors or skips. Its JaCoCo report has 9,171 covered and 1,347 missed lines
+(87.1934%), and 2,969 covered branches of 4,512 (65.8023%). The full
+`aiKnowledgeCheck` also passes. No production implementation, coverage policy,
+frozen protocol or measured data changed. The earlier measurement archive remains
+unchanged; this subsequent test correction is recorded separately here.
