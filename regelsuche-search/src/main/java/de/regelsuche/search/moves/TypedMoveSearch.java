@@ -36,9 +36,14 @@ public final class TypedMoveSearch {
     /** Opt-in policy whose expression features consume canonical tagged ASTs, never parser text. */
     public interface TypedPolicy extends MovePriorityPolicy {}
 
-    public record Context(Expr goal, List<String> initialAssumptions, MoveContext.Phase phase) {
+    /** A null goal is permitted only in the explicit source-only mode. */
+    public record Context(Expr goal, List<String> initialAssumptions, MoveContext.Phase phase, boolean sourceOnly) {
+        public Context(Expr goal, List<String> initialAssumptions, MoveContext.Phase phase) {
+            this(Objects.requireNonNull(goal, "goal"), initialAssumptions, phase, false);
+        }
         public Context {
-            Objects.requireNonNull(goal, "goal");
+            if (sourceOnly && goal != null) throw new IllegalArgumentException("source-only context cannot carry a goal");
+            if (!sourceOnly) Objects.requireNonNull(goal, "goal");
             initialAssumptions = AssumptionSignature.ofExpressions(
                 Objects.requireNonNull(initialAssumptions, "initialAssumptions")).normalizedAssumptions();
             Objects.requireNonNull(phase, "phase");
@@ -46,8 +51,11 @@ public final class TypedMoveSearch {
         public static Context frozen(Expr goal) {
             return new Context(goal, List.of(), MoveContext.Phase.FROZEN_EVALUATION);
         }
+        public static Context sourceOnly(List<String> assumptions, MoveContext.Phase phase) {
+            return new Context(null, assumptions, phase, true);
+        }
         private MoveContext encoded() {
-            return new MoveContext(CODEC.encodeExpression(goal), initialAssumptions, phase);
+            return new MoveContext(sourceOnly ? "" : CODEC.encodeExpression(goal), initialAssumptions, phase);
         }
     }
 
