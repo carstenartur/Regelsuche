@@ -14,6 +14,7 @@ env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache --max-workers=2
   :regelsuche-search:test --tests de.regelsuche.search.moves.TypedSourceOnlyContextTest \
   --tests de.regelsuche.search.moves.TypedSourceOnlySearchTest \
   --tests de.regelsuche.search.moves.TypedProgramMoveProviderTest \
+  --tests de.regelsuche.search.moves.TypedPrimitiveCandidateCacheTest \
   :regelsuche-learning:test --tests de.regelsuche.evolution.TypedExternalPolynomialComparisonWorkerTest \
   --tests de.regelsuche.evolution.TypedPolynomialSurfaceCostTest \
   --tests de.regelsuche.evolution.TypedLearnedMoveInventoryTest \
@@ -25,6 +26,5 @@ env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache --max-workers=2
   --output build/reports/typed-external-polynomial-comparison
 "$pilot_python" -m external_polynomial_comparison.run_typed \
   --verify --output build/reports/typed-external-polynomial-comparison
-# Offline audit is separate from the timed query ledger and never changes its manifest.
 "$pilot_python" -m external_polynomial_comparison.audit_typed \
   --output build/reports/typed-external-polynomial-comparison
