@@ -35,6 +35,22 @@ class WorkReplacementManifestTest {
             base.unsolvedPolicy(), List.of(new Partition("a", "a", "same-family", Split.TRAIN, List.of()),
                 new Partition("b", "b", "same-family", Split.FINAL_TEST, List.of()))));
     }
+    @Test void unknownInformationRegimeCannotBypassFamilyHoldout() {
+        for (var regime : List.of("SEALED_FAMILY_HOLDUOT", "INSTANCE_TRANSFER", "unknown"))
+            assertThrows(IllegalArgumentException.class, () -> withRegime(regime, partitions()));
+    }
+    @Test void publicDevelopmentAllowsDistinctInstancesOfOneFamily() {
+        var instances = List.of(new Partition("a", "a", "same-family", Split.TRAIN, List.of()),
+            new Partition("b", "b", "same-family", Split.FINAL_TEST, List.of()));
+        assertEquals("PUBLIC_DEVELOPMENT", withRegime("PUBLIC_DEVELOPMENT", instances).informationRegime());
+        assertThrows(IllegalArgumentException.class, () -> withRegime("SEALED_FAMILY_HOLDOUT", instances));
+        assertEquals("SEALED_FAMILY_HOLDOUT", withRegime("SEALED_FAMILY_HOLDOUT", partitions()).informationRegime());
+    }
+    private static WorkReplacementManifest withRegime(String regime, List<Partition> partitions) {
+        var base = manifest(Profile.LOADED_STREAM, 100, partitions());
+        return new WorkReplacementManifest(base.baselineCommit(), base.revisions(), regime, base.quality(), base.seeds(),
+            base.resources(), base.profile(), base.observationMode(), base.unsolvedPolicy(), partitions);
+    }
     static List<Partition> partitions() {
         return List.of(new Partition("train", "train-source", "train-family", Split.TRAIN, List.of()),
             new Partition("query", WorkReplacementLearning.identity("x+0"), "query-family", Split.FINAL_TEST, List.of()));

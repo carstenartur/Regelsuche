@@ -20,14 +20,27 @@ lifecycle account and comparison contract. Local implementation commits are
 
 - Eight phases, exact-once delegated work, four arms, three real session profiles,
   retained failures/unrun rows and fair total-budget allocation are implemented.
-- Java 25 tests: core 844, search 471, and learning 933 pass with zero failures,
-  errors or skips. The integration uses eight separate child JVMs and both stream
-  profiles. Primitive baselines do not restore learned models.
+- Java 25 tests: prior core 844 and search 471 runs passed; after the regular
+  GitHub review corrections below, the full learning suite passes 938 tests with
+  zero failures, errors or skips. The integration uses eight separate child JVMs
+  and both stream profiles. Primitive baselines do not restore learned models.
 - Independent review found two Important defects: omitted proof-output bytes and
   an oracle fixture that duplicated L1. Corrections charge all declared adapter
   output and require a supplied learned schema in the chosen oracle witness;
   focused RED/GREEN and the learning suite pass. Scoped independent re-review
   approved both corrections without further findings; full hosted CI remains pending.
+- Regular GitHub review identified three additional boundaries: evaluation could
+  carry a TRAIN context, unknown information-regime strings could bypass family
+  isolation, and child queries used a hardcoded deadline and reported ERROR.
+  Pre-fix behavioral RED reproduced all three (four failing tests). Corrections
+  require FROZEN_EVALUATION before callbacks, accept only PUBLIC_DEVELOPMENT and
+  SEALED_FAMILY_HOLDOUT, and enforce the declared child query deadline with typed
+  TIMEOUT. Killed-child unknown work marks accounting incomplete; paid receipts
+  and remaining rows survive, preventing economic claims. The startup/restore
+  deadline remains separate. All 20 focused tests pass, including a real hanging
+  JVM with a 50ms query deadline and the existing three-profile integration.
+  Scoped independent review and hosted qualification of these corrections remain
+  pending; earlier approvals do not cover the new code.
 - Actual pre-fix regressions also cover extreme numeric export, failed final
   replay and missing output evidence. For the new accounting/orchestration APIs,
   tests were written first but behavioral RED was not executed before filling the

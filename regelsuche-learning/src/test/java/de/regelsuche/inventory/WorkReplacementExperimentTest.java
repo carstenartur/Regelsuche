@@ -21,6 +21,24 @@ class WorkReplacementExperimentTest {
         MovePriorityPolicy.INVENTORY_ORDER);
     static final TypedSourceOnlySearch.Objective OBJECTIVE = state -> new TypedSourceOnlySearch.Score(
         state.expression() instanceof BinaryExpr ? 3 : 1, 1);
+    @Test void finalTestRejectsTrainingContextBeforeAnyCallback() { rejectsTrainingContext(Split.FINAL_TEST); }
+    @Test void validationRejectsTrainingContextBeforeAnyCallback() { rejectsTrainingContext(Split.VALIDATION); }
+    private static void rejectsTrainingContext(Split split) {
+        var original = query("query"); var p = original.problem();
+        var training = new TypedMoveSearch.Problem(p.source(), TypedMoveSearch.Context.sourceOnly(List.of(), MoveContext.Phase.TRAIN),
+            p.providers(), p.policy(), p.verifier(), p.stateScore(), p.mode(), p.scheduling(), p.budget());
+        var query = new WorkReplacementExperiment.Query(original.id(), original.sourceIdentity(), training, original.objective());
+        var manifest = WorkReplacementManifestTest.manifest(Profile.LOADED_STREAM, 20000,
+            List.of(new Partition("query", query.sourceIdentity(), "query-family", split, List.of())));
+        var acquisitions = new AtomicInteger(); var sessions = new AtomicInteger();
+        var plans = new EnumMap<Arm, WorkReplacementExperiment.Plan>(Arm.class);
+        for (var arm : Arm.values()) plans.put(arm, new WorkReplacementExperiment.Plan(manifest.binding(arm),
+            journal -> acquisitions.incrementAndGet(), LifecycleWorkAccount.empty(), (journal, prefix) -> {
+                sessions.incrementAndGet(); return new WorkReplacementTypedExecution(PROFILE, false, List.of());
+            }));
+        assertAll(() -> assertThrows(IllegalArgumentException.class, () -> new WorkReplacementExperiment().run(manifest, List.of(query), plans)),
+            () -> assertEquals(0, acquisitions.get()), () -> assertEquals(0, sessions.get()));
+    }
     @Test void successfulOnlineSearchCanFailLifecycleBudgetAfterFinalReplayAndOutput() {
         var query = query("query");
         var problem = query.problem();

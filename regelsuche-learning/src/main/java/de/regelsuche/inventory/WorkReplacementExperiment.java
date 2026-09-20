@@ -39,6 +39,10 @@ public final class WorkReplacementExperiment {
         public LifecycleWorkAccount account() { return account; }
         public boolean complete() { return complete; }
     }
+    /** A process-backed query exceeded its deadline; killed work may be unobservable. */
+    public static final class QueryTimeoutException extends RuntimeException {
+        public QueryTimeoutException(String message, Throwable cause) { super(message, cause); }
+    }
     @FunctionalInterface public interface Acquisition { void acquire(Journal journal); }
     @FunctionalInterface public interface SessionFactory { Session open(Journal journal, String receiptPrefix); }
     public interface Session extends AutoCloseable {
@@ -118,6 +122,10 @@ public final class WorkReplacementExperiment {
                 long share = remaining / (queries.size() - i);
                 rows.add(share == 0 ? notRun(arm, query, "no query share after restore")
                     : execute(manifest, arm, query, share, session, journal, prefix));
+                if (rows.getLast().status() == Status.TIMEOUT && !journal.complete()) {
+                    fillMissing(queries, arm, rows, "query timeout left unobservable work; stream stopped");
+                    return;
+                }
                 if (manifest.profile() == Profile.FRESH_PROCESS_PER_QUERY) { session.close(); session = null; }
             }
         } finally { if (session != null) session.close(); }
@@ -144,6 +152,10 @@ public final class WorkReplacementExperiment {
             long spent = Math.subtractExact(journal.account().totalWork(), before);
             var status = status(result, spent > share, elapsed > manifest.resources().queryTimeoutNanos());
             return new Row(arm, query.id(), status, share, elapsed, session.process().map(Process::pid).orElse(ProcessHandle.current().pid()), result, "");
+        } catch (QueryTimeoutException failure) {
+            journal.incomplete();
+            return new Row(arm, query.id(), Status.TIMEOUT, share, System.nanoTime() - start,
+                session.process().map(Process::pid).orElse(-1L), null, failure.toString());
         } catch (RuntimeException failure) {
             journal.incomplete();
             return new Row(arm, query.id(), Status.ERROR, share, System.nanoTime() - start, -1, null, failure.toString());
@@ -160,6 +172,8 @@ public final class WorkReplacementExperiment {
             throw new IllegalArgumentException("distinct nonempty query stream required");
         for (var arm : Arm.values()) manifest.validateBinding(arm, Objects.requireNonNull(plans.get(arm), "missing arm").binding());
         for (var query : queries) {
+            if (query.problem().context().phase() != de.regelsuche.search.moves.MoveContext.Phase.FROZEN_EVALUATION)
+                throw new IllegalArgumentException("evaluation requires FROZEN_EVALUATION context");
             var partition = manifest.partitions().stream().filter(value -> value.id().equals(query.id())).findFirst().orElseThrow();
             if (partition.split() == Split.TRAIN || !partition.sourceIdentity().equals(query.sourceIdentity())
                     || !query.sourceIdentity().equals(new de.regelsuche.search.program.CompiledAstReplayCodec().encodeExpression(query.problem().source())))

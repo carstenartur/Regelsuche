@@ -45,6 +45,8 @@ public record WorkReplacementManifest(String baselineCommit, Revisions revisions
     public WorkReplacementManifest {
         if (baselineCommit == null || !baselineCommit.matches("[0-9a-f]{40}")) throw new IllegalArgumentException("full baseline commit required");
         Objects.requireNonNull(revisions); requireText(informationRegime); Objects.requireNonNull(quality);
+        if (!List.of("PUBLIC_DEVELOPMENT", "SEALED_FAMILY_HOLDOUT").contains(informationRegime))
+            throw new IllegalArgumentException("unsupported information regime: " + informationRegime);
         seeds = List.copyOf(seeds); if (seeds.isEmpty()) throw new IllegalArgumentException("seed required");
         Objects.requireNonNull(resources); Objects.requireNonNull(profile); Objects.requireNonNull(observationMode);
         Objects.requireNonNull(unsolvedPolicy); partitions = List.copyOf(partitions);

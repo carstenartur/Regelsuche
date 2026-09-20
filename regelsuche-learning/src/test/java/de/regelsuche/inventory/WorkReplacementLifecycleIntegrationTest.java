@@ -103,7 +103,7 @@ class WorkReplacementLifecycleIntegrationTest {
             opens.incrementAndGet();
             String oracleSchemaId = arm == Arm.L_ORACLE ? fixture.supplied().schemaId() : "";
             if (manifest.profile() == Profile.FRESH_PROCESS_PER_QUERY) return new Child(learned(arm) ? fixture.acquired().model().toCanonicalJson() : "",
-                learned(arm), arm == Arm.B0, oracleSchemaId, journal, prefix);
+                learned(arm), arm == Arm.B0, oracleSchemaId, manifest.resources().queryTimeoutNanos(), journal, prefix);
             var providers = loadedProviders(arm, oracleSchemaId, journal, prefix);
             var selected = fixture.selected();
             return new WorkReplacementTypedExecution(new TypedSourcePolicySelection.Profile(selected.selected().id(), providers,
@@ -205,17 +205,25 @@ class WorkReplacementLifecycleIntegrationTest {
             List.of(), MovePriorityPolicy.INVENTORY_ORDER, verifier, state -> 0, MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED,
             new MoveSearch.Budget(8, 8, 100, 64, 20000));
     }
-    private static final class Child implements WorkReplacementExperiment.Session {
+    static final class Child implements WorkReplacementExperiment.Session {
         private final Process process;
         private final BufferedReader input;
         private final BufferedWriter output;
-        Child(String model, boolean learned, boolean historical, String oracleSchemaId, WorkReplacementExperiment.Journal journal, String prefix) {
+        private final long queryTimeoutNanos;
+        Child(String model, boolean learned, boolean historical, String oracleSchemaId, long queryTimeoutNanos,
+                WorkReplacementExperiment.Journal journal, String prefix) {
+            this(WorkReplacementProcessFixture.class,
+                Map.of("model", model, "learned", learned, "historical", historical, "oracleSchemaId", oracleSchemaId),
+                queryTimeoutNanos, journal, prefix);
+        }
+        Child(Class<?> worker, Map<String, ?> setup, long queryTimeoutNanos, WorkReplacementExperiment.Journal journal, String prefix) {
+            this.queryTimeoutNanos = queryTimeoutNanos;
             try {
                 process = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-                    "-cp", childClasspath(), WorkReplacementProcessFixture.class.getName()).redirectError(ProcessBuilder.Redirect.INHERIT).start();
+                    "-cp", childClasspath(), worker.getName()).redirectError(ProcessBuilder.Redirect.INHERIT).start();
                 input = process.inputReader(); output = process.outputWriter();
-                send(Map.of("model", model, "learned", learned, "historical", historical, "oracleSchemaId", oracleSchemaId));
-                append(JSON.readTree(receive()), journal, prefix);
+                send(setup);
+                append(JSON.readTree(receive(TimeUnit.SECONDS.toNanos(45))), journal, prefix);
             } catch (Exception failure) { throw new IllegalStateException(failure); }
         }
         @Override public Optional<Process> process() { return Optional.of(process); }
@@ -223,15 +231,17 @@ class WorkReplacementLifecycleIntegrationTest {
                 Quality quality, WorkReplacementExperiment.Journal journal, String prefix) {
             try {
                 send(Map.of("source", query.sourceIdentity(), "budget", budget, "quality", quality, "prefix", prefix));
-                var response = JSON.readTree(receive());
+                var response = JSON.readTree(receive(queryTimeoutNanos));
                 append(response.get("receipts"), journal, prefix);
                 return JSON.treeToValue(response.get("evaluation"), WorkReplacementExperiment.Evaluation.class);
+            } catch (TimeoutException failure) {
+                throw new WorkReplacementExperiment.QueryTimeoutException("child query exceeded declared deadline", failure);
             } catch (Exception failure) { throw new IllegalStateException(failure); }
         }
         private void send(Object value) throws IOException { output.write(JSON.writeValueAsString(value)); output.newLine(); output.flush(); }
-        private String receive() throws Exception {
+        private String receive(long timeoutNanos) throws Exception {
             try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-                try { return executor.submit(input::readLine).get(45, TimeUnit.SECONDS); }
+                try { return executor.submit(input::readLine).get(timeoutNanos, TimeUnit.NANOSECONDS); }
                 catch (TimeoutException failure) { process.destroyForcibly(); throw failure; }
             }
         }

@@ -19,7 +19,9 @@ for the first contract and the existing full-continuation search for the second.
 A score is not a target expression or proof authority. The same Query objects,
 objective and checker are passed to every arm. Process workers reconstruct the
 same typed source, registered objective and checker instead of serializing arbitrary
-callbacks. A source identity is checked against its typed expression.
+callbacks. A source identity is checked against its typed expression. Evaluation
+queries in both VALIDATION and FINAL_TEST must use FROZEN_EVALUATION contexts;
+all inputs are validated before any acquisition or session callback runs.
 
 | Arm | Execution | Knowledge | Permitted comparison |
 |---|---|---|---|
@@ -110,7 +112,10 @@ comparisons only; they do not prove a universal speedup or a complete CPU cost.
 source-only selector, and schema restore. TRAIN identities are checked before
 acquisition and selection. Source overlap and backward provenance across
 TRAIN/VALIDATION/FINAL_TEST are rejected. A sealed family holdout additionally
-rejects a shared family across partitions. Public development examples remain
+rejects a shared family across partitions. The only supported information-regime
+strings are `PUBLIC_DEVELOPMENT` and `SEALED_FAMILY_HOLDOUT`; unknown spellings
+are rejected. Public development permits distinct instances of a shared family,
+without claiming a sealed family holdout. Public development examples remain
 public development, even when their role in an individual run is FINAL_TEST.
 
 Elapsed lifecycle time is measured directly around each arm and query; it is not
@@ -123,9 +128,14 @@ retained separately, avoiding a self-referential report size/work definition.
 
 The in-process deadline is an observed deadline: an over-time returned execution is
 TIMEOUT and cannot succeed. Bounded work/state limits still apply. Hard preemption
-requires a process-backed session; the child-JVM integration uses a timed read and
-terminates the child on timeout. An arbitrary hanging in-process callback is not
-claimed to be preemptible.
+requires a process-backed session; the child-JVM integration uses the manifest's
+`queryTimeoutNanos` for its query response read and terminates the child on timeout.
+Its separate startup/restore response deadline remains 45 seconds; startup failure
+prevents query execution and retains NOT_RUN rows. A typed query-timeout failure
+produces TIMEOUT, retains known receipts, marks accounting incomplete for killed
+work that cannot be observed, and leaves the remaining stream rows NOT_RUN. Other
+exceptions remain ERROR. An arbitrary hanging in-process callback is not claimed
+to be preemptible.
 
 Errors, invalid proofs, unreachable thresholds, over-budget results and unrun rows
 remain present. Integrations append completed receipts before throwing. If a legacy
@@ -146,7 +156,7 @@ models without measured acquisition time cannot produce lifecycle runtime ratios
 ./gradlew --no-daemon :regelsuche-learning:test \
   --tests '*WorkReplacementAccountingTest' --tests '*WorkReplacementManifestTest' \
   --tests '*WorkReplacementExperimentTest' --tests '*WorkReplacementLifecycleIntegrationTest' \
-  --tests '*TypedSourcePolicyQualitySelectionTest'
+  --tests '*TypedSourcePolicyQualitySelectionTest' --tests '*WorkReplacementProcessTimeoutTest'
 ```
 
 The integration exercises actual training, proof formation, source-only policy
