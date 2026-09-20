@@ -8,4 +8,35 @@ Baseline: `7aec9ae0a1619dda98f859d1277ac8b287471423`. Its tree equals reviewed/t
 - #1048 head `ec1e5d40dde7b52f086621de704ac25b5a2b1c2a`, CI 35514858944: all required authorities successful; merge is baseline above. Hosted artifact ID 10606910982, reported SHA256 `c28f72b376d96d73860a6b882edf9e5d288fc4c1f17fe857119e14c898f7bee7`.
 - Fresh local Java 25.0.2: `./gradlew --no-daemon :regelsuche-search:test :regelsuche-learning:test` succeeded. JUnit XML: 471 search + 914 learning tests, zero failures/errors/skips.
 - Independent code review found no blocking issue. The inherited extreme-score JSON aggregate overflow is assigned to P01; long work overflow must continue to fail explicitly.
-- Existing negative learning results and all quality gates remain unchanged. P01–P12 are pending.
+- Post-merge main CI [35517882778](https://github.com/carstenartur/Regelsuche/actions/runs/35517882778) passed every required authority and `ciCheck` at that baseline. Main artifact 10607464502 has API-reported SHA256 `24a5bbc5882338c48cd2a4c5692281bd8f7715e38fc01c42487aa5c9daa90e06`; its ZIP was not downloaded.
+- Existing negative learning results and all quality thresholds remain unchanged.
+
+## P01 — implemented, qualification in progress
+
+[Draft PR #1049](https://github.com/carstenartur/Regelsuche/pull/1049) adds the v3
+lifecycle account and comparison contract. Local implementation commits are
+`2ea17e71a69824272cf132a45c76c374a628f322` and
+`5784d1c7e0f2fa5be701049cb5d40ecdf645b5f2`.
+
+- Eight phases, exact-once delegated work, four arms, three real session profiles,
+  retained failures/unrun rows and fair total-budget allocation are implemented.
+- Java 25 tests: core 844, search 471, and learning 933 pass with zero failures,
+  errors or skips. The integration uses eight separate child JVMs and both stream
+  profiles. Primitive baselines do not restore learned models.
+- Independent review found two Important defects: omitted proof-output bytes and
+  an oracle fixture that duplicated L1. Corrections charge all declared adapter
+  output and require a supplied learned schema in the chosen oracle witness;
+  focused RED/GREEN and the learning suite pass. Scoped independent re-review
+  approved both corrections without further findings; full hosted CI remains pending.
+- Actual pre-fix regressions also cover extreme numeric export, failed final
+  replay and missing output evidence. For the new accounting/orchestration APIs,
+  tests were written first but behavioral RED was not executed before filling the
+  implementation. Four post-implementation fault mutations supplement that
+  disclosed process deviation; they are not described as original RED evidence.
+- Initial hosted CI failed the accumulated context-growth limit against an older
+  baseline. The existing accepted-predecessor procedure independently qualified
+  M0 and retained both accepted and rejected reports; see
+  [the provenance](../../ai-knowledge/baseline-history/2026-09-20-main7aec9ae0-provenance.json).
+  No threshold, selector or exception changed. P01 still needs its full current-head CI.
+
+No economic learning advantage is asserted by P01. P02–P12 are pending.

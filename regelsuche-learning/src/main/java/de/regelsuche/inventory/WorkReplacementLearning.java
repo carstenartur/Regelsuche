@@ -19,18 +19,22 @@ public final class WorkReplacementLearning {
             WorkReplacementExperiment.Journal journal, String prefix) {
         manifest.requireTrainingSources(inputs.stream().map(input -> identity(input.expression())).toList());
         var formation = new TraceRewriteStrategyLearner().learn(genome, inputs, limits);
+        String formationJson = formation.toCanonicalJson();
         long search = Math.addExact(formation.trainingSearchWorkUnits(), formation.trainingPrimitiveWorkUnits());
-        charge(journal, prefix + "/train", TRAINING_SEARCH, search, TraceRewriteStrategyLearner.REVISION, formation.toCanonicalJson());
+        charge(journal, prefix + "/train", TRAINING_SEARCH, search, TraceRewriteStrategyLearner.REVISION, formationJson);
         long proof = java.util.stream.LongStream.of(formation.trainingReplayWorkUnits(), formation.trainingReplayPrimitiveWorkUnits(),
             formation.trainingExactWorkUnits(), formation.trainingMinimalityWorkUnits(), formation.trainingReferenceSupplementaryWorkUnits())
             .reduce(0, Math::addExact);
-        charge(journal, prefix + "/formation", RULE_FORMATION_PROOF, proof, TraceRewriteStrategyLearner.REVISION, formation.toCanonicalJson());
+        charge(journal, prefix + "/formation", RULE_FORMATION_PROOF, proof, TraceRewriteStrategyLearner.REVISION, formationJson);
         var inventory = formation.typedMoves();
-        charge(journal, prefix + "/compile", COMPILATION, inventory.providers().size(), "compiled-provider-count/v1", genome.toCanonicalJson());
+        String genomeJson = genome.toCanonicalJson();
+        charge(journal, prefix + "/compile", COMPILATION, inventory.providers().size(), "compiled-provider-count/v1", genomeJson);
         var model = inventory.checkedSchemas();
-        charge(journal, prefix + "/schemas", RULE_FORMATION_PROOF, model.formationWork(), CheckedLearnedSchemaModel.REVISION, model.toCanonicalJson());
-        materialized(journal, prefix + "/formation-output", formation.toCanonicalJson());
-        materialized(journal, prefix + "/model-output", model.toCanonicalJson());
+        String modelJson = model.toCanonicalJson();
+        charge(journal, prefix + "/schemas", RULE_FORMATION_PROOF, model.formationWork(), CheckedLearnedSchemaModel.REVISION, modelJson);
+        materialized(journal, prefix + "/formation-output", formationJson);
+        materialized(journal, prefix + "/genome-output", genomeJson);
+        materialized(journal, prefix + "/model-output", modelJson);
         return new Acquired(formation, inventory, model);
     }
     public static TypedSourcePolicySelection.Frozen select(WorkReplacementManifest manifest,
@@ -55,7 +59,9 @@ public final class WorkReplacementLearning {
     }
     public static TypedLearnedMoveInventory primitives(EvolutionGenome genome, WorkReplacementExperiment.Journal journal, String prefix) {
         var inventory = TypedLearnedMoveInventory.primitives(genome);
-        charge(journal, prefix + "/compile", COMPILATION, inventory.primitiveProviders().size(), "compiled-provider-count/v1", genome.toCanonicalJson());
+        String genomeJson = genome.toCanonicalJson();
+        charge(journal, prefix + "/compile", COMPILATION, inventory.primitiveProviders().size(), "compiled-provider-count/v1", genomeJson);
+        materialized(journal, prefix + "/genome-output", genomeJson);
         return inventory;
     }
     private static void materialized(WorkReplacementExperiment.Journal journal, String prefix, String text) {

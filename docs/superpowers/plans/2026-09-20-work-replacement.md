@@ -198,11 +198,11 @@ Ein Meilenstein enthält einen Nachweis, nicht nur neue Klassen oder grüne Unit
 
 **Ziel:** Eine reproduzierbare Grundlage statt gestapelter halbqualifizierter Änderungen.
 
-- [ ] Für #1047 den tatsächlichen Head, offene Review-Threads, Diff zum aktuellen Main und alle erforderlichen aktuellen CI-Jobs lesen. Nicht aus der PR-Beschreibung auf einen grünen Stand schließen.
-- [ ] Ausschließlich zugehörige Fehler beheben; keine zusätzlichen Optimierungen in den Merge-Fix hineinziehen. Nicht zugehörige Probleme getrennt nachweisen und bearbeiten, ohne einen fehlgeschlagenen Pflichtcheck zu umgehen.
-- [ ] #1047 nur am qualifizierten Head integrieren. Danach #1048 mit dem neuen Main abgleichen; dessen eigene Änderungen klar vom Vorläufer trennen.
-- [ ] Für #1048 die neun neuen Tests, bestehende Modulprüfungen, finale Replay-Budgetgrenzen und sämtliche Pflichtprüfungen erneut ausführen/auswerten. Prüfen, dass Qualitätsmetrik und Fortsetzungsvertrag zwischen Training und Anwendung identisch bleiben.
-- [ ] Nach dem Merge den Main-Commit mit tatsächlichen Nachweisen als `baselineCommit` festhalten. Bereits integrierte PR-Karten nur schließen, keine alten Branches unnötig erneut mergen.
+- [x] Für #1047 den tatsächlichen Head, offene Review-Threads, Diff zum aktuellen Main und alle erforderlichen aktuellen CI-Jobs lesen. Nicht aus der PR-Beschreibung auf einen grünen Stand schließen.
+- [x] Ausschließlich zugehörige Fehler beheben; keine zusätzlichen Optimierungen in den Merge-Fix hineinziehen. Nicht zugehörige Probleme getrennt nachweisen und bearbeiten, ohne einen fehlgeschlagenen Pflichtcheck zu umgehen.
+- [x] #1047 nur am qualifizierten Head integrieren. Danach #1048 mit dem neuen Main abgleichen; dessen eigene Änderungen klar vom Vorläufer trennen.
+- [x] Für #1048 die neun neuen Tests, bestehende Modulprüfungen, finale Replay-Budgetgrenzen und sämtliche Pflichtprüfungen erneut ausführen/auswerten. Prüfen, dass Qualitätsmetrik und Fortsetzungsvertrag zwischen Training und Anwendung identisch bleiben.
+- [x] Nach dem Merge den Main-Commit mit tatsächlichen Nachweisen als `baselineCommit` festhalten. Bereits integrierte PR-Karten nur schließen, keine alten Branches unnötig erneut mergen.
 
 **Abnahme:** Keine unaufgelöste fachliche Review-Anforderung; erfolgreicher aktueller Pflichtlauf; gespeicherte Commit-/Workflow-/Artefaktidentitäten. Ein noch laufender Check ist weder rot noch grün und berechtigt nicht zur Erfolgsmeldung.
 
@@ -216,12 +216,12 @@ Ein Meilenstein enthält einen Nachweis, nicht nur neue Klassen oder grüne Unit
 
 **Ein-/Ausgabe:** Ein Manifest bindet Basiscommit, Ausführungsrevision, Regel-/Modellrevision, Informationsregime, Objektivdefinition, Saatwerte, Ressourcenlimits und Datenpartitionen. Ergebnis enthält unveränderte Rohquittungen plus ein separat versioniertes Lebenszykluskonto. Historische Quittungen werden nicht neu interpretiert.
 
-- [ ] Ein reproduzierbares Gegenbeispiel schreiben: erfolgreiche Online-Suche, deren finale Replay-Arbeit das Budget überschreitet. Erwartung: `withinBudget=false`, gesamte Arbeit erhalten, kein Budgeterfolg.
-- [ ] Kostenstufen getrennt erfassen: Acquisition, Selection, Compilation, Restore, Query, FinalCheck und Export. Werden Quittungen ineinander delegiert, darf jede Operation genau einmal gezählt werden.
-- [ ] B0, B1, L1 und L-oracle über dieselben Problem-/Prüfobjekte und frische Ausführungssitzungen betreiben. Die Oracle-Variante im Validator von Erfolgszusammenfassungen ausschließen.
-- [ ] Drei Betriebsprofile definieren: frischer Prozess pro Anfrage; einmal geladenes Modell über einen Strom; vorgebildetes bereitgestelltes Modell, dessen Erwerbskosten trotzdem separat im Bericht stehen.
-- [ ] Fehler, Zeitüberschreitungen, unlösbare Qualitätsgrenzen und ungültige Nachweise im Ergebnis halten. Laufzeitquotienten nur mit deklarierter Behandlung ungelöster Aufgaben ausgeben; nicht nur die erfolgreichen Schnittmengen als Gesamtergebnis berichten.
-- [ ] Profiling und ausgabearme Zeitmessung trennen. Beide Kontrollarme tragen denselben Beobachtungsmodus. Vollständige Diagnoseprotokolle dürfen gestreamt werden, ihre IO-Arbeit verschwindet nicht.
+- [x] Ein reproduzierbares Gegenbeispiel schreiben: erfolgreiche Online-Suche, deren finale Replay-Arbeit das Budget überschreitet. Erwartung: `withinBudget=false`, gesamte Arbeit erhalten, kein Budgeterfolg.
+- [x] Kostenstufen getrennt erfassen: Acquisition, Selection, Compilation, Restore, Query, FinalCheck und Export. Werden Quittungen ineinander delegiert, darf jede Operation genau einmal gezählt werden.
+- [x] B0, B1, L1 und L-oracle über dieselben Problem-/Prüfobjekte und frische Ausführungssitzungen betreiben. Die Oracle-Variante im Validator von Erfolgszusammenfassungen ausschließen.
+- [x] Drei Betriebsprofile definieren: frischer Prozess pro Anfrage; einmal geladenes Modell über einen Strom; vorgebildetes bereitgestelltes Modell, dessen Erwerbskosten trotzdem separat im Bericht stehen.
+- [x] Fehler, Zeitüberschreitungen, unlösbare Qualitätsgrenzen und ungültige Nachweise im Ergebnis halten. Laufzeitquotienten nur mit deklarierter Behandlung ungelöster Aufgaben ausgeben; nicht nur die erfolgreichen Schnittmengen als Gesamtergebnis berichten.
+- [x] Profiling und ausgabearme Zeitmessung trennen. Beide Kontrollarme tragen denselben Beobachtungsmodus. Vollständige Diagnoseprotokolle dürfen gestreamt werden, ihre IO-Arbeit verschwindet nicht.
 
 **Konkrete Regressionen:** Summe delegierter Kosten entspricht Kontosumme; Null-/Negativarbeit wird abgewiesen, wo nicht erlaubt; `long`-Überläufe führen zu explizitem Fehler statt Wraparound; vertauschte Prüf-/Modellrevisionen werden verworfen; FINAL-TEST-Quelle darf nicht nach TRAIN zurückfließen; unvollständiger Lauf darf keine fehlende Zeile verlieren.
 

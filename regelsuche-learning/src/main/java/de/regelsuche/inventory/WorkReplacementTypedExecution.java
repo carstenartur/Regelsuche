@@ -37,11 +37,16 @@ public final class WorkReplacementTypedExecution implements WorkReplacementExper
             failedCheck = LearnedSchedulingArtifacts.json(failure.rejected());
         }
         String raw = LearnedSchedulingArtifacts.resultJson(result.search().encodedResult());
-        journal.append(queryAccount(prefix, result, raw));
-        charge(journal, prefix + "/check", FINAL_CHECK, result.replayWork(), "typed-source-final-replay/v3", failedCheck == null ? result.witness().toString() : failedCheck);
+        var queryAccount = queryAccount(prefix, result, raw);
+        journal.append(queryAccount);
+        String finalCheck = failedCheck == null ? result.witness().toString() : failedCheck;
+        charge(journal, prefix + "/check", FINAL_CHECK, result.replayWork(), "typed-source-final-replay/v3", finalCheck);
         String output = new de.regelsuche.search.program.CompiledAstReplayCodec().encodeExpression(result.incumbent().expression());
         // Logical output units are UTF-8 bytes materialized, distinct from CPU time and disk IO.
-        long outputBytes = Math.addExact((long) raw.getBytes(StandardCharsets.UTF_8).length, output.getBytes(StandardCharsets.UTF_8).length);
+        long queryBytes = queryAccount.receipts().stream().mapToLong(receipt -> receipt.rawReceipt().getBytes(StandardCharsets.UTF_8).length)
+            .reduce(0, Math::addExact);
+        long outputBytes = Math.addExact(queryBytes, Math.addExact((long) finalCheck.getBytes(StandardCharsets.UTF_8).length,
+            output.getBytes(StandardCharsets.UTF_8).length));
         charge(journal, prefix + "/output", OUTPUT, outputBytes, "utf8-materialized-bytes/v1", "");
         return new WorkReplacementExperiment.Evaluation(result.outputScore() <= quality.maximumScore(), validProof,
             result.inputScore(), result.outputScore(), output, raw,

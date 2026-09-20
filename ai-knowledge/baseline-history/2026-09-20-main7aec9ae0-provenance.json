@@ -1,0 +1,64 @@
+{
+  "schema": "regelsuche.ai-knowledge-baseline-provenance/v1",
+  "decision": "Advance only from clean, actually merged, independently qualified M0 main after its full unchanged old-baseline gate passes; the failing P01 candidate supplies no baseline values.",
+  "acceptedSource": {
+    "mainCommit": "7aec9ae0a1619dda98f859d1277ac8b287471423",
+    "tree": "56b841cf704a8db32b1c7c7420faff653087cc0f",
+    "pullRequest": 1048,
+    "prHead": "ec1e5d40dde7b52f086621de704ac25b5a2b1c2a",
+    "mainCiRun": 35517882778,
+    "prCiRun": 35514858944
+  },
+  "measurement": {
+    "origin": "Fresh complete local aiKnowledgeCheck on clean detached accepted main, unchanged old baseline and policy; independent review checked receipt hashes and report bytes.",
+    "extractorTag": "v0.1.10",
+    "extractorCommit": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+    "compiler": "JDK25 compiling unchanged extractor with original release17 target; existing retained initializer unchanged.",
+    "passed": true,
+    "estimatedContextTokens": 648025,
+    "oldBaselineTokens": 634445,
+    "increase": 13580,
+    "threshold": 15000,
+    "coverageControlTests": 8,
+    "complexityHotspots": 17
+  },
+  "oldBaselineSha256": "2928c6dabe73e410e8c50e584cfaa21b9e17eabc59f53c85985ea233fb217af9",
+  "newBaselineSha256": "b2d65ffe25f98ebbac0ca4e493d1b056d8e521cecb034d6b320277eb4e6d584b",
+  "newBaselineDerivation": "Byte-for-byte copy of retained generated accepted-predecessor metrics-snapshot.json; no numeric edits.",
+  "rejectedFeature": {
+    "commit": "6f59849a63db364b9665ae00f04eca9f09017812",
+    "estimatedContextTokens": 650825,
+    "oldBaselineIncrease": 16380,
+    "passed": false,
+    "retainedUnchanged": true,
+    "usedForBaseline": false,
+    "ciRun": 35519884533,
+    "artifact": 10607973389,
+    "zipSha256Verified": "3b0fc44acc9fd58fedca75845dc9f1364688572a7488811ed645d5c499aa5caf"
+  },
+  "unchangedPolicy": {
+    "maxContextTokenIncrease": 15000,
+    "maxConceptRadiusIncrease": 3,
+    "maxCognitiveDebtIncrease": 10,
+    "thresholdsSelectorsAndHotspotExceptionsChanged": false,
+    "testsRemovedOrSkipped": false,
+    "frozenExperimentsChanged": false
+  },
+  "retainedFilesSha256": {
+    "2026-09-20-main7aec9ae0-previous-baseline.json": "2928c6dabe73e410e8c50e584cfaa21b9e17eabc59f53c85985ea233fb217af9",
+    "2026-09-20-main7aec9ae0-aiKnowledgeCheck.log": "a92b603363705ddc251c3d43f326815cbae27e834f169220dd19bde699a43f94",
+    "2026-09-20-main7aec9ae0-check.json": "3953c448b31f867070a77e1ea369eb346dd29d96a7760515c58c3df5a911b648",
+    "2026-09-20-main7aec9ae0-ci-qualification.json": "72fb2a3f8ff2a4a282389868350f620f8ea23f9d4cfe4f096c01f4e4ce61d25c",
+    "2026-09-20-main7aec9ae0-complexity.json": "d214e25086481baa51e2545e64966e73080bdb93b7f469511e3e26422dfa0251",
+    "2026-09-20-main7aec9ae0-independent-review.md": "425a0667e3e42579f57f133873ef804d6adbfc68099aa8ecfff26ef4781fd2d3",
+    "2026-09-20-main7aec9ae0-metrics-snapshot.json": "b2d65ffe25f98ebbac0ca4e493d1b056d8e521cecb034d6b320277eb4e6d584b",
+    "2026-09-20-main7aec9ae0-receipt.json": "ba534b551b0348f412bb21b522a0c2601dfac755fde8bb9168b082336bf42a3f",
+    "2026-09-20-main7aec9ae0-trend.json": "95147642955f9958f9a6d0b936e001f1c9e7f0d31cd510ca0ceaf3e9e64d9822",
+    "2026-09-20-main7aec9ae0-run-gate.py": "da30a8de3507492d4ae491fff9d4f10ac1bd745c8f76280ed80e3ce23056e669",
+    "2026-09-20-p01-6f59849a-rejected-check.json": "c047ceeece59ff244d87901fd7a72eb0a0007bf55987fa4e6ee2a09ef15385d3",
+    "2026-09-20-p01-6f59849a-rejected-metrics-snapshot.json": "f2c5f65d3fe3300d74996f1239e579295b50ff314562c41694ac36e85e6805e0",
+    "2026-09-20-p01-6f59849a-rejected-receipt.json": "20aeecb6143acd97567ba94f426e10b30a6887d41c3d323eef049e2d21752fde",
+    "2026-09-20-p01-6f59849a-rejected-trend.json": "3daebd127d902698ecdc4e5b543be9fc12725f06af4aa23beb00a17f5de6afa9"
+  },
+  "qualificationBoundary": "The feature still requires complete CI at its own current head. Main artifact digest is API-reported; its ZIP was not downloaded. Qualification does not imply an implementation, learning or performance acceptance."
+}

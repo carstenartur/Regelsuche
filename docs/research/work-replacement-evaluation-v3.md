@@ -97,7 +97,11 @@ NOT_RUN rows for all remaining queries. No result matrix may omit or reorder a r
 
 The logical account combines explicitly labeled observed units, not CPU
 instructions: existing search/checker work, compiled provider instance counts,
-materialized UTF-8 output bytes, and attempted UTF-16 stream writes. Compilation
+materialized UTF-8 output bytes, and attempted UTF-16 stream writes. Final-check
+witness text (including rejected verification JSON), query-component receipt text,
+selected output identity, and genome artifacts all contribute their materialized
+UTF-8 bytes. Shared formation JSON is materialized and charged once even when two
+phase receipts reference it. Compilation
 counts do not measure compiler internals or CPU bit complexity. Raw legacy receipts
 keep their original meaning. These measurements support bounded logical-work
 comparisons only; they do not prove a universal speedup or a complete CPU cost.
@@ -152,3 +156,10 @@ outputs and logical receipts across repeated controls; elapsed times are deliber
 not required to match. The tests characterize this bounded development integration;
 no amortization, independent family capability, factor-two, or factor-ten result is
 claimed.
+
+The lifecycle integration supplies the oracle with one applicable learned schema
+for two declared cancellation queries, restricts generation to that schema, and
+checks its identifier in each selected final-check witness, including child JVMs.
+Diagnostic binding/matching and output are paid separately from L1's empirical
+selection. Both arms retain the same query/checker contract; oracle successes and
+ratios remain excluded from learning summaries.

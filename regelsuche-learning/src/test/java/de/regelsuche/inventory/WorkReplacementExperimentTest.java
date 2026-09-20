@@ -38,6 +38,26 @@ class WorkReplacementExperimentTest {
         assertEquals(0, result.successes(Arm.B1));
         assertTrue(improved.rows().getFirst().evaluation().rawReceipt().contains("QUALITY_REACHED"));
     }
+    @Test void finalCheckOutputExceedsThePreviouslyReportedSufficientBudget() {
+        var generous = WorkReplacementManifestTest.manifest(Profile.LOADED_STREAM, 20000, WorkReplacementManifestTest.partitions());
+        var calibration = new WorkReplacementExperiment().run(generous, List.of(query("query")), plans(generous, 0, new AtomicInteger()));
+        var arm = calibration.arms().get(Arm.B1);
+        var evaluation = arm.rows().getFirst().evaluation();
+        long oldBudget = Math.addExact(arm.account().work(QUERY), Math.addExact(arm.account().work(FINAL_CHECK),
+            Math.addExact(utf8(evaluation.rawReceipt()), utf8(evaluation.outputIdentity()))));
+        var tight = WorkReplacementManifestTest.manifest(Profile.LOADED_STREAM, oldBudget, WorkReplacementManifestTest.partitions());
+        var report = new WorkReplacementExperiment().run(tight, List.of(query("query")), plans(tight, 0, new AtomicInteger()));
+        assertEquals(WorkReplacementExperiment.Status.OVER_BUDGET, report.arms().get(Arm.B1).rows().getFirst().status());
+        assertFalse(report.arms().get(Arm.B1).withinBudget(oldBudget));
+        assertEquals(0, report.successes(Arm.B1));
+        assertOutputAccounted(arm.account(), evaluation);
+    }
+    @Test void primitiveCompilationPaysForItsGenomeArtifact() {
+        var journal = new WorkReplacementExperiment.Journal();
+        WorkReplacementLearning.primitives(de.regelsuche.evolution.TraceStrategyTransferExample.inventory(), journal, "primitive");
+        assertEquals(utf8(journal.account().receipts().getFirst().rawReceipt()), journal.account().work(OUTPUT));
+    }
+
     @Test void failedFinalReplayRetainsQueryAndFailedVerificationWork() {
         var base = query("query"); var p = base.problem(); var calls = new AtomicInteger();
         var verifier = TypedMoveSearch.primitiveReplay(TRANSPORT);
@@ -53,7 +73,14 @@ class WorkReplacementExperimentTest {
         assertEquals(9, journal.account().work(FINAL_CHECK));
         assertTrue(journal.account().work(QUERY) > 0);
         assertTrue(journal.complete());
+        assertOutputAccounted(journal.account(), evaluation);
     }
+    private static void assertOutputAccounted(LifecycleWorkAccount account, WorkReplacementExperiment.Evaluation evaluation) {
+        long receiptBytes = account.receipts().stream().filter(receipt -> receipt.phase() == QUERY || receipt.phase() == FINAL_CHECK)
+            .mapToLong(receipt -> utf8(receipt.rawReceipt())).reduce(0, Math::addExact);
+        assertEquals(Math.addExact(receiptBytes, utf8(evaluation.outputIdentity())), account.work(OUTPUT));
+    }
+    private static long utf8(String value) { return value.getBytes(java.nio.charset.StandardCharsets.UTF_8).length; }
 
     @Test void acquisitionIsPaidAndBaselineReceivesTheUnspentLearningBudget() {
         var manifest = WorkReplacementManifestTest.manifest(Profile.LOADED_STREAM, 20000, WorkReplacementManifestTest.partitions());

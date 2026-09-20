@@ -20,12 +20,16 @@ public final class WorkReplacementProcessFixture {
         var genome = TraceStrategyTransferExample.inventory();
         var inventory = WorkReplacementLearning.primitives(genome, journal, "restore");
         var all = inventory.newSearchSession(false, 0, 0);
+        var selectedProviders = all.providers();
         if (setup.path("learned").asBoolean()) {
             var restored = WorkReplacementLearning.restore(setup.path("model").asText(), genome.contentHash(), journal, "restore");
             all = inventory.newSchemaSearchSession(restored, 4, Map.of());
+            String oracleSchemaId = setup.path("oracleSchemaId").asText();
+            selectedProviders = oracleSchemaId.isEmpty() ? all.providers()
+                : restored.providers(1, Map.of(), java.util.Set.of(oracleSchemaId));
         } else journal.append(LifecycleWorkAccount.of(LifecycleWorkAccount.Receipt.skipped("restore/restore",
             LifecycleWorkAccount.Phase.RESTORE_REPROOF, "primitive baseline has no learned model")));
-        var profile = new TypedSourcePolicySelection.Profile("frozen", all.providers(), MovePriorityPolicy.INVENTORY_ORDER);
+        var profile = new TypedSourcePolicySelection.Profile("frozen", selectedProviders, MovePriorityPolicy.INVENTORY_ORDER);
         var session = new WorkReplacementTypedExecution(profile, setup.path("historical").asBoolean(), List.of());
         System.out.println(JSON.writeValueAsString(journal.account().receipts()));
         for (String line; (line = input.readLine()) != null;) {
