@@ -27,6 +27,19 @@ public final class TypedSourceOnlySearch {
         public boolean withinBudget() { return totalWork() <= workBudget; }
         public boolean improved() { return outputScore < inputScore; }
     }
+    /**
+     * Online quality control in the same frontier. Objective and path materialization work is
+     * already part of search.metrics(); final independent replay remains an additional charge.
+     * A quality outcome is eligible only when withinBudget() also holds after that replay.
+     */
+    public Result searchUntil(TypedMoveSearch.Problem problem, Objective objective, long maximumOutputScore,
+            SearchContinuationContract contract) {
+        var online = new TypedMoveSearch().searchUntil(problem, objective, maximumOutputScore, contract);
+        long replayWork = replay(problem, online.search().initialState(), online.incumbent(), online.witness());
+        return new Result(online.incumbent(), online.inputScore(), online.outputScore(), online.witness(),
+            online.search(), 0, replayWork, problem.budget().totalWork());
+    }
+
     public Result search(TypedMoveSearch.Problem problem, Objective objective) {
         Objects.requireNonNull(problem, "problem");
         Objects.requireNonNull(objective, "objective");
@@ -66,8 +79,16 @@ public final class TypedSourceOnlySearch {
         }
         if (!cursor.equals(root)) throw new IllegalStateException("incumbent lineage does not start at the input");
         Collections.reverse(witness);
+        long replayWork = replay(problem, root, incumbent, witness);
+        // Extra inspections and replay can exceed the search budget. Retain that overrun,
+        // never clamp it or convert an over-budget anytime candidate into a success.
+        return new Result(incumbent, initial.value(), best, witness, search, selectionWork, replayWork, problem.budget().totalWork());
+    }
+
+    private static long replay(TypedMoveSearch.Problem problem, TypedMoveSearch.State root,
+            TypedMoveSearch.State incumbent, List<TypedMoveSearch.WitnessStep> witness) {
         long replayWork = 0;
-        cursor = root;
+        var cursor = root;
         for (var step : witness) {
             if (!cursor.equals(step.source())) throw new IllegalStateException("broken incumbent lineage");
             var replay = problem.verifier().verify(cursor, step.move(), problem.context());
@@ -78,8 +99,7 @@ public final class TypedSourceOnlySearch {
             cursor = step.target();
         }
         if (!cursor.equals(incumbent)) throw new IllegalStateException("incumbent replay endpoint differs");
-        // Extra inspections and replay can exceed the search budget. Retain that overrun,
-        // never clamp it or convert an over-budget anytime candidate into a success.
-        return new Result(incumbent, initial.value(), best, witness, search, selectionWork, replayWork, problem.budget().totalWork());
+        return replayWork;
     }
+
 }

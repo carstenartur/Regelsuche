@@ -14,8 +14,8 @@ import java.util.function.ToDoubleFunction;
 public final class MoveSearch {
     public enum Mode { FAST, COMPLETE_BOUNDED_REFERENCE }
     public enum Scheduling { EAGER_CONTROL, STAGED, INCREMENTAL_NATIVE_ORDER }
-    public enum Outcome { TARGET_REACHED, BOUNDED_EXHAUSTED, INCONCLUSIVE, WORK_EXHAUSTED, STATE_LIMIT }
-    public enum Decision { ENQUEUED, DUPLICATE, PATH_BOUND, ASSUMPTION_REJECTED, PROOF_REJECTED, COMPLEXITY_BOUND, WORK_LIMIT }
+    public enum Outcome { TARGET_REACHED, BOUNDED_EXHAUSTED, INCONCLUSIVE, WORK_EXHAUSTED, STATE_LIMIT, QUALITY_REACHED }
+    public enum Decision { ENQUEUED, DUPLICATE, PATH_BOUND, ASSUMPTION_REJECTED, PROOF_REJECTED, COMPLEXITY_BOUND, WORK_LIMIT, DOMINATED }
     public record Budget(int maxPrimitiveSteps, int maxSearchDepth, long maxTheoryWork, int maxStates, long totalWork, int maxComplexityDebt) {
         public Budget(int primitive, int depth, long theory, int states, long work) { this(primitive, depth, theory, states, work, Integer.MAX_VALUE); }
         public Budget {
@@ -75,24 +75,40 @@ public final class MoveSearch {
         public Result { witness = List.copyOf(witness); events = List.copyOf(events); reachedStates = Set.copyOf(reachedStates); deadEndStates = List.copyOf(deadEndStates); stateAssessments = Map.copyOf(stateAssessments); }
         public boolean reached() { return outcome == Outcome.TARGET_REACHED; }
     }
+    /** A caller-supplied quality objective, not a desired expression or mathematical authority. */
+    public record ObjectiveScore(long value, long work) {
+        public ObjectiveScore {
+            if (work < 1) throw new IllegalArgumentException("objective inspection must report positive work");
+        }
+    }
+    @FunctionalInterface public interface Objective { ObjectiveScore evaluate(MoveState state); }
+    public record QualityResult(Result search, MoveState incumbent, long inputScore, long outputScore,
+            List<WitnessStep> witness, long objectiveWork) {
+        public QualityResult { witness = List.copyOf(witness); }
+    }
+
     private static final class Node {
         final MoveState state;
         final StateValue.Assessment value;
         final long theoryWork;
-        final List<WitnessStep> path;
+        final MoveWitnessPath path;
         MovePicker picker;
         long measured;
         long measuredMathematics;
         int generated;
         int enqueued;
         int pulls;
-        Node(MoveState state, long theoryWork, List<WitnessStep> path, StateValue.Assessment value) { this.state = state; this.theoryWork = theoryWork; this.path = path; this.value = value; }
+        Node(MoveState state, long theoryWork, MoveWitnessPath path, StateValue.Assessment value) { this.state = state; this.theoryWork = theoryWork; this.path = path; this.value = value; }
     }
     private record Ticket(Node node, double priority, long serial) {}
-    private record Identity(MoveState state, long theoryWork) {}
     private static final class Ledger {
         long primitive, search, verification, consumed, discarded, duplicates, deadEnds, explored, expanded, generated;
         final Map<String, Long> matches = new TreeMap<>();
+        MoveSearchObjective objective;
+        void observe(MoveState state, MoveWitnessPath path) {
+            if (objective != null) search = Math.addExact(search, objective.observe(state, path));
+        }
+        boolean qualityReached() { return objective != null && objective.satisfied(); }
         long total() { return Math.addExact(Math.addExact(primitive, search), verification); }
         void collect(Node node) {
             long now = node.picker.workMetrics().totalWorkUnits();
@@ -109,34 +125,71 @@ public final class MoveSearch {
     }
 
     public Result search(Problem problem) {
+        return search(problem, SearchContinuationContract.PATH_SENSITIVE);
+    }
+
+    /** Opt-in work replacement under an explicit continuation-locality contract. */
+    public Result search(Problem problem, SearchContinuationContract contract) {
+        return search(problem, contract, null);
+    }
+
+    /** Stop at sufficient source-only quality; no global optimality or target hit is implied. */
+    public QualityResult searchUntil(Problem problem, Objective objective, long maximumOutputScore,
+            SearchContinuationContract contract) {
+        if (!problem.context().goal().isEmpty() || problem.mode() != Mode.FAST) {
+            throw new IllegalArgumentException("quality stopping requires source-only FAST search");
+        }
+        var online = new MoveSearchObjective(objective, maximumOutputScore);
+        var result = search(problem, contract, online);
+        return new QualityResult(result, online.incumbent(), online.inputScore(), online.outputScore(),
+            online.witness(), online.objectiveWork());
+    }
+
+    private Result search(Problem problem, SearchContinuationContract contract, MoveSearchObjective objective) {
+        java.util.Objects.requireNonNull(contract, "contract");
+        if (contract != SearchContinuationContract.PATH_SENSITIVE && problem.mode() != Mode.FAST) {
+            throw new IllegalArgumentException("continuation dominance requires FAST mode");
+        }
         var budget = problem.budget();
         var ledger = new Ledger();
+        ledger.objective = objective;
         var events = new ArrayList<Event>();
         var deadEnds = new ArrayList<MoveState>();
         var reached = new HashSet<MoveState>();
-        var visited = new HashSet<Identity>();
+        var visited = new MoveSearchVisits(contract, work -> ledger.search = Math.addExact(ledger.search, work));
         var assessments = new java.util.HashMap<MoveState, StateValue.Assessment>();
         var root = new MoveState(problem.source(), 0, 0, "", problem.context().initialAssumptions(), Set.of(), 0);
         var rootValue = inspect(problem, root, ledger);
         root = new MoveState(root.expression(), 0, 0, "", root.assumptions(), rootValue.capabilities().keySet(), 0);
         assessments.put(root, rootValue);
+        ledger.observe(root, MoveWitnessPath.ROOT);
         var frontier = new PriorityQueue<Ticket>(Comparator.comparingDouble(Ticket::priority).thenComparingLong(Ticket::serial));
         long[] serial = {0};
-        frontier.add(new Ticket(new Node(root, 0, List.of(), rootValue), 0, serial[0]++)); visited.add(new Identity(root, 0));
-        boolean complete = true;
+        frontier.add(new Ticket(new Node(root, 0, MoveWitnessPath.ROOT, rootValue), 0, serial[0]++)); visited.add(root, 0);
+        boolean complete = contract == SearchContinuationContract.PATH_SENSITIVE;
         var outcome = Outcome.BOUNDED_EXHAUSTED;
         List<WitnessStep> witness = List.of();
         int hit = -1, primitiveHit = -1;
         var opened = new ArrayList<Node>();
         try {
             while (!frontier.isEmpty()) {
+                if (ledger.qualityReached()) {
+                    outcome = ledger.total() <= budget.totalWork() ? Outcome.QUALITY_REACHED : Outcome.WORK_EXHAUSTED;
+                    complete = false;
+                    break;
+                }
                 if (ledger.total() >= budget.totalWork()) { outcome = Outcome.WORK_EXHAUSTED; complete = false; break; }
                 var node = frontier.remove().node(); ledger.search++;
+                boolean current = visited.current(node.state, node.theoryWork);
+                if (contract != SearchContinuationContract.PATH_SENSITIVE && ledger.total() > budget.totalWork()) {
+                    outcome = Outcome.WORK_EXHAUSTED; complete = false; break;
+                }
+                if (!current) continue;
                 if (node.picker == null) {
                     if (ledger.explored >= budget.maxStates()) { outcome = Outcome.STATE_LIMIT; complete = false; break; }
                     ledger.explored++; reached.add(node.state);
                     if (node.state.expression().equals(problem.context().goal())) {
-                        outcome = Outcome.TARGET_REACHED; witness = node.path;
+                        outcome = Outcome.TARGET_REACHED; witness = node.path.steps();
                         hit = node.state.searchDepth(); primitiveHit = node.state.primitiveDepth(); complete = false; break;
                     }
                     if (node.state.searchDepth() == budget.maxSearchDepth()) continue;
@@ -155,7 +208,11 @@ public final class MoveSearch {
         } finally {
             closeIncremental(opened, ledger);
         }
-        if (cleanupOverrun(problem, ledger)) {
+        if (objective != null) {
+            ledger.search = Math.addExact(ledger.search, objective.finish());
+            if (outcome == Outcome.QUALITY_REACHED) witness = objective.witness();
+        }
+        if (cleanupOverrun(problem, ledger) || (objective != null && ledger.total() > budget.totalWork())) {
             outcome = Outcome.WORK_EXHAUSTED; complete = false;
             witness = List.of(); hit = -1; primitiveHit = -1;
         }
@@ -195,7 +252,7 @@ public final class MoveSearch {
     }
     private enum Expansion { MORE, EXHAUSTED, REJECTED_PROOF, WORK_LIMIT }
     private static Expansion expand(Problem problem, Node node, Ledger ledger, List<Event> events,
-            Set<Identity> visited, PriorityQueue<Ticket> frontier, long[] serial, Map<MoveState, StateValue.Assessment> assessments) {
+            MoveSearchVisits visited, PriorityQueue<Ticket> frontier, long[] serial, Map<MoveState, StateValue.Assessment> assessments) {
         var next = node.picker instanceof IncrementalMovePicker incremental
             ? incremental.next(Math.max(0, problem.budget().totalWork() - ledger.total())) : node.picker.next();
         ledger.collect(node); node.pulls++;
@@ -212,14 +269,16 @@ public final class MoveSearch {
         move = move.withCapabilityDelta(delta);
         boolean proofRejected = decision == Decision.PROOF_REJECTED || decision == Decision.ASSUMPTION_REJECTED;
         if (decision == Decision.ENQUEUED) {
-            visited.add(new Identity(child, admission.theoryWork())); node.enqueued++; assessments.put(child, admission.value());
-            var path = new ArrayList<>(node.path); path.add(new WitnessStep(node.state, child, move, verification));
-            frontier.add(new Ticket(new Node(child, admission.theoryWork(), List.copyOf(path), admission.value()),
+            visited.add(child, admission.theoryWork()); node.enqueued++; assessments.put(child, admission.value());
+            var path = node.path.append(new WitnessStep(node.state, child, move, verification));
+            frontier.add(new Ticket(new Node(child, admission.theoryWork(), path, admission.value()),
                 child.expression().equals(problem.context().goal()) ? -Double.MAX_VALUE : priority(problem, child, admission.value()), serial[0]++));
+            ledger.observe(child, path);
         }
         if (decision != Decision.ENQUEUED) ledger.discarded++;
         events.add(new Event(node.state, child, move, decision, verification));
         if (decision == Decision.WORK_LIMIT) return Expansion.WORK_LIMIT;
+        if (ledger.qualityReached()) return Expansion.MORE;
         int stage = node.picker instanceof StagedMovePicker staged ? staged.nextStage() : 0;
         // Parent widening stays on the frontier, so promising children can finish before later stages open.
         double continuation = problem.mode() == Mode.COMPLETE_BOUNDED_REFERENCE ? node.state.searchDepth()
@@ -228,7 +287,7 @@ public final class MoveSearch {
         return proofRejected ? Expansion.REJECTED_PROOF : Expansion.MORE;
     }
     private record Admission(MoveState child, long theoryWork, Decision decision, MoveVerifier.Verification verification, StateValue.Assessment value) {}
-    private static Admission admit(Problem problem, Node node, SearchMove move, Set<Identity> visited, Ledger ledger) {
+    private static Admission admit(Problem problem, Node node, SearchMove move, MoveSearchVisits visited, Ledger ledger) {
         var step = move.transformation();
         long depth = (long) node.state.primitiveDepth() + step.primitiveStepCount();
         long theory = Math.addExact(node.theoryWork, step.executionWork().exactTheoryWorkUnits());
@@ -244,13 +303,19 @@ public final class MoveSearch {
         else if (debt > problem.budget().maxComplexityDebt()) decision = Decision.COMPLEXITY_BOUND;
         else if (depth > problem.budget().maxPrimitiveSteps() || theory > problem.budget().maxTheoryWork()) decision = Decision.PATH_BOUND;
         else if (!problem.context().carries(move.assumptions(), node.state)) decision = Decision.ASSUMPTION_REJECTED;
-        else if (visited.contains(new Identity(child, theory))) { decision = Decision.DUPLICATE; ledger.duplicates++; }
-        else if (ledger.total() >= problem.budget().totalWork()) decision = Decision.WORK_LIMIT;
         else {
-            verification = problem.verifier().verify(node.state, move, problem.context());
-            ledger.verification = Math.addExact(ledger.verification, verification.work());
-            decision = ledger.total() > problem.budget().totalWork() ? Decision.WORK_LIMIT
-                : verification.accepted() ? Decision.ENQUEUED : Decision.PROOF_REJECTED;
+            decision = visited.rejection(child, theory);
+            if (decision == Decision.DUPLICATE) ledger.duplicates++;
+            if (ledger.total() > problem.budget().totalWork()) decision = Decision.WORK_LIMIT;
+            else if (decision == null) {
+                if (ledger.total() >= problem.budget().totalWork()) decision = Decision.WORK_LIMIT;
+                else {
+                    verification = problem.verifier().verify(node.state, move, problem.context());
+                    ledger.verification = Math.addExact(ledger.verification, verification.work());
+                    decision = ledger.total() > problem.budget().totalWork() ? Decision.WORK_LIMIT
+                        : verification.accepted() ? Decision.ENQUEUED : Decision.PROOF_REJECTED;
+                }
+            }
         }
         return new Admission(child, theory, decision, verification, value);
     }
