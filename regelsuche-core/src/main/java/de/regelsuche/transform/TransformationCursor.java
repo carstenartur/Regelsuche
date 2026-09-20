@@ -84,6 +84,8 @@ public interface TransformationCursor extends AutoCloseable {
 
     /** Pulls at most one distinct candidate. The allowance includes mathematical and mechanical cursor work. */
     Optional<Transformation> next(long workAllowance);
+    /** Inspect lifecycle without requiring a materialized attempt history. */
+    default Status status() { return snapshot().status(); }
     Work work();
     Snapshot snapshot();
     @Override void close();

@@ -26,6 +26,10 @@ native parser-text providers are never silently marked typed. Existing explicit
 `TypedProvider` primitive batches are also supported by staged v2. Their complete
 batch is generated only when that lane is first pulled. The batch's full work and
 all generated candidates remain counted even if only one candidate is consumed.
+Every materialized candidate must bind the expansion source before any of the
+batch is recorded or emitted. Rejection preserves the already paid batch work.
+Consumption preserves the original `SearchMove`, including costs, expansion,
+proof and value metadata; shared batch work is charged once.
 Opaque batches and non-primitive typed batches need an explicit registered
 contract. P02 supplies this boundary; it does not implement learned schema
 execution, AST transport replacement, learning or new proof authority.
@@ -94,3 +98,28 @@ source-only `withinBudget` and the P01 lifecycle journal. The improved expressio
 valid proof and known query/replay/output work may still be retained for diagnosis.
 A lifecycle stream reports an incomplete-account row and preserves later queries
 as NOT_RUN instead of allocating them from an unknown remainder.
+
+Training completeness follows every observation through its trial and frozen
+selection, including losing profiles. A known budget overshoot remains completely
+accounted; unknown delegated work is a separate condition. Selection acquisition
+retains all known training and output costs before marking the journal incomplete,
+so no restore or query receives a fabricated remaining budget.
+
+Source-only and target-specific selections using staged v2 export
+`regelsuche.typed-source-policy-selection/v3-accounting` and
+`regelsuche.typed-policy-selection/v3-accounting`, respectively. They expose
+observation, trial and aggregate completeness, bind the execution receipt revision,
+and identify work as the known subtotal until completeness is established.
+Source-only exports also bind their historical objective revision. Receipt
+`rawRevision` equals the exported schema. Historical constructors and supported
+legacy executions retain source v1/v2-quality and target v2 JSON bytes.
+
+Experiment reports containing `ACCOUNTING_INCOMPLETE` rows use
+`regelsuche.work-replacement-experiment/v4-accounting`; the historical v3 status
+set and exports are unchanged. An acquisition stopped before any query retains
+NOT_RUN rows and the existing arm-level incomplete marker.
+
+Native lifecycle polling uses the additive `TransformationCursor.status()`
+accessor. The prepared cursor returns its current status without copying attempt
+history; its full snapshot still retains every final attempt and all native v1
+records and hashes remain unchanged.

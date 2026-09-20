@@ -15,6 +15,8 @@ final class StagedIncrementalLanes {
         final int index, stage;
         final double score;
         Cursor cursor;
+        List<SearchMove> batch = List.of();
+        int batchIndex;
         boolean finished;
         Lane(MoveProvider provider, int index, MovePriorityPolicy policy, MoveState state, MoveContext context) {
             this.provider = provider; this.index = index;
@@ -52,7 +54,7 @@ final class StagedIncrementalLanes {
         for (Lane lane = selected(); lane != null; lane = selected()) {
             long remaining = Math.max(0, allowance - (workMetrics().totalWorkUnitsV2() - before));
             if (remaining == 0) { workExhausted = true; return Optional.empty(); }
-            if (lane.cursor == null) lane.cursor = StagedIncrementalSources.open(lane.provider, state, context, generated::addAll);
+            if (lane.cursor == null) open(lane);
             var candidate = lane.cursor.next(remaining);
             if (candidate.isPresent()) return emit(lane, candidate.orElseThrow());
             if (lane.cursor.snapshot().resumable()) { workExhausted = true; return Optional.empty(); }
@@ -61,8 +63,14 @@ final class StagedIncrementalLanes {
         }
         return Optional.empty();
     }
+    private void open(Lane lane) {
+        lane.cursor = StagedIncrementalSources.open(lane.provider, state, context, batch -> {
+            lane.batch = batch; generated.addAll(batch);
+        });
+    }
     private Optional<SearchMove> emit(Lane lane, de.regelsuche.transform.Transformation candidate) {
-        var move = SearchMove.from(candidate, lane.provider.descriptor(), workMetrics().totalWorkUnits());
+        var move = StagedIncrementalSources.typedBatch(lane.provider) ? lane.batch.get(lane.batchIndex++)
+            : SearchMove.from(candidate, lane.provider.descriptor(), workMetrics().totalWorkUnits());
         if (!StagedIncrementalSources.typedBatch(lane.provider)) generated.add(move);
         if (lane.provider.descriptor().sourceKind() == SearchMove.SourceKind.LEARNED) learnedBurst++;
         else if (lane.provider.descriptor().sourceKind() == SearchMove.SourceKind.PRIMITIVE) learnedBurst = 0;

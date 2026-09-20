@@ -26,6 +26,22 @@ class PreparedTransformationCursorTest {
         }
     }
 
+    @Test void lifecycleInspectionRetainsTheFullFinalAttemptHistory() {
+        var engine = new PreparedAstRewriteTransformationEngine(List.of(ADD_ZERO));
+        try (var cursor = engine.openResumableCursor("(a + 0) * (b + 0)", 10000)) {
+            assertEquals(TransformationCursor.Status.READY, cursor.status());
+            assertTrue(cursor.next(0).isEmpty());
+            assertEquals(TransformationCursor.Status.WORK_EXHAUSTED, cursor.status());
+            assertEquals(2, drain(cursor).size());
+            assertEquals(TransformationCursor.Status.EXHAUSTED, cursor.status());
+            var snapshot = cursor.snapshot();
+            assertEquals(7, snapshot.attempts().size());
+            assertEquals(2, snapshot.attempts().stream().filter(attempt ->
+                attempt.outcome() == TransformationCursor.AttemptOutcome.EMITTED).count());
+            assertTrue(snapshot.complete());
+        }
+    }
+
     @Test void onePullDoesNotVisitOrMatchInnerOccurrencesAndCloseDoesNotDrain() {
         var engine = new PreparedAstRewriteTransformationEngine(List.of(ADD_ZERO), 12, 100);
         var cursor = engine.openCursor("((a + 0) + (b + 0)) + 0");

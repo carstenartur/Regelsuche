@@ -58,6 +58,7 @@ class RegisteredIncrementalAccountingTest {
         assertEquals(0, result.rows().getLast().allocatedWork());
         assertFalse(result.withinBudget(1000000));
         assertEquals(0, report.successes(Arm.B1));
+        assertTrue(WorkReplacementArtifacts.json(report).startsWith("{\"schema\":\"regelsuche.work-replacement-experiment/v4-accounting\""));
     }
 
     private static WorkReplacementTypedExecution execution(WorkReplacementExperiment.Query query) {
@@ -75,7 +76,7 @@ class RegisteredIncrementalAccountingTest {
             p.stateScore(), p.mode(), MoveSearch.Scheduling.STAGED_INCREMENTAL, p.budget());
         return new WorkReplacementExperiment.Query(id, base.sourceIdentity(), problem, base.objective());
     }
-    private static RegisteredIncrementalMoveProvider provider() {
+    static RegisteredIncrementalMoveProvider provider() {
         var primitive = WorkReplacementExperimentTest.PROFILE.providers().getFirst();
         var definition = new Definition(IncrementalProviderContract.REVISION, "registered-zero", Kind.REGISTERED_SCHEMA, "fixture/v1", "scalar/v1",
             Transport.TYPED_AST_JSON, Mathematics.PRIMITIVE, null);

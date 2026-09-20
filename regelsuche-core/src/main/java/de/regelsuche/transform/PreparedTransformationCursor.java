@@ -171,6 +171,7 @@ final class PreparedTransformationCursor implements TransformationCursor {
         operations.forEach((operation, units) -> named.put(operation.name(), units));
         return new Work(named, primitiveRewrites);
     }
+    @Override public Status status() { return status; }
     @Override public Snapshot snapshot() {
         return new Snapshot(resumable ? "regelsuche.resumable-native-transformation-cursor-work/v2" : WORK_REVISION, definition, source, status, closed, work(), attempts, emitted.size(), detail);
     }

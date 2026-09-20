@@ -31,7 +31,7 @@ final class StagedIncrementalSources {
         if (provider instanceof RegisteredIncrementalMoveProvider registered) return registered.openSession(state, context);
         Factory factory = provider instanceof NativeIncrementalMoveProvider nativeProvider
             ? (s, c, meter) -> new NativeSource(nativeProvider.openResumableCursor(s.expression()), meter)
-            : (s, c, meter) -> new BatchSource(provider.candidates(s, c), meter, generatedBatch);
+            : (s, c, meter) -> new BatchSource(provider.candidates(s, c), s.expression(), meter, generatedBatch);
         return new ManagedIncrementalCursor(provider.descriptor(), definition(provider), factory, state, context);
     }
     private static final class NativeSource implements Source {
@@ -49,7 +49,7 @@ final class StagedIncrementalSources {
             mechanics = work.mechanicalUnits(); primitives = work.primitiveRewrites();
         }
         @Override public Status status() {
-            return switch (cursor.snapshot().status()) {
+            return switch (cursor.status()) {
                 case READY -> Status.READY;
                 case WORK_EXHAUSTED -> Status.LIMIT;
                 case EXHAUSTED -> cursor.snapshot().complete() ? Status.EXHAUSTED : Status.INCONCLUSIVE;
@@ -62,10 +62,14 @@ final class StagedIncrementalSources {
     private static final class BatchSource implements Source {
         private final MoveProvider.Batch batch;
         private int index;
-        BatchSource(MoveProvider.Batch batch, Meter meter, Consumer<List<SearchMove>> generated) {
+        BatchSource(MoveProvider.Batch batch, String source, Meter meter, Consumer<List<SearchMove>> generated) {
             this.batch = batch;
             meter.charge(Operation.LOAD, batch.work().totalWorkUnits());
             meter.charge(batch.work().candidateWork());
+            for (var move : batch.moves()) {
+                meter.charge(Operation.ADMISSION, 1);
+                move.provenance().requireSource(source);
+            }
             generated.accept(batch.moves());
         }
         @Override public Optional<Transformation> next(long allowance) {

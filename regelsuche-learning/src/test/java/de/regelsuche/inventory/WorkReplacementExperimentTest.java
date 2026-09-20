@@ -50,6 +50,8 @@ class WorkReplacementExperimentTest {
         var result = new WorkReplacementExperiment().run(manifest, List.of(query), plans(manifest, 0, new AtomicInteger()));
         var improved = result.arms().get(Arm.B1);
         assertEquals(WorkReplacementExperiment.Status.OVER_BUDGET, improved.rows().getFirst().status());
+        assertEquals(WorkReplacementExperiment.REVISION, result.revision());
+        assertTrue(WorkReplacementArtifacts.json(result).startsWith("{\"schema\":\"regelsuche.work-replacement-experiment/v3\""));
         assertFalse(improved.withinBudget(budget));
         assertEquals(calibration.replayWork(), improved.account().work(FINAL_CHECK));
         assertTrue(improved.account().totalWork() >= calibration.totalWork());

@@ -47,8 +47,9 @@ public final class WorkReplacementLearning {
             : new TypedPolicySelection().trainSourceOnly(tasks, profiles, objective);
         String raw = selected.toCanonicalJson();
         charge(journal, prefix + "/selection", SELECTION_TRAINING, selected.trainingWork(),
-            selected.qualityGoal() == null ? TypedSourcePolicySelection.REVISION : TypedSourcePolicySelection.QUALITY_REVISION, raw);
+            selected.revision(), raw);
         materialized(journal, prefix + "/selection-output", raw);
+        if (!selected.accountingComplete()) journal.incomplete();
         return selected;
     }
     public static CheckedLearnedSchemaModel restore(String json, String inventoryHash,

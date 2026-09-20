@@ -16,6 +16,7 @@ import java.util.Set;
 /** Orchestrates existing execution services. No search, learner or proof algorithm lives here. */
 public final class WorkReplacementExperiment {
     public static final String REVISION = "regelsuche.work-replacement-experiment/v3";
+    public static final String ACCOUNTING_REVISION = "regelsuche.work-replacement-experiment/v4-accounting";
     public enum Status { QUALITY_REACHED, QUALITY_UNREACHED, OVER_BUDGET, TIMEOUT, INVALID_PROOF, ERROR, NOT_RUN, ACCOUNTING_INCOMPLETE }
     public record Query(String id, String sourceIdentity, TypedMoveSearch.Problem problem, TypedSourceOnlySearch.Objective objective) {
         public Query {
@@ -63,6 +64,10 @@ public final class WorkReplacementExperiment {
         public Report {
             queries = List.copyOf(queries); arms = Map.copyOf(arms);
             validateRows(queries, arms);
+        }
+        public String revision() {
+            return arms.values().stream().flatMap(arm -> arm.rows().stream())
+                .anyMatch(row -> row.status() == Status.ACCOUNTING_INCOMPLETE) ? ACCOUNTING_REVISION : REVISION;
         }
         public long successes(Arm arm) {
             if (arm == Arm.L_ORACLE) throw new IllegalArgumentException("oracle is diagnostic, never a learning success");

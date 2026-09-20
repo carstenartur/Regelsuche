@@ -56,6 +56,60 @@ class TypedStagedIncrementalProviderTest {
         }
     }
 
+    @Test void everyMaterializedBatchMoveMustBindTheSourceBeforeEarlySuccess() {
+        var primitive = TypedMoveSearch.primitiveProvider(nativeProvider().descriptor(), TRANSPORT);
+        var provider = batchProvider((state, context) -> {
+            var batch = primitive.candidates(state, context);
+            var leaf = batch.moves().getFirst().transformation();
+            var sequence = new TransformationProvenance.Sequence("foreign-source", List.of(leaf));
+            var foreign = new Transformation(leaf.rule(), leaf.transformedExpression(), leaf.kind(), leaf.mayIncreaseComplexity(),
+                leaf.estimatedCostDelta(), leaf.equivalencePreservingByConstruction(), leaf.applicationKey(), leaf.assumptions(),
+                leaf.packId(), leaf.license(), leaf.primitiveRuleIds(), sequence);
+            return new MoveProvider.Batch(List.of(batch.moves().getFirst(), SearchMove.from(foreign, nativeProvider().descriptor(), 1)),
+                TransformationWorkMetrics.flatEngine(2), true);
+        });
+        var result = new TypedMoveSearch().search(problem(List.of(provider)));
+        assertFalse(result.reached(), "an unconsumed wrong-source candidate must invalidate the materialized batch");
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE, result.outcome());
+        assertEquals(0, result.metrics().generatedSuccessors());
+        assertEquals(2, result.metrics().primitiveWork());
+        assertEquals(0, result.metrics().verificationWork());
+        assertTrue(result.metrics().searchWork() > 0);
+    }
+
+    @Test void batchConsumptionPreservesTheOriginalSearchMoveAndSharedCosts() {
+        var primitive = TypedMoveSearch.primitiveProvider(nativeProvider().descriptor(), TRANSPORT);
+        var original = new java.util.concurrent.atomic.AtomicReference<SearchMove>();
+        var provider = batchProvider((state, context) -> {
+            var batch = primitive.candidates(state, context);
+            var move = batch.moves().getFirst();
+            var enriched = new SearchMove(move.transformation(), move.sourceKind(), move.ruleId(), "batch-family", 77, 42, 9,
+                move.primitiveExpansion(), move.assumptions(), SearchMove.ProofStrength.VERIFIED, move.provenance(),
+                java.util.Set.of("retained-capability"), new SearchMove.ValueEvidence(1, 0, 1, 3, 1, false, "batch-evidence"));
+            original.set(enriched);
+            return new MoveProvider.Batch(List.of(enriched), batch.work(), batch.complete());
+        });
+        var codec = new de.regelsuche.search.program.CompiledAstReplayCodec();
+        try (var picker = new IncrementalMovePicker(List.of(provider), MovePriorityPolicy.INVENTORY_ORDER,
+                MoveState.root(codec.encodeExpression(SOURCE)), MoveContext.frozen(codec.encodeExpression(TARGET)))) {
+            assertEquals(originalAfterPull(picker, original), picker.generatedMoves().getFirst());
+            assertEquals(1, picker.workMetrics().candidateWork().primitiveRewrites());
+            picker.close();
+            assertEquals(1, picker.workMetrics().candidateWork().primitiveRewrites());
+        }
+    }
+    private static SearchMove originalAfterPull(IncrementalMovePicker picker, java.util.concurrent.atomic.AtomicReference<SearchMove> original) {
+        var emitted = picker.next(1000).orElseThrow();
+        assertEquals(original.get(), emitted);
+        return emitted;
+    }
+    private static TypedMoveSearch.TypedProvider batchProvider(java.util.function.BiFunction<MoveState, MoveContext, MoveProvider.Batch> generate) {
+        return new TypedMoveSearch.TypedProvider() {
+            @Override public Descriptor descriptor() { return nativeProvider().descriptor(); }
+            @Override public Batch candidates(MoveState state, MoveContext context) { return generate.apply(state, context); }
+        };
+    }
+
     private static Source typedSource(MoveProvider primitive, MoveState state, MoveContext context, Meter meter) {
         return new Source() {
             @Override public Optional<Transformation> next(long allowance) {

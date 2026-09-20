@@ -18,6 +18,7 @@ import java.util.Objects;
  */
 public final class TypedPolicySelection {
     public static final String REVISION = "regelsuche.typed-policy-selection/v2";
+    public static final String ACCOUNTING_REVISION = "regelsuche.typed-policy-selection/v3-accounting";
     private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();
     private static final HistoryMovePolicy.Weights ZERO = new HistoryMovePolicy.Weights(0, 0, 0, 0, 0, 0, 0, 0);
     public enum PolicyKind { INVENTORY_ORDER, HISTORY_RANKED }
@@ -49,7 +50,11 @@ public final class TypedPolicySelection {
         }
     }
 
-    public record Observation(String taskId, MoveSearch.Outcome outcome, MoveSearch.Metrics metrics) {
+    public record Observation(String taskId, MoveSearch.Outcome outcome, MoveSearch.Metrics metrics,
+            boolean accountingComplete, String executionRevision) {
+        public Observation(String taskId, MoveSearch.Outcome outcome, MoveSearch.Metrics metrics) {
+            this(taskId, outcome, metrics, true, null);
+        }
         public Observation {
             Objects.requireNonNull(taskId); Objects.requireNonNull(outcome); Objects.requireNonNull(metrics);
         }
@@ -59,6 +64,10 @@ public final class TypedPolicySelection {
         public Trial { Objects.requireNonNull(profile); observations = List.copyOf(observations); }
         public long totalWork() {
             return observations.stream().mapToLong(observation -> observation.metrics().totalWork()).reduce(0, Math::addExact);
+        }
+        public boolean accountingComplete() { return observations.stream().allMatch(Observation::accountingComplete); }
+        public boolean explicitAccounting() {
+            return observations.stream().anyMatch(o -> o.executionRevision() != null || !o.accountingComplete());
         }
         public long solved() {
             return observations.stream().filter(observation -> observation.outcome() == MoveSearch.Outcome.TARGET_REACHED).count();
@@ -83,8 +92,10 @@ public final class TypedPolicySelection {
         public RuleHistoryMemory.Snapshot history() { return history; }
         public Profile selected() { return selected; }
         public List<Trial> trials() { return trials; }
-        /** Includes every trial, including unsuccessful or work-exhausted searches. */
+        /** Known work from every trial; a total-work claim also requires accountingComplete(). */
         public long trainingWork() { return trials.stream().mapToLong(Trial::totalWork).reduce(0, Math::addExact); }
+        public boolean accountingComplete() { return trials.stream().allMatch(Trial::accountingComplete); }
+        public String revision() { return trials.stream().anyMatch(Trial::explicitAccounting) ? ACCOUNTING_REVISION : REVISION; }
         public String toCanonicalJson() { return json; }
 
         /** Exact-source exclusion only; disjoint mathematical families require an external protocol. */
@@ -99,25 +110,40 @@ public final class TypedPolicySelection {
         }
 
         private String render() {
-            var writer = new JsonWriter().beginObject().property("schema", REVISION)
+            String schema = revision();
+            boolean explicitAccounting = schema.equals(ACCOUNTING_REVISION);
+            var writer = new JsonWriter().beginObject().property("schema", schema)
                 .property("authority", "EXPERIMENTAL_NO_PROMOTION")
                 .property("selection", "MAX_SOLVED_THEN_MIN_TOTAL_WORK_THEN_DECLARED_ORDER")
                 .property("workScope", "CHARGED_SEARCH_MECHANICS_AND_REPLAY;NOT_TOTAL_CPU_OR_FIT_SERIALIZATION")
                 .property("selected", selected.id()).property("trainingWork", trainingWork())
                 .stringArray("trainingSources", trainingSources)
-                .property("history", historyJson(history))
-                .array("trials", values -> trials.forEach(trial -> values.objectValue(value -> value
-                    .property("profile", trial.profile().id()).property("kind", trial.profile().kind().name())
-                    .property("weights", weightsJson(trial.profile().weights()))
-                    .property("solved", trial.solved()).property("totalWork", trial.totalWork())
-                    .array("observations", observations -> trial.observations().forEach(observation -> observations.objectValue(item -> item
-                        .property("task", observation.taskId()).property("outcome", observation.outcome().name())
-                        .property("primitiveWork", observation.metrics().primitiveWork())
-                        .property("searchWork", observation.metrics().searchWork())
-                        .property("verificationWork", observation.metrics().verificationWork())
-                        .property("totalWork", observation.metrics().totalWork())))))));
+                .property("history", historyJson(history));
+            if (explicitAccounting) writer.property("accountingComplete", accountingComplete())
+                .property("accountingScope", "KNOWN_REPORTED_WORK;ACCOUNTING_COMPLETE_REQUIRED_FOR_TOTAL");
+            writer.array("trials", values -> trials.forEach(trial -> values.objectValue(value -> writeTrial(value, trial, explicitAccounting))));
             return writer.endObject().toString();
         }
+        private void writeTrial(JsonWriter writer, Trial trial, boolean explicitAccounting) {
+            writer.property("profile", trial.profile().id()).property("kind", trial.profile().kind().name())
+                .property("weights", weightsJson(trial.profile().weights()))
+                .property("solved", trial.solved()).property("totalWork", trial.totalWork());
+            if (explicitAccounting) writer.property("accountingComplete", trial.accountingComplete());
+            writer.array("observations", out -> trial.observations().forEach(o -> out.objectValue(item -> writeObservation(item, o, explicitAccounting))));
+        }
+        private void writeObservation(JsonWriter writer, Observation o, boolean explicitAccounting) {
+            writer.property("task", o.taskId()).property("outcome", o.outcome().name())
+                .property("primitiveWork", o.metrics().primitiveWork()).property("searchWork", o.metrics().searchWork())
+                .property("verificationWork", o.metrics().verificationWork()).property("totalWork", o.metrics().totalWork());
+            if (explicitAccounting) {
+                writer.property("accountingComplete", o.accountingComplete());
+                if (o.executionRevision() != null) writer.property("executionRevision", o.executionRevision());
+            }
+        }
+    }
+    static String executionRevision(TypedMoveSearch.Result result) {
+        var receipt = result.encodedResult().stagedIncrementalExecution();
+        return receipt == null ? null : receipt.workRevision();
     }
 
     public FrozenPolicy train(RuleHistoryMemory.Snapshot history, List<TrainingTask> tasks, List<Profile> profiles) {
@@ -130,7 +156,8 @@ public final class TypedPolicySelection {
             var observations = new ArrayList<Observation>();
             for (var task : tasks) {
                 var result = execute(task.problem(), history, profile);
-                observations.add(new Observation(task.id(), result.outcome(), result.metrics()));
+                observations.add(new Observation(task.id(), result.outcome(), result.metrics(),
+                    result.accountingComplete(), executionRevision(result)));
             }
             trials.add(new Trial(profile, observations));
         }
