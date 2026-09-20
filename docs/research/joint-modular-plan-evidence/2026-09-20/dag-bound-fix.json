@@ -1,0 +1,59 @@
+{
+  "purpose": "separate DAG-bound regression reproduction; original modular timings remain unchanged",
+  "redRuntime": "build/reports/joint-modular-plan-v1-20260920-a/runtime",
+  "red": [
+    {
+      "depth": 16,
+      "status": "completed",
+      "wallNanos": 221327680,
+      "stdout": "depth=16 nodes=17 nanos=78795298"
+    },
+    {
+      "depth": 20,
+      "status": "completed",
+      "wallNanos": 201431625,
+      "stdout": "depth=20 nodes=21 nanos=96100421"
+    },
+    {
+      "depth": 24,
+      "status": "completed",
+      "wallNanos": 767201420,
+      "stdout": "depth=24 nodes=25 nanos=655849354"
+    },
+    {
+      "depth": 48,
+      "status": "killed-at-three-second-limit",
+      "wallNanos": 3010941125
+    }
+  ],
+  "greenIsolatedJavac": [
+    {
+      "depth": 16,
+      "status": "completed",
+      "wallNanos": 259903918,
+      "stdout": "depth=16 nodes=17 nanos=60186102"
+    },
+    {
+      "depth": 20,
+      "status": "completed",
+      "wallNanos": 425566347,
+      "stdout": "depth=20 nodes=21 nanos=114412641"
+    },
+    {
+      "depth": 24,
+      "status": "completed",
+      "wallNanos": 245768662,
+      "stdout": "depth=24 nodes=25 nanos=57507796"
+    },
+    {
+      "depth": 48,
+      "status": "completed",
+      "wallNanos": 283485088,
+      "stdout": "depth=48 nodes=49 nanos=42566584"
+    }
+  ],
+  "fixedSourceSha256": {
+    "regelsuche-search/src/main/java/de/regelsuche/search/program/JointComputationPlan.java": "4383af10bebe18509971a62b1d00d36a1e1d3056321fb517b4a485c06091cf21",
+    "regelsuche-search/src/main/java/de/regelsuche/search/program/PreparedJointComputation.java": "ce865f23e841ae694fd50e6bd8635ef0171ff8cb58d74fb8c13cce50d9ab57ee"
+  }
+}
