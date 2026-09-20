@@ -10,7 +10,7 @@ import java.util.Objects;
 /**
  * Opt-in, caller-owned primitive candidate reuse. Create a fresh instance for each
  * independently measured search. This caches generation, never proof authorization.
- * The descriptor, concrete pattern rules and transport bounds are fixed per instance.
+ * The descriptor, rule inventory and transport bounds must remain fixed per instance.
  */
 public final class TypedPrimitiveCandidateCache implements TypedMoveSearch.TypedProvider {
     public record Statistics(long hits, long misses, long bypasses, int entries, long retainedCharacters) {}
@@ -29,18 +29,38 @@ public final class TypedPrimitiveCandidateCache implements TypedMoveSearch.Typed
     private long bypasses;
     private long retainedCharacters;
 
+    /** Checked convenience constructor for concrete immutable pattern rules. */
     public TypedPrimitiveCandidateCache(Descriptor descriptor, List<PatternRewriteRule> rules,
             int maximumGrowth, int maximumCandidates, int capacity, long maximumCharacters) {
-        var retainedRules = List.copyOf(Objects.requireNonNull(rules, "rules"));
+        this(descriptor, patternTransport(rules, maximumGrowth, maximumCandidates), capacity, maximumCharacters);
+    }
+
+    /**
+     * Explicit integration boundary for a caller-owned deterministic transport.
+     * The caller must guarantee identical complete step metadata and order for
+     * equal source ASTs throughout the session. Mutable, random, history-dependent
+     * or externally reconfigured rules violate this contract and must not use it.
+     * No proof is trusted through this factory: verification still regenerates.
+     */
+    public static TypedPrimitiveCandidateCache forDeterministicTransport(Descriptor descriptor,
+            AstRewriteTransport transport, int capacity, long maximumCharacters) {
+        return new TypedPrimitiveCandidateCache(descriptor, transport, capacity, maximumCharacters);
+    }
+
+    private TypedPrimitiveCandidateCache(Descriptor descriptor, AstRewriteTransport transport,
+            int capacity, long maximumCharacters) {
         if (capacity < 0 || maximumCharacters < 0) throw new IllegalArgumentException("negative retention bound");
-        // Arbitrary providers and rule subclasses may depend on mutable state.
+        delegate = TypedMoveSearch.primitiveProvider(descriptor, Objects.requireNonNull(transport, "transport"));
+        this.capacity = capacity;
+        this.maximumCharacters = maximumCharacters;
+    }
+
+    private static AstRewriteTransport patternTransport(List<PatternRewriteRule> rules, int growth, int candidates) {
+        var retainedRules = List.copyOf(Objects.requireNonNull(rules, "rules"));
         if (retainedRules.stream().anyMatch(rule -> rule.getClass() != PatternRewriteRule.class)) {
             throw new IllegalArgumentException("only immutable concrete pattern rules are cacheable");
         }
-        delegate = TypedMoveSearch.primitiveProvider(descriptor,
-            new AstRewriteTransport(List.copyOf(retainedRules), maximumGrowth, maximumCandidates));
-        this.capacity = capacity;
-        this.maximumCharacters = maximumCharacters;
+        return new AstRewriteTransport(List.copyOf(retainedRules), growth, candidates);
     }
 
     @Override public Descriptor descriptor() { return delegate.descriptor(); }
@@ -52,7 +72,7 @@ public final class TypedPrimitiveCandidateCache implements TypedMoveSearch.Typed
             bypasses++;
             return delegate.candidates(state, context);
         }
-        // The restricted delegate reads only the expression and these premises.
+        // This primitive delegate reads only the expression and these premises.
         // Keep phase/goal as additional isolation. Depth/history/capabilities remain
         // untouched in MoveSearch state identity, scheduling and edge admission.
         var key = new Key(state.expression(), state.assumptions(), context);

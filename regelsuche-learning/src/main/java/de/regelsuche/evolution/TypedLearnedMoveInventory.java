@@ -4,6 +4,7 @@ import de.regelsuche.inventory.RuleUtilityEvidence;
 import de.regelsuche.search.moves.*;
 import de.regelsuche.search.program.CompiledLinearRewriteEngine;
 import de.regelsuche.search.program.RewriteProgram;
+import de.regelsuche.transform.AstRewriteTransport;
 import de.regelsuche.transform.PreparedAstRewriteTransformationEngine;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -15,6 +16,7 @@ import java.util.TreeMap;
 public final class TypedLearnedMoveInventory {
     private final TraceRewriteStrategyLearner.FrozenStrategy formation;
     private final List<MoveProvider> primitives;
+    private final List<AstRewriteTransport> primitiveTransports;
     private final List<TypedProgramMoveProvider> learned;
     private final Map<String, TypedMoveSearch.Verifier> primitiveVerifiers;
 
@@ -36,18 +38,21 @@ public final class TypedLearnedMoveInventory {
         var rules = new EvolutionGenomeCompiler().compile(inventory).rules();
         var engines = new HashMap<String, PreparedAstRewriteTransformationEngine>();
         var providers = new ArrayList<MoveProvider>();
+        var transports = new ArrayList<AstRewriteTransport>();
         var verifiers = new HashMap<String, TypedMoveSearch.Verifier>();
         for (int i = 0; i < rules.size(); i++) {
             var rule = rules.get(i);
             var engine = new PreparedAstRewriteTransformationEngine(List.of(rule), bounds.maxAstGrowthPerStep(), bounds.maxCandidatesPerState());
             engines.put(inventory.rewrites().get(i).geneId(), engine);
             var transport = engine.astTransport();
+            transports.add(transport);
             providers.add(TypedMoveSearch.primitiveProvider(new MoveProvider.Descriptor(rule.id(), rule.id(),
                 SearchMove.SourceKind.PRIMITIVE, SearchMove.ProofStrength.REPLAYABLE, List.of(),
                 SearchMove.ValueEvidence.UNKNOWN, inventory.contentHash()), transport));
             verifiers.put(rule.id(), TypedMoveSearch.primitiveReplay(transport));
         }
         primitives = List.copyOf(providers);
+        primitiveTransports = List.copyOf(transports);
         primitiveVerifiers = Map.copyOf(verifiers);
         var programs = new TreeMap<String, TypedProgramMoveProvider>();
         if (formation != null) for (var observation : formation.observations()) {
@@ -78,13 +83,29 @@ public final class TypedLearnedMoveInventory {
         }
     }
 
-    /** Initial uncached integration control; positive limits specify requested per-provider retention. */
+    /**
+     * Create fresh bounded caches for one search, without changing the default inventory.
+     * Limits are PER primitive provider. Include this construction in measured setup time.
+     * Zero limits select the original provider instances without cache bookkeeping.
+     */
     public SearchSession newSearchSession(boolean includeLearned, int maximumEntriesPerProvider,
             long maximumCharactersPerProvider) {
         if (maximumEntriesPerProvider < 0 || maximumCharactersPerProvider < 0) {
             throw new IllegalArgumentException("negative session retention bound");
         }
-        return new SearchSession(includeLearned ? providers() : primitiveProviders(), List.of(), verifier());
+        if (maximumEntriesPerProvider == 0 || maximumCharactersPerProvider == 0) {
+            return new SearchSession(includeLearned ? providers() : primitiveProviders(), List.of(), verifier());
+        }
+        var caches = new ArrayList<TypedPrimitiveCandidateCache>();
+        for (int i = 0; i < primitives.size(); i++) {
+            // EvolutionGenomeCompiler creates private final rules with immutable
+            // genome/pattern fields. No external rule subclass enters this inventory.
+            caches.add(TypedPrimitiveCandidateCache.forDeterministicTransport(primitives.get(i).descriptor(),
+                primitiveTransports.get(i), maximumEntriesPerProvider, maximumCharactersPerProvider));
+        }
+        var selected = new ArrayList<MoveProvider>(caches);
+        if (includeLearned) selected.addAll(learned);
+        return new SearchSession(selected, caches, verifier());
     }
 
     /** Regeneration uses the registered inventory; a learned identifier alone never authorizes an edge. */
