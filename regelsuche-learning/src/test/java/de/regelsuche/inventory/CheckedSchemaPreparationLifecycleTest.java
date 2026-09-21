@@ -114,7 +114,13 @@ class CheckedSchemaPreparationLifecycleTest {
     }
 
     private record Observation(String source, long processId, long workBeforeQuery, long allocatedWork,
-            long actualQueryWork, boolean accountingComplete, WorkReplacementExperiment.Evaluation evaluation) {}
+            long actualQueryWork, boolean accountingComplete, WorkReplacementExperiment.Evaluation evaluation) {
+        Map<String, Object> payload() {
+            return Map.of("source", source, "processId", processId, "workBeforeQuery", workBeforeQuery,
+                "allocatedWork", allocatedWork, "actualQueryWork", actualQueryWork,
+                "accountingComplete", accountingComplete, "evaluation", evaluation);
+        }
+    }
     private record Sample(boolean accountingComplete, LifecycleWorkAccount account, List<Observation> rows) {}
 
     private static Sample sample(boolean learned, boolean cold) {
@@ -141,7 +147,8 @@ class CheckedSchemaPreparationLifecycleTest {
             "processMode", cold ? "FRESH_PROCESS_PER_QUERY" : "REUSED_PROCESS",
             "totalBudget", BUDGET, "accountingComplete", sample.accountingComplete(),
             "totalWork", sample.account().totalWork(), "phaseWork", phases,
-            "rows", sample.rows(), "acquisitionReceiptMode", "PROVISIONED_ACTUAL_RECEIPT")));
+            "rows", sample.rows().stream().map(Observation::payload).toList(),
+            "acquisitionReceiptMode", "PROVISIONED_ACTUAL_RECEIPT")));
         return sample;
     }
 
