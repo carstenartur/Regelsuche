@@ -55,7 +55,8 @@ public final class WorkReplacementProcessFixture {
             var quality = JSON.treeToValue(request.get("quality"), WorkReplacementManifest.Quality.class);
             var execution = new WorkReplacementExperiment.Journal();
             var result = session.execute(query, request.path("budget").asLong(), quality, execution, request.path("prefix").asText());
-            System.out.println(JSON.writeValueAsString(Map.of("evaluation", result, "receipts", execution.account().receipts())));
+            System.out.println(JSON.writeValueAsString(Map.of("evaluation", result,
+                "receipts", execution.account().receipts(), "accountingComplete", execution.complete())));
         }
     }
     static TypedSourceOnlySearch.Score score(TypedMoveSearch.State state) { return new TypedSourceOnlySearch.Score(nodes(state.expression()), 1); }

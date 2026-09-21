@@ -7,6 +7,8 @@ import de.regelsuche.evolution.*;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.search.moves.*;
 import de.regelsuche.search.program.CompiledAstReplayCodec;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -98,6 +100,75 @@ class CheckedSchemaPreparationLifecycleTest {
             journal.account().totalWork(), preparationCount(journal.account()),
             journal.account().work(RESTORE_REPROOF), baseline.account().totalWork());
         // Different stream lengths: deliberately no speedup ratio is computed from these counters.
+    }
+
+    @Test void matchedWarmAndColdStreamsRetainBothArmsAndAllocateTheActualRemainder() {
+        for (boolean cold : List.of(false, true)) {
+            var baseline = sample(false, cold);
+            var oracle = sample(true, cold);
+            assertSample(baseline, false, cold);
+            assertSample(oracle, true, cold);
+            assertTrue(baseline.rows().getFirst().allocatedWork() >= oracle.rows().getFirst().allocatedWork(),
+                "the primitive control may spend its unconsumed acquisition budget on queries");
+        }
+    }
+
+    private record Observation(String source, long processId, long workBeforeQuery, long allocatedWork,
+            long actualQueryWork, boolean accountingComplete, WorkReplacementExperiment.Evaluation evaluation) {}
+    private record Sample(boolean accountingComplete, LifecycleWorkAccount account, List<Observation> rows) {}
+
+    private static Sample sample(boolean learned, boolean cold) {
+        var journal = new WorkReplacementExperiment.Journal();
+        if (learned) journal.append(acquisition);
+        var rows = new ArrayList<Observation>();
+        String prefix = (cold ? "cold/" : "warm/") + (learned ? "oracle" : "baseline");
+        if (cold) {
+            for (int i = 0; i < QUERIES.size(); i++) {
+                try (var child = child(learned, journal, prefix + "/setup/" + i)) {
+                    observe(child, journal, rows, i, prefix + "/query/" + i);
+                }
+            }
+        } else {
+            try (var child = child(learned, journal, prefix + "/setup")) {
+                for (int i = 0; i < QUERIES.size(); i++) observe(child, journal, rows, i, prefix + "/query/" + i);
+            }
+        }
+        var sample = new Sample(journal.complete(), journal.account(), List.copyOf(rows));
+        var phases = new LinkedHashMap<String, Long>();
+        for (var phase : LifecycleWorkAccount.Phase.values()) phases.put(phase.name(), sample.account().work(phase));
+        System.out.println("P03_MATCHED " + LearnedSchedulingArtifacts.json(Map.of(
+            "revision", "p03-matched-logical-work/v1", "arm", learned ? "L_ORACLE" : "B1",
+            "processMode", cold ? "FRESH_PROCESS_PER_QUERY" : "REUSED_PROCESS",
+            "totalBudget", BUDGET, "accountingComplete", sample.accountingComplete(),
+            "totalWork", sample.account().totalWork(), "phaseWork", phases,
+            "rows", sample.rows(), "acquisitionReceiptMode", "PROVISIONED_ACTUAL_RECEIPT")));
+        return sample;
+    }
+
+    private static void observe(WorkReplacementLifecycleIntegrationTest.Child child,
+            WorkReplacementExperiment.Journal journal, List<Observation> rows, int index, String prefix) {
+        long before = journal.account().totalWork();
+        long share = Math.max(0, BUDGET - before) / (QUERIES.size() - index);
+        var evaluation = child.execute(query(QUERIES.get(index), acquired.verifier()), share, quality(), journal, prefix);
+        rows.add(new Observation(QUERIES.get(index), child.process().orElseThrow().pid(), before, share,
+            journal.account().totalWork() - before, journal.complete(), evaluation));
+    }
+
+    private static void assertSample(Sample sample, boolean learned, boolean cold) {
+        assertEquals(QUERIES, sample.rows().stream().map(Observation::source).toList());
+        assertTrue(sample.accountingComplete(), sample.rows().toString());
+        assertTrue(sample.account().totalWork() <= BUDGET, sample.rows().toString());
+        assertEquals(learned ? acquisition.work(TRAINING_SEARCH) : 0, sample.account().work(TRAINING_SEARCH));
+        assertEquals(learned ? (cold ? QUERIES.size() : 1) : 0, preparationCount(sample.account()));
+        assertEquals(cold ? QUERIES.size() : 1, sample.rows().stream().map(Observation::processId).distinct().count());
+        for (int i = 0; i < sample.rows().size(); i++) {
+            var row = sample.rows().get(i);
+            assertEquals(Math.max(0, BUDGET - row.workBeforeQuery()) / (QUERIES.size() - i), row.allocatedWork());
+            assertTrue(row.accountingComplete());
+            assertTrue(row.evaluation().validProof(), row.toString());
+            if (learned) assertChecked(row.evaluation());
+        }
+        // All quality misses and scores are retained above; never require the oracle to beat B1.
     }
 
     private static WorkReplacementLifecycleIntegrationTest.Child child(boolean learned,
