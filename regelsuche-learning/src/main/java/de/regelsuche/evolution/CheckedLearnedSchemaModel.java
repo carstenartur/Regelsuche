@@ -298,6 +298,17 @@ public final class CheckedLearnedSchemaModel {
         return providers(maximumSchemasPerOccurrence, utilityBySchemaId, byId.keySet());
     }
 
+    /** Internal bridge to the same private application capability used by the eager provider. */
+    CheckedSchemaMatcherPlan prepareCursorPlan(int maximumSchemasPerOccurrence,
+            Map<String, Double> utilities, Set<String> included) {
+        return new CheckedSchemaMatcherPlan(this, descriptor, maximumSchemasPerOccurrence, utilities, included,
+            (schema, source, encodedSource, path, bindings, work) -> {
+                var application = apply(schema, source, encodedSource, path, bindings, work);
+                return application == null ? null
+                    : Transformation.exactTheory(ExactTheoryEvidence.fromVerified(application));
+            });
+    }
+
     private final class IndexedProvider implements TypedMoveSearch.TypedProvider {
         private final Map<String, List<Schema>> index;
         private final int maximumSchemasPerOccurrence;

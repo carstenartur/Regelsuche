@@ -233,6 +233,8 @@ class WorkReplacementLifecycleIntegrationTest {
                 send(Map.of("source", query.sourceIdentity(), "budget", budget, "quality", quality, "prefix", prefix));
                 var response = JSON.readTree(receive(queryTimeoutNanos));
                 append(response.get("receipts"), journal, prefix);
+                var complete = response.path("accountingComplete");
+                if (!complete.isBoolean() || !complete.booleanValue()) journal.incomplete();
                 return JSON.treeToValue(response.get("evaluation"), WorkReplacementExperiment.Evaluation.class);
             } catch (TimeoutException failure) {
                 throw new WorkReplacementExperiment.QueryTimeoutException("child query exceeded declared deadline", failure);

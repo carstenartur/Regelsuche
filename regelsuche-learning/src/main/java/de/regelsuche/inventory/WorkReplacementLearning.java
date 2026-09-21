@@ -58,6 +58,20 @@ public final class WorkReplacementLearning {
         charge(journal, prefix + "/restore", RESTORE_REPROOF, restored.loadWork(), CheckedLearnedSchemaModel.REVISION, json);
         return restored;
     }
+    /** Compile once per actual preparation, separately from restore, generation and final proof. */
+    public static CheckedSchemaMatcherPlan prepareSchemas(CheckedLearnedSchemaModel model, int maximum,
+            java.util.Map<String, Double> utilities, java.util.Set<String> included,
+            WorkReplacementExperiment.Journal journal, String prefix) {
+        var prepared = CheckedSchemaMatcherPlan.prepare(model, maximum, utilities, included);
+        var receipt = prepared.compilationReceipt();
+        String raw = LearnedSchedulingArtifacts.json(java.util.Map.of(
+            "revision", receipt.revision(), "configurationHash", receipt.configurationHash(),
+            "workUnits", receipt.workUnits(), "includedSchemas", receipt.includedSchemas(),
+            "patternNodeVisits", receipt.patternNodeVisits(), "orderingComparisons", receipt.orderingComparisons()));
+        charge(journal, prefix + "/schema-compile", COMPILATION, receipt.workUnits(), receipt.revision(), raw);
+        materialized(journal, prefix + "/schema-compile-output", raw);
+        return prepared;
+    }
     public static TypedLearnedMoveInventory primitives(EvolutionGenome genome, WorkReplacementExperiment.Journal journal, String prefix) {
         var inventory = TypedLearnedMoveInventory.primitives(genome);
         String genomeJson = genome.toCanonicalJson();
