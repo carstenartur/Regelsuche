@@ -100,11 +100,13 @@ stage, original provider index and final cursor receipt. Unopened lanes have nul
 cursors. `LearnedSchedulingArtifacts` emits the new field only for the new mode;
 frozen native v1 records and JSON shape are unchanged.
 
-Mechanical work enters the existing delegated-mechanics channel. Primitive and
-exact mathematics enter `candidateWork` exactly once through `Ledger.collect`;
-exact theory keeps its real step count and work units with zero invented
-primitive rewrites. Verification stays independently charged. These declared
-logical units make no runtime or universal speedup claim.
+Mechanical work enters the existing delegated-mechanics channel. Native/v2
+mathematics and nonprepaid mathematics in v3 enter `candidateWork` exactly once
+through `Ledger.collect`. Prepaid v3 application work follows the explicit
+`Work.metrics()` projection above. Full exact-theory receipts keep their real
+step counts and work units with zero invented primitive rewrites. Verification
+stays independently charged. These declared logical units make no runtime or
+universal speedup claim.
 
 Incomplete accounting invalidates target/quality budget success, including
 source-only `withinBudget` and the P01 lifecycle journal. The improved expression,
