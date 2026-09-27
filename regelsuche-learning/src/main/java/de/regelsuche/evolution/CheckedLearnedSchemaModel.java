@@ -12,6 +12,7 @@ import de.regelsuche.mining.TypedPatternGeneralizer;
 import de.regelsuche.moves.enumerate.TreePosition;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.search.moves.MoveContext;
+import de.regelsuche.search.moves.IncrementalProviderContract.ApplicationPhase;
 import de.regelsuche.search.moves.MoveProvider;
 import de.regelsuche.search.moves.MoveState;
 import de.regelsuche.search.moves.MoveVerifier;
@@ -298,6 +299,13 @@ public final class CheckedLearnedSchemaModel {
         return providers(maximumSchemasPerOccurrence, utilityBySchemaId, byId.keySet());
     }
 
+    /** Internal bridge to the same private application capability used by the eager provider. */
+    CheckedSchemaMatcherPlan prepareCursorPlan(int maximumSchemasPerOccurrence,
+            Map<String, Double> utilities, Set<String> included) {
+        return new CheckedSchemaMatcherPlan(this, descriptor, maximumSchemasPerOccurrence, utilities, included,
+            CheckedApplication::new);
+    }
+
     private final class IndexedProvider implements TypedMoveSearch.TypedProvider {
         private final Map<String, List<Schema>> index;
         private final int maximumSchemasPerOccurrence;
@@ -399,13 +407,66 @@ public final class CheckedLearnedSchemaModel {
     }
     private VerifiedApplication apply(Schema schema, Expr source, String encodedSource,
             List<Integer> path, Map<String, Expr> substitutions, Work work) {
-        for (Expr expression : substitutions.values()) domain(expression, bounds, work);
-        var position = new TreePosition(path, "checked-typed-occurrence");
-        Expr replacement = schema.target().instantiate(substitutions);
-        work.add(patternNodes(schema.target()) + path.size() + 1L);
-        Expr target = position.replaceAt(source, replacement).rewrittenRoot().orElseThrow();
-        domain(target, bounds, work);
-        if (source.equals(target)) return null;
+        var application = new CheckedApplication(schema, source, encodedSource, path, substitutions, work);
+        while (!application.done()) application.advance();
+        return application.verified;
+    }
+
+    /** The eager provider, lazy cursor and independent concrete verifier all execute these same checks. */
+    private final class CheckedApplication implements CheckedSchemaMatcherPlan.ApplicationSteps {
+        private final Schema schema;
+        private final Expr source;
+        private final String encodedSource;
+        private final List<Integer> path;
+        private final Map<String, Expr> substitutions;
+        private final java.util.Iterator<Expr> substitutionDomains;
+        private final Work work;
+        private ApplicationPhase phase;
+        private Expr target;
+        private VerifiedApplication verified;
+        private boolean done;
+
+        CheckedApplication(Schema schema, Expr source, String encodedSource, List<Integer> path,
+                Map<String, Expr> substitutions, Work work) {
+            this.schema = schema; this.source = source; this.encodedSource = encodedSource;
+            this.path = path; this.substitutions = substitutions; this.work = work;
+            substitutionDomains = substitutions.values().iterator();
+            phase = substitutionDomains.hasNext() ? ApplicationPhase.SUBSTITUTION_DOMAIN : ApplicationPhase.INSTANTIATION;
+        }
+        @Override public ApplicationPhase phase() { return phase; }
+        @Override public boolean done() { return done; }
+        @Override public void advance() {
+            if (done) throw new IllegalStateException("checked application already complete");
+            switch (phase) {
+                case SUBSTITUTION_DOMAIN -> {
+                    domain(substitutionDomains.next(), bounds, work);
+                    if (!substitutionDomains.hasNext()) phase = ApplicationPhase.INSTANTIATION;
+                }
+                case INSTANTIATION -> {
+                    Expr replacement = schema.target().instantiate(substitutions);
+                    work.add(patternNodes(schema.target()) + path.size() + 1L);
+                    target = new TreePosition(path, "checked-typed-occurrence").replaceAt(source, replacement).rewrittenRoot().orElseThrow();
+                    phase = ApplicationPhase.TARGET_DOMAIN;
+                }
+                case TARGET_DOMAIN -> {
+                    domain(target, bounds, work);
+                    if (source.equals(target)) done = true;
+                    else phase = ApplicationPhase.EVIDENCE;
+                }
+                case EVIDENCE -> {
+                    verified = evidence(schema, encodedSource, target, path, substitutions, work);
+                    done = true;
+                }
+            }
+        }
+        @Override public Transformation result() {
+            if (!done) throw new IllegalStateException("partial application has no mathematical authority");
+            return verified == null ? null : Transformation.exactTheory(ExactTheoryEvidence.fromVerified(verified));
+        }
+    }
+
+    private VerifiedApplication evidence(Schema schema, String encodedSource, Expr target,
+            List<Integer> path, Map<String, Expr> substitutions, Work work) {
         String encodedTarget = CODEC.encodeExpression(target);
         var evidence = JSON.createObjectNode().put("schema", APPLICATION_REVISION).put("checkerRevision", CHECKER_REVISION)
             .put("inventorySemanticsHash", inventorySemanticsHash).put("modelId", descriptor.id())

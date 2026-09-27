@@ -14,7 +14,7 @@ final class ManagedIncrementalCursor implements Cursor {
     private final Factory factory;
     private final MoveState state;
     private final MoveContext context;
-    private final Meter meter = new Meter();
+    private final Meter meter;
     private Source source;
     private Status status = Status.OPEN;
     private boolean admitted, closed, accountingComplete = true;
@@ -25,6 +25,7 @@ final class ManagedIncrementalCursor implements Cursor {
     ManagedIncrementalCursor(MoveProvider.Descriptor descriptor, Definition definition, Factory factory,
             MoveState state, MoveContext context) {
         this.descriptor = descriptor; this.definition = definition; this.factory = factory;
+        meter = new Meter(definition.revision());
         this.state = Objects.requireNonNull(state); this.context = Objects.requireNonNull(context);
     }
     @Override public Optional<Transformation> next(long allowance) {
@@ -87,6 +88,7 @@ final class ManagedIncrementalCursor implements Cursor {
         status = Status.LIMIT; return false;
     }
     private void fail(RuntimeException failure) {
+        meter.abandonPending();
         meter.charge(Operation.ABORT, 1);
         status = Status.FAILED; accountingComplete = false;
         detail = failure.getClass().getSimpleName() + ":" + String.valueOf(failure.getMessage());
@@ -103,5 +105,6 @@ final class ManagedIncrementalCursor implements Cursor {
             validateMathematics();
             if (!terminal()) status = Status.CLOSED;
         } catch (RuntimeException failure) { fail(failure); }
+        finally { meter.abandonPending(); }
     }
 }

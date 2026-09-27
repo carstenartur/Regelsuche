@@ -1,0 +1,27 @@
+{
+  "schema": "regelsuche.work-replacement-regression-evidence/v1",
+  "scope": "P03 fresh-process measurement accounting; not a mathematical proof or final package qualification",
+  "repository": "carstenartur/Regelsuche",
+  "testOnlyCommit": "2d165776ec9ce7f5136ad160f2d22375cd1615bb",
+  "unchangedImplementationCommit": "cc981d7582c54d07b01c2b51f128be719ddd4c45",
+  "workflowRun": 35635934703,
+  "job": 106453409080,
+  "javaVersion": "25.0.4+1",
+  "gradleVersion": "9.7.1",
+  "learningTestsCompleted": 966,
+  "learningTestsFailed": 3,
+  "failureKind": "org.opentest4j.AssertionFailedError at WorkReplacementChildAccountingTest.java:45",
+  "failedCases": [
+    "incompleteChildCannotBecomeACompleteParentAccount",
+    "malformedCompletenessIsNotCoercedToTrue",
+    "absentCompletenessIsNotAssumedTrue"
+  ],
+  "controlCase": "explicitCompleteChildPreservesItsPaidWork",
+  "artifactId": 10657030144,
+  "artifactSha256AsReportedByGitHub": "0833ccc12a31c22ff90b6426377deb647acf376f03659a04a7f21a4419243156",
+  "artifactBytesDownloadedAndVerified": true,
+  "artifactSha256ComputedFromDownloadedBytes": "0833ccc12a31c22ff90b6426377deb647acf376f03659a04a7f21a4419243156",
+  "artifactVerification": "Updated after downloading the retained ZIP: SHA-256 matches the GitHub digest and JUnit XML confirms the three named failures plus the passing positive control. The original record was written before that download.",
+  "observedFromCompletedJobLog": true,
+  "qualification": "Behavioral RED confirmed before the protocol fix. No full CI success or P03 acceptance is asserted here."
+}
