@@ -14,6 +14,8 @@ import java.util.TreeMap;
 public final class IncrementalProviderContract {
     private IncrementalProviderContract() {}
     public static final String REVISION = "regelsuche.incremental-provider/v2";
+    public static final String PREPAID_REVISION = "regelsuche.incremental-provider/v3-prepaid";
+    public enum ApplicationPhase { SUBSTITUTION_DOMAIN, INSTANTIATION, TARGET_DOMAIN, EVIDENCE }
     public enum Kind { NATIVE_RULES, REGISTERED_SCHEMA, TYPED_PRIMITIVE_BATCH }
     public enum Transport { PARSER_TEXT, TYPED_AST_JSON }
     public enum Mathematics { PRIMITIVE, EXACT, MIXED }
@@ -68,6 +70,17 @@ public final class IncrementalProviderContract {
     public static final class Meter {
         private final Map<String, Long> operations = new TreeMap<>();
         private ExecutionWork mathematics = ExecutionWork.ZERO;
+        public Meter() {}
+        /** Unreleased refusing API for the prepaid-work behavioral RED. */
+        public Meter(String revision) {}
+        public PrepaidApplication beginPrepaidApplication() { throw new UnsupportedOperationException("prepaid protocol not implemented"); }
+        public void prepay(PrepaidApplication application, ApplicationPhase phase, long units) {
+            throw new UnsupportedOperationException("prepaid protocol not implemented");
+        }
+        public void complete(PrepaidApplication application, ExecutionWork work) {
+            throw new UnsupportedOperationException("prepaid protocol not implemented");
+        }
+        public void abandon(PrepaidApplication application) { throw new UnsupportedOperationException("prepaid protocol not implemented"); }
         public void charge(Operation operation, long units) {
             if (units < 0) throw new IllegalArgumentException("negative incremental work");
             operations.merge(Objects.requireNonNull(operation).name(), units, Math::addExact);
@@ -75,6 +88,8 @@ public final class IncrementalProviderContract {
         public void charge(ExecutionWork work) { mathematics = mathematics.plus(Objects.requireNonNull(work)); }
         public Work work() { return new Work(operations, mathematics); }
     }
+    /** Opaque meter-owned payment handle; never a mathematical capability. */
+    public static final class PrepaidApplication { private PrepaidApplication() {} }
     @FunctionalInterface public interface Factory {
         Source open(MoveState state, MoveContext context, Meter meter);
     }
