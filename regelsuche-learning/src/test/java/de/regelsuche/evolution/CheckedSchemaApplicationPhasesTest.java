@@ -59,6 +59,7 @@ class CheckedSchemaApplicationPhasesTest {
     @Test void resumeAfterInstantiationOnlyFinishesRemainingPhasesAndChargesTheCandidateExactlyOnce() throws Exception {
         var cursor = plan.provider().openSession(state, MoveContext.frozen("unused"));
         var paused = untilPhase(cursor, "INSTANTIATION");
+        assertTrue(paused.path("phaseWork").path("INSTANTIATION").asLong() > 0, "each actual phase exposes its work separately");
         long matches = cursor.snapshot().work().units(IncrementalProviderContract.Operation.MATCH);
         long paid = cursor.snapshot().work().metrics().totalWorkUnitsV2();
         assertTrue(cursor.next(0).isEmpty());
@@ -117,6 +118,7 @@ class CheckedSchemaApplicationPhasesTest {
             assertFalse(cursor.snapshot().complete()); assertTrue(cursor.snapshot().accountingComplete());
             assertEquals(0, cursor.snapshot().work().mathematics().exactTheorySteps());
             assertTrue(prepaid(cursor).path("chargedUnits").asLong() >= 512);
+            assertTrue(prepaid(cursor).path("phaseWork").path("TARGET_DOMAIN").asLong() >= 512);
             assertEquals(0, prepaid(cursor).path("phaseCalls").path("EVIDENCE").asLong());
         }
     }

@@ -82,6 +82,19 @@ that status on a positive pull, using the same traversal and revision
 General receipts use `regelsuche.incremental-provider/v2`; staged execution uses
 `regelsuche.staged-incremental-move-search-work/v2` and
 `regelsuche.stage-provider-score-native-order-two-learned-burst/v2`.
+Checked schema application phases additionally opt into
+`regelsuche.incremental-provider/v3-prepaid` and staged work revision
+`regelsuche.staged-incremental-move-search-work/v3-prepaid`; the ordering revision
+does not change. Their optional `prepaidApplications` work extension explicitly
+records cumulative phase payments, phase events and completed prepaid mathematics.
+Partial payments confer no proof authority. Completion does not remove a payment
+or charge it again. `Work.metrics()` is the paid-work projection: prepaid units
+and phase events stay in delegated mechanics, while only nonprepaid mathematics
+enters `candidateWork`. Full `Work.mathematics()` is also retained for candidate
+admission and diagnosis, so consumers must not add it again to prepaid mechanics.
+Native and registered v2 receipts omit this extension and retain their old bytes
+and accounting formula. See `research/lazy-checked-schema-cursor.md` for phase
+boundaries and the versioned pending-work contract.
 `StagedIncrementalMoveExecution` records every definition, source expansion,
 stage, original provider index and final cursor receipt. Unopened lanes have null
 cursors. `LearnedSchedulingArtifacts` emits the new field only for the new mode;

@@ -28,7 +28,7 @@ import java.util.TreeMap;
 /** Immutable preparation shared by cursor sessions, not an eagerly generated candidate list. */
 public final class CheckedSchemaMatcherPlan {
     public static final String REVISION = "regelsuche.checked-schema-matcher-plan/v1";
-    public static final String WORK_REVISION = "regelsuche.checked-schema-cursor-work/v1";
+    public static final String WORK_REVISION = "regelsuche.checked-schema-cursor-work/v2-prepaid-phases";
     /** Preparation is a separate lifecycle charge; opening a cursor never rebuilds this index. */
     public record Compilation(String revision, String configurationHash, long workUnits,
             int includedSchemas, long patternNodeVisits, long orderingComparisons) {}
@@ -38,8 +38,14 @@ public final class CheckedSchemaMatcherPlan {
         Entry get(int index) { return index < shaped.size() ? shaped.get(index) : wildcard.get(index - shaped.size()); }
     }
     @FunctionalInterface interface Application {
-        Transformation apply(CheckedLearnedSchemaModel.Schema schema, Expr source, String encodedSource,
+        ApplicationSteps start(CheckedLearnedSchemaModel.Schema schema, Expr source, String encodedSource,
             List<Integer> path, Map<String, Expr> bindings, Work work);
+    }
+    interface ApplicationSteps {
+        IncrementalProviderContract.ApplicationPhase phase();
+        void advance();
+        boolean done();
+        Transformation result();
     }
 
     private final CheckedLearnedSchemaModel.Bounds bounds;
@@ -70,7 +76,7 @@ public final class CheckedSchemaMatcherPlan {
         String configuration = configuration(descriptor.id(), maximum, utility, selected);
         work.add(configuration.length());
         String configurationHash = SchematicProofPlan.hash(configuration);
-        definition = new Definition(IncrementalProviderContract.REVISION, descriptor.id(), Kind.REGISTERED_SCHEMA,
+        definition = new Definition(IncrementalProviderContract.PREPAID_REVISION, descriptor.id(), Kind.REGISTERED_SCHEMA,
             configurationHash, model.inventorySemanticsHash() + ";" + CheckedLearnedSchemaModel.CHECKER_REVISION
                 + ";" + REVISION + ";" + WORK_REVISION,
             Transport.TYPED_AST_JSON, Mathematics.EXACT, null);
@@ -96,9 +102,9 @@ public final class CheckedSchemaMatcherPlan {
         String shape = expression instanceof BinaryExpr binary ? binary.operator().name() : "LEAF";
         return new Range(index.getOrDefault(shape, List.of()), index.getOrDefault("P", List.of()));
     }
-    Transformation apply(Entry entry, Expr source, String encoded, List<Integer> path,
+    ApplicationSteps startApplication(Entry entry, Expr source, String encoded, List<Integer> path,
             Map<String, Expr> bindings, Work work) {
-        return application.apply(entry.schema(), source, encoded, path, bindings, work);
+        return application.start(entry.schema(), source, encoded, path, bindings, work);
     }
 
     private static void validate(CheckedLearnedSchemaModel model, int maximum, Map<String, Double> utility,

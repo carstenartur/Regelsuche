@@ -165,7 +165,12 @@ public final class LearnedSchedulingArtifacts {
         }
         if (value.getClass().isRecord()) {
             var result = new TreeMap<String, Object>();
-            for (RecordComponent component : value.getClass().getRecordComponents()) result.put(component.getName(), normalize(component.getAccessor().invoke(value)));
+            for (RecordComponent component : value.getClass().getRecordComponents()) {
+                Object part = component.getAccessor().invoke(value);
+                if (value instanceof de.regelsuche.search.moves.IncrementalProviderContract.Work
+                        && component.getName().equals("prepaidApplications") && part == null) continue;
+                result.put(component.getName(), normalize(part));
+            }
             return result;
         }
         throw new IllegalArgumentException("unsupported evidence value: " + value.getClass());

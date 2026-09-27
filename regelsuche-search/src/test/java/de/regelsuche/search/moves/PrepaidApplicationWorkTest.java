@@ -94,11 +94,33 @@ class PrepaidApplicationWorkTest {
         var before = meter.work();
         assertThrows(ArithmeticException.class, () -> meter.prepay(ticket, ApplicationPhase.INSTANTIATION, Long.MAX_VALUE));
         assertEquals(before, meter.work());
-        meter.charge(new ExecutionWork(0, Long.MAX_VALUE, Long.MAX_VALUE));
-        var full = meter.work();
-        assertThrows(ArithmeticException.class, () -> meter.complete(ticket, new ExecutionWork(0, 1, 1)));
-        assertEquals(full, meter.work());
+        assertThrows(ArithmeticException.class, () -> meter.charge(new ExecutionWork(0, Long.MAX_VALUE, Long.MAX_VALUE)));
+        assertEquals(before, meter.work());
         meter.abandon(ticket);
-        assertEquals(full.mathematics(), meter.work().mathematics());
+        assertEquals(before.mathematics(), meter.work().mathematics());
+    }
+
+    @Test void aggregatePaidTotalOverflowCannotMutateAnOtherwiseValidPrepaidAccount() {
+        var meter = new Meter(PREPAID_REVISION);
+        meter.charge(Operation.LOAD, Long.MAX_VALUE - 2);
+        var ticket = meter.beginPrepaidApplication();
+        meter.prepay(ticket, ApplicationPhase.SUBSTITUTION_DOMAIN, 1);
+        assertEquals(Long.MAX_VALUE, meter.work().metrics().totalWorkUnitsV2());
+        var before = meter.work();
+        assertThrows(ArithmeticException.class, () -> meter.prepay(ticket, ApplicationPhase.EVIDENCE, 0));
+        assertThrows(ArithmeticException.class, () -> meter.charge(Operation.PULL, 1));
+        assertEquals(before, meter.work());
+        meter.complete(ticket, new ExecutionWork(0, 1, 1));
+        assertEquals(Long.MAX_VALUE, meter.work().metrics().totalWorkUnitsV2());
+    }
+
+    @Test void legacyWorkSerializationAndProjectionRemainExact() throws Exception {
+        var meter = new Meter();
+        meter.charge(Operation.MATCH, 3); meter.charge(new ExecutionWork(0, 1, 5));
+        assertEquals(8, meter.work().metrics().totalWorkUnitsV2());
+        assertEquals(new ExecutionWork(0, 1, 5), meter.work().metrics().candidateWork());
+        var json = new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(meter.work());
+        assertFalse(json.has("prepaidApplications"));
+        assertEquals(2, json.size());
     }
 }

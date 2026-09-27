@@ -6,8 +6,13 @@ import java.util.List;
 public record StagedIncrementalMoveExecution(String workRevision, String orderRevision,
         List<Provider> providers, List<Expansion> expansions) {
     public static final String WORK_REVISION = "regelsuche.staged-incremental-move-search-work/v2";
+    public static final String PREPAID_WORK_REVISION = "regelsuche.staged-incremental-move-search-work/v3-prepaid";
     public static final String ORDER_REVISION = "regelsuche.stage-provider-score-native-order-two-learned-burst/v2";
-    public StagedIncrementalMoveExecution { providers = List.copyOf(providers); expansions = List.copyOf(expansions); }
+    public StagedIncrementalMoveExecution {
+        providers = List.copyOf(providers); expansions = List.copyOf(expansions);
+        if (providers.stream().anyMatch(provider -> IncrementalProviderContract.PREPAID_REVISION.equals(provider.definition().revision())))
+            workRevision = PREPAID_WORK_REVISION;
+    }
     public boolean accountingComplete() {
         return expansions.stream().flatMap(expansion -> expansion.lanes().stream())
             .allMatch(lane -> lane.cursor() == null || lane.cursor().accountingComplete());

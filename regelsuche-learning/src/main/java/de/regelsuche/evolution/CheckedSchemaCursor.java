@@ -5,6 +5,7 @@ import de.regelsuche.search.moves.IncrementalProviderContract.Meter;
 import de.regelsuche.search.moves.IncrementalProviderContract.Operation;
 import de.regelsuche.search.moves.IncrementalProviderContract.Source;
 import de.regelsuche.search.moves.IncrementalProviderContract.Status;
+import de.regelsuche.search.moves.IncrementalProviderContract.PrepaidApplication;
 
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
@@ -31,6 +32,9 @@ final class CheckedSchemaCursor implements Source {
     private int schemaIndex, attempted, produced;
     private CheckedSchemaMatcherPlan.Entry matchedEntry;
     private Map<String, Expr> bindings;
+    private CheckedSchemaMatcherPlan.ApplicationSteps application;
+    private Work applicationWork;
+    private PrepaidApplication payment;
     private Transformation ready;
     private boolean initialized, complete;
     private Status status = Status.READY;
@@ -47,7 +51,7 @@ final class CheckedSchemaCursor implements Source {
             status = Status.READY;
             if (ready != null) return emit();
             if (!initialized) initialize();
-            else if (matchedEntry != null) instantiate();
+            else if (matchedEntry != null) advanceApplication();
             else if (occurrence == null) advance();
             else if (schemaIndex < Math.min(relevant.size(), plan.maximumSchemasPerOccurrence())) match();
             else descend();
@@ -100,23 +104,33 @@ final class CheckedSchemaCursor implements Source {
             bindings = outcome.matches().getFirst().bindings();
         }
     }
-    private void instantiate() {
-        var work = new Work();
-        boolean paidAsMathematics = false;
-        try {
-            // Reuses the model's private checked application/evidence path, unchanged from eager v1.
-            ready = plan.apply(matchedEntry, source, encodedSource, occurrence.path(), bindings, work);
-            if (ready != null) {
-                meter.charge(ready.executionWork());
-                paidAsMathematics = true;
-                produced++;
-            }
-        } catch (IllegalArgumentException unsupported) {
-            work.add(1); complete = false;
-        } finally {
-            if (!paidAsMathematics) meter.charge(Operation.MATCH, work.units);
-            matchedEntry = null; bindings = null;
+    private void advanceApplication() {
+        if (application == null) {
+            applicationWork = new Work();
+            payment = meter.beginPrepaidApplication();
+            application = plan.startApplication(matchedEntry, source, encodedSource, occurrence.path(), bindings, applicationWork);
         }
+        long before = applicationWork.units;
+        var phase = application.phase();
+        boolean failed = false;
+        try {
+            application.advance();
+        } catch (IllegalArgumentException unsupported) {
+            meter.charge(Operation.MATCH, 1); complete = false; failed = true;
+        } finally {
+            meter.prepay(payment, phase, applicationWork.units - before);
+        }
+        if (failed) meter.abandon(payment);
+        else if (application.done()) {
+            ready = application.result();
+            if (ready == null) meter.abandon(payment);
+            else { meter.complete(payment, ready.executionWork()); produced++; }
+        } else return;
+        clearApplication();
+    }
+    private void clearApplication() {
+        application = null; applicationWork = null; payment = null;
+        matchedEntry = null; bindings = null;
     }
     private Optional<Transformation> emit() {
         meter.charge(Operation.PULL, 1);
@@ -141,7 +155,7 @@ final class CheckedSchemaCursor implements Source {
     @Override public Status status() { return status; }
     @Override public void close() {
         pending.clear(); occurrence = null; relevant = null;
-        matchedEntry = null; bindings = null; ready = null; source = null;
+        clearApplication(); ready = null; source = null;
         status = Status.CLOSED;
     }
 }
