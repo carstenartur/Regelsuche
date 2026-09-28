@@ -157,7 +157,7 @@ final class ExprMatcherEngine {
                 RetainedOperation.work(1);
                 RetainedOperation.checkpoint();
                 if (work.attempt.matched()) {
-                    return List.of(state.withBindings(work.attempt.bindings())
+                    return work.completed(state.withBindings(work.attempt.bindings())
                         .recognized(ExprMatcher.RecognitionStrength.EXACT,expression,0,atRoot)
                         .traced("pattern:exact"));
                 }
@@ -180,7 +180,7 @@ final class ExprMatcherEngine {
                     return List.of();
                 }
                 if (!work.attempt.matched()) return List.of();
-                return List.of(state.withBindings(work.attempt.bindings())
+                return work.completed(state.withBindings(work.attempt.bindings())
                     .recognized(ExprMatcher.RecognitionStrength.EQUIVALENCE_AWARE,expression,0,atRoot)
                     .traced("pattern:equivalence-aware"));
             } catch (RuntimeException | Error failure) {
@@ -668,9 +668,17 @@ final class ExprMatcherEngine {
     private static final class PatternAttemptWork implements RetainedGraph.View {
         private final RecognitionProfile exactProfile = RecognitionProfile.exact();
         private EquivalenceAwarePatternMatcher.MatchAttempt attempt;
+        private List<State> result;
 
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
-            visitor.reference(exactProfile); visitor.reference(attempt);
+            visitor.reference(exactProfile); visitor.reference(attempt); visitor.reference(result);
+        }
+
+        private List<State> completed(State state) {
+            result = List.of(state);
+            RetainedOperation.work(2);
+            RetainedOperation.checkpoint();
+            return result;
         }
     }
 

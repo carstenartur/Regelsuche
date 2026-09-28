@@ -19,7 +19,7 @@ class ExprMatcherOwnershipTest {
         ExprMatcher.MatchOutcome outcome;
         long work, workAfterFailure, retentionWork;
         MatchAbort failure;
-        boolean abortOutcome, abortClose, sawSession, inputMissing;
+        boolean abortOutcome, abortClose, sawSession, sawSessionStateList, inputMissing;
         boolean abortBindingCopy, sawBindingCopy, sawTraceCopy;
         boolean abortStateList, sawSecondBinding, sawOperationTrace;
         boolean sawRepresentativeList, sawLaterRepresentative, sawDescendantTrace;
@@ -141,6 +141,7 @@ class ExprMatcherOwnershipTest {
                 } else if (value instanceof FunctionExpr function) visitor.reference(function.arguments());
             }
             inputMissing |= !seen.contains(input);
+            sawSessionStateList |= hasSessionStateList;
             sawBindingCopy |= hasMutableBinding && hasFrozenBinding;
             sawPathCopy |= hasMutablePath && hasFrozenPath;
             sawPathBufferAndText |= hasPathBuffer && hasPathText;
@@ -226,6 +227,7 @@ class ExprMatcherOwnershipTest {
             assertTrue(matcher().match(input).matched());
         }
         assertNotNull(observation.outcome,"the complete result and source graph must still be observed");
+        assertTrue(observation.sawSessionStateList,"the probe must observe the actual Session result owner");
         assertEquals(0,observation.unpublishedResultScans,
             "after Session owns its raw/frozen states, monotone result assembly avoids an intermediate full scan");
         assertFalse(observation.inputMissing);
