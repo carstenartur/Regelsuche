@@ -67,6 +67,10 @@ public final class TypedLearnedMoveInventory {
         learned = List.copyOf(programs.values());
     }
 
+    public List<NativeMoveProvider> nativeProviders() { throw new UnsupportedOperationException("native learned inventory not wired"); }
+
+    public List<NativeMoveProvider> nativePrimitiveProviders() { throw new UnsupportedOperationException("native primitive inventory not wired"); }
+
     public List<MoveProvider> primitiveProviders() { return primitives; }
 
     /** Generalizes actual successful observations, then proves each symbolic statement. */
