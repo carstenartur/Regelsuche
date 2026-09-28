@@ -1,6 +1,8 @@
 package de.regelsuche.search.program;
 
 import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.transform.AstRewriteTransport;
 import de.regelsuche.transform.ExecutionWork;
@@ -16,11 +18,13 @@ import java.util.Objects;
  * structural histories and work accounting are separate from historical text execution.
  * Replay establishes reproducibility under the supplied rules, not their proof authority.
  */
-public final class CompiledAstRewriteProgram {
+public final class CompiledAstRewriteProgram implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(programId);v.reference(stages);}
     public static final String REVISION = "regelsuche.compiled-linear-rewrite/ast-v1";
 
     /** All intermediate states and their source-node/rule metadata, not an occurrence certificate. */
-    public record Candidate(String programId, List<String> sourceIds, List<AstRewriteTransport.Step> steps) {
+    public record Candidate(String programId, List<String> sourceIds, List<AstRewriteTransport.Step> steps) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(programId);v.reference(sourceIds);v.reference(steps);}
         public Candidate {
             requireId(programId);
             sourceIds = List.copyOf(sourceIds);
@@ -50,7 +54,8 @@ public final class CompiledAstRewriteProgram {
     }
 
     /** Mechanical source/candidate/composition events; not AST-node, CPU or allocation costs. */
-    public record Batch(List<Candidate> candidates, TransformationWorkMetrics workMetrics) {
+    public record Batch(List<Candidate> candidates, TransformationWorkMetrics workMetrics) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(candidates);v.reference(workMetrics);}
         public Batch {
             candidates = List.copyOf(candidates);
             Objects.requireNonNull(workMetrics, "workMetrics");
@@ -76,7 +81,9 @@ public final class CompiledAstRewriteProgram {
         public TransformationWorkMetrics workMetrics() { return workMetrics; }
     }
 
-    private record Stage(String sourceId, AstRewriteTransport transport) {}
+    private record Stage(String sourceId, AstRewriteTransport transport) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(sourceId);v.reference(transport);}
+    }
     private final String programId;
     private final List<Stage> stages;
     private final int maximumCandidates;

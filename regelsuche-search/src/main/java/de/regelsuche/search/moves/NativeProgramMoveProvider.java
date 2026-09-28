@@ -5,7 +5,8 @@ import de.regelsuche.transform.TransformationWorkMetrics;
 import java.util.*;
 
 /** Object transport of the existing registered interpreter, with independent full regeneration. */
-public record NativeProgramMoveProvider(MoveProvider.Descriptor descriptor,CompiledAstRewriteProgram program) implements NativeMoveProvider {
+public record NativeProgramMoveProvider(MoveProvider.Descriptor descriptor,CompiledAstRewriteProgram program) implements NativeMoveProvider,de.regelsuche.retention.RetainedGraph.View {
+    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(descriptor);v.reference(program);}
     public NativeProgramMoveProvider {
         Objects.requireNonNull(descriptor);Objects.requireNonNull(program);
         if((descriptor.sourceKind()!=SearchMove.SourceKind.LEARNED && descriptor.sourceKind()!=SearchMove.SourceKind.EXPERT)
