@@ -44,11 +44,12 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
         if(enforce && !complete)throw new SearchExecution.ResourceLimit();
         return measured;
     }
-    void finish(NativeMoveSearch.Result result){
+    void finish(NativeMoveSearch.Result result){finish(result,result);}
+    void finish(NativeMoveSearch.Result result,RetainedGraph.View output){
         store.close();kernel=null;operation=null;
         var receipt=new NativeMoveSearch.Accounting();result.accounting=receipt;
         receipt.update(validationWork,executionWork,store.work(),retentionWork,peakNodes,peakCharacters,peakReferences,0,0,0,complete,detail);
-        var retained=observe(result,false).retained();
+        var retained=observe(output,false).retained();
         receipt.update(validationWork,executionWork,store.work(),retentionWork,peakNodes,peakCharacters,peakReferences,
             retained.nodes(),retained.characters(),retained.references(),complete,detail);
     }

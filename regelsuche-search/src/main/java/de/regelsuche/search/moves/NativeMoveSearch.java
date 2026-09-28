@@ -117,23 +117,27 @@ public final class NativeMoveSearch {
         }
     }
     public record QualityResult(Result search,TypedMoveSearch.State incumbent,long inputScore,long outputScore,
-            List<SearchExecution.Step<TypedMoveSearch.State,NativeSearchMove,NativeVerification>> witness,long replayWork,long workBudget) {
+            List<SearchExecution.Step<TypedMoveSearch.State,NativeSearchMove,NativeVerification>> witness,long replayWork,long workBudget) implements RetainedGraph.View {
         public QualityResult { witness=List.copyOf(witness); }
-        public long totalWork(){return Math.addExact(search.metrics().totalWork(),replayWork);}
+        public long totalWork(){return search.totalWork();}
+        public boolean hasIncumbent(){return incumbent!=null;}
+        @Override public long inputScore(){if(!hasIncumbent())throw new IllegalStateException("input was not scored");return inputScore;}
+        @Override public long outputScore(){if(!hasIncumbent())throw new IllegalStateException("no scored incumbent");return outputScore;}
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(search);v.reference(incumbent);v.reference(witness);}
         public boolean withinBudget(){return search.accountingComplete() && totalWork()<=workBudget;}
     }
     public QualityResult searchUntil(Problem problem,TypedSourceOnlySearch.Objective objective,long maximumOutputScore,SearchContinuationContract continuation){
-        return select(problem,objective,maximumOutputScore,true,continuation);
+        return select(problem,objective,maximumOutputScore,true,continuation,null);
     }
     public QualityResult searchUntil(Problem problem,TypedSourceOnlySearch.Objective objective,long maximumOutputScore,SearchContinuationContract continuation,SearchExpressionStore.Limits limits){
-        Objects.requireNonNull(limits);return select(problem,objective,maximumOutputScore,true,continuation);
+        return select(problem,objective,maximumOutputScore,true,continuation,Objects.requireNonNull(limits));
     }
     public QualityResult searchBest(Problem problem,TypedSourceOnlySearch.Objective objective,SearchContinuationContract continuation,SearchExpressionStore.Limits limits){
-        Objects.requireNonNull(limits);return select(problem,objective,0,false,continuation);
+        return select(problem,objective,0,false,continuation,Objects.requireNonNull(limits));
     }
     /** Best admitted incumbent under the fixed budget; does not stop at an adequate score. */
     public QualityResult searchBest(Problem problem,TypedSourceOnlySearch.Objective objective,SearchContinuationContract continuation){
-        return select(problem,objective,0,false,continuation);
+        return select(problem,objective,0,false,continuation,null);
     }
     public static final class FinalCheckFailure extends IllegalStateException {
         private final QualityResult attempted;
@@ -144,22 +148,35 @@ public final class NativeMoveSearch {
         public QualityResult attempted(){return attempted;}
         public NativeVerification rejected(){return rejected;}
     }
+    private record ObjectiveAdapter(TypedSourceOnlySearch.Objective objective)
+            implements java.util.function.Function<TypedMoveSearch.State,MoveSearch.ObjectiveScore>,RetainedGraph.View {
+        @Override public MoveSearch.ObjectiveScore apply(TypedMoveSearch.State state){
+            var score=objective.evaluate(state);return new MoveSearch.ObjectiveScore(score.value(),score.work());
+        }
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(objective);}
+    }
     private QualityResult select(Problem problem,TypedSourceOnlySearch.Objective objective,long maximumOutputScore,
-            boolean stopAtQuality,SearchContinuationContract continuation){
+            boolean stopAtQuality,SearchContinuationContract continuation,SearchExpressionStore.Limits limits){
         Objects.requireNonNull(objective);
         if(!problem.context().sourceOnly())throw new IllegalArgumentException("source-only context required");
-        validate(problem);
-        var selection=new MoveSearchObjective<TypedMoveSearch.State,NativeSearchMove,NativeVerification>(state->{
-            var score=objective.evaluate(state);return new MoveSearch.ObjectiveScore(score.value(),score.work());
-        },maximumOutputScore,stopAtQuality);
-        try(var store=new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)) {
-            var execution=new Execution(problem,store);
-            var result=new Result(problem,new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
-                .search(execution,continuation,selection));
-            var replay=replay(execution,problem.source(),selection.incumbent().expression(),selection.witness());
-            var quality=new QualityResult(result,selection.incumbent(),selection.inputScore(),selection.outputScore(),selection.witness(),replay.work(),problem.budget().totalWork());
-            if(replay.rejected()!=null)throw new FinalCheckFailure(quality,replay.rejected());
-            return quality;
+        var selection=new MoveSearchObjective<TypedMoveSearch.State,NativeSearchMove,NativeVerification>(
+            new ObjectiveAdapter(objective),maximumOutputScore,stopAtQuality);
+        try(var store=new SearchExpressionStore(limits==null?SearchExpressionStore.Limits.DEFAULT:limits)) {
+            var accounting=limits==null?null:new NativeRetentionSession(problem,store,limits);
+            try(var operation=accounting==null?null:de.regelsuche.retention.RetainedOperation.open(accounting)) {
+                if(accounting==null)validate(problem);
+                else {accounting.operation(operation);accounting.validate(problem.source());}
+                var execution=new Execution(problem,store,accounting);
+                var searched=new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
+                    .search(execution,continuation,selection);
+                var replay=selection.incumbent()==null?new Replay(0,null):
+                    replay(execution,problem.source(),selection.incumbent().expression(),selection.witness());
+                var result=new Result(problem,searched,replay.work());
+                var quality=new QualityResult(result,selection.incumbent(),selection.inputScore(),selection.outputScore(),selection.witness(),replay.work(),problem.budget().totalWork());
+                if(accounting!=null){operation.close();accounting.finish(result,quality);}
+                if(replay.rejected()!=null)throw new FinalCheckFailure(quality,replay.rejected());
+                return quality;
+            }
         }
     }
     public Result search(Problem problem,SearchContinuationContract continuation,SearchExpressionStore.Limits limits){

@@ -4,7 +4,8 @@ import java.util.List;
 import java.util.Objects;
 
 /** A per-run incumbent, updated only for the trusted input and mathematically admitted edges. */
-final class MoveSearchObjective<S,M,V> {
+final class MoveSearchObjective<S,M,V> implements de.regelsuche.retention.RetainedGraph.View {
+    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(objective);v.reference(incumbent);v.reference(path);v.reference(witness);}
     private final java.util.function.Function<S,MoveSearch.ObjectiveScore> objective;
     private final long maximumOutputScore;
     private final boolean stopAtQuality;

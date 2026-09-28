@@ -53,6 +53,30 @@ class NativeRetentionSearchTest {
             assertEquals(result.search().metrics().totalWork()+result.replayWork()+accounting.validationWork()+accounting.executionWork()+accounting.storageWork()+accounting.retentionWork(),result.totalWork());
             assertEquals(new RetainedGraph.Usage(0,0,0),accounting.live());assertTrue(accounting.resultRetained().nodes()>=3);
             assertTrue(result.withinBudget());
+            assertEquals(RetainedGraph.measure(result).retained(),accounting.resultRetained());
+        }
+        var unscored=engine.searchUntil(problem,DepthObjective.INSTANCE,0,SearchContinuationContract.PATH_SENSITIVE,
+            new SearchExpressionStore.Limits(2,1000000,1000000,0));
+        assertFalse(unscored.hasIncumbent());assertThrows(IllegalStateException.class,unscored::inputScore);
+        assertThrows(IllegalStateException.class,unscored::outputScore);
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,unscored.search().outcome());assertFalse(unscored.withinBudget());
+        assertTrue(unscored.totalWork()>0);
+        var tinyBudget=new NativeMoveSearch.Problem(source,problem.context(),List.of(provider),problem.mode(),problem.scheduling(),
+            new MoveSearch.Budget(1,1,0,10,1));
+        var stopped=engine.searchBest(tinyBudget,DepthObjective.INSTANCE,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT);
+        assertEquals(MoveSearch.Outcome.WORK_EXHAUSTED,stopped.search().outcome());assertFalse(stopped.withinBudget());
+        assertTrue(stopped.totalWork()>1);assertSame(source,stopped.incumbent().expression());
+        for(boolean best:List.of(false,true)) {
+            var verifier=new FinalAllocation(NativeVerifier.registered(List.of(provider)));
+            var finalLimited=new NativeMoveSearch.Problem(source,problem.context(),List.of(provider),problem.mode(),problem.scheduling(),problem.budget(),
+                problem.policy(),problem.stateScore(),problem.stateValue(),verifier);
+            var limits=new SearchExpressionStore.Limits(10,1000000,1000000,0);
+            var result=best?engine.searchBest(finalLimited,DepthObjective.INSTANCE,SearchContinuationContract.PATH_SENSITIVE,limits):
+                engine.searchUntil(finalLimited,DepthObjective.INSTANCE,0,SearchContinuationContract.PATH_SENSITIVE,limits);
+            assertEquals(2,verifier.calls);assertEquals(1,result.witness().size());assertSame(target,result.incumbent().expression());
+            assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.search().outcome());assertFalse(result.withinBudget());
+            assertEquals("NATIVE_RETENTION_EXHAUSTED",result.search().accounting().detail());assertTrue(result.search().accounting().peak().nodes()>=20);
+            assertEquals(result.search().totalWork(),result.totalWork());
         }
     }
 
