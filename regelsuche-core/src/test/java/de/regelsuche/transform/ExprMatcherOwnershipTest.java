@@ -24,12 +24,14 @@ class ExprMatcherOwnershipTest {
         boolean sawRepresentativeList, sawLaterRepresentative, sawDescendantTrace;
         boolean sawPathCopy, sawPathBufferAndText, abortPathBuffer;
         boolean sawLimitedVisitWithDiagnostic, sawEmptyRepresentativesWithDiagnostic;
+        String abortTraceOutput;
         int unpublishedResultScans;
         final Set<String> patternDescriptions = Collections.newSetFromMap(new IdentityHashMap<>());
         final Set<List<?>> tracePrefixes = new HashSet<>();
         final Set<Object> states = Collections.newSetFromMap(new IdentityHashMap<>());
         final Set<Object> mutableStateLists = Collections.newSetFromMap(new IdentityHashMap<>());
         final Set<String> renderedPaths = Collections.newSetFromMap(new IdentityHashMap<>());
+        final Set<String> textBeforeTrace = new HashSet<>(), traceEntries = new HashSet<>();
         @Override public void executionWork(long units) {
             work += units;
             if (failure != null) workAfterFailure += units;
@@ -53,9 +55,11 @@ class ExprMatcherOwnershipTest {
             boolean hasMutablePath = false, hasFrozenPath = false, hasPathBuffer = false, hasPathText = false;
             boolean hasVisit = false, hasZeroPath = false, hasEmptyRepresentativeOwner = false;
             boolean hasLimitDiagnostic = false, hasEmptyDiagnostic = false;
+            var texts = new HashSet<String>(); var currentTraceEntries = new HashSet<String>();
             while (!pending.isEmpty()) {
                 Object value = pending.remove(); if (!seen.add(value)) continue;
                 if (value instanceof String text && text.startsWith("7:pattern")) patternDescriptions.add(text);
+                if (value instanceof String text && dynamicTrace(text)) texts.add(text);
                 if ("operation:ADD".equals(value)) sawOperationTrace = true;
                 if ("representative:1".equals(value)) sawLaterRepresentative = true;
                 if ("contains@0".equals(value)) sawDescendantTrace = true;
@@ -75,6 +79,9 @@ class ExprMatcherOwnershipTest {
                 if (value instanceof RetainedGraph.View view) view.retainedReferences(visitor);
                 else if (value instanceof Object[] array) for (var item : array) visitor.reference(item);
                 else if (value instanceof Collection<?> values) {
+                    if (values instanceof List<?>) for (Object item : values) {
+                        if (item instanceof String text && dynamicTrace(text)) currentTraceEntries.add(text);
+                    }
                     hasZeroPath |= values.equals(List.of(0));
                     if (values instanceof LinkedHashSet<?>) {
                         hasLimitDiagnostic |= values.stream().anyMatch(item -> item instanceof ExprMatcher.MatchDiagnostic d
@@ -119,6 +126,8 @@ class ExprMatcherOwnershipTest {
             sawPathBufferAndText |= hasPathBuffer && hasPathText;
             sawLimitedVisitWithDiagnostic |= hasVisit && hasZeroPath && hasLimitDiagnostic;
             sawEmptyRepresentativesWithDiagnostic |= hasEmptyRepresentativeOwner && hasEmptyDiagnostic;
+            traceEntries.addAll(currentTraceEntries);
+            texts.removeAll(currentTraceEntries); textBeforeTrace.addAll(texts);
             if (hasStateList && outcome == null) unpublishedResultScans++;
             if (abortBindingCopy && sawBindingCopy && failure == null) {
                 failure = new MatchAbort(); throw failure;
@@ -129,10 +138,19 @@ class ExprMatcherOwnershipTest {
             if (abortPathBuffer && sawPathBufferAndText && failure == null) {
                 failure = new MatchAbort(); throw failure;
             }
+            if (abortTraceOutput != null && textBeforeTrace.contains(abortTraceOutput) && failure == null) {
+                failure = new MatchAbort(); throw failure;
+            }
             if (abortOutcome && outcome != null && failure == null) {
                 failure = new MatchAbort(); throw failure;
             }
         }
+    }
+
+    private static boolean dynamicTrace(String value) {
+        return value.startsWith("number-property:") || value.startsWith("bind:") || value.startsWith("rebind:")
+            || value.startsWith("operation:") || value.startsWith("function:") || value.startsWith("contains@")
+            || value.startsWith("representative:");
     }
 
     private static ExprMatcher matcher() {
@@ -496,6 +514,93 @@ class ExprMatcherOwnershipTest {
         assertTrue(observation.sawEmptyRepresentativesWithDiagnostic,
             "the session diagnosis must overlap the actual provider-result owner before release");
         assertFalse(observation.inputMissing);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    @Test void dynamicTraceTextIsOwnedBeforeBeingAddedToAState() {
+        record Case(ExprMatcher matcher,Expr input,String trace,ExprMatcher.MatchOptions options) { }
+        var defaults = ExprMatcher.MatchOptions.defaults();
+        Expr x = new VariableExpr("x");
+        var cases = List.of(
+            new Case(ExprMatcher.integerLiteral(),new NumberExpr(2),"number-property:INTEGER_LITERAL",defaults),
+            new Case(ExprMatcher.bind("A",ExprMatcher.any()),x,"bind:A",defaults),
+            new Case(ExprMatcher.allOf(ExprMatcher.bind("A",ExprMatcher.any()),ExprMatcher.bind("A",ExprMatcher.any())),
+                x,"rebind:A",defaults),
+            new Case(ExprMatcher.op(ADD,ExprMatcher.any(),ExprMatcher.any()),
+                new ExpressionParser().parseTerm("x+y"),"operation:ADD",defaults),
+            new Case(ExprMatcher.fn("f",ExprMatcher.any()),new FunctionExpr("f",x),"function:f",defaults),
+            new Case(ExprMatcher.contains(ExprMatcher.literalVariable("x")),new FunctionExpr("f",x),"contains@0",defaults),
+            new Case(ExprMatcher.equivalent(RecognitionProfile.exact(),ExprMatcher.any()),
+                new ExpressionParser().parseTerm("x+0"),"representative:1",
+                defaults.withRepresentativeProvider(SimplifiedRepresentatives.INSTANCE)));
+        for (Case example : cases) {
+            var observation = new Observation(); observation.input = example.input();
+            try (var scope = RetainedOperation.open(observation)) {
+                observation.scope = scope;
+                assertTrue(example.matcher().match(example.input(),example.options()).matched());
+            }
+            assertTrue(observation.textBeforeTrace.contains(example.trace()),example.trace());
+            assertFalse(observation.inputMissing);
+            assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+        }
+    }
+
+    @Test void oneOperationReusesItsFinalTraceAcrossResultAlternatives() {
+        var matcher = ExprMatcher.op(ADD,ExprMatcher.any(),ExprMatcher.anyOf(ExprMatcher.any(),ExprMatcher.any()));
+        var results = matcher.match(new ExpressionParser().parseTerm("x+y")).matches();
+        assertEquals(2,results.size());
+        assertSame(results.getFirst().trace().getLast(),results.get(1).trace().getLast());
+    }
+
+    @Test void oneFunctionReusesItsFinalTraceAcrossResultAlternatives() {
+        var results = ExprMatcher.fn("f",ExprMatcher.anyOf(ExprMatcher.any(),ExprMatcher.any()))
+            .match(new FunctionExpr("f",new VariableExpr("x"))).matches();
+        assertEquals(2,results.size());
+        assertSame(results.getFirst().trace().getLast(),results.get(1).trace().getLast());
+    }
+
+    @Test void oneOccurrenceReusesItsTraceAcrossMatchesAtThatPath() {
+        var results = ExprMatcher.contains(ExprMatcher.anyOf(ExprMatcher.any(),ExprMatcher.any()))
+            .match(new VariableExpr("x")).matches();
+        assertEquals(2,results.size());
+        assertSame(results.getFirst().trace().getLast(),results.get(1).trace().getLast());
+    }
+
+    @Test void oneBindingReusesItsTraceAcrossResultAlternatives() {
+        var results = ExprMatcher.bind("A",ExprMatcher.anyOf(ExprMatcher.any(),ExprMatcher.any()))
+            .match(new VariableExpr("x")).matches();
+        assertEquals(2,results.size());
+        assertSame(results.getFirst().trace().getLast(),results.get(1).trace().getLast());
+    }
+
+    @Test void oneRebindingReusesItsTraceAcrossResultAlternatives() {
+        var matcher = ExprMatcher.allOf(ExprMatcher.bind("A",ExprMatcher.any()),
+            ExprMatcher.bind("A",ExprMatcher.anyOf(ExprMatcher.any(),ExprMatcher.any())));
+        var results = matcher.match(new VariableExpr("x")).matches();
+        assertEquals(2,results.size());
+        assertSame(results.getFirst().trace().getLast(),results.get(1).trace().getLast());
+    }
+
+    @Test void oneRepresentativeReusesItsTraceAcrossMatches() {
+        var matcher = ExprMatcher.equivalent(RecognitionProfile.exact(),ExprMatcher.anyOf(ExprMatcher.any(),ExprMatcher.any()));
+        var results = matcher.match(new ExpressionParser().parseTerm("x+0"),
+            ExprMatcher.MatchOptions.defaults().withRepresentativeProvider(SimplifiedRepresentatives.INSTANCE)).matches();
+        assertEquals(4,results.size());
+        assertSame(results.get(2).trace().getLast(),results.get(3).trace().getLast());
+    }
+
+    @Test void anAbortedTraceOutputCannotBePublishedInAState() {
+        Expr input = new ExpressionParser().parseTerm("x+y");
+        var observation = new Observation(); observation.input = input; observation.abortTraceOutput = "operation:ADD";
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var failure = assertThrows(MatchAbort.class,
+                () -> ExprMatcher.op(ADD,ExprMatcher.any(),ExprMatcher.any()).match(input));
+            assertSame(observation.failure,failure);
+            assertFalse(observation.traceEntries.contains("operation:ADD"));
+            assertNull(observation.outcome);
+            assertTrue(observation.workAfterFailure > 0);
+        }
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
 
