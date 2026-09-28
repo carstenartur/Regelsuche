@@ -9,13 +9,14 @@ import org.junit.jupiter.api.Test;
 class RewriteTemporaryOwnershipTest {
     /** Walks only audited references, never private fields or a second rewrite implementation. */
     private static final class Observation implements RetainedOperation.Sink {
-        RetainedOperation scope;long execution,validation;int queueWidth,simultaneousResults;
+        RetainedOperation scope;long execution,validation;int queueWidth,simultaneousResults,checkpoints;
         boolean canonicalThree,replacedArguments;
         List<Expr> abortAtCopiedArguments;long previousCheckpointWork,copyCheckpointWork;
         @Override public void executionWork(long units){execution=Math.addExact(execution,units);}
         @Override public void validationWork(long units){validation=Math.addExact(validation,units);}
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(scope);}
         @Override public void checkpoint(){
+            checkpoints++;
             RetainedGraph.measure(scope);
             var pending=new ArrayDeque<Object>();var seen=Collections.newSetFromMap(new IdentityHashMap<Object,Boolean>());
             var expressions=new ArrayList<FunctionExpr>();var argumentLists=new ArrayList<List<?>>();int results=0;
@@ -104,6 +105,19 @@ class RewriteTemporaryOwnershipTest {
         assertFalse(observation.replacedArguments,"abort occurs before replacing an argument or producing its ancestor");
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
         assertEquals(1,transport.generate(source).size(),"the failed scope cannot leak into a later historical call");
+    }
+
+    @Test void boundedTraversalScansOnlyWhenItsOwnedQueueGraphCanGrow(){
+        var leaf=new VariableExpr("x");
+        var root=new FunctionExpr("f",List.of(leaf,leaf,leaf));
+        var observation=new Observation();
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;AstRewriteTransport.requireBounded(root);
+        }
+        assertEquals(4,observation.validation,"all four occurrences are inspected despite shared identity");
+        assertEquals(3,observation.queueWidth,"actual simultaneous pending children stay observable");
+        assertEquals(3,observation.checkpoints,"initial frame, initial root Node and actual child expansion; leaf visits do not grow ownership");
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
 
 }

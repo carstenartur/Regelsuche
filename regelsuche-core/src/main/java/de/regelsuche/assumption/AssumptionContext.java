@@ -1,7 +1,8 @@
 package de.regelsuche.assumption;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -12,7 +13,8 @@ import java.util.Set;
  * <p>The context dedupes assumptions by their expression text so a rule that
  * fires multiple times along a path only contributes its assumption once.</p>
  */
-public final class AssumptionContext {
+public final class AssumptionContext implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(known); visitor.reference(assumptions); }
     private final Set<String> known = new LinkedHashSet<>();
     private final List<Assumption> assumptions = new ArrayList<>();
 
@@ -20,8 +22,14 @@ public final class AssumptionContext {
         if (assumption == null) {
             return;
         }
-        if (known.add(assumption.expression())) {
-            assumptions.add(assumption);
+        try (var owned = RetainedOperation.retain(this, assumption)) {
+            boolean added = known.add(assumption.expression());
+            RetainedOperation.work(1);
+            if (added) {
+                assumptions.add(assumption);
+                RetainedOperation.work(1);
+            }
+            RetainedOperation.checkpoint();
         }
     }
 
@@ -36,7 +44,11 @@ public final class AssumptionContext {
 
     /** @return immutable snapshot of the accumulated assumptions. */
     public List<Assumption> snapshot() {
-        return Collections.unmodifiableList(new ArrayList<>(assumptions));
+        try (var owned = RetainedOperation.retain(this)) {
+            var snapshot = List.copyOf(assumptions);
+            RetainedOperation.work(assumptions.size());
+            return RetainedOperation.produced(snapshot);
+        }
     }
 
     public boolean isEmpty() {

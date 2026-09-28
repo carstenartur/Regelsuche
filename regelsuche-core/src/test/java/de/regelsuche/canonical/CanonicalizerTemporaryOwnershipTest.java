@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 class CanonicalizerTemporaryOwnershipTest {
     private static final class Observation implements RetainedOperation.Sink {
         RetainedOperation scope;Expr source;long work;
-        boolean functionArguments,termContributions,factorBuckets,discardedPower;
+        boolean functionArguments,termContributions,factorBuckets,discardedPower,abortAtContributions;
         @Override public void executionWork(long units){work=Math.addExact(work,units);}
         @Override public void validationWork(long units){work=Math.addExact(work,units);}
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(scope);}
@@ -29,6 +29,7 @@ class CanonicalizerTemporaryOwnershipTest {
                     if(list.stream().allMatch(FunctionExpr.class::isInstance))functionArguments=true;
                     if(list.stream().allMatch(ExactRational.class::isInstance))termContributions=true;
                 }
+                if(abortAtContributions && termContributions)throw new BucketLimit();
                 if(value instanceof Map<?,?> map && map.keySet().equals(Set.of("f(x)","f(y)")))factorBuckets=true;
                 if(value instanceof BinaryExpr binary && value!=source && binary.operator()==BinaryOperator.POW
                         && binary.right().equals(new NumberExpr(0)))discardedPower=true;
@@ -75,4 +76,16 @@ class CanonicalizerTemporaryOwnershipTest {
         assertFalse(context.isEmpty());
         assertTrue(observation.discardedPower,"the freshly rebuilt x^0 exists before its valid assumption-aware reduction");released(observation);
     }
+    private static final class BucketLimit extends RuntimeException {}
+    @Test void bucketCheckpointAbortKeepsPaidWorkAndReleasesItsActualContributions(){
+        var term=call("f",new VariableExpr("x"));var source=new BinaryExpr(term,BinaryOperator.ADD,term);
+        var observation=new Observation();observation.abortAtContributions=true;
+        var canonicalizer=new ExpressionCanonicalizer();
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;assertThrows(BucketLimit.class,()->canonicalizer.canonicalize(source));
+        }
+        assertTrue(observation.termContributions);released(observation);
+        assertEquals(new BinaryExpr(new NumberExpr(2),BinaryOperator.MUL,term),canonicalizer.canonicalize(source));
+    }
+
 }
