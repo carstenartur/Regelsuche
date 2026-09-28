@@ -89,6 +89,8 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
             else if (occurrence == null) advance();
             else if (schemaIndex < Math.min(relevant.size(), plan.maximumSchemasPerOccurrence())) match();
             else descend();
+            de.regelsuche.retention.RetainedOperation.work(1);
+            de.regelsuche.retention.RetainedOperation.checkpoint();
             if (terminal()) return Optional.empty();
         }
         status = Status.LIMIT;
@@ -163,6 +165,8 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
             if (ready == null) meter.abandon(payment);
             else { meter.complete(payment, mathematics.apply(ready)); produced++; }
         } else return;
+        de.regelsuche.retention.RetainedOperation.work(1);
+        de.regelsuche.retention.RetainedOperation.checkpoint();
         clearApplication();
     }
     private void clearApplication() {
@@ -191,6 +195,7 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
     }
     @Override public Status status() { return status; }
     @Override public void close() {
+        de.regelsuche.retention.RetainedOperation.work(pending.size()+10L);
         pending.clear(); occurrence = null; relevant = null;
         clearApplication(); ready = null; source = null;
         status = Status.CLOSED;
