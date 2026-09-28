@@ -66,4 +66,39 @@ class PickerTemporaryOwnershipTest {
     }
     @Test void eagerScoringIncludesItsNotYetPublishedBatch(){check(false);}
     @Test void stagedScoringIncludesItsLiveBatch(){check(true);}
+    private static final class TemporaryScore implements NativeMovePriorityPolicy,RetainedGraph.View {
+        @Override public double score(NativeSearchMove move,TypedMoveSearch.State state,TypedMoveSearch.Context context){
+            var temporary=new ArrayList<Expr>();
+            for(int i=0;i<20;i++)temporary.add(new VariableExpr("score"+i));
+            try(var held=RetainedOperation.retain(temporary)){return 0;}
+        }
+        @Override public void retainedReferences(RetainedGraph.Visitor v){}
+    }
+    private static void checkAbortedWork(MoveSearch.Scheduling scheduling){
+        var a=de.regelsuche.transform.PatternExpr.var("A");
+        var zero=new de.regelsuche.transform.PatternRewriteRule("zero",de.regelsuche.transform.PatternExpr.op(
+            de.regelsuche.ast.BinaryOperator.ADD,a,de.regelsuche.transform.PatternExpr.num(0)),a);
+        var goal=new VariableExpr("x");
+        var source=new de.regelsuche.ast.BinaryExpr(goal,de.regelsuche.ast.BinaryOperator.ADD,new de.regelsuche.ast.NumberExpr(0));
+        var provider=new NativeMoveSearch.Primitive(new Provider().descriptor(),new de.regelsuche.transform.AstRewriteTransport(List.of(zero),64,128));
+        var context=TypedMoveSearch.Context.frozen(goal);
+        var generated=provider.candidates(new TypedMoveSearch.State(source,0,0,"",List.of(),java.util.Set.of(),0),context);
+        var problem=new NativeMoveSearch.Problem(source,context,List.of(provider),MoveSearch.Mode.FAST,scheduling,
+            new MoveSearch.Budget(1,1,0,10,10000000),new TemporaryScore(),NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE);
+        var engine=new NativeMoveSearch();
+        var aborted=engine.search(problem,SearchContinuationContract.PATH_SENSITIVE,new SearchExpressionStore.Limits(10,1000000,1000000,10));
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,aborted.outcome());
+        assertFalse(aborted.withinBudget());assertTrue(aborted.accounting().peak().nodes()>10);
+        assertEquals(generated.work().candidateWork().canonicalWorkUnits(),aborted.metrics().primitiveWork(),
+            "completed provider mathematics must survive a later scoring retention abort exactly once");
+        assertEquals(generated.moves().size(),aborted.metrics().generatedSuccessors());
+        assertTrue(aborted.metrics().searchWork()>=generated.work().totalWorkUnits());
+        var completed=engine.search(problem,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT);
+        assertEquals(MoveSearch.Outcome.TARGET_REACHED,completed.outcome(),completed.accounting().detail());
+        assertEquals(generated.work().candidateWork().canonicalWorkUnits(),completed.metrics().primitiveWork(),
+            "normal collection must not double-charge the provider receipt");
+    }
+    @Test void eagerAbortRetainsCompletedProviderWork(){checkAbortedWork(MoveSearch.Scheduling.EAGER_CONTROL);}
+    @Test void stagedAbortRetainsCompletedProviderWork(){checkAbortedWork(MoveSearch.Scheduling.STAGED);}
+
 }
