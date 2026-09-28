@@ -11,6 +11,7 @@ class PolynomialTemporaryOwnershipTest {
     private static final class Observation implements RetainedOperation.Sink {
         RetainedOperation scope;long work;int simultaneousTerms;boolean rejectedCoefficient;int renderedFactors;boolean optionalEnvelope;Expr inputRoot;boolean missingInput,abortAtCoefficient;int sourceOnlyFrames,simultaneousPowers;boolean zeroTerms,abortAtZeroTerms;
         Set<Expr> inputNodes=Collections.newSetFromMap(new IdentityHashMap<>());long peakNodes;
+        Set<String> normalizedVariables=new HashSet<>();
         @Override public void executionWork(long units){work=Math.addExact(work,units);}
         @Override public void validationWork(long units){work=Math.addExact(work,units);}
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(scope);}
@@ -36,7 +37,9 @@ class PolynomialTemporaryOwnershipTest {
                         if(map.values().stream().anyMatch(valueEntry->((ExactRational)valueEntry).isZero()))zeroTerms=true;
                     }
                     map.forEach((key,item)->{visitor.reference(key);visitor.reference(item);});
-                                    if(!map.isEmpty() && map.keySet().stream().allMatch(String.class::isInstance) && map.values().stream().allMatch(Integer.class::isInstance))powers++;
+                    if(!map.isEmpty() && map.keySet().stream().allMatch(String.class::isInstance) && map.values().stream().allMatch(Integer.class::isInstance)){
+                        powers++;map.keySet().forEach(key->normalizedVariables.add((String)key));
+                    }
                 }else if(value instanceof Collection<?> collection)collection.forEach(visitor::reference);
                 else if(value instanceof Object[] array)for(var item:array)visitor.reference(item);
                 else if(value instanceof NumberExpr number)visitor.reference(number.value());
@@ -60,6 +63,44 @@ class PolynomialTemporaryOwnershipTest {
         assertTrue(observation.work>0);assertFalse(observation.missingInput);
         assertTrue(observation.optionalEnvelope);
         assertEquals(3,observation.peakNodes,"only the original three AST nodes are needed throughout this normalization");
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+    @Test void failedLeftOperandDoesNotBuildTheUnusedRightPolynomial(){
+        var right=new VariableExpr("unused_right");
+        for(var normalizer:List.of(new PolynomialNormalizer(),PolynomialNormalizer.monomialOnly()))
+            for(var operator:List.of(BinaryOperator.ADD,BinaryOperator.SUB,BinaryOperator.MUL)){
+                var source=new BinaryExpr(new FunctionExpr("f",List.of(new VariableExpr("x"))),operator,right);
+                var observation=sourceObservation(source);
+                try(var scope=RetainedOperation.open(observation)){
+                    observation.scope=scope;assertTrue(normalizer.normalize(source).isEmpty());
+                }
+                assertFalse(observation.normalizedVariables.contains(right.name()),"a rejected left operand makes the right conversion unnecessary");
+                assertTrue(observation.work>0);assertFalse(observation.missingInput);
+                assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+            }
+    }
+    @Test void monomialRestrictionChecksTheSimplifiedLeftBeforeBuildingTheRight(){
+        var x=new VariableExpr("x");var y=new VariableExpr("y");var right=new VariableExpr("right_operand");
+        var sum=new BinaryExpr(x,BinaryOperator.ADD,y);var product=new BinaryExpr(sum,BinaryOperator.MUL,right);
+        var observation=sourceObservation(product);
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;assertTrue(PolynomialNormalizer.monomialOnly().normalize(product).isEmpty());
+        }
+        assertFalse(observation.normalizedVariables.contains(right.name()));
+        assertTrue(new PolynomialNormalizer().normalize(product).isPresent(),"the full normalizer still expands both terms");
+        var cancelled=new BinaryExpr(sum,BinaryOperator.SUB,x);
+        assertEquals(Optional.of(new BinaryExpr(right,BinaryOperator.MUL,y)),
+            PolynomialNormalizer.monomialOnly().normalize(new BinaryExpr(cancelled,BinaryOperator.MUL,right)),
+            "the left restriction applies after cancellation, not to its unreduced AST shape");
+        assertFalse(observation.missingInput);assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+    @Test void singleFactorRenderingDoesNotAllocateAFactorList(){
+        var source=new VariableExpr("x");var observation=sourceObservation(source);
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;assertEquals(Optional.of(source),new PolynomialNormalizer().normalize(source));
+        }
+        assertEquals(0,observation.renderedFactors,"one emitted variable needs no factor list or AST fold");
+        assertTrue(observation.optionalEnvelope);assertFalse(observation.missingInput);
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
     @Test void realPolynomialMultiplicationRetainsBothOperandsAndAccumulatingTerms(){
