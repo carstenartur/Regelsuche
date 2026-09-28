@@ -11,7 +11,7 @@ class CanonicalizerWorkBoundaryTest {
     private enum Boundary { BUCKET, FUNCTION, ADD_ALL, SNAPSHOT }
     private static final class Stop extends RuntimeException {}
     private static final class Sink implements RetainedOperation.Sink {
-        final Boundary boundary;RetainedOperation scope;FunctionExpr source;
+        final Boundary boundary;RetainedOperation scope;FunctionExpr source,expectedFunction;
         long work,lastCheckpoint,atBoundary;List<?> snapshot;
         Sink(Boundary boundary){this.boundary=boundary;}
         @Override public void executionWork(long units){work=Math.addExact(work,units);}
@@ -30,7 +30,7 @@ class CanonicalizerWorkBoundaryTest {
                 var value=pending.removeFirst();if(!seen.add(value))continue;
                 if(boundary==Boundary.BUCKET && value instanceof Map<?,?> map && map.containsKey("f(x)")
                         && map.get("f(x)") instanceof RetainedGraph.View)stop=true;
-                if(boundary==Boundary.FUNCTION && value instanceof FunctionExpr function && value!=source && function.equals(source))stop=true;
+                if(boundary==Boundary.FUNCTION && value instanceof FunctionExpr function && value!=source && function.equals(expectedFunction))stop=true;
                 if(boundary==Boundary.SNAPSHOT && value instanceof List<?> list && !(value instanceof ArrayList<?>)
                         && list.size()==1 && list.getFirst() instanceof Assumption)foundSnapshot=list;
                 if(value instanceof RetainedGraph.View view)view.retainedReferences(visitor);
@@ -54,8 +54,10 @@ class CanonicalizerWorkBoundaryTest {
         assertEquals(3,sink.atBoundary,"one completed lookup/insert plus two nested frame-acquisition units");released(sink);
     }
     @Test void functionArgumentCopyIsPaidBeforeTheNewFunctionCheckpoint(){
-        var source=new FunctionExpr("f",List.of(new VariableExpr("x"),new VariableExpr("y"),new VariableExpr("z")));
+        var source=new FunctionExpr("f",List.of(new VariableExpr("x"),new VariableExpr("y"),
+            new BinaryExpr(new VariableExpr("z"),BinaryOperator.ADD,new NumberExpr(0))));
         var sink=new Sink(Boundary.FUNCTION);sink.source=source;
+        sink.expectedFunction=new FunctionExpr("f",List.of(new VariableExpr("x"),new VariableExpr("y"),new VariableExpr("z")));
         try(var scope=RetainedOperation.open(sink)){sink.scope=scope;assertThrows(Stop.class,()->new ExpressionCanonicalizer().canonicalize(source));}
         assertEquals(6,sink.atBoundary,"three copied arguments plus produced and frame acquisition");released(sink);
     }

@@ -127,6 +127,19 @@ class PolynomialTemporaryOwnershipTest {
         assertFalse(observation.missingInput);assertTrue(observation.optionalEnvelope);assertTrue(observation.work>0);
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
+    @Test void anAlreadyOrderedLeftAssociatedVariableSumReusesTheWholeInputTree(){
+        var x=new VariableExpr("x");var y=new VariableExpr("y");var z=new VariableExpr("z");
+        var source=new BinaryExpr(new BinaryExpr(x,BinaryOperator.ADD,y),BinaryOperator.ADD,z);
+        var observation=sourceObservation(source);
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;
+            assertSame(source,new PolynomialNormalizer().normalize(source).orElseThrow());
+        }
+        assertEquals(5,observation.peakNodes,"unchanged normal form needs no new AST ancestor");
+        assertFalse(observation.missingInput);assertTrue(observation.optionalEnvelope);
+        assertTrue(observation.work>4);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
     @Test void realPolynomialMultiplicationRetainsBothOperandsAndAccumulatingTerms(){
         var sum=new BinaryExpr(new VariableExpr("x"),BinaryOperator.ADD,new VariableExpr("y"));
         var normalizer=new PolynomialNormalizer();

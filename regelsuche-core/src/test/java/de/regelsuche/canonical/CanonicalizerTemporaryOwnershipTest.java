@@ -10,13 +10,13 @@ import org.junit.jupiter.api.Test;
 
 class CanonicalizerTemporaryOwnershipTest {
     private static final class Observation implements RetainedOperation.Sink {
-        RetainedOperation scope;Expr source;long work,validation;Expr requiredRoot;boolean missingRoot;int inputOwners;
+        RetainedOperation scope;Expr source;long work,validation,peakNodes;Expr requiredRoot;boolean missingRoot;int inputOwners;
         boolean functionArguments,termContributions,factorBuckets,discardedPower,abortAtContributions;
         @Override public void executionWork(long units){work=Math.addExact(work,units);}
         @Override public void validationWork(long units){work=Math.addExact(work,units);validation=Math.addExact(validation,units);}
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(scope);}
         @Override public void checkpoint(){
-            RetainedGraph.measure(scope);
+            peakNodes=Math.max(peakNodes,RetainedGraph.measure(scope).retained().nodes());
             var pending=new ArrayDeque<Object>();var seen=Collections.newSetFromMap(new IdentityHashMap<Object,Boolean>());
             var visitor=new RetainedGraph.Visitor(){
                 @Override public void reference(Object value){if(value!=null)pending.addLast(value);}
@@ -95,13 +95,27 @@ class CanonicalizerTemporaryOwnershipTest {
         var source=new FunctionExpr("f",List.of(call("g",new VariableExpr("x")),call("h",new VariableExpr("y"))));
         var observation=new Observation();observation.requiredRoot=source;
         try(var scope=RetainedOperation.open(observation)){
-            observation.scope=scope;assertEquals(source,new ExpressionCanonicalizer().canonicalize(source));
+            observation.scope=scope;assertSame(source,new ExpressionCanonicalizer().canonicalize(source));
         }
         assertFalse(observation.missingRoot,"every nested checkpoint still sees the complete input graph");
         assertEquals(5,observation.validation,"all actual recursive visits remain paid");
-        assertTrue(observation.functionArguments,"newly rebuilt argument lists remain observable");
+        assertFalse(observation.functionArguments,"unchanged arguments need no copied list");
+        assertEquals(5,observation.peakNodes,"unchanged function ancestors retain their original AST identity");
         assertEquals(1,observation.inputOwners,"only the public boundary allocates the input owner");
         released(observation);
+    }
+
+    @Test void changingOneFunctionArgumentKeepsItsUnchangedSiblingsByIdentity(){
+        var first=call("g",new VariableExpr("x"));var last=call("h",new VariableExpr("z"));
+        var source=new FunctionExpr("f",List.of(first,plusZero("y"),last));
+        var observation=new Observation();observation.requiredRoot=source;
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;
+            var result=(FunctionExpr)new ExpressionCanonicalizer().canonicalize(source);
+            assertNotSame(source,result);assertSame(first,result.arguments().get(0));
+            assertEquals(new VariableExpr("y"),result.arguments().get(1));assertSame(last,result.arguments().get(2));
+        }
+        assertFalse(observation.missingRoot);released(observation);
     }
 
 }
