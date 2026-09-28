@@ -7,6 +7,15 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class ObjectBackedMoveSearchTest {
+    @Test void nativeInputCannotBypassTheExistingCodecTextAndUnicodeLimits() {
+        var search=new NativeMoveSearch();
+        for(var source:List.<Expr>of(new VariableExpr("x".repeat(4097)),new VariableExpr("x\uD800"))) {
+            var problem=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.frozen(new VariableExpr("goal")),List.of(),
+                MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(1,1,0,2,100));
+            assertThrows(IllegalArgumentException.class,()->search.search(problem,SearchContinuationContract.PATH_SENSITIVE),
+                "removing serialization must not widen accepted inputs");
+        }
+    }
     @Test void primitiveNativeSearchRetainsProducerObjectsAndExportsTheSameFullLegacyResult() {
         var leaf=NumberExpr.exact("-7/13");var source=new BinaryExpr(leaf,BinaryOperator.ADD,new NumberExpr(0));
         var rule=new PatternRewriteRule("zero",PatternExpr.op(BinaryOperator.ADD,PatternExpr.var("A"),PatternExpr.num(0)),PatternExpr.var("A"));
