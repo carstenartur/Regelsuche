@@ -24,5 +24,12 @@ class NativeProgramMoveProviderTest {
         assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome());assertSame(goal,result.output());
         assertEquals(2,result.witness().getFirst().move().primitiveStepCount());
         assertEquals(legacy.encodedResult(),result.exportLegacy());
+        var provider=new NativeProgramMoveProvider(descriptor,program);
+        var history=program.transformMeasured(source).candidates().getFirst();
+        var forged=new CompiledAstRewriteProgram.Candidate(history.programId(),List.of("foreign-stage",history.sourceIds().getLast()),history.steps());
+        var sourceState=new TypedMoveSearch.State(source,0,0,"",List.of(),java.util.Set.of(),0);
+        var rejected=provider.verify(sourceState,provider.proposal(forged,0),context);
+        assertFalse(rejected.accepted(),"same endpoints cannot authorize a different program stage");
+        assertTrue(rejected.work()>0,"failed independent regeneration remains paid");
     }
 }

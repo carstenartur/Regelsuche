@@ -1,20 +1,23 @@
 package de.regelsuche.search.moves;
 
-import de.regelsuche.transform.AstRewriteTransport;
 import de.regelsuche.search.program.CompiledAstReplayCodec;
 import java.util.List;
 
-/** Typed recheck receipt. The exact producer binding, not its eventual digest, determines equality. */
-public record NativeVerification(boolean accepted,long work,AstRewriteTransport.Step checkedStep,String ruleId,String reason)
+/** Typed recheck receipt. Complete producer structure, never a digest, determines equality. */
+public record NativeVerification(boolean accepted,long work,NativeMoveProof checkedProof,String ruleId,String reason)
         implements SearchExecution.Verification {
     public NativeVerification {
-        if(work<0 || reason==null || (accepted && (checkedStep==null || ruleId==null)))throw new IllegalArgumentException("invalid native verification");
+        if(work<0 || reason==null || (accepted && (checkedProof==null || ruleId==null)))throw new IllegalArgumentException("invalid native verification");
     }
     public MoveVerifier.Verification exportLegacy(){
         if(!accepted)return new MoveVerifier.Verification(false,work,List.of(),reason);
-        var codec=new CompiledAstReplayCodec();
-        String receipt="typed-primitive-replay:"+NativeSearchMove.digest(codec.encodeExpression(checkedStep.source())+"\n"
-            +codec.encodeExpression(checkedStep.target())+"\n"+ruleId);
+        String receipt=switch(checkedProof) {
+            case NativeMoveProof.Primitive primitive -> {
+                var codec=new CompiledAstReplayCodec();
+                yield "typed-primitive-replay:"+NativeSearchMove.digest(codec.encodeExpression(primitive.source())+"\n"+codec.encodeExpression(primitive.target())+"\n"+ruleId);
+            }
+            case NativeMoveProof.Program program -> "typed-program-replay:"+program.exportLegacy().applicationKey();
+        };
         return new MoveVerifier.Verification(true,work,List.of(receipt),reason);
     }
 }

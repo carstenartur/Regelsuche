@@ -13,6 +13,20 @@ public final class NativeMoveSearch {
             Objects.requireNonNull(descriptor);Objects.requireNonNull(transport);
             if(descriptor.sourceKind()!=SearchMove.SourceKind.PRIMITIVE)throw new IllegalArgumentException("primitive native provider required");
         }
+        @Override public Batch candidates(TypedMoveSearch.State source,TypedMoveSearch.Context context){
+            if(!NativeMoveProvider.carries(descriptor.requiredAssumptions(),source,context))return NativeMoveProvider.rejectedAssumptions();
+            var steps=transport.generate(source.expression());var work=TransformationWorkMetrics.flatEngine(steps.size());
+            return new Batch(steps.stream().map(step->new NativeSearchMove(step,descriptor,work.totalWorkUnits(),Set.of())).toList(),
+                work.withCandidateWork(new ExecutionWork(steps.size(),0,0)),false);
+        }
+        @Override public NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove move,TypedMoveSearch.Context context){
+            if(!NativeMoveProvider.carries(move.assumptions(),source,context))return new NativeVerification(false,1,null,null,"TYPED_PRIMITIVE_ASSUMPTIONS_MISSING");
+            var generated=transport.generate(source.expression());
+            boolean accepted=descriptor.equals(move.descriptor()) && source.expression().equals(move.sourceExpression())
+                && move.proof() instanceof NativeMoveProof.Primitive proof && generated.contains(proof.step());
+            return new NativeVerification(accepted,TransformationWorkMetrics.flatEngine(generated.size()).totalWorkUnits(),
+                accepted?move.proof():null,accepted?move.ruleId():null,accepted?"TYPED_PRIMITIVE_REPLAYED":"TYPED_PRIMITIVE_REPLAY_REJECTED");
+        }
     }
     public record Problem(Expr source, TypedMoveSearch.Context context, List<NativeMoveProvider> providers,
             MoveSearch.Mode mode, MoveSearch.Scheduling scheduling, MoveSearch.Budget budget) {
@@ -72,28 +86,21 @@ public final class NativeMoveSearch {
             var available=new HashSet<>(initialAssumptions());available.addAll(state.assumptions());return available.containsAll(assumptions);
         }
         @Override public NativeVerification verify(TypedMoveSearch.State state,NativeSearchMove move){
-            if(!carries(move.assumptions(),state))return new NativeVerification(false,1,null,null,"TYPED_PRIMITIVE_ASSUMPTIONS_MISSING");
             var provider=problem.providers().stream().filter(p->p.descriptor().equals(move.descriptor())).findFirst();
-            if(provider.isEmpty())return new NativeVerification(false,1,null,null,"UNREGISTERED_NATIVE_PRIMITIVE");
-            var regenerated=((Primitive)provider.orElseThrow()).transport().generate(state.expression());
-            boolean accepted=state.expression().equals(move.sourceExpression()) && regenerated.contains(move.step());
-            return new NativeVerification(accepted,TransformationWorkMetrics.flatEngine(regenerated.size()).totalWorkUnits(),
-                accepted?move.step():null,accepted?move.ruleId():null,accepted?"TYPED_PRIMITIVE_REPLAYED":"TYPED_PRIMITIVE_REPLAY_REJECTED");
+            return provider.isEmpty()?new NativeVerification(false,1,null,null,"UNREGISTERED_NATIVE_PROVIDER")
+                :provider.orElseThrow().verify(state,move,problem.context());
         }
         @Override public SearchExecution.Picker<NativeSearchMove> picker(TypedMoveSearch.State state){
             var providers=problem.providers().stream().<SearchBatches.Provider<NativeSearchMove>>map(p->new SearchBatches.Provider<>() {
                 @Override public MoveProvider.Descriptor descriptor(){return p.descriptor();}
                 @Override public SearchBatches.Batch<NativeSearchMove> candidates(){
-                    if(!carries(p.descriptor().requiredAssumptions(),state))return new SearchBatches.Batch<>(List.of(),new TransformationWorkMetrics(0,0,0,0,0,1,1,0,0,0,0,0,0,0),true);
-                    if(!(p instanceof Primitive primitive))throw new UnsupportedOperationException("native provider generation is not implemented");
-                    var steps=primitive.transport().generate(state.expression());var work=TransformationWorkMetrics.flatEngine(steps.size());
-                    return new SearchBatches.Batch<>(steps.stream().map(step->new NativeSearchMove(step,p.descriptor(),work.totalWorkUnits(),Set.of())).toList(),
-                        work.withCandidateWork(new ExecutionWork(steps.size(),0,0)),false);
+                    var batch=p.candidates(state,problem.context());
+                    return new SearchBatches.Batch<>(batch.moves(),batch.work(),batch.complete());
                 }
             }).toList();
             var ranking=new SearchBatches.Ranking<NativeSearchMove>() {
                 @Override public double score(NativeSearchMove move){return 0;}
-                @Override public int stage(MoveProvider.Descriptor descriptor){return MovePriorityPolicy.Stage.NORMAL_PRIMITIVE.ordinal();}
+                @Override public int stage(MoveProvider.Descriptor descriptor){return MovePriorityPolicy.INVENTORY_ORDER.stage(descriptor,null,null).ordinal();}
                 @Override public double providerScore(MoveProvider.Descriptor descriptor){return 0;}
                 @Override public long contextWork(){return 0;}
                 @Override public void requireSource(NativeSearchMove move){move.requireSource(state.expression());}
