@@ -10,8 +10,8 @@ public final class RetainedOperation implements AutoCloseable,RetainedGraph.View
         void checkpoint();
     }
     private static final ThreadLocal<RetainedOperation> CURRENT=new ThreadLocal<>();
-    private final RetainedOperation previous;
-    private final Sink sink;
+    private RetainedOperation previous;
+    private Sink sink;
     private final long owner=Thread.currentThread().threadId();
     private Frame current;
     private boolean closed;
@@ -35,11 +35,12 @@ public final class RetainedOperation implements AutoCloseable,RetainedGraph.View
     @Override public void close(){
         if(closed)return;
         if(Thread.currentThread().threadId()!=owner || CURRENT.get()!=this || current!=null)throw new IllegalStateException("native operation scope order");
-        closed=true;if(previous==null)CURRENT.remove();else CURRENT.set(previous);sink.executionWork(1);
+        closed=true;if(previous==null)CURRENT.remove();else CURRENT.set(previous);
+        var charged=sink;previous=null;sink=null;charged.executionWork(3);
     }
     public static final class Frame implements AutoCloseable,RetainedGraph.View {
-        private final RetainedOperation scope;
-        private final Frame previous;
+        private RetainedOperation scope;
+        private Frame previous;
         private Object[] values;
         private boolean closed;
         private Frame(RetainedOperation scope,Object[] values){this.scope=scope;previous=scope.current;this.values=values;}
@@ -47,7 +48,8 @@ public final class RetainedOperation implements AutoCloseable,RetainedGraph.View
         @Override public void close(){
             if(closed)return;
             if(Thread.currentThread().threadId()!=scope.owner || scope.current!=this)throw new IllegalStateException("native retained frame order");
-            closed=true;scope.current=previous;values=null;scope.sink.executionWork(2);
+            closed=true;scope.current=previous;
+            var charged=scope.sink;values=null;previous=null;scope=null;charged.executionWork(4);
         }
     }
 }

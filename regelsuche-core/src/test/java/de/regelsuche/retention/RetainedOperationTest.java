@@ -29,7 +29,7 @@ class RetainedOperationTest {
         var inner=RetainedOperation.retain(new de.regelsuche.ast.VariableExpr("inner"));
         assertEquals(3,RetainedGraph.measure(inner).retained().nodes());
         inner.close();outer.close();scope.close();
-        assertEquals(10,sink.work);
+        assertEquals(16,sink.work);
         assertEquals(0,RetainedGraph.measure(inner).retained().nodes(),"closed frame must release prior frame and scope");
         assertEquals(0,RetainedGraph.measure(scope).retained().nodes(),"closed scope must release its sink");
     }
