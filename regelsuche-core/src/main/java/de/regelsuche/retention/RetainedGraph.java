@@ -3,6 +3,7 @@ package de.regelsuche.retention;
 import de.regelsuche.ast.*;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.symbol.SymbolId;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
 
@@ -10,7 +11,9 @@ import java.util.*;
  * Explicit logical ownership, not JVM bytes. Each described field/collection entry is a slot;
  * collection backing storage contributes one slot. Only exact audited owning container classes are supported;
  * wrappers/views/subclasses and opaque comparators are rejected. Scalars use canonical decimal characters;
- * BigInteger conversion text is paid and overlaps the retained scalar in the peak. Null fields still occupy slots. Shared objects
+ * BigInteger/BigDecimal conversion text is paid and overlaps the retained scalar in the peak,
+ * independent of library rendering caches. This is a logical scalar rule, not a heap layout estimate.
+ * Null fields still occupy slots. Shared objects
  * count once by identity. Only explicitly audited stateless enum types are borrowed; enum Views are traversed. No reflection or retained registry.
  */
 public final class RetainedGraph {
@@ -137,10 +140,12 @@ public final class RetainedGraph {
                 case ExactRational rational -> { reference(rational.numerator());reference(rational.denominator()); }
                 case BigInteger integer -> {
                     if(integer.getClass()!=BigInteger.class)throw new Unmeasured(integer,observation());
-                    String decimal=integer.toString();int digits=decimal.length();
-                    characters=Math.addExact(characters,digits);temporaryCharacters=Math.max(temporaryCharacters,digits);
-                    accountingReferences=Math.max(accountingReferences,Math.addExact(6,Math.addExact(2L*seen.size(),pending.size())));
-                    work=Math.addExact(work,Math.addExact(digits,2L)); // conversion scan and temporary reference acquisition/release
+                    scalarText(integer.toString());
+                }
+                case BigDecimal decimal -> {
+                    if(decimal.getClass()!=BigDecimal.class)throw new Unmeasured(decimal,observation());
+                    // Canonical exponent notation also bounds inspection for extreme scales.
+                    scalarText(decimal.toString());
                 }
                 case SymbolId symbol -> reference(symbol.namespace());
                 // The exact ThreadLocal key has no strong value field; values belong to the thread map.
@@ -174,6 +179,12 @@ public final class RetainedGraph {
                 case char[] array -> characters=Math.addExact(characters,array.length);
                 default -> throw new Unmeasured(value,observation());
             }
+        }
+        void scalarText(String decimal){
+            int digits=decimal.length();
+            characters=Math.addExact(characters,digits);temporaryCharacters=Math.max(temporaryCharacters,digits);
+            accountingReferences=Math.max(accountingReferences,Math.addExact(6,Math.addExact(2L*seen.size(),pending.size())));
+            work=Math.addExact(work,Math.addExact(digits,2L)); // conversion scan and temporary reference acquisition/release
         }
         void node(){nodes=Math.addExact(nodes,1);}
         boolean standardContainer(Object value){

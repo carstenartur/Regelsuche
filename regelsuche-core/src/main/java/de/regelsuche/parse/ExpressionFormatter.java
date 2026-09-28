@@ -17,6 +17,7 @@ import java.util.Objects;
 public final class ExpressionFormatter {
     private static final java.math.BigInteger NUMERIC_SYNTAX_LIMIT = java.math.BigInteger.TEN.pow(
         de.regelsuche.scalar.ExactRationalDomain.MAX_DIGITS);
+    private static final java.math.BigInteger NEGATIVE_NUMERIC_SYNTAX_LIMIT = NUMERIC_SYNTAX_LIMIT.negate();
     private ExpressionFormatter() {
     }
 
@@ -114,31 +115,96 @@ public final class ExpressionFormatter {
         if (!withinNumericSyntaxLimits(value)) {
             throw new IllegalArgumentException("Numeric leaf exceeds parser digit limits");
         }
-        String formatted;
-        boolean fraction = false;
         if (value.isInteger()) {
-            formatted = value.numerator().toString();
-        } else try {
-            var decimal = value.toBigDecimal(java.math.MathContext.UNLIMITED).stripTrailingZeros();
-            if (decimal.scale() > de.regelsuche.scalar.ExactRationalDomain.MAX_DECIMAL_SCALE) {
-                throw new ArithmeticException("render using integer fraction syntax");
-            }
-            formatted = decimal.toPlainString();
-            if (formatted.replace("-", "").replace(".", "").length()
-                    > de.regelsuche.scalar.ExactRationalDomain.MAX_DIGITS) {
-                throw new ArithmeticException("render using integer fraction syntax");
-            }
-        } catch (ArithmeticException repeatingDecimal) {
-            formatted = value.numerator() + " / " + value.denominator();
-            fraction = true;
+            String formatted = value.numerator().toString();
+            // The produced text is retained by append before any callback or growth.
+            RetainedOperation.work(formatted.length() + 1L);
+            builder.append(formatted, value.signum() < 0 && parentPrecedence > 0);
+            return;
         }
-        builder.append(formatted, (value.signum() < 0 || fraction) && parentPrecedence > 0);
+        RetainedOperation.work(3); // scratch owner and the two decimal operands
+        var conversion = new NumberConversion(value);
+        try (var scratch = RetainedOperation.retain(conversion)) {
+            try {
+                conversion.format(value);
+            } catch (RuntimeException | Error failure) {
+                try { RetainedOperation.checkpoint(); }
+                catch (RuntimeException | Error observation) {
+                    if (observation != failure) failure.addSuppressed(observation);
+                }
+                throw failure;
+            }
+            // append's checkpoint observes all actual conversion temporaries together.
+            builder.append(conversion.formatted,
+                (value.signum() < 0 || conversion.fraction) && parentPrecedence > 0);
+        }
     }
 
     /** Whether integer/fraction syntax can represent both components within parser limits. */
     public static boolean withinNumericSyntaxLimits(de.regelsuche.scalar.ExactRational value) {
-        return value.numerator().abs().compareTo(NUMERIC_SYNTAX_LIMIT) < 0
-            && value.denominator().compareTo(NUMERIC_SYNTAX_LIMIT) < 0;
+        RetainedOperation.work(2); // sign and numerator comparison, without allocating abs()
+        boolean numeratorFits = value.numerator().signum() < 0
+            ? value.numerator().compareTo(NEGATIVE_NUMERIC_SYNTAX_LIMIT) > 0
+            : value.numerator().compareTo(NUMERIC_SYNTAX_LIMIT) < 0;
+        if (!numeratorFits) return false;
+        RetainedOperation.work(1);
+        return value.denominator().compareTo(NUMERIC_SYNTAX_LIMIT) < 0;
+    }
+
+    /** One bounded conversion owns its actual operands and all still-live results. */
+    private static final class NumberConversion implements RetainedGraph.View {
+        private final java.math.BigDecimal numerator;
+        private final java.math.BigDecimal denominator;
+        private java.math.BigDecimal quotient, decimal;
+        private String plain, numeratorText, denominatorText, formatted;
+        private boolean fraction;
+
+        private NumberConversion(de.regelsuche.scalar.ExactRational value) {
+            numerator = new java.math.BigDecimal(value.numerator());
+            denominator = new java.math.BigDecimal(value.denominator());
+        }
+
+        private void format(de.regelsuche.scalar.ExactRational value) {
+            RetainedOperation.work(1); // the attempted division is paid even if it repeats
+            try {
+                quotient = numerator.divide(denominator, java.math.MathContext.UNLIMITED);
+            } catch (ArithmeticException repeatingDecimal) {
+                // Only the exact library division is caught, never accounting failures.
+                fraction = true;
+            }
+            if (!fraction) {
+                RetainedOperation.work(1);
+                decimal = quotient.stripTrailingZeros();
+                if (decimal.scale() <= de.regelsuche.scalar.ExactRationalDomain.MAX_DECIMAL_SCALE) {
+                    plain = decimal.toPlainString();
+                    RetainedOperation.work(plain.length() + 1L);
+                    int digits = 0;
+                    for (int index = 0; index < plain.length(); index++) {
+                        char item = plain.charAt(index);
+                        RetainedOperation.work(1);
+                        if (item != '-' && item != '.') digits++;
+                    }
+                    if (digits <= de.regelsuche.scalar.ExactRationalDomain.MAX_DIGITS) {
+                        formatted = plain;
+                        return;
+                    }
+                }
+                fraction = true;
+            }
+            numeratorText = value.numerator().toString();
+            RetainedOperation.work(numeratorText.length() + 1L);
+            denominatorText = value.denominator().toString();
+            RetainedOperation.work(denominatorText.length() + 1L);
+            formatted = numeratorText + " / " + denominatorText;
+            RetainedOperation.work(formatted.length() + 1L);
+        }
+
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(numerator); visitor.reference(denominator);
+            visitor.reference(quotient); visitor.reference(decimal);
+            visitor.reference(plain); visitor.reference(numeratorText);
+            visitor.reference(denominatorText); visitor.reference(formatted);
+        }
     }
 
     private static void scheduleFunction(
