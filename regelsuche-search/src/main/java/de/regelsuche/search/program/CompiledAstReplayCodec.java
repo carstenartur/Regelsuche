@@ -103,7 +103,7 @@ public final class CompiledAstReplayCodec {
     public String encodeExpression(Expr expression) {
         AstTransportObservation.record(AstTransportObservation.Operation.EXPRESSION_ENCODE);
         Objects.requireNonNull(expression, "expression");
-        ExpressionCache cache = EXPRESSION_CACHE.get();
+        ExpressionCache cache = de.regelsuche.retention.RetainedJson.active()?null:EXPRESSION_CACHE.get();
         if (cache != null) {
             String existing = cache.byIdentity.get(expression);
             if (existing != null) return existing;
@@ -135,7 +135,7 @@ public final class CompiledAstReplayCodec {
     public Expr decodeExpression(String document) {
         AstTransportObservation.record(AstTransportObservation.Operation.EXPRESSION_DECODE);
         Objects.requireNonNull(document, "document");
-        ExpressionCache cache = EXPRESSION_CACHE.get();
+        ExpressionCache cache = de.regelsuche.retention.RetainedJson.active()?null:EXPRESSION_CACHE.get();
         if (cache != null) {
             Expr existing = cache.byDocument.get(document);
             if (existing != null) return existing;

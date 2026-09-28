@@ -80,16 +80,32 @@ public final class NativeMoveSearch {
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(detail);}
     }
     /** Separate output-phase receipt; never changes the already published search charge. */
-    public record ExportAccounting(long work,long budget,RetainedGraph.Usage peak,RetainedGraph.Usage resultRetained,
-            boolean complete,String detail) implements RetainedGraph.View {
-        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(peak);v.reference(resultRetained);v.reference(detail);}
+    public static final class ExportAccounting implements RetainedGraph.View {
+        private final long budget;
+        private long work,peakNodes,peakCharacters,peakReferences,resultNodes,resultCharacters,resultReferences;
+        private boolean complete;private String detail="";
+        ExportAccounting(long budget){this.budget=budget;}
+        void update(long work,long pn,long pc,long pr,RetainedGraph.Usage retained,boolean complete,String detail){
+            this.work=work;peakNodes=pn;peakCharacters=pc;peakReferences=pr;
+            resultNodes=retained.nodes();resultCharacters=retained.characters();resultReferences=retained.references();this.complete=complete;this.detail=detail;
+        }
+        public long work(){return work;}public long budget(){return budget;}
+        public RetainedGraph.Usage peak(){return new RetainedGraph.Usage(peakNodes,peakCharacters,peakReferences);}
+        public RetainedGraph.Usage resultRetained(){return new RetainedGraph.Usage(resultNodes,resultCharacters,resultReferences);}
+        public boolean complete(){return complete;}public String detail(){return detail;}
+        public String workRevision(){return Result.EXPORT_REVISION;}
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(detail);}
     }
     public static final class ExportFailure extends IllegalStateException {
         private final ExportResult attempted;
         ExportFailure(ExportResult attempted){super(attempted.accounting().detail());this.attempted=attempted;}
         public ExportResult attempted(){return attempted;}
     }
-    public record ExportResult(MoveSearch.Result projection,ExportAccounting accounting) implements RetainedGraph.View {
+    public static final class ExportResult implements RetainedGraph.View {
+        private MoveSearch.Result projection;private final ExportAccounting accounting;
+        ExportResult(MoveSearch.Result projection,ExportAccounting accounting){this.projection=projection;this.accounting=accounting;}
+        void discard(){projection=null;}
+        public MoveSearch.Result projection(){return projection;}public ExportAccounting accounting(){return accounting;}
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(projection);v.reference(accounting);}
         public boolean complete(){return accounting.complete();}
     }

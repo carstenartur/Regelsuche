@@ -48,7 +48,7 @@ class NativeExportAccountingTest {
         var result=source();long paidSearch=result.totalWork();
         var normal=assertDoesNotThrow(()->result.exportLegacy(1000000,SearchExpressionStore.Limits.DEFAULT));
         assertTrue(normal.complete(),normal.accounting().detail());
-        for(long budget:List.of(0L,normal.accounting().work()-1)) {
+        for(long budget:List.of(0L,1L,64L,4096L,normal.accounting().work()/3,normal.accounting().work()/2,normal.accounting().work()-1)) {
             var stopped=result.exportLegacy(budget,SearchExpressionStore.Limits.DEFAULT);
             assertFalse(stopped.complete());assertNull(stopped.projection());
             assertEquals(de.regelsuche.retention.RetainedGraph.measure(stopped).retained(),stopped.accounting().resultRetained(),"the final receipt describes only the actually returned graph");

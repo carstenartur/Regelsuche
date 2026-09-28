@@ -47,13 +47,23 @@ final class NativeExportSession implements RetainedOperation.Sink {
             finally{json=null;operation.close();operation=null;source=null;executionWork(3);}
         }
         if(work>budget)fail("NATIVE_EXPORT_WORK_EXHAUSTED");if(!complete)projection=null;
-        // Receipt scaffolding is observed too. Replacing scalar values does not alter its graph shape.
-        var zero=new RetainedGraph.Usage(0,0,0);executionWork(8);
-        var attempted=new NativeMoveSearch.ExportResult(projection,new NativeMoveSearch.ExportAccounting(work,budget,zero,zero,complete,detail));
-        var retained=observe(attempted,false).retained();
-        if(!complete && projection!=null){projection=null;executionWork(2);retained=observe(new NativeMoveSearch.ExportResult(null,attempted.accounting()),false).retained();}
-        executionWork(3);if(work>budget){fail("NATIVE_EXPORT_WORK_EXHAUSTED");projection=null;}
-        return new NativeMoveSearch.ExportResult(projection,new NativeMoveSearch.ExportAccounting(work,budget,
-            new RetainedGraph.Usage(peakNodes,peakCharacters,peakReferences),retained,complete,detail));
+        var receipt=new NativeMoveSearch.ExportAccounting(budget);
+        var output=new NativeMoveSearch.ExportResult(projection,receipt);
+        var retained=new RetainedGraph.Usage(0,0,0);
+        boolean changed;
+        do {
+            settle(output,receipt,retained);
+            String measuredDetail=detail;var measuredProjection=output.projection();
+            retained=observe(output,false).retained();
+            settle(output,receipt,retained);
+            changed=!measuredDetail.equals(detail) || measuredProjection!=output.projection();
+        }while(changed); // only the one-way complete -> incomplete transition can change this graph
+        return output;
+    }
+    private void settle(NativeMoveSearch.ExportResult output,NativeMoveSearch.ExportAccounting receipt,RetainedGraph.Usage retained){
+        executionWork(12);
+        if(work>budget)fail("NATIVE_EXPORT_WORK_EXHAUSTED");
+        if(!complete && output.projection()!=null){output.discard();projection=null;executionWork(2);}
+        receipt.update(work,peakNodes,peakCharacters,peakReferences,retained,complete,detail);
     }
 }
