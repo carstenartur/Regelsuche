@@ -166,6 +166,7 @@ public final class EquivalenceAwarePatternMatcher {
         private Map<String, Expr> inferred;
         private List<PatternExpr> patternOperands;
         private List<Expr> expressionOperands;
+        private boolean ownershipGrew;
 
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
             visitor.reference(profile); visitor.reference(budget); visitor.reference(alternatives);
@@ -195,11 +196,14 @@ public final class EquivalenceAwarePatternMatcher {
         private boolean matchContinuation() {
             while (pending != null) {
                 currentTask = pending;
-                RetainedOperation.work(1);
+                ownershipGrew = false;
+                RetainedOperation.work(2);
                 boolean matched = currentTask instanceof PermutationTask permutation
                     ? matchPermutation(permutation)
                     : matchPair((PairTask) currentTask);
-                RetainedOperation.checkpoint();
+                // Consuming an already observed task cannot increase this graph.
+                // Every newly owned continuation, list or binding is observed.
+                if (ownershipGrew) RetainedOperation.checkpoint();
                 currentTask = null;
                 RetainedOperation.work(1);
                 if (!matched) {
@@ -233,7 +237,8 @@ public final class EquivalenceAwarePatternMatcher {
                 alternatives.push(new Alternative(new PermutationTask(
                     permutation.patterns(), permutation.expressions(), permutation.patternIndex(),
                     index + 1, permutation.next()), new HashMap<>(current)));
-                RetainedOperation.work(4L + current.size());
+                ownershipGrew = true;
+                RetainedOperation.work(5L + current.size());
             }
             budget.consumeBranch();
             Expr candidate = permutation.expressions().get(index);
@@ -241,7 +246,8 @@ public final class EquivalenceAwarePatternMatcher {
             remaining.remove(index);
             pending = new PairTask(operand, candidate, new PermutationTask(
                 permutation.patterns(), remaining, permutation.patternIndex() + 1, 0, permutation.next()));
-            RetainedOperation.work(4L + permutation.expressions().size()
+            ownershipGrew = true;
+            RetainedOperation.work(5L + permutation.expressions().size()
                 + permutation.expressions().size() - index);
             return true;
         }
@@ -271,7 +277,8 @@ public final class EquivalenceAwarePatternMatcher {
             RetainedOperation.work(1);
             if (bound == null) {
                 current.put(placeholder.name(), candidate);
-                RetainedOperation.work(1);
+                ownershipGrew = true;
+                RetainedOperation.work(2);
                 return true;
             }
             return equivalent(bound, candidate, profile, budget);
@@ -305,7 +312,8 @@ public final class EquivalenceAwarePatternMatcher {
             if (!profile.isAssociative(operation.operator())) {
                 pending = new PairTask(operation.left(), binary.left(),
                     new PairTask(operation.right(), binary.right(), pending));
-                RetainedOperation.work(3);
+                ownershipGrew = true;
+                RetainedOperation.work(4);
                 return true;
             }
             return matchAssociative(operation, binary);
@@ -317,7 +325,8 @@ public final class EquivalenceAwarePatternMatcher {
                 return true;
             }
             inferred = new HashMap<>(current);
-            RetainedOperation.work(current.size() + 1L);
+            ownershipGrew = true;
+            RetainedOperation.work(current.size() + 2L);
             if (!tryInferPowerBinding(operation, candidate, inferred, profile, budget)) {
                 return false;
             }
@@ -329,7 +338,8 @@ public final class EquivalenceAwarePatternMatcher {
         private boolean matchAssociative(PatternExpr.Operation operation, BinaryExpr binary) {
             patternOperands = new ArrayList<>();
             expressionOperands = new ArrayList<>();
-            RetainedOperation.work(2);
+            ownershipGrew = true;
+            RetainedOperation.work(3);
             flattenPattern(operation, operation.operator(), patternOperands);
             flattenExpression(binary, operation.operator(), expressionOperands);
             if (patternOperands.size() != expressionOperands.size()) {
@@ -355,7 +365,8 @@ public final class EquivalenceAwarePatternMatcher {
         private void prependPairs(List<PatternExpr> patterns, List<Expr> expressions) {
             for (int index = patterns.size() - 1; index >= 0; index--) {
                 pending = new PairTask(patterns.get(index), expressions.get(index), pending);
-                RetainedOperation.work(2);
+                ownershipGrew = true;
+                RetainedOperation.work(3);
             }
         }
     }
