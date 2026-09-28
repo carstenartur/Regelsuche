@@ -19,7 +19,18 @@ class PatternMatcherTemporaryOwnershipTest {
         int nonGrowingCheckpoints;
         Set<Object> previousObjects;
         boolean inputMissing, sawBoundChoice, abortBoundChoice;
-        @Override public void executionWork(long units) { work = Math.addExact(work, units); }
+        boolean abortResultClose;
+        int outcomeBranches;
+        MatchAbort closeFailure;
+        long workAfterCloseFailure;
+        @Override public void executionWork(long units) {
+            work = Math.addExact(work, units);
+            if (closeFailure != null) workAfterCloseFailure += units;
+            else if (abortResultClose && outcomeBranches > 0 && units == 4) {
+                closeFailure = new MatchAbort();
+                throw closeFailure;
+            }
+        }
         @Override public void validationWork(long units) { executionWork(units); }
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(scope); }
         @Override public void checkpoint() {
@@ -36,6 +47,8 @@ class PatternMatcherTemporaryOwnershipTest {
             while (!pending.isEmpty()) {
                 Object value = pending.remove();
                 if (!seen.add(value)) continue;
+                if (value instanceof EquivalenceAwarePatternMatcher.MatchAttempt attempt)
+                    outcomeBranches = attempt.visitedBranches();
                 if (value.getClass().getEnclosingClass() == EquivalenceAwarePatternMatcher.class) {
                     if (value.getClass().getSimpleName().equals("Alternative")) currentAlternatives++;
                     if (value.getClass().getSimpleName().endsWith("Task")) currentTasks++;
@@ -135,6 +148,23 @@ class PatternMatcherTemporaryOwnershipTest {
             assertFalse(observation.inputMissing);
             observation.abortBoundChoice = false;
             assertTrue(EquivalenceAwarePatternMatcher.matchDetailed(pattern(),input,bindings,RecognitionProfile.arithmeticAc()).matched());
+        }
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    @Test void aFailedResultHandoffSettlesBranchesThatNoCallerCanReceive() {
+        Expr input = new ExpressionParser().parseTerm("f(x+y,y)");
+        var bindings = new HashMap<String,Expr>();
+        var observation = new Observation(); observation.input = input; observation.abortResultClose = true;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var failure = assertThrows(MatchAbort.class,() -> EquivalenceAwarePatternMatcher.matchDetailed(
+                pattern(),input,bindings,RecognitionProfile.arithmeticAc()));
+            assertSame(observation.closeFailure,failure,"the failed handoff preserves its original error");
+            assertTrue(observation.outcomeBranches > 2);
+            assertEquals(observation.outcomeBranches,observation.workAfterCloseFailure,
+                "no outcome was returned: its delegated branch work must be settled exactly once here");
+            assertTrue(bindings.isEmpty());
         }
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
