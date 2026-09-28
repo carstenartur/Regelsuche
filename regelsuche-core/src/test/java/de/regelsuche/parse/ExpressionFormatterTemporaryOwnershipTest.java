@@ -19,6 +19,8 @@ class ExpressionFormatterTemporaryOwnershipTest {
         boolean inputMissing, growth, abortGrowth, unwrittenReplacement;
         boolean parenthesisGrowth, renderedNumberOwned;
         String renderedNumber;
+        String expectedOutput;
+        boolean actualResultCopyOwned;
         @Override public void executionWork(long units) { work = Math.addExact(work, units); }
         @Override public void validationWork(long units) { executionWork(units); }
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(scope); }
@@ -58,6 +60,10 @@ class ExpressionFormatterTemporaryOwnershipTest {
                 } else if (value instanceof FunctionExpr function) visitor.reference(function.arguments());
             }
             buffers = Math.max(buffers, currentBuffers);
+            if (expectedOutput != null && seen.stream().anyMatch(value -> expectedOutput.equals(value))) {
+                actualResultCopyOwned |= seen.stream().anyMatch(value -> value instanceof char[] buffer
+                    && matches(buffer, expectedOutput));
+            }
             if (oldBuffer && parenthesisReplacement) {
                 parenthesisGrowth = true;
                 renderedNumberOwned = seen.stream().anyMatch(value -> value instanceof String text && text.equals(renderedNumber));
@@ -71,6 +77,11 @@ class ExpressionFormatterTemporaryOwnershipTest {
             previousWork = work;
             if (peakCharacters >= abortCharactersAt) throw new GrowthLimit();
         }
+    }
+    private static boolean matches(char[] buffer, String text) {
+        if (buffer.length < text.length()) return false;
+        for (int index = 0; index < text.length(); index++) if (buffer[index] != text.charAt(index)) return false;
+        return true;
     }
     private static final class AllocatingEmission implements LongConsumer, RetainedGraph.View {
         char[] captured;
@@ -136,6 +147,7 @@ class ExpressionFormatterTemporaryOwnershipTest {
     @Test void actualPendingActionsInputAndOutputCopiesOverlapUntilTheHandoff() {
         var input = new ExpressionParser().parseTerm("f(a, b + c, (x^y)^z)");
         var observation = new Observation(); observation.input = input;
+        observation.expectedOutput = "f(a, b + c, (x ^ y) ^ z)";
         String output;
         try (var scope = RetainedOperation.open(observation)) {
             observation.scope = scope;
@@ -143,7 +155,7 @@ class ExpressionFormatterTemporaryOwnershipTest {
         }
         assertEquals("f(a, b + c, (x ^ y) ^ z)", output);
         assertTrue(observation.queuedActions >= 5, "real pending formatter actions remain owned");
-        assertTrue(observation.peakCharacters >= output.length() * 2L, "the result overlaps its actual backing buffer");
+        assertTrue(observation.actualResultCopyOwned, "the complete result String overlaps its actual populated backing buffer");
         assertFalse(observation.inputMissing);
         assertTrue(observation.work > output.length());
         assertEquals(0, RetainedGraph.measure(observation.scope).retained().characters());
@@ -152,12 +164,13 @@ class ExpressionFormatterTemporaryOwnershipTest {
     @Test void allocatedGrowthIsPaidAndOwnedBeforeAnAbortingCheckpoint() {
         var input = new FunctionExpr("a".repeat(80), List.of());
         var observation = new Observation(); observation.input = input; observation.abortGrowth = true;
+        var emitted = new Emission();
         try (var scope = RetainedOperation.open(observation)) {
             observation.scope = scope;
-            assertThrows(GrowthLimit.class, () -> ExpressionFormatter.format(input));
+            assertThrows(GrowthLimit.class, () -> ExpressionFormatter.formatMeasured(input, emitted));
             assertTrue(observation.growth);
             assertTrue(observation.unwrittenReplacement);
-            assertTrue(observation.growthWork >= 82, "80 allocated characters and frame acquisition are already paid");
+            assertEquals(82, observation.growthWork, "80 allocated characters and frame acquisition are paid independently of delegated emission");
             assertTrue(observation.peakCharacters >= 176, "input, old buffer and replacement overlap");
             assertFalse(observation.inputMissing);
             observation.abortGrowth = false;

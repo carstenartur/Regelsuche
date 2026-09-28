@@ -34,7 +34,7 @@ public final class ExpressionFormatter {
         Objects.requireNonNull(emittedCodeUnits, "emittedCodeUnits");
         if (expr instanceof VariableExpr variable) {
             try (var input = RetainedOperation.retain(expr, emittedCodeUnits)) {
-                emittedCodeUnits.accept(variable.name().length());
+                emit(emittedCodeUnits, variable.name().length());
                 RetainedOperation.work(1);
                 return variable.name();
             }
@@ -132,12 +132,7 @@ public final class ExpressionFormatter {
             formatted = value.numerator() + " / " + value.denominator();
             fraction = true;
         }
-        if ((value.signum() < 0 && parentPrecedence > 0)
-                || (fraction && parentPrecedence > 0)) {
-            builder.append('(').append(formatted).append(')');
-        } else {
-            builder.append(formatted);
-        }
+        builder.append(formatted, (value.signum() < 0 || fraction) && parentPrecedence > 0);
     }
 
     /** Whether integer/fraction syntax can represent both components within parser limits. */
@@ -212,6 +207,24 @@ public final class ExpressionFormatter {
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }
     }
 
+    private static void emit(java.util.function.LongConsumer callback, long units) {
+        if (callback == NativeEmission.INSTANCE) {
+            // This closed implementation only updates the existing work counter.
+            callback.accept(units);
+            return;
+        }
+        try {
+            callback.accept(units);
+        } catch (RuntimeException | Error failure) {
+            try { RetainedOperation.checkpoint(); }
+            catch (RuntimeException | Error observation) {
+                if (observation != failure) failure.addSuppressed(observation);
+            }
+            throw failure;
+        }
+        RetainedOperation.checkpoint();
+    }
+
     private static final class Output implements RetainedGraph.View {
         private final Object input;
         private char[] text = new char[16];
@@ -236,15 +249,21 @@ public final class ExpressionFormatter {
         }
 
         private Output append(String value) {
+            return append(value, false);
+        }
+
+        private Output append(String value, boolean parenthesized) {
             fragment = value;
             RetainedOperation.work(1);
             try {
                 RetainedOperation.checkpoint();
-                emittedCodeUnits.accept(value.length());
+                if (parenthesized) append('(');
+                emit(emittedCodeUnits, value.length());
                 ensureCapacity(value.length());
                 value.getChars(0, value.length(), text, size);
                 size += value.length();
                 RetainedOperation.work(1);
+                if (parenthesized) append(')');
             } finally {
                 fragment = null;
                 RetainedOperation.work(1);
@@ -253,7 +272,7 @@ public final class ExpressionFormatter {
         }
 
         private Output append(char value) {
-            emittedCodeUnits.accept(1);
+            emit(emittedCodeUnits, 1);
             ensureCapacity(1);
             text[size++] = value;
             RetainedOperation.work(1);
