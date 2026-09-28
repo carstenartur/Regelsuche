@@ -645,8 +645,10 @@ class ExprMatcherOwnershipTest {
                 observation.scope = scope;
                 var result = boundComparison(ExprMatcher.sameAs("A","B")).match(input);
                 assertEquals(source.equals("x+x"),result.matched()); assertTrue(result.complete());
-                assertEquals(source.equals("x+x") ? 0 : 1,result.patternBranches());
+                assertEquals(0,result.patternBranches(),"literal comparisons do not open commutative alternatives");
             }
+            assertEquals(!source.equals("x+x"),observation.sawPatternAttempt,
+                "only direct equality bypasses the existing literal matcher");
             assertTrue(observation.comparisonDescriptions.isEmpty(),source);
             assertFalse(observation.inputMissing);
             assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
