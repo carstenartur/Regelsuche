@@ -266,18 +266,21 @@ class ExprMatcherOwnershipTest {
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
 
-    @Test void anOperationLimitPreservesTheFirstAlternativeAndAppendsItsFinalTrace() {
+    @Test void anOperationLimitPreservesAlternativeOrderAndAppendsItsFinalTrace() {
         Expr input = new ExpressionParser().parseTerm("x+y");
         var matcher = ExprMatcher.op(ADD,ExprMatcher.anyOf(ExprMatcher.any(),ExprMatcher.any()),
             ExprMatcher.anyOf(ExprMatcher.any(),ExprMatcher.literalVariable("y")));
         var observation = new Observation(); observation.input = input;
         try (var scope = RetainedOperation.open(observation)) {
             observation.scope = scope;
-            var result = matcher.match(input,new ExprMatcher.MatchOptions(null,1,100,100));
-            assertEquals(1,result.matches().size());
+            var result = matcher.match(input,new ExprMatcher.MatchOptions(null,2,100,100));
+            assertEquals(2,result.matches().size());
             assertEquals(List.of("any","any","operation:ADD"),result.matches().getFirst().trace());
+            assertEquals(List.of("any","literal-variable","operation:ADD"),result.matches().get(1).trace());
+            assertEquals(10,result.evaluatedSteps());
             assertFalse(result.complete());
-            assertTrue(result.diagnostics().stream().allMatch(d -> d.code().equals("MATCH_RESULT_LIMIT")));
+            assertEquals(List.of(new ExprMatcher.MatchDiagnostic("MATCH_RESULT_LIMIT",matcher.canonicalDescriptor())),
+                result.diagnostics());
         }
         assertFalse(observation.inputMissing);
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
