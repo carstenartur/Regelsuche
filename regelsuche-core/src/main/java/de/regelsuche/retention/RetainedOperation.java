@@ -25,10 +25,20 @@ public final class RetainedOperation implements AutoCloseable,RetainedGraph.View
     /** Retains the actual mutable collections/objects, so later checkpoints observe their current fields. */
     public static Frame retain(Object... values){
         var scope=CURRENT.get();if(scope==null)return null;
-        var frame=new Frame(scope,values);scope.sink.executionWork(2);scope.current=frame;
-        try { scope.sink.checkpoint();return frame; }
+        var frame=new Frame(scope,values);scope.current=frame;
+        boolean observationAttempted=false;
+        try {
+            scope.sink.executionWork(2);
+            observationAttempted=true;scope.sink.checkpoint();return frame;
+        }
         catch(RuntimeException | Error failure){
-            try{frame.close();}catch(RuntimeException | Error cleanup){failure.addSuppressed(cleanup);}
+            // Values were already allocated by the caller: a failed acquisition
+            // debit must still observe their ownership before restoring the parent.
+            if(!observationAttempted) {
+                try{scope.sink.checkpoint();}
+                catch(RuntimeException | Error observation){if(observation!=failure)failure.addSuppressed(observation);}
+            }
+            try{frame.close();}catch(RuntimeException | Error cleanup){if(cleanup!=failure)failure.addSuppressed(cleanup);}
             throw failure;
         }
     }

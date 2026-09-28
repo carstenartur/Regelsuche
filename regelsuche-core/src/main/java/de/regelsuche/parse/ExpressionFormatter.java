@@ -117,9 +117,9 @@ public final class ExpressionFormatter {
         }
         if (value.isInteger()) {
             String formatted = value.numerator().toString();
-            // The produced text is retained by append before any callback or growth.
-            RetainedOperation.work(formatted.length() + 1L);
-            builder.append(formatted, value.signum() < 0 && parentPrecedence > 0);
+            // Publish the produced text before its debit can fail, or a callback can run.
+            builder.append(formatted, value.signum() < 0 && parentPrecedence > 0,
+                formatted.length() + 1L);
             return;
         }
         RetainedOperation.work(3); // scratch owner and the two decimal operands
@@ -136,7 +136,7 @@ public final class ExpressionFormatter {
             }
             // append's checkpoint observes all actual conversion temporaries together.
             builder.append(conversion.formatted,
-                (value.signum() < 0 || conversion.fraction) && parentPrecedence > 0);
+                (value.signum() < 0 || conversion.fraction) && parentPrecedence > 0, 0);
         }
     }
 
@@ -324,10 +324,13 @@ public final class ExpressionFormatter {
             return this;
         }
 
-        private Output append(String value, boolean parenthesized) {
+        private Output append(String value, boolean parenthesized, long conversionWork) {
             fragment = value;
-            RetainedOperation.work(1);
+            boolean observationAttempted = false;
             try {
+                RetainedOperation.work(1);
+                if (conversionWork != 0) RetainedOperation.work(conversionWork);
+                observationAttempted = true;
                 RetainedOperation.checkpoint();
                 if (parenthesized) append('(');
                 emit(emittedCodeUnits, value.length());
@@ -337,6 +340,12 @@ public final class ExpressionFormatter {
                 RetainedOperation.work(1);
                 if (parenthesized) append(')');
             } catch (RuntimeException | Error failure) {
+                if (!observationAttempted) {
+                    try { RetainedOperation.checkpoint(); }
+                    catch (RuntimeException | Error observation) {
+                        if (observation != failure) failure.addSuppressed(observation);
+                    }
+                }
                 try { clearFragment(); }
                 catch (RuntimeException | Error cleanup) {
                     if (cleanup != failure) failure.addSuppressed(cleanup);
