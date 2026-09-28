@@ -181,4 +181,13 @@ class RetainedGraphImmutableInventoryTest {
         return result;
     }
 
+    @Test void failedFreshAliasFallbackPreservesEarlierObservedNodeAndCharacterPeaks(){
+        var inventory=new RetainedGraph.Inventory();Object data=metadataObjects(inventory).get(1);
+        var failure=assertThrows(RetainedGraph.Unmeasured.class,
+            ()->inventory.measure(new Object[]{inventory,data,new Object(),new VariableExpr("x")}));
+        assertTrue(failure.attempted().peak().nodes()>=1,"the first scanner really visited x after recording the earlier unknown");
+        assertTrue(failure.attempted().peak().characters()>=1,"the later fresh scanner cannot erase already observed text");
+        assertTrue(failure.attempted().work()>0);assertEquals(0,inventory.cachedVertices());inventory.close();
+    }
+
 }
