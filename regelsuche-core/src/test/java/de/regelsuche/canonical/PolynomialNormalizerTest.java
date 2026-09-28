@@ -47,6 +47,13 @@ class PolynomialNormalizerTest {
         assertTrue(normalizer.normalize(parse("sin(x)^2")).isEmpty());
         assertEquals(parse("x^4"),normalizer.normalize(parse("(x^2)^2")).orElseThrow());
     }
+    @Test void nestedVariablePowersKeepExactDegreesAndTheExistingOverflowBoundary(){
+        for(var service:List.of(normalizer,PolynomialNormalizer.monomialOnly())){
+            assertEquals(parse("x^3*y^3"),service.normalize(parse("x^2*y^3*x")).orElseThrow());
+            assertEquals(parse("x^2147483647"),service.normalize(parse("x^2147483646*x")).orElseThrow());
+            assertTrue(service.normalize(parse("x^2147483647*x")).isEmpty());
+        }
+    }
 
     @Test
     void collectsGlobalLikeTermsAfterExpansion() {

@@ -50,6 +50,8 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
     public Optional<Expr> normalize(Expr expression) {
         try(var owned=RetainedOperation.retain(this,expression)) {
             RetainedOperation.work(1);
+            Expr existing=normalizedVariablePower(expression);
+            if(existing!=null)return RetainedOperation.produced(Optional.of(existing));
             Polynomial polynomial = toPolynomial(expression);
             if (polynomial == null) {
                 return Optional.empty();
@@ -61,6 +63,16 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
                     : RetainedOperation.produced(Optional.of(normalized));
             }
         }
+    }
+
+    /** Positive bounded powers of one variable already have the emitted normal form. */
+    private Expr normalizedVariablePower(Expr expression){
+        RetainedOperation.work(1);
+        if(!(expression instanceof BinaryExpr binary) || binary.operator()!=BinaryOperator.POW
+                || !(binary.left() instanceof VariableExpr) || !(binary.right() instanceof NumberExpr number))return null;
+        RetainedOperation.work(2);
+        if(!isNonNegativeInteger(number.value()) || number.value().isZero())return null;
+        return number.value().isOne()?binary.left():expression;
     }
 
     private Polynomial toPolynomial(Expr expression) {
@@ -136,6 +148,10 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
         if (exponentValue == 0) {
             return null;
         }
+        if(base instanceof VariableExpr variable){
+            RetainedOperation.work(1);
+            return Polynomial.monomial(1,Monomial.variable(variable.name(),exponentValue));
+        }
         Polynomial basePolynomial = toPolynomial(base);
         try(var baseOwned=RetainedOperation.retain(basePolynomial)) {
             if (basePolynomial == null) {
@@ -164,7 +180,11 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
         }
 
         private static Monomial variable(String name) {
-            var powers = Map.of(name, 1);
+            return variable(name,1);
+        }
+
+        private static Monomial variable(String name,int exponent) {
+            var powers = Map.of(name, exponent);
             RetainedOperation.work(2); // Actual singleton map creation and its entry.
             return RetainedOperation.produced(new Monomial(powers));
         }
