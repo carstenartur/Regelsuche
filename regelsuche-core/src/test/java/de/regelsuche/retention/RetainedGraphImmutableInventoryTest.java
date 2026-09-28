@@ -115,19 +115,19 @@ class RetainedGraphImmutableInventoryTest {
         assertEquals(new RetainedGraph.Usage(0,0,2),RetainedGraph.measure(inventory).retained());
     }
 
-    @Test void finalMetadataSweepStillOverlapsTheFirstScannersEmptyOwnedStructures(){
+    @Test void privateMetadataTotalsNeedOnlyTheOneActuallyAllocatedScanner(){
         var inventory=new RetainedGraph.Inventory(1,1,1);var root=new Root(null,inventory);
         var measured=inventory.measure(root);
-        // Root/owner/backend and empty containers: 8 slots. The first scanner remains
-        // on the stack: map, queue, current, two backings + seven own fields = 12.
-        // The second scanner owns six slots (including inventory), plus four seen
-        // identity entries of two slots each. Their real handoff peak is 8+12+14.
+        // Root/owner/backend/containers retain8 slots. One scanner has5 base slots,
+        // seven own fields,2 mask entries and4 seen slots (two identities):18.
+        // The removed MetadataScan does not exist and incurs neither storage nor work.
         assertEquals(new RetainedGraph.Usage(0,0,8),measured.retained());
-        assertEquals(34,measured.peak().references());inventory.close();
+        assertEquals(26,measured.peak().references());inventory.close();
         var direct=new RetainedGraph.Inventory(1,1,1);
-        var bounded=direct.measure(direct,new RetainedGraph.Usage(0,0,28));
-        assertEquals(32,bounded.peak().references(),"direct root drops exactly the wrapper's two field slots");
-        assertTrue(bounded.peak().references()>28);direct.close();
+        var bounded=direct.measure(direct,new RetainedGraph.Usage(0,0,21));
+        assertEquals(new RetainedGraph.Usage(0,0,6),bounded.retained());
+        assertEquals(22,bounded.peak().references(),"no wrapper: two fewer retained and two fewer seen slots");
+        assertTrue(bounded.peak().references()>21);direct.close();
     }
 
     @Test void publicViewAliasesOfActualInventoryMetadataHaveOneIdentityContribution(){
@@ -188,6 +188,17 @@ class RetainedGraphImmutableInventoryTest {
         assertTrue(failure.attempted().peak().nodes()>=1,"the first scanner really visited x after recording the earlier unknown");
         assertTrue(failure.attempted().peak().characters()>=1,"the later fresh scanner cannot erase already observed text");
         assertTrue(failure.attempted().work()>0);assertEquals(0,inventory.cachedVertices());inventory.close();
+    }
+
+    @Test void tinyPrivateMetadataHasIndependentlyCountedSlotsAndObjects(){
+        var inventory=new RetainedGraph.Inventory(2,2,2);var root=new Root(new VariableExpr("x"),inventory);
+        inventory.measure(root);var measured=inventory.measure(root);
+        // Two live vertices/IDs, two child arrays (one entry in total), two one-word masks:
+        // metadata slots5 + index4 + rows2 + vertex fields6 + child1 + masks2 =20.
+        // Root/leaf payload adds5 slots. Four primary objects + backend/index/rows3
+        // + vertices2 + child arrays2 + masks2 =13 objects.
+        assertEquals(new RetainedGraph.Usage(1,1,25),measured.retained());assertEquals(13,measured.objects());
+        assertEquals(RetainedGraph.measure(root).retained(),measured.retained());inventory.close();
     }
 
 }

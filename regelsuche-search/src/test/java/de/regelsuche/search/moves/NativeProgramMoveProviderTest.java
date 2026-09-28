@@ -41,6 +41,7 @@ class NativeProgramMoveProviderTest {
         NativeMoveSearch.Result result;
         try(var transport=AstTransportObservation.open()) {
         result=assertDoesNotThrow(()->new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,List.of(new NativeProgramMoveProvider(descriptor,program)),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,budget),SearchContinuationContract.PATH_SENSITIVE));
+        System.out.println("P04_INVENTORY_PROGRAM outcome="+result.observedOutcome()+" total="+result.totalWork()+" budget="+result.workBudget()+" withinBudget="+result.withinBudget()+" replay="+result.replayWork()+" validation="+result.accounting().validationWork()+" execution="+result.accounting().executionWork()+" storage="+result.accounting().storageWork()+" retention="+result.accounting().retentionWork()+" peak="+result.accounting().peak()+" retained="+result.accounting().resultRetained()+" external="+result.accounting().externalRetained()+" metrics="+result.metrics());
         assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.observedOutcome(),()->result.accounting().detail()+" total="+result.totalWork()+" retention="+result.accounting().retentionWork()+" replay="+result.replayWork()+" metrics="+result.metrics());assertSame(goal,result.output());
         assertEquals(2,result.witness().getFirst().move().primitiveStepCount());
         assertEquals(0,transport.total(),"native program admission must not invoke any codec");

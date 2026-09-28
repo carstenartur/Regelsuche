@@ -12,6 +12,7 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
     private final IdentityHashMap<Object,Vertex> index=new IdentityHashMap<>();
     private final ArrayList<Vertex> rows=new ArrayList<>();
     private int childSlots,words,liveRows,childArrays,maskArrays;
+    private long metadataSlots=5,metadataObjects=3;
     ImmutableRetentionInventory(int vertexLimit,int wordLimit,int childLimit){
         if(vertexLimit<1 || wordLimit<1 || childLimit<1)throw new IllegalArgumentException("nonpositive immutable inventory limit");
         this.vertexLimit=vertexLimit;this.wordLimit=wordLimit;this.childLimit=childLimit;
@@ -32,7 +33,7 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
         scan.pay(1);var previous=index.get(value);if(previous!=null)return previous;
         if(rows.size()>=vertexLimit)return null;
         var vertex=new Vertex(rows.size(),value);index.put(value,vertex);rows.add(vertex);liveRows++;
-        scan.pay(3);scan.accountingPeak();return vertex;
+        scan.pay(3+metadataDelta(6,1));scan.accountingPeak();return vertex;
     }
     private boolean known(Object value){
         return value instanceof Expr || value instanceof ExactRational || value instanceof String
@@ -56,7 +57,7 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
         scan.markPrimary(vertex.id);
         if(children.size()>childLimit-childSlots)return;
         int[] ids=new int[children.size()];scan.temporarySlots=children.size()+2L;scan.pay(ids.length+1L);
-        vertex.children=ids;childSlots+=ids.length;childArrays++;scan.accountingPeak();
+        vertex.children=ids;childSlots+=ids.length;childArrays++;scan.pay(metadataDelta(ids.length,1));scan.accountingPeak();
         for(int i=0;i<children.size();i++){
             Object child=children.get(i);scan.pay(1);
             boolean arguments=value instanceof FunctionExpr function && child==function.arguments();
@@ -79,7 +80,7 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
             }
             int length=last-first+1;if(length>wordLimit-words)return false;
             vertex.mask=new long[length];vertex.firstWord=first;words+=length;maskArrays++;
-            scan.pay(length+2L);scan.accountingPeak();
+            scan.pay(length+2L+metadataDelta(length,1));scan.accountingPeak();
             vertex.mask[(vertex.id>>>6)-first]|=1L<<(vertex.id&63);scan.pay(1);
             for(int child:vertex.children){
                 var nested=rows.get(child);scan.pay(1);
@@ -100,10 +101,11 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
     private void prepare(InventoryScan scan){for(var row:rows){scan.pay(1);if(row!=null && !row.active)closure(row,scan);}}
     private long remove(int id){
         var row=rows.get(id);if(row==null)return 0;
-        index.remove(row.key);liveRows--;long work=2;
-        if(row.children!=null){childSlots-=row.children.length;childArrays--;work++;}
-        if(row.mask!=null){words-=row.mask.length;maskArrays--;work++;}
-        row.key=null;row.children=null;row.mask=null;rows.set(id,null);return Math.addExact(work,4);
+        index.remove(row.key);liveRows--;long work=2,removedSlots=5,removedObjects=1;
+        if(row.children!=null){childSlots-=row.children.length;childArrays--;removedSlots+=row.children.length;removedObjects++;work+=3;}
+        if(row.mask!=null){words-=row.mask.length;maskArrays--;removedSlots+=row.mask.length;removedObjects++;work+=3;}
+        row.key=null;row.children=null;row.mask=null;rows.set(id,null);
+        return Math.addExact(work,4+metadataDelta(-removedSlots,-removedObjects));
     }
     private long prune(long[] primary,boolean success){
         long work=0;
@@ -118,8 +120,35 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
         for(var row:rows){work=Math.addExact(work,1);if(row!=null && !row.active){row.active=true;work=Math.addExact(work,1);}}
         return work;
     }
-    long close(){long work=prune(null,false);work=Math.addExact(work,rows.size()+2L);rows.clear();index.clear();return work;}
-    private long metadataReferences(){return Math.addExact(5L,Math.addExact(2L*index.size()+rows.size(),3L*liveRows+childSlots+words));}
+    long close(){
+        long work=prune(null,false);work=Math.addExact(work,rows.size()+2L+metadataDelta(-rows.size(),0));
+        rows.clear();index.clear();return work;
+    }
+    private long metadataDelta(long slots,long objects){
+        metadataSlots=Math.addExact(metadataSlots,slots);metadataObjects=Math.addExact(metadataObjects,objects);return 6; // two reads, checked additions and writes
+    }
+    private long metadataReferences(){return metadataSlots;}
+    /** Paid independent counter/formula check at phase boundaries, never on the per-reference hot path. */
+    private void checkMetadataTotals(InventoryScan scan){
+        long live=liveRows,allocated=rows.size(),edges=childSlots,maskWords=words,children=childArrays,masks=maskArrays;
+        long slots=Math.addExact(5,Math.addExact(5L*live,Math.addExact(allocated,Math.addExact(edges,maskWords))));
+        long objects=Math.addExact(3,Math.addExact(live,Math.addExact(children,masks)));
+        scan.pay(18); // six counter reads, size consistency read, eight arithmetic operations, three comparisons
+        if(slots!=metadataSlots || objects!=metadataObjects || index.size()!=live)
+            throw new IllegalStateException("immutable inventory metadata counters disagree");
+    }
+    private boolean cacheKeys(InventoryScan scan){
+        for(int i=0;i<rows.size();i++){
+            var row=rows.get(i);scan.pay(1);if(row==null)continue;
+            Object key=row.key;scan.pay(3); // key read and both incoming key edges, already included in M
+            scan.temporarySlots=2;scan.accountingPeak();
+            try {
+                if(row.active){scan.hit(key);}
+                else {scan.pay(1);if(!scan.seen.containsKey(key))return false;}
+            }finally{scan.temporarySlots=0;scan.pay(2);}
+        }
+        return true;
+    }
     private static boolean marked(long[] mask,int id){return (id>>>6)<mask.length && (mask[id>>>6]&(1L<<(id&63)))!=0;}
 
     private static final class InventoryScan extends RetainedGraph.Scan implements RetainedGraph.View {
@@ -127,7 +156,6 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
         long[] primary,cacheOnly;boolean cachePhase,ownerReached,settled,finished,metadataAlias;
         ArrayList<Object> capture;long temporarySlots,closureSlots,combinedAuxiliaryPeak,scratchPeak;
         long extraNodes,extraCharacters,extraReferences,extraObjects,hitObjects;
-        long metadataReferencesBefore,metadataObjectsBefore;
         Object rejected;boolean failed;
         InventoryScan(ImmutableRetentionInventory inventory,RetainedGraph.Inventory owner,RetainedGraph.Usage limits){
             this.inventory=inventory;this.owner=owner;this.limits=Objects.requireNonNull(limits);
@@ -197,7 +225,6 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
                 try {
                     inspect(value);
                     if(staged)inventory.stage(value,capture,nodes-beforeNodes,characters-beforeCharacters,references-beforeReferences,this);
-                    if(cachePhase){metadataReferencesBefore=Math.addExact(metadataReferencesBefore,references-beforeReferences);metadataObjectsBefore++;}
                 }catch(RetainedGraph.Unmeasured unknown){if(rejected==null)rejected=value;failed=true;}
                 finally {if(capture!=null){pay(capture.size()+1L);capture.clear();capture=null;temporarySlots=0;}}
             }
@@ -208,31 +235,20 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
                 if(metadataAlias)return freshAliasFallback(root);
                 if(!ownerReached)failed=true;
                 if(!failed)inventory.prepare(this);
+                inventory.checkMetadataTotals(this);
                 cachePhase=true;
-                long ownerFields=references;owner.retainedReferences(this);
-                metadataReferencesBefore=Math.addExact(metadataReferencesBefore,references-ownerFields);drain();
+                if(!inventory.cacheKeys(this))return freshAliasFallback(root);
                 long unionNodes=nodes,unionCharacters=characters,unionReferences=references;
-                long primaryReferences=unionReferences-extraReferences-metadataReferencesBefore;
                 var peak=new RetainedGraph.Usage(unionNodes,Math.addExact(unionCharacters,temporaryCharacters),
-                    Math.addExact(unionReferences-metadataReferencesBefore,combinedAuxiliaryPeak));
+                    Math.addExact(unionReferences,combinedAuxiliaryPeak));
                 boolean within=peak.nodes()<=limits.nodes() && peak.characters()<=limits.characters() && peak.references()<=limits.references();
                 pay(inventory.prune(primary,!failed && within));
+                inventory.checkMetadataTotals(this);
+                var retained=new RetainedGraph.Usage(unionNodes-extraNodes,unionCharacters-extraCharacters,
+                    Math.addExact(unionReferences-extraReferences,inventory.metadataSlots));
+                long objects=seen.size()+hitObjects-extraObjects+inventory.metadataObjects;
+                if(!failed && within)pay(inventory.activate());
                 settle();
-                var metadata=new MetadataScan(inventory);var remaining=metadata.measure(owner);pay(remaining.work());
-                var retained=new RetainedGraph.Usage(unionNodes-extraNodes,unionCharacters-extraCharacters,Math.addExact(primaryReferences,remaining.retained().references()));
-                peak=peak.maximum(new RetainedGraph.Usage(retained.nodes(),retained.characters(),Math.addExact(primaryReferences,Math.addExact(12,remaining.peak().references()))));
-                // settle empties the first scanner's map/queue and releases P/C arrays;
-                // the scanner itself is still executing: its five base ownership slots
-                // and seven additional reference fields overlap the new metadata scan.
-                long objects=seenObjectsBeforeSettle+hitObjects-extraObjects-metadataObjectsBefore+remaining.objects();
-                // The post-prune bookkeeping sweep is part of the whole inspection too.
-                // No staged entry becomes usable before that final peak has passed.
-                if(peak.nodes()>limits.nodes() || peak.characters()>limits.characters() || peak.references()>limits.references()){
-                    long removedObjects=inventory.liveRows+inventory.childArrays+inventory.maskArrays;
-                    pay(inventory.prune(null,false));
-                    retained=new RetainedGraph.Usage(retained.nodes(),retained.characters(),Math.addExact(primaryReferences,inventory.metadataReferences()));
-                    objects-=removedObjects;
-                } else if(!failed)pay(inventory.activate());
                 var result=new RetainedGraph.Observation(retained,peak,work,objects);
                 finished=true;
                 if(rejected!=null)throw new RetainedGraph.Unmeasured(rejected,result);
@@ -257,10 +273,15 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
         }
         /** Rare public metadata aliases use the unchanged reference scanner, including its real extra cost. */
         private RetainedGraph.Observation freshAliasFallback(Object root){
+            // Fresh reference scans can stop earlier at an unknown payload. They cannot
+            // erase the nodes/text/slots already visited by the continuing primary scan.
+            long observedNodes=nodes,observedCharacters=Math.addExact(characters,temporaryCharacters);
+            long observedReferences=Math.addExact(references,scratchPeak);pay(5);
             pay(4);var union=fresh(new AliasUnion(root,owner,this));pay(union.work());
             long currentScratch=12L+2L*seen.size()+pending.size()+primary.length+cacheOnly.length;
             var peak=union.peak().maximum(new RetainedGraph.Usage(union.retained().nodes(),union.retained().characters(),
                 Math.addExact(Math.max(0,union.retained().references()-currentScratch),scratchPeak)));
+            peak=peak.maximum(new RetainedGraph.Usage(observedNodes,observedCharacters,observedReferences));
             union=null;pay(1);
             pay(inventory.prune(null,false));settle();
             var remaining=fresh(root);pay(remaining.work());
@@ -275,31 +296,6 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
         long seenObjectsBeforeSettle;
         private void settle(){
             if(settled)return;seenObjectsBeforeSettle=seen.size();pay(2L*seen.size()+pending.size()+2);seen.clear();pending.clear();primary=null;cacheOnly=null;settled=true;
-        }
-    }
-    /** Paid metadata-only sweep after pruning; immutable keys are already part of the primary union. */
-    private static final class MetadataScan extends RetainedGraph.Scan {
-        private final ImmutableRetentionInventory inventory;
-        MetadataScan(ImmutableRetentionInventory inventory){this.inventory=inventory;work=1;accountingPeak();}
-        @Override void accountingPeak(){
-            // Existing scanner map/queue/current/backings plus this inventory field.
-            accountingReferences=Math.max(accountingReferences,Math.addExact(6,Math.addExact(2L*seen.size(),pending.size())));
-        }
-        @Override public void reference(Object value){
-            references=Math.addExact(references,1);work=Math.addExact(work,2);
-            if(value!=null && !inventory.index.containsKey(value))pending.addLast(value);
-            accountingPeak();
-        }
-        RetainedGraph.Observation measure(RetainedGraph.Inventory owner){
-            try {
-                seen.put(owner,Boolean.TRUE);work=Math.addExact(work,1);owner.retainedReferences(this);
-                while(!pending.isEmpty()){
-                    Object value=pending.removeFirst();work=Math.addExact(work,1);
-                    if(seen.put(value,Boolean.TRUE)!=null)continue;
-                    work=Math.addExact(work,1);accountingPeak();inspect(value);
-                }
-                var measured=observation();return new RetainedGraph.Observation(measured.retained(),measured.peak(),measured.work(),measured.objects()-1);
-            } finally {pending.clear();seen.clear();}
         }
     }
 }
