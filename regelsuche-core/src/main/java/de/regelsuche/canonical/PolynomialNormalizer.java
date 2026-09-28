@@ -1,6 +1,8 @@
 package de.regelsuche.canonical;
 
 import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
+import de.regelsuche.retention.RetainedSortedMap;
 
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
@@ -10,7 +12,6 @@ import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.scalar.ExactRational;
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -48,35 +49,43 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
     }
 
     public Optional<Expr> normalize(Expr expression) {
-        Polynomial polynomial = toPolynomial(expression);
-        if (polynomial == null) {
-            return Optional.empty();
+        try(var owned=RetainedOperation.retain(this,expression)) {
+            RetainedOperation.work(1);
+            Polynomial polynomial = toPolynomial(expression);
+            if (polynomial == null) {
+                return Optional.empty();
+            }
+            try(var value=RetainedOperation.retain(polynomial)) {
+                Expr normalized = polynomial.toExpr();
+                return normalized == null
+                    ? Optional.empty()
+                    : Optional.of(RetainedOperation.produced(normalized));
+            }
         }
-        Expr normalized = polynomial.toExpr();
-        return normalized == null
-            ? Optional.empty()
-            : Optional.of(normalized);
     }
 
     private Polynomial toPolynomial(Expr expression) {
-        if (expression instanceof NumberExpr number) {
-            return Polynomial.constant(number.value());
+        try(var owned=RetainedOperation.retain(expression)) {
+            RetainedOperation.work(1);
+            if (expression instanceof NumberExpr number) {
+                return Polynomial.constant(number.value());
+            }
+            if (expression instanceof VariableExpr variable) {
+                return Polynomial.monomial(
+                    1,
+                    Monomial.variable(variable.name()));
+            }
+            if (!(expression instanceof BinaryExpr binary)) {
+                return null;
+            }
+            return switch (binary.operator()) {
+                case ADD -> combine(binary.left(), binary.right(), 1);
+                case SUB -> combine(binary.left(), binary.right(), -1);
+                case MUL -> multiply(binary.left(), binary.right());
+                case POW -> power(binary.left(), binary.right());
+                case DIV -> null;
+            };
         }
-        if (expression instanceof VariableExpr variable) {
-            return Polynomial.monomial(
-                1,
-                Monomial.variable(variable.name()));
-        }
-        if (!(expression instanceof BinaryExpr binary)) {
-            return null;
-        }
-        return switch (binary.operator()) {
-            case ADD -> combine(binary.left(), binary.right(), 1);
-            case SUB -> combine(binary.left(), binary.right(), -1);
-            case MUL -> multiply(binary.left(), binary.right());
-            case POW -> power(binary.left(), binary.right());
-            case DIV -> null;
-        };
     }
 
     private Polynomial combine(
@@ -85,26 +94,34 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
         int rightSign
     ) {
         Polynomial leftPolynomial = toPolynomial(left);
-        Polynomial rightPolynomial = toPolynomial(right);
-        if (leftPolynomial == null || rightPolynomial == null) {
-            return null;
+        try(var leftOwned=RetainedOperation.retain(leftPolynomial)) {
+            Polynomial rightPolynomial = toPolynomial(right);
+            try(var rightOwned=RetainedOperation.retain(rightPolynomial)) {
+                if (leftPolynomial == null || rightPolynomial == null) {
+                    return null;
+                }
+                var scaled=rightPolynomial.scale(rightSign);
+                try(var scaledOwned=RetainedOperation.retain(scaled)){return leftPolynomial.add(scaled);}
+            }
         }
-        return leftPolynomial.add(
-            rightPolynomial.scale(rightSign));
     }
 
     private Polynomial multiply(Expr left, Expr right) {
         Polynomial leftPolynomial = toPolynomial(left);
-        Polynomial rightPolynomial = toPolynomial(right);
-        if (leftPolynomial == null || rightPolynomial == null) {
-            return null;
+        try(var leftOwned=RetainedOperation.retain(leftPolynomial)) {
+            Polynomial rightPolynomial = toPolynomial(right);
+            try(var rightOwned=RetainedOperation.retain(rightPolynomial)) {
+                if (leftPolynomial == null || rightPolynomial == null) {
+                    return null;
+                }
+                if (!expandCompositePolynomials
+                        && (!leftPolynomial.isMonomial()
+                            || !rightPolynomial.isMonomial())) {
+                    return null;
+                }
+                return leftPolynomial.multiply(rightPolynomial);
+            }
         }
-        if (!expandCompositePolynomials
-                && (!leftPolynomial.isMonomial()
-                    || !rightPolynomial.isMonomial())) {
-            return null;
-        }
-        return leftPolynomial.multiply(rightPolynomial);
     }
 
     private Polynomial power(Expr base, Expr exponent) {
@@ -121,14 +138,16 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
             return null;
         }
         Polynomial basePolynomial = toPolynomial(base);
-        if (basePolynomial == null) {
-            return null;
+        try(var baseOwned=RetainedOperation.retain(basePolynomial)) {
+            if (basePolynomial == null) {
+                return null;
+            }
+            if (!expandCompositePolynomials
+                    && !basePolynomial.isMonomial()) {
+                return null;
+            }
+            return basePolynomial.pow(exponentValue);
         }
-        if (!expandCompositePolynomials
-                && !basePolynomial.isMonomial()) {
-            return null;
-        }
-        return basePolynomial.pow(exponentValue);
     }
 
     private boolean isNonNegativeInteger(ExactRational value) {
@@ -136,10 +155,13 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
             && value.numerator().bitLength() <= 31;
     }
 
-    private record Monomial(Map<String, Integer> powers) {
+    private record Monomial(Map<String, Integer> powers) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(powers);}
         private Monomial {
-            powers = Collections.unmodifiableMap(
-                new TreeMap<>(powers));
+            try(var source=RetainedOperation.retain(powers)) {
+                RetainedOperation.work(powers.size()+1L);
+                powers = RetainedOperation.produced(RetainedSortedMap.copyOf(powers));
+            }
         }
 
         private static Monomial constant() {
@@ -152,36 +174,46 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
 
         private Monomial multiply(Monomial other) {
             Map<String, Integer> result = new TreeMap<>(powers);
-            for (Map.Entry<String, Integer> entry
-                    : other.powers.entrySet()) {
-                try {
-                    result.merge(
-                        entry.getKey(),
-                        entry.getValue(),
-                        Math::addExact);
-                } catch (ArithmeticException exception) {
-                    return null;
+            RetainedOperation.work(powers.size());
+            RetainedOperation.work(1);
+            try(var maps=RetainedOperation.retain(this,other,result)) {
+                for (Map.Entry<String, Integer> entry
+                        : other.powers.entrySet()) {
+                    RetainedOperation.work(1);
+                    try {
+                        result.merge(
+                            entry.getKey(),
+                            entry.getValue(),
+                            Math::addExact);
+                    } catch (ArithmeticException exception) {
+                        return null;
+                    }
                 }
+                RetainedOperation.work(result.size());
+                result.values().removeIf(value -> value == 0);RetainedOperation.checkpoint();
+                return RetainedOperation.produced(new Monomial(result));
             }
-            result.values().removeIf(value -> value == 0);
-            return new Monomial(result);
         }
 
         private Monomial pow(int exponent) {
             Map<String, Integer> result = new TreeMap<>();
-            for (Map.Entry<String, Integer> entry
-                    : powers.entrySet()) {
-                try {
-                    result.put(
-                        entry.getKey(),
-                        Math.multiplyExact(
-                            entry.getValue(),
-                            exponent));
-                } catch (ArithmeticException exception) {
-                    return null;
+            RetainedOperation.work(1);
+            try(var maps=RetainedOperation.retain(this,result)) {
+                for (Map.Entry<String, Integer> entry
+                        : powers.entrySet()) {
+                    RetainedOperation.work(1);
+                    try {
+                        result.put(
+                            entry.getKey(),
+                            Math.multiplyExact(
+                                entry.getValue(),
+                                exponent));
+                    } catch (ArithmeticException exception) {
+                        return null;
+                    }
                 }
+                return RetainedOperation.produced(new Monomial(result));
             }
-            return new Monomial(result);
         }
 
         private long degree() {
@@ -229,7 +261,8 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
         }
     }
 
-    private static final class Polynomial {
+    private static final class Polynomial implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(terms);}
         private static final Comparator<
             Map.Entry<Monomial, ExactRational>> TERM_ORDER =
                 Comparator
@@ -264,53 +297,71 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
         ) {
             Map<Monomial, ExactRational> result =
                 new LinkedHashMap<>();
-            result.put(monomial, coefficient);
-            return new Polynomial(result);
+            RetainedOperation.work(1);
+            try(var maps=RetainedOperation.retain(monomial,coefficient,result)) {
+                result.put(monomial, coefficient);RetainedOperation.work(1);
+                return RetainedOperation.produced(new Polynomial(result));
+            }
         }
 
         private Polynomial add(Polynomial other) {
             Map<Monomial, ExactRational> result =
                 new LinkedHashMap<>(terms);
-            for (Map.Entry<Monomial, ExactRational> entry
-                    : other.terms.entrySet()) {
-                result.merge(
-                    entry.getKey(),
-                    entry.getValue(),
-                    ExactRational::add);
-                if (result.size() > MAX_EXPANDED_TERMS) {
-                    return null;
+            RetainedOperation.work(terms.size());
+            RetainedOperation.work(1);
+            try(var maps=RetainedOperation.retain(this,other,result)) {
+                for (Map.Entry<Monomial, ExactRational> entry
+                        : other.terms.entrySet()) {
+                    RetainedOperation.work(1);
+                    result.merge(
+                        entry.getKey(),
+                        entry.getValue(),
+                        ExactRational::add);
+                    RetainedOperation.checkpoint();
+                    if (result.size() > MAX_EXPANDED_TERMS) {
+                        return null;
+                    }
                 }
+                return RetainedOperation.produced(new Polynomial(result));
             }
-            return new Polynomial(result);
         }
 
         private Polynomial multiply(Polynomial other) {
             Map<Monomial, ExactRational> result =
                 new LinkedHashMap<>();
-            for (Map.Entry<Monomial, ExactRational> left
-                    : terms.entrySet()) {
-                for (Map.Entry<Monomial, ExactRational> right
-                        : other.terms.entrySet()) {
-                    Monomial monomial = left.getKey().multiply(
-                        right.getKey());
-                    if (monomial == null) {
-                        return null;
-                    }
-                    ExactRational coefficient =
-                        left.getValue().multiply(right.getValue());
-                    if (!withinCoefficientBudget(coefficient)) {
-                        return null;
-                    }
-                    result.merge(
-                        monomial,
-                        coefficient,
-                        ExactRational::add);
-                    if (result.size() > MAX_EXPANDED_TERMS) {
-                        return null;
+            RetainedOperation.work(1);
+            try(var maps=RetainedOperation.retain(this,other,result)) {
+                for (Map.Entry<Monomial, ExactRational> left
+                        : terms.entrySet()) {
+                    for (Map.Entry<Monomial, ExactRational> right
+                            : other.terms.entrySet()) {
+                        Monomial monomial = left.getKey().multiply(
+                            right.getKey());
+                        try(var monomialOwned=RetainedOperation.retain(monomial)) {
+                            if (monomial == null) {
+                                return null;
+                            }
+                            ExactRational coefficient =
+                                left.getValue().multiply(right.getValue());
+                            RetainedOperation.work(1);
+                            try(var coefficientOwned=RetainedOperation.retain(coefficient)) {
+                                if (!withinCoefficientBudget(coefficient)) {
+                                    return null;
+                                }
+                                result.merge(
+                                    monomial,
+                                    coefficient,
+                                    ExactRational::add);
+                                RetainedOperation.work(1);RetainedOperation.checkpoint();
+                                if (result.size() > MAX_EXPANDED_TERMS) {
+                                    return null;
+                                }
+                            }
+                        }
                     }
                 }
+                return RetainedOperation.produced(new Polynomial(result));
             }
-            return new Polynomial(result);
         }
 
         private Polynomial scale(long factor) {
@@ -330,23 +381,26 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
                 1,
                 Monomial.constant());
             Polynomial factor = this;
-            int remaining = exponent;
-            while (remaining > 0) {
-                if ((remaining & 1) == 1) {
-                    result = result.multiply(factor);
-                    if (result == null) {
-                        return null;
+            Object[] current={result,factor};
+            try(var state=RetainedOperation.retain(this,current)) {
+                int remaining = exponent;
+                while (remaining > 0) {
+                    if ((remaining & 1) == 1) {
+                        result = result.multiply(factor);current[0]=result;RetainedOperation.work(1);RetainedOperation.checkpoint();
+                        if (result == null) {
+                            return null;
+                        }
+                    }
+                    remaining >>= 1;
+                    if (remaining > 0) {
+                        factor = factor.multiply(factor);current[1]=factor;RetainedOperation.work(1);RetainedOperation.checkpoint();
+                        if (factor == null) {
+                            return null;
+                        }
                     }
                 }
-                remaining >>= 1;
-                if (remaining > 0) {
-                    factor = factor.multiply(factor);
-                    if (factor == null) {
-                        return null;
-                    }
-                }
+                return RetainedOperation.produced(result);
             }
-            return result;
         }
 
         private static boolean withinCoefficientBudget(ExactRational value) {
@@ -402,15 +456,19 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
         ) {
             Map<Monomial, ExactRational> normalized =
                 new LinkedHashMap<>();
-            for (Map.Entry<Monomial, ExactRational> entry
-                    : source.entrySet()) {
-                if (!entry.getValue().isZero()) {
-                    normalized.put(
-                        entry.getKey(),
-                        entry.getValue());
+            RetainedOperation.work(1);
+            try(var maps=RetainedOperation.retain(source,normalized)) {
+                for (Map.Entry<Monomial, ExactRational> entry
+                        : source.entrySet()) {
+                    RetainedOperation.work(1);
+                    if (!entry.getValue().isZero()) {
+                        normalized.put(
+                            entry.getKey(),
+                            entry.getValue());
+                    }
                 }
+                return RetainedOperation.produced(normalized);
             }
-            return normalized;
         }
     }
 
