@@ -13,13 +13,32 @@ import java.util.Objects;
 import java.util.TreeMap;
 
 /** Declarative, nestable matcher algebra independent of {@link ExprTemplate}. */
-public sealed interface ExprMatcher
+public sealed interface ExprMatcher extends RetainedGraph.View
     permits ExprMatcher.Any, ExprMatcher.LiteralNumber,
         ExprMatcher.LiteralVariable, ExprMatcher.NumberProperty,
         ExprMatcher.Pattern, ExprMatcher.Bind, ExprMatcher.AllOf,
         ExprMatcher.AnyOf, ExprMatcher.Not, ExprMatcher.Operation,
         ExprMatcher.Function, ExprMatcher.Contains,
         ExprMatcher.Equivalent, ExprMatcher.Where {
+
+    @Override default void retainedReferences(RetainedGraph.Visitor visitor) {
+        switch (this) {
+            case Any ignored -> { }
+            case LiteralNumber literal -> visitor.reference(literal.value());
+            case LiteralVariable literal -> visitor.reference(literal.name());
+            case NumberProperty property -> visitor.reference(property.kind());
+            case Pattern pattern -> { visitor.reference(pattern.pattern()); visitor.reference(pattern.recognitionProfile()); }
+            case Bind bind -> { visitor.reference(bind.name()); visitor.reference(bind.matcher()); visitor.reference(bind.equalityProfile()); }
+            case AllOf all -> visitor.reference(all.matchers());
+            case AnyOf any -> visitor.reference(any.matchers());
+            case Not not -> visitor.reference(not.matcher());
+            case Operation operation -> { visitor.reference(operation.operator()); visitor.reference(operation.left()); visitor.reference(operation.right()); }
+            case Function function -> { visitor.reference(function.name()); visitor.reference(function.arguments()); }
+            case Contains contains -> visitor.reference(contains.matcher());
+            case Equivalent equivalent -> { visitor.reference(equivalent.recognitionProfile()); visitor.reference(equivalent.matcher()); }
+            case Where where -> { visitor.reference(where.matcher()); visitor.reference(where.constraint()); }
+        }
+    }
 
     default MatchOutcome match(Expr expression) {
         return match(expression, MatchOptions.defaults());
@@ -154,7 +173,8 @@ public sealed interface ExprMatcher
         int maxResults,
         int maxSteps,
         int maxPatternBranches
-    ) {
+    ) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(representativeProvider); }
         public MatchOptions {
             representativeProvider = representativeProvider == null
                 ? EquivalentExpressionProvider.identity()
@@ -186,16 +206,18 @@ public sealed interface ExprMatcher
         }
     }
 
-    enum MatchStatus {
+    enum MatchStatus implements RetainedGraph.View {
         MATCHED,
         NOT_MATCHED,
-        INCONCLUSIVE
+        INCONCLUSIVE;
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }
     }
 
-    enum RecognitionStrength {
+    enum RecognitionStrength implements RetainedGraph.View {
         EXACT,
         EQUIVALENCE_AWARE,
         BOUNDED_REPRESENTATIVE;
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }
 
         static RecognitionStrength strongest(
             RecognitionStrength left,
@@ -211,7 +233,11 @@ public sealed interface ExprMatcher
         int representativeIndex,
         RecognitionStrength recognitionStrength,
         List<String> trace
-    ) {
+    ) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(bindings); visitor.reference(representative);
+            visitor.reference(recognitionStrength); visitor.reference(trace);
+        }
         public MatchResult {
             Objects.requireNonNull(bindings, "bindings");
             bindings = de.regelsuche.retention.RetainedSortedMap.copyOf(bindings);
@@ -227,7 +253,10 @@ public sealed interface ExprMatcher
         }
     }
 
-    record MatchDiagnostic(String code, String matcherDescriptor) {
+    record MatchDiagnostic(String code, String matcherDescriptor) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(code); visitor.reference(matcherDescriptor);
+        }
         public MatchDiagnostic {
             code = requireText(code, "code");
             matcherDescriptor = requireText(
@@ -240,7 +269,10 @@ public sealed interface ExprMatcher
         List<MatchDiagnostic> diagnostics,
         int evaluatedSteps,
         int patternBranches
-    ) {
+    ) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(matches); visitor.reference(diagnostics);
+        }
         public MatchOutcome {
             matches = List.copyOf(Objects.requireNonNull(matches, "matches"));
             diagnostics = List.copyOf(
@@ -298,10 +330,11 @@ public sealed interface ExprMatcher
         }
     }
 
-    enum NumberPropertyKind {
+    enum NumberPropertyKind implements RetainedGraph.View {
         NUMBER_LITERAL,
         INTEGER_LITERAL,
-        NON_ZERO_NUMBER_LITERAL
+        NON_ZERO_NUMBER_LITERAL;
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }
     }
 
     record NumberProperty(NumberPropertyKind kind) implements ExprMatcher {
@@ -318,8 +351,7 @@ public sealed interface ExprMatcher
     record Pattern(
         PatternExpr pattern,
         RecognitionProfile recognitionProfile
-    ) implements ExprMatcher,RetainedGraph.View {
-        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(pattern);v.reference(recognitionProfile);}
+    ) implements ExprMatcher {
         public Pattern {
             pattern = Objects.requireNonNull(pattern, "pattern");
             recognitionProfile = recognitionProfile == null
@@ -486,8 +518,14 @@ public sealed interface ExprMatcher
         }
     }
 
-    sealed interface Constraint permits BindingMatches, SameAs {
+    sealed interface Constraint extends RetainedGraph.View permits BindingMatches, SameAs {
         String canonicalDescriptor();
+        @Override default void retainedReferences(RetainedGraph.Visitor visitor) {
+            switch (this) {
+                case BindingMatches binding -> { visitor.reference(binding.bindingName()); visitor.reference(binding.matcher()); }
+                case SameAs same -> { visitor.reference(same.leftBinding()); visitor.reference(same.rightBinding()); visitor.reference(same.recognitionProfile()); }
+            }
+        }
     }
 
     record BindingMatches(

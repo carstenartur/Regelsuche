@@ -5,6 +5,8 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -24,23 +26,48 @@ final class ExprMatcherEngine {
         ExprMatcher.MatchOptions options
     ) {
         Session session = new Session(options);
-        State initial = new State(
+        session.initial = new State(
             Map.of(),
             expression,
             0,
             ExprMatcher.RecognitionStrength.EXACT,
             List.of()
         );
-        List<State> states = session.limit(
-            evaluate(matcher, expression, initial, session, true),
-            matcher.canonicalDescriptor()
-        );
-        return new ExprMatcher.MatchOutcome(
-            states.stream().map(State::toResult).toList(),
-            List.copyOf(session.diagnostics),
-            session.steps,
-            session.patternBranches
-        );
+        try (var owned = RetainedOperation.retainCompleted(3,matcher,expression,session)) {
+            try {
+                session.rawStates = evaluate(matcher,expression,session.initial,session,true);
+                session.states = session.limit(session.rawStates,matcher.canonicalDescriptor());
+                RetainedOperation.work(2L + (session.states == session.rawStates ? 0 : session.states.size()));
+                RetainedOperation.checkpoint();
+                session.rawStates = null;
+                session.results = new ArrayList<>(session.states.size());
+                RetainedOperation.work(2);
+                for (State state : session.states) {
+                    session.results.add(state.toResult());
+                    // Result, sorted binding owner/backing, copied entries, and list insertion.
+                    RetainedOperation.work(4L + state.bindings().size());
+                }
+                session.outcome = new ExprMatcher.MatchOutcome(session.results,List.copyOf(session.diagnostics),
+                    session.steps,session.patternBranches);
+                RetainedOperation.work(3L + session.results.size() + session.diagnostics.size());
+                RetainedOperation.checkpoint();
+                return session.outcome;
+            } catch (RuntimeException | Error failure) {
+                try { RetainedOperation.checkpoint(); }
+                catch (RuntimeException | Error observation) {
+                    if (observation != failure) failure.addSuppressed(observation);
+                }
+                throw failure;
+            }
+        } catch (RuntimeException | Error failure) {
+            // Only returned outcomes delegate counters. This also covers a failed
+            // final frame close; a nested failed pattern attempt settles itself.
+            try { RetainedOperation.work((long) session.steps + session.patternBranches); }
+            catch (RuntimeException | Error accounting) {
+                if (accounting != failure) failure.addSuppressed(accounting);
+            }
+            throw failure;
+        }
     }
 
     private static List<State> evaluate(
@@ -575,13 +602,23 @@ final class ExprMatcherEngine {
         return List.copyOf(result);
     }
 
-    private static final class Session {
+    private static final class Session implements RetainedGraph.View {
         private final ExprMatcher.MatchOptions options;
         private final Set<ExprMatcher.MatchDiagnostic> diagnostics =
             new LinkedHashSet<>();
         private int steps;
         private int patternBranches;
         private boolean stepLimitReported;
+        private State initial;
+        private List<State> rawStates;
+        private List<State> states;
+        private List<ExprMatcher.MatchResult> results;
+        private ExprMatcher.MatchOutcome outcome;
+
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(options); visitor.reference(diagnostics); visitor.reference(initial);
+            visitor.reference(rawStates); visitor.reference(states); visitor.reference(results); visitor.reference(outcome);
+        }
 
         private Session(ExprMatcher.MatchOptions options) {
             this.options = options;
@@ -618,7 +655,11 @@ final class ExprMatcherEngine {
         int representativeIndex,
         ExprMatcher.RecognitionStrength recognitionStrength,
         List<String> trace
-    ) {
+    ) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(bindings); visitor.reference(representative);
+            visitor.reference(recognitionStrength); visitor.reference(trace);
+        }
         private State {
             bindings = Map.copyOf(bindings);
             representative = Objects.requireNonNull(
