@@ -252,6 +252,7 @@ public final class NativeMoveSearch {
                 var execution=new Execution(problem,store,accounting);
                 var searched=new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
                     .search(execution,continuation,selection);
+                accounting.completed(searched,selection);
                 var replay=selection.incumbent()==null?new Replay(0,null):
                     replay(execution,problem.source(),selection.incumbent().expression(),selection.witness());
                 var result=new Result(problem,searched,replay.work());
@@ -272,6 +273,7 @@ public final class NativeMoveSearch {
             var execution=new Execution(problem,store,accounting);
             var searched=new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
                 .search(execution,continuation,null);
+            accounting.completed(searched,null);
             var replay=searched.outcome()==MoveSearch.Outcome.TARGET_REACHED
                 ?replay(execution,problem.source(),problem.context().goal(),searched.witness()):new Replay(0,null);
             var result=new Result(problem,searched,replay.work());accounting.finish(result);
