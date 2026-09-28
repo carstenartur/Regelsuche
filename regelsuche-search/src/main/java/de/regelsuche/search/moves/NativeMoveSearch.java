@@ -7,7 +7,7 @@ import java.util.*;
 
 /** Explicit Expr execution through the same frontier and batch pickers as the historical facade. */
 public final class NativeMoveSearch {
-    public static final String REVISION = "regelsuche.native-expr-move-search/v1";
+    public static final String REVISION = "regelsuche.native-expr-move-search/v2-final-replay";
     public record Primitive(MoveProvider.Descriptor descriptor, AstRewriteTransport transport) implements NativeMoveProvider {
         public Primitive {
             Objects.requireNonNull(descriptor);Objects.requireNonNull(transport);
@@ -50,9 +50,13 @@ public final class NativeMoveSearch {
     public static final class Result {
         private final SearchExecution.Result<TypedMoveSearch.State,NativeSearchMove,NativeVerification,NativeStateValue.Assessment> result;
         private final Expr source;
+        private final long replayWork,workBudget;
         private final List<StagedIncrementalMoveExecution.Provider> incrementalProviders;
         private Result(Problem problem,SearchExecution.Result<TypedMoveSearch.State,NativeSearchMove,NativeVerification,NativeStateValue.Assessment> result){
-            this.source=problem.source();this.result=result;
+            this(problem,result,0);
+        }
+        private Result(Problem problem,SearchExecution.Result<TypedMoveSearch.State,NativeSearchMove,NativeVerification,NativeStateValue.Assessment> result,long replayWork){
+            this.source=problem.source();this.result=result;this.replayWork=replayWork;this.workBudget=problem.budget().totalWork();
             incrementalProviders=problem.scheduling()==MoveSearch.Scheduling.STAGED_INCREMENTAL?problem.providers().stream()
                 .map(p->new StagedIncrementalMoveExecution.Provider(p.descriptor(),NativeIncrementalSources.definition(p))).toList():null;
         }
@@ -61,14 +65,19 @@ public final class NativeMoveSearch {
             return result.pickerReceipts().stream().map(r->(SearchExecution.Expansion<TypedMoveSearch.State>)r).toList();
         }
         public boolean accountingComplete(){return cursorReceipts().stream().flatMap(r->r.lanes().stream()).allMatch(l->l.cursor()==null || l.cursor().accountingComplete());}
-        public MoveSearch.Outcome outcome(){return result.outcome();}
+        public long replayWork(){return replayWork;}
+        public long totalWork(){return Math.addExact(metrics().totalWork(),replayWork);}
+        public boolean withinBudget(){return accountingComplete() && totalWork()<=workBudget;}
+        public MoveSearch.Outcome outcome(){return totalWork()>workBudget?MoveSearch.Outcome.WORK_EXHAUSTED:result.outcome();}
         public Expr output(){return result.witness().isEmpty()?source:result.witness().getLast().target().expression();}
         public List<SearchExecution.Step<TypedMoveSearch.State,NativeSearchMove,NativeVerification>> witness(){return result.witness();}
+        /** Frontier receipt. Independently paid final replay is separate; use totalWork for the whole result. */
         public MoveSearch.Metrics metrics(){return result.metrics();}
+        /** Historical frontier projection; the additive native replay receipt remains available separately. */
         public MoveSearch.Result exportLegacy(){
             var assessments=new HashMap<MoveState,StateValue.Assessment>();
             result.stateAssessments().forEach((state,value)->assessments.put(export(state),export(value)));
-            return new MoveSearch.Result(result.outcome(),result.witness().stream().map(s->new MoveSearch.WitnessStep(export(s.source()),export(s.target()),s.move().exportLegacy(),s.verification().exportLegacy())).toList(),
+            return new MoveSearch.Result(outcome(),result.witness().stream().map(s->new MoveSearch.WitnessStep(export(s.source()),export(s.target()),s.move().exportLegacy(),s.verification().exportLegacy())).toList(),
                 result.events().stream().map(e->new MoveSearch.Event(export(e.source()),export(e.target()),e.move().exportLegacy(),e.decision(),e.verification()==null?null:e.verification().exportLegacy())).toList(),
                 result.reachedStates().stream().map(NativeMoveSearch::export).collect(java.util.stream.Collectors.toSet()),
                 result.deadEndStates().stream().map(NativeMoveSearch::export).toList(),result.metrics(),result.completeBoundedRelation(),assessments,null,incrementalProviders==null?null:
@@ -110,27 +119,48 @@ public final class NativeMoveSearch {
             var execution=new Execution(problem,store);
             var result=new Result(problem,new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
                 .search(execution,continuation,selection));
-            long replayWork=0;
-            TypedMoveSearch.State cursor=selection.witness().isEmpty()?selection.incumbent():selection.witness().getFirst().source();
-            if(!cursor.expression().equals(problem.source()) || cursor.searchDepth()!=0)throw new IllegalStateException("native replay root differs");
-            for(var step:selection.witness()) {
-                if(!cursor.equals(step.source()))throw new IllegalStateException("broken native incumbent lineage");
-                var checked=execution.verify(cursor,step.move());
-                replayWork=Math.addExact(replayWork,checked.work());
-                if(!checked.accepted() || !checked.equals(step.verification()))throw new FinalCheckFailure(
-                    new QualityResult(result,selection.incumbent(),selection.inputScore(),selection.outputScore(),selection.witness(),replayWork,problem.budget().totalWork()),checked);
-                cursor=step.target();
-            }
-            if(!cursor.equals(selection.incumbent()))throw new IllegalStateException("native replay endpoint differs");
-            return new QualityResult(result,selection.incumbent(),selection.inputScore(),selection.outputScore(),selection.witness(),replayWork,problem.budget().totalWork());
+            var replay=replay(execution,problem.source(),selection.incumbent().expression(),selection.witness());
+            var quality=new QualityResult(result,selection.incumbent(),selection.inputScore(),selection.outputScore(),selection.witness(),replay.work(),problem.budget().totalWork());
+            if(replay.rejected()!=null)throw new FinalCheckFailure(quality,replay.rejected());
+            return quality;
         }
     }
     public Result search(Problem problem,SearchContinuationContract continuation){
         validate(problem);
         try(var store=new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)) {
-            return new Result(problem,new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
-                .search(new Execution(problem,store),continuation,null));
+            var execution=new Execution(problem,store);
+            var searched=new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
+                .search(execution,continuation,null);
+            var replay=searched.outcome()==MoveSearch.Outcome.TARGET_REACHED
+                ?replay(execution,problem.source(),problem.context().goal(),searched.witness()):new Replay(0,null);
+            var result=new Result(problem,searched,replay.work());
+            if(replay.rejected()!=null)throw new TargetCheckFailure(result,replay.rejected());
+            return result;
         }
+    }
+    public static final class TargetCheckFailure extends IllegalStateException {
+        private final Result attempted;private final NativeVerification rejected;
+        private TargetCheckFailure(Result attempted,NativeVerification rejected){
+            super("independent native target replay differs");this.attempted=attempted;this.rejected=rejected;
+        }
+        public Result attempted(){return attempted;}
+        public NativeVerification rejected(){return rejected;}
+    }
+    private record Replay(long work,NativeVerification rejected) {}
+    private static Replay replay(Execution execution,Expr source,Expr target,
+            List<SearchExecution.Step<TypedMoveSearch.State,NativeSearchMove,NativeVerification>> witness){
+        long work=0;
+        TypedMoveSearch.State cursor=witness.isEmpty()?null:witness.getFirst().source();
+        if(cursor!=null && (!cursor.expression().equals(source) || cursor.searchDepth()!=0))
+            throw new IllegalStateException("native replay root differs");
+        for(var step:witness) {
+            if(!cursor.equals(step.source()))throw new IllegalStateException("broken native witness lineage");
+            var checked=execution.verify(cursor,step.move());work=Math.addExact(work,checked.work());
+            if(!checked.accepted() || !checked.equals(step.verification()))return new Replay(work,checked);
+            cursor=step.target();
+        }
+        if(!(cursor==null?source:cursor.expression()).equals(target))throw new IllegalStateException("native replay endpoint differs");
+        return new Replay(work,null);
     }
     private static void validate(Problem problem){
         de.regelsuche.search.program.AstExpressionValidation.inspect(problem.source());

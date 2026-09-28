@@ -57,8 +57,23 @@ class NativeSourceOnlySearchTest {
             var result=new NativeMoveSearch().search(target,SearchContinuationContract.PATH_SENSITIVE);
             assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome());assertEquals(goal,result.output());
             assertEquals(2,checks.get(),"target witnesses require fresh independent replay as source-only incumbents do");
-            assertEquals(0,transport.total());
+            assertEquals(0,transport.total());assertTrue(result.replayWork()>0);
+            assertEquals(result.metrics().totalWork()+result.replayWork(),result.totalWork());assertTrue(result.withinBudget());
+            var shortBudget=new NativeMoveSearch.Problem(target.source(),target.context(),target.providers(),target.mode(),target.scheduling(),
+                new MoveSearch.Budget(2,2,0,10,result.totalWork()-1),target.policy(),target.stateScore(),target.stateValue(),target.verifier());
+            var limited=new NativeMoveSearch().search(shortBudget,SearchContinuationContract.PATH_SENSITIVE);
+            assertFalse(limited.withinBudget());assertEquals(MoveSearch.Outcome.WORK_EXHAUSTED,limited.outcome());
+            assertEquals(result.totalWork(),limited.totalWork());
         }
+    }
+    @Test void targetFinalFailureRetainsAttemptedPaidWork() {
+        var checks=new AtomicInteger();var sourceOnly=problem(checks,true,1000);
+        var target=new NativeMoveSearch.Problem(sourceOnly.source(),TypedMoveSearch.Context.frozen(((BinaryExpr)sourceOnly.source()).left()),
+            sourceOnly.providers(),sourceOnly.mode(),sourceOnly.scheduling(),sourceOnly.budget(),
+            sourceOnly.policy(),sourceOnly.stateScore(),sourceOnly.stateValue(),sourceOnly.verifier());
+        var failure=assertThrows(NativeMoveSearch.TargetCheckFailure.class,()->new NativeMoveSearch().search(target,SearchContinuationContract.PATH_SENSITIVE));
+        assertEquals(2,checks.get());assertEquals(37,failure.attempted().replayWork());
+        assertFalse(failure.rejected().accepted());assertTrue(failure.attempted().totalWork()>37);
     }
     @Test void bestBudgetUsesTheSameObjectiveWithoutEarlyQualityStop() {
         var checks=new AtomicInteger();
