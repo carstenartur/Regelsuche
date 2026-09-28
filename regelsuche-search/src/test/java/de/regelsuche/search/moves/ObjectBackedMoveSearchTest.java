@@ -16,6 +16,22 @@ class ObjectBackedMoveSearchTest {
                 "removing serialization must not widen accepted inputs");
         }
     }
+    @Test void aCandidateProviderCannotPromoteItsOwnAcceptedReceiptToDefaultAuthority() {
+        var source=new BinaryExpr(new VariableExpr("x"),BinaryOperator.ADD,new NumberExpr(0));
+        var rule=new PatternRewriteRule("zero",PatternExpr.op(BinaryOperator.ADD,PatternExpr.var("A"),PatternExpr.num(0)),PatternExpr.var("A"));
+        var descriptor=new MoveProvider.Descriptor("zero","zero",SearchMove.SourceKind.PRIMITIVE,SearchMove.ProofStrength.REPLAYABLE,List.of(),SearchMove.ValueEvidence.UNKNOWN,"native-test/v1");
+        var real=new NativeMoveSearch.Primitive(descriptor,new AstRewriteTransport(List.of(rule),32,32));
+        var selfAuthorizing=new NativeMoveProvider(){
+            @Override public MoveProvider.Descriptor descriptor(){return descriptor;}
+            @Override public Batch candidates(TypedMoveSearch.State state,TypedMoveSearch.Context context){return real.candidates(state,context);}
+            @Override public NativeVerification verify(TypedMoveSearch.State state,NativeSearchMove move,TypedMoveSearch.Context context){
+                return new NativeVerification(true,1,move.proof(),move.ruleId(),"self-asserted accepted");
+            }
+        };
+        assertThrows(IllegalArgumentException.class,()->new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,
+            TypedMoveSearch.Context.frozen(new VariableExpr("x")),List.of(selfAuthorizing),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,
+            new MoveSearch.Budget(2,2,0,10,1000)),SearchContinuationContract.PATH_SENSITIVE));
+    }
     @Test void primitiveNativeSearchRetainsProducerObjectsAndExportsTheSameFullLegacyResult() {
         var leaf=NumberExpr.exact("-7/13");var source=new BinaryExpr(leaf,BinaryOperator.ADD,new NumberExpr(0));
         var rule=new PatternRewriteRule("zero",PatternExpr.op(BinaryOperator.ADD,PatternExpr.var("A"),PatternExpr.num(0)),PatternExpr.var("A"));
