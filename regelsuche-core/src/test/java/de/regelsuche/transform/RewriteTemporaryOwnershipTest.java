@@ -11,7 +11,7 @@ class RewriteTemporaryOwnershipTest {
     private static final class Observation implements RetainedOperation.Sink {
         RetainedOperation scope;long execution,validation;int queueWidth,simultaneousResults,checkpoints;
         boolean canonicalThree,replacedArguments;
-        List<Expr> abortAtCopiedArguments;long previousCheckpointWork,copyCheckpointWork;
+        List<Expr> abortAtCopiedArguments;List<?> abortedArguments;long previousCheckpointWork,copyCheckpointWork;
         @Override public void executionWork(long units){execution=Math.addExact(execution,units);}
         @Override public void validationWork(long units){validation=Math.addExact(validation,units);}
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(scope);}
@@ -44,6 +44,7 @@ class RewriteTemporaryOwnershipTest {
                 else if(value instanceof Object[] array)for(var item:array)visitor.reference(item);
             }
             if(abortAtCopiedArguments!=null && argumentLists.stream().anyMatch(abortAtCopiedArguments::equals)) {
+                abortedArguments=argumentLists.stream().filter(abortAtCopiedArguments::equals).findFirst().orElseThrow();
                 copyCheckpointWork=execution-previousCheckpointWork;
                 throw new CopyLimit();
             }
@@ -102,7 +103,7 @@ class RewriteTemporaryOwnershipTest {
         }
         assertEquals(arguments.size()+2,observation.copyCheckpointWork,
             "completed argument copies and frame acquisition are paid before the failing checkpoint");
-        assertFalse(observation.replacedArguments,"abort occurs before replacing an argument or producing its ancestor");
+        assertEquals(arguments,observation.abortedArguments,"the actual copied arguments remain unchanged when their checkpoint aborts");
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
         assertEquals(1,transport.generate(source).size(),"the failed scope cannot leak into a later historical call");
     }

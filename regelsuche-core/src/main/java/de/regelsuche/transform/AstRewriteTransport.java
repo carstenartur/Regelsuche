@@ -83,28 +83,39 @@ public final class AstRewriteTransport implements RetainedGraph.View {
     static void requireBounded(Expr root) {
         Objects.requireNonNull(root, "expression");
         var pending = new ArrayDeque<Node>();
-        try(var retained=RetainedOperation.retain(root,pending)) {
-        pending.push(new Node(root, 0));RetainedOperation.work(1);RetainedOperation.checkpoint();
-        int nodes = 0;
-        while (!pending.isEmpty()) {
-            var node = pending.pop();RetainedOperation.work(1);
-            try(var visiting=RetainedOperation.retain(node)) {
-            RetainedOperation.validation(1);
-            if (++nodes > MAXIMUM_NODES || node.depth() > MAXIMUM_DEPTH) {
-                throw new IllegalArgumentException("AST transport structural limit exceeded");
-            }
-            if (node.expression() instanceof BinaryExpr binary) {
-                pending.push(new Node(binary.right(), node.depth() + 1));
-                pending.push(new Node(binary.left(), node.depth() + 1));RetainedOperation.work(2);
-            } else if (node.expression() instanceof FunctionExpr function) {
-                if (function.arguments().size() > MAXIMUM_NODES - nodes) {
-                    throw new IllegalArgumentException("AST transport argument limit exceeded");
-                }
-                for (var argument : function.arguments()) {pending.push(new Node(argument, node.depth() + 1));RetainedOperation.work(1);}
-            }
+        Node[] current = {null};
+        RetainedOperation.work(2);
+        try (var retained = RetainedOperation.retain(root, pending, current)) {
+            pending.push(new Node(root, 0));
+            RetainedOperation.work(1);
             RetainedOperation.checkpoint();
+            int nodes = 0;
+            while (!pending.isEmpty()) {
+                // Move an already-owned Node from the queue into one stable current slot.
+                // Dropping the previous Node cannot grow the retained graph; no fresh Frame is needed.
+                current[0] = pending.pop();
+                RetainedOperation.work(2);
+                Node node = current[0];
+                RetainedOperation.validation(1);
+                if (++nodes > MAXIMUM_NODES || node.depth() > MAXIMUM_DEPTH) {
+                    throw new IllegalArgumentException("AST transport structural limit exceeded");
+                }
+                if (node.expression() instanceof BinaryExpr binary) {
+                    pending.push(new Node(binary.right(), node.depth() + 1));
+                    pending.push(new Node(binary.left(), node.depth() + 1));
+                    RetainedOperation.work(2);
+                    RetainedOperation.checkpoint();
+                } else if (node.expression() instanceof FunctionExpr function) {
+                    if (function.arguments().size() > MAXIMUM_NODES - nodes) {
+                        throw new IllegalArgumentException("AST transport argument limit exceeded");
+                    }
+                    for (var argument : function.arguments()) {
+                        pending.push(new Node(argument, node.depth() + 1));
+                        RetainedOperation.work(1);
+                    }
+                    if (!function.arguments().isEmpty()) RetainedOperation.checkpoint();
+                }
             }
-        }
         }
     }
 }

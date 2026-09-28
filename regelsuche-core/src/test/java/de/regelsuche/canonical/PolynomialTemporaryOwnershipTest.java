@@ -9,7 +9,8 @@ import org.junit.jupiter.api.Test;
 
 class PolynomialTemporaryOwnershipTest {
     private static final class Observation implements RetainedOperation.Sink {
-        RetainedOperation scope;long work;int simultaneousTerms;boolean rejectedCoefficient;int renderedFactors;boolean optionalEnvelope;
+        RetainedOperation scope;long work;int simultaneousTerms;boolean rejectedCoefficient;int renderedFactors;boolean optionalEnvelope;Expr inputRoot;boolean missingInput,abortAtCoefficient;int sourceOnlyFrames;
+        Set<Expr> inputNodes=Collections.newSetFromMap(new IdentityHashMap<>());
         @Override public void executionWork(long units){work=Math.addExact(work,units);}
         @Override public void validationWork(long units){work=Math.addExact(work,units);}
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(scope);}
@@ -20,9 +21,10 @@ class PolynomialTemporaryOwnershipTest {
                 @Override public void reference(Object value){if(value!=null)pending.addLast(value);}
                 @Override public void requireExact(Object value,Class<?> type){assertEquals(type,value.getClass());}
             };
-            visitor.reference(scope);int terms=0;
+            visitor.reference(scope);int terms=0,sourceFrames=0;
             while(!pending.isEmpty()){
                 var value=pending.removeFirst();if(!seen.add(value))continue;
+                if(value instanceof Object[] array && array.length==1 && array[0] instanceof Expr expression && inputNodes.contains(expression))sourceFrames++;
                 if(value instanceof ExactRational rational && rational.numerator().bitLength()>4096)rejectedCoefficient=true;
                 if(value instanceof Optional<?> optional){optionalEnvelope=true;optional.ifPresent(visitor::reference);}
                 if(value instanceof ArrayList<?> list && !list.isEmpty() && list.stream().allMatch(Expr.class::isInstance))
@@ -37,6 +39,9 @@ class PolynomialTemporaryOwnershipTest {
                 else if(value instanceof BinaryExpr binary){visitor.reference(binary.left());visitor.reference(binary.right());}
             }
             simultaneousTerms=Math.max(simultaneousTerms,terms);
+            sourceOnlyFrames=Math.max(sourceOnlyFrames,sourceFrames);
+            if(inputRoot!=null && !seen.contains(inputRoot))missingInput=true;
+            if(abortAtCoefficient && rejectedCoefficient)throw new CoefficientLimit();
         }
     }
     @Test void realPolynomialMultiplicationRetainsBothOperandsAndAccumulatingTerms(){
@@ -78,6 +83,38 @@ class PolynomialTemporaryOwnershipTest {
         }
         assertTrue(observation.optionalEnvelope,"normalization constructs an Optional owner before handing off the Expr");
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    private static final class CoefficientLimit extends RuntimeException {}
+    private static Observation sourceObservation(Expr root){
+        var observation=new Observation();observation.inputRoot=root;
+        var pending=new ArrayDeque<Expr>();pending.add(root);
+        while(!pending.isEmpty()){
+            var expression=pending.removeFirst();if(!observation.inputNodes.add(expression))continue;
+            if(expression instanceof BinaryExpr binary){pending.add(binary.left());pending.add(binary.right());}
+            else if(expression instanceof FunctionExpr function)pending.addAll(function.arguments());
+        }
+        return observation;
+    }
+    @Test void oneInputOwnerCoversRecursiveSourceVisitsWhileActualPolynomialPeaksRemainVisible(){
+        var source=new BinaryExpr(new BinaryExpr(new VariableExpr("x"),BinaryOperator.ADD,new VariableExpr("y")),BinaryOperator.POW,new NumberExpr(3));
+        var normalizer=new PolynomialNormalizer();var expected=normalizer.normalize(source);
+        var observation=sourceObservation(source);
+        try(var scope=RetainedOperation.open(observation)){observation.scope=scope;assertEquals(expected,normalizer.normalize(source));}
+        assertFalse(observation.missingInput,"the outer input owner covers every actual nested checkpoint");
+        assertTrue(observation.simultaneousTerms>=3);assertTrue(observation.optionalEnvelope);
+        assertEquals(0,observation.sourceOnlyFrames,"recursive visits do not allocate frames for already-owned immutable source nodes");
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+    @Test void currentInputAndOversizedCoefficientRemainOwnedWhenTheirCheckpointAborts(){
+        var source=new BinaryExpr(new NumberExpr(2),BinaryOperator.POW,new NumberExpr(4096));
+        var observation=sourceObservation(source);observation.abortAtCoefficient=true;
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;assertThrows(CoefficientLimit.class,()->new PolynomialNormalizer().normalize(source));
+        }
+        assertTrue(observation.rejectedCoefficient);assertFalse(observation.missingInput);
+        assertTrue(observation.work>4);assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+        assertTrue(new PolynomialNormalizer().normalize(source).isEmpty());
     }
 
 }

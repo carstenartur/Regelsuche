@@ -87,7 +87,7 @@ class TypedLearnedMoveInventoryTest {
                 inventory.nativeProviders(),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,budget,
                 HistoryMovePolicy.nativePolicy(history.freeze(),HistoryMovePolicy.Weights.DEFAULT),NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE),
                 SearchContinuationContract.PATH_SENSITIVE);
-            assertEquals(MoveSearch.Outcome.TARGET_REACHED,nativeResult.observedOutcome(),nativeResult.accounting().detail());
+            assertEquals(MoveSearch.Outcome.TARGET_REACHED,nativeResult.observedOutcome(),()->nativeResult.accounting().detail()+" total="+nativeResult.totalWork()+" retention="+nativeResult.accounting().retentionWork()+" replay="+nativeResult.replayWork()+" metrics="+nativeResult.metrics());
             assertEquals(SearchMove.SourceKind.LEARNED,nativeResult.witness().getFirst().move().descriptor().sourceKind());
             assertEquals(3,nativeResult.witness().getFirst().move().primitiveStepCount());
             assertEquals(goal,nativeResult.output());
