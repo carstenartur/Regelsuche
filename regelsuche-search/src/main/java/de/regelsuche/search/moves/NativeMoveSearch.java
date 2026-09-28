@@ -67,6 +67,8 @@ public final class NativeMoveSearch {
         public long executionWork(){return executionWork;}
         public long storageWork(){return storageWork;}
         public long retentionWork(){return retentionWork;}
+        /** Post-close caller input graph, separate from and overlapping result ownership; empty means unknown. */
+        public Optional<RetainedGraph.Usage> externalRetained(){throw new UnsupportedOperationException("external ownership observation not installed");}
         public RetainedGraph.Usage live(){return new RetainedGraph.Usage(0,0,0);}
         public RetainedGraph.Usage peak(){return new RetainedGraph.Usage(peakNodes,peakCharacters,peakReferences);}
         public RetainedGraph.Usage resultRetained(){return new RetainedGraph.Usage(resultNodes,resultCharacters,resultReferences);}
