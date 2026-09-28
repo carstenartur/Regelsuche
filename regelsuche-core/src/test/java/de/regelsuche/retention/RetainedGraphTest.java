@@ -6,6 +6,20 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class RetainedGraphTest {
+    private enum DescribedEnum implements RetainedGraph.View {
+        VALUE;
+        final ArrayList<Expr> values=new ArrayList<>();
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(values);}
+    }
+    private enum UnknownEnum { VALUE }
+    @Test void enumViewsAreTraversedAndUnknownEnumCapturesAreNotAssumedEmpty() {
+        try {
+            DescribedEnum.VALUE.values.add(new VariableExpr("x"));
+            assertEquals(1,RetainedGraph.measure(DescribedEnum.VALUE).retained().nodes());
+            assertThrows(RetainedGraph.Unmeasured.class,()->RetainedGraph.measure(UnknownEnum.VALUE));
+        } finally {DescribedEnum.VALUE.values.clear();}
+    }
+
     @Test void sharedObjectsCountOnceWhileEveryRetainedReferenceCountsAndReleasedGraphsDisappear() {
         var leaf=new VariableExpr("x");var binary=new BinaryExpr(leaf,BinaryOperator.ADD,leaf);
         var roots=new ArrayList<Object>();roots.add(binary);roots.add(leaf);

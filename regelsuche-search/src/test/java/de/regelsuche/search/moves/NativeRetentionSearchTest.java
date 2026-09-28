@@ -7,6 +7,34 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NativeRetentionSearchTest {
+    private enum AllocatingScore implements java.util.function.ToDoubleFunction<TypedMoveSearch.State>,RetainedGraph.View {
+        INSTANCE;
+        private final java.util.ArrayList<de.regelsuche.ast.Expr> cache=new java.util.ArrayList<>();
+        @Override public double applyAsDouble(TypedMoveSearch.State state){
+            for(int i=0;i<100;i++)cache.add(new VariableExpr("temporary"+i));
+            return 0;
+        }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(cache);}
+    }
+    @Test void anEnumCallbackCannotHideTheRunCreatedGraphDeclaredByItsView() {
+        var a=de.regelsuche.transform.PatternExpr.var("A");
+        var rule=new de.regelsuche.transform.PatternRewriteRule("zero",de.regelsuche.transform.PatternExpr.op(
+            de.regelsuche.ast.BinaryOperator.ADD,a,de.regelsuche.transform.PatternExpr.num(0)),a);
+        var target=new VariableExpr("x");
+        var source=new de.regelsuche.ast.BinaryExpr(new de.regelsuche.ast.BinaryExpr(target,de.regelsuche.ast.BinaryOperator.ADD,new de.regelsuche.ast.NumberExpr(0)),
+            de.regelsuche.ast.BinaryOperator.ADD,new de.regelsuche.ast.NumberExpr(0));
+        var descriptor=new MoveProvider.Descriptor("zero","zero",SearchMove.SourceKind.PRIMITIVE,SearchMove.ProofStrength.REPLAYABLE,List.of(),SearchMove.ValueEvidence.UNKNOWN,"zero-v1");
+        var provider=new NativeMoveSearch.Primitive(descriptor,new de.regelsuche.transform.AstRewriteTransport(List.of(rule),64,128));
+        try {
+            var problem=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.frozen(target),List.of(provider),MoveSearch.Mode.FAST,
+                MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(2,2,0,10,1000000),NativeMovePriorityPolicy.INVENTORY_ORDER,AllocatingScore.INSTANCE,NativeStateValue.NONE);
+            var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,new SearchExpressionStore.Limits(20,1000000,1000000,0));
+            assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.outcome());assertFalse(result.accountingComplete());
+            assertEquals("NATIVE_RETENTION_EXHAUSTED",result.accounting().detail());
+            assertTrue(result.accounting().peak().nodes()>=100);
+        } finally {AllocatingScore.INSTANCE.cache.clear();}
+    }
+
     @Test void sharedInputTextCannotTurnTheStoreBoundaryIntoAnUnreceiptedException() {
         String shared="x".repeat(100);
         var source=new de.regelsuche.ast.FunctionExpr("f",List.of(new VariableExpr(shared),new VariableExpr(shared)));
