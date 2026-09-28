@@ -20,7 +20,7 @@ class ExprMatcherOwnershipTest {
         MatchAbort failure;
         boolean abortOutcome, abortClose, sawSession, inputMissing;
         boolean abortBindingCopy, sawBindingCopy, sawTraceCopy;
-        boolean abortStateList, sawSecondBinding;
+        boolean abortStateList, sawSecondBinding, sawOperationTrace;
         int unpublishedResultScans;
         final Set<String> patternDescriptions = Collections.newSetFromMap(new IdentityHashMap<>());
         final Set<List<?>> tracePrefixes = new HashSet<>();
@@ -49,6 +49,7 @@ class ExprMatcherOwnershipTest {
             while (!pending.isEmpty()) {
                 Object value = pending.remove(); if (!seen.add(value)) continue;
                 if (value instanceof String text && text.startsWith("7:pattern")) patternDescriptions.add(text);
+                if ("operation:ADD".equals(value)) sawOperationTrace = true;
                 sawSession |= value.getClass().getEnclosingClass() == ExprMatcherEngine.class
                     && value.getClass().getSimpleName().equals("Session");
                 if (value.getClass().getEnclosingClass() == ExprMatcherEngine.class
@@ -233,6 +234,53 @@ class ExprMatcherOwnershipTest {
     @Test void functionArgumentsOwnTheirActualIntermediateLists() {
         verifyComposedLists(ExprMatcher.fn("f",ExprMatcher.bind("A",ExprMatcher.any()),
             ExprMatcher.bind("B",ExprMatcher.any())),new ExpressionParser().parseTerm("f(x,y)"),1);
+    }
+
+    @Test void bindingResultsOwnTheirActualMutableAssemblyList() {
+        verifyComposedLists(ExprMatcher.bind("A",ExprMatcher.any()),new VariableExpr("x"),1);
+    }
+
+    @Test void constraintResultsOwnTheirActualMutableAssemblyList() {
+        verifyComposedLists(ExprMatcher.where(ExprMatcher.pattern(PatternExpr.var("A")),
+            ExprMatcher.bindingMatches("A",ExprMatcher.any())),new VariableExpr("x"),1);
+    }
+
+    @Test void operationSidesOwnTheirActualIntermediateLists() {
+        verifyComposedLists(ExprMatcher.op(ADD,ExprMatcher.any(),ExprMatcher.any()),
+            new ExpressionParser().parseTerm("x+y"),1);
+    }
+
+    @Test void anAbortedOperationAssemblyCannotProduceItsFinalTrace() {
+        Expr input = new ExpressionParser().parseTerm("x+y");
+        var observation = new Observation(); observation.input = input; observation.abortStateList = true;
+        var matcher = ExprMatcher.op(ADD,ExprMatcher.any(),ExprMatcher.any());
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var failure = assertThrows(MatchAbort.class,() -> matcher.match(input));
+            assertSame(observation.failure,failure);
+            assertFalse(observation.mutableStateLists.isEmpty());
+            assertFalse(observation.sawOperationTrace,"the final trace is built only after assembly and its limit");
+            assertNull(observation.outcome);
+            assertTrue(observation.workAfterFailure > 0);
+        }
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    @Test void anOperationLimitPreservesTheFirstAlternativeAndAppendsItsFinalTrace() {
+        Expr input = new ExpressionParser().parseTerm("x+y");
+        var matcher = ExprMatcher.op(ADD,ExprMatcher.anyOf(ExprMatcher.any(),ExprMatcher.any()),
+            ExprMatcher.anyOf(ExprMatcher.any(),ExprMatcher.literalVariable("y")));
+        var observation = new Observation(); observation.input = input;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var result = matcher.match(input,new ExprMatcher.MatchOptions(null,1,100,100));
+            assertEquals(1,result.matches().size());
+            assertEquals(List.of("any","any","operation:ADD"),result.matches().getFirst().trace());
+            assertFalse(result.complete());
+            assertTrue(result.diagnostics().stream().allMatch(d -> d.code().equals("MATCH_RESULT_LIMIT")));
+        }
+        assertFalse(observation.inputMissing);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
 
     private static void verifyComposedLists(ExprMatcher matcher,Expr input,int matches) {
