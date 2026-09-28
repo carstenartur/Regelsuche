@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CheckedSchemaMatcherPlan.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">CheckedSchemaMatcherPlan.java</span></div><h1>CheckedSchemaMatcherPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import static de.regelsuche.evolution.CheckedSchemaSupport.*;
+import de.regelsuche.search.moves.IncrementalProviderContract.Definition;
+import de.regelsuche.search.moves.IncrementalProviderContract.Kind;
+import de.regelsuche.search.moves.IncrementalProviderContract.Mathematics;
+import de.regelsuche.search.moves.IncrementalProviderContract.Registration;
+import de.regelsuche.search.moves.IncrementalProviderContract.Registry;
+import de.regelsuche.search.moves.IncrementalProviderContract.Transport;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.search.moves.IncrementalProviderContract;
+import de.regelsuche.search.moves.MoveProvider;
+import de.regelsuche.search.moves.RegisteredIncrementalMoveProvider;
+import de.regelsuche.transform.ExprMatcher;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.Transformation;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+
+/** Immutable preparation shared by cursor sessions, not an eagerly generated candidate list. */
+public final class CheckedSchemaMatcherPlan {
+    public static final String REVISION = &quot;regelsuche.checked-schema-matcher-plan/v1&quot;;
+    public static final String WORK_REVISION = &quot;regelsuche.checked-schema-cursor-work/v2-prepaid-phases&quot;;
+    /** Preparation is a separate lifecycle charge; opening a cursor never rebuilds this index. */
+<span class="fc" id="L33">    public record Compilation(String revision, String configurationHash, long workUnits,</span>
+            int includedSchemas, long patternNodeVisits, long orderingComparisons) {}
+<span class="fc" id="L35">    record Entry(CheckedLearnedSchemaModel.Schema schema, ExprMatcher matcher, int reduction) {}</span>
+<span class="fc" id="L36">    record Range(List&lt;Entry&gt; shaped, List&lt;Entry&gt; wildcard) {</span>
+<span class="fc" id="L37">        int size() { return shaped.size() + wildcard.size(); }</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        Entry get(int index) { return index &lt; shaped.size() ? shaped.get(index) : wildcard.get(index - shaped.size()); }</span>
+    }
+    @FunctionalInterface interface Application {
+        ApplicationSteps start(CheckedLearnedSchemaModel.Schema schema, Expr source, String encodedSource,
+            List&lt;Integer&gt; path, Map&lt;String, Expr&gt; bindings, Work work);
+    }
+    interface ApplicationSteps {
+        IncrementalProviderContract.ApplicationPhase phase();
+        void advance();
+        boolean done();
+        Transformation result();
+    }
+
+    private final CheckedLearnedSchemaModel.Bounds bounds;
+    private final MoveProvider.Descriptor descriptor;
+    private final int maximumSchemasPerOccurrence;
+    private final boolean allSchemasIncluded;
+    private final Map&lt;String, List&lt;Entry&gt;&gt; index;
+    private final Application application;
+    private final Definition definition;
+    private final Compilation compilation;
+
+    CheckedSchemaMatcherPlan(CheckedLearnedSchemaModel model, MoveProvider.Descriptor descriptor, int maximum,
+<span class="fc" id="L61">            Map&lt;String, Double&gt; utilities, Set&lt;String&gt; included, Application application) {</span>
+<span class="fc" id="L62">        this.descriptor = Objects.requireNonNull(descriptor);</span>
+<span class="fc" id="L63">        this.application = Objects.requireNonNull(application);</span>
+<span class="fc" id="L64">        bounds = model.bounds();</span>
+<span class="fc" id="L65">        maximumSchemasPerOccurrence = maximum;</span>
+<span class="fc" id="L66">        var work = new Work();</span>
+<span class="fc" id="L67">        var utility = Map.copyOf(utilities);</span>
+<span class="fc" id="L68">        var selected = Set.copyOf(included);</span>
+<span class="fc" id="L69">        validate(model, maximum, utility, selected, work);</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        allSchemasIncluded = selected.size() == model.schemas().size();</span>
+<span class="fc" id="L71">        var entries = new ArrayList&lt;Entry&gt;();</span>
+<span class="fc" id="L72">        long patternVisits = prepareEntries(model, selected, entries, work);</span>
+<span class="fc" id="L73">        var comparisons = new Work();</span>
+<span class="fc" id="L74">        index = orderedIndex(entries, utility, comparisons);</span>
+<span class="fc" id="L75">        work.add(comparisons.units + entries.size());</span>
+<span class="fc" id="L76">        String configuration = configuration(descriptor.id(), maximum, utility, selected);</span>
+<span class="fc" id="L77">        work.add(configuration.length());</span>
+<span class="fc" id="L78">        String configurationHash = SchematicProofPlan.hash(configuration);</span>
+<span class="fc" id="L79">        definition = new Definition(IncrementalProviderContract.PREPAID_REVISION, descriptor.id(), Kind.REGISTERED_SCHEMA,</span>
+<span class="fc" id="L80">            configurationHash, model.inventorySemanticsHash() + &quot;;&quot; + CheckedLearnedSchemaModel.CHECKER_REVISION</span>
+                + &quot;;&quot; + REVISION + &quot;;&quot; + WORK_REVISION,
+            Transport.TYPED_AST_JSON, Mathematics.EXACT, null);
+<span class="fc" id="L83">        compilation = new Compilation(WORK_REVISION, configurationHash, work.units, entries.size(),</span>
+            patternVisits, comparisons.units);
+<span class="fc" id="L85">    }</span>
+
+    public static CheckedSchemaMatcherPlan prepare(CheckedLearnedSchemaModel model, int maximum,
+            Map&lt;String, Double&gt; utilities, Set&lt;String&gt; included) {
+<span class="fc" id="L89">        return Objects.requireNonNull(model).prepareCursorPlan(maximum, utilities, included);</span>
+    }
+<span class="fc" id="L91">    public Compilation compilationReceipt() { return compilation; }</span>
+<span class="fc" id="L92">    public long compilationWork() { return compilation.workUnits(); }</span>
+    public RegisteredIncrementalMoveProvider provider() {
+<span class="fc" id="L94">        var registration = new Registration(definition,</span>
+<span class="fc" id="L95">            (state, context, meter) -&gt; new CheckedSchemaCursor(this, state.expression(), meter));</span>
+<span class="fc" id="L96">        return new RegisteredIncrementalMoveProvider(descriptor, definition, new Registry(List.of(registration)));</span>
+    }
+<span class="fc" id="L98">    CheckedLearnedSchemaModel.Bounds bounds() { return bounds; }</span>
+<span class="fc" id="L99">    int maximumSchemasPerOccurrence() { return maximumSchemasPerOccurrence; }</span>
+<span class="fc" id="L100">    boolean allSchemasIncluded() { return allSchemasIncluded; }</span>
+    Range relevant(Expr expression) {
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        String shape = expression instanceof BinaryExpr binary ? binary.operator().name() : &quot;LEAF&quot;;</span>
+<span class="fc" id="L103">        return new Range(index.getOrDefault(shape, List.of()), index.getOrDefault(&quot;P&quot;, List.of()));</span>
+    }
+    ApplicationSteps startApplication(Entry entry, Expr source, String encoded, List&lt;Integer&gt; path,
+            Map&lt;String, Expr&gt; bindings, Work work) {
+<span class="fc" id="L107">        return application.start(entry.schema(), source, encoded, path, bindings, work);</span>
+    }
+
+    private static void validate(CheckedLearnedSchemaModel model, int maximum, Map&lt;String, Double&gt; utility,
+            Set&lt;String&gt; included, Work work) {
+<span class="pc bpc" id="L112" title="2 of 4 branches missed.">        if (maximum &lt; 1 || maximum &gt; model.bounds().maximumSchemas())</span>
+<span class="nc" id="L113">            throw new IllegalArgumentException(&quot;schema selection bound outside model limits&quot;);</span>
+<span class="fc" id="L114">        var known = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        for (var schema : model.schemas()) { work.add(1); known.add(schema.id()); }</span>
+<span class="fc" id="L116">        work.add(included.size() + utility.size() + 1L);</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (!known.containsAll(included)) throw new IllegalArgumentException(&quot;unregistered included schema&quot;);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        for (var entry : utility.entrySet()) {</span>
+<span class="pc bpc" id="L119" title="2 of 4 branches missed.">            if (!known.contains(entry.getKey()) || !Double.isFinite(entry.getValue()))</span>
+<span class="nc" id="L120">                throw new IllegalArgumentException(&quot;unknown schema or nonfinite selection utility&quot;);</span>
+<span class="fc" id="L121">        }</span>
+<span class="fc" id="L122">    }</span>
+    private static long prepareEntries(CheckedLearnedSchemaModel model, Set&lt;String&gt; selected,
+            List&lt;Entry&gt; entries, Work work) {
+<span class="fc" id="L125">        long visits = 0;</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        for (var schema : model.schemas()) {</span>
+<span class="fc" id="L127">            work.add(1);</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (!selected.contains(schema.id())) continue;</span>
+<span class="fc" id="L129">            int sourceNodes = nodes(schema.source()), targetNodes = nodes(schema.target());</span>
+<span class="fc" id="L130">            visits = Math.addExact(visits, sourceNodes + targetNodes);</span>
+<span class="fc" id="L131">            work.add(sourceNodes + targetNodes + 1L);</span>
+<span class="fc" id="L132">            entries.add(new Entry(schema, ExprMatcher.pattern(schema.source()), sourceNodes - targetNodes));</span>
+<span class="fc" id="L133">        }</span>
+<span class="fc" id="L134">        return visits;</span>
+    }
+    private static Map&lt;String, List&lt;Entry&gt;&gt; orderedIndex(List&lt;Entry&gt; entries, Map&lt;String, Double&gt; utility, Work comparisons) {
+<span class="fc" id="L137">        var comparator = Comparator.&lt;Entry&gt;comparingDouble(entry -&gt; utility.getOrDefault(entry.schema().id(), 0.0))</span>
+<span class="fc" id="L138">            .reversed().thenComparing(Comparator.comparingInt(Entry::reduction).reversed())</span>
+<span class="pc" id="L139">            .thenComparing(entry -&gt; entry.schema().id());</span>
+<span class="fc" id="L140">        entries.sort((left, right) -&gt; { comparisons.add(1); return comparator.compare(left, right); });</span>
+<span class="fc" id="L141">        var grouped = new TreeMap&lt;String, List&lt;Entry&gt;&gt;();</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        for (var entry : entries) {</span>
+<span class="fc" id="L143">            PatternExpr pattern = entry.schema().source();</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            String shape = pattern instanceof PatternExpr.Operation operation ? operation.operator().name()</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">                : pattern instanceof PatternExpr.Placeholder ? &quot;P&quot; : &quot;LEAF&quot;;</span>
+<span class="fc" id="L146">            grouped.computeIfAbsent(shape, ignored -&gt; new ArrayList&lt;&gt;()).add(entry);</span>
+<span class="fc" id="L147">        }</span>
+<span class="fc" id="L148">        grouped.replaceAll((key, value) -&gt; List.copyOf(value));</span>
+<span class="fc" id="L149">        return Map.copyOf(grouped);</span>
+    }
+    private static String configuration(String modelId, int maximum,
+            Map&lt;String, Double&gt; utility, Set&lt;String&gt; selected) {
+<span class="fc" id="L153">        var root = JSON.createObjectNode().put(&quot;revision&quot;, REVISION).put(&quot;workRevision&quot;, WORK_REVISION)</span>
+<span class="fc" id="L154">            .put(&quot;modelId&quot;, modelId)</span>
+<span class="fc" id="L155">            .put(&quot;maximumSchemasPerOccurrence&quot;, maximum).put(&quot;order&quot;, &quot;preorder;shaped-before-wildcard;utility-reduction-id&quot;);</span>
+<span class="fc" id="L156">        var ids = root.putArray(&quot;included&quot;);</span>
+<span class="fc" id="L157">        selected.stream().sorted().forEach(ids::add);</span>
+<span class="fc" id="L158">        var values = root.putObject(&quot;utilities&quot;);</span>
+<span class="fc" id="L159">        new TreeMap&lt;&gt;(utility).forEach((id, value) -&gt; values.put(id, Double.toHexString(value)));</span>
+<span class="fc" id="L160">        return write(root);</span>
+    }
+    private static int nodes(PatternExpr expression) {
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        return expression instanceof PatternExpr.Operation operation</span>
+<span class="fc" id="L164">            ? 1 + nodes(operation.left()) + nodes(operation.right()) : 1;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

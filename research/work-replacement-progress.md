@@ -63,10 +63,40 @@ Commit bindings and API-reported artifact digests are retained in
 
 No economic learning advantage is asserted by P01.
 
-## P02 — in progress
+## P02 — integrated
 
-Starts from qualified integrated main `3deeb519357cdd6e67184d8104c0d925a0cf19d7`.
-Native v1 reference output was captured before any P02 edits for early success,
-complete enumeration, atomic generation overrun and state limits. The new
-registered contract must preserve those historical bytes and the existing
-mathematical checker boundary. P03–P12 remain pending.
+[PR #1050](https://github.com/carstenartur/Regelsuche/pull/1050) extends the
+incremental provider contract through a registered wrapper without adding a
+search-to-learning dependency. Native v1 behavior and mathematical authorization
+remain separate from registration. Opening, matching, suspension, closing and
+atomic overruns are paid; staged execution does not pre-open later providers.
+
+- Qualified head: `3d08afe62314375b6b7aac9e9a086c30de104f68`; local reviewed
+  counterpart: `cfb63e6b66252115e7d5be859dda206a22aaa527`.
+- Full hosted CI [35529617769](https://github.com/carstenartur/Regelsuche/actions/runs/35529617769)
+  passed all six authorities, `Checkout-local ciCheck` and CodeQL. Independent
+  scoped review approved the final corrections without remaining findings.
+- Local final evidence: 845 core, 495 search and 951 learning tests, with no
+  failures, errors or skips. Genuine pre-fix regressions cover dropped incomplete
+  accounting, unconsumed wrong-source candidates, lost typed move metadata and
+  unversioned status reports. Historical artifacts remain unchanged.
+- Merge/main: `f751f90f58ee10aa122c42218b66a13760053aa0`; tree
+  `ff3271d79f108f125f2e0294e7c656c662034339` equals the qualified head's tree.
+  Post-merge CI [35532193563](https://github.com/carstenartur/Regelsuche/actions/runs/35532193563)
+  also passed all six authorities and `Checkout-local ciCheck`; this was
+  reconfirmed on 2026-09-27.
+
+## P03 — qualification in progress
+
+[PR #1051](https://github.com/carstenartur/Regelsuche/pull/1051) adds an actual
+learned/restored checked-schema cursor and paid preparation. Its mechanism and
+diagnostic comparison boundaries are documented in
+[the lazy-cursor report](lazy-checked-schema-cursor.md).
+
+The independent review of published head
+`db6d93b17b4050fc485f2ae5f59fb4a8208d7291` confirmed laziness across occurrences,
+but required independently suspendable application phases with retained partial
+costs. That correction is being completed before qualification. A successful
+historical test run or the restarted original-head CI is not acceptance of the
+correction. P04–P12 production implementation remains pending; prepared test
+corpora are not implementation or learning-success evidence.

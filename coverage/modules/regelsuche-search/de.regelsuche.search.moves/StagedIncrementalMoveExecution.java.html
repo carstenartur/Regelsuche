@@ -6,16 +6,21 @@ import java.util.List;
 public record StagedIncrementalMoveExecution(String workRevision, String orderRevision,
         List&lt;Provider&gt; providers, List&lt;Expansion&gt; expansions) {
     public static final String WORK_REVISION = &quot;regelsuche.staged-incremental-move-search-work/v2&quot;;
+    public static final String PREPAID_WORK_REVISION = &quot;regelsuche.staged-incremental-move-search-work/v3-prepaid&quot;;
     public static final String ORDER_REVISION = &quot;regelsuche.stage-provider-score-native-order-two-learned-burst/v2&quot;;
-<span class="fc" id="L10">    public StagedIncrementalMoveExecution { providers = List.copyOf(providers); expansions = List.copyOf(expansions); }</span>
+<span class="fc" id="L11">    public StagedIncrementalMoveExecution {</span>
+<span class="fc" id="L12">        providers = List.copyOf(providers); expansions = List.copyOf(expansions);</span>
+<span class="pc bpc" id="L13" title="1 of 2 branches missed.">        if (providers.stream().anyMatch(provider -&gt; IncrementalProviderContract.PREPAID_REVISION.equals(provider.definition().revision())))</span>
+<span class="nc" id="L14">            workRevision = PREPAID_WORK_REVISION;</span>
+<span class="fc" id="L15">    }</span>
     public boolean accountingComplete() {
-<span class="fc" id="L12">        return expansions.stream().flatMap(expansion -&gt; expansion.lanes().stream())</span>
-<span class="fc bfc" id="L13" title="All 4 branches covered.">            .allMatch(lane -&gt; lane.cursor() == null || lane.cursor().accountingComplete());</span>
+<span class="fc" id="L17">        return expansions.stream().flatMap(expansion -&gt; expansion.lanes().stream())</span>
+<span class="fc bfc" id="L18" title="All 4 branches covered.">            .allMatch(lane -&gt; lane.cursor() == null || lane.cursor().accountingComplete());</span>
     }
-<span class="fc" id="L15">    public record Provider(MoveProvider.Descriptor descriptor, IncrementalProviderContract.Definition definition) {}</span>
-<span class="fc" id="L16">    public record Lane(int providerIndex, int stage, IncrementalProviderContract.Snapshot cursor) {}</span>
+<span class="fc" id="L20">    public record Provider(MoveProvider.Descriptor descriptor, IncrementalProviderContract.Definition definition) {}</span>
+<span class="fc" id="L21">    public record Lane(int providerIndex, int stage, IncrementalProviderContract.Snapshot cursor) {}</span>
     public record Expansion(MoveState source, boolean closed, List&lt;Lane&gt; lanes) {
-<span class="fc" id="L18">        public Expansion { lanes = List.copyOf(lanes); }</span>
+<span class="fc" id="L23">        public Expansion { lanes = List.copyOf(lanes); }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

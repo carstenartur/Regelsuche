@@ -165,10 +165,15 @@ public final class LearnedSchedulingArtifacts {
         }
 <span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (value.getClass().isRecord()) {</span>
 <span class="fc" id="L167">            var result = new TreeMap&lt;String, Object&gt;();</span>
-<span class="fc bfc" id="L168" title="All 2 branches covered.">            for (RecordComponent component : value.getClass().getRecordComponents()) result.put(component.getName(), normalize(component.getAccessor().invoke(value)));</span>
-<span class="fc" id="L169">            return result;</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            for (RecordComponent component : value.getClass().getRecordComponents()) {</span>
+<span class="fc" id="L169">                Object part = component.getAccessor().invoke(value);</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">                if (value instanceof de.regelsuche.search.moves.IncrementalProviderContract.Work</span>
+<span class="fc bfc" id="L171" title="All 4 branches covered.">                        &amp;&amp; component.getName().equals(&quot;prepaidApplications&quot;) &amp;&amp; part == null) continue;</span>
+<span class="fc" id="L172">                result.put(component.getName(), normalize(part));</span>
+            }
+<span class="fc" id="L174">            return result;</span>
         }
-<span class="nc" id="L171">        throw new IllegalArgumentException(&quot;unsupported evidence value: &quot; + value.getClass());</span>
+<span class="nc" id="L176">        throw new IllegalArgumentException(&quot;unsupported evidence value: &quot; + value.getClass());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

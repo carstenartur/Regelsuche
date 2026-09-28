@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CheckedSchemaCursor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">CheckedSchemaCursor.java</span></div><h1>CheckedSchemaCursor.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import static de.regelsuche.evolution.CheckedSchemaSupport.*;
+import de.regelsuche.search.moves.IncrementalProviderContract.Meter;
+import de.regelsuche.search.moves.IncrementalProviderContract.Operation;
+import de.regelsuche.search.moves.IncrementalProviderContract.Source;
+import de.regelsuche.search.moves.IncrementalProviderContract.Status;
+import de.regelsuche.search.moves.IncrementalProviderContract.PrepaidApplication;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import de.regelsuche.transform.ExprMatcher;
+import de.regelsuche.transform.Transformation;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+/** One retained match/application at most; never traverses or instantiates later sites eagerly. */
+final class CheckedSchemaCursor implements Source {
+<span class="fc" id="L23">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+<span class="fc" id="L24">    private record Occurrence(Expr expression, List&lt;Integer&gt; path) {}</span>
+    private final CheckedSchemaMatcherPlan plan;
+    private final String encodedSource;
+    private final Meter meter;
+<span class="fc" id="L28">    private final ArrayDeque&lt;Occurrence&gt; pending = new ArrayDeque&lt;&gt;();</span>
+    private Expr source;
+    private Occurrence occurrence;
+    private CheckedSchemaMatcherPlan.Range relevant;
+    private int schemaIndex, attempted, produced;
+    private CheckedSchemaMatcherPlan.Entry matchedEntry;
+    private Map&lt;String, Expr&gt; bindings;
+    private CheckedSchemaMatcherPlan.ApplicationSteps application;
+    private Work applicationWork;
+    private PrepaidApplication payment;
+    private Transformation ready;
+    private boolean initialized, complete;
+<span class="fc" id="L40">    private Status status = Status.READY;</span>
+
+<span class="fc" id="L42">    CheckedSchemaCursor(CheckedSchemaMatcherPlan plan, String encodedSource, Meter meter) {</span>
+<span class="fc" id="L43">        this.plan = plan; this.encodedSource = encodedSource; this.meter = meter;</span>
+<span class="fc" id="L44">        complete = plan.allSchemasIncluded();</span>
+<span class="fc" id="L45">    }</span>
+    @Override public Optional&lt;Transformation&gt; next(long allowance) {
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (allowance &lt; 0) throw new IllegalArgumentException(&quot;negative schema allowance&quot;);</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (terminal()) return Optional.empty();</span>
+<span class="fc" id="L49">        long before = total();</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        while (total() - before &lt; allowance) {</span>
+<span class="fc" id="L51">            status = Status.READY;</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            if (ready != null) return emit();</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            if (!initialized) initialize();</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            else if (matchedEntry != null) advanceApplication();</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            else if (occurrence == null) advance();</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">            else if (schemaIndex &lt; Math.min(relevant.size(), plan.maximumSchemasPerOccurrence())) match();</span>
+<span class="fc" id="L57">            else descend();</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">            if (terminal()) return Optional.empty();</span>
+        }
+<span class="fc" id="L60">        status = Status.LIMIT;</span>
+<span class="fc" id="L61">        return Optional.empty();</span>
+    }
+<span class="pc bpc" id="L63" title="1 of 6 branches missed.">    private boolean terminal() { return status == Status.EXHAUSTED || status == Status.INCONCLUSIVE || status == Status.CLOSED; }</span>
+<span class="fc" id="L64">    private long total() { return meter.work().metrics().totalWorkUnitsV2(); }</span>
+    private void initialize() {
+<span class="fc" id="L66">        initialized = true;</span>
+<span class="fc" id="L67">        var work = new Work();</span>
+<span class="fc" id="L68">        work.add(1);</span>
+        try {
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">            if (encodedSource.length() &gt; 262_144) throw new IllegalArgumentException(&quot;schema source transport size limit&quot;);</span>
+<span class="fc" id="L71">            source = CODEC.decodeExpression(encodedSource);</span>
+<span class="fc" id="L72">            domain(source, plan.bounds(), work);</span>
+<span class="fc" id="L73">            pending.push(new Occurrence(source, List.of()));</span>
+<span class="fc" id="L74">        } catch (IllegalArgumentException unsupported) {</span>
+<span class="fc" id="L75">            complete = false; status = Status.INCONCLUSIVE;</span>
+<span class="fc" id="L76">        } finally { meter.charge(Operation.LOAD, work.units); }</span>
+<span class="fc" id="L77">    }</span>
+    private void advance() {
+<span class="fc" id="L79">        meter.charge(Operation.MATCH, 1);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (pending.isEmpty()) {</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            status = complete ? Status.EXHAUSTED : Status.INCONCLUSIVE;</span>
+<span class="fc" id="L82">            return;</span>
+        }
+<span class="fc" id="L84">        occurrence = pending.pop();</span>
+<span class="fc" id="L85">        relevant = plan.relevant(occurrence.expression());</span>
+<span class="fc" id="L86">        schemaIndex = 0;</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (relevant.size() &gt; plan.maximumSchemasPerOccurrence()) complete = false;</span>
+<span class="fc" id="L88">    }</span>
+    private void match() {
+<span class="fc" id="L90">        meter.charge(Operation.MATCH, 1);</span>
+<span class="fc bfc" id="L91" title="All 4 branches covered.">        if (attempted &gt;= plan.bounds().maximumMatchAttempts() || produced &gt;= plan.bounds().maximumCandidates()) {</span>
+<span class="fc" id="L92">            complete = false; status = Status.INCONCLUSIVE;</span>
+<span class="fc" id="L93">            return;</span>
+        }
+<span class="fc" id="L95">        attempted++;</span>
+<span class="fc" id="L96">        var entry = relevant.get(schemaIndex++);</span>
+        // Existing exact matcher is bounded but atomic. A completed match is retained across pulls.
+<span class="fc" id="L98">        var outcome = entry.matcher().match(occurrence.expression(), new ExprMatcher.MatchOptions(</span>
+<span class="fc" id="L99">            null, 1, plan.bounds().maximumExpressionNodes() * 4, plan.bounds().maximumExpressionNodes() * 4));</span>
+<span class="fc" id="L100">        meter.charge(Operation.MATCH, (long) outcome.evaluatedSteps() + outcome.patternBranches());</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (!outcome.complete()) complete = false;</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (outcome.matched()) {</span>
+<span class="fc" id="L103">            matchedEntry = entry;</span>
+<span class="fc" id="L104">            bindings = outcome.matches().getFirst().bindings();</span>
+        }
+<span class="fc" id="L106">    }</span>
+    private void advanceApplication() {
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (application == null) {</span>
+<span class="fc" id="L109">            applicationWork = new Work();</span>
+<span class="fc" id="L110">            payment = meter.beginPrepaidApplication();</span>
+<span class="fc" id="L111">            application = plan.startApplication(matchedEntry, source, encodedSource, occurrence.path(), bindings, applicationWork);</span>
+        }
+<span class="fc" id="L113">        long before = applicationWork.units;</span>
+<span class="fc" id="L114">        var phase = application.phase();</span>
+<span class="fc" id="L115">        boolean failed = false;</span>
+        try {
+<span class="fc" id="L117">            application.advance();</span>
+<span class="fc" id="L118">        } catch (IllegalArgumentException unsupported) {</span>
+<span class="fc" id="L119">            meter.charge(Operation.MATCH, 1); complete = false; failed = true;</span>
+        } finally {
+<span class="fc" id="L121">            meter.prepay(payment, phase, applicationWork.units - before);</span>
+        }
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (failed) meter.abandon(payment);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        else if (application.done()) {</span>
+<span class="fc" id="L125">            ready = application.result();</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            if (ready == null) meter.abandon(payment);</span>
+<span class="fc" id="L127">            else { meter.complete(payment, ready.executionWork()); produced++; }</span>
+<span class="fc" id="L128">        } else return;</span>
+<span class="fc" id="L129">        clearApplication();</span>
+<span class="fc" id="L130">    }</span>
+    private void clearApplication() {
+<span class="fc" id="L132">        application = null; applicationWork = null; payment = null;</span>
+<span class="fc" id="L133">        matchedEntry = null; bindings = null;</span>
+<span class="fc" id="L134">    }</span>
+    private Optional&lt;Transformation&gt; emit() {
+<span class="fc" id="L136">        meter.charge(Operation.PULL, 1);</span>
+<span class="fc" id="L137">        Transformation result = ready;</span>
+<span class="fc" id="L138">        ready = null;</span>
+<span class="fc" id="L139">        return Optional.of(result);</span>
+    }
+    private void descend() {
+<span class="fc" id="L142">        meter.charge(Operation.MATCH, 1);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (occurrence.expression() instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L144">            pending.push(new Occurrence(binary.right(), child(occurrence.path(), 1)));</span>
+<span class="fc" id="L145">            pending.push(new Occurrence(binary.left(), child(occurrence.path(), 0)));</span>
+<span class="fc" id="L146">            meter.charge(Operation.MATCH, 2L * (occurrence.path().size() + 1));</span>
+        }
+<span class="fc" id="L148">        occurrence = null; relevant = null;</span>
+<span class="fc" id="L149">    }</span>
+    private static List&lt;Integer&gt; child(List&lt;Integer&gt; path, int index) {
+<span class="fc" id="L151">        var result = new ArrayList&lt;&gt;(path);</span>
+<span class="fc" id="L152">        result.add(index);</span>
+<span class="fc" id="L153">        return List.copyOf(result);</span>
+    }
+<span class="fc" id="L155">    @Override public Status status() { return status; }</span>
+    @Override public void close() {
+<span class="fc" id="L157">        pending.clear(); occurrence = null; relevant = null;</span>
+<span class="fc" id="L158">        clearApplication(); ready = null; source = null;</span>
+<span class="fc" id="L159">        status = Status.CLOSED;</span>
+<span class="fc" id="L160">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -60,7 +60,7 @@ public final class WorkReplacementTypedExecution implements WorkReplacementExper
 <span class="fc bfc" id="L60" title="All 2 branches covered.">        for (var entry : new java.util.TreeMap&lt;&gt;(result.search().metrics().chargedComponents()).entrySet()) {</span>
 <span class="fc" id="L61">            String id = prefix + &quot;/query/&quot; + entry.getKey(); children.add(id);</span>
 <span class="fc" id="L62">            receipts.add(new LifecycleWorkAccount.Receipt(id, QUERY, entry.getValue(), entry.getValue(), List.of(),</span>
-<span class="pc bpc" id="L63" title="1 of 2 branches missed.">                &quot;move-search-components/v3&quot;, entry.getValue().toString(), entry.getValue() == 0 ? &quot;no charged operations&quot; : &quot;&quot;));</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">                &quot;move-search-components/v3&quot;, entry.getValue().toString(), entry.getValue() == 0 ? &quot;no charged operations&quot; : &quot;&quot;));</span>
 <span class="fc" id="L64">        }</span>
 <span class="fc" id="L65">        String root = prefix + &quot;/query&quot;;</span>
 <span class="fc" id="L66">        receipts.add(new LifecycleWorkAccount.Receipt(root, QUERY, result.selectionWork(), result.queryWork(), children,</span>
