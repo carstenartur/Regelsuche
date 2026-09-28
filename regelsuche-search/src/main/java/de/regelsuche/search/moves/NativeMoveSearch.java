@@ -57,13 +57,14 @@ public final class NativeMoveSearch {
     }
     /** Populated privately before result publication; accessors expose only immutable scalar observations. */
     public static final class Accounting implements RetainedGraph.View {
-        private long validationWork,storageWork,retentionWork,peakNodes,peakCharacters,peakReferences,resultNodes,resultCharacters,resultReferences;
+        private long validationWork,executionWork,storageWork,retentionWork,peakNodes,peakCharacters,peakReferences,resultNodes,resultCharacters,resultReferences;
         private boolean complete;private String detail="";
-        void update(long validation,long storage,long retention,long pn,long pc,long pr,long rn,long rc,long rr,boolean complete,String detail){
-            validationWork=validation;storageWork=storage;retentionWork=retention;peakNodes=pn;peakCharacters=pc;peakReferences=pr;
+        void update(long validation,long execution,long storage,long retention,long pn,long pc,long pr,long rn,long rc,long rr,boolean complete,String detail){
+            validationWork=validation;executionWork=execution;storageWork=storage;retentionWork=retention;peakNodes=pn;peakCharacters=pc;peakReferences=pr;
             resultNodes=rn;resultCharacters=rc;resultReferences=rr;this.complete=complete;this.detail=detail;
         }
         public long validationWork(){return validationWork;}
+        public long executionWork(){return executionWork;}
         public long storageWork(){return storageWork;}
         public long retentionWork(){return retentionWork;}
         public RetainedGraph.Usage live(){return new RetainedGraph.Usage(0,0,0);}
@@ -71,7 +72,7 @@ public final class NativeMoveSearch {
         public RetainedGraph.Usage resultRetained(){return new RetainedGraph.Usage(resultNodes,resultCharacters,resultReferences);}
         public boolean complete(){return complete;}
         public String detail(){return detail;}
-        long work(){return Math.addExact(Math.addExact(validationWork,storageWork),retentionWork);}
+        long work(){return Math.addExact(Math.addExact(Math.addExact(validationWork,executionWork),storageWork),retentionWork);}
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(detail);}
     }
     public static final class Result implements RetainedGraph.View {
@@ -159,15 +160,18 @@ public final class NativeMoveSearch {
         Objects.requireNonNull(limits);
         try(var store=new SearchExpressionStore(limits)) {
             var accounting=new NativeRetentionSession(problem,store,limits);
+            try(var operation=de.regelsuche.retention.RetainedOperation.open(accounting)) {
+            accounting.operation(operation);
             accounting.validate(problem.source());if(problem.context().goal()!=null)accounting.validate(problem.context().goal());
             var execution=new Execution(problem,store,accounting);
             var searched=new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
                 .search(execution,continuation,null);
             var replay=searched.outcome()==MoveSearch.Outcome.TARGET_REACHED
                 ?replay(execution,problem.source(),problem.context().goal(),searched.witness()):new Replay(0,null);
-            var result=new Result(problem,searched,replay.work());accounting.finish(result);
+            var result=new Result(problem,searched,replay.work());operation.close();accounting.finish(result);
             if(replay.rejected()!=null)throw new TargetCheckFailure(result,replay.rejected());
             return result;
+            }
         }
     }
     public Result search(Problem problem,SearchContinuationContract continuation){

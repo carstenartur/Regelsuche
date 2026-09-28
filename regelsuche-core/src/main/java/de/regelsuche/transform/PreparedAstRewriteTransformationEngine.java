@@ -1,6 +1,7 @@
 package de.regelsuche.transform;
 
 import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 
 import de.regelsuche.assumption.Assumption;
 import de.regelsuche.ast.BinaryExpr;
@@ -181,7 +182,10 @@ public final class PreparedAstRewriteTransformationEngine
         AstRewriteTransport.requireBounded(root);
         int originalSize = canonicalAstNodeCount(root);
         Set<AstRewriteTransport.Step> steps = new LinkedHashSet<>();
-        for (RewriteResult result : rewriteEverywhere(root, false)) {
+        try(var retained=RetainedOperation.retain(this,root,steps)) {
+        var rewritten=rewriteEverywhere(root,false);
+        try(var candidates=RetainedOperation.retain(rewritten)) {
+        for (RewriteResult result : rewritten) {
             AstRewriteTransport.requireBounded(result.expression());
             if (root.equals(result.expression())
                     || canonicalAstNodeCount(result.expression()) - originalSize > maxAstSizeIncreasePerStep) continue;
@@ -192,7 +196,9 @@ public final class PreparedAstRewriteTransformationEngine
                 rule.descriptor().packId(), rule.descriptor().license()));
             if (steps.size() >= maxCandidatesPerState) break;
         }
-        return List.copyOf(steps);
+        return RetainedOperation.produced(List.copyOf(steps));
+        }
+        }
     }
 
     private List<RewriteResult> rewriteEverywhere(Expr subtree) {
@@ -201,6 +207,7 @@ public final class PreparedAstRewriteTransformationEngine
 
     private List<RewriteResult> rewriteEverywhere(Expr subtree, boolean retainLegacyHash) {
         List<RewriteResult> results = new ArrayList<>();
+        try(var retained=retainLegacyHash?null:RetainedOperation.retain(this,subtree,results)) {
         String subtreeHash = null;
         for (RewriteRule rule : ruleIndex == null ? rules : ruleIndex.candidates(subtree)) {
             Expr rewritten = applyIfMatched(rule, subtree);
@@ -263,13 +270,17 @@ public final class PreparedAstRewriteTransformationEngine
                 }
             }
         }
+        if(!retainLegacyHash)RetainedOperation.checkpoint();
         return results;
+        }
     }
 
     private static Expr applyIfMatched(RewriteRule rule, Expr subtree) {
         if (rule.getClass() == PatternRewriteRule.class) {
             PatternRewriteRule patternRule = (PatternRewriteRule) rule;
             Map<String, Expr> bindings = new HashMap<>();
+            try(var retained=RetainedOperation.retain(patternRule,subtree,bindings)) {
+            RetainedOperation.work(1);
             if (!EquivalenceAwarePatternMatcher.match(
                     patternRule.source(),
                     subtree,
@@ -278,6 +289,7 @@ public final class PreparedAstRewriteTransformationEngine
                 return null;
             }
             return patternRule.target().instantiate(bindings);
+            }
         }
         if (!rule.matches(subtree)) {
             return null;
@@ -323,7 +335,8 @@ public final class PreparedAstRewriteTransformationEngine
         Expr expression,
         String sourceSubtreeHash,
         List<Assumption> assumptions
-    ) {
+    ) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(rule);v.reference(expression);v.reference(sourceSubtreeHash);v.reference(assumptions);}
         private RewriteResult {
             assumptions = assumptions == null
                 ? List.of()

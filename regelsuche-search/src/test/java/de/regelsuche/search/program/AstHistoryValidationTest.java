@@ -16,6 +16,30 @@ class AstHistoryValidationTest {
     private static CompiledAstRewriteProgram.Candidate history(Expr source, Expr target, List<String> assumptions) {
         return new CompiledAstRewriteProgram.Candidate("program",List.of("stage"),List.of(step(source,target,assumptions)));
     }
+    private static final class Work implements de.regelsuche.retention.RetainedOperation.Sink {
+        long validation,execution;
+        @Override public void validationWork(long units){validation+=units;}
+        @Override public void executionWork(long units){execution+=units;}
+        @Override public void checkpoint(){}
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor visitor){}
+    }
+    @Test void successfulAndAbortedDirectHistoryTraversalRemainPaidWithoutSerialization() {
+        var source=new VariableExpr("x");var valid=history(source,new NumberExpr(0),List.of());
+        var invalid=new CompiledAstRewriteProgram.Candidate("p".repeat(4097),valid.sourceIds(),valid.steps());
+        var work=new Work();
+        try(var transport=AstTransportObservation.open();var observed=de.regelsuche.retention.RetainedOperation.open(work)) {
+            var inspected=AstExpressionValidation.inspectHistory(valid);
+            assertEquals(inspected.work(),work.validation);
+            long paid=work.validation;
+            assertThrows(IllegalArgumentException.class,()->AstExpressionValidation.inspectHistory(invalid));
+            assertTrue(work.validation>paid,"refused metadata inspection cannot refund its already performed work");
+            assertEquals(0,transport.total());
+        }
+        long finished=work.validation;
+        AstExpressionValidation.inspectHistory(valid);
+        assertEquals(finished,work.validation,"closed observation must not retain or receive the next execution");
+    }
+
     @Test void directHistoryValidationMatchesCanonicalBytesWithoutTransport() {
         var source=new FunctionExpr("f",List.of(new VariableExpr("x"),NumberExpr.exact("-7/13")));
         var target=new VariableExpr("é😀");

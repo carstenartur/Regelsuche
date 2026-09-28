@@ -56,6 +56,7 @@ public final class AstExpressionValidation {
         boolean byteGenerator;
         long expression(Expr expression, int depth) {
             Objects.requireNonNull(expression);
+            de.regelsuche.retention.RetainedOperation.validation(1);
             if (++nodes > AstRewriteTransport.MAXIMUM_NODES || depth > AstRewriteTransport.MAXIMUM_DEPTH)
                 throw new IllegalArgumentException("AST replay structural limit exceeded");
             return switch (expression) {
@@ -80,6 +81,7 @@ public final class AstExpressionValidation {
             };
         }
         long text(String value) {
+            de.regelsuche.retention.RetainedOperation.validation(value==null?0:value.length());
             if (value == null || value.isBlank() || value.length() > CompiledAstReplayCodec.MAXIMUM_TEXT_CHARACTERS)
                 throw new IllegalArgumentException("invalid or oversized AST replay text");
             characters = Math.addExact(characters, value.length());
