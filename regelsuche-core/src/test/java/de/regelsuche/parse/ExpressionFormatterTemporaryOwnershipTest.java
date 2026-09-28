@@ -27,12 +27,18 @@ class ExpressionFormatterTemporaryOwnershipTest {
         int decimalObjects;
         final Set<String> decimalValues = new HashSet<>();
         final Set<String> observedText = new HashSet<>();
+        long failConversionCharge = -1;
+        final ArithmeticException conversionFailure = new ArithmeticException("conversion charge failure");
         @Override public void executionWork(long units) {
             if (throwCleanupAfterCallback && callbackStateObserved && units == 1) {
                 throwCleanupAfterCallback = false;
                 throw new CleanupFailure();
             }
             work = Math.addExact(work, units);
+            if (units == failConversionCharge) {
+                failConversionCharge = -1;
+                throw conversionFailure;
+            }
         }
         @Override public void validationWork(long units) { executionWork(units); }
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(scope); }
@@ -131,6 +137,25 @@ class ExpressionFormatterTemporaryOwnershipTest {
         }
         assertEquals(0, RetainedGraph.measure(observation.scope).retained().characters());
         assertEquals("1 / 3", ExpressionFormatter.format(input));
+    }
+
+    @Test void failedIntegerConversionChargeStillObservesTheProducedText() {
+        String expected = "12345678901234567";
+        var input = NumberExpr.exact(expected);
+        var observation = new Observation(); observation.input = input;
+        observation.failConversionCharge = expected.length() + 1L;
+        var emitted = new Emission();
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            assertSame(observation.conversionFailure,
+                assertThrows(ArithmeticException.class, () -> ExpressionFormatter.formatMeasured(input, emitted)));
+            assertTrue(observation.observedText.contains(expected),
+                "the already produced integer String must be observed before error cleanup");
+            assertEquals(0, emitted.count);
+            assertFalse(observation.inputMissing);
+        }
+        assertEquals(0, RetainedGraph.measure(observation.scope).retained().characters());
+        assertEquals(expected, ExpressionFormatter.format(input));
     }
     private static boolean matches(char[] buffer, String text) {
         if (buffer.length < text.length()) return false;
