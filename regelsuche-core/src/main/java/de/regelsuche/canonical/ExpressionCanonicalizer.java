@@ -142,7 +142,9 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
                     RetainedOperation.work(1);
                     RetainedOperation.checkpoint();
                 }
-                return RetainedOperation.produced(new FunctionExpr(functionExpr.name(), normalised));
+                var result = new FunctionExpr(functionExpr.name(), normalised);
+                RetainedOperation.work(normalised.size());
+                return RetainedOperation.produced(result);
             }
         }
         return expression;
@@ -174,8 +176,9 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
                                     if (value.isZero()) continue;
                                     String key = ExpressionFormatter.format(coefficient.term());
                                     try (var formatted = RetainedOperation.retain(key)) {
-                                        buckets.computeIfAbsent(key, ignored -> new TermBucket(coefficient.term())).add(value);
+                                        var bucket = buckets.computeIfAbsent(key, ignored -> new TermBucket(coefficient.term()));
                                         RetainedOperation.work(1);
+                                        bucket.add(value);
                                         RetainedOperation.checkpoint();
                                     }
                                 }
@@ -288,10 +291,8 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
                 }
                 if (context != null) {
                     var assumptions = factorContext.snapshot();
-                    RetainedOperation.work(assumptions.size());
                     try (var committed = RetainedOperation.retain(assumptions)) {
                         context.addAll(assumptions);
-                        RetainedOperation.work(assumptions.size());
                     }
                 }
                 List<Expr> ordered = new ArrayList<>();

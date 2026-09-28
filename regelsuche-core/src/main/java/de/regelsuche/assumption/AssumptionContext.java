@@ -38,6 +38,7 @@ public final class AssumptionContext implements RetainedGraph.View {
             return;
         }
         for (Assumption assumption : additions) {
+            RetainedOperation.work(1);
             add(assumption);
         }
     }
