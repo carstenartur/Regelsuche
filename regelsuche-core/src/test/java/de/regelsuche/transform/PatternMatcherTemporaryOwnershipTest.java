@@ -16,6 +16,8 @@ class PatternMatcherTemporaryOwnershipTest {
         Expr input;
         long work;
         int alternatives, tasks, mutableBindingMaps;
+        int nonGrowingCheckpoints;
+        Set<Object> previousObjects;
         boolean inputMissing, sawBoundChoice, abortBoundChoice;
         @Override public void executionWork(long units) { work = Math.addExact(work, units); }
         @Override public void validationWork(long units) { executionWork(units); }
@@ -52,6 +54,8 @@ class PatternMatcherTemporaryOwnershipTest {
             alternatives = Math.max(alternatives,currentAlternatives);
             tasks = Math.max(tasks,currentTasks);
             mutableBindingMaps = Math.max(mutableBindingMaps,currentMutableBindingMaps);
+            if (previousObjects != null && previousObjects.containsAll(seen)) nonGrowingCheckpoints++;
+            previousObjects = seen;
             inputMissing |= !seen.contains(input);
             sawBoundChoice |= bound && currentAlternatives >= 1;
             if (abortBoundChoice && bound && currentAlternatives >= 1) throw new MatchAbort();
@@ -80,6 +84,21 @@ class PatternMatcherTemporaryOwnershipTest {
         assertEquals(1,observation.mutableBindingMaps,"the invocation already owns a private working map");
         assertFalse(observation.inputMissing);
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    @Test void consumingLiteralTasksDoesNotRescanAShrinkingOwnedGraph() {
+        Expr input = new ExpressionParser().parseTerm("f(x,y)");
+        var observation = new Observation(); observation.input = input;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            assertTrue(EquivalenceAwarePatternMatcher.matchDetailed(
+                PatternExpr.fn("f",new PatternExpr.LiteralVariable("x"),new PatternExpr.LiteralVariable("y")),
+                input,Map.of(),RecognitionProfile.exact()).matched());
+        }
+        assertEquals(0,observation.nonGrowingCheckpoints,
+            "literal comparisons only consume already observed tasks; they create no owned graph growth");
+        assertTrue(observation.tasks >= 3,"new continuation chains still require a peak observation");
+        assertFalse(observation.inputMissing);
     }
 
     @Test void actualBacktrackingContinuationAndBindingCopiesRemainOwned() {
