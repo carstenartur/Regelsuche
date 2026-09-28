@@ -10,10 +10,10 @@ import org.junit.jupiter.api.Test;
 
 class CanonicalizerTemporaryOwnershipTest {
     private static final class Observation implements RetainedOperation.Sink {
-        RetainedOperation scope;Expr source;long work;
+        RetainedOperation scope;Expr source;long work,validation;Expr requiredRoot;boolean missingRoot;int inputOwners;
         boolean functionArguments,termContributions,factorBuckets,discardedPower,abortAtContributions;
         @Override public void executionWork(long units){work=Math.addExact(work,units);}
-        @Override public void validationWork(long units){work=Math.addExact(work,units);}
+        @Override public void validationWork(long units){work=Math.addExact(work,units);validation=Math.addExact(validation,units);}
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(scope);}
         @Override public void checkpoint(){
             RetainedGraph.measure(scope);
@@ -22,9 +22,10 @@ class CanonicalizerTemporaryOwnershipTest {
                 @Override public void reference(Object value){if(value!=null)pending.addLast(value);}
                 @Override public void requireExact(Object value,Class<?> type){assertEquals(type,value.getClass());}
             };
-            visitor.reference(scope);
+            visitor.reference(scope);int owners=0;
             while(!pending.isEmpty()){
                 var value=pending.removeFirst();if(!seen.add(value))continue;
+                if(value instanceof Object[] held && held.length==3 && held[0] instanceof ExpressionCanonicalizer && held[1] instanceof Expr)owners++;
                 if(value instanceof ArrayList<?> list && list.size()==2){
                     if(list.stream().allMatch(FunctionExpr.class::isInstance))functionArguments=true;
                     if(list.stream().allMatch(ExactRational.class::isInstance))termContributions=true;
@@ -41,6 +42,8 @@ class CanonicalizerTemporaryOwnershipTest {
                 else if(value instanceof BinaryExpr binary){visitor.reference(binary.left());visitor.reference(binary.right());}
                 else if(value instanceof FunctionExpr function)visitor.reference(function.arguments());
             }
+            inputOwners=Math.max(inputOwners,owners);
+            if(requiredRoot!=null && !seen.contains(requiredRoot))missingRoot=true;
         }
     }
     private static Expr call(String name,Expr argument){return new FunctionExpr(name,List.of(argument));}
@@ -86,6 +89,19 @@ class CanonicalizerTemporaryOwnershipTest {
         }
         assertTrue(observation.termContributions);released(observation);
         assertEquals(new BinaryExpr(new NumberExpr(2),BinaryOperator.MUL,term),canonicalizer.canonicalize(source));
+    }
+
+    @Test void privateCanonicalRecursionReusesTheLiveImmutableInputOwner(){
+        var source=new FunctionExpr("f",List.of(call("g",new VariableExpr("x")),call("h",new VariableExpr("y"))));
+        var observation=new Observation();observation.requiredRoot=source;
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;assertEquals(source,new ExpressionCanonicalizer().canonicalize(source));
+        }
+        assertFalse(observation.missingRoot,"every nested checkpoint still sees the complete input graph");
+        assertEquals(5,observation.validation,"all actual recursive visits remain paid");
+        assertTrue(observation.functionArguments,"newly rebuilt argument lists remain observable");
+        assertEquals(1,observation.inputOwners,"only the public boundary allocates the input owner");
+        released(observation);
     }
 
 }
