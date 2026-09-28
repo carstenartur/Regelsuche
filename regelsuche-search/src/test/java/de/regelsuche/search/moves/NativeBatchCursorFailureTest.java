@@ -54,8 +54,8 @@ class NativeBatchCursorFailureTest {
         var move=provider.primitive.candidates(source,problem.context()).moves().getFirst();
         assertTrue(problem.verifier().verify(source,move,problem.context()).accepted(),"lifecycle failure does not invalidate mathematics");
         var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE);
-        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.outcome(),"failed close must survive eager draining into a batch");
-        assertFalse(result.accountingComplete());assertFalse(result.withinBudget());
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.observedOutcome(),"failed close must survive eager draining into a batch");
+        assertFalse(result.accountingComplete());assertFalse(result.observationsComplete());assertFalse(result.withinBudget());
         assertEquals(1,result.batchCursorReceipts().size());
         var receipt=result.batchCursorReceipts().getFirst();
         assertEquals(Status.FAILED,receipt.status());assertTrue(receipt.closed());assertFalse(receipt.accountingComplete());
@@ -64,12 +64,12 @@ class NativeBatchCursorFailureTest {
         assertEquals(1,result.metrics().primitiveWork());assertTrue(result.totalWork()>0);
         assertTrue(result.cursorReceipts().isEmpty(),"batch cursor receipts must not contaminate staged-lane projections");
         var control=new NativeMoveSearch().search(problem(new Provider(false),scheduling,false),SearchContinuationContract.PATH_SENSITIVE);
-        assertEquals(MoveSearch.Outcome.TARGET_REACHED,control.outcome());assertTrue(control.accountingComplete());assertTrue(control.withinBudget());
+        assertEquals(MoveSearch.Outcome.TARGET_REACHED,control.observedOutcome());assertTrue(control.observationsComplete());assertFalse(control.accountingComplete());assertFalse(control.withinBudget());assertTrue(control.totalWork()<=control.workBudget());
         var qualityProblem=problem(new Provider(true),scheduling,true);var engine=new NativeMoveSearch();
         for(var quality:List.of(engine.searchUntil(qualityProblem,new Depth(),0,SearchContinuationContract.PATH_SENSITIVE),
                 engine.searchBest(qualityProblem,new Depth(),SearchContinuationContract.PATH_SENSITIVE))){
-            assertFalse(quality.search().accountingComplete());assertFalse(quality.withinBudget());
-            assertEquals(MoveSearch.Outcome.INCONCLUSIVE,quality.search().outcome());
+            assertFalse(quality.search().accountingComplete());assertFalse(quality.search().observationsComplete());assertFalse(quality.withinBudget());
+            assertEquals(MoveSearch.Outcome.INCONCLUSIVE,quality.search().observedOutcome());
         }
     }
     @Test void stagedBatchKeepsFailedCursorCloseReceipt(){check(MoveSearch.Scheduling.STAGED);}

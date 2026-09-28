@@ -86,17 +86,45 @@ atomic overruns are paid; staged execution does not pre-open later providers.
   also passed all six authorities and `Checkout-local ciCheck`; this was
   reconfirmed on 2026-09-27.
 
-## P03 — qualification in progress
+## P03 — integrated
 
-[PR #1051](https://github.com/carstenartur/Regelsuche/pull/1051) adds an actual
-learned/restored checked-schema cursor and paid preparation. Its mechanism and
-diagnostic comparison boundaries are documented in
+[PR #1051](https://github.com/carstenartur/Regelsuche/pull/1051) adds the actual
+learned/restored checked-schema cursor, paid preparation and independently
+suspendable prepaid application phases. Its mechanism is documented in
 [the lazy-cursor report](lazy-checked-schema-cursor.md).
 
-The independent review of published head
-`db6d93b17b4050fc485f2ae5f59fb4a8208d7291` confirmed laziness across occurrences,
-but required independently suspendable application phases with retained partial
-costs. That correction is being completed before qualification. A successful
-historical test run or the restarted original-head CI is not acceptance of the
-correction. P04–P12 production implementation remains pending; prepared test
-corpora are not implementation or learning-success evidence.
+Accepted main is `ee6dd6892d899662c857c1f2bc2861e233e68563`, tree
+`e1bee2a7712ff95f14b2c3513f565ff6c26bde8b`. Post-merge CI
+[36360112301, attempt 2](https://github.com/carstenartur/Regelsuche/actions/runs/36360112301/attempts/2)
+passed all six authorities and `ciCheck` job `108741752739`; CodeQL also passed.
+The first post-merge SymPy attempt failed during external apt setup before tests;
+the unchanged-source rerun completed. P03 is the accepted predecessor for P04.
+
+## P04 — additive foundation, total qualification incomplete
+
+[PR #1054](https://github.com/carstenartur/Regelsuche/pull/1054) prepares native
+immutable Expr execution through the existing shared frontier, pickers and
+managed cursor lifecycle. Primitive rules, the existing compiled-program
+interpreter, learned/restored checked schemata, history ranking and independent
+admission/final replay operate through additive native interfaces. Historical
+facades and their accounting contracts remain supported. No new learner, search
+algorithm, proof-result cache or mathematical authority is introduced.
+
+This increment does **not** complete P04. Native search and native export publish
+`PARTIAL_ATOMIC_INVENTORY`: total accounting is incomplete, `withinBudget` is
+false, and the public search outcome is `INCONCLUSIVE`. Real mathematical
+witnesses and selected incumbents remain available; observed outcomes/work/peaks
+are diagnostic. Explicit exports can retain diagnostic artefacts with
+`INCONCLUSIVE` and `completeBoundedRelation=false`; the convenience export throws
+with its attempted receipt. Production-phase native registration remains refused.
+See [the native qualification boundary](native-expr-qualification.md).
+
+Before this increment can merge, its exact final head must pass the full affected
+module suites, unchanged public P03 legacy corpus comparison, independent review
+and all hosted authorities. Earlier green slice CI is intermediate evidence only.
+Remaining P04 work is a follow-up: complete the atomic ownership/work inventory
+(canonicalizer, normalization, matching/backtracking, domain/instantiation,
+formatting and application-side export helpers), qualify the full native public
+differential under its declared revision, and rerun complete accounting/retention
+acceptance. P04 has no completion checkmark. P05–P12 remain subsequent work, and
+no economic learning advantage is asserted.

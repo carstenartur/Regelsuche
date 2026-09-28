@@ -36,7 +36,7 @@ class NativeExternalRetentionTest {
             assertEquals(new RetainedGraph.Usage(0,0,0),result.accounting().live());
             RetainedGraph.View roots=v->{v.reference(problem);v.reference(quality?capture:null);};
             assertEquals(RetainedGraph.measure(roots).retained(),external);
-            assertEquals(limit==100,result.accountingComplete());assertEquals(limit==100,result.withinBudget());
+            assertEquals(limit==100,result.observationsComplete());assertEquals(limit==100,result.totalWork()<=result.workBudget() && result.observationsComplete());assertFalse(result.accountingComplete());assertFalse(result.withinBudget());
             assertTrue(result.accounting().retentionWork()>RetainedGraph.measure(roots).work());
         }
     }

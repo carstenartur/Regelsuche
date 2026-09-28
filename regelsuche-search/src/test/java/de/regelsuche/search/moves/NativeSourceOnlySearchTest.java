@@ -37,10 +37,10 @@ class NativeSourceOnlySearchTest {
         NativeMoveSearch.QualityResult result;
         try(var transport=AstTransportObservation.open()) {
             result=new NativeMoveSearch().searchUntil(problem,Objective.QUALITY,1,SearchContinuationContract.PATH_SENSITIVE);
-            assertEquals(MoveSearch.Outcome.QUALITY_REACHED,result.search().outcome());assertSame(leaf,result.incumbent().expression());
+            assertEquals(MoveSearch.Outcome.QUALITY_REACHED,result.search().observedOutcome());assertSame(leaf,result.incumbent().expression());
             assertEquals(3,result.inputScore());assertEquals(1,result.outputScore());assertEquals(2,checks.value);
             assertTrue(result.replayWork()>0);assertEquals(result.search().totalWork(),result.totalWork());
-            assertTrue(result.totalWork()>result.search().metrics().totalWork()+result.replayWork());assertTrue(result.withinBudget());
+            assertTrue(result.totalWork()>result.search().metrics().totalWork()+result.replayWork());assertFalse(result.withinBudget());assertTrue(result.totalWork()<=result.workBudget());
             assertEquals(0,transport.total(),"native selection, admission and independent final replay must avoid the codec");
         }
         checks.value=0;
@@ -64,12 +64,12 @@ class NativeSourceOnlySearchTest {
         var checks=new Counter();var target=target(problem(checks,0,BUDGET));
         try(var transport=AstTransportObservation.open()) {
             var result=new NativeMoveSearch().search(target,SearchContinuationContract.PATH_SENSITIVE);
-            assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome());assertEquals(target.context().goal(),result.output());
+            assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.observedOutcome());assertEquals(target.context().goal(),result.output());
             assertEquals(2,checks.value);assertEquals(0,transport.total());assertTrue(result.replayWork()>0);
-            assertTrue(result.totalWork()>result.metrics().totalWork()+result.replayWork());assertTrue(result.withinBudget());
+            assertTrue(result.totalWork()>result.metrics().totalWork()+result.replayWork());assertFalse(result.withinBudget());assertTrue(result.totalWork()<=result.workBudget());
             checks.value=0;
             var limited=new NativeMoveSearch().search(target(problem(checks,0,result.totalWork()-1)),SearchContinuationContract.PATH_SENSITIVE);
-            assertEquals(2,checks.value);assertFalse(limited.withinBudget());assertEquals(MoveSearch.Outcome.WORK_EXHAUSTED,limited.outcome());
+            assertEquals(2,checks.value);assertFalse(limited.withinBudget());assertEquals(MoveSearch.Outcome.WORK_EXHAUSTED,limited.observedOutcome());
             assertEquals(result.totalWork(),limited.totalWork());
         }
     }
@@ -82,7 +82,7 @@ class NativeSourceOnlySearchTest {
     @Test void bestBudgetUsesTheSameObjectiveWithoutEarlyQualityStop() {
         var checks=new Counter();
         var result=new NativeMoveSearch().searchBest(problem(checks,0,BUDGET),Objective.BEST,SearchContinuationContract.PATH_SENSITIVE);
-        assertNotEquals(MoveSearch.Outcome.QUALITY_REACHED,result.search().outcome());
+        assertNotEquals(MoveSearch.Outcome.QUALITY_REACHED,result.search().observedOutcome());
         assertEquals(Long.MIN_VALUE,result.outputScore());assertEquals(1,result.witness().size());assertEquals(2,checks.value);
     }
     private static NativeMoveSearch.Problem target(NativeMoveSearch.Problem sourceOnly){

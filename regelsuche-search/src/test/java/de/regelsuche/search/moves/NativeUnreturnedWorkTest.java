@@ -80,7 +80,7 @@ class NativeUnreturnedWorkTest {
         var delegate=provider();var problem=problem(new InterruptedProvider(delegate),NativeVerifier.registered(List.of(delegate)),scheduling);
         var work=delegate.program().transformMeasured(problem.source()).workMetrics();
         var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE);
-        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.outcome());
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.observedOutcome());
         assertEquals(work.candidateWork().canonicalWorkUnits(),result.metrics().primitiveWork(),"real completed program generation cannot disappear at its native handoff");
         assertTrue(result.metrics().searchWork()>=work.totalWorkUnits());assertEquals(0,result.metrics().consumedSuccessors());
         }
@@ -92,7 +92,7 @@ class NativeUnreturnedWorkTest {
         var state=new TypedMoveSearch.State(problem.source(),0,0,"",List.of(),Set.of(),0);
         long full=delegate.verify(state,delegate.proposal(batch.candidates().getFirst(),0),problem.context()).work();
         var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE);
-        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.outcome());assertEquals(stopAt,verifier.calls);
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.observedOutcome());assertEquals(stopAt,verifier.calls);
         assertEquals(batch.workMetrics().candidateWork().canonicalWorkUnits(),result.metrics().primitiveWork());
         if(stopAt==1)assertEquals(regeneration,result.metrics().verificationWork(),"regeneration is complete; comparison never began");
         else {assertEquals(full,result.metrics().verificationWork());assertEquals(regeneration,result.replayWork(),"aborted independent final regeneration stays paid");}

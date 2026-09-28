@@ -21,11 +21,11 @@ class NativeCapabilityRetentionTest {
             MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(1,1,0,10,1000000),NativeMovePriorityPolicy.INVENTORY_ORDER,
             NativeMoveSearch.ZeroScore.INSTANCE,new Value(replacement));
         var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE);
-        assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome(),result.accounting().detail());
-        assertTrue(result.accountingComplete());assertTrue(result.withinBudget());
+        assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.observedOutcome(),result.accounting().detail());
+        assertTrue(result.observationsComplete());assertFalse(result.accountingComplete());assertFalse(result.withinBudget());assertTrue(result.totalWork()<=result.workBudget());
         assertEquals(2,result.accounting().resultRetained().nodes());
         assertEquals(RetainedGraph.measure(result).retained(),result.accounting().resultRetained());
-        var projected=result.exportLegacy();
+        var projected=result.exportLegacy(NativeMoveSearch.Result.DEFAULT_EXPORT_WORK,SearchExpressionStore.Limits.DEFAULT).projection();
         assertEquals(1,projected.stateAssessments().size());
         assertEquals("usable",projected.stateAssessments().values().iterator().next().capabilities().get("usable").providerId());
     }

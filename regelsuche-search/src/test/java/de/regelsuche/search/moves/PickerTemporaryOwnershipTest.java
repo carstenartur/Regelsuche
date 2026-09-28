@@ -94,7 +94,7 @@ class PickerTemporaryOwnershipTest {
             new MoveSearch.Budget(1,1,0,10,10000000),policy,NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE);
         var engine=new NativeMoveSearch();
         var aborted=engine.search(problem,SearchContinuationContract.PATH_SENSITIVE,new SearchExpressionStore.Limits(10,1000000,1000000,10));
-        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,aborted.outcome());
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,aborted.observedOutcome());
         assertFalse(aborted.withinBudget());assertTrue(aborted.accounting().peak().nodes()>10);
         assertEquals(generated.work().candidateWork().canonicalWorkUnits(),aborted.metrics().primitiveWork(),
             "completed provider mathematics must survive a later scoring retention abort exactly once");
@@ -103,7 +103,7 @@ class PickerTemporaryOwnershipTest {
         assertEquals(1,policy.calls,"resource abort must not resume scoring or consume a candidate");
         assertEquals(0,aborted.metrics().consumedSuccessors());assertTrue(aborted.witness().isEmpty());
         var completed=engine.search(problem,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT);
-        assertEquals(MoveSearch.Outcome.TARGET_REACHED,completed.outcome(),completed.accounting().detail());
+        assertEquals(MoveSearch.Outcome.TARGET_REACHED,completed.observedOutcome(),completed.accounting().detail());
         assertEquals(generated.work().candidateWork().canonicalWorkUnits(),completed.metrics().primitiveWork(),
             "normal collection must not double-charge the provider receipt");
         assertEquals(2,policy.calls);

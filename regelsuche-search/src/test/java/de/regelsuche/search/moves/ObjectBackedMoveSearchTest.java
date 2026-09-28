@@ -59,9 +59,9 @@ class ObjectBackedMoveSearchTest {
         var nativeResult=assertDoesNotThrow(()->new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,
             List.of(new NativeMoveSearch.Primitive(descriptor,transport)),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,budget),
             SearchContinuationContract.PATH_SENSITIVE));
-        assertEquals(MoveSearch.Outcome.TARGET_REACHED,nativeResult.outcome());
+        assertEquals(MoveSearch.Outcome.TARGET_REACHED,nativeResult.observedOutcome());
         assertSame(leaf,nativeResult.output(),"untouched producer subtree must survive frontier and independent admission");
-        assertEquals(withNativePrimitiveVerificationWork(legacy.encodedResult()),nativeResult.exportLegacy(),"every event/state/witness/assessment/receipt must project equally");
+        assertEquals(withNativePrimitiveVerificationWork(legacy.encodedResult()),nativeResult.exportLegacy(NativeMoveSearch.Result.DEFAULT_EXPORT_WORK,SearchExpressionStore.Limits.DEFAULT).projection(),"every event/state/witness/assessment/receipt must project equally");
     }
     @Test void nativePrimitiveBatchUsesTheSameStagedManagedLanes() {
         assertNativePrimitiveBatch(SearchMove.ProofStrength.REPLAYABLE);
@@ -77,15 +77,15 @@ class ObjectBackedMoveSearchTest {
         var budget=new MoveSearch.Budget(1,1,0,10,1000000);var context=TypedMoveSearch.Context.frozen(leaf);
         assertEquals(MoveSearch.Outcome.TARGET_REACHED,new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,
             List.of(new NativeMoveSearch.Primitive(descriptor,transport)),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,budget),
-            SearchContinuationContract.PATH_SENSITIVE).outcome());
+            SearchContinuationContract.PATH_SENSITIVE).observedOutcome());
         var legacy=new TypedMoveSearch().search(new TypedMoveSearch.Problem(source,context,List.of(TypedMoveSearch.primitiveProvider(descriptor,transport)),
             MovePriorityPolicy.INVENTORY_ORDER,TypedMoveSearch.primitiveReplay(transport),s->0,MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED_INCREMENTAL,budget));
         var nativeResult=new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,List.of(new NativeMoveSearch.Primitive(descriptor,transport)),
             MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED_INCREMENTAL,budget),SearchContinuationContract.PATH_SENSITIVE);
-        var projected=nativeResult.exportLegacy();assertEquals(withNativePrimitiveVerificationWork(legacy.encodedResult()).witness(),projected.witness());
+        var projected=nativeResult.exportLegacy(NativeMoveSearch.Result.DEFAULT_EXPORT_WORK,SearchExpressionStore.Limits.DEFAULT).projection();assertEquals(withNativePrimitiveVerificationWork(legacy.encodedResult()).witness(),projected.witness());
         assertEquals(withNativePrimitiveVerificationWork(legacy.encodedResult()).events(),projected.events());
         assertEquals(withNativePrimitiveVerificationWork(legacy.encodedResult()).metrics(),nativeResult.metrics());
-        assertTrue(nativeResult.accountingComplete());assertTrue(nativeResult.cursorReceipts().getFirst().closed());
+        assertTrue(nativeResult.observationsComplete());assertFalse(nativeResult.accountingComplete());assertTrue(nativeResult.cursorReceipts().getFirst().closed());
         assertEquals(IncrementalProviderContract.NATIVE_REVISION,projected.stagedIncrementalExecution().providers().getFirst().definition().revision());
     }
 
@@ -95,9 +95,9 @@ class ObjectBackedMoveSearchTest {
         var metrics=new MoveSearch.Metrics(m.generatedSuccessors(),m.consumedSuccessors(),m.discardedSuccessors(),m.unconsumedSuccessors(),
             m.duplicates(),m.deadEnds(),m.exploredStates(),m.expandedStates(),m.primitiveWork(),m.searchWork(),m.verificationWork()+1,
             m.firstHitDepth(),m.firstHitPrimitiveDepth(),m.familyMatches());
-        return new MoveSearch.Result(old.outcome(),old.witness().stream().map(w->new MoveSearch.WitnessStep(w.source(),w.target(),w.move(),nativeVerification(w.verification()))).toList(),
+        return new MoveSearch.Result(MoveSearch.Outcome.INCONCLUSIVE,old.witness().stream().map(w->new MoveSearch.WitnessStep(w.source(),w.target(),w.move(),nativeVerification(w.verification()))).toList(),
             old.events().stream().map(e->new MoveSearch.Event(e.source(),e.target(),e.move(),e.decision(),nativeVerification(e.verification()))).toList(),
-            old.reachedStates(),old.deadEndStates(),metrics,old.completeBoundedRelation(),old.stateAssessments(),old.incrementalExecution(),old.stagedIncrementalExecution());
+            old.reachedStates(),old.deadEndStates(),metrics,false,old.stateAssessments(),old.incrementalExecution(),old.stagedIncrementalExecution());
     }
     private static MoveVerifier.Verification nativeVerification(MoveVerifier.Verification old) {
         return old==null?null:new MoveVerifier.Verification(old.accepted(),old.work()+1,old.receipts(),old.reason());

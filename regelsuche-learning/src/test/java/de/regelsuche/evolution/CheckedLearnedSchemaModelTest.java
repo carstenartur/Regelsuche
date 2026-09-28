@@ -45,15 +45,15 @@ class CheckedLearnedSchemaModelTest {
         assertFalse(verifier.verify(state(parse("(x+y)*(x-y)+z*z")),proposal,context).accepted());
         var result=new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,providers,
             MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(0,1,100000,10,1000000)),SearchContinuationContract.PATH_SENSITIVE);
-        assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome());assertEquals(target,result.output());
+        assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.observedOutcome());assertEquals(target,result.output());
         assertEquals(0,result.witness().getFirst().move().primitiveStepCount());
         var checks=new NativeTestObservation.Checks(verifier);
         var sourceOnly=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION),providers,
             MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(0,1,100000,10,1000000),NativeMovePriorityPolicy.INVENTORY_ORDER,
             NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE,checks);
         var quality=new NativeMoveSearch().searchUntil(sourceOnly,NativeTestObservation.Objective.POWER,0,SearchContinuationContract.PATH_SENSITIVE);
-        assertEquals(MoveSearch.Outcome.QUALITY_REACHED,quality.search().outcome());assertEquals(target,quality.incumbent().expression());
-        assertEquals(2,checks.calls());assertTrue(quality.replayWork()>0);assertTrue(quality.withinBudget());
+        assertEquals(MoveSearch.Outcome.QUALITY_REACHED,quality.search().observedOutcome());assertEquals(target,quality.incumbent().expression());
+        assertEquals(2,checks.calls());assertTrue(quality.replayWork()>0);assertFalse(quality.withinBudget());assertTrue(quality.totalWork()<=quality.workBudget());
     }
 
     @Test void formsDirectCheckedRulesFromChangedSubtreesOfActualSelectedPaths() {

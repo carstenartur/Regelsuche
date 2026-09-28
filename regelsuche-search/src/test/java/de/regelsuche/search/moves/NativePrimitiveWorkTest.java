@@ -23,7 +23,7 @@ class NativePrimitiveWorkTest {
             assertEquals(actualGeneration,checked.work(),"fresh primitive verification performs the same paid generation, including its mathematical rewrite");
             var result=new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,List.of(provider),MoveSearch.Mode.FAST,
                 MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(1,1,0,10,10000000)),SearchContinuationContract.PATH_SENSITIVE);
-            assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome());assertTrue(result.withinBudget());
+            assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.observedOutcome());assertFalse(result.withinBudget());assertTrue(result.totalWork()<=result.workBudget());
             assertEquals(actualGeneration,result.metrics().verificationWork());assertEquals(actualGeneration,result.replayWork());
             assertEquals(0,transport.total(),"paid regeneration remains native until explicit export");
         }

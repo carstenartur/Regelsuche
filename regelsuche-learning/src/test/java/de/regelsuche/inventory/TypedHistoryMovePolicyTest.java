@@ -97,7 +97,7 @@ class TypedHistoryMovePolicyTest {
             List.of(new NativeMoveSearch.Primitive(DESCRIPTOR,TRANSPORT)),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,
             new MoveSearch.Budget(3,3,0,20,1000000),nativePolicy,NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE);
         assertEquals(withNativePrimitiveVerificationWork(run(source,goal,legacy,10000).encodedResult()),
-            new NativeMoveSearch().search(nativeProblem,SearchContinuationContract.PATH_SENSITIVE).exportLegacy());
+            new NativeMoveSearch().search(nativeProblem,SearchContinuationContract.PATH_SENSITIVE).exportLegacy(NativeMoveSearch.Result.DEFAULT_EXPORT_WORK,SearchExpressionStore.Limits.DEFAULT).projection());
     }
 
     @Test void nativeHistoryRankingHasAuditedBoundedOwnershipAcrossIndependentSearches() {
@@ -109,11 +109,11 @@ class TypedHistoryMovePolicyTest {
                 new MoveSearch.Budget(3,3,0,20,10000000),policy,NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE);
             try(var transport=de.regelsuche.search.program.AstTransportObservation.open()) {
                 var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT);
-                assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome(),result.accounting().detail());
-                assertTrue(result.withinBudget());assertTrue(result.accounting().executionWork()>0);assertEquals(0,transport.total());
+                assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.observedOutcome(),result.accounting().detail());
+                assertFalse(result.withinBudget());assertTrue(result.totalWork()<=result.workBudget());assertTrue(result.accounting().executionWork()>0);assertEquals(0,transport.total());
                 var limited=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,
                     new SearchExpressionStore.Limits(1000000,result.accounting().peak().characters()-1,2000000,0));
-                assertEquals(MoveSearch.Outcome.INCONCLUSIVE,limited.outcome());assertFalse(limited.withinBudget());
+                assertEquals(MoveSearch.Outcome.INCONCLUSIVE,limited.observedOutcome());assertFalse(limited.withinBudget());
                 assertEquals("NATIVE_RETENTION_EXHAUSTED",limited.accounting().detail());assertTrue(limited.totalWork()>0);
                 assertEquals(new de.regelsuche.retention.RetainedGraph.Usage(0,0,0),limited.accounting().live());
             }
@@ -135,9 +135,9 @@ class TypedHistoryMovePolicyTest {
         var metrics=new MoveSearch.Metrics(m.generatedSuccessors(),m.consumedSuccessors(),m.discardedSuccessors(),m.unconsumedSuccessors(),
             m.duplicates(),m.deadEnds(),m.exploredStates(),m.expandedStates(),m.primitiveWork(),m.searchWork(),m.verificationWork()+1,
             m.firstHitDepth(),m.firstHitPrimitiveDepth(),m.familyMatches());
-        return new MoveSearch.Result(old.outcome(),old.witness().stream().map(w->new MoveSearch.WitnessStep(w.source(),w.target(),w.move(),nativeVerification(w.verification()))).toList(),
+        return new MoveSearch.Result(MoveSearch.Outcome.INCONCLUSIVE,old.witness().stream().map(w->new MoveSearch.WitnessStep(w.source(),w.target(),w.move(),nativeVerification(w.verification()))).toList(),
             old.events().stream().map(e->new MoveSearch.Event(e.source(),e.target(),e.move(),e.decision(),nativeVerification(e.verification()))).toList(),
-            old.reachedStates(),old.deadEndStates(),metrics,old.completeBoundedRelation(),old.stateAssessments(),old.incrementalExecution(),old.stagedIncrementalExecution());
+            old.reachedStates(),old.deadEndStates(),metrics,false,old.stateAssessments(),old.incrementalExecution(),old.stagedIncrementalExecution());
     }
     private static MoveVerifier.Verification nativeVerification(MoveVerifier.Verification old) {
         return old==null?null:new MoveVerifier.Verification(old.accepted(),old.work()+1,old.receipts(),old.reason());

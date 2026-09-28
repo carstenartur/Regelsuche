@@ -87,13 +87,13 @@ class TypedLearnedMoveInventoryTest {
                 inventory.nativeProviders(),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,budget,
                 HistoryMovePolicy.nativePolicy(history.freeze(),HistoryMovePolicy.Weights.DEFAULT),NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE),
                 SearchContinuationContract.PATH_SENSITIVE);
-            assertEquals(MoveSearch.Outcome.TARGET_REACHED,nativeResult.outcome(),nativeResult.accounting().detail());
+            assertEquals(MoveSearch.Outcome.TARGET_REACHED,nativeResult.observedOutcome(),nativeResult.accounting().detail());
             assertEquals(SearchMove.SourceKind.LEARNED,nativeResult.witness().getFirst().move().descriptor().sourceKind());
             assertEquals(3,nativeResult.witness().getFirst().move().primitiveStepCount());
             assertEquals(goal,nativeResult.output());
             assertNotEquals(MoveSearch.Outcome.TARGET_REACHED,new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,
                 inventory.nativePrimitiveProviders(),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,budget),
-                SearchContinuationContract.PATH_SENSITIVE).outcome());
+                SearchContinuationContract.PATH_SENSITIVE).observedOutcome());
             assertEquals(0,transport.total(),"the existing learner and interpreter feed direct native history selection");
         }
         assertEquals(frozen, formation.toCanonicalJson());

@@ -8,7 +8,10 @@ import java.util.*;
 
 /** Explicit Expr execution through the same frontier and batch pickers as the historical facade. */
 public final class NativeMoveSearch {
-    public static final String REVISION = "regelsuche.native-expr-move-search/v3-audited-ownership";
+    public static final String REVISION = "regelsuche.native-expr-move-search/v4-partial-atomic-inventory";
+    /** Fixed release coverage, independent of mathematical proof validity or observed resource limits. */
+    public enum Coverage { PARTIAL_ATOMIC_INVENTORY }
+    public static Coverage coverage(){return Coverage.PARTIAL_ATOMIC_INVENTORY;}
     public record Primitive(MoveProvider.Descriptor descriptor, AstRewriteTransport transport) implements NativeMoveProvider,RetainedGraph.View {
     @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(descriptor);v.reference(transport);}
 
@@ -73,9 +76,14 @@ public final class NativeMoveSearch {
         void external(RetainedGraph.Usage usage,boolean known){externalNodes=usage.nodes();externalCharacters=usage.characters();externalReferences=usage.references();externalKnown=known;}
         /** Session-owned lookup/kernel graph after close, excluding result and caller input graphs. */
         public RetainedGraph.Usage live(){return new RetainedGraph.Usage(0,0,0);}
+        /** Peak of observed graphs only; uninstrumented atomic temporaries make total coverage incomplete. */
         public RetainedGraph.Usage peak(){return new RetainedGraph.Usage(peakNodes,peakCharacters,peakReferences);}
         public RetainedGraph.Usage resultRetained(){return new RetainedGraph.Usage(resultNodes,resultCharacters,resultReferences);}
-        public boolean complete(){return complete;}
+        /** No total work/retention qualification is available while the atomic inventory remains partial. */
+        public boolean complete(){return false;}
+        public Coverage coverage(){return NativeMoveSearch.coverage();}
+        /** Diagnostic completion of installed observations, never evidence of complete accounting. */
+        public boolean observationsComplete(){return complete;}
         public String detail(){return detail;}
         long work(){return Math.addExact(Math.addExact(Math.addExact(validationWork,executionWork),storageWork),retentionWork);}
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(detail);}
@@ -90,16 +98,22 @@ public final class NativeMoveSearch {
             this.work=work;peakNodes=pn;peakCharacters=pc;peakReferences=pr;
             resultNodes=retained.nodes();resultCharacters=retained.characters();resultReferences=retained.references();this.complete=complete;this.detail=detail;
         }
+        /** Observed output work only; missing atomic helpers prevent a total-cost claim. */
         public long work(){return work;}public long budget(){return budget;}
+        /** Peak of observed graphs only; uninstrumented atomic temporaries make total coverage incomplete. */
         public RetainedGraph.Usage peak(){return new RetainedGraph.Usage(peakNodes,peakCharacters,peakReferences);}
         public RetainedGraph.Usage resultRetained(){return new RetainedGraph.Usage(resultNodes,resultCharacters,resultReferences);}
-        public boolean complete(){return complete;}public String detail(){return detail;}
+        /** No total work/retention qualification is available while the atomic inventory remains partial. */
+        public boolean complete(){return false;}
+        public Coverage coverage(){return NativeMoveSearch.coverage();}
+        /** Diagnostic completion of installed observations, never evidence of complete accounting. */
+        public boolean observationsComplete(){return complete;}public String detail(){return detail;}
         public String workRevision(){return Result.EXPORT_REVISION;}
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(detail);}
     }
     public static final class ExportFailure extends IllegalStateException {
         private final ExportResult attempted;
-        ExportFailure(ExportResult attempted){super(attempted.accounting().detail());this.attempted=attempted;}
+        ExportFailure(ExportResult attempted){super(attempted.accounting().detail().isEmpty()?attempted.coverage().name():attempted.accounting().detail());this.attempted=attempted;}
         public ExportResult attempted(){return attempted;}
     }
     public static final class ExportResult implements RetainedGraph.View {
@@ -109,6 +123,9 @@ public final class NativeMoveSearch {
         public MoveSearch.Result projection(){return projection;}public ExportAccounting accounting(){return accounting;}
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(projection);v.reference(accounting);}
         public boolean complete(){return accounting.complete();}
+        /** A diagnostic artefact was materialized; this does not qualify its costs or bounded relation. */
+        public boolean artifactAvailable(){return projection!=null;}
+        public Coverage coverage(){return accounting.coverage();}
     }
     public static final class Result implements RetainedGraph.View {
         Accounting accounting;
@@ -131,24 +148,31 @@ public final class NativeMoveSearch {
         }
         /** Managed cursor receipts from eager/staged batch draining; separate from lane scheduling receipts. */
         public List<IncrementalProviderContract.Snapshot> batchCursorReceipts(){return result.batchCursorReceipts();}
-        public boolean accountingComplete(){return (accounting==null || accounting.complete())
+        public Coverage coverage(){return NativeMoveSearch.coverage();}
+        public boolean accountingComplete(){return false;}
+        /** Installed observations completed; partial coverage still precludes total qualification. */
+        public boolean observationsComplete(){return (accounting==null || accounting.observationsComplete())
             && batchCursorReceipts().stream().allMatch(receipt->receipt.accountingComplete() && receipt.status()!=IncrementalProviderContract.Status.FAILED)
             && cursorReceipts().stream().flatMap(r->r.lanes().stream()).allMatch(l->l.cursor()==null || l.cursor().accountingComplete());}
         public Accounting accounting(){if(accounting==null)throw new IllegalStateException("ownership accounting unavailable for this revision");return accounting;}
         public String workRevision(){return REVISION;}
         public long replayWork(){return replayWork;}
+        /** Sum of observed search/replay/accounting work, not a complete execution-cost upper bound. */
         public long totalWork(){return Math.addExact(Math.addExact(metrics().totalWork(),replayWork),accounting==null?0:accounting.work());}
         public boolean withinBudget(){return accountingComplete() && totalWork()<=workBudget;}
-        public MoveSearch.Outcome outcome(){if(accounting!=null && !accounting.complete())return MoveSearch.Outcome.INCONCLUSIVE;return totalWork()>workBudget?MoveSearch.Outcome.WORK_EXHAUSTED:result.outcome();}
+        public MoveSearch.Outcome outcome(){return MoveSearch.Outcome.INCONCLUSIVE;}
+        /** Diagnostic execution outcome including observed failures; never a total-budget qualification. */
+        public MoveSearch.Outcome observedOutcome(){if(accounting!=null && !accounting.observationsComplete())return MoveSearch.Outcome.INCONCLUSIVE;return totalWork()>workBudget?MoveSearch.Outcome.WORK_EXHAUSTED:result.outcome();}
+        public long workBudget(){return workBudget;}
         public Expr output(){return result.witness().isEmpty()?source:result.witness().getLast().target().expression();}
         public List<SearchExecution.Step<TypedMoveSearch.State,NativeSearchMove,NativeVerification>> witness(){return result.witness();}
-        /** Frontier receipt. Independently paid final replay is separate; use totalWork for the whole result. */
+        /** Frontier receipt. Independently paid final replay is separate; totalWork adds the other observed result costs. */
         public MoveSearch.Metrics metrics(){return result.metrics();}
-        /** Independent finite output-phase budget; add its paid work once to totalWork for an end-to-end comparison. */
+        /** Independent finite output-phase budget; add its observed work once to totalWork; coverage remains incomplete. */
         public ExportResult exportLegacy(long workBudget,SearchExpressionStore.Limits limits){return NativeExportSession.run(this,workBudget,limits);}
         public static final long DEFAULT_EXPORT_WORK=10_000_000;
-        public static final String EXPORT_REVISION="regelsuche.native-legacy-export/v1-lexical-buffers";
-        /** Historical frontier projection; the additive native replay receipt remains available separately. */
+        public static final String EXPORT_REVISION="regelsuche.native-legacy-export/v2-partial-atomic-inventory";
+        /** Requires fully qualified output accounting; partial coverage throws with its paid diagnostic artefact. */
         public MoveSearch.Result exportLegacy(){
             var exported=exportLegacy(DEFAULT_EXPORT_WORK,SearchExpressionStore.Limits.DEFAULT);
             if(!exported.complete())throw new ExportFailure(exported);return exported.projection();
@@ -166,7 +190,7 @@ public final class NativeMoveSearch {
                 for(var state:result.deadEndStates()){dead.add(export(state));de.regelsuche.retention.RetainedOperation.checkpoint();}
                 if(incrementalProviders!=null)for(var receipt:cursorReceipts()){expansions.add(new StagedIncrementalMoveExecution.Expansion(export(receipt.source()),receipt.closed(),receipt.lanes()));de.regelsuche.retention.RetainedOperation.checkpoint();}
                 de.regelsuche.retention.RetainedOperation.work(assessments.size()+witness.size()+events.size()+reached.size()+dead.size()+expansions.size()+7L);
-                return de.regelsuche.retention.RetainedOperation.produced(new MoveSearch.Result(outcome(),witness,events,reached,dead,result.metrics(),result.completeBoundedRelation(),assessments,null,
+                return de.regelsuche.retention.RetainedOperation.produced(new MoveSearch.Result(outcome(),witness,events,reached,dead,result.metrics(),false,assessments,null,
                     incrementalProviders==null?null:new StagedIncrementalMoveExecution(REVISION,StagedIncrementalMoveExecution.ORDER_REVISION,incrementalProviders,expansions)));
             }
         }
@@ -174,6 +198,7 @@ public final class NativeMoveSearch {
     public record QualityResult(Result search,TypedMoveSearch.State incumbent,long inputScore,long outputScore,
             List<SearchExecution.Step<TypedMoveSearch.State,NativeSearchMove,NativeVerification>> witness,long replayWork,long workBudget) implements RetainedGraph.View {
         public QualityResult { witness=List.copyOf(witness); }
+        /** Observed work only; see the native search coverage and accounting receipt. */
         public long totalWork(){return search.totalWork();}
         public boolean hasIncumbent(){return incumbent!=null;}
         @Override public long inputScore(){if(!hasIncumbent())throw new IllegalStateException("input was not scored");return inputScore;}

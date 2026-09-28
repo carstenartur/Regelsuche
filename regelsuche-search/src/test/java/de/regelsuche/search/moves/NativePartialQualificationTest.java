@@ -23,25 +23,33 @@ class NativePartialQualificationTest {
             MoveSearch.Mode.FAST,scheduling,new MoveSearch.Budget(2,2,0,10,10000000));
     }
     private static void partial(NativeMoveSearch.Result result){
+        assertEquals(NativeMoveSearch.Coverage.PARTIAL_ATOMIC_INVENTORY,result.coverage());
+        assertTrue(result.observationsComplete());assertTrue(result.accounting().observationsComplete());
         assertFalse(result.accountingComplete(),"known unobserved atomic allocations must prevent full native accounting qualification");
         assertFalse(result.accounting().complete());assertFalse(result.withinBudget());
         assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.outcome());
+        assertTrue(result.replayWork()>0);
+    }
+    private static void target(NativeMoveSearch.Result result){
+        partial(result);assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.observedOutcome());
         assertEquals(new VariableExpr("x"),result.output());assertEquals(1,result.witness().size());
-        assertTrue(result.witness().getFirst().verification().accepted());assertTrue(result.replayWork()>0);
+        assertTrue(result.witness().getFirst().verification().accepted());
     }
     @Test void allNativeEntryPointsPreserveMathematicsButRefuseTotalQualification(){
         var search=new NativeMoveSearch();
         try(var transport=AstTransportObservation.open()){
             for(var scheduling:List.of(MoveSearch.Scheduling.STAGED,MoveSearch.Scheduling.EAGER_CONTROL,MoveSearch.Scheduling.STAGED_INCREMENTAL)){
-                partial(search.search(problem(false,scheduling),SearchContinuationContract.PATH_SENSITIVE));
-                partial(search.search(problem(false,scheduling),SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT));
+                target(search.search(problem(false,scheduling),SearchContinuationContract.PATH_SENSITIVE));
+                target(search.search(problem(false,scheduling),SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT));
                 for(boolean explicit:List.of(false,true)){
                     var until=explicit?search.searchUntil(problem(true,scheduling),Objective.INSTANCE,1,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT)
                         :search.searchUntil(problem(true,scheduling),Objective.INSTANCE,1,SearchContinuationContract.PATH_SENSITIVE);
-                    partial(until.search());assertFalse(until.withinBudget());assertEquals(1,until.outputScore());assertEquals(new VariableExpr("x"),until.incumbent().expression());
+                    partial(until.search());assertEquals(MoveSearch.Outcome.QUALITY_REACHED,until.search().observedOutcome());
+                    assertEquals(1,until.witness().size());assertTrue(until.witness().getFirst().verification().accepted());assertFalse(until.withinBudget());assertEquals(1,until.outputScore());assertEquals(new VariableExpr("x"),until.incumbent().expression());
                     var best=explicit?search.searchBest(problem(true,scheduling),Objective.INSTANCE,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT)
                         :search.searchBest(problem(true,scheduling),Objective.INSTANCE,SearchContinuationContract.PATH_SENSITIVE);
-                    partial(best.search());assertFalse(best.withinBudget());assertEquals(1,best.outputScore());assertEquals(new VariableExpr("x"),best.incumbent().expression());
+                    partial(best.search());assertNotEquals(MoveSearch.Outcome.QUALITY_REACHED,best.search().observedOutcome());
+                    assertEquals(1,best.witness().size());assertTrue(best.witness().getFirst().verification().accepted());assertFalse(best.withinBudget());assertEquals(1,best.outputScore());assertEquals(new VariableExpr("x"),best.incumbent().expression());
                 }
             }
             assertEquals(0,transport.total());
@@ -51,6 +59,8 @@ class NativePartialQualificationTest {
         var result=new NativeMoveSearch().search(problem(false,MoveSearch.Scheduling.STAGED),SearchContinuationContract.PATH_SENSITIVE);
         long work=result.totalWork();
         var exported=result.exportLegacy(10000000,SearchExpressionStore.Limits.DEFAULT);
+        assertEquals(NativeMoveSearch.Coverage.PARTIAL_ATOMIC_INVENTORY,exported.coverage());
+        assertTrue(exported.artifactAvailable());assertTrue(exported.accounting().observationsComplete());
         assertFalse(exported.complete());assertFalse(exported.accounting().complete());assertNotNull(exported.projection());
         assertEquals(MoveSearch.Outcome.INCONCLUSIVE,exported.projection().outcome());assertFalse(exported.projection().completeBoundedRelation());
         assertEquals(1,exported.projection().witness().size());assertTrue(exported.projection().witness().getFirst().verification().accepted());

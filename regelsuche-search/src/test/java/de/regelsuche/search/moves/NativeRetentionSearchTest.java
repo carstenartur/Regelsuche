@@ -39,16 +39,16 @@ class NativeRetentionSearchTest {
         var target=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.frozen(source),List.of(),MoveSearch.Mode.FAST,
             MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(1,1,0,10,1000000));
         var engine=new NativeMoveSearch();var result=engine.search(target,SearchContinuationContract.PATH_SENSITIVE);
-        assertTrue(assertDoesNotThrow(result::accounting).complete());assertEquals("regelsuche.native-expr-move-search/v3-audited-ownership",result.workRevision());
+        assertTrue(assertDoesNotThrow(result::accounting).observationsComplete());assertFalse(result.accounting().complete());assertEquals("regelsuche.native-expr-move-search/v4-partial-atomic-inventory",result.workRevision());
         var problem=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION),List.of(),
             target.mode(),target.scheduling(),target.budget());
         for(var quality:List.of(engine.searchUntil(problem,DepthObjective.INSTANCE,1,SearchContinuationContract.PATH_SENSITIVE),
                 engine.searchBest(problem,DepthObjective.INSTANCE,SearchContinuationContract.PATH_SENSITIVE))) {
-            assertTrue(assertDoesNotThrow(quality.search()::accounting).complete());assertEquals(result.workRevision(),quality.search().workRevision());
+            assertTrue(assertDoesNotThrow(quality.search()::accounting).observationsComplete());assertFalse(quality.search().accounting().complete());assertEquals(result.workRevision(),quality.search().workRevision());
             assertTrue(quality.totalWork()>quality.search().metrics().totalWork());
         }
         var unsupported=engine.searchUntil(problem,state->new TypedSourceOnlySearch.Score(0,0),0,SearchContinuationContract.PATH_SENSITIVE);
-        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,unsupported.search().outcome());assertFalse(unsupported.hasIncumbent());
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,unsupported.search().observedOutcome());assertFalse(unsupported.hasIncumbent());
         assertFalse(unsupported.withinBudget());assertTrue(unsupported.totalWork()>0);
         assertTrue(unsupported.search().accounting().detail().startsWith("NATIVE_RETENTION_UNSUPPORTED:"));
     }
@@ -93,19 +93,19 @@ class NativeRetentionSearchTest {
             assertTrue(accounting.validationWork()>0);assertTrue(accounting.executionWork()>0);assertTrue(accounting.retentionWork()>0);
             assertEquals(result.search().metrics().totalWork()+result.replayWork()+accounting.validationWork()+accounting.executionWork()+accounting.storageWork()+accounting.retentionWork(),result.totalWork());
             assertEquals(new RetainedGraph.Usage(0,0,0),accounting.live());assertTrue(accounting.resultRetained().nodes()>=3);
-            assertTrue(result.withinBudget());
+            assertFalse(result.withinBudget());assertTrue(result.totalWork()<=result.workBudget());
             assertEquals(RetainedGraph.measure(result).retained(),accounting.resultRetained());
         }
         var unscored=engine.searchUntil(problem,DepthObjective.INSTANCE,0,SearchContinuationContract.PATH_SENSITIVE,
             new SearchExpressionStore.Limits(2,1000000,1000000,0));
         assertFalse(unscored.hasIncumbent());assertThrows(IllegalStateException.class,unscored::inputScore);
         assertThrows(IllegalStateException.class,unscored::outputScore);
-        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,unscored.search().outcome());assertFalse(unscored.withinBudget());
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,unscored.search().observedOutcome());assertFalse(unscored.withinBudget());
         assertTrue(unscored.totalWork()>0);
         var tinyBudget=new NativeMoveSearch.Problem(source,problem.context(),List.of(provider),problem.mode(),problem.scheduling(),
             new MoveSearch.Budget(1,1,0,10,1));
         var stopped=engine.searchBest(tinyBudget,DepthObjective.INSTANCE,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT);
-        assertEquals(MoveSearch.Outcome.WORK_EXHAUSTED,stopped.search().outcome());assertFalse(stopped.withinBudget());
+        assertEquals(MoveSearch.Outcome.WORK_EXHAUSTED,stopped.search().observedOutcome());assertFalse(stopped.withinBudget());
         assertTrue(stopped.totalWork()>1);assertSame(source,stopped.incumbent().expression());
         for(boolean best:List.of(false,true)) {
             var verifier=new FinalAllocation(NativeVerifier.registered(List.of(provider)));
@@ -115,7 +115,7 @@ class NativeRetentionSearchTest {
             var result=best?engine.searchBest(finalLimited,DepthObjective.INSTANCE,SearchContinuationContract.PATH_SENSITIVE,limits):
                 engine.searchUntil(finalLimited,DepthObjective.INSTANCE,0,SearchContinuationContract.PATH_SENSITIVE,limits);
             assertEquals(2,verifier.calls);assertEquals(1,result.witness().size());assertSame(target,result.incumbent().expression());
-            assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.search().outcome());assertFalse(result.withinBudget());
+            assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.search().observedOutcome());assertFalse(result.withinBudget());
             assertEquals("NATIVE_RETENTION_EXHAUSTED",result.search().accounting().detail());assertTrue(result.search().accounting().peak().nodes()>=20);
             assertEquals(result.search().totalWork(),result.totalWork());
         }
@@ -135,7 +135,7 @@ class NativeRetentionSearchTest {
         var result=assertDoesNotThrow(()->new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,
             new SearchExpressionStore.Limits(10,1000000,1000000,0)));
         assertEquals(2,verifier.calls);assertEquals(1,result.witness().size(),"the admitted witness must survive failed final qualification");
-        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.outcome());assertFalse(result.accountingComplete());assertFalse(result.withinBudget());
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.observedOutcome());assertFalse(result.accountingComplete());assertFalse(result.withinBudget());
         assertEquals("NATIVE_RETENTION_EXHAUSTED",result.accounting().detail());
         assertTrue(result.accounting().peak().nodes()>=20);assertTrue(result.totalWork()>result.metrics().totalWork());
         assertEquals(new RetainedGraph.Usage(0,0,0),result.accounting().live());
@@ -154,7 +154,7 @@ class NativeRetentionSearchTest {
             var problem=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.frozen(target),List.of(provider),MoveSearch.Mode.FAST,
                 MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(2,2,0,10,1000000),NativeMovePriorityPolicy.INVENTORY_ORDER,AllocatingScore.INSTANCE,NativeStateValue.NONE);
             var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,new SearchExpressionStore.Limits(20,1000000,1000000,0));
-            assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.outcome());assertFalse(result.accountingComplete());
+            assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.observedOutcome());assertFalse(result.accountingComplete());
             assertEquals("NATIVE_RETENTION_EXHAUSTED",result.accounting().detail());
             assertTrue(result.accounting().peak().nodes()>=100);
         } finally {AllocatingScore.INSTANCE.cache.clear();}
@@ -167,11 +167,11 @@ class NativeRetentionSearchTest {
             MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(1,1,0,10,1000000));
         var result=assertDoesNotThrow(()->new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,
             new SearchExpressionStore.Limits(10,150,10000,1)));
-        assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome(),result.accounting().detail());
-        assertTrue(result.accountingComplete());assertTrue(result.withinBudget());
+        assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.observedOutcome(),result.accounting().detail());
+        assertTrue(result.observationsComplete());assertFalse(result.accountingComplete());assertFalse(result.withinBudget());assertTrue(result.totalWork()<=result.workBudget());
         var rejected=assertDoesNotThrow(()->new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,
             new SearchExpressionStore.Limits(2,150,10000,1)));
-        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,rejected.outcome());
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,rejected.observedOutcome());
         assertTrue(rejected.totalWork()>0);assertEquals("NATIVE_RETENTION_EXHAUSTED",rejected.accounting().detail());
     }
 
@@ -185,7 +185,7 @@ class NativeRetentionSearchTest {
         var problem=new NativeMoveSearch.Problem(new VariableExpr("x"),TypedMoveSearch.Context.frozen(new VariableExpr("y")),List.of(provider),
             MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(2,1,0,10,1000000));
         var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,new SearchExpressionStore.Limits(10,1000000,1000000,0));
-        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.outcome(),"the generated AST is rejected by growth before any batch is emitted, but still occupies memory");
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.observedOutcome(),"the generated AST is rejected by growth before any batch is emitted, but still occupies memory");
         assertEquals("NATIVE_RETENTION_EXHAUSTED",result.accounting().detail());
         assertTrue(result.accounting().peak().nodes()>10);assertTrue(result.totalWork()>0);
         assertTrue(result.witness().isEmpty());
@@ -203,8 +203,8 @@ class NativeRetentionSearchTest {
             var problem=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.frozen(target),List.of(provider),
                 MoveSearch.Mode.FAST,scheduling,new MoveSearch.Budget(2,1,0,10,1000000));
             var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT);
-            assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome(),result.accounting().detail());
-            assertTrue(result.accountingComplete());assertTrue(result.withinBudget());
+            assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.observedOutcome(),result.accounting().detail());
+            assertTrue(result.observationsComplete());assertFalse(result.accountingComplete());assertFalse(result.withinBudget());assertTrue(result.totalWork()<=result.workBudget());
             assertSame(target,result.output());assertEquals(1,result.witness().size());
             assertTrue(result.accounting().resultRetained().nodes()>=3);
             assertTrue(result.accounting().peak().references()>result.accounting().resultRetained().references());
@@ -217,12 +217,12 @@ class NativeRetentionSearchTest {
         var small=new NativeMoveSearch.Problem(expression,TypedMoveSearch.Context.frozen(expression),List.of(),
             MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(1,1,0,10,1));
         var overrun=new NativeMoveSearch().search(small,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT);
-        assertEquals(MoveSearch.Outcome.WORK_EXHAUSTED,overrun.outcome());assertFalse(overrun.withinBudget());
+        assertEquals(MoveSearch.Outcome.WORK_EXHAUSTED,overrun.observedOutcome());assertFalse(overrun.withinBudget());
         assertTrue(overrun.accounting().retentionWork()>1);
         var opaque=new NativeMoveSearch.Problem(expression,small.context(),List.of(),small.mode(),small.scheduling(),
             new MoveSearch.Budget(1,1,0,10,100000),NativeMovePriorityPolicy.INVENTORY_ORDER,s->0,NativeStateValue.NONE);
         var unknown=new NativeMoveSearch().search(opaque,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT);
-        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,unknown.outcome());assertFalse(unknown.accountingComplete());
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,unknown.observedOutcome());assertFalse(unknown.accountingComplete());assertFalse(unknown.observationsComplete());
         assertTrue(unknown.accounting().detail().startsWith("NATIVE_RETENTION_UNSUPPORTED:"));
         assertTrue(unknown.accounting().retentionWork()>0);
     }
@@ -232,13 +232,13 @@ class NativeRetentionSearchTest {
             MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(1,1,0,10,100000));
         var rejected=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,
             new SearchExpressionStore.Limits(1,2,4,0));
-        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,rejected.outcome());
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,rejected.observedOutcome());
         assertEquals("NATIVE_RETENTION_EXHAUSTED",rejected.accounting().detail());
-        assertFalse(rejected.accountingComplete());assertFalse(rejected.withinBudget());
+        assertFalse(rejected.accountingComplete());assertFalse(rejected.observationsComplete());assertFalse(rejected.withinBudget());
         assertTrue(rejected.accounting().retentionWork()>0);assertTrue(rejected.totalWork()>0);
-        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,rejected.exportLegacy().outcome());
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,rejected.exportLegacy(NativeMoveSearch.Result.DEFAULT_EXPORT_WORK,SearchExpressionStore.Limits.DEFAULT).projection().outcome());
         var accepted=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT);
-        assertEquals(MoveSearch.Outcome.TARGET_REACHED,accepted.outcome());assertTrue(accepted.withinBudget());
+        assertEquals(MoveSearch.Outcome.TARGET_REACHED,accepted.observedOutcome());assertFalse(accepted.withinBudget());assertTrue(accepted.totalWork()<=accepted.workBudget());
         assertTrue(accepted.accounting().validationWork()>0);assertTrue(accepted.accounting().storageWork()>0);
         assertTrue(accepted.accounting().retentionWork()>0);
         assertEquals(new RetainedGraph.Usage(0,0,0),accepted.accounting().live(),"closed session retains no lookup graph");

@@ -71,8 +71,8 @@ class CheckedSchemaCursorTest {
                 new MoveSearch.Budget(0,1,100000,10,100000000));
             try(var transport=AstTransportObservation.open()) {
                 var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT);
-                assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome(),result.accounting().detail());
-                assertTrue(result.accountingComplete());assertTrue(result.withinBudget());assertTrue(result.replayWork()>0);
+                assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.observedOutcome(),result.accounting().detail());
+                assertTrue(result.observationsComplete());assertFalse(result.accountingComplete());assertFalse(result.withinBudget());assertTrue(result.totalWork()<=result.workBudget());assertTrue(result.replayWork()>0);
                 assertEquals(0,transport.total());assertTrue(result.accounting().peak().nodes()>0);
                 assertTrue(result.accounting().resultRetained().nodes()>0);
                 assertEquals(new de.regelsuche.retention.RetainedGraph.Usage(0,0,0),result.accounting().live());
@@ -145,10 +145,10 @@ class CheckedSchemaCursorTest {
             MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED_INCREMENTAL,budget),SearchContinuationContract.PATH_SENSITIVE));
         long paidSearch=result.totalWork();var searchOwned=de.regelsuche.retention.RetainedGraph.measure(result).retained();
         var paidExport=result.exportLegacy(NativeMoveSearch.Result.DEFAULT_EXPORT_WORK,SearchExpressionStore.Limits.DEFAULT);
-        assertTrue(paidExport.complete(),paidExport.accounting().detail());assertTrue(paidExport.accounting().work()>0);
-        var projection=paidExport.projection();assertEquals(projection,result.exportLegacy());
+        assertTrue(paidExport.artifactAvailable(),paidExport.accounting().detail());assertFalse(paidExport.complete());assertTrue(paidExport.accounting().work()>0);
+        var projection=paidExport.projection();assertEquals(projection,result.exportLegacy(NativeMoveSearch.Result.DEFAULT_EXPORT_WORK,SearchExpressionStore.Limits.DEFAULT).projection());
         assertEquals(paidSearch,result.totalWork());assertEquals(searchOwned,de.regelsuche.retention.RetainedGraph.measure(result).retained());
-        assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome());
+        assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.observedOutcome());
         assertEquals(legacy.encodedResult().witness(),projection.witness());assertEquals(legacy.encodedResult().events(),projection.events());
         assertEquals(legacy.metrics(),result.metrics());
         var receipts=projection.stagedIncrementalExecution();assertNotNull(receipts);assertTrue(receipts.accountingComplete());
@@ -166,7 +166,7 @@ class CheckedSchemaCursorTest {
             new MoveSearch.Budget(0,1,100000,10,1000000),NativeMovePriorityPolicy.INVENTORY_ORDER,NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE,checks);
         try(var transport=AstTransportObservation.open()) {
         var quality=new NativeMoveSearch().searchUntil(problem,NativeTestObservation.Objective.DEPTH,0,SearchContinuationContract.PATH_SENSITIVE);
-        assertTrue(quality.withinBudget());assertEquals(2,checks.calls());assertTrue(quality.replayWork()>0);
+        assertFalse(quality.withinBudget());assertTrue(quality.totalWork()<=quality.workBudget());assertEquals(2,checks.calls());assertTrue(quality.replayWork()>0);
         assertTrue(quality.search().cursorReceipts().stream().allMatch(SearchExecution.Expansion::closed));
         assertEquals(0,transport.total(),"checked schema generation, selection, admission and final replay must stay native");
         }
@@ -174,11 +174,11 @@ class CheckedSchemaCursorTest {
         for(long budget:List.of(8L,128L,1024L,2048L,4096L,8192L,16384L,32768L,65536L,131072L,262144L,524288L)) {
             var limited=new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,List.of(provider),MoveSearch.Mode.FAST,
                 MoveSearch.Scheduling.STAGED_INCREMENTAL,new MoveSearch.Budget(0,1,100000,10,budget)),SearchContinuationContract.PATH_SENSITIVE);
-            observedBudgets.add(budget+":"+limited.outcome()+":"+limited.totalWork()+":"+limited.cursorReceipts().stream().flatMap(expansion->expansion.lanes().stream()).filter(lane->lane.cursor()!=null).map(lane->lane.cursor().work().prepaidApplications().toString()).toList());
+            observedBudgets.add(budget+":"+limited.observedOutcome()+":"+limited.totalWork()+":"+limited.cursorReceipts().stream().flatMap(expansion->expansion.lanes().stream()).filter(lane->lane.cursor()!=null).map(lane->lane.cursor().work().prepaidApplications().toString()).toList());
             for(var expansion:limited.cursorReceipts())for(var lane:expansion.lanes())if(lane.cursor()!=null) {
                 assertTrue(lane.cursor().closed());var prepaid=lane.cursor().work().prepaidApplications();
                 if(prepaid.abandonedApplications()>0) {
-                    abandoned=true;assertEquals(MoveSearch.Outcome.WORK_EXHAUSTED,limited.outcome());
+                    abandoned=true;assertEquals(MoveSearch.Outcome.WORK_EXHAUSTED,limited.observedOutcome());
                     assertTrue(prepaid.chargedUnits()>0);assertEquals(0,prepaid.openApplications());
                     assertTrue(limited.metrics().totalWork()>=prepaid.chargedUnits());
                 }

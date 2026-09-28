@@ -41,20 +41,22 @@ class NativeProgramMoveProviderTest {
         NativeMoveSearch.Result result;
         try(var transport=AstTransportObservation.open()) {
         result=assertDoesNotThrow(()->new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,List.of(new NativeProgramMoveProvider(descriptor,program)),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,budget),SearchContinuationContract.PATH_SENSITIVE));
-        assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome());assertSame(goal,result.output());
+        assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.observedOutcome());assertSame(goal,result.output());
         assertEquals(2,result.witness().getFirst().move().primitiveStepCount());
         assertEquals(0,transport.total(),"native program admission must not invoke any codec");
         }
         try(var transport=AstTransportObservation.open()) {
-            assertEquals(legacy.encodedResult(),result.exportLegacy());
+            var expected=legacy.encodedResult();
+            assertEquals(new MoveSearch.Result(MoveSearch.Outcome.INCONCLUSIVE,expected.witness(),expected.events(),expected.reachedStates(),expected.deadEndStates(),
+                expected.metrics(),false,expected.stateAssessments(),expected.incrementalExecution(),expected.stagedIncrementalExecution()),result.exportLegacy(NativeMoveSearch.Result.DEFAULT_EXPORT_WORK,SearchExpressionStore.Limits.DEFAULT).projection());
             assertTrue(transport.total()>0,"explicit export exercises the measured codec");
         }
         var accountedProblem=new NativeMoveSearch.Problem(source,context,List.of(new NativeProgramMoveProvider(descriptor,program)),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,
             new MoveSearch.Budget(2,1,0,10,1000000));
         var accounted=new NativeMoveSearch().search(accountedProblem,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT);
-        assertEquals(MoveSearch.Outcome.TARGET_REACHED,accounted.outcome(),accounted.accounting().detail());
+        assertEquals(MoveSearch.Outcome.TARGET_REACHED,accounted.observedOutcome(),accounted.accounting().detail());
         assertTrue(accounted.accounting().validationWork()>0);assertTrue(accounted.accounting().executionWork()>0);
-        assertTrue(accounted.withinBudget());assertEquals(2,accounted.witness().getFirst().move().primitiveStepCount());
+        assertFalse(accounted.withinBudget());assertTrue(accounted.totalWork()<=accounted.workBudget());assertEquals(2,accounted.witness().getFirst().move().primitiveStepCount());
         var provider=new NativeProgramMoveProvider(descriptor,program);
         var history=program.transformMeasured(source).candidates().getFirst();
         var forged=new CompiledAstRewriteProgram.Candidate(history.programId(),List.of("foreign-stage",history.sourceIds().getLast()),history.steps());
