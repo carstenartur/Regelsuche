@@ -27,6 +27,23 @@ class NativeExportAccountingTest {
             assertEquals(paidSearch,result.totalWork());assertSame(before,result.accounting());
         }
     }
+    @Test void exportDoesNotReadOrPopulateACallersLexicalExpressionCache(){
+        var result=source();var codec=new de.regelsuche.search.program.CompiledAstReplayCodec();
+        var warm=new VariableExpr("outer");
+        de.regelsuche.search.program.CompiledAstReplayCodec.withExpressionCache(8,1000000,()->{
+            codec.encodeExpression(warm);
+            var output=result.exportLegacy(1000000,SearchExpressionStore.Limits.DEFAULT);assertTrue(output.complete());
+            try(var transport=AstTransportObservation.open()) {
+                codec.encodeExpression(warm);assertEquals(0,transport.count(de.regelsuche.search.program.AstTransportObservation.Operation.EXPRESSION_JSON_WRITE));
+                codec.encodeExpression(result.output());assertEquals(1,transport.count(de.regelsuche.search.program.AstTransportObservation.Operation.EXPRESSION_JSON_WRITE),"export must not insert its AST into a caller-owned outer cache");
+            }
+            try(var transport=AstTransportObservation.open()) {
+                assertTrue(result.exportLegacy(1000000,SearchExpressionStore.Limits.DEFAULT).complete());
+                assertTrue(transport.count(de.regelsuche.search.program.AstTransportObservation.Operation.EXPRESSION_JSON_WRITE)>0,"warm outer entries do not make native export encoding free");
+            }
+            return null;
+        });
+    }
     @Test void zeroAndTightWorkAndRetentionReturnPaidIncompleteExportsWithoutAProjection(){
         var result=source();long paidSearch=result.totalWork();
         var normal=assertDoesNotThrow(()->result.exportLegacy(1000000,SearchExpressionStore.Limits.DEFAULT));
