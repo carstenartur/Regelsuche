@@ -66,9 +66,7 @@ final class MatcherDescriptor {
             case ExprMatcher.LiteralVariable value -> assembly.put(0,value.name());
             case ExprMatcher.NumberProperty value -> assembly.put(0,value.kind().name());
             case ExprMatcher.Pattern value -> {
-                // Keep the existing record rendering. Its internal temporaries
-                // remain a separate, explicitly incomplete inventory item.
-                assembly.putText(0,value.pattern().toString());
+                assembly.put(0,PatternDescriptorText.render(value.pattern()));
                 assembly.put(1,profile(value.recognitionProfile()));
             }
             case ExprMatcher.Bind value -> {
