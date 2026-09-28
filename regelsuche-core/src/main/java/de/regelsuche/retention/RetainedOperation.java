@@ -15,16 +15,19 @@ public final class RetainedOperation implements AutoCloseable,RetainedGraph.View
     private final long owner=Thread.currentThread().threadId();
     private Frame current;
     private boolean closed;
-    private RetainedOperation(Sink sink){this.sink=Objects.requireNonNull(sink);previous=CURRENT.get();CURRENT.set(this);sink.executionWork(1);}
+    private RetainedOperation(Sink sink){this.sink=Objects.requireNonNull(sink);previous=CURRENT.get();sink.executionWork(1);CURRENT.set(this);}
     public static RetainedOperation open(Sink sink){return new RetainedOperation(sink);}
     public static void work(long units){var scope=CURRENT.get();if(scope!=null)scope.sink.executionWork(units);}
     public static void validation(long units){var scope=CURRENT.get();if(scope!=null)scope.sink.validationWork(units);}
     /** Retains the actual mutable collections/objects, so later checkpoints observe their current fields. */
     public static Frame retain(Object... values){
         var scope=CURRENT.get();if(scope==null)return null;
-        var frame=new Frame(scope,values);scope.current=frame;scope.sink.executionWork(2);
+        var frame=new Frame(scope,values);scope.sink.executionWork(2);scope.current=frame;
         try { scope.sink.checkpoint();return frame; }
-        catch(RuntimeException failure){frame.close();throw failure;}
+        catch(RuntimeException | Error failure){
+            try{frame.close();}catch(RuntimeException | Error cleanup){failure.addSuppressed(cleanup);}
+            throw failure;
+        }
     }
     public static void checkpoint(){var scope=CURRENT.get();if(scope!=null)scope.sink.checkpoint();}
     public static <T> T produced(T value){work(1);try(var frame=retain(value)){return value;}}
