@@ -206,96 +206,113 @@ public final class PreparedAstRewriteTransformationEngine
     }
 
     private List<RewriteResult> rewriteEverywhere(Expr subtree, boolean retainLegacyHash) {
-        List<RewriteResult> results = new ArrayList<>();
-        try(var retained=retainLegacyHash?null:RetainedOperation.retain(this,subtree,results)) {
-        String subtreeHash = null;
-        for (RewriteRule rule : ruleIndex == null ? rules : ruleIndex.candidates(subtree)) {
-            Expr rewritten = applyIfMatched(rule, subtree);
-            if (!retainLegacyHash && rewritten != null) AstRewriteTransport.requireBounded(rewritten);
-            if (rewritten == null || rewritten.equals(subtree)) {
-                continue;
+        List<RewriteResult> results = retainLegacyHash ? new ArrayList<>() : null;
+        RetainedOperation.Frame owned = null;
+        try {
+            String subtreeHash = null;
+            for (RewriteRule rule : ruleIndex == null ? rules : ruleIndex.candidates(subtree)) {
+                Expr rewritten = applyIfMatched(rule, subtree);
+                if (!retainLegacyHash && rewritten != null) AstRewriteTransport.requireBounded(rewritten);
+                if (rewritten == null || rewritten.equals(subtree)) continue;
+                if (retainLegacyHash && subtreeHash == null) subtreeHash = stableHash(subtree);
+                if (results == null) {
+                    results = new ArrayList<>();
+                    RetainedOperation.work(1);
+                    owned = RetainedOperation.retain(results, rewritten);
+                }
+                results.add(new RewriteResult(rule, rewritten, subtreeHash, rule.assumptions(subtree)));
+                if (!retainLegacyHash) {
+                    RetainedOperation.work(2);
+                    RetainedOperation.checkpoint();
+                }
             }
-            if (retainLegacyHash && subtreeHash == null) {
-                subtreeHash = stableHash(subtree);
+            if (subtree instanceof BinaryExpr binaryExpr) {
+                results = rewriteBinaryChildren(binaryExpr, retainLegacyHash, results);
+            } else if (subtree instanceof FunctionExpr functionExpr) {
+                results = rewriteFunctionArguments(functionExpr, retainLegacyHash, results);
             }
-            results.add(new RewriteResult(
-                rule,
-                rewritten,
-                subtreeHash,
-                rule.assumptions(subtree)
-            ));
-        }
-
-        if (subtree instanceof BinaryExpr binaryExpr) {
-            rewriteBinaryChildren(binaryExpr, retainLegacyHash, results);
-        } else if (subtree instanceof FunctionExpr functionExpr) {
-            rewriteFunctionArguments(functionExpr, retainLegacyHash, results);
-        }
-        if(!retainLegacyHash)RetainedOperation.checkpoint();
-        return results;
+            return results == null ? List.of() : results;
+        } finally {
+            if (owned != null) owned.close();
         }
     }
 
-    private void rewriteBinaryChildren(BinaryExpr binaryExpr, boolean retainLegacyHash,
+    private List<RewriteResult> rewriteBinaryChildren(BinaryExpr binaryExpr, boolean retainLegacyHash,
             List<RewriteResult> results) {
-            var leftRewrites=rewriteEverywhere(binaryExpr.left(), retainLegacyHash);
-            try(var child=retainLegacyHash?null:RetainedOperation.retain(leftRewrites)) {
-            for (RewriteResult leftRewrite : leftRewrites) {
-                results.add(new RewriteResult(
-                    leftRewrite.rule(),
-                    new BinaryExpr(
-                        leftRewrite.expression(),
-                        binaryExpr.operator(),
-                        binaryExpr.right()
-                    ),
-                    leftRewrite.sourceSubtreeHash(),
-                    leftRewrite.assumptions()
-                ));
-                if(!retainLegacyHash){RetainedOperation.work(2);RetainedOperation.checkpoint();}
+        RetainedOperation.Frame owned = null;
+        try {
+            var leftRewrites = rewriteEverywhere(binaryExpr.left(), retainLegacyHash);
+            if (results == null && !leftRewrites.isEmpty()) {
+                results = new ArrayList<>();
+                RetainedOperation.work(1);
+                owned = RetainedOperation.retain(results, leftRewrites);
             }
+            try (var child = retainLegacyHash || leftRewrites.isEmpty() ? null : RetainedOperation.retain(leftRewrites)) {
+
+                for (RewriteResult rewrite : leftRewrites) {
+                    results.add(new RewriteResult(rewrite.rule(),
+                        new BinaryExpr(rewrite.expression(), binaryExpr.operator(), binaryExpr.right()),
+                        rewrite.sourceSubtreeHash(), rewrite.assumptions()));
+                    if (!retainLegacyHash) { RetainedOperation.work(2); RetainedOperation.checkpoint(); }
+                }
             }
-            var rightRewrites=rewriteEverywhere(binaryExpr.right(), retainLegacyHash);
-            try(var child=retainLegacyHash?null:RetainedOperation.retain(rightRewrites)) {
-            for (RewriteResult rightRewrite : rightRewrites) {
-                results.add(new RewriteResult(
-                    rightRewrite.rule(),
-                    new BinaryExpr(
-                        binaryExpr.left(),
-                        binaryExpr.operator(),
-                        rightRewrite.expression()
-                    ),
-                    rightRewrite.sourceSubtreeHash(),
-                    rightRewrite.assumptions()
-                ));
-                if(!retainLegacyHash){RetainedOperation.work(2);RetainedOperation.checkpoint();}
+            var rightRewrites = rewriteEverywhere(binaryExpr.right(), retainLegacyHash);
+            if (results == null && !rightRewrites.isEmpty()) {
+                results = new ArrayList<>();
+                RetainedOperation.work(1);
+                owned = RetainedOperation.retain(results, rightRewrites);
             }
+            try (var child = retainLegacyHash || rightRewrites.isEmpty() ? null : RetainedOperation.retain(rightRewrites)) {
+
+                for (RewriteResult rewrite : rightRewrites) {
+                    results.add(new RewriteResult(rewrite.rule(),
+                        new BinaryExpr(binaryExpr.left(), binaryExpr.operator(), rewrite.expression()),
+                        rewrite.sourceSubtreeHash(), rewrite.assumptions()));
+                    if (!retainLegacyHash) { RetainedOperation.work(2); RetainedOperation.checkpoint(); }
+                }
             }
+            return results;
+        } finally {
+            if (owned != null) owned.close();
+        }
     }
 
-    private void rewriteFunctionArguments(FunctionExpr functionExpr, boolean retainLegacyHash,
+    private List<RewriteResult> rewriteFunctionArguments(FunctionExpr functionExpr, boolean retainLegacyHash,
             List<RewriteResult> results) {
+        RetainedOperation.Frame owned = null;
+        try {
             List<Expr> arguments = functionExpr.arguments();
             for (int index = 0; index < arguments.size(); index++) {
-                final int position = index;
-                var argumentRewrites=rewriteEverywhere(arguments.get(index), retainLegacyHash);
-                try(var child=retainLegacyHash?null:RetainedOperation.retain(argumentRewrites)) {
-                for (RewriteResult argumentRewrite : argumentRewrites) {
-                    List<Expr> replaced = new ArrayList<>(arguments);
-                    if(!retainLegacyHash)RetainedOperation.work(arguments.size());
-                    try(var argumentsHeld=retainLegacyHash?null:RetainedOperation.retain(replaced)) {
-                    replaced.set(position, argumentRewrite.expression());
-                    if(!retainLegacyHash)RetainedOperation.work(1);
-                    results.add(new RewriteResult(
-                        argumentRewrite.rule(),
-                        new FunctionExpr(functionExpr.name(), replaced),
-                        argumentRewrite.sourceSubtreeHash(),
-                        argumentRewrite.assumptions()
-                    ));
-                    if(!retainLegacyHash){RetainedOperation.work(replaced.size()+2L);RetainedOperation.checkpoint();}
+                var argumentRewrites = rewriteEverywhere(arguments.get(index), retainLegacyHash);
+                if (results == null && !argumentRewrites.isEmpty()) {
+                    results = new ArrayList<>();
+                    RetainedOperation.work(1);
+                    owned = RetainedOperation.retain(results, argumentRewrites);
+                }
+                try (var child = retainLegacyHash || argumentRewrites.isEmpty() ? null : RetainedOperation.retain(argumentRewrites)) {
+
+                    for (RewriteResult rewrite : argumentRewrites) {
+                        appendFunctionRewrite(functionExpr, index, rewrite, retainLegacyHash, results);
                     }
                 }
-                }
             }
+            return results;
+        } finally {
+            if (owned != null) owned.close();
+        }
+    }
+
+    private void appendFunctionRewrite(FunctionExpr functionExpr, int position, RewriteResult rewrite,
+            boolean retainLegacyHash, List<RewriteResult> results) {
+        List<Expr> replaced = new ArrayList<>(functionExpr.arguments());
+        if (!retainLegacyHash) RetainedOperation.work(replaced.size());
+        try (var argumentsHeld = retainLegacyHash ? null : RetainedOperation.retain(replaced)) {
+            replaced.set(position, rewrite.expression());
+            if (!retainLegacyHash) RetainedOperation.work(1);
+            results.add(new RewriteResult(rewrite.rule(), new FunctionExpr(functionExpr.name(), replaced),
+                rewrite.sourceSubtreeHash(), rewrite.assumptions()));
+            if (!retainLegacyHash) { RetainedOperation.work(replaced.size()+2L); RetainedOperation.checkpoint(); }
+        }
     }
 
     private static Expr applyIfMatched(RewriteRule rule, Expr subtree) {
