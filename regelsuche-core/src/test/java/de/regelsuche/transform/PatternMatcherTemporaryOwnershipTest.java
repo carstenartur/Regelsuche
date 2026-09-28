@@ -189,4 +189,38 @@ class PatternMatcherTemporaryOwnershipTest {
         assertFalse(observation.inputMissing);
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
+
+    @Test void booleanResultsPayBranchesThatTheirCallerCannotReceiveAsACounter() {
+        Expr input = new ExpressionParser().parseTerm("f(x+y,y)");
+        var pattern = pattern(); var profile = RecognitionProfile.arithmeticAc();
+        var detailed = new Observation(); detailed.input = input;
+        EquivalenceAwarePatternMatcher.MatchAttempt result;
+        try (var scope = RetainedOperation.open(detailed)) {
+            detailed.scope = scope;
+            result = EquivalenceAwarePatternMatcher.matchDetailed(pattern,input,new HashMap<>(),profile);
+        }
+        var compatibility = new Observation(); compatibility.input = input;
+        try (var scope = RetainedOperation.open(compatibility)) {
+            compatibility.scope = scope;
+            assertTrue(EquivalenceAwarePatternMatcher.match(pattern,input,new HashMap<>(),profile));
+        }
+        assertTrue(result.visitedBranches() > 2);
+        assertEquals(detailed.work + result.visitedBranches() + result.bindings().size() + 1,
+            compatibility.work,"the same match additionally pays its branches and caller-map publication once");
+    }
+
+    @Test void booleanCloseFailureDoesNotChargeAlreadySettledBranchesAgain() {
+        Expr input = new ExpressionParser().parseTerm("f(x+y,y)");
+        var observation = new Observation(); observation.input = input; observation.abortResultClose = true;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var failure = assertThrows(MatchAbort.class,() -> EquivalenceAwarePatternMatcher.match(
+                pattern(),input,new HashMap<>(),RecognitionProfile.arithmeticAc()));
+            assertSame(observation.closeFailure,failure);
+            assertTrue(observation.outcomeBranches > 2);
+            assertEquals(0,observation.workAfterCloseFailure,
+                "the boolean path already settled branches before publishing its bindings");
+        }
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
 }
