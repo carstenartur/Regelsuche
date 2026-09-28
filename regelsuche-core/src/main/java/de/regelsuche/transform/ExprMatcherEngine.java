@@ -258,19 +258,23 @@ final class ExprMatcherEngine {
         Session session,
         boolean atRoot
     ) {
-        List<State> current = List.of(state);
-        for (ExprMatcher matcher : all.matchers()) {
-            List<State> next = new ArrayList<>();
-            for (State candidate : current) {
-                next.addAll(evaluate(
-                    matcher, expression, candidate, session, atRoot));
-            }
-            current = session.limit(next, all);
-            if (current.isEmpty()) {
-                break;
+        var lists = new StateLists(); lists.current = List.of(state);
+        try (var owned = RetainedOperation.retainCompleted(3,all,expression,state,session,lists)) {
+            try {
+                for (ExprMatcher matcher : all.matchers()) {
+                    lists.begin();
+                    for (State candidate : lists.current) {
+                        lists.add(evaluate(matcher,expression,candidate,session,atRoot));
+                    }
+                    lists.freeze(session,all);
+                    lists.advance();
+                    if (lists.current.isEmpty()) break;
+                }
+                return lists.current;
+            } catch (RuntimeException | Error failure) {
+                observeFailure(failure); throw failure;
             }
         }
-        return current;
     }
 
     private static List<State> matchAny(
@@ -280,12 +284,19 @@ final class ExprMatcherEngine {
         Session session,
         boolean atRoot
     ) {
-        List<State> matches = new ArrayList<>();
-        for (ExprMatcher matcher : any.matchers()) {
-            matches.addAll(evaluate(
-                matcher, expression, state, session, atRoot));
+        var lists = new StateLists();
+        try (var owned = RetainedOperation.retainCompleted(1,any,expression,state,session,lists)) {
+            try {
+                lists.begin();
+                for (ExprMatcher matcher : any.matchers()) {
+                    lists.add(evaluate(matcher,expression,state,session,atRoot));
+                }
+                lists.freeze(session,any);
+                return lists.result;
+            } catch (RuntimeException | Error failure) {
+                observeFailure(failure); throw failure;
+            }
         }
-        return session.limit(matches, any);
     }
 
     private static List<State> matchNot(
@@ -339,26 +350,27 @@ final class ExprMatcherEngine {
                     != function.arguments().size()) {
             return List.of();
         }
-        List<State> current = List.of(state);
-        for (int index = 0; index < function.arguments().size(); index++) {
-            List<State> next = new ArrayList<>();
-            for (State match : current) {
-                next.addAll(evaluate(
-                    function.arguments().get(index),
-                    candidate.arguments().get(index),
-                    match,
-                    session,
-                    false
-                ));
-            }
-            current = session.limit(next, function);
-            if (current.isEmpty()) {
-                return List.of();
+        var lists = new StateLists(); lists.current = List.of(state);
+        try (var owned = RetainedOperation.retainCompleted(3,function,expression,state,session,lists)) {
+            try {
+                for (int index = 0; index < function.arguments().size(); index++) {
+                    lists.begin();
+                    for (State match : lists.current) {
+                        lists.add(evaluate(function.arguments().get(index),candidate.arguments().get(index),
+                            match,session,false));
+                    }
+                    lists.freeze(session,function);
+                    lists.advance();
+                    if (lists.current.isEmpty()) return List.of();
+                }
+                lists.begin();
+                for (State match : lists.current) lists.add(match.traced("function:" + function.name()));
+                lists.freeze();
+                return lists.result;
+            } catch (RuntimeException | Error failure) {
+                observeFailure(failure); throw failure;
             }
         }
-        return current.stream()
-            .map(match -> match.traced("function:" + function.name()))
-            .toList();
     }
 
     private static void collectContained(
@@ -606,6 +618,68 @@ final class ExprMatcherEngine {
         result.addAll(path);
         result.add(index);
         return List.copyOf(result);
+    }
+
+    private static void observeFailure(Throwable failure) {
+        try { RetainedOperation.checkpoint(); }
+        catch (RuntimeException | Error observation) {
+            if (observation != failure) failure.addSuppressed(observation);
+        }
+    }
+
+    /** Actual per-call owners; no completed result is registered beyond the caller's frame. */
+    private static final class StateLists implements RetainedGraph.View {
+        private List<State> current;
+        private ArrayList<State> next;
+        private List<State> child;
+        private List<State> result;
+
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(current); visitor.reference(next);
+            visitor.reference(child); visitor.reference(result);
+        }
+
+        private void begin() {
+            next = new ArrayList<>(); child = null; result = null;
+            RetainedOperation.work(4);
+        }
+
+        private void add(List<State> values) {
+            child = values;
+            RetainedOperation.work(1);
+            next.addAll(values);
+            RetainedOperation.work(1L + values.size());
+            // Observe before the next child replaces its actual result list.
+            RetainedOperation.checkpoint();
+            child = null;
+            RetainedOperation.work(1);
+        }
+
+        private void add(State value) {
+            next.add(value);
+            RetainedOperation.work(1);
+            RetainedOperation.checkpoint();
+        }
+
+        private void freeze(Session session,ExprMatcher matcher) {
+            result = session.limit(next,matcher);
+            observeFrozen();
+        }
+
+        private void freeze() {
+            result = List.copyOf(next);
+            observeFrozen();
+        }
+
+        private void observeFrozen() {
+            RetainedOperation.work(2L + result.size());
+            RetainedOperation.checkpoint();
+        }
+
+        private void advance() {
+            current = result;
+            RetainedOperation.work(1);
+        }
     }
 
     private static final class Session implements RetainedGraph.View {
