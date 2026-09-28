@@ -16,7 +16,7 @@ class ExpressionFormatterTemporaryOwnershipTest {
         RetainedOperation scope;
         Expr input;
         long work, previousWork, growthWork, peakCharacters, abortCharactersAt = Long.MAX_VALUE;
-        int queuedActions, buffers;
+        int queuedActions, buffers, checkpoints;
         boolean inputMissing, growth, abortGrowth, unwrittenReplacement;
         boolean parenthesisGrowth, renderedNumberOwned;
         String renderedNumber;
@@ -33,6 +33,7 @@ class ExpressionFormatterTemporaryOwnershipTest {
         @Override public void validationWork(long units) { executionWork(units); }
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(scope); }
         @Override public void checkpoint() {
+            checkpoints++;
             peakCharacters = Math.max(peakCharacters, RetainedGraph.measure(scope).retained().characters());
             var pending = new ArrayDeque<Object>();
             var seen = Collections.newSetFromMap(new IdentityHashMap<Object, Boolean>());
@@ -149,7 +150,7 @@ class ExpressionFormatterTemporaryOwnershipTest {
     }
 
     @Test void failedFragmentCleanupCannotReplaceTheOriginalCallbackFailure() {
-        var input = new FunctionExpr("f", List.of());
+        var input = new NumberExpr(-2);
         var observation = new Observation(); observation.throwCleanupAfterCallback = true;
         var emitted = new AllocatingEmission(); emitted.fail = true;
         try (var scope = RetainedOperation.open(observation)) {
@@ -160,6 +161,22 @@ class ExpressionFormatterTemporaryOwnershipTest {
             assertTrue(observation.callbackStateObserved);
             assertTrue(observation.work >= 1_000);
         }
+        assertEquals(0, RetainedGraph.measure(observation.scope).retained().characters());
+    }
+
+    @Test void textAlreadyOwnedByTheSourceOrCurrentActionNeedsNoRepeatedWholeGraphScan() {
+        var input = new FunctionExpr("f", List.of(new VariableExpr("a"), new VariableExpr("b")));
+        var observation = new Observation(); observation.input = input; observation.expectedOutput = "f(a, b)";
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            assertEquals(observation.expectedOutput, ExpressionFormatter.format(input));
+        }
+        assertTrue(observation.checkpoints <= 3,
+            "observe workspace, scheduled owners and copied result; existing input/action text adds no owned object");
+        assertTrue(observation.queuedActions >= 3);
+        assertTrue(observation.actualResultCopyOwned);
+        assertFalse(observation.inputMissing);
+        assertTrue(observation.work > observation.expectedOutput.length());
         assertEquals(0, RetainedGraph.measure(observation.scope).retained().characters());
     }
     private static final class Emission implements LongConsumer, RetainedGraph.View {
