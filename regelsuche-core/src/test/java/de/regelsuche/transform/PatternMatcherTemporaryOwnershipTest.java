@@ -23,6 +23,8 @@ class PatternMatcherTemporaryOwnershipTest {
         int outcomeBranches;
         MatchAbort closeFailure;
         long workAfterCloseFailure;
+        Map<String,Expr> callerBindings;
+        boolean sawPublishedBindings;
         @Override public void executionWork(long units) {
             work = Math.addExact(work, units);
             if (closeFailure != null) workAfterCloseFailure += units;
@@ -67,6 +69,9 @@ class PatternMatcherTemporaryOwnershipTest {
             alternatives = Math.max(alternatives,currentAlternatives);
             tasks = Math.max(tasks,currentTasks);
             mutableBindingMaps = Math.max(mutableBindingMaps,currentMutableBindingMaps);
+            sawPublishedBindings |= callerBindings != null && !callerBindings.isEmpty()
+                && seen.contains(callerBindings)
+                && seen.stream().anyMatch(value -> value instanceof EquivalenceAwarePatternMatcher.MatchAttempt);
             if (previousObjects != null && previousObjects.containsAll(seen)) nonGrowingCheckpoints++;
             previousObjects = seen;
             inputMissing |= !seen.contains(input);
@@ -166,6 +171,22 @@ class PatternMatcherTemporaryOwnershipTest {
                 "no outcome was returned: its delegated branch work must be settled exactly once here");
             assertTrue(bindings.isEmpty());
         }
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    @Test void booleanCompatibilityPublicationKeepsCallerAndResultBindingsOwned() {
+        Expr input = new ExpressionParser().parseTerm("f(x+y,y)");
+        var bindings = new HashMap<String,Expr>();
+        var observation = new Observation(); observation.input = input; observation.callerBindings = bindings;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            assertTrue(EquivalenceAwarePatternMatcher.match(pattern(),input,bindings,RecognitionProfile.arithmeticAc()));
+        }
+        assertEquals(Map.of("A",new VariableExpr("y"),"B",new VariableExpr("x")),bindings);
+        assertTrue(observation.sawPublishedBindings,
+            "the boolean API must observe its actual caller/result binding overlap before returning");
+        assertTrue(observation.outcomeBranches > 2);
+        assertFalse(observation.inputMissing);
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
 }
