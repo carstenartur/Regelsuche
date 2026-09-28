@@ -47,6 +47,9 @@ public final class NativeMoveSearch {
                 throw new IllegalArgumentException("native provider does not implement this scheduling contract");
         }
     }
+    public record Accounting(long validationWork,long storageWork,long retentionWork,
+            de.regelsuche.retention.RetainedGraph.Usage live,de.regelsuche.retention.RetainedGraph.Usage peak,
+            de.regelsuche.retention.RetainedGraph.Usage resultRetained,boolean complete,String detail) {}
     public static final class Result {
         private final SearchExecution.Result<TypedMoveSearch.State,NativeSearchMove,NativeVerification,NativeStateValue.Assessment> result;
         private final Expr source;
@@ -65,6 +68,7 @@ public final class NativeMoveSearch {
             return result.pickerReceipts().stream().map(r->(SearchExecution.Expansion<TypedMoveSearch.State>)r).toList();
         }
         public boolean accountingComplete(){return cursorReceipts().stream().flatMap(r->r.lanes().stream()).allMatch(l->l.cursor()==null || l.cursor().accountingComplete());}
+        public Accounting accounting(){throw new UnsupportedOperationException("native run ownership not accounted");}
         public long replayWork(){return replayWork;}
         public long totalWork(){return Math.addExact(metrics().totalWork(),replayWork);}
         public boolean withinBudget(){return accountingComplete() && totalWork()<=workBudget;}
@@ -124,6 +128,9 @@ public final class NativeMoveSearch {
             if(replay.rejected()!=null)throw new FinalCheckFailure(quality,replay.rejected());
             return quality;
         }
+    }
+    public Result search(Problem problem,SearchContinuationContract continuation,SearchExpressionStore.Limits limits){
+        throw new UnsupportedOperationException("native run ownership not enforced");
     }
     public Result search(Problem problem,SearchContinuationContract continuation){
         validate(problem);
