@@ -2,7 +2,6 @@ package de.regelsuche.canonical;
 
 import de.regelsuche.retention.RetainedGraph;
 import de.regelsuche.retention.RetainedOperation;
-import de.regelsuche.retention.RetainedSortedMap;
 
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
@@ -157,19 +156,17 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
 
     private record Monomial(Map<String, Integer> powers) implements RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(powers);}
-        private Monomial {
-            try(var source=RetainedOperation.retain(powers)) {
-                RetainedOperation.work(powers.size()+1L);
-                powers = RetainedOperation.produced(RetainedSortedMap.copyOf(powers));
-            }
-        }
+        // Private factories transfer immutable zero/singleton maps or exclusive natural-order TreeMaps.
+        // No caller mutates a transferred powers map; multiply/pow always create distinct accumulators.
 
         private static Monomial constant() {
-            return new Monomial(Map.of());
+            return RetainedOperation.produced(new Monomial(Map.of()));
         }
 
         private static Monomial variable(String name) {
-            return new Monomial(Map.of(name, 1));
+            var powers = Map.of(name, 1);
+            RetainedOperation.work(2); // Actual singleton map creation and its entry.
+            return RetainedOperation.produced(new Monomial(powers));
         }
 
         private Monomial multiply(Monomial other) {
