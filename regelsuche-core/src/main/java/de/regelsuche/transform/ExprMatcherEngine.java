@@ -101,7 +101,7 @@ final class ExprMatcherEngine {
         if (matcher instanceof ExprMatcher.NumberProperty property) {
             return matchesNumberProperty(expression, property.kind())
                 ? List.of(state.traced(
-                    "number-property:" + property.kind().name()))
+                    MatcherTrace.text("number-property:",property.kind().name())))
                 : List.of();
         }
         if (matcher instanceof ExprMatcher.Pattern pattern) {
@@ -218,13 +218,23 @@ final class ExprMatcherEngine {
                 for (State candidate : lists.current) {
                     Expr previous = candidate.bindings.get(bind.name());
                     if (previous == null) {
-                        lists.add(candidate.withBinding(bind.name(),expression).traced("bind:" + bind.name()));
+                        RetainedOperation.work(1);
+                        if (lists.trace == null) {
+                            lists.trace = MatcherTrace.text("bind:",bind.name());
+                            RetainedOperation.work(1);
+                        }
+                        lists.add(candidate.withBinding(bind.name(),expression).traced(lists.trace));
                         continue;
                     }
                     Comparison comparison = compare(previous,expression,bind.equalityProfile(),session,
                         bind.canonicalDescriptor());
                     if (comparison.matched) {
-                        lists.add(candidate.withStrength(comparison.strength).traced("rebind:" + bind.name()));
+                        RetainedOperation.work(1);
+                        if (lists.rebindTrace == null) {
+                            lists.rebindTrace = MatcherTrace.text("rebind:",bind.name());
+                            RetainedOperation.work(1);
+                        }
+                        lists.add(candidate.withStrength(comparison.strength).traced(lists.rebindTrace));
                     }
                 }
                 lists.freeze(session,bind);
@@ -346,8 +356,11 @@ final class ExprMatcherEngine {
                 lists.freeze(session,operation);
                 lists.advance();
                 lists.begin();
-                for (State candidate : lists.current) {
-                    lists.add(candidate.traced("operation:" + operation.operator().name()));
+                RetainedOperation.work(1);
+                if (!lists.current.isEmpty()) {
+                    lists.trace = MatcherTrace.text("operation:",operation.operator().name());
+                    RetainedOperation.work(1);
+                    for (State candidate : lists.current) lists.add(candidate.traced(lists.trace));
                 }
                 lists.freeze();
                 return lists.result;
@@ -383,7 +396,9 @@ final class ExprMatcherEngine {
                     if (lists.current.isEmpty()) return List.of();
                 }
                 lists.begin();
-                for (State match : lists.current) lists.add(match.traced("function:" + function.name()));
+                lists.trace = MatcherTrace.text("function:",function.name());
+                RetainedOperation.work(1);
+                for (State match : lists.current) lists.add(match.traced(lists.trace));
                 lists.freeze();
                 return lists.result;
             } catch (RuntimeException | Error failure) {
@@ -431,12 +446,14 @@ final class ExprMatcherEngine {
                 if (!visit.candidates.isEmpty()) {
                     visit.renderedPath = MatcherOccurrencePath.render(path);
                     RetainedOperation.work(1);
-                    for (State match : visit.candidates) matches.add(match.traced("contains@" + visit.renderedPath));
+                    visit.trace = MatcherTrace.text("contains@",visit.renderedPath);
+                    RetainedOperation.work(1);
+                    for (State match : visit.candidates) matches.add(match.traced(visit.trace));
                 }
                 // Even an empty result is observed before this visit releases it.
                 RetainedOperation.checkpoint();
-                visit.candidates = null; visit.renderedPath = null;
-                RetainedOperation.work(2);
+                visit.candidates = null; visit.renderedPath = null; visit.trace = null;
+                RetainedOperation.work(3);
                 if (expression instanceof BinaryExpr binary) {
                     collectContained(matcher,binary.left(),state,session,append(path,0),matches);
                     collectContained(matcher,binary.right(),state,session,append(path,1),matches);
@@ -478,9 +495,13 @@ final class ExprMatcherEngine {
                         boolean changed = index > 0 || !representative.equals(expression);
                         lists.current = evaluate(equivalent.matcher(),representative,state,session,atRoot);
                         RetainedOperation.work(1);
+                        if (changed && !lists.current.isEmpty()) {
+                            lists.trace = MatcherTrace.ordinal("representative:",index);
+                            RetainedOperation.work(1);
+                        }
                         for (State candidate : lists.current) {
                             lists.add(changed ? candidate.recognized(ExprMatcher.RecognitionStrength.BOUNDED_REPRESENTATIVE,
-                                representative,index,atRoot).traced("representative:" + index) : candidate);
+                                representative,index,atRoot).traced(lists.trace) : candidate);
                         }
                         // Observe empty as well as successful child lists before replacing them.
                         RetainedOperation.checkpoint();
@@ -649,12 +670,13 @@ final class ExprMatcherEngine {
     private static final class ContainedVisit implements RetainedGraph.View {
         private final List<Integer> path;
         private String renderedPath;
+        private String trace;
         private List<State> candidates;
 
         private ContainedVisit(List<Integer> path) { this.path = path; }
 
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
-            visitor.reference(path); visitor.reference(renderedPath); visitor.reference(candidates);
+            visitor.reference(path); visitor.reference(renderedPath); visitor.reference(candidates); visitor.reference(trace);
         }
     }
 
@@ -664,10 +686,13 @@ final class ExprMatcherEngine {
         private ArrayList<State> next;
         private List<State> child;
         private List<State> result;
+        private String trace;
+        private String rebindTrace;
 
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
             visitor.reference(current); visitor.reference(next);
             visitor.reference(child); visitor.reference(result);
+            visitor.reference(trace); visitor.reference(rebindTrace);
         }
 
         private void begin() {
