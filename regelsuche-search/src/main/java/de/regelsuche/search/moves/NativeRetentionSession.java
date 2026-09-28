@@ -44,13 +44,29 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
         if(enforce && !complete)throw new SearchExecution.ResourceLimit();
         return measured;
     }
+    private record Handoff(NativeRetentionSession session,RetainedGraph.View output) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(session);v.reference(output);}
+    }
     void finish(NativeMoveSearch.Result result){finish(result,result);}
     void finish(NativeMoveSearch.Result result,RetainedGraph.View output){
-        store.close();kernel=null;operation=null;
+        executionWork(5);
         var receipt=new NativeMoveSearch.Accounting();result.accounting=receipt;
-        receipt.update(validationWork,executionWork,store.work(),retentionWork,peakNodes,peakCharacters,peakReferences,0,0,0,complete,detail);
+        update(receipt,0,0,0);
+        observe(new Handoff(this,output),false);
+        store.close();kernel=null;
+        if(operation!=null)operation.close();operation=null;executionWork(2);
+        update(receipt,0,0,0);
+        String measuredDetail=detail;
         var retained=observe(output,false).retained();
+        update(receipt,retained.nodes(),retained.characters(),retained.references());
+        if(!measuredDetail.equals(detail)) {
+            retained=observe(output,false).retained();
+            update(receipt,retained.nodes(),retained.characters(),retained.references());
+        }
+    }
+    private void update(NativeMoveSearch.Accounting receipt,long nodes,long characters,long references){
+        executionWork(13);
         receipt.update(validationWork,executionWork,store.work(),retentionWork,peakNodes,peakCharacters,peakReferences,
-            retained.nodes(),retained.characters(),retained.references(),complete,detail);
+            nodes,characters,references,complete,detail);
     }
 }

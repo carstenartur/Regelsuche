@@ -173,7 +173,7 @@ public final class NativeMoveSearch {
                     replay(execution,problem.source(),selection.incumbent().expression(),selection.witness());
                 var result=new Result(problem,searched,replay.work());
                 var quality=new QualityResult(result,selection.incumbent(),selection.inputScore(),selection.outputScore(),selection.witness(),replay.work(),problem.budget().totalWork());
-                if(accounting!=null){operation.close();accounting.finish(result,quality);}
+                if(accounting!=null)accounting.finish(result,quality);
                 if(replay.rejected()!=null)throw new FinalCheckFailure(quality,replay.rejected());
                 return quality;
             }
@@ -191,7 +191,7 @@ public final class NativeMoveSearch {
                 .search(execution,continuation,null);
             var replay=searched.outcome()==MoveSearch.Outcome.TARGET_REACHED
                 ?replay(execution,problem.source(),problem.context().goal(),searched.witness()):new Replay(0,null);
-            var result=new Result(problem,searched,replay.work());operation.close();accounting.finish(result);
+            var result=new Result(problem,searched,replay.work());accounting.finish(result);
             if(replay.rejected()!=null)throw new TargetCheckFailure(result,replay.rejected());
             return result;
             }
