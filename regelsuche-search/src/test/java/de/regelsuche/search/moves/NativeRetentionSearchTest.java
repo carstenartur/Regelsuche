@@ -7,6 +7,21 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NativeRetentionSearchTest {
+    @Test void sharedInputTextCannotTurnTheStoreBoundaryIntoAnUnreceiptedException() {
+        String shared="x".repeat(100);
+        var source=new de.regelsuche.ast.FunctionExpr("f",List.of(new VariableExpr(shared),new VariableExpr(shared)));
+        var problem=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.frozen(source),List.of(),MoveSearch.Mode.FAST,
+            MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(1,1,0,10,1000000));
+        var result=assertDoesNotThrow(()->new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,
+            new SearchExpressionStore.Limits(10,150,10000,1)));
+        assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome(),result.accounting().detail());
+        assertTrue(result.accountingComplete());assertTrue(result.withinBudget());
+        var rejected=assertDoesNotThrow(()->new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,
+            new SearchExpressionStore.Limits(2,150,10000,1)));
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,rejected.outcome());
+        assertTrue(rejected.totalWork()>0);assertEquals("NATIVE_RETENTION_EXHAUSTED",rejected.accounting().detail());
+    }
+
     @Test void discardedAtomicRewriteStillConsumesRetentionAndWork() {
         var arguments=new de.regelsuche.transform.PatternExpr[20];
         java.util.Arrays.fill(arguments,de.regelsuche.transform.PatternExpr.num(1));

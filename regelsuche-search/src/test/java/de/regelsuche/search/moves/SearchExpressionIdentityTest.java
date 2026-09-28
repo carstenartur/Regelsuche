@@ -7,6 +7,19 @@ import java.util.*;
 import org.junit.jupiter.api.Test;
 
 class SearchExpressionIdentityTest {
+    @Test void sharedTextAndScalarIdentitiesHaveTheSameFootprintInTheStoreAndWholeGraph() {
+        String shared="x".repeat(100);
+        var expression=new FunctionExpr("f",List.of(new VariableExpr(shared),new VariableExpr(shared)));
+        assertEquals(101,de.regelsuche.retention.RetainedGraph.measure(expression).retained().characters());
+        try(var store=new SearchExpressionStore(new SearchExpressionStore.Limits(10,150,10000,1))) {
+            assertDoesNotThrow(()->store.intern(expression));
+            assertEquals(101,store.statistics().liveCharacters());
+            var rational=NumberExpr.exact("1/7").value();
+            store.intern(new FunctionExpr("f",List.of(new NumberExpr(rational),new NumberExpr(rational))));
+            assertEquals(103,store.statistics().liveCharacters(),"shared numerator and denominator are retained once each");
+        }
+    }
+
     @Test void collisionDoesNotConflateUnequalExpressionsAndIndependentEqualTreesShareTheIndex() {
         try (var store = new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)) {
             var a = new VariableExpr("Aa"); var b = new VariableExpr("BB");
