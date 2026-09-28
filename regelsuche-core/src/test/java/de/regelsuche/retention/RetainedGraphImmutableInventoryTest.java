@@ -130,4 +130,17 @@ class RetainedGraphImmutableInventoryTest {
         assertTrue(bounded.peak().references()>28);direct.close();
     }
 
+    @Test void publicViewAliasesOfActualInventoryMetadataHaveOneIdentityContribution(){
+        var inventory=new RetainedGraph.Inventory(1,1,1);var values=new ArrayList<Object>();
+        inventory.retainedReferences(new RetainedGraph.Visitor(){
+            @Override public void reference(Object value){values.add(value);}
+            @Override public void requireExact(Object value,Class<?> type){assertEquals(type,value.getClass());}
+        });
+        var root=new Object[]{inventory,values.getFirst()};
+        var measured=inventory.measure(root);var reference=RetainedGraph.measure(root);
+        assertEquals(new RetainedGraph.Usage(0,0,8),reference.retained());assertEquals(5,reference.objects());
+        assertEquals(reference.retained(),measured.retained());assertEquals(reference.objects(),measured.objects());
+        inventory.close();
+    }
+
 }
