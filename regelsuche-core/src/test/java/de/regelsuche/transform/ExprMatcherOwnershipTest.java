@@ -270,6 +270,7 @@ class ExprMatcherOwnershipTest {
         Expr input = new ExpressionParser().parseTerm("x+y");
         var matcher = ExprMatcher.op(ADD,ExprMatcher.anyOf(ExprMatcher.any(),ExprMatcher.any()),
             ExprMatcher.anyOf(ExprMatcher.any(),ExprMatcher.literalVariable("y")));
+        var diagnostic = new ExprMatcher.MatchDiagnostic("MATCH_RESULT_LIMIT",matcher.canonicalDescriptor());
         var observation = new Observation(); observation.input = input;
         try (var scope = RetainedOperation.open(observation)) {
             observation.scope = scope;
@@ -279,8 +280,7 @@ class ExprMatcherOwnershipTest {
             assertEquals(List.of("any","literal-variable","operation:ADD"),result.matches().get(1).trace());
             assertEquals(10,result.evaluatedSteps());
             assertFalse(result.complete());
-            assertEquals(List.of(new ExprMatcher.MatchDiagnostic("MATCH_RESULT_LIMIT",matcher.canonicalDescriptor())),
-                result.diagnostics());
+            assertEquals(List.of(diagnostic),result.diagnostics());
         }
         assertFalse(observation.inputMissing);
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
