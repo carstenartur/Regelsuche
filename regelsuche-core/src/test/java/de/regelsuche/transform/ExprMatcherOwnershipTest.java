@@ -15,6 +15,7 @@ class ExprMatcherOwnershipTest {
     private static final class Observation implements RetainedOperation.Sink {
         RetainedOperation scope;
         Expr input;
+        Expr representativeSource;
         ExprMatcher.MatchOutcome outcome;
         long work, workAfterFailure, retentionWork;
         MatchAbort failure;
@@ -25,6 +26,7 @@ class ExprMatcherOwnershipTest {
         boolean sawPathCopy, sawPathBufferAndText, abortPathBuffer;
         boolean sawLimitedVisitWithDiagnostic, sawEmptyRepresentativesWithDiagnostic;
         String abortTraceOutput;
+        boolean sawLiteralArguments, abortLiteralArguments, sawPatternAttempt;
         int unpublishedResultScans;
         final Set<String> patternDescriptions = Collections.newSetFromMap(new IdentityHashMap<>());
         final Set<List<?>> tracePrefixes = new HashSet<>();
@@ -32,6 +34,7 @@ class ExprMatcherOwnershipTest {
         final Set<Object> mutableStateLists = Collections.newSetFromMap(new IdentityHashMap<>());
         final Set<String> renderedPaths = Collections.newSetFromMap(new IdentityHashMap<>());
         final Set<String> textBeforeTrace = new HashSet<>(), traceEntries = new HashSet<>();
+        final Set<String> comparisonDescriptions = Collections.newSetFromMap(new IdentityHashMap<>());
         @Override public void executionWork(long units) {
             work += units;
             if (failure != null) workAfterFailure += units;
@@ -60,6 +63,10 @@ class ExprMatcherOwnershipTest {
                 Object value = pending.remove(); if (!seen.add(value)) continue;
                 if (value instanceof String text && text.startsWith("7:pattern")) patternDescriptions.add(text);
                 if (value instanceof String text && dynamicTrace(text)) texts.add(text);
+                if (value instanceof String text && (text.startsWith("4:bind") || text.startsWith("7:same-as"))) {
+                    comparisonDescriptions.add(text);
+                }
+                sawPatternAttempt |= value instanceof EquivalenceAwarePatternMatcher.MatchAttempt;
                 if ("operation:ADD".equals(value)) sawOperationTrace = true;
                 if ("representative:1".equals(value)) sawLaterRepresentative = true;
                 if ("contains@0".equals(value)) sawDescendantTrace = true;
@@ -79,6 +86,8 @@ class ExprMatcherOwnershipTest {
                 if (value instanceof RetainedGraph.View view) view.retainedReferences(visitor);
                 else if (value instanceof Object[] array) for (var item : array) visitor.reference(item);
                 else if (value instanceof Collection<?> values) {
+                    sawLiteralArguments |= values instanceof ArrayList<?> && !values.isEmpty()
+                        && values.stream().allMatch(item -> item instanceof PatternExpr);
                     if (values instanceof List<?>) for (Object item : values) {
                         if (item instanceof String text && dynamicTrace(text)) currentTraceEntries.add(text);
                     }
@@ -94,7 +103,7 @@ class ExprMatcherOwnershipTest {
                         hasFrozenPath |= !(values instanceof ArrayList<?>);
                     }
                     sawRepresentativeList |= values instanceof List<?> && values.size() == 2
-                        && values.stream().anyMatch(item -> item == input)
+                        && values.stream().anyMatch(item -> item == (representativeSource == null ? input : representativeSource))
                         && values.stream().allMatch(item -> item instanceof Expr);
                     if (values instanceof List<?> list && !list.isEmpty() && "any".equals(list.getFirst())) {
                         tracePrefixes.add(List.copyOf(list));
@@ -139,6 +148,9 @@ class ExprMatcherOwnershipTest {
                 failure = new MatchAbort(); throw failure;
             }
             if (abortTraceOutput != null && textBeforeTrace.contains(abortTraceOutput) && failure == null) {
+                failure = new MatchAbort(); throw failure;
+            }
+            if (abortLiteralArguments && sawLiteralArguments && failure == null) {
                 failure = new MatchAbort(); throw failure;
             }
             if (abortOutcome && outcome != null && failure == null) {
@@ -601,6 +613,125 @@ class ExprMatcherOwnershipTest {
             assertNull(observation.outcome);
             assertTrue(observation.workAfterFailure > 0);
         }
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    private static ExprMatcher boundComparison(ExprMatcher.Constraint constraint) {
+        return ExprMatcher.where(ExprMatcher.op(ADD,ExprMatcher.bind("A",ExprMatcher.any()),
+            ExprMatcher.bind("B",ExprMatcher.any())),constraint);
+    }
+
+    @Test void aSuccessfulRebindingDoesNotRenderAnUnusedDescription() {
+        Expr input = new VariableExpr("x");
+        var matcher = ExprMatcher.allOf(ExprMatcher.bind("A",ExprMatcher.any()),
+            ExprMatcher.bind("A",ExprMatcher.pattern(PatternExpr.var("B"))));
+        var observation = new Observation(); observation.input = input;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var result = matcher.match(input);
+            assertTrue(result.matched()); assertTrue(result.complete());
+            assertEquals(Map.of("A",input,"B",input),result.matches().getFirst().bindings());
+        }
+        assertTrue(observation.comparisonDescriptions.isEmpty());
+        assertTrue(observation.patternDescriptions.isEmpty());
+        assertFalse(observation.inputMissing);
+    }
+
+    @Test void conclusiveBindingComparisonsDoNotRenderUnusedDescriptions() {
+        for (String source : List.of("x+x","x+y")) {
+            Expr input = new ExpressionParser().parseTerm(source);
+            var observation = new Observation(); observation.input = input;
+            try (var scope = RetainedOperation.open(observation)) {
+                observation.scope = scope;
+                var result = boundComparison(ExprMatcher.sameAs("A","B")).match(input);
+                assertEquals(source.equals("x+x"),result.matched()); assertTrue(result.complete());
+                assertEquals(source.equals("x+x") ? 0 : 1,result.patternBranches());
+            }
+            assertTrue(observation.comparisonDescriptions.isEmpty(),source);
+            assertFalse(observation.inputMissing);
+            assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+        }
+    }
+
+    @Test void aBoundedComparisonStillReportsItsOriginalConstraintDescription() {
+        Expr input = new ExpressionParser().parseTerm("(x+y)+(y+x)");
+        var constraint = ExprMatcher.sameAs("A","B",RecognitionProfile.arithmeticAc());
+        var expected = new ExprMatcher.MatchDiagnostic("COMMUTATIVE_BACKTRACKING_LIMIT",constraint.canonicalDescriptor());
+        var observation = new Observation(); observation.input = input;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var result = boundComparison(constraint).match(input,new ExprMatcher.MatchOptions(null,64,100,1));
+            assertFalse(result.matched()); assertFalse(result.complete());
+            assertEquals(1,result.patternBranches()); assertEquals(List.of(expected),result.diagnostics());
+        }
+        assertEquals(1,observation.comparisonDescriptions.size());
+        assertFalse(observation.inputMissing);
+    }
+
+    @Test void comparisonOwnsTheActualRepresentativeListDuringLiteralMatching() {
+        Expr input = new ExpressionParser().parseTerm("x+(x+0)");
+        var profile = RecognitionProfile.exact().withRecognitionRules(Set.of("add-zero"),1);
+        var observation = new Observation(); observation.input = input;
+        observation.representativeSource = ((BinaryExpr) input).right();
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var result = boundComparison(ExprMatcher.sameAs("A","B",profile)).match(input,
+                ExprMatcher.MatchOptions.defaults().withRepresentativeProvider(SimplifiedRepresentatives.INSTANCE));
+            assertTrue(result.matched()); assertTrue(result.complete());
+            assertEquals(ExprMatcher.RecognitionStrength.BOUNDED_REPRESENTATIVE,result.matches().getFirst().recognitionStrength());
+        }
+        assertTrue(observation.sawRepresentativeList);
+        assertFalse(observation.inputMissing);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    @Test void literalFunctionPreparationOwnsItsActualArgumentAssembly() {
+        Expr input = new ExpressionParser().parseTerm("f(x,y)+f(y,x)");
+        var observation = new Observation(); observation.input = input;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var result = boundComparison(ExprMatcher.sameAs("A","B")).match(input);
+            assertFalse(result.matched()); assertTrue(result.complete());
+        }
+        assertTrue(observation.sawLiteralArguments,"the mutable literal-argument list must be visible before freezing");
+        assertFalse(observation.inputMissing);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    @Test void anAbortedLiteralPreparationDoesNotStartThePatternComparison() {
+        Expr input = new ExpressionParser().parseTerm("f(x,y)+f(y,x)");
+        var observation = new Observation(); observation.input = input; observation.abortLiteralArguments = true;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var failure = assertThrows(MatchAbort.class,() -> boundComparison(ExprMatcher.sameAs("A","B")).match(input));
+            assertSame(observation.failure,failure);
+            assertTrue(observation.sawLiteralArguments); assertFalse(observation.sawPatternAttempt);
+            assertNull(observation.outcome); assertTrue(observation.workAfterFailure > 0);
+        }
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    private enum NullRepresentatives implements EquivalentExpressionProvider, RetainedGraph.View {
+        INSTANCE;
+        @Override public List<Expr> representatives(Expr input,RecognitionProfile profile) {
+            var result = new ArrayList<Expr>(); result.add(null); result.add(null); return result;
+        }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }
+    }
+
+    @Test void repeatedComparisonDiagnosticsRenderTheirSourceOnlyOnce() {
+        Expr input = new ExpressionParser().parseTerm("x+y");
+        var constraint = ExprMatcher.sameAs("A","B",RecognitionProfile.exact().withRecognitionRules(Set.of("unused"),1));
+        var expected = new ExprMatcher.MatchDiagnostic("REPRESENTATIVE_PROVIDER_NULL",constraint.canonicalDescriptor());
+        var observation = new Observation(); observation.input = input;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var result = boundComparison(constraint).match(input,
+                ExprMatcher.MatchOptions.defaults().withRepresentativeProvider(NullRepresentatives.INSTANCE));
+            assertFalse(result.matched()); assertEquals(List.of(expected),result.diagnostics());
+        }
+        assertEquals(1,observation.comparisonDescriptions.size());
+        assertFalse(observation.inputMissing);
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
 
