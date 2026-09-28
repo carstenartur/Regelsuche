@@ -55,13 +55,12 @@ public final class RetainedGraph {
     }
     /** Each invocation pays fresh traversal/index work and drops all strong bookkeeping references. */
     public static Observation measure(Object root) {
-        var scan=new Scan();
+        var scan=new Scan(true);
         try {
             scan.reference(root);
             while(!scan.pending.isEmpty()) {
                 Object value=scan.pending.removeFirst();scan.work=Math.addExact(scan.work,1);
-                if(scan.seen.put(value,Boolean.TRUE)!=null)continue;
-                scan.work=Math.addExact(scan.work,1);scan.accountingPeak();scan.inspect(value);
+                scan.accountingPeak();scan.inspect(value);
             }
             return scan.observation();
         } finally { scan.pending.clear();scan.seen.clear(); }
@@ -93,15 +92,25 @@ public final class RetainedGraph {
     }
 
     static class Scan implements Visitor {
+        private final boolean admitWhenQueued;
         final IdentityHashMap<Object,Boolean> seen=new IdentityHashMap<>();
         final ArrayDeque<Object> pending=new ArrayDeque<>();
         long nodes,characters,references,work,accountingReferences=5,temporaryCharacters;
+        Scan(){this(false);} // The optional inventory has its own cache-aware admission loop.
+        Scan(boolean admitWhenQueued){this.admitWhenQueued=admitWhenQueued;}
         @Override public void requireExact(Object value,Class<?> auditedType){
             if(value.getClass()!=auditedType)throw new Unmeasured(value,observation());
         }
         @Override public void reference(Object value){
             references=Math.addExact(references,1);work=Math.addExact(work,1);
-            if(value!=null && !borrowedEnum(value))pending.addLast(value);
+            if(value!=null && !borrowedEnum(value)) {
+                if(!admitWhenQueued)pending.addLast(value);
+                else if(seen.put(value,Boolean.TRUE)==null) {
+                    // Every reference slot and lookup remains paid. Only the first
+                    // encounter acquires an identity entry and a pending traversal.
+                    work=Math.addExact(work,1);pending.addLast(value);
+                }
+            }
             accountingPeak();
         }
         void accountingPeak(){
@@ -191,7 +200,8 @@ public final class RetainedGraph {
             // Both paths leave through measure's finally. Settle each occupied identity slot and
             // pending traversal slot before publishing the receipt; none can survive the call.
             long settledWork=Math.addExact(work,Math.addExact(2L*seen.size(),pending.size()));
-            return new Observation(retained,new Usage(nodes,Math.addExact(characters,temporaryCharacters),Math.addExact(references,accountingReferences)),settledWork,seen.size());
+            long inspected=admitWhenQueued?seen.size()-pending.size():seen.size();
+            return new Observation(retained,new Usage(nodes,Math.addExact(characters,temporaryCharacters),Math.addExact(references,accountingReferences)),settledWork,inspected);
         }
     }
 }
