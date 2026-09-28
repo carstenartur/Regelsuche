@@ -8,13 +8,13 @@ import java.util.*;
 /** Explicit Expr execution through the same frontier and batch pickers as the historical facade. */
 public final class NativeMoveSearch {
     public static final String REVISION = "regelsuche.native-expr-move-search/v1";
-    public record Primitive(MoveProvider.Descriptor descriptor, AstRewriteTransport transport) {
+    public record Primitive(MoveProvider.Descriptor descriptor, AstRewriteTransport transport) implements NativeMoveProvider {
         public Primitive {
             Objects.requireNonNull(descriptor);Objects.requireNonNull(transport);
             if(descriptor.sourceKind()!=SearchMove.SourceKind.PRIMITIVE)throw new IllegalArgumentException("primitive native provider required");
         }
     }
-    public record Problem(Expr source, TypedMoveSearch.Context context, List<Primitive> providers,
+    public record Problem(Expr source, TypedMoveSearch.Context context, List<NativeMoveProvider> providers,
             MoveSearch.Mode mode, MoveSearch.Scheduling scheduling, MoveSearch.Budget budget) {
         public Problem {
             Objects.requireNonNull(source);Objects.requireNonNull(context);providers=List.copyOf(providers);
@@ -75,7 +75,7 @@ public final class NativeMoveSearch {
             if(!carries(move.assumptions(),state))return new NativeVerification(false,1,null,null,"TYPED_PRIMITIVE_ASSUMPTIONS_MISSING");
             var provider=problem.providers().stream().filter(p->p.descriptor().equals(move.descriptor())).findFirst();
             if(provider.isEmpty())return new NativeVerification(false,1,null,null,"UNREGISTERED_NATIVE_PRIMITIVE");
-            var regenerated=provider.orElseThrow().transport().generate(state.expression());
+            var regenerated=((Primitive)provider.orElseThrow()).transport().generate(state.expression());
             boolean accepted=state.expression().equals(move.sourceExpression()) && regenerated.contains(move.step());
             return new NativeVerification(accepted,TransformationWorkMetrics.flatEngine(regenerated.size()).totalWorkUnits(),
                 accepted?move.step():null,accepted?move.ruleId():null,accepted?"TYPED_PRIMITIVE_REPLAYED":"TYPED_PRIMITIVE_REPLAY_REJECTED");
@@ -85,7 +85,8 @@ public final class NativeMoveSearch {
                 @Override public MoveProvider.Descriptor descriptor(){return p.descriptor();}
                 @Override public SearchBatches.Batch<NativeSearchMove> candidates(){
                     if(!carries(p.descriptor().requiredAssumptions(),state))return new SearchBatches.Batch<>(List.of(),new TransformationWorkMetrics(0,0,0,0,0,1,1,0,0,0,0,0,0,0),true);
-                    var steps=p.transport().generate(state.expression());var work=TransformationWorkMetrics.flatEngine(steps.size());
+                    if(!(p instanceof Primitive primitive))throw new UnsupportedOperationException("native provider generation is not implemented");
+                    var steps=primitive.transport().generate(state.expression());var work=TransformationWorkMetrics.flatEngine(steps.size());
                     return new SearchBatches.Batch<>(steps.stream().map(step->new NativeSearchMove(step,p.descriptor(),work.totalWorkUnits(),Set.of())).toList(),
                         work.withCandidateWork(new ExecutionWork(steps.size(),0,0)),false);
                 }
