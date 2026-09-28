@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 class PolynomialTemporaryOwnershipTest {
     private static final class Observation implements RetainedOperation.Sink {
-        RetainedOperation scope;long work;int simultaneousTerms;boolean rejectedCoefficient;int renderedFactors;boolean optionalEnvelope;Expr inputRoot;boolean missingInput,abortAtCoefficient;int sourceOnlyFrames;
+        RetainedOperation scope;long work;int simultaneousTerms;boolean rejectedCoefficient;int renderedFactors;boolean optionalEnvelope;Expr inputRoot;boolean missingInput,abortAtCoefficient;int sourceOnlyFrames;boolean zeroTerms,abortAtZeroTerms;
         Set<Expr> inputNodes=Collections.newSetFromMap(new IdentityHashMap<>());
         @Override public void executionWork(long units){work=Math.addExact(work,units);}
         @Override public void validationWork(long units){work=Math.addExact(work,units);}
@@ -31,7 +31,10 @@ class PolynomialTemporaryOwnershipTest {
                     renderedFactors=Math.max(renderedFactors,list.size());
                 if(value instanceof RetainedGraph.View view)view.retainedReferences(visitor);
                 else if(value instanceof Map<?,?> map){
-                    if(!map.isEmpty() && map.values().stream().allMatch(ExactRational.class::isInstance))terms++;
+                    if(!map.isEmpty() && map.values().stream().allMatch(ExactRational.class::isInstance)){
+                        terms++;
+                        if(map.values().stream().anyMatch(valueEntry->((ExactRational)valueEntry).isZero()))zeroTerms=true;
+                    }
                     map.forEach((key,item)->{visitor.reference(key);visitor.reference(item);});
                 }else if(value instanceof Collection<?> collection)collection.forEach(visitor::reference);
                 else if(value instanceof Object[] array)for(var item:array)visitor.reference(item);
@@ -42,6 +45,7 @@ class PolynomialTemporaryOwnershipTest {
             sourceOnlyFrames=Math.max(sourceOnlyFrames,sourceFrames);
             if(inputRoot!=null && !seen.contains(inputRoot))missingInput=true;
             if(abortAtCoefficient && rejectedCoefficient)throw new CoefficientLimit();
+            if(abortAtZeroTerms && zeroTerms)throw new CoefficientLimit();
         }
     }
     @Test void realPolynomialMultiplicationRetainsBothOperandsAndAccumulatingTerms(){
@@ -115,6 +119,37 @@ class PolynomialTemporaryOwnershipTest {
         assertTrue(observation.rejectedCoefficient);assertFalse(observation.missingInput);
         assertTrue(observation.work>4);assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
         assertTrue(new PolynomialNormalizer().normalize(source).isEmpty());
+    }
+
+    @Test void completedPolynomialTakesItsExclusiveAccumulatorWithoutCopyingIt(){
+        var source=new VariableExpr("x");var observation=sourceObservation(source);
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;assertEquals(Optional.of(source),new PolynomialNormalizer().normalize(source));
+        }
+        assertEquals(1,observation.simultaneousTerms,"one private monomial accumulator becomes the completed polynomial's terms");
+        assertFalse(observation.missingInput);assertTrue(observation.optionalEnvelope);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+    @Test void finalZeroFilteringPreservesOperandMapsAndStableOutput(){
+        var sum=new BinaryExpr(new VariableExpr("x"),BinaryOperator.ADD,new VariableExpr("y"));
+        var source=new BinaryExpr(sum,BinaryOperator.SUB,sum);var normalizer=new PolynomialNormalizer();
+        var before=normalizer.normalize(sum);var observation=sourceObservation(source);
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;assertEquals(Optional.of(new NumberExpr(0)),normalizer.normalize(source));
+        }
+        assertTrue(observation.simultaneousTerms>=3,"separate left/right and accumulating maps still overlap");
+        assertFalse(observation.missingInput);assertEquals(before,normalizer.normalize(sum));
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    @Test void zeroTermIsObservedBeforeTheFinalFilterMayDiscardIt(){
+        var source=new NumberExpr(0);var observation=sourceObservation(source);observation.abortAtZeroTerms=true;
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;assertThrows(CoefficientLimit.class,()->new PolynomialNormalizer().normalize(source));
+        }
+        assertTrue(observation.zeroTerms);assertFalse(observation.missingInput);
+        assertTrue(observation.work>4);assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+        assertEquals(Optional.of(source),new PolynomialNormalizer().normalize(source));
     }
 
 }
