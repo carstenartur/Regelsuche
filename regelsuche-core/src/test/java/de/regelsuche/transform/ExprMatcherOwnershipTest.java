@@ -19,6 +19,7 @@ class ExprMatcherOwnershipTest {
         long work, workAfterFailure;
         MatchAbort failure;
         boolean abortOutcome, abortClose, sawSession, inputMissing;
+        int unpublishedResultScans;
         @Override public void executionWork(long units) {
             work += units;
             if (failure != null) workAfterFailure += units;
@@ -37,6 +38,7 @@ class ExprMatcherOwnershipTest {
                 @Override public void requireExact(Object value, Class<?> type) { assertEquals(type,value.getClass()); }
             };
             visitor.reference(scope);
+            boolean hasStateList = false;
             while (!pending.isEmpty()) {
                 Object value = pending.remove(); if (!seen.add(value)) continue;
                 sawSession |= value.getClass().getEnclosingClass() == ExprMatcherEngine.class
@@ -44,7 +46,12 @@ class ExprMatcherOwnershipTest {
                 if (value instanceof ExprMatcher.MatchOutcome result) outcome = result;
                 if (value instanceof RetainedGraph.View view) view.retainedReferences(visitor);
                 else if (value instanceof Object[] array) for (var item : array) visitor.reference(item);
-                else if (value instanceof Collection<?> values) values.forEach(visitor::reference);
+                else if (value instanceof Collection<?> values) {
+                    hasStateList |= values.stream().anyMatch(item -> item != null
+                        && item.getClass().getEnclosingClass() == ExprMatcherEngine.class
+                        && item.getClass().getSimpleName().equals("State"));
+                    values.forEach(visitor::reference);
+                }
                 else if (value instanceof Map<?,?> map)
                     map.forEach((key,item) -> { visitor.reference(key); visitor.reference(item); });
                 else if (value instanceof BinaryExpr binary) {
@@ -52,6 +59,7 @@ class ExprMatcherOwnershipTest {
                 } else if (value instanceof FunctionExpr function) visitor.reference(function.arguments());
             }
             inputMissing |= !seen.contains(input);
+            if (hasStateList && outcome == null) unpublishedResultScans++;
             if (abortOutcome && outcome != null && failure == null) {
                 failure = new MatchAbort(); throw failure;
             }
@@ -98,6 +106,19 @@ class ExprMatcherOwnershipTest {
         assertTrue(result.matched()); assertFalse(result.complete());
         assertEquals("MATCH_RESULT_LIMIT",result.diagnostics().getFirst().code());
         assertDoesNotThrow(() -> RetainedGraph.measure(result));
+    }
+
+    @Test void monotonicallyGrowingResultAssemblyUsesItsPublicationObservation() {
+        Expr input = new ExpressionParser().parseTerm("f(x+y,y)");
+        var observation = new Observation(); observation.input = input;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            assertTrue(matcher().match(input).matched());
+        }
+        assertNotNull(observation.outcome,"the complete result and source graph must still be observed");
+        assertEquals(0,observation.unpublishedResultScans,
+            "retaining the raw/frozen states through monotone result assembly avoids an intermediate full scan");
+        assertFalse(observation.inputMissing);
     }
 
     @Test void abortedOutcomePaysItsUnreturnedStepsAndNestedBranchCounters() {
