@@ -116,39 +116,58 @@ public final class CompiledAstRewriteProgram implements RetainedGraph.View {
     public Batch transformMeasured(Expr expression) {
         Objects.requireNonNull(expression, "expression");
         List<Candidate> current = List.of();
+        var retainedCurrent=new Object[]{current};
         long calls = 0, emitted = 0, composed = 0, duplicates = 0;
+        try(var operation=RetainedOperation.retain(this,expression,retainedCurrent)) {
         for (int index = 0; index < stages.size(); index++) {
             var stage = stages.get(index);
             var next = new ArrayList<Candidate>();
+            try(var stageFrame=RetainedOperation.retain(current,next)) {
             int prefixes = index == 0 ? 1 : current.size();
             for (int p = 0; p < prefixes; p++) {
                 Expr input = index == 0 ? expression : current.get(p).target();
                 var generated = stage.transport().generate(input);
                 calls++;
                 emitted = Math.addExact(emitted, generated.size());
+                try(var generatedFrame=RetainedOperation.retain(generated)) {
                 for (var step : generated) {
                     if (next.size() >= maximumCandidates) {
                         throw new CandidateLimitExceeded(metrics(calls, emitted, composed, duplicates));
                     }
                     var steps = new ArrayList<AstRewriteTransport.Step>();
                     var ids = new ArrayList<String>();
+                    try(var historyFrame=RetainedOperation.retain(steps,ids)) {
                     if (index != 0) {
                         steps.addAll(current.get(p).steps());
                         ids.addAll(current.get(p).sourceIds());
+                        RetainedOperation.work(Math.addExact(steps.size(),ids.size()));
                         composed++;
                     }
                     steps.add(step);
                     ids.add(stage.sourceId());
-                    next.add(new Candidate(programId, ids, steps));
+                    RetainedOperation.work(2);
+                    next.add(RetainedOperation.produced(new Candidate(programId, ids, steps)));
+                    RetainedOperation.work(Math.addExact(1,Math.addExact(steps.size(),ids.size())));
+                    RetainedOperation.checkpoint();
+                    }
+                }
                 }
             }
             // Equal endpoints alone cannot collapse histories with different intermediate states,
             // rule metadata or side conditions. First structural history wins deterministically.
-            current = List.copyOf(new LinkedHashSet<>(next));
+            var unique=new LinkedHashSet<>(next);
+            try(var dedupFrame=RetainedOperation.retain(unique)) {
+                RetainedOperation.work(next.size());
+                current=RetainedOperation.produced(List.copyOf(unique));
+                retainedCurrent[0]=current;
+                RetainedOperation.work(Math.addExact(1,current.size()));
+            }
             duplicates = Math.addExact(duplicates, next.size() - current.size());
             if (current.isEmpty()) break;
+            }
         }
-        return new Batch(current, metrics(calls, emitted, composed, duplicates));
+        return RetainedOperation.produced(new Batch(current, metrics(calls, emitted, composed, duplicates)));
+        }
     }
 
     private static TransformationWorkMetrics metrics(long calls, long emitted, long composed, long duplicates) {
