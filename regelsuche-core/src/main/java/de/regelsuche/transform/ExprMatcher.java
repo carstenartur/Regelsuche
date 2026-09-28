@@ -1,11 +1,9 @@
 package de.regelsuche.transform;
 
 import de.regelsuche.retention.RetainedGraph;
-import de.regelsuche.retention.RetainedOperation;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -618,18 +616,7 @@ public sealed interface ExprMatcher extends RetainedGraph.View
     }
 
     private static String descriptor(String type, String... fields) {
-        StringBuilder result = new StringBuilder();
-        appendField(result, requireText(type, "type"));
-        Arrays.stream(fields).forEach(field ->
-            appendField(result, Objects.requireNonNull(field, "field")));
-        String description = result.toString();
-        try (var owned = RetainedOperation.retainCompleted(description.length() + 1L,description)) {
-            return description;
-        }
-    }
-
-    private static void appendField(StringBuilder result, String field) {
-        result.append(field.length()).append(':').append(field);
+        return MatcherDescriptor.render(requireText(type, "type"),fields);
     }
 
     private static String requireText(String value, String field) {
