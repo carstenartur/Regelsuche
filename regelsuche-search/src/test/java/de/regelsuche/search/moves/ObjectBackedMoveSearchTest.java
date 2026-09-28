@@ -64,11 +64,20 @@ class ObjectBackedMoveSearchTest {
         assertEquals(legacy.encodedResult(),nativeResult.exportLegacy(),"every event/state/witness/assessment/receipt must project equally");
     }
     @Test void nativePrimitiveBatchUsesTheSameStagedManagedLanes() {
+        assertNativePrimitiveBatch(SearchMove.ProofStrength.REPLAYABLE);
+    }
+    @Test void verifiedPrimitiveEvidenceStillUsesPrimitiveMathematicalWork() {
+        assertNativePrimitiveBatch(SearchMove.ProofStrength.VERIFIED);
+    }
+    private void assertNativePrimitiveBatch(SearchMove.ProofStrength strength) {
         var leaf=new VariableExpr("x");var source=new BinaryExpr(leaf,BinaryOperator.ADD,new NumberExpr(0));
         var rule=new PatternRewriteRule("zero",PatternExpr.op(BinaryOperator.ADD,PatternExpr.var("A"),PatternExpr.num(0)),PatternExpr.var("A"));
         var transport=new AstRewriteTransport(List.of(rule),32,32);
-        var descriptor=new MoveProvider.Descriptor("zero","zero",SearchMove.SourceKind.PRIMITIVE,SearchMove.ProofStrength.REPLAYABLE,List.of(),SearchMove.ValueEvidence.UNKNOWN,"native-staged/v1");
+        var descriptor=new MoveProvider.Descriptor("zero","zero",SearchMove.SourceKind.PRIMITIVE,strength,List.of(),SearchMove.ValueEvidence.UNKNOWN,"native-staged/v1");
         var budget=new MoveSearch.Budget(1,1,0,10,1000);var context=TypedMoveSearch.Context.frozen(leaf);
+        assertEquals(MoveSearch.Outcome.TARGET_REACHED,new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,
+            List.of(new NativeMoveSearch.Primitive(descriptor,transport)),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,budget),
+            SearchContinuationContract.PATH_SENSITIVE).outcome());
         var legacy=new TypedMoveSearch().search(new TypedMoveSearch.Problem(source,context,List.of(TypedMoveSearch.primitiveProvider(descriptor,transport)),
             MovePriorityPolicy.INVENTORY_ORDER,TypedMoveSearch.primitiveReplay(transport),s->0,MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED_INCREMENTAL,budget));
         var nativeResult=new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,List.of(new NativeMoveSearch.Primitive(descriptor,transport)),
