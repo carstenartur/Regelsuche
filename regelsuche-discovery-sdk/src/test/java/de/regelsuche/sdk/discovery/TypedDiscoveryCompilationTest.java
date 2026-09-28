@@ -57,7 +57,8 @@ class TypedDiscoveryCompilationTest {
                 assertTrue(diagnostics.getDiagnostics().stream()
                     .filter(diagnostic -> diagnostic.getKind() == Diagnostic.Kind.ERROR)
                     .anyMatch(diagnostic -> diagnostic.getCode().contains("incompatible.types")
-                        || diagnostic.getCode().contains("cant.apply")),
+                        || diagnostic.getCode().contains("cant.apply")
+                        || diagnostic.getCode().equals("compiler.err.prob.found.req")),
                     () -> "Expected a type error, not a missing dependency: " + diagnostics.getDiagnostics());
             }
         }
