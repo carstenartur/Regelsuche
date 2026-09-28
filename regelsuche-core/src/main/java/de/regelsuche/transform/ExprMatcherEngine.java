@@ -426,12 +426,13 @@ final class ExprMatcherEngine {
                     session.diagnostic("MATCH_RESULT_LIMIT",matcher.canonicalDescriptor());
                     return;
                 }
-                visit.renderedPath = path.isEmpty() ? "root" : path.stream()
-                    .map(String::valueOf).reduce((left,right) -> left + "." + right).orElse("root");
-                RetainedOperation.work(1);
                 visit.candidates = evaluate(matcher,expression,state,session,false);
                 RetainedOperation.work(1);
-                for (State match : visit.candidates) matches.add(match.traced("contains@" + visit.renderedPath));
+                if (!visit.candidates.isEmpty()) {
+                    visit.renderedPath = MatcherOccurrencePath.render(path);
+                    RetainedOperation.work(1);
+                    for (State match : visit.candidates) matches.add(match.traced("contains@" + visit.renderedPath));
+                }
                 // Even an empty result is observed before this visit releases it.
                 RetainedOperation.checkpoint();
                 visit.candidates = null; visit.renderedPath = null;
@@ -632,7 +633,10 @@ final class ExprMatcherEngine {
         List<Integer> result = new ArrayList<>(path.size() + 1);
         result.addAll(path);
         result.add(index);
-        return List.copyOf(result);
+        List<Integer> frozen = List.copyOf(result);
+        try (var owned = RetainedOperation.retainCompleted(5L + path.size() + frozen.size(),path,result,frozen)) {
+            return frozen;
+        }
     }
 
     private static void observeFailure(Throwable failure) {
@@ -745,7 +749,11 @@ final class ExprMatcherEngine {
         }
 
         private void diagnostic(String code, String descriptor) {
-            diagnostics.add(new ExprMatcher.MatchDiagnostic(code, descriptor));
+            var diagnostic = new ExprMatcher.MatchDiagnostic(code,descriptor);
+            diagnostics.add(diagnostic);
+            // Include attempted duplicates as well as inserted records. The
+            // current visit/provider owner must still overlap the changed set.
+            try (var owned = RetainedOperation.retainCompleted(2,diagnostic,diagnostics)) { }
         }
 
         private List<State> limit(List<State> states, ExprMatcher matcher) {
