@@ -116,7 +116,9 @@ public final class HistoryMovePolicy implements MovePriorityPolicy,RetainedGraph
     }
     @Override public Stage stage(MoveProvider.Descriptor provider, MoveState state, MoveContext context) {
         // Expensive/bridge lanes do not become cheap simply because they were useful before.
-        return stage(provider,contextKey(state),state.previousRule(),MovePriorityPolicy.super.stage(provider,state,context));
+        var ordinary=MovePriorityPolicy.super.stage(provider,state,context);
+        if(ordinary==Stage.EXPENSIVE || ordinary==Stage.EXPLORATION)return ordinary;
+        return stage(provider,contextKey(state),state.previousRule(),ordinary);
     }
     private Stage stage(MoveProvider.Descriptor provider,String key,String previousRule,Stage ordinary) {
         if (ordinary == Stage.EXPENSIVE || ordinary == Stage.EXPLORATION) return ordinary;
