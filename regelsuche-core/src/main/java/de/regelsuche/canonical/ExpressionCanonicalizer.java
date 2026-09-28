@@ -142,20 +142,44 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
             };
         }
         if (expression instanceof FunctionExpr functionExpr) {
-            List<Expr> normalised = new ArrayList<>(functionExpr.arguments().size());
+            return canonicalizeFunction(functionExpr, context);
+        }
+        return expression;
+    }
+
+    private Expr canonicalizeFunction(FunctionExpr function, AssumptionContext context) {
+        for (int index = 0; index < function.arguments().size(); index++) {
+            Expr original = function.arguments().get(index);
+            Expr normalized = canonicalizeChild(original, context);
             RetainedOperation.work(1);
-            try (var arguments = RetainedOperation.retain(normalised)) {
-                for (Expr argument : functionExpr.arguments()) {
-                    normalised.add(canonicalizeChild(argument, context));
+            if (normalized != original) return rebuildFunction(function, context, index, normalized);
+        }
+        return function;
+    }
+
+    /** The first changed child makes the argument accumulator necessary; earlier siblings stay shared. */
+    private Expr rebuildFunction(FunctionExpr function, AssumptionContext context, int changedIndex, Expr changed) {
+        try (var changedChild = RetainedOperation.retain(changed)) {
+            List<Expr> normalized = new ArrayList<>(function.arguments().size());
+            RetainedOperation.work(1);
+            try (var arguments = RetainedOperation.retain(normalized)) {
+                for (int index = 0; index < changedIndex; index++) {
+                    normalized.add(function.arguments().get(index));
+                    RetainedOperation.work(1);
+                }
+                normalized.add(changed);
+                RetainedOperation.work(1);
+                RetainedOperation.checkpoint();
+                for (int index = changedIndex + 1; index < function.arguments().size(); index++) {
+                    normalized.add(canonicalizeChild(function.arguments().get(index), context));
                     RetainedOperation.work(1);
                     RetainedOperation.checkpoint();
                 }
-                var result = new FunctionExpr(functionExpr.name(), normalised);
-                RetainedOperation.work(normalised.size());
+                var result = new FunctionExpr(function.name(), normalized);
+                RetainedOperation.work(normalized.size());
                 return RetainedOperation.produced(result);
             }
         }
-        return expression;
     }
 
     private Expr canonicalizeAddition(BinaryExpr expression, AssumptionContext context) {

@@ -84,6 +84,7 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
         if (!(expression instanceof BinaryExpr binary) || binary.operator() != BinaryOperator.ADD) return null;
         RetainedOperation.work(2);
         if (!variableSumNode(binary.left()) || !variableSumNode(binary.right())) return null;
+        if (isNormalizedVariableSum(expression)) return expression;
         var variables = new ArrayList<VariableExpr>();
         var pending = new ArrayDeque<Expr>();
         RetainedOperation.work(2);
@@ -96,6 +97,22 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
             }
             return leftAssociate(variables, BinaryOperator.ADD);
         }
+    }
+
+    /** Recognizes the existing bounded normal form without rebuilding its unchanged ancestors. */
+    private static boolean isNormalizedVariableSum(Expr expression) {
+        Expr remaining = expression;
+        VariableExpr next = null;
+        int terms = 1;
+        while (remaining instanceof BinaryExpr binary && binary.operator() == BinaryOperator.ADD) {
+            RetainedOperation.work(1);
+            if (!(binary.right() instanceof VariableExpr variable) || ++terms > MAX_EXPANDED_TERMS) return false;
+            if (next != null && compareVariables(variable, next) >= 0) return false;
+            next = variable;
+            remaining = binary.left();
+        }
+        RetainedOperation.work(1);
+        return remaining instanceof VariableExpr variable && next != null && compareVariables(variable, next) < 0;
     }
 
     private static boolean variableSumNode(Expr expression) {
