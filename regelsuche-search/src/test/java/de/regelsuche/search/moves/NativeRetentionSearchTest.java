@@ -16,6 +16,39 @@ class NativeRetentionSearchTest {
         }
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(cache);}
     }
+    private static final class FinalAllocation implements NativeVerifier,RetainedGraph.View {
+        private final NativeVerifier verifier;private int calls;
+        FinalAllocation(NativeVerifier verifier){this.verifier=verifier;}
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(verifier);}
+        @Override public NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove move,TypedMoveSearch.Context context){
+            if(++calls==2) {
+                var temporary=new java.util.ArrayList<de.regelsuche.ast.Expr>();
+                for(int i=0;i<20;i++)temporary.add(new VariableExpr("final"+i));
+                try(var retained=de.regelsuche.retention.RetainedOperation.retain(temporary)) {return verifier.verify(source,move,context);}
+            }
+            return verifier.verify(source,move,context);
+        }
+    }
+    @Test void finalIndependentReplayReturnsItsPaidResourceFailureInsteadOfLosingTheResult() {
+        var a=de.regelsuche.transform.PatternExpr.var("A");
+        var rule=new de.regelsuche.transform.PatternRewriteRule("zero",de.regelsuche.transform.PatternExpr.op(
+            de.regelsuche.ast.BinaryOperator.ADD,a,de.regelsuche.transform.PatternExpr.num(0)),a);
+        var target=new VariableExpr("x");
+        var source=new de.regelsuche.ast.BinaryExpr(target,de.regelsuche.ast.BinaryOperator.ADD,new de.regelsuche.ast.NumberExpr(0));
+        var descriptor=new MoveProvider.Descriptor("zero","zero",SearchMove.SourceKind.PRIMITIVE,SearchMove.ProofStrength.REPLAYABLE,List.of(),SearchMove.ValueEvidence.UNKNOWN,"zero-v1");
+        var provider=new NativeMoveSearch.Primitive(descriptor,new de.regelsuche.transform.AstRewriteTransport(List.of(rule),64,128));
+        var verifier=new FinalAllocation(NativeVerifier.registered(List.of(provider)));
+        var problem=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.frozen(target),List.of(provider),MoveSearch.Mode.FAST,
+            MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(1,1,0,10,1000000),NativeMovePriorityPolicy.INVENTORY_ORDER,NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE,verifier);
+        var result=assertDoesNotThrow(()->new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,
+            new SearchExpressionStore.Limits(10,1000000,1000000,0)));
+        assertEquals(2,verifier.calls);assertEquals(1,result.witness().size(),"the admitted witness must survive failed final qualification");
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.outcome());assertFalse(result.accountingComplete());assertFalse(result.withinBudget());
+        assertEquals("NATIVE_RETENTION_EXHAUSTED",result.accounting().detail());
+        assertTrue(result.accounting().peak().nodes()>=20);assertTrue(result.totalWork()>result.metrics().totalWork());
+        assertEquals(new RetainedGraph.Usage(0,0,0),result.accounting().live());
+    }
+
     @Test void anEnumCallbackCannotHideTheRunCreatedGraphDeclaredByItsView() {
         var a=de.regelsuche.transform.PatternExpr.var("A");
         var rule=new de.regelsuche.transform.PatternRewriteRule("zero",de.regelsuche.transform.PatternExpr.op(
