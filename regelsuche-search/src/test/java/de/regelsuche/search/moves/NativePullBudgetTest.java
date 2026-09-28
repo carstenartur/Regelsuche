@@ -72,13 +72,15 @@ class NativePullBudgetTest {
         }
     }
     private static final class EmptyLane implements StagedIncrementalLanes.Source<NativeMoveProof>,ManagedProviderCursor.Binding<NativeMoveProof>,ObjectSource<NativeMoveProof> {
-        private final String id;private final long closingWork;
-        private int opens,pulls,closes;
-        EmptyLane(String id,long closingWork){this.id=id;this.closingWork=closingWork;}
+        private final String id;private final long closingWork,openingWork;
+        private int opens,pulls,closes,cursorOpens;
+        EmptyLane(String id,long closingWork){this(id,closingWork,0);}
+        EmptyLane(String id,long closingWork,long openingWork){this.id=id;this.closingWork=closingWork;this.openingWork=openingWork;}
         @Override public MoveProvider.Descriptor descriptor(){return new MoveProvider.Descriptor(id,id,SearchMove.SourceKind.PRIMITIVE,SearchMove.ProofStrength.REPLAYABLE,List.of(),SearchMove.ValueEvidence.UNKNOWN,id);}
         @Override public boolean batch(){return false;}
         @Override public boolean nativeTransport(){return true;}
         @Override public ObjectCursor<NativeMoveProof> open(java.util.function.Consumer<List<NativeMoveProof>> generated,java.util.function.LongSupplier totalWork){
+            cursorOpens++;RetainedOperation.work(openingWork);
             return new ManagedProviderCursor<>(new Definition(NATIVE_REVISION,id,Kind.REGISTERED_SCHEMA,"model","semantics",Transport.NATIVE_EXPR_V1,Mathematics.PRIMITIVE,null),this);
         }
         @Override public boolean carries(){return true;}
@@ -119,6 +121,22 @@ class NativePullBudgetTest {
         var lanes=new StagedIncrementalLanes<>(List.<StagedIncrementalLanes.Source<NativeMoveProof>>of(first,second),new EmptyRanking(),"state");
         assertTrue(lanes.next(10).isEmpty());assertEquals(1,second.opens);assertFalse(lanes.workExhausted());
         assertEquals(10,lanes.workMetrics().totalWorkUnitsV2());lanes.close();
+    }
+
+    @Test void nativeLaneOpeningConsumesAllowanceBeforeTheFirstCursorPull(){
+        var lane=new EmptyLane("opening",0,7);var paid=new Paid();
+        try(var operation=RetainedOperation.open(paid)){
+            var lanes=new StagedIncrementalLanes<>(List.<StagedIncrementalLanes.Source<NativeMoveProof>>of(lane),new EmptyRanking(),"state");
+            long before=paid.work;
+            assertTrue(lanes.next(5).isEmpty());assertEquals(1,lane.cursorOpens);
+            assertEquals(0,lane.opens,"seven native opening units exhausted allowance five before managed admission/open");
+            assertEquals(0,lane.pulls);assertTrue(lanes.workExhausted());assertEquals(7,paid.work-before);
+            assertEquals(1,lanes.workMetrics().totalWorkUnitsV2(),"only the pre-existing provider ordering unit");
+            assertTrue(lanes.next(4).isEmpty());assertEquals(1,lane.cursorOpens,"resume reuses the already created cursor");
+            assertEquals(1,lane.opens);assertEquals(1,lane.pulls);assertEquals(1,lane.closes);
+            assertEquals(7,paid.work-before);assertEquals(5,lanes.workMetrics().totalWorkUnitsV2());
+            lanes.close();assertEquals(7,paid.work-before);
+        }
     }
 
 }
