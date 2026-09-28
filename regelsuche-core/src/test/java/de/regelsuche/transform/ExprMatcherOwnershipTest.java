@@ -19,8 +19,10 @@ class ExprMatcherOwnershipTest {
         long work, workAfterFailure;
         MatchAbort failure;
         boolean abortOutcome, abortClose, sawSession, inputMissing;
+        boolean abortBindingCopy, sawBindingCopy, sawTraceCopy;
         int unpublishedResultScans;
         final Set<String> patternDescriptions = Collections.newSetFromMap(new IdentityHashMap<>());
+        final Set<List<?>> tracePrefixes = new HashSet<>();
         @Override public void executionWork(long units) {
             work += units;
             if (failure != null) workAfterFailure += units;
@@ -49,19 +51,28 @@ class ExprMatcherOwnershipTest {
                 if (value instanceof RetainedGraph.View view) view.retainedReferences(visitor);
                 else if (value instanceof Object[] array) for (var item : array) visitor.reference(item);
                 else if (value instanceof Collection<?> values) {
+                    if (values instanceof List<?> list && !list.isEmpty() && "any".equals(list.getFirst())) {
+                        tracePrefixes.add(List.copyOf(list));
+                        sawTraceCopy |= list instanceof ArrayList<?>;
+                    }
                     hasStateList |= values.stream().anyMatch(item -> item != null
                         && item.getClass().getEnclosingClass() == ExprMatcherEngine.class
                         && item.getClass().getSimpleName().equals("State"));
                     values.forEach(visitor::reference);
                 }
-                else if (value instanceof Map<?,?> map)
+                else if (value instanceof Map<?,?> map) {
+                    sawBindingCopy |= map instanceof HashMap<?,?> && map.get("A") == input;
                     map.forEach((key,item) -> { visitor.reference(key); visitor.reference(item); });
+                }
                 else if (value instanceof BinaryExpr binary) {
                     visitor.reference(binary.left()); visitor.reference(binary.right());
                 } else if (value instanceof FunctionExpr function) visitor.reference(function.arguments());
             }
             inputMissing |= !seen.contains(input);
             if (hasStateList && outcome == null) unpublishedResultScans++;
+            if (abortBindingCopy && sawBindingCopy && failure == null) {
+                failure = new MatchAbort(); throw failure;
+            }
             if (abortOutcome && outcome != null && failure == null) {
                 failure = new MatchAbort(); throw failure;
             }
@@ -133,6 +144,43 @@ class ExprMatcherOwnershipTest {
         assertTrue(observation.patternDescriptions.contains(description),
             "explicit descriptor output must be owned and charged before returning");
         assertTrue(observation.work >= description.length());
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    private static ExprMatcher twoBindings() {
+        return ExprMatcher.allOf(ExprMatcher.bind("A",ExprMatcher.any()),ExprMatcher.bind("B",ExprMatcher.any()));
+    }
+
+    @Test void intermediateBindingsAndTraceCopiesRemainVisibleBeforeComposition() {
+        Expr input = new VariableExpr("x");
+        var observation = new Observation(); observation.input = input;
+        ExprMatcher.MatchOutcome result;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            result = twoBindings().match(input);
+        }
+        assertEquals(Map.of("A",input,"B",input),result.matches().getFirst().bindings());
+        assertEquals(List.of("any","bind:A","any","bind:B"),result.matches().getFirst().trace());
+        assertTrue(observation.sawBindingCopy,"the actual mutable binding copy must overlap its frozen result");
+        assertTrue(observation.sawTraceCopy,"the actual trace assembly list must remain observable");
+        assertTrue(observation.tracePrefixes.contains(List.of("any")));
+        assertTrue(observation.tracePrefixes.contains(List.of("any","bind:A")));
+        assertTrue(observation.tracePrefixes.contains(List.of("any","bind:A","any")));
+        assertFalse(observation.inputMissing);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    @Test void anAbortedBindingCopyCannotReturnAnUnpaidCompletedOutcome() {
+        Expr input = new VariableExpr("x");
+        var observation = new Observation(); observation.input = input; observation.abortBindingCopy = true;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var failure = assertThrows(MatchAbort.class,() -> twoBindings().match(input));
+            assertSame(observation.failure,failure);
+            assertTrue(observation.sawBindingCopy);
+            assertNull(observation.outcome);
+            assertTrue(observation.workAfterFailure > 0,"cleanup and unreturned match work must remain paid");
+        }
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
 
