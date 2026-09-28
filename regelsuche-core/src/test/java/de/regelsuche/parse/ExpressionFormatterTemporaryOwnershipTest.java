@@ -23,6 +23,10 @@ class ExpressionFormatterTemporaryOwnershipTest {
         String expectedOutput;
         boolean actualResultCopyOwned;
         boolean throwCleanupAfterCallback, callbackStateObserved;
+        boolean abortAtDecimalOperands;
+        int decimalObjects;
+        final Set<String> decimalValues = new HashSet<>();
+        final Set<String> observedText = new HashSet<>();
         @Override public void executionWork(long units) {
             if (throwCleanupAfterCallback && callbackStateObserved && units == 1) {
                 throwCleanupAfterCallback = false;
@@ -43,10 +47,15 @@ class ExpressionFormatterTemporaryOwnershipTest {
             };
             visitor.reference(scope);
             boolean oldBuffer = false, replacement = false, parenthesisReplacement = false;
-            int currentBuffers = 0;
+            int currentBuffers = 0, currentDecimals = 0;
             while (!pending.isEmpty()) {
                 var value = pending.remove();
                 if (!seen.add(value)) continue;
+                if (value instanceof java.math.BigDecimal decimal) {
+                    currentDecimals++;
+                    decimalValues.add(decimal.toString());
+                }
+                if (value instanceof String text) observedText.add(text);
                 if (value instanceof char[] buffer) {
                     currentBuffers++;
                     if (buffer.length == 16) oldBuffer = true;
@@ -69,6 +78,8 @@ class ExpressionFormatterTemporaryOwnershipTest {
                 } else if (value instanceof FunctionExpr function) visitor.reference(function.arguments());
             }
             buffers = Math.max(buffers, currentBuffers);
+            decimalObjects = Math.max(decimalObjects, currentDecimals);
+            if (abortAtDecimalOperands && currentDecimals >= 2) throw new GrowthLimit();
             if (expectedOutput != null && seen.stream().anyMatch(value -> expectedOutput.equals(value))) {
                 actualResultCopyOwned |= seen.stream().anyMatch(value -> value instanceof char[] buffer
                     && matches(buffer, expectedOutput));
@@ -87,6 +98,39 @@ class ExpressionFormatterTemporaryOwnershipTest {
             if (peakCharacters >= 1_000) callbackStateObserved = true;
             if (peakCharacters >= abortCharactersAt) throw new GrowthLimit();
         }
+    }
+
+    @Test void exactDecimalAndFractionFormattingOwnTheirActualConversionWorkspace() {
+        var cases = Map.of("1/8", "0.125", "1/3", "1 / 3", "-2/5", "-0.4");
+        for (var entry : cases.entrySet()) {
+            var input = NumberExpr.exact(entry.getKey());
+            var observation = new Observation(); observation.input = input;
+            try (var scope = RetainedOperation.open(observation)) {
+                observation.scope = scope;
+                assertEquals(entry.getValue(), ExpressionFormatter.format(input));
+            }
+            assertTrue(observation.decimalObjects >= 2, "the actual decimal numerator and denominator overlap");
+            if (entry.getKey().equals("1/8")) assertTrue(observation.decimalValues.contains("0.125"));
+            if (entry.getKey().equals("1/3")) assertTrue(observation.observedText.containsAll(Set.of("1", "3", "1 / 3")),
+                "integer component strings remain owned while constructing the fraction");
+            assertFalse(observation.inputMissing);
+            assertEquals(0, RetainedGraph.measure(observation.scope).retained().characters());
+        }
+    }
+
+    @Test void conversionOperandCheckpointCanAbortBeforeDivisionOrOutput() {
+        var input = NumberExpr.exact("1/3");
+        var observation = new Observation(); observation.input = input; observation.abortAtDecimalOperands = true;
+        var emitted = new Emission();
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            assertThrows(GrowthLimit.class, () -> ExpressionFormatter.formatMeasured(input, emitted));
+            assertEquals(0, emitted.count);
+            assertTrue(observation.work > 2);
+            assertFalse(observation.inputMissing);
+        }
+        assertEquals(0, RetainedGraph.measure(observation.scope).retained().characters());
+        assertEquals("1 / 3", ExpressionFormatter.format(input));
     }
     private static boolean matches(char[] buffer, String text) {
         if (buffer.length < text.length()) return false;

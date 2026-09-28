@@ -97,6 +97,23 @@ class RetainedGraphTest {
         assertEquals(60,measured.peak().characters(),"retained scalar and live decimal conversion overlap");
         assertTrue(measured.work()>=30);
     }
+    @Test void exactDecimalScalarsExposeTheirCanonicalRepresentationAndInspectionWork() {
+        var decimal=new java.math.BigDecimal("12.50");
+        var measured=RetainedGraph.measure(decimal);
+        assertEquals(5,measured.retained().characters());
+        assertTrue(measured.peak().characters()>=5);
+        assertTrue(measured.work()>5);
+        assertEquals(measured,RetainedGraph.measure(decimal),"a warmed library rendering cache cannot change the logical scalar contract");
+    }
+    @Test void opaqueBigDecimalSubclassCannotHideAnOwnedExpressionGraph() {
+        class CapturingDecimal extends java.math.BigDecimal {
+            final Expr retained;
+            CapturingDecimal(Expr retained){super("1.5");this.retained=retained;}
+        }
+        var rejected=assertThrows(RetainedGraph.Unmeasured.class,
+            ()->RetainedGraph.measure(new CapturingDecimal(new VariableExpr("captured"))));
+        assertTrue(rejected.attempted().work()>0);
+    }
     @Test void immutableSortedOwnerKeepsOrderAndExposesItsActualBackingGraph() {
         var map=RetainedSortedMap.copyOf(java.util.Map.of("b",new VariableExpr("b"),"a",new VariableExpr("a")));
         assertEquals(java.util.List.of("a","b"),new ArrayList<>(map.keySet()));
