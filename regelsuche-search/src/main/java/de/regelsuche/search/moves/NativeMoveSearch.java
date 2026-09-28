@@ -29,30 +29,31 @@ public final class NativeMoveSearch {
         }
     }
     public record Problem(Expr source, TypedMoveSearch.Context context, List<NativeMoveProvider> providers,
-            MoveSearch.Mode mode, MoveSearch.Scheduling scheduling, MoveSearch.Budget budget) {
+            MoveSearch.Mode mode, MoveSearch.Scheduling scheduling, MoveSearch.Budget budget,
+            NativeMovePriorityPolicy policy,java.util.function.ToDoubleFunction<TypedMoveSearch.State> stateScore,NativeStateValue stateValue) {
+        public Problem(Expr source,TypedMoveSearch.Context context,List<NativeMoveProvider> providers,MoveSearch.Mode mode,MoveSearch.Scheduling scheduling,MoveSearch.Budget budget){
+            this(source,context,providers,mode,scheduling,budget,NativeMovePriorityPolicy.INVENTORY_ORDER,state->0,NativeStateValue.NONE);
+        }
         public Problem {
             Objects.requireNonNull(source);Objects.requireNonNull(context);providers=List.copyOf(providers);
             Objects.requireNonNull(mode);Objects.requireNonNull(scheduling);Objects.requireNonNull(budget);
+            Objects.requireNonNull(policy);Objects.requireNonNull(stateScore);Objects.requireNonNull(stateValue);
             if(context.phase()==MoveContext.Phase.PRODUCTION)throw new IllegalArgumentException("experimental scheduling is not production-qualified (#745)");
             if(scheduling!=MoveSearch.Scheduling.STAGED && scheduling!=MoveSearch.Scheduling.EAGER_CONTROL)
                 throw new IllegalArgumentException("native provider does not implement this scheduling contract");
         }
     }
-    record Assessment(int complexity,double value,long searchWork,long primitiveWork,Map<String,SearchExecution.Capability<Expr>> capabilities)
-            implements SearchExecution.Assessment<Expr> {
-        static final Assessment EMPTY=new Assessment(0,0,0,0,Map.of());
-    }
     public static final class Result {
-        private final SearchExecution.Result<TypedMoveSearch.State,NativeSearchMove,NativeVerification,Assessment> result;
+        private final SearchExecution.Result<TypedMoveSearch.State,NativeSearchMove,NativeVerification,NativeStateValue.Assessment> result;
         private final Expr source;
-        private Result(Expr source,SearchExecution.Result<TypedMoveSearch.State,NativeSearchMove,NativeVerification,Assessment> result){this.source=source;this.result=result;}
+        private Result(Expr source,SearchExecution.Result<TypedMoveSearch.State,NativeSearchMove,NativeVerification,NativeStateValue.Assessment> result){this.source=source;this.result=result;}
         public MoveSearch.Outcome outcome(){return result.outcome();}
         public Expr output(){return result.witness().isEmpty()?source:result.witness().getLast().target().expression();}
         public List<SearchExecution.Step<TypedMoveSearch.State,NativeSearchMove,NativeVerification>> witness(){return result.witness();}
         public MoveSearch.Metrics metrics(){return result.metrics();}
         public MoveSearch.Result exportLegacy(){
             var assessments=new HashMap<MoveState,StateValue.Assessment>();
-            result.stateAssessments().forEach((state,value)->assessments.put(export(state),StateValue.Assessment.EMPTY));
+            result.stateAssessments().forEach((state,value)->assessments.put(export(state),export(value)));
             return new MoveSearch.Result(result.outcome(),result.witness().stream().map(s->new MoveSearch.WitnessStep(export(s.source()),export(s.target()),s.move().exportLegacy(),s.verification().exportLegacy())).toList(),
                 result.events().stream().map(e->new MoveSearch.Event(export(e.source()),export(e.target()),e.move().exportLegacy(),e.decision(),e.verification()==null?null:e.verification().exportLegacy())).toList(),
                 result.reachedStates().stream().map(NativeMoveSearch::export).collect(java.util.stream.Collectors.toSet()),
@@ -91,7 +92,7 @@ public final class NativeMoveSearch {
         },maximumOutputScore,stopAtQuality);
         try(var store=new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)) {
             var execution=new Execution(problem,store);
-            var result=new Result(problem.source(),new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,Assessment,NativeVerification>()
+            var result=new Result(problem.source(),new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
                 .search(execution,continuation,selection));
             long replayWork=0;
             TypedMoveSearch.State cursor=selection.witness().isEmpty()?selection.incumbent():selection.witness().getFirst().source();
@@ -111,7 +112,7 @@ public final class NativeMoveSearch {
     public Result search(Problem problem,SearchContinuationContract continuation){
         validate(problem);
         try(var store=new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)) {
-            return new Result(problem.source(),new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,Assessment,NativeVerification>()
+            return new Result(problem.source(),new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
                 .search(new Execution(problem,store),continuation,null));
         }
     }
@@ -119,7 +120,7 @@ public final class NativeMoveSearch {
         de.regelsuche.search.program.AstExpressionValidation.inspect(problem.source());
         if(problem.context().goal()!=null)de.regelsuche.search.program.AstExpressionValidation.inspect(problem.context().goal());
     }
-    private static final class Execution implements SearchExecution.Environment<Expr,TypedMoveSearch.State,NativeSearchMove,Assessment,NativeVerification> {
+    private static final class Execution implements SearchExecution.Environment<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification> {
         private final Problem problem;private final SearchExpressionStore store;
         Execution(Problem problem,SearchExpressionStore store){this.problem=Objects.requireNonNull(problem);this.store=store;}
         @Override public Expr source(){return problem.source();}
@@ -132,8 +133,8 @@ public final class NativeMoveSearch {
             de.regelsuche.search.program.AstExpressionValidation.inspect(expression);
             return new TypedMoveSearch.State(store.dereference(store.intern(expression)),depth,primitive,previous,assumptions,capabilities,debt);
         }
-        @Override public Assessment inspect(TypedMoveSearch.State state){return Assessment.EMPTY;}
-        @Override public double score(TypedMoveSearch.State state){return 0;}
+        @Override public NativeStateValue.Assessment inspect(TypedMoveSearch.State state){return problem.stateValue().evaluate(state,problem.context());}
+        @Override public double score(TypedMoveSearch.State state){return problem.stateScore().applyAsDouble(state);}
         @Override public boolean carries(List<String> assumptions,TypedMoveSearch.State state){
             var available=new HashSet<>(initialAssumptions());available.addAll(state.assumptions());return available.containsAll(assumptions);
         }
@@ -151,14 +152,19 @@ public final class NativeMoveSearch {
                 }
             }).toList();
             var ranking=new SearchBatches.Ranking<NativeSearchMove>() {
-                @Override public double score(NativeSearchMove move){return 0;}
-                @Override public int stage(MoveProvider.Descriptor descriptor){return MovePriorityPolicy.INVENTORY_ORDER.stage(descriptor,null,null).ordinal();}
-                @Override public double providerScore(MoveProvider.Descriptor descriptor){return 0;}
-                @Override public long contextWork(){return 0;}
+                @Override public double score(NativeSearchMove move){return problem.policy().score(move,state,problem.context());}
+                @Override public int stage(MoveProvider.Descriptor descriptor){return problem.policy().stage(descriptor,state,problem.context()).ordinal();}
+                @Override public double providerScore(MoveProvider.Descriptor descriptor){return problem.policy().providerScore(descriptor,state,problem.context());}
+                @Override public long contextWork(){return problem.policy().contextWork(state,problem.context());}
                 @Override public void requireSource(NativeSearchMove move){move.requireSource(state.expression());}
             };
             return scheduling()==MoveSearch.Scheduling.STAGED?new StagedBatchPicker<>(providers,ranking):new EagerBatchPicker<>(providers,ranking);
         }
+    }
+    private static StateValue.Assessment export(NativeStateValue.Assessment value){
+        var capabilities=new TreeMap<String,StateValue.Capability>();var codec=new CompiledAstReplayCodec();
+        value.capabilities().forEach((key,c)->capabilities.put(key,new StateValue.Capability(c.providerId(),codec.encodeExpression(c.sourceExpression()),c.subtreePath(),codec.encodeExpression(c.matchedExpression()),codec.encodeExpression(c.rewrittenExpression()))));
+        return new StateValue.Assessment(value.complexity(),value.value(),value.searchWork(),value.primitiveWork(),capabilities);
     }
     static MoveState export(TypedMoveSearch.State state){return new MoveState(new CompiledAstReplayCodec().encodeExpression(state.expression()),state.searchDepth(),state.primitiveDepth(),state.previousRule(),state.assumptions(),state.capabilities(),state.complexityDebt());}
 }

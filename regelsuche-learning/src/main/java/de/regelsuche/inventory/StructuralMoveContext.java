@@ -21,14 +21,20 @@ public record StructuralMoveContext(String rootOperator, int degree, int variabl
     public static StructuralMoveContext fromTyped(MoveState state) {
         return of(new de.regelsuche.search.program.CompiledAstReplayCodec().decodeExpression(state.expression()), state);
     }
+    public static StructuralMoveContext of(de.regelsuche.search.moves.TypedMoveSearch.State state) {
+        return of(state.expression(),state.assumptions(),state.capabilities());
+    }
     private static StructuralMoveContext of(Expr root, MoveState state) {
+        return of(root,state.assumptions(),state.capabilities());
+    }
+    private static StructuralMoveContext of(Expr root,List<String> assumptions,java.util.Set<String> capabilities) {
         var seen = new HashMap<Expr, Integer>(); var variables = new HashSet<String>();
         int[] counts = new int[3]; collect(root, seen, variables, counts);
         String operator = root instanceof BinaryExpr binary ? binary.operator().name()
             : root instanceof FunctionExpr function ? "FUNCTION:" + function.name() : root instanceof VariableExpr ? "VARIABLE" : "NUMBER";
         return new StructuralMoveContext(operator, degree(root), variables.size(), counts[1], counts[2],
-            seen.values().stream().mapToInt(count -> Math.max(0, count - 1)).sum(), state.assumptions(),
-            state.capabilities().stream().sorted().toList(), counts[0]);
+            seen.values().stream().mapToInt(count -> Math.max(0, count - 1)).sum(), assumptions,
+            capabilities.stream().sorted().toList(), counts[0]);
     }
     public String key() {
         return new JsonWriter().beginObject().property("root", rootOperator).property("degree", degree).property("variables", variables)
