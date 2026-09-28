@@ -113,6 +113,7 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
                     return null;
                 }
                 var scaled=rightPolynomial.scale(rightSign);
+                if (scaled == null) return null;
                 try(var scaledOwned=RetainedOperation.retain(scaled)){return leftPolynomial.add(scaled);}
             }
         }
@@ -397,11 +398,24 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
         }
 
         private Polynomial scale(long factor) {
-            return factor == 1
-                ? this
-                : multiply(monomial(
-                    factor,
-                    Monomial.constant()));
+            if (factor == 1) return this;
+            if (factor != -1) return multiply(monomial(factor, Monomial.constant()));
+            var result = new LinkedHashMap<Monomial, ExactRational>();
+            RetainedOperation.work(1);
+            try (var maps = RetainedOperation.retain(this, result)) {
+                for (var entry : terms.entrySet()) {
+                    var coefficient = entry.getValue().negate();
+                    RetainedOperation.work(1);
+                    try (var scalar = RetainedOperation.retain(coefficient)) {
+                        if (!withinCoefficientBudget(coefficient)) return null;
+                        result.put(entry.getKey(), coefficient);
+                        RetainedOperation.work(1);
+                        RetainedOperation.checkpoint();
+                        if (result.size() > MAX_EXPANDED_TERMS) return null;
+                    }
+                }
+                return RetainedOperation.produced(new Polynomial(result));
+            }
         }
 
         private boolean isMonomial() {
