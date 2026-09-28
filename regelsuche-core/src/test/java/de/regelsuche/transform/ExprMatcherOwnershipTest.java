@@ -20,10 +20,12 @@ class ExprMatcherOwnershipTest {
         MatchAbort failure;
         boolean abortOutcome, abortClose, sawSession, inputMissing;
         boolean abortBindingCopy, sawBindingCopy, sawTraceCopy;
+        boolean abortStateList, sawSecondBinding;
         int unpublishedResultScans;
         final Set<String> patternDescriptions = Collections.newSetFromMap(new IdentityHashMap<>());
         final Set<List<?>> tracePrefixes = new HashSet<>();
         final Set<Object> states = Collections.newSetFromMap(new IdentityHashMap<>());
+        final Set<Object> mutableStateLists = Collections.newSetFromMap(new IdentityHashMap<>());
         @Override public void executionWork(long units) {
             work += units;
             if (failure != null) workAfterFailure += units;
@@ -62,9 +64,13 @@ class ExprMatcherOwnershipTest {
                     hasStateList |= values.stream().anyMatch(item -> item != null
                         && item.getClass().getEnclosingClass() == ExprMatcherEngine.class
                         && item.getClass().getSimpleName().equals("State"));
+                    if (values instanceof ArrayList<?> && values.stream().anyMatch(item -> item != null
+                            && item.getClass().getEnclosingClass() == ExprMatcherEngine.class
+                            && item.getClass().getSimpleName().equals("State"))) mutableStateLists.add(values);
                     values.forEach(visitor::reference);
                 }
                 else if (value instanceof Map<?,?> map) {
+                    sawSecondBinding |= map.get("B") == input;
                     if (map.get("A") == input) {
                         hasMutableBinding |= map instanceof HashMap<?,?>;
                         hasFrozenBinding |= !(map instanceof HashMap<?,?>);
@@ -79,6 +85,9 @@ class ExprMatcherOwnershipTest {
             sawBindingCopy |= hasMutableBinding && hasFrozenBinding;
             if (hasStateList && outcome == null) unpublishedResultScans++;
             if (abortBindingCopy && sawBindingCopy && failure == null) {
+                failure = new MatchAbort(); throw failure;
+            }
+            if (abortStateList && !mutableStateLists.isEmpty() && failure == null) {
                 failure = new MatchAbort(); throw failure;
             }
             if (abortOutcome && outcome != null && failure == null) {
@@ -209,6 +218,51 @@ class ExprMatcherOwnershipTest {
         assertTrue(observation.states.size() <= 3,
             "source, changed bindings and new trace need at most three states; unchanged recognition adds none");
         assertFalse(observation.inputMissing);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    @Test void alternativeResultsOwnTheirActualMutableAssemblyList() {
+        verifyComposedLists(ExprMatcher.anyOf(ExprMatcher.bind("A",ExprMatcher.any()),
+            ExprMatcher.bind("B",ExprMatcher.any())),new VariableExpr("x"),2);
+    }
+
+    @Test void conjunctionResultsOwnTheirActualIntermediateLists() {
+        verifyComposedLists(twoBindings(),new VariableExpr("x"),1);
+    }
+
+    @Test void functionArgumentsOwnTheirActualIntermediateLists() {
+        verifyComposedLists(ExprMatcher.fn("f",ExprMatcher.bind("A",ExprMatcher.any()),
+            ExprMatcher.bind("B",ExprMatcher.any())),new ExpressionParser().parseTerm("f(x,y)"),1);
+    }
+
+    private static void verifyComposedLists(ExprMatcher matcher,Expr input,int matches) {
+        var expected = matcher.match(input);
+        var observation = new Observation(); observation.input = input;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var actual = matcher.match(input);
+            assertEquals(expected,actual);
+            assertEquals(matches,actual.matches().size());
+        }
+        assertFalse(observation.mutableStateLists.isEmpty(),
+            "actual mutable composition lists must be observed before only their frozen result remains");
+        assertFalse(observation.inputMissing);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    @Test void anAbortedAlternativeAssemblyDoesNotGenerateItsLaterBranch() {
+        Expr input = new VariableExpr("x");
+        var observation = new Observation(); observation.input = input; observation.abortStateList = true;
+        var matcher = ExprMatcher.anyOf(ExprMatcher.bind("A",ExprMatcher.any()),ExprMatcher.bind("B",ExprMatcher.any()));
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var failure = assertThrows(MatchAbort.class,() -> matcher.match(input));
+            assertSame(observation.failure,failure);
+            assertFalse(observation.mutableStateLists.isEmpty());
+            assertFalse(observation.sawSecondBinding,"later alternatives must not run after the paid assembly abort");
+            assertNull(observation.outcome);
+            assertTrue(observation.workAfterFailure > 0);
+        }
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
 
