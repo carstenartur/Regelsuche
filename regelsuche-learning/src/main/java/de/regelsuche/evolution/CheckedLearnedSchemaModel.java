@@ -12,6 +12,7 @@ import de.regelsuche.mining.TypedPatternGeneralizer;
 import de.regelsuche.moves.enumerate.TreePosition;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.search.moves.MoveContext;
+import de.regelsuche.search.moves.NativeMoveProvider;
 import de.regelsuche.search.moves.IncrementalProviderContract.ApplicationPhase;
 import de.regelsuche.search.moves.MoveProvider;
 import de.regelsuche.search.moves.MoveState;
@@ -278,6 +279,9 @@ public final class CheckedLearnedSchemaModel {
         return new CheckedLearnedSchemaModel(inventoryHash, originStrategyHash, bounds, combined, schemas, attempts, formationWork, loadWork);
     }
 
+    public List<NativeMoveProvider> nativeProviders() {
+        throw new UnsupportedOperationException("native checked schema generation is not implemented");
+    }
     public List<MoveProvider> providers() { return providers(bounds.maximumSchemas()); }
     public List<MoveProvider> providers(int maximumSchemasPerOccurrence) { return providers(maximumSchemasPerOccurrence, Map.of()); }
     public List<MoveProvider> providers(int maximumSchemasPerOccurrence, Map<String, Double> utilityBySchemaId,
