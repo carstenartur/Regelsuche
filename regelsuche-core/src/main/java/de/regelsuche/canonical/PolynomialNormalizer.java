@@ -11,6 +11,7 @@ import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.scalar.ExactRational;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -52,6 +53,8 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
             RetainedOperation.work(1);
             Expr existing=normalizedVariablePower(expression);
             if(existing!=null)return RetainedOperation.produced(Optional.of(existing));
+            Expr variableSum=normalizeVariableSum(expression);
+            if(variableSum!=null)return RetainedOperation.produced(Optional.of(variableSum));
             Polynomial polynomial = toPolynomial(expression);
             if (polynomial == null) {
                 return Optional.empty();
@@ -73,6 +76,57 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
         RetainedOperation.work(2);
         if(!isNonNegativeInteger(number.value()) || number.value().isZero())return null;
         return number.value().isOne()?binary.left():expression;
+    }
+
+    /** Distinct degree-one terms need only ordering and association, not coefficient maps. */
+    private Expr normalizeVariableSum(Expr expression) {
+        RetainedOperation.work(1);
+        if (!(expression instanceof BinaryExpr binary) || binary.operator() != BinaryOperator.ADD) return null;
+        RetainedOperation.work(2);
+        if (!variableSumNode(binary.left()) || !variableSumNode(binary.right())) return null;
+        var variables = new ArrayList<VariableExpr>();
+        var pending = new ArrayDeque<Expr>();
+        RetainedOperation.work(2);
+        pending.addLast(expression);RetainedOperation.work(1);
+        try (var workspace = RetainedOperation.retain(variables, pending)) {
+            if (!collectVariableSum(variables, pending)) return null;
+            variables.sort(PolynomialNormalizer::compareVariables);
+            for (int index = 1; index < variables.size(); index++) {
+                if (compareVariables(variables.get(index - 1), variables.get(index)) == 0) return null;
+            }
+            return leftAssociate(variables, BinaryOperator.ADD);
+        }
+    }
+
+    private static boolean variableSumNode(Expr expression) {
+        return expression instanceof VariableExpr
+            || expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.ADD;
+    }
+
+    private static boolean collectVariableSum(List<VariableExpr> variables, ArrayDeque<Expr> pending) {
+        while (!pending.isEmpty()) {
+            Expr expression = pending.removeLast();RetainedOperation.work(1);
+            if (expression instanceof VariableExpr variable) {
+                variables.add(variable);RetainedOperation.work(1);
+            } else if (expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.ADD) {
+                pending.addLast(binary.right());pending.addLast(binary.left());RetainedOperation.work(2);
+            } else return false;
+            RetainedOperation.checkpoint();
+            if (variables.size() > MAX_EXPANDED_TERMS) return false;
+        }
+        return true;
+    }
+
+    private static int compareVariables(VariableExpr left, VariableExpr right) {
+        // A degree-one monomial's existing sortKey is exactly its lossless variable name.
+        String a = left.name(), b = right.name();
+        for (int index = 0; index < Math.min(a.length(), b.length()); index++) {
+            RetainedOperation.work(1);
+            int order = Character.compare(a.charAt(index), b.charAt(index));
+            if (order != 0) return order;
+        }
+        RetainedOperation.work(1);
+        return Integer.compare(a.length(), b.length());
     }
 
     private Polynomial toPolynomial(Expr expression) {
@@ -548,7 +602,7 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
         }
     }
 
-    private static Expr leftAssociate(List<Expr> expressions, BinaryOperator operator) {
+    private static Expr leftAssociate(List<? extends Expr> expressions, BinaryOperator operator) {
         RetainedOperation.work(1);
         if (expressions.size() == 1) return expressions.getFirst();
         Object[] current = {expressions.getFirst()};
