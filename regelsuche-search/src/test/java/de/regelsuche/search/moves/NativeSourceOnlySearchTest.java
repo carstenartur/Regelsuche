@@ -52,13 +52,15 @@ class NativeSourceOnlySearchTest {
     @Test void finalReplayOwnsTheCompletedResultAfterReleasingClosedFrontierScratch(){
         for(boolean sourceOnly:List.of(false,true)){
             var checks=new Counter();checks.inspectFinalRoot=true;var problem=problem(checks,0,BUDGET);
-            NativeMoveSearch.Result result=sourceOnly
-                ?new NativeMoveSearch().searchUntil(problem,Objective.QUALITY,1,SearchContinuationContract.PATH_SENSITIVE).search()
-                :new NativeMoveSearch().search(target(problem),SearchContinuationContract.PATH_SENSITIVE);
+            NativeMoveSearch.Result result;RetainedGraph.View output;
+            if(sourceOnly){
+                var quality=new NativeMoveSearch().searchUntil(problem,Objective.QUALITY,1,SearchContinuationContract.PATH_SENSITIVE);
+                result=quality.search();output=quality;
+            }else{result=new NativeMoveSearch().search(target(problem),SearchContinuationContract.PATH_SENSITIVE);output=result;}
             assertEquals(2,checks.value);assertTrue(result.replayWork()>0);assertEquals(1,result.witness().size());
             assertTrue(checks.completedRoot,"the actual final checker must see the immutable complete result as the direct ownership root");
             assertEquals(sourceOnly,checks.selectionRetained,"source-only final replay must keep its separately selected incumbent and witness owned");
-            assertEquals(RetainedGraph.measure(result).retained(),result.accounting().resultRetained());
+            assertEquals(RetainedGraph.measure(output).retained(),result.accounting().resultRetained());
         }
     }
     @Test void sourceOnlyQualityPaysAFreshIndependentReplayBeforeAnyExport() {
@@ -110,10 +112,12 @@ class NativeSourceOnlySearchTest {
         assertFalse(failure.rejected().accepted());assertTrue(failure.attempted().totalWork()>37);
     }
     @Test void bestBudgetUsesTheSameObjectiveWithoutEarlyQualityStop() {
-        var checks=new Counter();
+        var checks=new Counter();checks.inspectFinalRoot=true;
         var result=new NativeMoveSearch().searchBest(problem(checks,0,BUDGET),Objective.BEST,SearchContinuationContract.PATH_SENSITIVE);
         assertNotEquals(MoveSearch.Outcome.QUALITY_REACHED,result.search().observedOutcome());
         assertEquals(Long.MIN_VALUE,result.outputScore());assertEquals(1,result.witness().size());assertEquals(2,checks.value);
+        assertTrue(checks.completedRoot);assertTrue(checks.selectionRetained);
+        assertEquals(RetainedGraph.measure(result).retained(),result.search().accounting().resultRetained());
     }
     private static NativeMoveSearch.Problem target(NativeMoveSearch.Problem sourceOnly){
         return new NativeMoveSearch.Problem(sourceOnly.source(),TypedMoveSearch.Context.frozen(((BinaryExpr)sourceOnly.source()).left()),
