@@ -69,7 +69,11 @@ final class StagedIncrementalLanes<M,S> implements SearchExecution.Picker<M>,Ret
         for (Lane lane = selected(); lane != null; lane = selected()) {
             long remaining = Math.max(0, allowance - (pullWork() - before));
             if (remaining == 0) { workExhausted = true; return Optional.empty(); }
-            if (lane.cursor == null) open(lane);
+            if (lane.cursor == null) {
+                open(lane);
+                remaining = Math.max(0, allowance - (pullWork() - before));
+                if (remaining == 0) { workExhausted = true; return Optional.empty(); }
+            }
             var candidate = lane.cursor.next(remaining);
             if (candidate.isPresent()) return emit(lane, candidate.orElseThrow());
             if (lane.cursor.snapshot().resumable()) { workExhausted = true; return Optional.empty(); }

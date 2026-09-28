@@ -28,7 +28,8 @@ public final class NativeMoveSearch {
             var generated=transport.generate(source.expression());
             boolean accepted=descriptor.equals(move.descriptor()) && source.expression().equals(move.sourceExpression())
                 && move.proof() instanceof NativeMoveProof.Primitive proof && generated.contains(proof.step());
-            return new NativeVerification(accepted,TransformationWorkMetrics.flatEngine(generated.size()).totalWorkUnits(),
+            return new NativeVerification(accepted,TransformationWorkMetrics.flatEngine(generated.size())
+                    .withCandidateWork(new ExecutionWork(generated.size(),0,0)).totalWorkUnitsV2(),
                 accepted?move.proof():null,accepted?move.ruleId():null,accepted?"TYPED_PRIMITIVE_REPLAYED":"TYPED_PRIMITIVE_REPLAY_REJECTED");
         }
     }

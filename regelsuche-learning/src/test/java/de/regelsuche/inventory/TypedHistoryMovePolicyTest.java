@@ -96,7 +96,8 @@ class TypedHistoryMovePolicyTest {
         var nativeProblem=new NativeMoveSearch.Problem(source,new TypedMoveSearch.Context(goal,List.of(),MoveContext.Phase.TRAIN),
             List.of(new NativeMoveSearch.Primitive(DESCRIPTOR,TRANSPORT)),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,
             new MoveSearch.Budget(3,3,0,20,1000000),nativePolicy,NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE);
-        assertEquals(run(source,goal,legacy,10000).encodedResult(),new NativeMoveSearch().search(nativeProblem,SearchContinuationContract.PATH_SENSITIVE).exportLegacy());
+        assertEquals(withNativePrimitiveVerificationWork(run(source,goal,legacy,10000).encodedResult()),
+            new NativeMoveSearch().search(nativeProblem,SearchContinuationContract.PATH_SENSITIVE).exportLegacy());
     }
 
     @Test void nativeHistoryRankingHasAuditedBoundedOwnershipAcrossIndependentSearches() {
@@ -126,5 +127,19 @@ class TypedHistoryMovePolicyTest {
             List.of(TypedMoveSearch.primitiveProvider(DESCRIPTOR, TRANSPORT)), policy,
             TypedMoveSearch.primitiveReplay(TRANSPORT), state -> 0,
             MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED, new MoveSearch.Budget(3, 3, 0, 20, work)));
+    }
+
+    /** These single-step fixtures regenerate one primitive in each admission; v3 pays that actual work. */
+    private static MoveSearch.Result withNativePrimitiveVerificationWork(MoveSearch.Result old) {
+        var m=old.metrics();
+        var metrics=new MoveSearch.Metrics(m.generatedSuccessors(),m.consumedSuccessors(),m.discardedSuccessors(),m.unconsumedSuccessors(),
+            m.duplicates(),m.deadEnds(),m.exploredStates(),m.expandedStates(),m.primitiveWork(),m.searchWork(),m.verificationWork()+1,
+            m.firstHitDepth(),m.firstHitPrimitiveDepth(),m.familyMatches());
+        return new MoveSearch.Result(old.outcome(),old.witness().stream().map(w->new MoveSearch.WitnessStep(w.source(),w.target(),w.move(),nativeVerification(w.verification()))).toList(),
+            old.events().stream().map(e->new MoveSearch.Event(e.source(),e.target(),e.move(),e.decision(),nativeVerification(e.verification()))).toList(),
+            old.reachedStates(),old.deadEndStates(),metrics,old.completeBoundedRelation(),old.stateAssessments(),old.incrementalExecution(),old.stagedIncrementalExecution());
+    }
+    private static MoveVerifier.Verification nativeVerification(MoveVerifier.Verification old) {
+        return old==null?null:new MoveVerifier.Verification(old.accepted(),old.work()+1,old.receipts(),old.reason());
     }
 }
