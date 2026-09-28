@@ -126,16 +126,7 @@ final class ExprMatcherEngine {
             return matchFunction(function, expression, state, session);
         }
         if (matcher instanceof ExprMatcher.Contains contains) {
-            List<State> matches = new ArrayList<>();
-            collectContained(
-                contains.matcher(),
-                expression,
-                state,
-                session,
-                List.of(),
-                matches
-            );
-            return session.limit(matches, matcher);
+            return matchContains(contains,expression,state,session);
         }
         if (matcher instanceof ExprMatcher.Equivalent equivalent) {
             return matchEquivalent(
@@ -401,57 +392,60 @@ final class ExprMatcherEngine {
         }
     }
 
+    private static List<State> matchContains(
+        ExprMatcher.Contains contains,
+        Expr expression,
+        State state,
+        Session session
+    ) {
+        var lists = new StateLists();
+        try (var owned = RetainedOperation.retainCompleted(1,contains,expression,state,session,lists)) {
+            try {
+                lists.begin();
+                collectContained(contains.matcher(),expression,state,session,List.of(),lists);
+                lists.freeze(session,contains);
+                return lists.result;
+            } catch (RuntimeException | Error failure) {
+                observeFailure(failure); throw failure;
+            }
+        }
+    }
+
     private static void collectContained(
         ExprMatcher matcher,
         Expr expression,
         State state,
         Session session,
         List<Integer> path,
-        List<State> matches
+        StateLists matches
     ) {
-        if (matches.size() >= session.options.maxResults()) {
-            session.diagnostic(
-                "MATCH_RESULT_LIMIT", matcher.canonicalDescriptor());
-            return;
-        }
-        String renderedPath = path.isEmpty()
-            ? "root"
-            : path.stream()
-                .map(String::valueOf)
-                .reduce((left, right) -> left + "." + right)
-                .orElse("root");
-        evaluate(matcher, expression, state, session, false).stream()
-            .map(match -> match.traced("contains@" + renderedPath))
-            .forEach(matches::add);
-        if (expression instanceof BinaryExpr binary) {
-            collectContained(
-                matcher,
-                binary.left(),
-                state,
-                session,
-                append(path, 0),
-                matches
-            );
-            collectContained(
-                matcher,
-                binary.right(),
-                state,
-                session,
-                append(path, 1),
-                matches
-            );
-        } else if (expression instanceof FunctionExpr function) {
-            for (int index = 0;
-                    index < function.arguments().size();
-                    index++) {
-                collectContained(
-                    matcher,
-                    function.arguments().get(index),
-                    state,
-                    session,
-                    append(path, index),
-                    matches
-                );
+        var visit = new ContainedVisit(path);
+        try (var owned = RetainedOperation.retainCompleted(1,matcher,expression,state,session,visit,matches)) {
+            try {
+                if (matches.next.size() >= session.options.maxResults()) {
+                    session.diagnostic("MATCH_RESULT_LIMIT",matcher.canonicalDescriptor());
+                    return;
+                }
+                visit.renderedPath = path.isEmpty() ? "root" : path.stream()
+                    .map(String::valueOf).reduce((left,right) -> left + "." + right).orElse("root");
+                RetainedOperation.work(1);
+                visit.candidates = evaluate(matcher,expression,state,session,false);
+                RetainedOperation.work(1);
+                for (State match : visit.candidates) matches.add(match.traced("contains@" + visit.renderedPath));
+                // Even an empty result is observed before this visit releases it.
+                RetainedOperation.checkpoint();
+                visit.candidates = null; visit.renderedPath = null;
+                RetainedOperation.work(2);
+                if (expression instanceof BinaryExpr binary) {
+                    collectContained(matcher,binary.left(),state,session,append(path,0),matches);
+                    collectContained(matcher,binary.right(),state,session,append(path,1),matches);
+                } else if (expression instanceof FunctionExpr function) {
+                    for (int index = 0; index < function.arguments().size(); index++) {
+                        collectContained(matcher,function.arguments().get(index),state,session,append(path,index),matches);
+                    }
+                }
+            } catch (RuntimeException | Error failure) {
+                observeFailure(failure); throw failure;
             }
         }
     }
@@ -463,47 +457,40 @@ final class ExprMatcherEngine {
         Session session,
         boolean atRoot
     ) {
-        List<Expr> representatives = session.options
-            .representativeProvider()
-            .representatives(expression, equivalent.recognitionProfile());
-        if (representatives == null || representatives.isEmpty()) {
-            session.diagnostic(
-                "REPRESENTATIVE_PROVIDER_EMPTY",
-                equivalent.canonicalDescriptor()
-            );
-            return List.of();
-        }
-        List<State> matches = new ArrayList<>();
-        for (int index = 0; index < representatives.size(); index++) {
-            Expr representative = representatives.get(index);
-            if (representative == null) {
-                session.diagnostic(
-                    "REPRESENTATIVE_PROVIDER_NULL",
-                    equivalent.canonicalDescriptor()
-                );
-                continue;
-            }
-            boolean changed = index > 0 || !representative.equals(expression);
-            for (State candidate : evaluate(
-                    equivalent.matcher(),
-                    representative,
-                    state,
-                    session,
-                    atRoot)) {
-                matches.add(changed
-                    ? candidate
-                        .recognized(
-                            ExprMatcher.RecognitionStrength
-                                .BOUNDED_REPRESENTATIVE,
-                            representative,
-                            index,
-                            atRoot
-                        )
-                        .traced("representative:" + index)
-                    : candidate);
+        var lists = new StateLists();
+        try (var owned = RetainedOperation.retainCompleted(1,equivalent,expression,state,session,lists)) {
+            List<Expr> representatives = session.options.representativeProvider()
+                .representatives(expression,equivalent.recognitionProfile());
+            try (var representativeOwner = RetainedOperation.retain(representatives)) {
+                try {
+                    if (representatives == null || representatives.isEmpty()) {
+                        session.diagnostic("REPRESENTATIVE_PROVIDER_EMPTY",equivalent.canonicalDescriptor());
+                        return List.of();
+                    }
+                    lists.begin();
+                    for (int index = 0; index < representatives.size(); index++) {
+                        Expr representative = representatives.get(index);
+                        if (representative == null) {
+                            session.diagnostic("REPRESENTATIVE_PROVIDER_NULL",equivalent.canonicalDescriptor());
+                            continue;
+                        }
+                        boolean changed = index > 0 || !representative.equals(expression);
+                        lists.current = evaluate(equivalent.matcher(),representative,state,session,atRoot);
+                        RetainedOperation.work(1);
+                        for (State candidate : lists.current) {
+                            lists.add(changed ? candidate.recognized(ExprMatcher.RecognitionStrength.BOUNDED_REPRESENTATIVE,
+                                representative,index,atRoot).traced("representative:" + index) : candidate);
+                        }
+                        // Observe empty as well as successful child lists before replacing them.
+                        RetainedOperation.checkpoint();
+                    }
+                    lists.freeze(session,equivalent);
+                    return lists.result;
+                } catch (RuntimeException | Error failure) {
+                    observeFailure(failure); throw failure;
+                }
             }
         }
-        return session.limit(matches, equivalent);
     }
 
     private static List<State> evaluateConstraint(
@@ -652,6 +639,18 @@ final class ExprMatcherEngine {
         try { RetainedOperation.checkpoint(); }
         catch (RuntimeException | Error observation) {
             if (observation != failure) failure.addSuppressed(observation);
+        }
+    }
+
+    private static final class ContainedVisit implements RetainedGraph.View {
+        private final List<Integer> path;
+        private String renderedPath;
+        private List<State> candidates;
+
+        private ContainedVisit(List<Integer> path) { this.path = path; }
+
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(path); visitor.reference(renderedPath); visitor.reference(candidates);
         }
     }
 
