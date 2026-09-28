@@ -140,7 +140,10 @@ public final class RetainedJson {
             int needed=Math.addExact(size,length);
             if(needed>buffer.length){
                 var old=buffer;var replacement=new char[Math.max(needed,Math.multiplyExact(buffer.length,2))];
-                try(var frame=RetainedOperation.retain(old,replacement)){RetainedOperation.work(Math.addExact(replacement.length,size));System.arraycopy(old,0,replacement,0,size);buffer=replacement;}
+                RetainedOperation.work(replacement.length);
+                try(var frame=RetainedOperation.retain(old,replacement)){
+                    System.arraycopy(old,0,replacement,0,size);RetainedOperation.work(size);buffer=replacement;
+                }
             }
             System.arraycopy(input,offset,buffer,size,length);size=needed;RetainedOperation.work(length);RetainedOperation.checkpoint();
         }

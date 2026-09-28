@@ -232,6 +232,11 @@ public final class PreparedAstRewriteTransformationEngine
                 results = rewriteFunctionArguments(functionExpr, retainLegacyHash, results);
             }
             return results == null ? List.of() : results;
+        } catch (RuntimeException | Error failure) {
+            try (var release = owned) {
+                owned = null;
+                throw failure;
+            }
         } finally {
             if (owned != null) owned.close();
         }
@@ -272,6 +277,11 @@ public final class PreparedAstRewriteTransformationEngine
                 }
             }
             return results;
+        } catch (RuntimeException | Error failure) {
+            try (var release = owned) {
+                owned = null;
+                throw failure;
+            }
         } finally {
             if (owned != null) owned.close();
         }
@@ -297,6 +307,11 @@ public final class PreparedAstRewriteTransformationEngine
                 }
             }
             return results;
+        } catch (RuntimeException | Error failure) {
+            try (var release = owned) {
+                owned = null;
+                throw failure;
+            }
         } finally {
             if (owned != null) owned.close();
         }
