@@ -204,7 +204,14 @@ public final class NativeMoveSearch {
             throw new IllegalStateException("native replay root differs");
         for(var step:witness) {
             if(!cursor.equals(step.source()))throw new IllegalStateException("broken native witness lineage");
-            var checked=execution.verify(cursor,step.move());work=Math.addExact(work,checked.work());
+            NativeVerification checked;
+            try {checked=execution.verify(cursor,step.move());}
+            catch(SearchExecution.ResourceLimit exhausted) {
+                if(execution.accounting==null)throw exhausted;
+                execution.accounting.incomplete("NATIVE_RESOURCE_LIMIT");
+                return new Replay(work,null);
+            }
+            work=Math.addExact(work,checked.work());
             if(!checked.accepted() || !checked.equals(step.verification()))return new Replay(work,checked);
             cursor=step.target();
         }
@@ -242,6 +249,7 @@ public final class NativeMoveSearch {
             var available=new HashSet<>(initialAssumptions());available.addAll(state.assumptions());return available.containsAll(assumptions);
         }
         @Override public NativeVerification verify(TypedMoveSearch.State state,NativeSearchMove move){
+            de.regelsuche.retention.RetainedOperation.work(1);
             return problem.verifier().verify(state,move,problem.context());
         }
         @Override public SearchExecution.Picker<NativeSearchMove> picker(TypedMoveSearch.State state){

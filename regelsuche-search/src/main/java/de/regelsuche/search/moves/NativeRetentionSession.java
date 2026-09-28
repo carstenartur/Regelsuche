@@ -27,7 +27,8 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
     long work(){return Math.addExact(Math.addExact(Math.addExact(validationWork,executionWork),retentionWork),store.work());}
     boolean complete(){return complete;}
     @Override public void checkpoint(){observe(this,true);}
-    void fail(String reason){complete=false;if(detail.isEmpty())detail=reason;throw new SearchExecution.ResourceLimit();}
+    void incomplete(String reason){complete=false;if(detail.isEmpty())detail=reason;}
+    void fail(String reason){incomplete(reason);throw new SearchExecution.ResourceLimit();}
     private RetainedGraph.Observation observe(Object root,boolean enforce){
         RetainedGraph.Observation measured;
         try { measured=RetainedGraph.measure(root); }
