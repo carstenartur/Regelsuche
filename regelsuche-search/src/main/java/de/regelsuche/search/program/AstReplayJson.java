@@ -24,7 +24,8 @@ final class AstReplayJson {
     private ObjectNode write(Expr expression, int depth, int[] nodes) {
         visit(depth, nodes);
         Objects.requireNonNull(expression, "expression");
-        var node = mapper.createObjectNode();
+        var node = de.regelsuche.retention.RetainedJson.object(mapper);
+        try(var retained=de.regelsuche.retention.RetainedJson.active()?de.regelsuche.retention.RetainedOperation.retain(node):null) {
         switch (expression) {
             case NumberExpr number -> {
                 // Bound conversion of arbitrarily large in-memory values before decimal rendering.
@@ -53,7 +54,8 @@ final class AstReplayJson {
                 function.arguments().forEach(argument -> arguments.add(write(argument, depth + 1, nodes)));
             }
         }
-        return node;
+        return de.regelsuche.retention.RetainedOperation.produced(node);
+        }
     }
 
     private Expr read(JsonNode node, int depth, int[] nodes) {
@@ -93,6 +95,7 @@ final class AstReplayJson {
     }
 
     private static void visit(int depth, int[] nodes) {
+        de.regelsuche.retention.RetainedOperation.work(1);
         if (depth > AstRewriteTransport.MAXIMUM_DEPTH || ++nodes[0] > AstRewriteTransport.MAXIMUM_NODES) {
             throw new IllegalArgumentException("AST replay structural limit exceeded");
         }
@@ -109,6 +112,7 @@ final class AstReplayJson {
             throw new IllegalArgumentException("invalid or oversized AST replay text");
         }
         for (int i = 0; i < value.length(); i++) {
+            de.regelsuche.retention.RetainedOperation.work(1);
             char character = value.charAt(i);
             if (Character.isHighSurrogate(character)) {
                 if (++i == value.length() || !Character.isLowSurrogate(value.charAt(i))) {

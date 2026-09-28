@@ -84,6 +84,11 @@ public final class NativeMoveSearch {
             boolean complete,String detail) implements RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(peak);v.reference(resultRetained);v.reference(detail);}
     }
+    public static final class ExportFailure extends IllegalStateException {
+        private final ExportResult attempted;
+        ExportFailure(ExportResult attempted){super(attempted.accounting().detail());this.attempted=attempted;}
+        public ExportResult attempted(){return attempted;}
+    }
     public record ExportResult(MoveSearch.Result projection,ExportAccounting accounting) implements RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(projection);v.reference(accounting);}
         public boolean complete(){return accounting.complete();}
@@ -118,17 +123,31 @@ public final class NativeMoveSearch {
         public List<SearchExecution.Step<TypedMoveSearch.State,NativeSearchMove,NativeVerification>> witness(){return result.witness();}
         /** Frontier receipt. Independently paid final replay is separate; use totalWork for the whole result. */
         public MoveSearch.Metrics metrics(){return result.metrics();}
-        public ExportResult exportLegacy(long workBudget,SearchExpressionStore.Limits limits){throw new UnsupportedOperationException("paid export not installed");}
+        /** Independent finite output-phase budget; add its paid work once to totalWork for an end-to-end comparison. */
+        public ExportResult exportLegacy(long workBudget,SearchExpressionStore.Limits limits){return NativeExportSession.run(this,workBudget,limits);}
+        public static final long DEFAULT_EXPORT_WORK=10_000_000;
+        public static final String EXPORT_REVISION="regelsuche.native-legacy-export/v1-lexical-buffers";
         /** Historical frontier projection; the additive native replay receipt remains available separately. */
         public MoveSearch.Result exportLegacy(){
+            var exported=exportLegacy(DEFAULT_EXPORT_WORK,SearchExpressionStore.Limits.DEFAULT);
+            if(!exported.complete())throw new ExportFailure(exported);return exported.projection();
+        }
+        MoveSearch.Result projectLegacy(){
             var assessments=new HashMap<MoveState,StateValue.Assessment>();
-            result.stateAssessments().forEach((state,value)->assessments.put(export(state),export(value)));
-            return new MoveSearch.Result(outcome(),result.witness().stream().map(s->new MoveSearch.WitnessStep(export(s.source()),export(s.target()),s.move().exportLegacy(),s.verification().exportLegacy())).toList(),
-                result.events().stream().map(e->new MoveSearch.Event(export(e.source()),export(e.target()),e.move().exportLegacy(),e.decision(),e.verification()==null?null:e.verification().exportLegacy())).toList(),
-                result.reachedStates().stream().map(NativeMoveSearch::export).collect(java.util.stream.Collectors.toSet()),
-                result.deadEndStates().stream().map(NativeMoveSearch::export).toList(),result.metrics(),result.completeBoundedRelation(),assessments,null,incrementalProviders==null?null:
-                    new StagedIncrementalMoveExecution(REVISION,StagedIncrementalMoveExecution.ORDER_REVISION,incrementalProviders,
-                        cursorReceipts().stream().map(r->new StagedIncrementalMoveExecution.Expansion(export(r.source()),r.closed(),r.lanes())).toList()));
+            var witness=new ArrayList<MoveSearch.WitnessStep>();var events=new ArrayList<MoveSearch.Event>();
+            var reached=new HashSet<MoveState>();var dead=new ArrayList<MoveState>();
+            var expansions=new ArrayList<StagedIncrementalMoveExecution.Expansion>();
+            try(var retained=de.regelsuche.retention.RetainedOperation.retain(assessments,witness,events,reached,dead,expansions)) {
+                for(var e:result.stateAssessments().entrySet()){assessments.put(export(e.getKey()),export(e.getValue()));de.regelsuche.retention.RetainedOperation.checkpoint();}
+                for(var step:result.witness()){witness.add(new MoveSearch.WitnessStep(export(step.source()),export(step.target()),step.move().exportLegacy(),step.verification().exportLegacy()));de.regelsuche.retention.RetainedOperation.checkpoint();}
+                for(var event:result.events()){events.add(new MoveSearch.Event(export(event.source()),export(event.target()),event.move().exportLegacy(),event.decision(),event.verification()==null?null:event.verification().exportLegacy()));de.regelsuche.retention.RetainedOperation.checkpoint();}
+                for(var state:result.reachedStates()){reached.add(export(state));de.regelsuche.retention.RetainedOperation.checkpoint();}
+                for(var state:result.deadEndStates()){dead.add(export(state));de.regelsuche.retention.RetainedOperation.checkpoint();}
+                if(incrementalProviders!=null)for(var receipt:cursorReceipts()){expansions.add(new StagedIncrementalMoveExecution.Expansion(export(receipt.source()),receipt.closed(),receipt.lanes()));de.regelsuche.retention.RetainedOperation.checkpoint();}
+                de.regelsuche.retention.RetainedOperation.work(assessments.size()+witness.size()+events.size()+reached.size()+dead.size()+expansions.size()+7L);
+                return de.regelsuche.retention.RetainedOperation.produced(new MoveSearch.Result(outcome(),witness,events,reached,dead,result.metrics(),result.completeBoundedRelation(),assessments,null,
+                    incrementalProviders==null?null:new StagedIncrementalMoveExecution(REVISION,StagedIncrementalMoveExecution.ORDER_REVISION,incrementalProviders,expansions)));
+            }
         }
     }
     public record QualityResult(Result search,TypedMoveSearch.State incumbent,long inputScore,long outputScore,
@@ -299,8 +318,15 @@ public final class NativeMoveSearch {
     }
     private static StateValue.Assessment export(NativeStateValue.Assessment value){
         var capabilities=new TreeMap<String,StateValue.Capability>();var codec=new CompiledAstReplayCodec();
-        value.capabilities().forEach((key,c)->capabilities.put(key,new StateValue.Capability(c.providerId(),codec.encodeExpression(c.sourceExpression()),c.subtreePath(),codec.encodeExpression(c.matchedExpression()),codec.encodeExpression(c.rewrittenExpression()))));
-        return new StateValue.Assessment(value.complexity(),value.value(),value.searchWork(),value.primitiveWork(),capabilities);
+        var text=new String[3];
+        try(var retained=de.regelsuche.retention.RetainedOperation.retain(capabilities,text)) {
+            for(var entry:value.capabilities().entrySet()) {
+                var c=entry.getValue();text[0]=codec.encodeExpression(c.sourceExpression());text[1]=codec.encodeExpression(c.matchedExpression());text[2]=codec.encodeExpression(c.rewrittenExpression());
+                capabilities.put(entry.getKey(),new StateValue.Capability(c.providerId(),text[0],c.subtreePath(),text[1],text[2]));
+                de.regelsuche.retention.RetainedOperation.work(4);de.regelsuche.retention.RetainedOperation.checkpoint();
+            }
+            return de.regelsuche.retention.RetainedOperation.produced(new StateValue.Assessment(value.complexity(),value.value(),value.searchWork(),value.primitiveWork(),capabilities));
+        }
     }
     static MoveState export(TypedMoveSearch.State state){return new MoveState(new CompiledAstReplayCodec().encodeExpression(state.expression()),state.searchDepth(),state.primitiveDepth(),state.previousRule(),state.assumptions(),state.capabilities(),state.complexityDebt());}
 }

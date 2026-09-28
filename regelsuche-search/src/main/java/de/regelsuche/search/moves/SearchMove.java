@@ -11,7 +11,9 @@ import java.util.Set;
 public record SearchMove(Transformation transformation, SourceKind sourceKind, String ruleId, String ruleFamily,
         long generationCost, long applicationCost, long verificationCost, List<Transformation> primitiveExpansion,
         List<String> assumptions, ProofStrength proofStrength, TransformationProvenance provenance,
-        Set<String> capabilityDelta, ValueEvidence valueEvidence) implements SearchExecution.Edge<String, SearchMove> {
+        Set<String> capabilityDelta, ValueEvidence valueEvidence) implements SearchExecution.Edge<String, SearchMove>, de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(transformation);v.reference(sourceKind);v.reference(ruleId);v.reference(ruleFamily);v.reference(primitiveExpansion);v.reference(assumptions);v.reference(proofStrength);v.reference(provenance);v.reference(capabilityDelta);v.reference(valueEvidence);}
+
     @Override public String targetExpression() { return transformation.transformedExpression(); }
     @Override public int primitiveStepCount() { return transformation.primitiveStepCount(); }
     @Override public de.regelsuche.transform.ExecutionWork executionWork() { return transformation.executionWork(); }

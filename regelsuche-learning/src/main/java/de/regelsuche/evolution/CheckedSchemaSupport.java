@@ -25,10 +25,10 @@ import java.util.TreeMap;
 
 /** Shared bounded representation checks. None of the public JSON is an authority. */
 final class CheckedSchemaSupport {
-    static final ObjectMapper JSON = new ObjectMapper(JsonFactory.builder()
+    static final ObjectMapper JSON = new ObjectMapper(new de.regelsuche.retention.RetainedJson.Factory(JsonFactory.builder()
         .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
         .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(140)
-            .maxStringLength(262_144).maxNameLength(128).maxNumberLength(20).build()).build())
+            .maxStringLength(262_144).maxNameLength(128).maxNumberLength(20).build()).build()))
         .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
     static final int MAXIMUM_JSON_CHARACTERS = 1_048_576;
 
@@ -49,8 +49,8 @@ final class CheckedSchemaSupport {
     }
 
     static String write(JsonNode value) {
-        try { return JSON.writeValueAsString(value); }
-        catch (JsonProcessingException exception) { throw new IllegalArgumentException("cannot encode checked schema", exception); }
+        try { return de.regelsuche.retention.RetainedJson.writeString(JSON,value); }
+        catch (java.io.IOException exception) { throw new IllegalArgumentException("cannot encode checked schema", exception); }
     }
 
     static void fields(JsonNode value, String... expected) {

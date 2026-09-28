@@ -143,7 +143,12 @@ class CheckedSchemaCursorTest {
             MovePriorityPolicy.INVENTORY_ORDER,model.verifier(),s->0,MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED_INCREMENTAL,budget));
         var result=assertDoesNotThrow(()->new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,List.of(selected.nativeProvider()),
             MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED_INCREMENTAL,budget),SearchContinuationContract.PATH_SENSITIVE));
-        var projection=result.exportLegacy();assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome());
+        long paidSearch=result.totalWork();var searchOwned=de.regelsuche.retention.RetainedGraph.measure(result).retained();
+        var paidExport=result.exportLegacy(NativeMoveSearch.Result.DEFAULT_EXPORT_WORK,SearchExpressionStore.Limits.DEFAULT);
+        assertTrue(paidExport.complete(),paidExport.accounting().detail());assertTrue(paidExport.accounting().work()>0);
+        var projection=paidExport.projection();assertEquals(projection,result.exportLegacy());
+        assertEquals(paidSearch,result.totalWork());assertEquals(searchOwned,de.regelsuche.retention.RetainedGraph.measure(result).retained());
+        assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome());
         assertEquals(legacy.encodedResult().witness(),projection.witness());assertEquals(legacy.encodedResult().events(),projection.events());
         assertEquals(legacy.metrics(),result.metrics());
         var receipts=projection.stagedIncrementalExecution();assertNotNull(receipts);assertTrue(receipts.accountingComplete());

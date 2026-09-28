@@ -37,11 +37,11 @@ public final class CompiledAstReplayCodec {
     private static final Set<String> EXPRESSION_FIELDS = Set.of("schema", "expression");
     private static final Set<String> STEP_FIELDS = Set.of("rule", "kind", "mayIncreaseComplexity", "estimatedCostDelta",
         "equivalencePreservingByConstruction", "assumptions", "packId", "license");
-    private static final ObjectMapper JSON = new ObjectMapper(JsonFactory.builder()
+    private static final ObjectMapper JSON = new ObjectMapper(new de.regelsuche.retention.RetainedJson.Factory(JsonFactory.builder()
         .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
         .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(270)
             .maxStringLength(MAXIMUM_TEXT_CHARACTERS).maxNameLength(128).maxNumberLength(32).build())
-        .build()).enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+        .build())).enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
     private static final ThreadLocal<ExpressionCache> EXPRESSION_CACHE = new ThreadLocal<>();
 
     /**
@@ -115,14 +115,19 @@ public final class CompiledAstReplayCodec {
     private String encodeExpressionUncached(Expr expression) {
         AstTransportObservation.record(AstTransportObservation.Operation.EXPRESSION_JSON_WRITE);
         var data = new AstReplayJson(JSON);
-        var root = JSON.createObjectNode().put("schema", EXPRESSION_SCHEMA);
+        var root = de.regelsuche.retention.RetainedJson.object(JSON).put("schema", EXPRESSION_SCHEMA);
+        try(var retained=de.regelsuche.retention.RetainedJson.active()?de.regelsuche.retention.RetainedOperation.retain(root):null) {
         root.set("expression", data.write(expression));
         try {
-            String encoded = JSON.writeValueAsString(root);
-            requireBytes(encoded.getBytes(StandardCharsets.UTF_8));
-            return encoded;
-        } catch (JsonProcessingException exception) {
+            String encoded = de.regelsuche.retention.RetainedJson.writeString(JSON,root);
+            byte[] utf8=encoded.getBytes(StandardCharsets.UTF_8);
+            try(var text=de.regelsuche.retention.RetainedOperation.retain(encoded,utf8)) {
+                de.regelsuche.retention.RetainedOperation.work(Math.addExact(encoded.length(),utf8.length));
+                requireBytes(utf8);return encoded;
+            }
+        } catch (java.io.IOException exception) {
             throw new IllegalArgumentException("cannot encode typed move expression", exception);
+        }
         }
     }
 
@@ -151,7 +156,7 @@ public final class CompiledAstReplayCodec {
             }
             if (cache != null) cache.retain(expression, document);
             return expression;
-        } catch (JsonProcessingException exception) {
+        } catch (java.io.IOException exception) {
             throw new IllegalArgumentException("invalid typed move expression JSON", exception);
         }
     }
@@ -161,8 +166,9 @@ public final class CompiledAstReplayCodec {
         AstTransportObservation.record(AstTransportObservation.Operation.HISTORY_ENCODE);
         Objects.requireNonNull(candidate, "candidate");
         var data = new AstReplayJson(JSON);
-        var root = JSON.createObjectNode().put("schema", SCHEMA).put("backend", CompiledAstRewriteProgram.REVISION)
+        var root = de.regelsuche.retention.RetainedJson.object(JSON).put("schema", SCHEMA).put("backend", CompiledAstRewriteProgram.REVISION)
             .put("program", data.text(candidate.programId()));
+        try(var retained=de.regelsuche.retention.RetainedJson.active()?de.regelsuche.retention.RetainedOperation.retain(root):null) {
         var sources = root.putArray("sourceIds");
         candidate.sourceIds().forEach(id -> sources.add(data.text(id)));
         var states = root.putArray("states");
@@ -178,11 +184,13 @@ public final class CompiledAstReplayCodec {
             node.put("packId", data.text(step.packId())).put("license", data.text(step.license()));
         }
         try {
-            byte[] result = JSON.writeValueAsBytes(root);
-            requireBytes(result);
-            return result;
-        } catch (JsonProcessingException exception) {
+            byte[] result = de.regelsuche.retention.RetainedJson.writeBytes(JSON,root);
+            try(var bytes=de.regelsuche.retention.RetainedOperation.retain(result)) {
+                de.regelsuche.retention.RetainedOperation.work(result.length);requireBytes(result);return result;
+            }
+        } catch (java.io.IOException exception) {
             throw new IllegalArgumentException("cannot encode AST replay", exception);
+        }
         }
     }
 
@@ -223,7 +231,7 @@ public final class CompiledAstReplayCodec {
             return new Candidate(data.text(root, "program"), sourceIds, steps);
         } catch (CharacterCodingException exception) {
             throw new IllegalArgumentException("invalid UTF-8 AST replay JSON", exception);
-        } catch (JsonProcessingException exception) {
+        } catch (java.io.IOException exception) {
             throw new IllegalArgumentException("invalid AST replay JSON", exception);
         }
     }
@@ -232,7 +240,15 @@ public final class CompiledAstReplayCodec {
     public String contentHash(Candidate candidate) {
         AstTransportObservation.record(AstTransportObservation.Operation.HISTORY_HASH);
         try {
-            return "sha256:" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(encode(candidate)));
+            byte[] encoded=encode(candidate);
+            try(var held=de.regelsuche.retention.RetainedOperation.retain(encoded)) {
+                de.regelsuche.retention.RetainedOperation.work(encoded.length);
+                byte[] digest=MessageDigest.getInstance("SHA-256").digest(encoded);
+                try(var output=de.regelsuche.retention.RetainedOperation.retain(digest)) {
+                    de.regelsuche.retention.RetainedOperation.work(digest.length*3L);
+                    return de.regelsuche.retention.RetainedOperation.produced("sha256:"+HexFormat.of().formatHex(digest));
+                }
+            }
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 unavailable", exception);
         }

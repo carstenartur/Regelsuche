@@ -88,6 +88,13 @@ public final class RetainedGraph {
                 case FunctionExpr function -> { node();reference(function.name());reference(function.arguments()); }
                 case VariableExpr variable -> { node();reference(variable.name());reference(variable.symbol().orElse(null)); }
                 case NumberExpr number -> { node();reference(number.value()); }
+                case com.fasterxml.jackson.core.io.ContentReference content when content.getClass()==com.fasterxml.jackson.core.io.ContentReference.class -> {reference(content.getRawContent());reference(null); /* pre-existing error-report metadata */}
+                case com.fasterxml.jackson.databind.node.TextNode text when text.getClass()==com.fasterxml.jackson.databind.node.TextNode.class -> reference(text.textValue());
+                case com.fasterxml.jackson.databind.node.IntNode valueNode when valueNode.getClass()==com.fasterxml.jackson.databind.node.IntNode.class -> {}
+                case com.fasterxml.jackson.databind.node.LongNode valueNode when valueNode.getClass()==com.fasterxml.jackson.databind.node.LongNode.class -> {}
+                case com.fasterxml.jackson.databind.node.DoubleNode valueNode when valueNode.getClass()==com.fasterxml.jackson.databind.node.DoubleNode.class -> {}
+                case com.fasterxml.jackson.databind.node.BooleanNode valueNode when valueNode.getClass()==com.fasterxml.jackson.databind.node.BooleanNode.class -> {}
+                case com.fasterxml.jackson.databind.node.NullNode valueNode when valueNode.getClass()==com.fasterxml.jackson.databind.node.NullNode.class -> {}
                 case String text -> characters=Math.addExact(characters,text.length());
                 case StringBuilder text -> {reference(null);characters=Math.addExact(characters,text.length());}
                 case ExactRational rational -> { reference(rational.numerator());reference(rational.denominator()); }
@@ -122,6 +129,7 @@ public final class RetainedGraph {
                     if(collection instanceof PriorityQueue<?> queue)reference(queue.comparator());
                     for(Object entry:collection)reference(entry);
                 }
+                case java.util.concurrent.atomic.AtomicReferenceArray<?> array when array.getClass()==java.util.concurrent.atomic.AtomicReferenceArray.class -> { reference(null);for(int i=0;i<array.length();i++)reference(array.get(i)); }
                 case Object[] array -> { for(Object entry:array)reference(entry); }
                 case long[] array -> { for(int i=0;i<array.length;i++)reference(null); }
                 case int[] array -> { for(int i=0;i<array.length;i++)reference(null); }

@@ -55,11 +55,15 @@ public final class MoveSearch {
         }
     }
     /** The full attempted target identity is retained even when admission rejects it. */
-    public record Event(MoveState source, MoveState target, SearchMove move, Decision decision, MoveVerifier.Verification verification) {
+    public record Event(MoveState source, MoveState target, SearchMove move, Decision decision, MoveVerifier.Verification verification) implements de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(source);v.reference(target);v.reference(move);v.reference(decision);v.reference(verification);}
+
         /** Empty means NOT_PERFORMED, not a failed or free mathematical verification. JSON retains explicit null. */
         public java.util.Optional<MoveVerifier.Verification> verificationResult() { return java.util.Optional.ofNullable(verification); }
     }
-    public record WitnessStep(MoveState source, MoveState target, SearchMove move, MoveVerifier.Verification verification) {}
+    public record WitnessStep(MoveState source, MoveState target, SearchMove move, MoveVerifier.Verification verification) implements de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(source);v.reference(target);v.reference(move);v.reference(verification);}
+}
     public record Metrics(long generatedSuccessors, long consumedSuccessors, long discardedSuccessors, long unconsumedSuccessors,
             long duplicates, long deadEnds, long exploredStates, long expandedStates, long primitiveWork, long searchWork,
             long verificationWork, int firstHitDepth, int firstHitPrimitiveDepth, Map<String, Long> familyMatches) implements de.regelsuche.retention.RetainedGraph.View {
@@ -74,7 +78,9 @@ public final class MoveSearch {
     }
     public record Result(Outcome outcome, List<WitnessStep> witness, List<Event> events, Set<MoveState> reachedStates, List<MoveState> deadEndStates,
             Metrics metrics, boolean completeBoundedRelation, Map<MoveState, StateValue.Assessment> stateAssessments,
-            IncrementalMoveExecution incrementalExecution, StagedIncrementalMoveExecution stagedIncrementalExecution) {
+            IncrementalMoveExecution incrementalExecution, StagedIncrementalMoveExecution stagedIncrementalExecution) implements de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(outcome);v.reference(witness);v.reference(events);v.reference(reachedStates);v.reference(deadEndStates);v.reference(metrics);v.reference(stateAssessments);v.reference(incrementalExecution);v.reference(stagedIncrementalExecution);}
+
         public Result(Outcome outcome, List<WitnessStep> witness, List<Event> events, Set<MoveState> reachedStates,
                 List<MoveState> deadEndStates, Metrics metrics, boolean completeBoundedRelation,
                 Map<MoveState, StateValue.Assessment> stateAssessments, IncrementalMoveExecution incrementalExecution) {

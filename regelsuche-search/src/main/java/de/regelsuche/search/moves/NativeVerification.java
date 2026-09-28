@@ -18,7 +18,11 @@ public record NativeVerification(boolean accepted,long work,NativeMoveProof chec
         String receipt=switch(checkedProof) {
             case NativeMoveProof.Primitive primitive -> {
                 var codec=new CompiledAstReplayCodec();
-                yield "typed-primitive-replay:"+NativeSearchMove.digest(codec.encodeExpression(primitive.source())+"\n"+codec.encodeExpression(primitive.target())+"\n"+ruleId);
+                var text=new String[2];
+                try(var held=de.regelsuche.retention.RetainedOperation.retain(text)) {
+                    text[0]=codec.encodeExpression(primitive.source());text[1]=codec.encodeExpression(primitive.target());
+                    yield "typed-primitive-replay:"+NativeSearchMove.digest(text[0]+"\n"+text[1]+"\n"+ruleId);
+                }
             }
             case NativeMoveProof.Program program -> "typed-program-replay:"+program.exportLegacy().applicationKey();
             case NativeMoveProof.Exact exact -> "checked-schema-application:"+exact.evidence().exportLegacy().binding().evidenceHash();

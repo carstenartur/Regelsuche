@@ -545,16 +545,18 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
     private static ExactTheoryEvidence.Binding renderEvidence(ApplicationData data,String encodedSource) {
         de.regelsuche.search.program.AstTransportObservation.record(de.regelsuche.search.program.AstTransportObservation.Operation.EVIDENCE_JSON_WRITE);
         String encodedTarget=CODEC.encodeExpression(data.target());
-        var evidence=JSON.createObjectNode().put("schema",data.revision()).put("checkerRevision",data.checkerRevision())
+        var evidence=de.regelsuche.retention.RetainedJson.object(JSON).put("schema",data.revision()).put("checkerRevision",data.checkerRevision())
             .put("inventorySemanticsHash",data.inventorySemanticsHash()).put("modelId",data.modelId())
             .put("schemaId",data.schemaId()).put("proofHash",data.proofHash()).put("domain",data.domain())
             .put("source",encodedSource).put("target",encodedTarget);
+        try(var retained=de.regelsuche.retention.RetainedOperation.retain(data,encodedSource,encodedTarget,evidence)) {
         var positions=evidence.putArray("path");data.path().forEach(positions::add);
         var bindings=evidence.putArray("bindings");data.substitutions().forEach((name,value)->bindings.addObject()
             .put("name",name).put("expression",CODEC.encodeExpression(value)));
         evidence.put("applicationWork",data.applicationWork());String canonical=write(evidence);
         return new ExactTheoryEvidence.Binding(encodedSource,encodedTarget,data.schemaId(),SchematicProofPlan.hash(canonical),
             data.proofHash(),data.modelHash(),data.applicationWork(),canonical);
+        }
     }
 
     /** Checks one supplied occurrence and substitution; never enumerates primitive paths or other sites. */

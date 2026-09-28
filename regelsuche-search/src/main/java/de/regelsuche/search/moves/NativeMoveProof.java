@@ -21,9 +21,13 @@ public sealed interface NativeMoveProof permits NativeMoveProof.Primitive,Native
         @Override public ExecutionWork work(){return new ExecutionWork(1,0,0);}
         @Override public String rule(){return step.rule();}
         @Override public Transformation exportLegacy(){
-            var codec=new CompiledAstReplayCodec();String source=codec.encodeExpression(source()),target=codec.encodeExpression(target());
-            return new Transformation(step.rule(),target,step.kind(),step.mayIncreaseComplexity(),step.estimatedCostDelta(),
-                step.equivalencePreservingByConstruction(),"typed:"+NativeSearchMove.digest(source+"\n"+target+"\n"+step.rule()),step.assumptions(),step.packId(),step.license());
+            var codec=new CompiledAstReplayCodec();var text=new String[2];
+            try(var held=de.regelsuche.retention.RetainedOperation.retain(text)) {
+            text[0]=codec.encodeExpression(source());text[1]=codec.encodeExpression(target());
+            String source=text[0],target=text[1];
+            return de.regelsuche.retention.RetainedOperation.produced(new Transformation(step.rule(),target,step.kind(),step.mayIncreaseComplexity(),step.estimatedCostDelta(),
+                step.equivalencePreservingByConstruction(),"typed:"+NativeSearchMove.digest(source+"\n"+target+"\n"+step.rule()),step.assumptions(),step.packId(),step.license()));
+            }
         }
     }
     record Program(CompiledAstRewriteProgram.Candidate history) implements NativeMoveProof,RetainedGraph.View {
@@ -37,13 +41,17 @@ public sealed interface NativeMoveProof permits NativeMoveProof.Primitive,Native
         @Override public String rule(){return history.programId();}
         @Override public Transformation exportLegacy(){
             var codec=new CompiledAstReplayCodec();String identity=codec.contentHash(history);
-            var steps=new ArrayList<Transformation>();
+            var steps=new ArrayList<Transformation>();var expressions=new String[2];
+            try(var held=de.regelsuche.retention.RetainedOperation.retain(history,identity,steps,expressions)) {
             for(int i=0;i<history.steps().size();i++) {
                 var step=history.steps().get(i);
                 steps.add(new Transformation(step.rule(),codec.encodeExpression(step.target()),step.kind(),step.mayIncreaseComplexity(),
                     step.estimatedCostDelta(),step.equivalencePreservingByConstruction(),"typed-program:"+identity+":"+i,step.assumptions(),step.packId(),step.license()));
             }
-            return new RewriteCandidate(history.programId(),codec.encodeExpression(source()),codec.encodeExpression(target()),steps).toTransformation();
+            expressions[0]=codec.encodeExpression(source());expressions[1]=codec.encodeExpression(target());
+            de.regelsuche.retention.RetainedOperation.work(steps.size()+3L);
+            return de.regelsuche.retention.RetainedOperation.produced(new RewriteCandidate(history.programId(),expressions[0],expressions[1],steps).toTransformation());
+            }
         }
     }
     record Exact(NativeExactTheoryEvidence evidence) implements NativeMoveProof,RetainedGraph.View {

@@ -34,6 +34,7 @@ class NativeExportAccountingTest {
         for(long budget:List.of(0L,normal.accounting().work()-1)) {
             var stopped=result.exportLegacy(budget,SearchExpressionStore.Limits.DEFAULT);
             assertFalse(stopped.complete());assertNull(stopped.projection());
+            assertEquals(de.regelsuche.retention.RetainedGraph.measure(stopped).retained(),stopped.accounting().resultRetained(),"the final receipt describes only the actually returned graph");
             assertTrue(stopped.accounting().work()>budget);assertEquals("NATIVE_EXPORT_WORK_EXHAUSTED",stopped.accounting().detail());
         }
         var memory=result.exportLegacy(1000000,new SearchExpressionStore.Limits(1000,1000,1,0));

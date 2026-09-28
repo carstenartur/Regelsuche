@@ -16,7 +16,8 @@ public record Transformation(
     String license,
     List<String> primitiveRuleIds,
     TransformationProvenance provenance
-) {
+) implements de.regelsuche.retention.RetainedGraph.View {
+    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(rule);v.reference(transformedExpression);v.reference(kind);v.reference(applicationKey);v.reference(assumptions);v.reference(packId);v.reference(license);v.reference(primitiveRuleIds);v.reference(provenance);}
     public Transformation(String rule, String transformedExpression) {
         this(
             rule,

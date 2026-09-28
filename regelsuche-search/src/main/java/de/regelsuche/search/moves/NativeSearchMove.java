@@ -30,9 +30,28 @@ public record NativeSearchMove(NativeMoveProof proof,MoveProvider.Descriptor des
     @Override public List<String> assumptions(){return proof.assumptions();}
     @Override public NativeSearchMove withCapabilityDelta(Set<String> delta){return new NativeSearchMove(proof,descriptor,generationCost,delta);}
     @Override public void requireSource(Expr source){if(!proof.source().equals(source))throw new IllegalArgumentException("native proposal differs from source");}
-    public SearchMove exportLegacy(){return SearchMove.from(proof.exportLegacy(),descriptor,generationCost).withCapabilityDelta(capabilityDelta);}
+    public SearchMove exportLegacy(){
+        var transformation=proof.exportLegacy();
+        try(var held=de.regelsuche.retention.RetainedOperation.retain(transformation)) {
+            var projected=SearchMove.from(transformation,descriptor,generationCost);
+            try(var first=de.regelsuche.retention.RetainedOperation.retain(projected)) {
+                de.regelsuche.retention.RetainedOperation.work(3);
+                return de.regelsuche.retention.RetainedOperation.produced(projected.withCapabilityDelta(capabilityDelta));
+            }
+        }
+    }
     static String digest(String value){
-        try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));}
+        try{
+            byte[] input=value.getBytes(StandardCharsets.UTF_8);
+            try(var held=de.regelsuche.retention.RetainedOperation.retain(value,input)) {
+                de.regelsuche.retention.RetainedOperation.work(Math.addExact(value.length(),input.length));
+                byte[] digest=MessageDigest.getInstance("SHA-256").digest(input);
+                try(var output=de.regelsuche.retention.RetainedOperation.retain(digest)) {
+                    de.regelsuche.retention.RetainedOperation.work(digest.length*3L);
+                    return de.regelsuche.retention.RetainedOperation.produced(HexFormat.of().formatHex(digest));
+                }
+            }
+        }
         catch(NoSuchAlgorithmException failure){throw new IllegalStateException(failure);}
     }
 }
