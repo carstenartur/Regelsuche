@@ -103,6 +103,18 @@ class PolynomialTemporaryOwnershipTest {
         assertTrue(observation.optionalEnvelope);assertFalse(observation.missingInput);
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
+    @Test void subtractionReusesImmutableMonomialKeysWhileNegatingOwnedCoefficients(){
+        var x=new VariableExpr("x");var y=new VariableExpr("y");
+        var source=new BinaryExpr(new NumberExpr(0),BinaryOperator.SUB,new BinaryExpr(x,BinaryOperator.ADD,y));
+        var expected=new BinaryExpr(new BinaryExpr(new NumberExpr(0),BinaryOperator.SUB,x),BinaryOperator.SUB,y);
+        var observation=sourceObservation(source);
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;assertEquals(Optional.of(expected),new PolynomialNormalizer().normalize(source));
+        }
+        assertEquals(2,observation.simultaneousPowers,"negating coefficients needs no copied variable powers or multiplication by a constant monomial");
+        assertTrue(observation.work>0);assertFalse(observation.missingInput);assertTrue(observation.optionalEnvelope);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
     @Test void realPolynomialMultiplicationRetainsBothOperandsAndAccumulatingTerms(){
         var sum=new BinaryExpr(new VariableExpr("x"),BinaryOperator.ADD,new VariableExpr("y"));
         var normalizer=new PolynomialNormalizer();

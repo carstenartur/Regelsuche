@@ -83,6 +83,14 @@ class PolynomialNormalizerTest {
         assertEquals("0", normalize("0.3*x - 0.1*x - 0.2*x"));
     }
 
+    @Test void subtractionKeepsItsCoefficientLimitAndExactSigns(){
+        assertEquals("x - 0.5 * y",normalize("(2*x - y) - (x - 0.5*y)"));
+        var atLimit=new NumberExpr(de.regelsuche.scalar.ExactRational.integer(java.math.BigInteger.ONE.shiftLeft(4095)));
+        var outside=new BinaryExpr(atLimit,BinaryOperator.ADD,atLimit);
+        assertTrue(normalizer.normalize(new BinaryExpr(new NumberExpr(0),BinaryOperator.SUB,outside)).isEmpty());
+        assertTrue(normalizer.normalize(new BinaryExpr(new NumberExpr(0),BinaryOperator.SUB,atLimit)).isPresent());
+    }
+
     @Test
     void rejectsUnsupportedOperatorsAndNonIntegerPowers() {
         assertTrue(normalizer.normalize(parse("x / y + x")).isEmpty());
