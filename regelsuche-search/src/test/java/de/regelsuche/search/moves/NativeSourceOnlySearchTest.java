@@ -2,6 +2,7 @@ package de.regelsuche.search.moves;
 
 import static org.junit.jupiter.api.Assertions.*;
 import de.regelsuche.ast.*;
+import de.regelsuche.search.program.AstTransportObservation;
 import de.regelsuche.transform.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -20,11 +21,15 @@ class NativeSourceOnlySearchTest {
             @Override public NativeVerification verify(TypedMoveSearch.State state,NativeSearchMove move,TypedMoveSearch.Context context){checks.incrementAndGet();return primitive.verify(state,move,context);}
         };
         var problem=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION),List.of(provider),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(2,2,0,10,1000),NativeMovePriorityPolicy.INVENTORY_ORDER,s->0,NativeStateValue.NONE,provider::verify);
-        var result=assertDoesNotThrow(()->new NativeMoveSearch().searchUntil(problem,s->new TypedSourceOnlySearch.Score(s.expression() instanceof BinaryExpr?3:1,1),1,SearchContinuationContract.PATH_SENSITIVE));
+        NativeMoveSearch.QualityResult result;
+        try(var transport=AstTransportObservation.open()) {
+        result=assertDoesNotThrow(()->new NativeMoveSearch().searchUntil(problem,s->new TypedSourceOnlySearch.Score(s.expression() instanceof BinaryExpr?3:1,1),1,SearchContinuationContract.PATH_SENSITIVE));
         assertEquals(MoveSearch.Outcome.QUALITY_REACHED,result.search().outcome());assertSame(leaf,result.incumbent().expression());
         assertEquals(3,result.inputScore());assertEquals(1,result.outputScore());
         assertEquals(2,checks.get(),"admission and final replay must both execute the real independent verifier");
         assertTrue(result.replayWork()>0);assertEquals(result.search().metrics().totalWork()+result.replayWork(),result.totalWork());assertTrue(result.withinBudget());
+        assertEquals(0,transport.total(),"native selection, admission and independent final replay must avoid the codec");
+        }
         checks.set(0);
         var small=new NativeMoveSearch.Problem(source,problem.context(),problem.providers(),problem.mode(),problem.scheduling(),new MoveSearch.Budget(2,2,0,10,result.totalWork()-1),problem.policy(),problem.stateScore(),problem.stateValue(),problem.verifier());
         var overrun=new NativeMoveSearch().searchUntil(small,s->new TypedSourceOnlySearch.Score(s.expression() instanceof BinaryExpr?3:1,1),1,SearchContinuationContract.PATH_SENSITIVE);

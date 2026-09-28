@@ -18,4 +18,17 @@ class AstTransportObservationTest {
             assertEquals(5,observation.total());
         }
     }
+    @Test void nestedScopesRestoreTheirParentAndThreadsHaveIndependentCounters() throws Exception {
+        var codec=new CompiledAstReplayCodec();
+        try(var outer=AstTransportObservation.open()) {
+            try(var inner=AstTransportObservation.open()) {
+                codec.encodeExpression(new VariableExpr("nested"));assertEquals(2,inner.total());assertEquals(2,outer.total());
+                var other=new Thread(()->codec.encodeExpression(new VariableExpr("other")));other.start();other.join();
+                assertEquals(2,inner.total());assertEquals(2,outer.total());
+            }
+            codec.encodeExpression(new VariableExpr("parent"));assertEquals(4,outer.total());
+        }
+        codec.encodeExpression(new VariableExpr("outside"));
+        try(var fresh=AstTransportObservation.open()){assertEquals(0,fresh.total());}
+    }
 }

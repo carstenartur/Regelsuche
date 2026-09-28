@@ -520,6 +520,7 @@ public final class CheckedLearnedSchemaModel {
             schema.id(),schema.proofHash(),DOMAIN,source,target,path,substitutions,work.units,modelHash),encodedSource);
     }
     private static ExactTheoryEvidence.Binding renderEvidence(ApplicationData data,String encodedSource) {
+        de.regelsuche.search.program.AstTransportObservation.record(de.regelsuche.search.program.AstTransportObservation.Operation.EVIDENCE_JSON_WRITE);
         String encodedTarget=CODEC.encodeExpression(data.target());
         var evidence=JSON.createObjectNode().put("schema",data.revision()).put("checkerRevision",data.checkerRevision())
             .put("inventorySemanticsHash",data.inventorySemanticsHash()).put("modelId",data.modelId())

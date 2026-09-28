@@ -101,6 +101,7 @@ public final class CompiledAstReplayCodec {
 
     /** Canonical structural transport for one AST search state; no parser/formatter round-trip. */
     public String encodeExpression(Expr expression) {
+        AstTransportObservation.record(AstTransportObservation.Operation.EXPRESSION_ENCODE);
         Objects.requireNonNull(expression, "expression");
         ExpressionCache cache = EXPRESSION_CACHE.get();
         if (cache != null) {
@@ -112,6 +113,7 @@ public final class CompiledAstReplayCodec {
     }
 
     private String encodeExpressionUncached(Expr expression) {
+        AstTransportObservation.record(AstTransportObservation.Operation.EXPRESSION_JSON_WRITE);
         var data = new AstReplayJson(JSON);
         var root = JSON.createObjectNode().put("schema", EXPRESSION_SCHEMA);
         root.set("expression", data.write(expression));
@@ -126,6 +128,7 @@ public final class CompiledAstReplayCodec {
 
     /** Decodes only the canonical expression-state schema and rejects alternate JSON spellings. */
     public Expr decodeExpression(String document) {
+        AstTransportObservation.record(AstTransportObservation.Operation.EXPRESSION_DECODE);
         Objects.requireNonNull(document, "document");
         ExpressionCache cache = EXPRESSION_CACHE.get();
         if (cache != null) {
@@ -135,6 +138,7 @@ public final class CompiledAstReplayCodec {
         byte[] bytes = document.getBytes(StandardCharsets.UTF_8);
         requireBytes(bytes);
         try {
+            AstTransportObservation.record(AstTransportObservation.Operation.EXPRESSION_JSON_READ);
             JsonNode root = JSON.readTree(document);
             AstReplayJson.fields(root, EXPRESSION_FIELDS);
             var data = new AstReplayJson(JSON);
@@ -154,6 +158,7 @@ public final class CompiledAstReplayCodec {
 
     /** Canonical field order and exact typed values. No executable rule or class is serialized. */
     public byte[] encode(Candidate candidate) {
+        AstTransportObservation.record(AstTransportObservation.Operation.HISTORY_ENCODE);
         Objects.requireNonNull(candidate, "candidate");
         var data = new AstReplayJson(JSON);
         var root = JSON.createObjectNode().put("schema", SCHEMA).put("backend", CompiledAstRewriteProgram.REVISION)
@@ -183,6 +188,7 @@ public final class CompiledAstReplayCodec {
 
     /** Returns data only. Use the receiving program's replayEncoded method for source-bound regeneration. */
     public Candidate decode(byte[] bytes) {
+        AstTransportObservation.record(AstTransportObservation.Operation.HISTORY_DECODE);
         requireBytes(bytes);
         try {
             String text = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
@@ -224,6 +230,7 @@ public final class CompiledAstReplayCodec {
 
     /** Content identity of canonical data, not a signature, rule-set identity or proof. */
     public String contentHash(Candidate candidate) {
+        AstTransportObservation.record(AstTransportObservation.Operation.HISTORY_HASH);
         try {
             return "sha256:" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(encode(candidate)));
         } catch (NoSuchAlgorithmException exception) {

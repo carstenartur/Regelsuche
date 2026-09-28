@@ -20,10 +20,17 @@ class NativeProgramMoveProviderTest {
         var budget=new MoveSearch.Budget(2,1,0,10,10000);var context=TypedMoveSearch.Context.frozen(goal);
         var old=new TypedProgramMoveProvider(descriptor,program);
         var legacy=new TypedMoveSearch().search(new TypedMoveSearch.Problem(source,context,List.of(old),MovePriorityPolicy.INVENTORY_ORDER,old.verifier(),s->0,MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,budget));
-        var result=assertDoesNotThrow(()->new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,List.of(new NativeProgramMoveProvider(descriptor,program)),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,budget),SearchContinuationContract.PATH_SENSITIVE));
+        NativeMoveSearch.Result result;
+        try(var transport=AstTransportObservation.open()) {
+        result=assertDoesNotThrow(()->new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,List.of(new NativeProgramMoveProvider(descriptor,program)),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,budget),SearchContinuationContract.PATH_SENSITIVE));
         assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome());assertSame(goal,result.output());
         assertEquals(2,result.witness().getFirst().move().primitiveStepCount());
-        assertEquals(legacy.encodedResult(),result.exportLegacy());
+        assertEquals(0,transport.total(),"native program admission must not invoke any codec");
+        }
+        try(var transport=AstTransportObservation.open()) {
+            assertEquals(legacy.encodedResult(),result.exportLegacy());
+            assertTrue(transport.total()>0,"explicit export exercises the measured codec");
+        }
         var provider=new NativeProgramMoveProvider(descriptor,program);
         var history=program.transformMeasured(source).candidates().getFirst();
         var forged=new CompiledAstRewriteProgram.Candidate(history.programId(),List.of("foreign-stage",history.sourceIds().getLast()),history.steps());

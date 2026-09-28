@@ -5,6 +5,7 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.search.moves.*;
 import de.regelsuche.search.program.CompiledAstReplayCodec;
+import de.regelsuche.search.program.AstTransportObservation;
 import de.regelsuche.transform.Transformation;
 import java.util.ArrayList;
 import java.util.List;
@@ -96,9 +97,12 @@ class CheckedSchemaCursorTest {
         var problem=new NativeMoveSearch.Problem(source,context,List.of(provider),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED_INCREMENTAL,
             new MoveSearch.Budget(0,1,100000,10,1000000),NativeMovePriorityPolicy.INVENTORY_ORDER,s->0,NativeStateValue.NONE,
             (s,m,c)->{checks.incrementAndGet();return verifier.verify(s,m,c);});
+        try(var transport=AstTransportObservation.open()) {
         var quality=new NativeMoveSearch().searchUntil(problem,s->new TypedSourceOnlySearch.Score(s.searchDepth()==0?1:0,1),0,SearchContinuationContract.PATH_SENSITIVE);
         assertTrue(quality.withinBudget());assertEquals(2,checks.get());assertTrue(quality.replayWork()>0);
         assertTrue(quality.search().cursorReceipts().stream().allMatch(SearchExecution.Expansion::closed));
+        assertEquals(0,transport.total(),"checked schema generation, selection, admission and final replay must stay native");
+        }
         boolean abandoned=false;
         for(long budget:List.of(8L,16L,32L,64L,128L,256L,512L,1024L)) {
             var limited=new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,List.of(provider),MoveSearch.Mode.FAST,
