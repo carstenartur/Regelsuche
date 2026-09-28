@@ -1,5 +1,7 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.retention.RetainedGraph;
+
 /**
  * Deterministic work ledger for producing one batch of transformations.
  *
@@ -24,7 +26,9 @@ public record TransformationWorkMetrics(
     long duplicateCandidatesDropped,
     ExecutionWork candidateWork,
     long delegatedMechanicalWorkUnits
-) {
+) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(candidateWork);}
+
     public static final TransformationWorkMetrics ZERO =
         new TransformationWorkMetrics(
             0, 0, 0, 0, 0, 0, 0,

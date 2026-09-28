@@ -1,11 +1,15 @@
 package de.regelsuche.search.moves;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import de.regelsuche.search.program.CompiledAstReplayCodec;
 import java.util.List;
 
 /** Typed recheck receipt. Complete producer structure, never a digest, determines equality. */
 public record NativeVerification(boolean accepted,long work,NativeMoveProof checkedProof,String ruleId,String reason)
-        implements SearchExecution.Verification {
+        implements SearchExecution.Verification,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(checkedProof);v.reference(ruleId);v.reference(reason);}
+
     public NativeVerification {
         if(work<0 || reason==null || (accepted && (checkedProof==null || ruleId==null)))throw new IllegalArgumentException("invalid native verification");
     }

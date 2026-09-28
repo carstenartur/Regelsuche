@@ -16,7 +16,10 @@ import java.util.*;
 public final class RetainedGraph {
     private RetainedGraph() {}
     public interface View { void retainedReferences(Visitor visitor); }
-    public interface Visitor { void reference(Object value); }
+    public interface Visitor {
+        void reference(Object value);
+        void requireExact(Object value,Class<?> auditedType);
+    }
     public record Usage(long nodes,long characters,long references) implements View {
         @Override public void retainedReferences(Visitor visitor) {}
         public Usage { if(nodes<0 || characters<0 || references<0)throw new IllegalArgumentException("negative retention"); }
@@ -45,6 +48,9 @@ public final class RetainedGraph {
         final IdentityHashMap<Object,Boolean> seen=new IdentityHashMap<>();
         final ArrayDeque<Object> pending=new ArrayDeque<>();
         long nodes,characters,references,work,accountingReferences=5,temporaryCharacters;
+        @Override public void requireExact(Object value,Class<?> auditedType){
+            if(value.getClass()!=auditedType)throw new Unmeasured(value,observation());
+        }
         @Override public void reference(Object value){
             references=Math.addExact(references,1);work=Math.addExact(work,1);
             if(value!=null && !(value instanceof Enum<?>))pending.addLast(value);
@@ -70,6 +76,8 @@ public final class RetainedGraph {
                     work=Math.addExact(work,Math.addExact(digits,2L)); // conversion scan and temporary reference acquisition/release
                 }
                 case SymbolId symbol -> reference(symbol.namespace());
+                // The exact ThreadLocal key has no strong value field; values belong to the thread map.
+                case ThreadLocal<?> local when local.getClass()==ThreadLocal.class -> {}
                 case UUID ignored -> {}
                 case Long ignored -> {}
                 case Integer ignored -> {}

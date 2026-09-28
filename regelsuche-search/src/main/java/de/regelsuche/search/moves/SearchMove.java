@@ -21,7 +21,8 @@ public record SearchMove(Transformation transformation, SourceKind sourceKind, S
 
     /** Estimates are features, not certificates. Unknown path length is -1, never the observed detour length. */
     public record ValueEvidence(double confidence, double legacyAverageImprovement, long supportingObservations,
-            int bestKnownPrimitiveSteps, int macroSearchDepth, boolean boundedMinimumProved, String evidenceId) {
+            int bestKnownPrimitiveSteps, int macroSearchDepth, boolean boundedMinimumProved, String evidenceId) implements de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(evidenceId);}
         public static final ValueEvidence UNKNOWN = new ValueEvidence(0, 0, 0, -1, 1, false, "");
         public ValueEvidence {
             if (!Double.isFinite(confidence) || confidence < 0 || confidence > 1

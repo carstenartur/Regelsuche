@@ -1,5 +1,7 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import de.regelsuche.ast.*;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -9,10 +11,18 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 
 /** Necessary root-shape conditions only; matching and proof authority stay with the rule. */
-final class RuleShapeIndex {
-    private record FunctionShape(String name, int arity) {}
-    private record VariableShape(String name) {}
-    private record Entry(int ordinal, RewriteRule rule) {}
+final class RuleShapeIndex implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(buckets);v.reference(fallback);}
+
+    private record FunctionShape(String name, int arity) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(name);}
+}
+    private record VariableShape(String name) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(name);}
+}
+    private record Entry(int ordinal, RewriteRule rule) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(rule);}
+}
     private final Map<Object, List<Entry>> buckets;
     private final List<Entry> fallback;
 

@@ -1,5 +1,7 @@
 package de.regelsuche.search.moves;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import de.regelsuche.ast.Expr;
 import de.regelsuche.search.program.*;
 import de.regelsuche.transform.*;
@@ -9,7 +11,9 @@ import java.util.*;
 public sealed interface NativeMoveProof permits NativeMoveProof.Primitive,NativeMoveProof.Program,NativeMoveProof.Exact {
     Expr source(); Expr target(); List<String> assumptions(); ExecutionWork work(); String rule();
     Transformation exportLegacy();
-    record Primitive(AstRewriteTransport.Step step) implements NativeMoveProof {
+    record Primitive(AstRewriteTransport.Step step) implements NativeMoveProof,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(step);}
+
         public Primitive { Objects.requireNonNull(step); }
         @Override public Expr source(){return step.source();}
         @Override public Expr target(){return step.target();}
@@ -22,7 +26,9 @@ public sealed interface NativeMoveProof permits NativeMoveProof.Primitive,Native
                 step.equivalencePreservingByConstruction(),"typed:"+NativeSearchMove.digest(source+"\n"+target+"\n"+step.rule()),step.assumptions(),step.packId(),step.license());
         }
     }
-    record Program(CompiledAstRewriteProgram.Candidate history) implements NativeMoveProof {
+    record Program(CompiledAstRewriteProgram.Candidate history) implements NativeMoveProof,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(history);}
+
         public Program { Objects.requireNonNull(history); }
         @Override public Expr source(){return history.source();}
         @Override public Expr target(){return history.target();}
@@ -40,7 +46,9 @@ public sealed interface NativeMoveProof permits NativeMoveProof.Primitive,Native
             return new RewriteCandidate(history.programId(),codec.encodeExpression(source()),codec.encodeExpression(target()),steps).toTransformation();
         }
     }
-    record Exact(NativeExactTheoryEvidence evidence) implements NativeMoveProof {
+    record Exact(NativeExactTheoryEvidence evidence) implements NativeMoveProof,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(evidence);}
+
         public Exact { Objects.requireNonNull(evidence); }
         @Override public Expr source(){return evidence.binding().source();}
         @Override public Expr target(){return evidence.binding().target();}

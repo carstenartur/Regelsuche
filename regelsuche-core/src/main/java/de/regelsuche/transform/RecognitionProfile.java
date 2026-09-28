@@ -1,5 +1,7 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import de.regelsuche.ast.BinaryOperator;
 import java.util.EnumSet;
 import java.util.Set;
@@ -11,7 +13,9 @@ public record RecognitionProfile(
     boolean inferAlgebraicBindings,
     Set<String> recognitionRuleIds,
     int maxEquivalenceDepth
-) {
+) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(associativeOperators);v.reference(commutativeOperators);v.reference(recognitionRuleIds);}
+
     public RecognitionProfile(Set<BinaryOperator> associativeOperators, Set<BinaryOperator> commutativeOperators) {
         this(associativeOperators, commutativeOperators, false, Set.of(), 0);
     }

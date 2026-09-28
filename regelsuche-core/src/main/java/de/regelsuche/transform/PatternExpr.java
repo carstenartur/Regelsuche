@@ -1,5 +1,7 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -70,7 +72,9 @@ public sealed interface PatternExpr extends ExprTemplate
     @Override
     Expr instantiate(Map<String, Expr> bindings);
 
-    record Placeholder(String name) implements PatternExpr {
+    record Placeholder(String name) implements PatternExpr,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(name);}
+
         public Placeholder {
             if (name == null || name.isBlank()) {
                 throw new IllegalArgumentException(
@@ -96,7 +100,9 @@ public sealed interface PatternExpr extends ExprTemplate
         }
     }
 
-    record LiteralNumber(ExactRational value) implements PatternExpr {
+    record LiteralNumber(ExactRational value) implements PatternExpr,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(value);}
+
         public LiteralNumber {
             Objects.requireNonNull(value, "value");
         }
@@ -113,7 +119,9 @@ public sealed interface PatternExpr extends ExprTemplate
         }
     }
 
-    record LiteralVariable(String name) implements PatternExpr {
+    record LiteralVariable(String name) implements PatternExpr,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(name);}
+
         public LiteralVariable {
             Objects.requireNonNull(name, "name");
             if (name.isBlank()) {
@@ -138,7 +146,9 @@ public sealed interface PatternExpr extends ExprTemplate
         BinaryOperator operator,
         PatternExpr left,
         PatternExpr right
-    ) implements PatternExpr {
+    ) implements PatternExpr,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(operator);v.reference(left);v.reference(right);}
+
         public Operation {
             if (operator == null || left == null || right == null) {
                 throw new IllegalArgumentException(
@@ -170,7 +180,9 @@ public sealed interface PatternExpr extends ExprTemplate
     record Function(
         String name,
         List<PatternExpr> arguments
-    ) implements PatternExpr {
+    ) implements PatternExpr,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(name);v.reference(arguments);}
+
         public Function {
             Objects.requireNonNull(name, "name");
             if (name.isBlank()) {

@@ -1,5 +1,7 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import de.regelsuche.assumption.Assumption;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
@@ -45,7 +47,9 @@ import java.util.Set;
  * oracle, and differential tests require exact ordered transformation parity.</p>
  */
 public final class PreparedAstRewriteTransformationEngine
-        implements TransformationEngine {
+        implements TransformationEngine,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(parser);v.reference(canonicalizer);v.reference(rules);v.reference(ruleIndex);}
+
     private static final int DEFAULT_MAX_AST_SIZE_INCREASE = 12;
     private static final int DEFAULT_MAX_CANDIDATES_PER_STATE = 80;
 

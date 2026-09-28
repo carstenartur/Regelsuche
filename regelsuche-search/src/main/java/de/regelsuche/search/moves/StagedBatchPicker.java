@@ -1,5 +1,7 @@
 package de.regelsuche.search.moves;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import de.regelsuche.transform.TransformationWorkMetrics;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -7,10 +9,14 @@ import java.util.List;
 import java.util.Optional;
 
 /** Opens provider batches on demand. Metadata ordering never invokes an engine. */
-final class StagedBatchPicker<M> implements SearchExecution.Picker<M> {
+final class StagedBatchPicker<M> implements SearchExecution.Picker<M>,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(lanes);v.reference(primitiveLanes);v.reference(generated);v.reference(policy);v.reference(work);}
+
     private static final int EXHAUSTED_STAGE = MovePriorityPolicy.Stage.values().length;
     private record Ranked<M>(M move, double score) {}
-    private final class Lane {
+    private final class Lane implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(StagedBatchPicker.this);v.reference(provider);v.reference(moves);}
+
         final SearchBatches.Provider<M> provider;
         final int stage;
         final double score;

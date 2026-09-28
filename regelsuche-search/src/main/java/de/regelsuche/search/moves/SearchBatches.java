@@ -1,16 +1,24 @@
 package de.regelsuche.search.moves;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import de.regelsuche.transform.TransformationWorkMetrics;
 import java.util.List;
 
 /** Representation-free batch opening/ranking; candidates retain their producer metadata. */
 final class SearchBatches {
     private SearchBatches() {}
-    record Batch<M>(List<M> moves,TransformationWorkMetrics work,boolean complete) {
+    record Batch<M>(List<M> moves,TransformationWorkMetrics work,boolean complete) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(moves);v.reference(work);}
+
         Batch { moves=List.copyOf(moves); }
     }
-    interface Provider<M> { MoveProvider.Descriptor descriptor(); Batch<M> candidates(); }
-    interface Ranking<M> {
+    interface Provider<M> extends RetainedGraph.View {
+        @Override default void retainedReferences(RetainedGraph.Visitor v){v.requireExact(this,Void.class);}
+ MoveProvider.Descriptor descriptor(); Batch<M> candidates(); }
+    interface Ranking<M> extends RetainedGraph.View {
+        @Override default void retainedReferences(RetainedGraph.Visitor v){v.requireExact(this,Void.class);}
+
         double score(M move); int stage(MoveProvider.Descriptor descriptor);
         double providerScore(MoveProvider.Descriptor descriptor); long contextWork(); void requireSource(M move);
     }

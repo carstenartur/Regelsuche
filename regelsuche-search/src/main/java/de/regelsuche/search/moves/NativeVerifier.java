@@ -19,8 +19,8 @@ public interface NativeVerifier {
         var verifiers=new LinkedHashMap<MoveProvider.Descriptor,NativeVerifier>();
         for(var provider:List.copyOf(providers)) {
             NativeVerifier verifier=null;
-            if(provider instanceof NativeMoveSearch.Primitive primitive)verifier=primitive::verify;
-            else if(provider instanceof NativeProgramMoveProvider program)verifier=program::verify;
+            if(provider instanceof NativeMoveSearch.Primitive primitive)verifier=new Builtin(primitive);
+            else if(provider instanceof NativeProgramMoveProvider program)verifier=new Builtin(program);
             else for(var installed:ServiceLoader.load(NativeVerifierProvider.class,NativeVerifier.class.getClassLoader())) {
                 var recognized=Objects.requireNonNull(installed.recognize(provider));
                 if(recognized.isPresent()) {
@@ -32,6 +32,12 @@ public interface NativeVerifier {
             if(verifiers.putIfAbsent(provider.descriptor(),verifier)!=null)throw new IllegalArgumentException("duplicate native provider descriptor");
         }
         return new Registered(verifiers);
+    }
+    final class Builtin implements NativeVerifier,de.regelsuche.retention.RetainedGraph.View {
+        private final NativeMoveProvider provider;
+        private Builtin(NativeMoveProvider provider){this.provider=provider;}
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(provider);}
+        @Override public NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove proposal,TypedMoveSearch.Context context){return provider.verify(source,proposal,context);}
     }
     final class Registered implements NativeVerifier,de.regelsuche.retention.RetainedGraph.View {
         private final java.util.Map<MoveProvider.Descriptor,NativeVerifier> verifiers;

@@ -1,5 +1,7 @@
 package de.regelsuche.search.moves;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import de.regelsuche.transform.TransformationWorkMetrics;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -7,7 +9,9 @@ import java.util.List;
 import java.util.Optional;
 
 /** Explicit eager control. Stable ties preserve inventory order; every score is evaluated once. */
-final class EagerBatchPicker<M> implements SearchExecution.Picker<M> {
+final class EagerBatchPicker<M> implements SearchExecution.Picker<M>,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(generated);v.reference(work);}
+
     private record Ranked<M>(M move, double score) {}
     private final List<M> generated;
     private final TransformationWorkMetrics work;

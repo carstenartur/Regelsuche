@@ -1,5 +1,7 @@
 package de.regelsuche.canonical;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import static de.regelsuche.assumption.ExpressionDefinedness.canElideWithoutDomainLoss;
 
 import de.regelsuche.assumption.Assumption;
@@ -44,7 +46,9 @@ import java.util.Optional;
  * do with them (record on the rule candidate, prove them, or skip the
  * reduction altogether).</p>
  */
-public class ExpressionCanonicalizer {
+public class ExpressionCanonicalizer implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.requireExact(this,ExpressionCanonicalizer.class);v.reference(parser);v.reference(polynomialNormalizer);}
+
     private final ExpressionParser parser = new ExpressionParser();
     private final PolynomialNormalizer polynomialNormalizer = PolynomialNormalizer.monomialOnly();
 

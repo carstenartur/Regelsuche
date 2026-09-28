@@ -9,7 +9,9 @@ import java.util.*;
 /** Explicit Expr execution through the same frontier and batch pickers as the historical facade. */
 public final class NativeMoveSearch {
     public static final String REVISION = "regelsuche.native-expr-move-search/v2-final-replay";
-    public record Primitive(MoveProvider.Descriptor descriptor, AstRewriteTransport transport) implements NativeMoveProvider {
+    public record Primitive(MoveProvider.Descriptor descriptor, AstRewriteTransport transport) implements NativeMoveProvider,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(descriptor);v.reference(transport);}
+
         public Primitive {
             Objects.requireNonNull(descriptor);Objects.requireNonNull(transport);
             if(descriptor.sourceKind()!=SearchMove.SourceKind.PRIMITIVE)throw new IllegalArgumentException("primitive native provider required");
@@ -239,6 +241,7 @@ public final class NativeMoveSearch {
         }
         @Override public SearchExecution.Picker<NativeSearchMove> picker(TypedMoveSearch.State state){
             var ranking=new SearchBatches.Ranking<NativeSearchMove>() {
+                @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(Execution.this);v.reference(state);}
                 @Override public double score(NativeSearchMove move){return problem.policy().score(move,state,problem.context());}
                 @Override public int stage(MoveProvider.Descriptor descriptor){return problem.policy().stage(descriptor,state,problem.context()).ordinal();}
                 @Override public double providerScore(MoveProvider.Descriptor descriptor){return problem.policy().providerScore(descriptor,state,problem.context());}
@@ -248,6 +251,7 @@ public final class NativeMoveSearch {
             if(scheduling()==MoveSearch.Scheduling.STAGED_INCREMENTAL)return new StagedIncrementalLanes<>(problem.providers().stream()
                 .map(p->NativeIncrementalSources.lane(p,state,problem.context())).toList(),ranking,state);
             var providers=problem.providers().stream().<SearchBatches.Provider<NativeSearchMove>>map(p->new SearchBatches.Provider<>() {
+                @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(Execution.this);v.reference(p);v.reference(state);}
                 @Override public MoveProvider.Descriptor descriptor(){return p.descriptor();}
                 @Override public SearchBatches.Batch<NativeSearchMove> candidates(){
                     var batch=p.candidates(state,problem.context());

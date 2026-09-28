@@ -1,5 +1,7 @@
 package de.regelsuche.search.moves;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.transform.TransformationWorkMetrics;
 import java.util.List;
@@ -12,7 +14,9 @@ public interface MoveProvider {
 
     record Descriptor(String id, String ruleFamily, SearchMove.SourceKind sourceKind,
             SearchMove.ProofStrength proofStrength, List<String> requiredAssumptions,
-            SearchMove.ValueEvidence valueEvidence, String provenanceId) {
+            SearchMove.ValueEvidence valueEvidence, String provenanceId) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(id);v.reference(ruleFamily);v.reference(sourceKind);v.reference(proofStrength);v.reference(requiredAssumptions);v.reference(valueEvidence);v.reference(provenanceId);}
+
         public Descriptor {
             if (id == null || id.isBlank() || ruleFamily == null || ruleFamily.isBlank() || provenanceId == null || provenanceId.isBlank()) {
                 throw new IllegalArgumentException("provider identity is required");

@@ -1,5 +1,7 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
@@ -9,7 +11,9 @@ import java.util.List;
 import java.util.Objects;
 
 /** Explicit typed primitive boundary. Construction of a step is not proof of its validity. */
-public final class AstRewriteTransport {
+public final class AstRewriteTransport implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(engine);}
+
     public static final String REVISION = "regelsuche.ast-rewrite-transport/v1";
     public static final int MAXIMUM_NODES = 10_000;
     public static final int MAXIMUM_DEPTH = 128;
@@ -18,7 +22,9 @@ public final class AstRewriteTransport {
     /** Structural source and target, with the primitive rule's metadata. No display-text identity. */
     public record Step(Expr source, Expr target, String rule, RewriteKind kind,
             boolean mayIncreaseComplexity, int estimatedCostDelta, boolean equivalencePreservingByConstruction,
-            List<String> assumptions, String packId, String license) {
+            List<String> assumptions, String packId, String license) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(target);v.reference(rule);v.reference(kind);v.reference(assumptions);v.reference(packId);v.reference(license);}
+
         public Step {
             requireBounded(source);
             requireBounded(target);

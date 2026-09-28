@@ -1,5 +1,7 @@
 package de.regelsuche.search.moves;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import de.regelsuche.ast.Expr;
 import de.regelsuche.transform.*;
 import java.nio.charset.StandardCharsets;
@@ -9,7 +11,9 @@ import java.util.*;
 
 /** Native proposal. Admission still independently verifies the full retained producer data. */
 public record NativeSearchMove(NativeMoveProof proof,MoveProvider.Descriptor descriptor,long generationCost,
-        Set<String> capabilityDelta) implements SearchExecution.Edge<Expr,NativeSearchMove> {
+        Set<String> capabilityDelta) implements SearchExecution.Edge<Expr,NativeSearchMove>,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(proof);v.reference(descriptor);v.reference(capabilityDelta);}
+
     public NativeSearchMove {
         Objects.requireNonNull(proof);Objects.requireNonNull(descriptor);capabilityDelta=Set.copyOf(capabilityDelta);
         if(generationCost<0)throw new IllegalArgumentException("negative generation work");
