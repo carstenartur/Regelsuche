@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 class PolynomialTemporaryOwnershipTest {
     private static final class Observation implements RetainedOperation.Sink {
-        RetainedOperation scope;long work;int simultaneousTerms;boolean rejectedCoefficient;
+        RetainedOperation scope;long work;int simultaneousTerms;boolean rejectedCoefficient;int renderedFactors;boolean optionalEnvelope;
         @Override public void executionWork(long units){work=Math.addExact(work,units);}
         @Override public void validationWork(long units){work=Math.addExact(work,units);}
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(scope);}
@@ -24,6 +24,9 @@ class PolynomialTemporaryOwnershipTest {
             while(!pending.isEmpty()){
                 var value=pending.removeFirst();if(!seen.add(value))continue;
                 if(value instanceof ExactRational rational && rational.numerator().bitLength()>4096)rejectedCoefficient=true;
+                if(value instanceof Optional<?> optional){optionalEnvelope=true;optional.ifPresent(visitor::reference);}
+                if(value instanceof ArrayList<?> list && !list.isEmpty() && list.stream().allMatch(Expr.class::isInstance))
+                    renderedFactors=Math.max(renderedFactors,list.size());
                 if(value instanceof RetainedGraph.View view)view.retainedReferences(visitor);
                 else if(value instanceof Map<?,?> map){
                     if(!map.isEmpty() && map.values().stream().allMatch(ExactRational.class::isInstance))terms++;
@@ -56,4 +59,25 @@ class PolynomialTemporaryOwnershipTest {
         assertTrue(observation.work>4,"attempted normalization does more than opening/closing the outer scope");
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
+    @Test void actualMonomialFactorListIsObservedDuringAstFolding(){
+        var product=new BinaryExpr(new BinaryExpr(new VariableExpr("x"),BinaryOperator.MUL,new VariableExpr("y")),
+            BinaryOperator.MUL,new VariableExpr("z"));
+        var normalizer=new PolynomialNormalizer();var expected=normalizer.normalize(product);
+        var observation=new Observation();
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;assertEquals(expected,normalizer.normalize(product));
+        }
+        assertEquals(3,observation.renderedFactors,"the actual three rendered Expr factors survive until the AST fold finishes");
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+    @Test void actualOptionalResultEnvelopeOverlapsItsRenderedExpression(){
+        var source=new VariableExpr("x");var normalizer=new PolynomialNormalizer();
+        var expected=normalizer.normalize(source);var observation=new Observation();
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;assertEquals(expected,normalizer.normalize(source));
+        }
+        assertTrue(observation.optionalEnvelope,"normalization constructs an Optional owner before handing off the Expr");
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
 }
