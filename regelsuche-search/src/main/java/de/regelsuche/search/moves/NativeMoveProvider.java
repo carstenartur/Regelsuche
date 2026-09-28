@@ -10,7 +10,8 @@ public interface NativeMoveProvider {
     default IncrementalProviderContract.Mathematics mathematicalKind(){
         throw new IllegalArgumentException("native provider requires an explicit mathematical work contract");
     }
-    record Batch(List<NativeSearchMove> moves,TransformationWorkMetrics work,boolean complete) {
+    record Batch(List<NativeSearchMove> moves,TransformationWorkMetrics work,boolean complete) implements de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(moves);v.reference(work);}
         public Batch { moves=List.copyOf(moves); }
     }
     static boolean carries(List<String> required,TypedMoveSearch.State source,TypedMoveSearch.Context context) {

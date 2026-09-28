@@ -1,5 +1,7 @@
 package de.regelsuche.search.moves;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import static de.regelsuche.search.moves.IncrementalProviderContract.*;
 
 import de.regelsuche.transform.ExecutionWork;
@@ -7,8 +9,11 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Owns admission/lifecycle and keeps its meter even if a delegated open, pull or close throws. */
-final class ManagedProviderCursor<T> implements ObjectCursor<T> {
-    interface Binding<T> {
+final class ManagedProviderCursor<T> implements ObjectCursor<T>,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(definition);v.reference(binding);v.reference(meter);v.reference(source);v.reference(status);v.reference(emittedWork);v.reference(detail);}
+
+    interface Binding<T> extends RetainedGraph.View {
+        @Override default void retainedReferences(RetainedGraph.Visitor v){v.requireExact(this,Void.class);}
         boolean carries();
         ObjectSource<T> open(Meter meter);
         void requireSource(T candidate);

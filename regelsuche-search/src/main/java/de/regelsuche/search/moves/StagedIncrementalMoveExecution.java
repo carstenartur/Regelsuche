@@ -1,5 +1,7 @@
 package de.regelsuche.search.moves;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import java.util.List;
 
 /** Distinct v2 receipt: no fields are added to the frozen native v1 serialization. */
@@ -17,8 +19,12 @@ public record StagedIncrementalMoveExecution(String workRevision, String orderRe
         return expansions.stream().flatMap(expansion -> expansion.lanes().stream())
             .allMatch(lane -> lane.cursor() == null || lane.cursor().accountingComplete());
     }
-    public record Provider(MoveProvider.Descriptor descriptor, IncrementalProviderContract.Definition definition) {}
-    public record Lane(int providerIndex, int stage, IncrementalProviderContract.Snapshot cursor) {}
+    public record Provider(MoveProvider.Descriptor descriptor, IncrementalProviderContract.Definition definition) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(descriptor);v.reference(definition);}
+}
+    public record Lane(int providerIndex, int stage, IncrementalProviderContract.Snapshot cursor) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(cursor);}
+}
     public record Expansion(MoveState source, boolean closed, List<Lane> lanes) {
         public Expansion { lanes = List.copyOf(lanes); }
     }

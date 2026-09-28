@@ -1,5 +1,7 @@
 package de.regelsuche.search.moves;
 
+import de.regelsuche.retention.RetainedGraph;
+
 import static de.regelsuche.search.moves.IncrementalProviderContract.*;
 
 import de.regelsuche.transform.TransformationWorkMetrics;
@@ -9,13 +11,18 @@ import java.util.List;
 import java.util.Optional;
 
 /** Stage selection inside IncrementalMovePicker; provider progress remains attached to its parent expansion. */
-final class StagedIncrementalLanes<M,S> implements SearchExecution.Picker<M> {
-    interface Source<M> {
+final class StagedIncrementalLanes<M,S> implements SearchExecution.Picker<M>,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(lanes);v.reference(generated);v.reference(state);v.reference(ordering);}
+
+    interface Source<M> extends RetainedGraph.View {
+        @Override default void retainedReferences(RetainedGraph.Visitor v){v.requireExact(this,Void.class);}
         MoveProvider.Descriptor descriptor();
         boolean batch();
         ObjectCursor<M> open(java.util.function.Consumer<List<M>> generated,java.util.function.LongSupplier totalWork);
     }
-    private final class Lane {
+    private final class Lane implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(StagedIncrementalLanes.this);v.reference(provider);v.reference(cursor);}
+
         final Source<M> provider;
         final int index, stage;
         final double score;
@@ -68,8 +75,16 @@ final class StagedIncrementalLanes<M,S> implements SearchExecution.Picker<M> {
         }
         return Optional.empty();
     }
+    private final class Generated implements java.util.function.Consumer<List<M>>,RetainedGraph.View {
+        @Override public void accept(List<M> moves){generated.addAll(moves);}
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(StagedIncrementalLanes.this);}
+    }
+    private final class TotalWork implements java.util.function.LongSupplier,RetainedGraph.View {
+        @Override public long getAsLong(){return workMetrics().totalWorkUnits();}
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(StagedIncrementalLanes.this);}
+    }
     private void open(Lane lane) {
-        lane.cursor=lane.provider.open(generated::addAll,()->workMetrics().totalWorkUnits());
+        lane.cursor=lane.provider.open(new Generated(),new TotalWork());
     }
     private Optional<M> emit(Lane lane,M move) {
         if(!lane.provider.batch())generated.add(move);

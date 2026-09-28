@@ -50,7 +50,9 @@ public final class SearchExecution {
         default boolean ownershipComplete(){return true;}
 
     }
-    public record Expansion<S>(S source,boolean closed,List<StagedIncrementalMoveExecution.Lane> lanes) {
+    public record Expansion<S>(S source,boolean closed,List<StagedIncrementalMoveExecution.Lane> lanes) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(lanes);}
+
         public Expansion { lanes=List.copyOf(lanes); }
     }
     public record Step<S,M,V>(S source,S target,M move,V verification) implements RetainedGraph.View {
