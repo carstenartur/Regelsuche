@@ -62,7 +62,7 @@ final class MatcherDescriptor {
     private static void fields(Source source,Assembly assembly) {
         switch (source) {
             case ExprMatcher.Any ignored -> { }
-            case ExprMatcher.LiteralNumber value -> assembly.put(0,value.value().canonicalText());
+            case ExprMatcher.LiteralNumber value -> assembly.putText(0,value.value().canonicalText());
             case ExprMatcher.LiteralVariable value -> assembly.put(0,value.name());
             case ExprMatcher.NumberProperty value -> assembly.put(0,value.kind().name());
             case ExprMatcher.Pattern value -> {
