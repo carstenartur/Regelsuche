@@ -12,7 +12,13 @@ class RewriteTemporaryOwnershipTest {
         RetainedOperation scope;long execution,validation;int queueWidth,simultaneousResults,checkpoints;
         boolean canonicalThree,replacedArguments,emptyMutableBatch;
         List<Expr> abortAtCopiedArguments;List<?> abortedArguments;long previousCheckpointWork,copyCheckpointWork;
-        @Override public void executionWork(long units){execution=Math.addExact(execution,units);}
+        Expr abortAtResult;boolean batchAborted;final BatchLimit primary=new BatchLimit();
+        final List<CleanupLimit> cleanupFailures=new ArrayList<>();
+        final Set<RetainedOperation.Frame> frames=Collections.newSetFromMap(new IdentityHashMap<>());
+        @Override public void executionWork(long units){
+            execution=Math.addExact(execution,units);
+            if(batchAborted && units==4){var cleanup=new CleanupLimit();cleanupFailures.add(cleanup);throw cleanup;}
+        }
         @Override public void validationWork(long units){validation=Math.addExact(validation,units);}
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(scope);}
         @Override public void checkpoint(){
@@ -20,6 +26,7 @@ class RewriteTemporaryOwnershipTest {
             RetainedGraph.measure(scope);
             var pending=new ArrayDeque<Object>();var seen=Collections.newSetFromMap(new IdentityHashMap<Object,Boolean>());
             var expressions=new ArrayList<FunctionExpr>();var argumentLists=new ArrayList<List<?>>();int results=0;
+            boolean completedTarget=false;
             var visitor=new RetainedGraph.Visitor(){
                 @Override public void reference(Object value){if(value!=null)pending.addLast(value);}
                 @Override public void requireExact(Object value,Class<?> type){assertEquals(type,value.getClass());}
@@ -27,6 +34,7 @@ class RewriteTemporaryOwnershipTest {
             visitor.reference(scope);
             while(!pending.isEmpty()){
                 var value=pending.removeFirst();if(!seen.add(value))continue;
+                if(value instanceof RetainedOperation.Frame frame)frames.add(frame);
                 if(value instanceof ArrayList<?> list && list.isEmpty())emptyMutableBatch=true;
                 if(value instanceof NumberExpr number && number.equals(new NumberExpr(3)))canonicalThree=true;
                 if(value instanceof ArrayDeque<?> queue && queue.stream().allMatch(RetainedGraph.View.class::isInstance))queueWidth=Math.max(queueWidth,queue.size());
@@ -39,11 +47,15 @@ class RewriteTemporaryOwnershipTest {
                         @Override public void reference(Object item){direct.add(item);visitor.reference(item);}
                         @Override public void requireExact(Object item,Class<?> type){visitor.requireExact(item,type);}
                     });
-                    if(direct.stream().anyMatch(RewriteRule.class::isInstance) && direct.stream().anyMatch(Expr.class::isInstance))results++;
+                    if(direct.stream().anyMatch(RewriteRule.class::isInstance) && direct.stream().anyMatch(Expr.class::isInstance)){
+                        results++;
+                        if(abortAtResult!=null && direct.contains(abortAtResult))completedTarget=true;
+                    }
                 }else if(value instanceof Collection<?> collection)collection.forEach(visitor::reference);
                 else if(value instanceof Map<?,?> map)map.forEach((key,item)->{visitor.reference(key);visitor.reference(item);});
                 else if(value instanceof Object[] array)for(var item:array)visitor.reference(item);
             }
+            if(completedTarget){batchAborted=true;throw primary;}
             if(abortAtCopiedArguments!=null && argumentLists.stream().anyMatch(abortAtCopiedArguments::equals)) {
                 abortedArguments=argumentLists.stream().filter(abortAtCopiedArguments::equals).findFirst().orElseThrow();
                 copyCheckpointWork=execution-previousCheckpointWork;
@@ -90,6 +102,40 @@ class RewriteTemporaryOwnershipTest {
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
     private static final class CopyLimit extends RuntimeException {}
+    private static final class BatchLimit extends RuntimeException {}
+    private static final class CleanupLimit extends RuntimeException {}
+    private static void assertOriginalFailureSurvivesCleanup(Expr source,Expr target){
+        var a=PatternExpr.var("A");
+        var zero=new PatternRewriteRule("zero",PatternExpr.op(BinaryOperator.ADD,a,PatternExpr.num(0)),a);
+        var transport=new AstRewriteTransport(List.of(zero),32,32);
+        var expected=transport.generate(source);assertEquals(1,expected.size());assertEquals(target,expected.getFirst().target());
+        var observation=new Observation();observation.abortAtResult=target;RuntimeException thrown;
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;thrown=assertThrows(RuntimeException.class,()->transport.generate(source));
+        }
+        assertTrue(observation.batchAborted,"the real filled candidate batch reached the failing checkpoint");
+        assertFalse(observation.cleanupFailures.isEmpty(),"actual frame release also failed after releasing ownership");
+        assertEquals(new RetainedGraph.Usage(0,0,4),RetainedGraph.measure(observation.scope).retained());
+        for(var frame:observation.frames)
+            assertEquals(new RetainedGraph.Usage(0,0,4),RetainedGraph.measure(frame).retained());
+        assertEquals(expected,transport.generate(source),"the aborted observation does not leak into historical calls");
+        assertSame(observation.primary,thrown,"cleanup must not replace the original resource failure");
+        assertEquals(observation.cleanupFailures,List.of(thrown.getSuppressed()));
+    }
+    @Test void directRewritePreservesPrimaryFailureWhenReleaseAlsoFails(){
+        var x=new VariableExpr("x");
+        assertOriginalFailureSurvivesCleanup(new BinaryExpr(x,BinaryOperator.ADD,new NumberExpr(0)),x);
+    }
+    @Test void binaryChildRewritePreservesPrimaryFailureWhenReleaseAlsoFails(){
+        var x=new VariableExpr("x");var y=new VariableExpr("y");
+        var child=new BinaryExpr(x,BinaryOperator.ADD,new NumberExpr(0));
+        assertOriginalFailureSurvivesCleanup(new BinaryExpr(child,BinaryOperator.MUL,y),new BinaryExpr(x,BinaryOperator.MUL,y));
+    }
+    @Test void functionRewritePreservesPrimaryFailureWhenReleaseAlsoFails(){
+        var x=new VariableExpr("x");var y=new VariableExpr("y");
+        var child=new BinaryExpr(x,BinaryOperator.ADD,new NumberExpr(0));
+        assertOriginalFailureSurvivesCleanup(new FunctionExpr("f",List.of(child,y)),new FunctionExpr("f",List.of(x,y)));
+    }
     @Test void argumentCopyIsPaidBeforeItsOwnershipCheckpointCanAbort(){
         var a=PatternExpr.var("A");
         var zero=new PatternRewriteRule("zero",PatternExpr.op(BinaryOperator.ADD,a,PatternExpr.num(0)),a);
