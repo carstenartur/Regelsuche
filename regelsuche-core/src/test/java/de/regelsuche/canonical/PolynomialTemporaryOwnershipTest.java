@@ -115,6 +115,18 @@ class PolynomialTemporaryOwnershipTest {
         assertTrue(observation.work>0);assertFalse(observation.missingInput);assertTrue(observation.optionalEnvelope);
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
+    @Test void aDistinctVariableSumReusesItsLeavesWithoutAGeneralPolynomialWorkspace(){
+        var x=new VariableExpr("x");var y=new VariableExpr("y");var z=new VariableExpr("z");
+        var source=new BinaryExpr(z,BinaryOperator.ADD,new BinaryExpr(y,BinaryOperator.ADD,x));
+        var observation=sourceObservation(source);
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;var result=(BinaryExpr)new PolynomialNormalizer().normalize(source).orElseThrow();
+            var left=(BinaryExpr)result.left();assertSame(x,left.left());assertSame(y,left.right());assertSame(z,result.right());
+        }
+        assertTrue(observation.peakNodes<=7,"the five input AST nodes plus two new addition nodes suffice");
+        assertFalse(observation.missingInput);assertTrue(observation.optionalEnvelope);assertTrue(observation.work>0);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
     @Test void realPolynomialMultiplicationRetainsBothOperandsAndAccumulatingTerms(){
         var sum=new BinaryExpr(new VariableExpr("x"),BinaryOperator.ADD,new VariableExpr("y"));
         var normalizer=new PolynomialNormalizer();

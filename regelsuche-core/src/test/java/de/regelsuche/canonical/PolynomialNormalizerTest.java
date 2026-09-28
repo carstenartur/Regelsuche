@@ -54,6 +54,32 @@ class PolynomialNormalizerTest {
             assertTrue(service.normalize(parse("x^2147483647*x")).isEmpty());
         }
     }
+    @Test void distinctVariableSumsKeepOrderAssociationAndSymbolIdentity(){
+        for(var service:List.of(normalizer,PolynomialNormalizer.monomialOnly())){
+            for(String expression:List.of("a+(b+c)","c+(b+a)","(b+a)+c","a+(aa+ab)")){
+                var expected=expression.contains("aa")?parse("a+aa+ab"):parse("a+b+c");
+                assertEquals(expected,service.normalize(parse(expression)).orElseThrow());
+            }
+            var first=VariableExpr.scoped(new SymbolId(new UUID(0,7),1));
+            var second=VariableExpr.scoped(new SymbolId(new UUID(0,7),2));
+            assertEquals(new BinaryExpr(first,BinaryOperator.ADD,second),
+                service.normalize(new BinaryExpr(second,BinaryOperator.ADD,first)).orElseThrow());
+            assertEquals(parse("2*x+y"),service.normalize(parse("x+(y+x)")).orElseThrow());
+            assertEquals(parse("x+y+1"),service.normalize(parse("y+(1+x)")).orElseThrow());
+        }
+    }
+    @Test void variableSumShortcutPreservesTheGeneralTermLimitAndDuplicateFallback(){
+        var variables=new java.util.ArrayList<Expr>();
+        for(int i=0;i<1001;i++)variables.add(new VariableExpr("v"+i));
+        assertTrue(normalizer.normalize(balancedSum(variables.subList(0,1000))).isPresent());
+        assertTrue(normalizer.normalize(balancedSum(variables)).isEmpty());
+        assertEquals(parse("1001*x"),normalizer.normalize(balancedSum(java.util.Collections.nCopies(1001,new VariableExpr("x")))).orElseThrow());
+    }
+    private static Expr balancedSum(List<? extends Expr> expressions){
+        if(expressions.size()==1)return expressions.getFirst();
+        int split=expressions.size()/2;
+        return new BinaryExpr(balancedSum(expressions.subList(0,split)),BinaryOperator.ADD,balancedSum(expressions.subList(split,expressions.size())));
+    }
 
     @Test
     void collectsGlobalLikeTermsAfterExpansion() {
