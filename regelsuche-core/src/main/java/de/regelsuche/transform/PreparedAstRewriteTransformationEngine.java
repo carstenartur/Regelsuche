@@ -227,6 +227,17 @@ public final class PreparedAstRewriteTransformationEngine
         }
 
         if (subtree instanceof BinaryExpr binaryExpr) {
+            rewriteBinaryChildren(binaryExpr, retainLegacyHash, results);
+        } else if (subtree instanceof FunctionExpr functionExpr) {
+            rewriteFunctionArguments(functionExpr, retainLegacyHash, results);
+        }
+        if(!retainLegacyHash)RetainedOperation.checkpoint();
+        return results;
+        }
+    }
+
+    private void rewriteBinaryChildren(BinaryExpr binaryExpr, boolean retainLegacyHash,
+            List<RewriteResult> results) {
             var leftRewrites=rewriteEverywhere(binaryExpr.left(), retainLegacyHash);
             try(var child=retainLegacyHash?null:RetainedOperation.retain(leftRewrites)) {
             for (RewriteResult leftRewrite : leftRewrites) {
@@ -259,7 +270,10 @@ public final class PreparedAstRewriteTransformationEngine
                 if(!retainLegacyHash){RetainedOperation.work(2);RetainedOperation.checkpoint();}
             }
             }
-        } else if (subtree instanceof FunctionExpr functionExpr) {
+    }
+
+    private void rewriteFunctionArguments(FunctionExpr functionExpr, boolean retainLegacyHash,
+            List<RewriteResult> results) {
             List<Expr> arguments = functionExpr.arguments();
             for (int index = 0; index < arguments.size(); index++) {
                 final int position = index;
@@ -282,10 +296,6 @@ public final class PreparedAstRewriteTransformationEngine
                 }
                 }
             }
-        }
-        if(!retainLegacyHash)RetainedOperation.checkpoint();
-        return results;
-        }
     }
 
     private static Expr applyIfMatched(RewriteRule rule, Expr subtree) {
