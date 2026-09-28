@@ -115,12 +115,13 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
      */
     public Expr canonicalize(Expr expression, AssumptionContext context) {
         try (var owned = RetainedOperation.retain(this, expression, context)) {
-            RetainedOperation.validation(1);
-            return RetainedOperation.produced(canonicalizeOwned(expression, context));
+            return canonicalizeOwned(expression, context);
         }
     }
 
     private Expr canonicalizeOwned(Expr expression, AssumptionContext context) {
+        // The public boundary owns the complete immutable input throughout private recursion.
+        RetainedOperation.validation(1);
         if (expression instanceof BinaryExpr binaryExpr) {
             Optional<Expr> polynomial = polynomialNormalizer.normalize(binaryExpr);
             if (polynomial.isPresent()) {
@@ -138,7 +139,7 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
             RetainedOperation.work(1);
             try (var arguments = RetainedOperation.retain(normalised)) {
                 for (Expr argument : functionExpr.arguments()) {
-                    normalised.add(canonicalize(argument, context));
+                    normalised.add(canonicalizeOwned(argument, context));
                     RetainedOperation.work(1);
                     RetainedOperation.checkpoint();
                 }
@@ -160,7 +161,7 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
             RetainedOperation.work(2);
             try (var accumulation = RetainedOperation.retain(buckets, normalizedTerms)) {
                 for (SignedTerm signedTerm : terms) {
-                    Expr normalized = canonicalize(signedTerm.term(), context);
+                    Expr normalized = canonicalizeOwned(signedTerm.term(), context);
                     try (var rewritten = RetainedOperation.retain(normalized)) {
                         // A fresh ADD/SUB from normalization joins this same signed addition pass.
                         RetainedOperation.work(normalizedTerms.size());
@@ -268,7 +269,7 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
             RetainedOperation.work(3);
             try (var accumulation = RetainedOperation.retain(factorContext, numeric, buckets)) {
                 for (Expr factor : factors) {
-                    Expr normalized = canonicalize(factor, factorContext);
+                    Expr normalized = canonicalizeOwned(factor, factorContext);
                     try (var rewritten = RetainedOperation.retain(normalized)) {
                         if (normalized instanceof NumberExpr numberExpr) {
                             numeric[0] = ((ExactRational) numeric[0]).multiply(numberExpr.value());
@@ -339,9 +340,9 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
     }
 
     private Expr canonicalizePower(BinaryExpr expression, AssumptionContext context) {
-        Expr base = canonicalize(expression.left(), context);
+        Expr base = canonicalizeOwned(expression.left(), context);
         try (var left = RetainedOperation.retain(base)) {
-            Expr exponent = canonicalize(expression.right(), context);
+            Expr exponent = canonicalizeOwned(expression.right(), context);
             try (var right = RetainedOperation.retain(exponent)) {
                 if (isNumber(exponent, 0)) {
                     Expr retained = new BinaryExpr(base, BinaryOperator.POW, exponent);
@@ -379,9 +380,9 @@ public class ExpressionCanonicalizer implements RetainedGraph.View {
      * </ul>
      */
     private Expr canonicalizeDivision(BinaryExpr expression, AssumptionContext context) {
-        Expr numerator = canonicalize(expression.left(), context);
+        Expr numerator = canonicalizeOwned(expression.left(), context);
         try (var left = RetainedOperation.retain(numerator)) {
-            Expr denominator = canonicalize(expression.right(), context);
+            Expr denominator = canonicalizeOwned(expression.right(), context);
             try (var right = RetainedOperation.retain(denominator)) {
                 if (numerator instanceof NumberExpr a && denominator instanceof NumberExpr b && !b.value().isZero()) {
                     var quotient = a.value().divide(b.value());
