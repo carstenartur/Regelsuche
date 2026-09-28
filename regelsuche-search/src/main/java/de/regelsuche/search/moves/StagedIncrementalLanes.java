@@ -12,7 +12,7 @@ import java.util.Optional;
 
 /** Stage selection inside IncrementalMovePicker; provider progress remains attached to its parent expansion. */
 final class StagedIncrementalLanes<M,S> implements SearchExecution.Picker<M>,RetainedGraph.View {
-    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(lanes);v.reference(generated);v.reference(state);v.reference(ordering);}
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(lanes);v.reference(generated);v.reference(state);v.reference(ordering);v.reference(batchReceipts);}
 
     interface Source<M> extends RetainedGraph.View {
         @Override default void retainedReferences(RetainedGraph.Visitor v){v.requireExact(this,Void.class);}
@@ -29,6 +29,7 @@ final class StagedIncrementalLanes<M,S> implements SearchExecution.Picker<M>,Ret
         final double score;
         ObjectCursor<M> cursor;
         boolean finished;
+        int capturedBatchReceipts;
         Lane(Source<M> provider, int index, SearchBatches.Ranking<M> ranking) {
             this.provider = provider; this.index = index;
             stage = ranking.stage(provider.descriptor());
@@ -38,6 +39,7 @@ final class StagedIncrementalLanes<M,S> implements SearchExecution.Picker<M>,Ret
     }
     private final List<Lane> lanes = new ArrayList<>();
     private final List<M> generated = new ArrayList<>();
+    private final List<Snapshot> batchReceipts = new ArrayList<>();
     private final S state;
     private final TransformationWorkMetrics ordering;
     private int learnedBurst;
@@ -120,6 +122,16 @@ final class StagedIncrementalLanes<M,S> implements SearchExecution.Picker<M>,Ret
         return work;
     }
     public List<M> generatedMoves() { return List.copyOf(generated); }
+    @Override public List<Snapshot> batchCursorReceipts() {
+        for(var lane:lanes)if(lane.cursor!=null){
+            var receipts=lane.cursor.batchCursorReceipts();
+            for(int i=lane.capturedBatchReceipts;i<receipts.size();i++){
+                batchReceipts.add(receipts.get(i));de.regelsuche.retention.RetainedOperation.work(1);
+            }
+            lane.capturedBatchReceipts=receipts.size();
+        }
+        return List.copyOf(batchReceipts);
+    }
     public boolean complete() { return lanes.stream().allMatch(lane -> lane.finished && lane.cursor.snapshot().complete()); }
     public boolean workExhausted() { return workExhausted; }
     SearchExecution.Expansion<S> receipt() {

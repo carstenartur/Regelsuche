@@ -39,16 +39,23 @@ final class NativeIncrementalSources {
             return cursor.next(allowance).map(proof->new NativeSearchMove(proof,descriptor,totalWork.getAsLong(),Set.of()));
         }
         @Override public Snapshot snapshot(){return cursor.snapshot();}
+        @Override public List<Snapshot> batchCursorReceipts(){return cursor.batchCursorReceipts();}
         @Override public void close(){cursor.close();}
     }
-    private record BatchBinding(NativeMoveProvider provider,TypedMoveSearch.State state,TypedMoveSearch.Context context,
-            Consumer<List<NativeSearchMove>> generated) implements ManagedProviderCursor.Binding<NativeSearchMove> {
-        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(provider);v.reference(state);v.reference(context);v.reference(generated);}
+    private static final class BatchBinding implements ManagedProviderCursor.Binding<NativeSearchMove> {
+        private final NativeMoveProvider provider;private final TypedMoveSearch.State state;private final TypedMoveSearch.Context context;
+        private final Consumer<List<NativeSearchMove>> generated;private List<Snapshot> receipts=List.of();
+        BatchBinding(NativeMoveProvider provider,TypedMoveSearch.State state,TypedMoveSearch.Context context,Consumer<List<NativeSearchMove>> generated){
+            this.provider=provider;this.state=state;this.context=context;this.generated=generated;
+        }
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(provider);v.reference(state);v.reference(context);v.reference(generated);v.reference(receipts);}
+        @Override public List<Snapshot> batchCursorReceipts(){return receipts;}
         @Override public boolean carries(){return NativeMoveProvider.carries(provider.descriptor().requiredAssumptions(),state,context);}
         @Override public void requireSource(NativeSearchMove move){move.requireSource(state.expression());}
         @Override public ExecutionWork work(NativeSearchMove move){return move.executionWork();}
         @Override public ObjectSource<NativeSearchMove> open(Meter meter){
             var batch=provider.candidates(state,context);
+            receipts=batch.cursorReceipts();de.regelsuche.retention.RetainedOperation.work(1);
             meter.charge(Operation.LOAD,batch.work().totalWorkUnits());meter.charge(batch.work().candidateWork());
             for(var move:batch.moves()){meter.charge(Operation.ADMISSION,1);move.requireSource(state.expression());}
             generated.accept(batch.moves());

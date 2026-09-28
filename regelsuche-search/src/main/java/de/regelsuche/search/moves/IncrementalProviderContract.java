@@ -118,6 +118,8 @@ public final class IncrementalProviderContract {
         /** One candidate at most. LIMIT is resumable on the same cursor; all atomic overruns remain paid. */
         Optional<T> next(long allowance);
         Snapshot snapshot();
+        /** Immutable, append-only receipt sequence for delegated batch drains; historical cursors have none. */
+        default List<Snapshot> batchCursorReceipts(){return List.of();}
         @Override void close();
     }
     public interface Cursor extends ObjectCursor<Transformation> {}

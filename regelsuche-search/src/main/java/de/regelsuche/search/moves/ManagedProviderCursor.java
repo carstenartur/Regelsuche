@@ -18,6 +18,7 @@ final class ManagedProviderCursor<T> implements ObjectCursor<T>,RetainedGraph.Vi
         ObjectSource<T> open(Meter meter);
         void requireSource(T candidate);
         ExecutionWork work(T candidate);
+        default java.util.List<Snapshot> batchCursorReceipts(){return java.util.List.of();}
     }
     private final Definition definition;
     private final Binding<T> binding;
@@ -33,6 +34,7 @@ final class ManagedProviderCursor<T> implements ObjectCursor<T>,RetainedGraph.Vi
         this.definition=Objects.requireNonNull(definition);this.binding=Objects.requireNonNull(binding);
         meter=new Meter(definition.revision());
     }
+    @Override public java.util.List<Snapshot> batchCursorReceipts(){return binding.batchCursorReceipts();}
     @Override public Optional<T> next(long allowance) {
         if (allowance < 0) throw new IllegalArgumentException("negative cursor allowance");
         if (closed || terminal()) return Optional.empty();
