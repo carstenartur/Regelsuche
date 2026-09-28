@@ -38,10 +38,10 @@ final class ExprMatcherEngine {
                 session.rawStates = evaluate(matcher,expression,session.initial,session,true);
                 session.states = session.limit(session.rawStates,matcher.canonicalDescriptor());
                 RetainedOperation.work(2L + (session.states == session.rawStates ? 0 : session.states.size()));
-                RetainedOperation.checkpoint();
-                session.rawStates = null;
+                // Keep both actual lists until publication. Root assembly only
+                // adds owners, so that observation includes its earlier peaks.
                 session.results = new ArrayList<>(session.states.size());
-                RetainedOperation.work(2);
+                RetainedOperation.work(1);
                 for (State state : session.states) {
                     session.results.add(state.toResult());
                     // Result, sorted binding owner/backing, copied entries, and list insertion.
