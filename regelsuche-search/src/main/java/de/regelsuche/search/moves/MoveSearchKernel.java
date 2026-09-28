@@ -4,6 +4,8 @@ import de.regelsuche.retention.RetainedGraph;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -94,6 +96,7 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
             v.reference(MoveSearchKernel.this);v.reference(problem);v.reference(contract);v.reference(ledger);
             v.reference(events);v.reference(deadEnds);v.reference(reached);v.reference(visited);v.reference(assessments);
             v.reference(frontier);v.reference(budget);v.reference(serial);v.reference(opened);v.reference(witness);v.reference(outcome);v.reference(active);
+            v.reference(assessmentOrder);v.reference(reachedOrder);v.reference(result);
         }
         private final SearchExecution.Environment<E,S,M,A,V> problem;
         private final SearchContinuationContract contract;
@@ -101,9 +104,11 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
         private final Ledger ledger = new Ledger();
         private final List<SearchExecution.Event<S,M,V>> events = new ArrayList<>();
         private final List<S> deadEnds = new ArrayList<>();
-        private final Set<S> reached = new HashSet<>();
+        private final Set<S> reached = new LinkedHashSet<>();
         private final MoveSearchVisits<S> visited;
-        private final Map<S, A> assessments = new java.util.HashMap<>();
+        private final Map<S, A> assessments = new LinkedHashMap<>();
+        private List<S> assessmentOrder=List.of(),reachedOrder=List.of();
+        private SearchExecution.Result<S,M,V,A> result;
         private final PriorityQueue<Ticket> frontier = new PriorityQueue<>(
             new TicketOrder());
         private final long[] serial = {0};
@@ -128,7 +133,7 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
             var root = problem.state(problem.source(), 0, 0, "", problem.initialAssumptions(), Set.of(), 0);
             var rootValue = inspect(problem, root, ledger);
             root = problem.state(root.expression(), 0, 0, "", root.assumptions(), rootValue.capabilities().keySet(), 0);
-            assessments.put(root, rootValue);
+            recordAssessment(assessments,root,rootValue);
             ledger.observe(root, MoveWitnessPath.root());
             frontier.add(new Ticket(new Node(root, 0, MoveWitnessPath.root(), rootValue), 0, serial[0]++));
             visited.add(root, 0);
@@ -185,7 +190,8 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
                 return false;
             }
             ledger.explored++;
-            reached.add(node.state);
+            boolean firstOpening=reached.add(node.state);
+            de.regelsuche.retention.RetainedOperation.work(firstOpening?3:1);
             if (node.state.expression().equals(problem.goal())) {
                 stop(Outcome.TARGET_REACHED);
                 witness = node.path.steps();
@@ -242,10 +248,18 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
                 stop(Outcome.INCONCLUSIVE); witness = List.of(); hit = -1; primitiveHit = -1;
             }
             if (outcome == Outcome.BOUNDED_EXHAUSTED && !complete) outcome = Outcome.INCONCLUSIVE;
-            return new SearchExecution.Result<>(outcome, witness, events, reached, deadEnds, new Metrics(ledger.generated, ledger.consumed, ledger.discarded,
+            // Capture chronology before Map.copyOf/Set.copyOf discard iteration order.
+            // These fields also own the immutable copies throughout final replay/handoff.
+            assessmentOrder=List.copyOf(assessments.keySet());
+            de.regelsuche.retention.RetainedOperation.work(assessmentOrder.size()+1L);
+            reachedOrder=List.copyOf(reached);
+            de.regelsuche.retention.RetainedOperation.work(reachedOrder.size()+1L);
+            result = new SearchExecution.Result<>(outcome, witness, events, reached, deadEnds, new Metrics(ledger.generated, ledger.consumed, ledger.discarded,
                 ledger.generated - ledger.consumed, ledger.duplicates, ledger.deadEnds, ledger.explored, ledger.expanded,
                 ledger.primitive, ledger.search, ledger.verification, hit, primitiveHit, ledger.matches), complete, assessments,
-                receipts,ledger.batchReceipts);
+                receipts,ledger.batchReceipts,assessmentOrder,reachedOrder);
+            de.regelsuche.retention.RetainedOperation.work(3);
+            return result;
         }
     }
 
@@ -278,7 +292,7 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
         move = move.withCapabilityDelta(delta);
         boolean proofRejected = decision == Decision.PROOF_REJECTED || decision == Decision.ASSUMPTION_REJECTED;
         if (decision == Decision.ENQUEUED) {
-            visited.add(child, admission.theoryWork()); node.enqueued++; assessments.put(child, admission.value());
+            visited.add(child, admission.theoryWork()); node.enqueued++; recordAssessment(assessments,child,admission.value());
             var path = node.path.append(new SearchExecution.Step<>(node.state, child, move, verification));
             frontier.add(new Ticket(new Node(child, admission.theoryWork(), path, admission.value()),
                 child.expression().equals(problem.goal()) ? -Double.MAX_VALUE : priority(problem, child, admission.value()), serial[0]++));
@@ -294,6 +308,10 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
             : priority(problem, node.state, node.value) + 1 + stage + node.pulls / 2.0;
         frontier.add(new Ticket(node, continuation, serial[0]++)); ledger.search++;
         return proofRejected ? Expansion.REJECTED_PROOF : Expansion.MORE;
+    }
+    private void recordAssessment(Map<S,A> assessments,S state,A value){
+        boolean firstAdmission=assessments.put(state,value)==null;
+        de.regelsuche.retention.RetainedOperation.work(firstAdmission?3:1);
     }
     private final class Admission {
         private final S child; private final long theoryWork; private final Decision decision; private final V verification; private final A value;
