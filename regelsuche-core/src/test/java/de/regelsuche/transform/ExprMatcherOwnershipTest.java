@@ -21,6 +21,7 @@ class ExprMatcherOwnershipTest {
         boolean abortOutcome, abortClose, sawSession, inputMissing;
         boolean abortBindingCopy, sawBindingCopy, sawTraceCopy;
         boolean abortStateList, sawSecondBinding, sawOperationTrace;
+        boolean sawRepresentativeList, sawLaterRepresentative, sawDescendantTrace;
         int unpublishedResultScans;
         final Set<String> patternDescriptions = Collections.newSetFromMap(new IdentityHashMap<>());
         final Set<List<?>> tracePrefixes = new HashSet<>();
@@ -50,6 +51,8 @@ class ExprMatcherOwnershipTest {
                 Object value = pending.remove(); if (!seen.add(value)) continue;
                 if (value instanceof String text && text.startsWith("7:pattern")) patternDescriptions.add(text);
                 if ("operation:ADD".equals(value)) sawOperationTrace = true;
+                if ("representative:1".equals(value)) sawLaterRepresentative = true;
+                if ("contains@0".equals(value)) sawDescendantTrace = true;
                 sawSession |= value.getClass().getEnclosingClass() == ExprMatcherEngine.class
                     && value.getClass().getSimpleName().equals("Session");
                 if (value.getClass().getEnclosingClass() == ExprMatcherEngine.class
@@ -58,6 +61,9 @@ class ExprMatcherOwnershipTest {
                 if (value instanceof RetainedGraph.View view) view.retainedReferences(visitor);
                 else if (value instanceof Object[] array) for (var item : array) visitor.reference(item);
                 else if (value instanceof Collection<?> values) {
+                    sawRepresentativeList |= values instanceof List<?> && values.size() == 2
+                        && values.stream().anyMatch(item -> item == input)
+                        && values.stream().allMatch(item -> item instanceof Expr);
                     if (values instanceof List<?> list && !list.isEmpty() && "any".equals(list.getFirst())) {
                         tracePrefixes.add(List.copyOf(list));
                         sawTraceCopy |= list instanceof ArrayList<?>;
@@ -281,6 +287,88 @@ class ExprMatcherOwnershipTest {
             assertEquals(10,result.evaluatedSteps());
             assertFalse(result.complete());
             assertEquals(List.of(diagnostic),result.diagnostics());
+        }
+        assertFalse(observation.inputMissing);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    @Test void descendantResultsOwnTheirActualMutableAssemblyList() {
+        verifyComposedLists(ExprMatcher.contains(ExprMatcher.any()),
+            new ExpressionParser().parseTerm("f(x+y,z)"),5);
+    }
+
+    @Test void equivalentResultsOwnTheirActualMutableAssemblyList() {
+        verifyComposedLists(ExprMatcher.equivalent(RecognitionProfile.exact(),ExprMatcher.any()),
+            new VariableExpr("x"),1);
+    }
+
+    private enum SimplifiedRepresentatives implements EquivalentExpressionProvider, RetainedGraph.View {
+        INSTANCE;
+        @Override public List<Expr> representatives(Expr input,RecognitionProfile profile) {
+            return List.of(input,((BinaryExpr) input).left());
+        }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }
+    }
+
+    @Test void equivalentMatchingOwnsItsActualReturnedRepresentativeList() {
+        Expr input = new ExpressionParser().parseTerm("x+0");
+        var matcher = ExprMatcher.equivalent(RecognitionProfile.exact(),ExprMatcher.any());
+        var options = ExprMatcher.MatchOptions.defaults().withRepresentativeProvider(SimplifiedRepresentatives.INSTANCE);
+        var expected = matcher.match(input,options);
+        var observation = new Observation(); observation.input = input;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var result = matcher.match(input,options);
+            assertEquals(expected,result);
+            assertEquals(2,result.matches().size());
+            assertSame(input,result.matches().getFirst().representative());
+            assertSame(((BinaryExpr) input).left(),result.matches().get(1).representative());
+            assertEquals(List.of("any","representative:1"),result.matches().get(1).trace());
+        }
+        assertTrue(observation.sawRepresentativeList,"the provider's actual list must survive nested evaluation");
+        assertFalse(observation.inputMissing);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    @Test void anAbortedDescendantAssemblyDoesNotVisitItsChildren() {
+        verifyTraversalAbort(ExprMatcher.contains(ExprMatcher.any()),new ExpressionParser().parseTerm("x+y"),
+            ExprMatcher.MatchOptions.defaults());
+    }
+
+    @Test void anAbortedRepresentativeAssemblyDoesNotMatchItsNextRepresentative() {
+        verifyTraversalAbort(ExprMatcher.equivalent(RecognitionProfile.exact(),ExprMatcher.any()),
+            new ExpressionParser().parseTerm("x+0"),
+            ExprMatcher.MatchOptions.defaults().withRepresentativeProvider(SimplifiedRepresentatives.INSTANCE));
+    }
+
+    private static void verifyTraversalAbort(ExprMatcher matcher,Expr input,ExprMatcher.MatchOptions options) {
+        var observation = new Observation(); observation.input = input; observation.abortStateList = true;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var failure = assertThrows(MatchAbort.class,() -> matcher.match(input,options));
+            assertSame(observation.failure,failure);
+            assertFalse(observation.mutableStateLists.isEmpty());
+            assertFalse(observation.sawLaterRepresentative);
+            assertFalse(observation.sawDescendantTrace);
+            assertNull(observation.outcome);
+            assertTrue(observation.workAfterFailure > 0);
+        }
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    @Test void aDescendantLimitPreservesPreorderPathsAndItsOriginalDiagnostic() {
+        Expr input = new ExpressionParser().parseTerm("f(x+y,z)");
+        var matcher = ExprMatcher.contains(ExprMatcher.any());
+        var expectedDiagnostic = new ExprMatcher.MatchDiagnostic("MATCH_RESULT_LIMIT",ExprMatcher.any().canonicalDescriptor());
+        var observation = new Observation(); observation.input = input;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var result = matcher.match(input,new ExprMatcher.MatchOptions(null,3,100,100));
+            assertEquals(List.of(List.of("any","contains@root"),List.of("any","contains@0"),
+                List.of("any","contains@0.0")),result.matches().stream().map(ExprMatcher.MatchResult::trace).toList());
+            assertEquals(4,result.evaluatedSteps());
+            assertEquals(List.of(expectedDiagnostic),result.diagnostics());
+            assertFalse(result.complete());
         }
         assertFalse(observation.inputMissing);
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
