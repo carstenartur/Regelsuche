@@ -7,6 +7,27 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NativeRetentionSearchTest {
+    @Test void registeredPrimitivePathOwnsItsProvidersPickerProposalsAndCheckedResult() {
+        var a=de.regelsuche.transform.PatternExpr.var("A");
+        var rule=new de.regelsuche.transform.PatternRewriteRule("zero",de.regelsuche.transform.PatternExpr.op(
+            de.regelsuche.ast.BinaryOperator.ADD,a,de.regelsuche.transform.PatternExpr.num(0)),a);
+        var target=new VariableExpr("x");
+        var source=new de.regelsuche.ast.BinaryExpr(target,de.regelsuche.ast.BinaryOperator.ADD,new de.regelsuche.ast.NumberExpr(0));
+        var descriptor=new MoveProvider.Descriptor("zero","zero",SearchMove.SourceKind.PRIMITIVE,SearchMove.ProofStrength.PRIMITIVE,List.of(),SearchMove.ValueEvidence.UNKNOWN,"zero-v1");
+        var provider=new NativeMoveSearch.Primitive(descriptor,new de.regelsuche.transform.AstRewriteTransport(List.of(rule),64,128));
+        for(var scheduling:List.of(MoveSearch.Scheduling.STAGED,MoveSearch.Scheduling.EAGER_CONTROL)) {
+            var problem=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.frozen(target),List.of(provider),
+                MoveSearch.Mode.FAST,scheduling,new MoveSearch.Budget(2,1,0,10,1000000));
+            var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT);
+            assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome(),result.accounting().detail());
+            assertTrue(result.accountingComplete());assertTrue(result.withinBudget());
+            assertSame(target,result.output());assertEquals(1,result.witness().size());
+            assertTrue(result.accounting().resultRetained().nodes()>=3);
+            assertTrue(result.accounting().peak().references()>result.accounting().resultRetained().references());
+            assertTrue(result.replayWork()>0);
+        }
+    }
+
     @Test void paidOwnershipWorkParticipatesInTheExistingBudgetAndOpaqueCallbacksFailClosed() {
         var expression=new VariableExpr("x");
         var small=new NativeMoveSearch.Problem(expression,TypedMoveSearch.Context.frozen(expression),List.of(),
