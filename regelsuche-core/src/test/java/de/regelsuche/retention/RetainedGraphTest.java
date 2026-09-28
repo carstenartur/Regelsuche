@@ -6,6 +6,30 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class RetainedGraphTest {
+    @Test void sharedOwnersKeepAllReferenceSlotsWithoutQueuingTheSameObjectRepeatedly() {
+        class Shared implements RetainedGraph.View {
+            final String text = "shared";
+            long aliasesStillQueued = -1;
+            @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+                var scan = (RetainedGraph.Scan) visitor;
+                aliasesStillQueued = scan.pending.stream().filter(value -> value == this).count();
+                visitor.reference(text);
+            }
+        }
+        var shared = new Shared();
+        Object[] actualSlots = new Object[1_000];
+        java.util.Arrays.fill(actualSlots, shared);
+        var observed = RetainedGraph.measure(actualSlots);
+        assertEquals(new RetainedGraph.Usage(0, 6, 1_002), observed.retained(),
+            "the array's thousand actual slots remain paid and retained");
+        assertEquals(3, observed.objects(), "array, shared owner and text are distinct actual objects");
+        assertEquals(0, shared.aliasesStillQueued,
+            "a shared immutable or mutable owner needs only one pending traversal entry");
+        assertTrue(observed.work() < 1_100, "reference visits remain linear while redundant queue removals disappear");
+        assertTrue(observed.peak().references() < 1_100,
+            "the scanner must actually avoid the thousand duplicate queue entries");
+    }
+
     private enum DescribedEnum implements RetainedGraph.View {
         VALUE;
         final ArrayList<Expr> values=new ArrayList<>();
