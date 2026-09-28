@@ -37,7 +37,8 @@ final class ExprMatcherEngine {
             try {
                 session.rawStates = evaluate(matcher,expression,session.initial,session,true);
                 session.states = session.limit(session.rawStates,matcher);
-                RetainedOperation.work(2L + (session.states == session.rawStates ? 0 : session.states.size()));
+                // limit pays its own copy; these are the two caller assignments.
+                RetainedOperation.work(2);
                 // Keep both actual lists until publication. Root assembly only
                 // adds owners, so that observation includes its earlier peaks.
                 session.results = new ArrayList<>(session.states.size());
@@ -771,7 +772,9 @@ final class ExprMatcherEngine {
 
         private void freeze(Session session,ExprMatcher matcher) {
             result = session.limit(next,matcher);
-            observeFrozen();
+            // The limiter owns and pays the copy before this handoff.
+            RetainedOperation.work(1);
+            RetainedOperation.checkpoint();
         }
 
         private void freeze() {
@@ -787,6 +790,18 @@ final class ExprMatcherEngine {
         private void advance() {
             current = result;
             RetainedOperation.work(1);
+        }
+    }
+
+    private static final class LimitedStates implements RetainedGraph.View {
+        private final List<State> source;
+        private State[] prefix;
+        private List<State> result;
+
+        private LimitedStates(List<State> source) { this.source = source; }
+
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(source); visitor.reference(prefix); visitor.reference(result);
         }
     }
 
@@ -835,10 +850,33 @@ final class ExprMatcherEngine {
 
         private List<State> limit(List<State> states, ExprMatcher matcher) {
             if (states.size() <= options.maxResults()) {
-                return List.copyOf(states);
+                List<State> result = List.copyOf(states);
+                if (result == states) {
+                    RetainedOperation.work(1);
+                    return result;
+                }
+                try (var owned = RetainedOperation.retainCompleted(1L + result.size(),states,result)) {
+                    return result;
+                }
             }
             diagnostic("MATCH_RESULT_LIMIT", matcher.canonicalDescriptor());
-            return List.copyOf(states.subList(0, options.maxResults()));
+            var limited = new LimitedStates(states);
+            try (var owned = RetainedOperation.retainCompleted(1,this,matcher,limited)) {
+                try {
+                    limited.prefix = new State[options.maxResults()];
+                    RetainedOperation.work(1L + limited.prefix.length);
+                    for (int index = 0; index < limited.prefix.length; index++) {
+                        limited.prefix[index] = states.get(index);
+                        RetainedOperation.work(1);
+                    }
+                    limited.result = List.of(limited.prefix);
+                    RetainedOperation.work(2L + limited.prefix.length);
+                    RetainedOperation.checkpoint();
+                    return limited.result;
+                } catch (RuntimeException | Error failure) {
+                    observeFailure(failure); throw failure;
+                }
+            }
         }
     }
 
