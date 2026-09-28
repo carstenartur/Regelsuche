@@ -8,7 +8,9 @@ import java.util.*;
 
 /**
  * Explicit logical ownership, not JVM bytes. Each described field/collection entry is a slot;
- * collection backing storage contributes one slot. Null fields still occupy slots. Shared objects
+ * collection backing storage contributes one slot. Only exact audited owning container classes are supported;
+ * wrappers/views/subclasses and opaque comparators are rejected. Scalars use canonical decimal characters;
+ * BigInteger conversion text is paid and overlaps the retained scalar in the peak. Null fields still occupy slots. Shared objects
  * count once by identity. Global enum constants are borrowed. No reflection or retained registry.
  */
 public final class RetainedGraph {
@@ -41,7 +43,7 @@ public final class RetainedGraph {
     private static final class Scan implements Visitor {
         final IdentityHashMap<Object,Boolean> seen=new IdentityHashMap<>();
         final ArrayDeque<Object> pending=new ArrayDeque<>();
-        long nodes,characters,references,work,accountingReferences=5;
+        long nodes,characters,references,work,accountingReferences=5,temporaryCharacters;
         @Override public void reference(Object value){
             references=Math.addExact(references,1);work=Math.addExact(work,1);
             if(value!=null && !(value instanceof Enum<?>))pending.addLast(value);
@@ -60,7 +62,10 @@ public final class RetainedGraph {
                 case String text -> characters=Math.addExact(characters,text.length());
                 case ExactRational rational -> { reference(rational.numerator());reference(rational.denominator()); }
                 case BigInteger integer -> {
-                    int digits=integer.toString().length();characters=Math.addExact(characters,digits);work=Math.addExact(work,digits);
+                    String decimal=integer.toString();int digits=decimal.length();
+                    characters=Math.addExact(characters,digits);temporaryCharacters=Math.max(temporaryCharacters,digits);
+                    accountingReferences=Math.max(accountingReferences,Math.addExact(6,Math.addExact(2L*seen.size(),pending.size())));
+                    work=Math.addExact(work,Math.addExact(digits,2L)); // conversion scan and temporary reference acquisition/release
                 }
                 case SymbolId symbol -> reference(symbol.namespace());
                 case UUID ignored -> {}
@@ -75,10 +80,14 @@ public final class RetainedGraph {
                 case View view -> view.retainedReferences(this);
                 case Map<?,?> map when standardContainer(map) -> {
                     reference(null); // logical backing slot
+                    if(map instanceof SortedMap<?,?> sorted)reference(sorted.comparator());
                     for(var entry:map.entrySet()){reference(entry.getKey());reference(entry.getValue());}
                 }
                 case Collection<?> collection when standardContainer(collection) -> {
-                    reference(null);for(Object entry:collection)reference(entry);
+                    reference(null);
+                    if(collection instanceof SortedSet<?> sorted)reference(sorted.comparator());
+                    if(collection instanceof PriorityQueue<?> queue)reference(queue.comparator());
+                    for(Object entry:collection)reference(entry);
                 }
                 case Object[] array -> { for(Object entry:array)reference(entry); }
                 case byte[] array -> characters=Math.addExact(characters,array.length);
@@ -87,13 +96,31 @@ public final class RetainedGraph {
             }
         }
         void node(){nodes=Math.addExact(nodes,1);}
-        boolean standardContainer(Object value){return value.getClass().getName().startsWith("java.util.");}
+        boolean standardContainer(Object value){
+            Class<?> type=value.getClass();
+            if(type==TreeMap.class)return ((TreeMap<?,?>)value).comparator()==null;
+            if(type==TreeSet.class)return ((TreeSet<?>)value).comparator()==null;
+            if(type==PriorityQueue.class) {
+                var comparator=((PriorityQueue<?>)value).comparator();
+                return comparator==null || comparator instanceof View;
+            }
+            if(type==ArrayList.class || type==LinkedList.class || type==ArrayDeque.class || type==HashMap.class
+                    || type==LinkedHashMap.class || type==IdentityHashMap.class || type==HashSet.class || type==LinkedHashSet.class)return true;
+            return switch(type.getName()) {
+                case "java.util.ImmutableCollections$ListN", "java.util.ImmutableCollections$List12",
+                    "java.util.ImmutableCollections$MapN", "java.util.ImmutableCollections$Map1",
+                    "java.util.ImmutableCollections$SetN", "java.util.ImmutableCollections$Set12",
+                    "java.util.Collections$EmptyList", "java.util.Collections$EmptyMap", "java.util.Collections$EmptySet",
+                    "java.util.Collections$SingletonList", "java.util.Collections$SingletonMap", "java.util.Collections$SingletonSet" -> true;
+                default -> false;
+            };
+        }
         Observation observation(){
             var retained=new Usage(nodes,characters,references);
             // Both paths leave through measure's finally. Settle each occupied identity slot and
             // pending traversal slot before publishing the receipt; none can survive the call.
             long settledWork=Math.addExact(work,Math.addExact(2L*seen.size(),pending.size()));
-            return new Observation(retained,new Usage(nodes,characters,Math.addExact(references,accountingReferences)),settledWork,seen.size());
+            return new Observation(retained,new Usage(nodes,Math.addExact(characters,temporaryCharacters),Math.addExact(references,accountingReferences)),settledWork,seen.size());
         }
     }
 }
