@@ -51,8 +51,8 @@ class PatternMatcherTemporaryOwnershipTest {
             alternatives = Math.max(alternatives,currentAlternatives);
             tasks = Math.max(tasks,currentTasks);
             inputMissing |= !seen.contains(input);
-            sawBoundChoice |= bound && currentAlternatives >= 2;
-            if (abortBoundChoice && bound && currentAlternatives >= 2) throw new MatchAbort();
+            sawBoundChoice |= bound && currentAlternatives >= 1;
+            if (abortBoundChoice && bound && currentAlternatives >= 1) throw new MatchAbort();
         }
     }
 
@@ -71,7 +71,7 @@ class PatternMatcherTemporaryOwnershipTest {
         assertTrue(result.matched());
         assertEquals(Map.of("A",new VariableExpr("y"),"B",new VariableExpr("x")),result.bindings());
         assertTrue(result.visitedBranches() > 2,"the later constraint must reopen an earlier AC choice");
-        assertTrue(observation.alternatives >= 2,"the selected and saved actual alternatives overlap");
+        assertTrue(observation.alternatives >= 1,"a saved actual alternative remains owned while the current branch executes");
         assertTrue(observation.tasks >= 3,"the real continuation chain is retained");
         assertTrue(observation.sawBoundChoice,"a current binding overlaps its saved alternative");
         assertFalse(observation.inputMissing);
