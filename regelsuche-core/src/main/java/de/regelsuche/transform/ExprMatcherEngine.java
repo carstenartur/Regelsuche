@@ -751,10 +751,21 @@ final class ExprMatcherEngine {
             List<String> nextTrace,
             long assemblyWork
         ) {
+            // Evaluate all five field identities; mathematical equivalence is
+            // insufficient for reusing an execution state.
+            boolean unchanged = (nextBindings == bindings)
+                & (nextRepresentative == representative)
+                & (nextRepresentativeIndex == representativeIndex)
+                & (nextStrength == recognitionStrength)
+                & (nextTrace == trace);
+            if (unchanged) {
+                RetainedOperation.work(assemblyWork + 5);
+                return this;
+            }
             State result = new State(nextBindings,nextRepresentative,nextRepresentativeIndex,nextStrength,nextTrace);
-            // State construction and both immutable-copy operations. Charge
+            // Identity checks, State construction and immutable-copy operations. Charge
             // additional copied entries only when the returned owners differ.
-            long freezingWork = 3;
+            long freezingWork = 8;
             if (result.bindings != nextBindings) freezingWork += 2L + nextBindings.size();
             if (result.trace != nextTrace) freezingWork += 2L + nextTrace.size();
             try (var owned = RetainedOperation.retainCompleted(assemblyWork + freezingWork,
