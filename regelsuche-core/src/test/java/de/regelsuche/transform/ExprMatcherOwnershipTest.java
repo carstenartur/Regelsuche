@@ -223,17 +223,17 @@ class ExprMatcherOwnershipTest {
     }
 
     @Test void alternativeResultsOwnTheirActualMutableAssemblyList() {
-        verifyComposedLists(ExprMatcher.anyOf(ExprMatcher.bind("A",ExprMatcher.any()),
-            ExprMatcher.bind("B",ExprMatcher.any())),new VariableExpr("x"),2);
+        verifyComposedLists(ExprMatcher.anyOf(ExprMatcher.any(),ExprMatcher.literalVariable("x")),
+            new VariableExpr("x"),2);
     }
 
     @Test void conjunctionResultsOwnTheirActualIntermediateLists() {
-        verifyComposedLists(twoBindings(),new VariableExpr("x"),1);
+        verifyComposedLists(ExprMatcher.allOf(ExprMatcher.any(),ExprMatcher.any()),new VariableExpr("x"),1);
     }
 
     @Test void functionArgumentsOwnTheirActualIntermediateLists() {
-        verifyComposedLists(ExprMatcher.fn("f",ExprMatcher.bind("A",ExprMatcher.any()),
-            ExprMatcher.bind("B",ExprMatcher.any())),new ExpressionParser().parseTerm("f(x,y)"),1);
+        verifyComposedLists(ExprMatcher.fn("f",ExprMatcher.any(),ExprMatcher.any()),
+            new ExpressionParser().parseTerm("f(x,y)"),1);
     }
 
     @Test void bindingResultsOwnTheirActualMutableAssemblyList() {
@@ -304,7 +304,7 @@ class ExprMatcherOwnershipTest {
     @Test void anAbortedAlternativeAssemblyDoesNotGenerateItsLaterBranch() {
         Expr input = new VariableExpr("x");
         var observation = new Observation(); observation.input = input; observation.abortStateList = true;
-        var matcher = ExprMatcher.anyOf(ExprMatcher.bind("A",ExprMatcher.any()),ExprMatcher.bind("B",ExprMatcher.any()));
+        var matcher = ExprMatcher.anyOf(ExprMatcher.any(),ExprMatcher.bind("B",ExprMatcher.any()));
         try (var scope = RetainedOperation.open(observation)) {
             observation.scope = scope;
             var failure = assertThrows(MatchAbort.class,() -> matcher.match(input));
