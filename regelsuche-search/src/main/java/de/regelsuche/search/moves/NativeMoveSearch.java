@@ -233,7 +233,8 @@ public final class NativeMoveSearch {
         @Override public MoveSearch.Scheduling scheduling(){return problem.scheduling();}
         @Override public TypedMoveSearch.State state(Expr expression,int depth,int primitive,String previous,List<String> assumptions,Set<String> capabilities,int debt){
             if(accounting==null)de.regelsuche.search.program.AstExpressionValidation.inspect(expression);else accounting.validate(expression);
-            return new TypedMoveSearch.State(store.dereference(store.intern(expression)),depth,primitive,previous,assumptions,capabilities,debt);
+            try {return new TypedMoveSearch.State(store.dereference(store.intern(expression)),depth,primitive,previous,assumptions,capabilities,debt);}
+            catch(SearchExpressionStore.LimitExceeded exhausted){if(accounting!=null)accounting.fail("NATIVE_RETENTION_EXHAUSTED");throw exhausted;}
         }
         @Override public NativeStateValue.Assessment inspect(TypedMoveSearch.State state){return problem.stateValue().evaluate(state,problem.context());}
         @Override public double score(TypedMoveSearch.State state){return problem.stateScore().applyAsDouble(state);}
