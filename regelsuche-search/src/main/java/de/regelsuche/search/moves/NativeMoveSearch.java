@@ -1,6 +1,7 @@
 package de.regelsuche.search.moves;
 
 import de.regelsuche.ast.Expr;
+import de.regelsuche.retention.RetainedGraph;
 import de.regelsuche.search.program.CompiledAstReplayCodec;
 import de.regelsuche.transform.*;
 import java.util.*;
@@ -28,11 +29,15 @@ public final class NativeMoveSearch {
                 accepted?move.proof():null,accepted?move.ruleId():null,accepted?"TYPED_PRIMITIVE_REPLAYED":"TYPED_PRIMITIVE_REPLAY_REJECTED");
         }
     }
+    public enum ZeroScore implements java.util.function.ToDoubleFunction<TypedMoveSearch.State> { INSTANCE;
+        @Override public double applyAsDouble(TypedMoveSearch.State state){return 0;}
+    }
     public record Problem(Expr source, TypedMoveSearch.Context context, List<NativeMoveProvider> providers,
             MoveSearch.Mode mode, MoveSearch.Scheduling scheduling, MoveSearch.Budget budget,
-            NativeMovePriorityPolicy policy,java.util.function.ToDoubleFunction<TypedMoveSearch.State> stateScore,NativeStateValue stateValue,NativeVerifier verifier) {
+            NativeMovePriorityPolicy policy,java.util.function.ToDoubleFunction<TypedMoveSearch.State> stateScore,NativeStateValue stateValue,NativeVerifier verifier) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(context);v.reference(providers);v.reference(mode);v.reference(scheduling);v.reference(budget);v.reference(policy);v.reference(stateScore);v.reference(stateValue);v.reference(verifier);}
         public Problem(Expr source,TypedMoveSearch.Context context,List<NativeMoveProvider> providers,MoveSearch.Mode mode,MoveSearch.Scheduling scheduling,MoveSearch.Budget budget){
-            this(source,context,providers,mode,scheduling,budget,NativeMovePriorityPolicy.INVENTORY_ORDER,state->0,NativeStateValue.NONE,NativeVerifier.registered(providers));
+            this(source,context,providers,mode,scheduling,budget,NativeMovePriorityPolicy.INVENTORY_ORDER,ZeroScore.INSTANCE,NativeStateValue.NONE,NativeVerifier.registered(providers));
         }
         public Problem(Expr source,TypedMoveSearch.Context context,List<NativeMoveProvider> providers,MoveSearch.Mode mode,MoveSearch.Scheduling scheduling,MoveSearch.Budget budget,
                 NativeMovePriorityPolicy policy,java.util.function.ToDoubleFunction<TypedMoveSearch.State> stateScore,NativeStateValue stateValue){
@@ -47,10 +52,28 @@ public final class NativeMoveSearch {
                 throw new IllegalArgumentException("native provider does not implement this scheduling contract");
         }
     }
-    public record Accounting(long validationWork,long storageWork,long retentionWork,
-            de.regelsuche.retention.RetainedGraph.Usage live,de.regelsuche.retention.RetainedGraph.Usage peak,
-            de.regelsuche.retention.RetainedGraph.Usage resultRetained,boolean complete,String detail) {}
-    public static final class Result {
+    /** Populated privately before result publication; accessors expose only immutable scalar observations. */
+    public static final class Accounting implements RetainedGraph.View {
+        private long validationWork,storageWork,retentionWork,peakNodes,peakCharacters,peakReferences,resultNodes,resultCharacters,resultReferences;
+        private boolean complete;private String detail="";
+        void update(long validation,long storage,long retention,long pn,long pc,long pr,long rn,long rc,long rr,boolean complete,String detail){
+            validationWork=validation;storageWork=storage;retentionWork=retention;peakNodes=pn;peakCharacters=pc;peakReferences=pr;
+            resultNodes=rn;resultCharacters=rc;resultReferences=rr;this.complete=complete;this.detail=detail;
+        }
+        public long validationWork(){return validationWork;}
+        public long storageWork(){return storageWork;}
+        public long retentionWork(){return retentionWork;}
+        public RetainedGraph.Usage live(){return new RetainedGraph.Usage(0,0,0);}
+        public RetainedGraph.Usage peak(){return new RetainedGraph.Usage(peakNodes,peakCharacters,peakReferences);}
+        public RetainedGraph.Usage resultRetained(){return new RetainedGraph.Usage(resultNodes,resultCharacters,resultReferences);}
+        public boolean complete(){return complete;}
+        public String detail(){return detail;}
+        long work(){return Math.addExact(Math.addExact(validationWork,storageWork),retentionWork);}
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(detail);}
+    }
+    public static final class Result implements RetainedGraph.View {
+        Accounting accounting;
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(result);v.reference(source);v.reference(incrementalProviders);v.reference(accounting);}
         private final SearchExecution.Result<TypedMoveSearch.State,NativeSearchMove,NativeVerification,NativeStateValue.Assessment> result;
         private final Expr source;
         private final long replayWork,workBudget;
@@ -67,12 +90,12 @@ public final class NativeMoveSearch {
         public List<SearchExecution.Expansion<TypedMoveSearch.State>> cursorReceipts(){
             return result.pickerReceipts().stream().map(r->(SearchExecution.Expansion<TypedMoveSearch.State>)r).toList();
         }
-        public boolean accountingComplete(){return cursorReceipts().stream().flatMap(r->r.lanes().stream()).allMatch(l->l.cursor()==null || l.cursor().accountingComplete());}
-        public Accounting accounting(){throw new UnsupportedOperationException("native run ownership not accounted");}
+        public boolean accountingComplete(){return (accounting==null || accounting.complete()) && cursorReceipts().stream().flatMap(r->r.lanes().stream()).allMatch(l->l.cursor()==null || l.cursor().accountingComplete());}
+        public Accounting accounting(){if(accounting==null)throw new IllegalStateException("ownership accounting unavailable for this revision");return accounting;}
         public long replayWork(){return replayWork;}
-        public long totalWork(){return Math.addExact(metrics().totalWork(),replayWork);}
+        public long totalWork(){return Math.addExact(Math.addExact(metrics().totalWork(),replayWork),accounting==null?0:accounting.work());}
         public boolean withinBudget(){return accountingComplete() && totalWork()<=workBudget;}
-        public MoveSearch.Outcome outcome(){return totalWork()>workBudget?MoveSearch.Outcome.WORK_EXHAUSTED:result.outcome();}
+        public MoveSearch.Outcome outcome(){if(accounting!=null && !accounting.complete())return MoveSearch.Outcome.INCONCLUSIVE;return totalWork()>workBudget?MoveSearch.Outcome.WORK_EXHAUSTED:result.outcome();}
         public Expr output(){return result.witness().isEmpty()?source:result.witness().getLast().target().expression();}
         public List<SearchExecution.Step<TypedMoveSearch.State,NativeSearchMove,NativeVerification>> witness(){return result.witness();}
         /** Frontier receipt. Independently paid final replay is separate; use totalWork for the whole result. */
@@ -130,7 +153,19 @@ public final class NativeMoveSearch {
         }
     }
     public Result search(Problem problem,SearchContinuationContract continuation,SearchExpressionStore.Limits limits){
-        throw new UnsupportedOperationException("native run ownership not enforced");
+        Objects.requireNonNull(limits);
+        try(var store=new SearchExpressionStore(limits)) {
+            var accounting=new NativeRetentionSession(problem,store,limits);
+            accounting.validate(problem.source());if(problem.context().goal()!=null)accounting.validate(problem.context().goal());
+            var execution=new Execution(problem,store,accounting);
+            var searched=new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
+                .search(execution,continuation,null);
+            var replay=searched.outcome()==MoveSearch.Outcome.TARGET_REACHED
+                ?replay(execution,problem.source(),problem.context().goal(),searched.witness()):new Replay(0,null);
+            var result=new Result(problem,searched,replay.work());accounting.finish(result);
+            if(replay.rejected()!=null)throw new TargetCheckFailure(result,replay.rejected());
+            return result;
+        }
     }
     public Result search(Problem problem,SearchContinuationContract continuation){
         validate(problem);
@@ -173,9 +208,16 @@ public final class NativeMoveSearch {
         de.regelsuche.search.program.AstExpressionValidation.inspect(problem.source());
         if(problem.context().goal()!=null)de.regelsuche.search.program.AstExpressionValidation.inspect(problem.context().goal());
     }
-    private static final class Execution implements SearchExecution.Environment<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification> {
+    private static final class Execution implements SearchExecution.Environment<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>,RetainedGraph.View {
         private final Problem problem;private final SearchExpressionStore store;
-        Execution(Problem problem,SearchExpressionStore store){this.problem=Objects.requireNonNull(problem);this.store=store;}
+        private final NativeRetentionSession accounting;
+        Execution(Problem problem,SearchExpressionStore store){this(problem,store,null);}
+        Execution(Problem problem,SearchExpressionStore store,NativeRetentionSession accounting){this.problem=Objects.requireNonNull(problem);this.store=store;this.accounting=accounting;}
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(problem);v.reference(store);v.reference(accounting);}
+        @Override public void ownership(RetainedGraph.View root){if(accounting!=null)accounting.ownership(root);}
+        @Override public void checkpoint(){if(accounting!=null)accounting.checkpoint();}
+        @Override public long additionalWork(){return accounting==null?0:accounting.work();}
+        @Override public boolean ownershipComplete(){return accounting==null || accounting.complete();}
         @Override public Expr source(){return problem.source();}
         @Override public Expr goal(){return problem.context().goal();}
         @Override public List<String> initialAssumptions(){return problem.context().initialAssumptions();}
@@ -183,7 +225,7 @@ public final class NativeMoveSearch {
         @Override public MoveSearch.Mode mode(){return problem.mode();}
         @Override public MoveSearch.Scheduling scheduling(){return problem.scheduling();}
         @Override public TypedMoveSearch.State state(Expr expression,int depth,int primitive,String previous,List<String> assumptions,Set<String> capabilities,int debt){
-            de.regelsuche.search.program.AstExpressionValidation.inspect(expression);
+            if(accounting==null)de.regelsuche.search.program.AstExpressionValidation.inspect(expression);else accounting.validate(expression);
             return new TypedMoveSearch.State(store.dereference(store.intern(expression)),depth,primitive,previous,assumptions,capabilities,debt);
         }
         @Override public NativeStateValue.Assessment inspect(TypedMoveSearch.State state){return problem.stateValue().evaluate(state,problem.context());}

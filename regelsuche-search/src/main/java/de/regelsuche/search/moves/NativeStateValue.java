@@ -17,14 +17,16 @@ public interface NativeStateValue {
         }
     }
     record Assessment(int complexity,double value,long searchWork,long primitiveWork,Map<String,Capability> capabilities)
-            implements SearchExecution.Assessment<Expr> {
+            implements SearchExecution.Assessment<Expr>,de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(capabilities);}
         public static final Assessment EMPTY=new Assessment(0,0,0,0,Map.of());
         public Assessment {
             if(complexity<0 || !Double.isFinite(value) || searchWork<0 || primitiveWork<0 || capabilities==null
                 || capabilities.entrySet().stream().anyMatch(e->e.getKey()==null || e.getKey().isBlank() || e.getValue()==null))
                 throw new IllegalArgumentException("invalid native state assessment");
-            capabilities=java.util.Collections.unmodifiableMap(new TreeMap<>(capabilities));
+            capabilities=de.regelsuche.retention.RetainedSortedMap.copyOf(capabilities);
         }
     }
-    NativeStateValue NONE=(state,context)->Assessment.EMPTY;
+    enum Empty implements NativeStateValue { INSTANCE; @Override public Assessment evaluate(TypedMoveSearch.State state,TypedMoveSearch.Context context){return Assessment.EMPTY;} }
+    NativeStateValue NONE=Empty.INSTANCE;
 }

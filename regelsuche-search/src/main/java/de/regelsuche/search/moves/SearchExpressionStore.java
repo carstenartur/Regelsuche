@@ -8,8 +8,10 @@ import java.util.LinkedHashMap;
 import java.util.Objects;
 
 /** Per-run ownership. Optional FIFO index eviction never releases a still-owned expression. */
-public final class SearchExpressionStore implements AutoCloseable {
-    public record Limits(long nodes, long characters, long references, int indexEntries) {
+public final class SearchExpressionStore implements AutoCloseable,de.regelsuche.retention.RetainedGraph.View {
+    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(limits);v.reference(index);v.reference(roots);v.reference(nodes);}
+    public record Limits(long nodes, long characters, long references, int indexEntries) implements de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v) {}
         public static final Limits DEFAULT = new Limits(1_000_000, 16_777_216, 2_000_000, 4096);
         public Limits {
             if (nodes < 1 || characters < 1 || references < 1 || indexEntries < 0)
@@ -28,19 +30,23 @@ public final class SearchExpressionStore implements AutoCloseable {
     private final IdentityHashMap<Expr, Boolean> nodes = new IdentityHashMap<>();
     private long characters, references, peakNodes, peakCharacters, peakReferences, evictions;
     private boolean closed;
+    private long work;
+    public long work(){return work;}
+    private void pay(long units){work=Math.addExact(work,units);}
 
     public SearchExpressionStore(Limits limits) { this.limits = Objects.requireNonNull(limits); }
 
     public SearchExpressionRef intern(Expr expression) {
-        requireOpen(); Objects.requireNonNull(expression);
+        requireOpen(); Objects.requireNonNull(expression);pay(1);
         var existing = index.get(expression); // HashMap confirms full immutable Expr equality after hashing.
         if (existing != null) return existing;
         var added = new IdentityHashMap<Expr, Boolean>();
         var pending = new ArrayDeque<Expr>(); pending.push(expression);
         long addedCharacters = 0, addedReferences = 2; // owned root slot and reference -> expression
         while (!pending.isEmpty()) {
-            Expr node = pending.pop();
-            if (nodes.containsKey(node) || added.put(node, Boolean.TRUE) != null) continue;
+            Expr node = pending.pop();pay(1);
+            pay(1);if(nodes.containsKey(node))continue;
+            pay(1);if(added.put(node,Boolean.TRUE)!=null)continue;
             addedReferences = Math.addExact(addedReferences, 2); // ownership-index key/value
             switch (node) {
                 case BinaryExpr binary -> {
@@ -70,19 +76,19 @@ public final class SearchExpressionStore implements AutoCloseable {
         if (nextNodes > limits.nodes() || nextCharacters > limits.characters() || withIndex > limits.references()) throw new LimitExceeded();
         // Validation/arithmetic precedes mutation, including rejection under total live retention pressure.
         var reference = new SearchExpressionRef(this, expression);
-        nodes.putAll(added); roots.add(reference); references = nextReferences; characters = nextCharacters;
+        pay(Math.addExact(added.size(),1));nodes.putAll(added); roots.add(reference); references = nextReferences; characters = nextCharacters;
         if (limits.indexEntries() > 0) {
             if (index.size() == limits.indexEntries()) {
-                index.remove(index.keySet().iterator().next()); evictions = Math.addExact(evictions, 1);
+                pay(1);index.remove(index.keySet().iterator().next()); evictions = Math.addExact(evictions, 1);
             }
-            index.put(expression, reference);
+            pay(1);index.put(expression, reference);
         }
         peakNodes = Math.max(peakNodes, nextNodes); peakCharacters = Math.max(peakCharacters, characters);
         peakReferences = Math.max(peakReferences, withIndex);
         return reference;
     }
     public Expr dereference(SearchExpressionRef reference) {
-        requireOpen();
+        requireOpen();pay(1);
         if (reference == null || reference.owner != this) throw new IllegalArgumentException("foreign expression session reference");
         return reference.expression;
     }
@@ -91,5 +97,5 @@ public final class SearchExpressionStore implements AutoCloseable {
             peakNodes, peakCharacters, peakReferences, index.size(), evictions);
     }
     private void requireOpen() { if (closed) throw new IllegalStateException("expression session is closed"); }
-    @Override public void close() { closed = true; index.clear(); roots.clear(); nodes.clear(); characters = 0; references = 0; }
+    @Override public void close() { if(closed)return;pay(Math.addExact(roots.size(),Math.addExact(2L*index.size(),2L*nodes.size())));closed = true; index.clear(); roots.clear(); nodes.clear(); characters = 0; references = 0; }
 }

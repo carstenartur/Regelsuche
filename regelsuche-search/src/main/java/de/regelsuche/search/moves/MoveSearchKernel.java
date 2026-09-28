@@ -1,5 +1,6 @@
 package de.regelsuche.search.moves;
 
+import de.regelsuche.retention.RetainedGraph;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -13,8 +14,10 @@ import java.util.function.ToDoubleFunction;
 import static de.regelsuche.search.moves.MoveSearch.*;
 
 /** The single frontier implementation, shared by legacy and object-native facades. */
-final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends SearchExecution.Edge<E,M>,A extends SearchExecution.Assessment<E>,V extends SearchExecution.Verification> {
-    private final class Node {
+final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends SearchExecution.Edge<E,M>,A extends SearchExecution.Assessment<E>,V extends SearchExecution.Verification> implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v) {}
+    private final class Node implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(MoveSearchKernel.this);v.reference(state);v.reference(value);v.reference(path);v.reference(picker);}
         final S state;
         final A value;
         final long theoryWork;
@@ -27,12 +30,15 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
         int pulls;
         Node(S state, long theoryWork, MoveWitnessPath<S,M,V> path, A value) { this.state = state; this.theoryWork = theoryWork; this.path = path; this.value = value; }
     }
-    private final class Ticket {
+    private final class Ticket implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(MoveSearchKernel.this);v.reference(node);}
         private final Node node; private final double priority; private final long serial;
         Ticket(Node node,double priority,long serial) { this.node=node;this.priority=priority;this.serial=serial; }
         Node node(){return node;} double priority(){return priority;} long serial(){return serial;}
     }
-    private final class Ledger {
+    private final class Ledger implements RetainedGraph.View {
+        SearchExecution.Environment<E,S,M,A,V> workOwner;
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(MoveSearchKernel.this);v.reference(matches);v.reference(objective);v.reference(workOwner);}
         long primitive, search, verification, consumed, discarded, duplicates, deadEnds, explored, expanded, generated;
         final Map<String, Long> matches = new TreeMap<>();
         MoveSearchObjective<S,M,V> objective;
@@ -40,7 +46,7 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
             if (objective != null) search = Math.addExact(search, objective.observe(state, path));
         }
         boolean qualityReached() { return objective != null && objective.satisfied(); }
-        long total() { return Math.addExact(Math.addExact(primitive, search), verification); }
+        long total() { return Math.addExact(Math.addExact(Math.addExact(primitive, search), verification),workOwner==null?0:workOwner.additionalWork()); }
         void collect(Node node) {
             long now = node.picker.workMetrics().totalWorkUnits();
             search = Math.addExact(search, now - node.measured); node.measured = now;
@@ -64,7 +70,23 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
     }
 
     /** Mutable state of one invocation of the existing frontier, never shared between searches. */
-    private final class SearchRun {
+    private final class LedgerCharge implements java.util.function.LongConsumer,RetainedGraph.View {
+        private final Ledger ledger;
+        LedgerCharge(Ledger ledger){this.ledger=ledger;}
+        @Override public void accept(long work){ledger.search=Math.addExact(ledger.search,work);}
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(MoveSearchKernel.this);v.reference(ledger);}
+    }
+    private final class TicketOrder implements Comparator<Ticket>,RetainedGraph.View {
+        @Override public int compare(Ticket a,Ticket b){int priority=Double.compare(a.priority(),b.priority());return priority==0?Long.compare(a.serial(),b.serial()):priority;}
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(MoveSearchKernel.this);}
+    }
+    private final class SearchRun implements RetainedGraph.View {
+        private Node active;
+        @Override public void retainedReferences(RetainedGraph.Visitor v){
+            v.reference(MoveSearchKernel.this);v.reference(problem);v.reference(contract);v.reference(ledger);
+            v.reference(events);v.reference(deadEnds);v.reference(reached);v.reference(visited);v.reference(assessments);
+            v.reference(frontier);v.reference(budget);v.reference(serial);v.reference(opened);v.reference(witness);v.reference(outcome);v.reference(active);
+        }
         private final SearchExecution.Environment<E,S,M,A,V> problem;
         private final SearchContinuationContract contract;
         private final Budget budget;
@@ -75,7 +97,7 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
         private final MoveSearchVisits<S> visited;
         private final Map<S, A> assessments = new java.util.HashMap<>();
         private final PriorityQueue<Ticket> frontier = new PriorityQueue<>(
-            Comparator.<Ticket>comparingDouble(Ticket::priority).thenComparingLong(Ticket::serial));
+            new TicketOrder());
         private final long[] serial = {0};
         private final List<Node> opened = new ArrayList<>();
         private boolean complete;
@@ -89,8 +111,12 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
             this.problem = problem;
             this.contract = contract;
             budget = problem.budget();
-            ledger.objective = objective;
-            visited = new MoveSearchVisits<>(contract, work -> ledger.search = Math.addExact(ledger.search, work));
+            ledger.objective = objective;ledger.workOwner=problem;
+            visited = new MoveSearchVisits<>(contract, new LedgerCharge(ledger));
+            complete = contract == SearchContinuationContract.PATH_SENSITIVE;
+        }
+        private void initialize() {
+            problem.ownership(this);problem.checkpoint();
             var root = problem.state(problem.source(), 0, 0, "", problem.initialAssumptions(), Set.of(), 0);
             var rootValue = inspect(problem, root, ledger);
             root = problem.state(root.expression(), 0, 0, "", root.assumptions(), rootValue.capabilities().keySet(), 0);
@@ -98,13 +124,18 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
             ledger.observe(root, MoveWitnessPath.root());
             frontier.add(new Ticket(new Node(root, 0, MoveWitnessPath.root(), rootValue), 0, serial[0]++));
             visited.add(root, 0);
-            complete = contract == SearchContinuationContract.PATH_SENSITIVE;
+            problem.checkpoint();
         }
 
         SearchExecution.Result<S,M,V,A> run() {
             try {
-                while (!stopped && !frontier.isEmpty()) advance();
-            } finally {
+                initialize();
+                while (!stopped && !frontier.isEmpty()) {
+                    advance();problem.checkpoint();
+                    if(!problem.ownershipComplete())stop(Outcome.INCONCLUSIVE);
+                }
+            } catch(SearchExecution.ResourceLimit exhausted) { stop(Outcome.INCONCLUSIVE); }
+            finally {
                 closeIncremental(opened, ledger);
             }
             return finish();
@@ -120,7 +151,7 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
                 stop(Outcome.WORK_EXHAUSTED);
                 return;
             }
-            var node = frontier.remove().node();
+            var node = frontier.remove().node();active=node;
             ledger.search++;
             boolean current = visited.current(node.state, node.theoryWork);
             if (contract != SearchContinuationContract.PATH_SENSITIVE && ledger.total() > budget.totalWork()) {
@@ -181,14 +212,15 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
                 ledger.search = Math.addExact(ledger.search, objective.finish());
                 if (outcome == Outcome.QUALITY_REACHED) witness = objective.witness();
             }
-            if (cleanupOverrun(problem, ledger) || (objective != null && ledger.total() > budget.totalWork())) {
+            if (cleanupOverrun(problem, ledger) || ((objective != null || problem.additionalWork()>0) && ledger.total() > budget.totalWork())) {
                 stop(Outcome.WORK_EXHAUSTED);
                 witness = List.of();
                 hit = -1;
                 primitiveHit = -1;
             }
+            if(!problem.ownershipComplete()) { stop(Outcome.INCONCLUSIVE);witness=List.of();hit=-1;primitiveHit=-1; }
             var receipts = opened.stream().map(node -> node.picker.executionReceipt()).toList();
-            boolean accountingComplete = opened.stream().allMatch(node -> node.picker.accountingComplete());
+            boolean accountingComplete = problem.ownershipComplete() && opened.stream().allMatch(node -> node.picker.accountingComplete());
             if (!accountingComplete && outcome != Outcome.WORK_EXHAUSTED) {
                 stop(Outcome.INCONCLUSIVE); witness = List.of(); hit = -1; primitiveHit = -1;
             }

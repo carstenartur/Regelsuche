@@ -31,10 +31,16 @@ public interface NativeVerifier {
             if(verifier==null)throw new IllegalArgumentException("unsupported native provider registration");
             if(verifiers.putIfAbsent(provider.descriptor(),verifier)!=null)throw new IllegalArgumentException("duplicate native provider descriptor");
         }
-        return (source,proposal,context)->{
+        return new Registered(verifiers);
+    }
+    final class Registered implements NativeVerifier,de.regelsuche.retention.RetainedGraph.View {
+        private final java.util.Map<MoveProvider.Descriptor,NativeVerifier> verifiers;
+        private Registered(java.util.Map<MoveProvider.Descriptor,NativeVerifier> verifiers){this.verifiers=java.util.Map.copyOf(verifiers);}
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(verifiers);}
+        @Override public NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove proposal,TypedMoveSearch.Context context){
             var verifier=verifiers.get(proposal.descriptor());
             return verifier==null?new NativeVerification(false,1,null,null,"UNREGISTERED_NATIVE_PROVIDER"):
                 verifier.verify(source,proposal,context);
-        };
+        }
     }
 }

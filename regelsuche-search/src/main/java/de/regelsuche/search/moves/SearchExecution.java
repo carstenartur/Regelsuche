@@ -1,5 +1,6 @@
 package de.regelsuche.search.moves;
 
+import de.regelsuche.retention.RetainedGraph;
 import de.regelsuche.transform.ExecutionWork;
 import de.regelsuche.transform.TransformationWorkMetrics;
 import java.util.List;
@@ -10,6 +11,7 @@ import java.util.Set;
 /** Representation boundary of the one frontier. Neither scheduling nor proof authority lives here. */
 public final class SearchExecution {
     private SearchExecution() {}
+    static final class ResourceLimit extends RuntimeException {}
     public interface Position<E> {
         E expression(); int searchDepth(); int primitiveDepth(); String previousRule();
         List<String> assumptions(); Set<String> capabilities(); int complexityDebt();
@@ -42,15 +44,25 @@ public final class SearchExecution {
         S state(E expression,int depth,int primitive,String previous,List<String> assumptions,Set<String> capabilities,int debt);
         A inspect(S state); double score(S state); V verify(S state,M move); boolean carries(List<String> assumptions,S state);
         Picker<M> picker(S state);
+        default void ownership(RetainedGraph.View root) {}
+        default void checkpoint() {}
+        default long additionalWork(){return 0;}
+        default boolean ownershipComplete(){return true;}
+
     }
     public record Expansion<S>(S source,boolean closed,List<StagedIncrementalMoveExecution.Lane> lanes) {
         public Expansion { lanes=List.copyOf(lanes); }
     }
-    public record Step<S,M,V>(S source,S target,M move,V verification) {}
-    public record Event<S,M,V>(S source,S target,M move,MoveSearch.Decision decision,V verification) {}
+    public record Step<S,M,V>(S source,S target,M move,V verification) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(target);v.reference(move);v.reference(verification);}
+    }
+    public record Event<S,M,V>(S source,S target,M move,MoveSearch.Decision decision,V verification) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(target);v.reference(move);v.reference(decision);v.reference(verification);}
+    }
     record Result<S,M,V,A>(MoveSearch.Outcome outcome,List<Step<S,M,V>> witness,List<Event<S,M,V>> events,
             Set<S> reachedStates,List<S> deadEndStates,MoveSearch.Metrics metrics,boolean completeBoundedRelation,
-            Map<S,A> stateAssessments,List<Object> pickerReceipts) {
+            Map<S,A> stateAssessments,List<Object> pickerReceipts) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(outcome);v.reference(witness);v.reference(events);v.reference(reachedStates);v.reference(deadEndStates);v.reference(metrics);v.reference(stateAssessments);v.reference(pickerReceipts);}
         Result {
             witness=List.copyOf(witness);events=List.copyOf(events);reachedStates=Set.copyOf(reachedStates);
             deadEndStates=List.copyOf(deadEndStates);stateAssessments=Map.copyOf(stateAssessments);pickerReceipts=List.copyOf(pickerReceipts);

@@ -49,6 +49,13 @@ class RetainedGraphTest {
         assertEquals(60,measured.peak().characters(),"retained scalar and live decimal conversion overlap");
         assertTrue(measured.work()>=30);
     }
+    @Test void immutableSortedOwnerKeepsOrderAndExposesItsActualBackingGraph() {
+        var map=RetainedSortedMap.copyOf(java.util.Map.of("b",new VariableExpr("b"),"a",new VariableExpr("a")));
+        assertEquals(java.util.List.of("a","b"),new ArrayList<>(map.keySet()));
+        assertThrows(UnsupportedOperationException.class,()->map.keySet().clear());
+        assertThrows(UnsupportedOperationException.class,()->map.entrySet().iterator().next().setValue(new VariableExpr("changed")));
+        assertEquals(2,RetainedGraph.measure(map).retained().nodes());
+    }
     @Test void undescribedPayloadCannotPretendToHaveZeroRetention() {
         var rejected=assertThrows(RetainedGraph.Unmeasured.class,()->RetainedGraph.measure(new Object()));
         assertEquals(5,rejected.attempted().work(),"failed admission retains performed audit work");

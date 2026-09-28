@@ -5,7 +5,8 @@ import java.util.Collections;
 import java.util.List;
 
 /** Immutable shared witness prefixes; appending never copies the complete ancestral path. */
-final class MoveWitnessPath<S,M,V> {
+final class MoveWitnessPath<S,M,V> implements de.regelsuche.retention.RetainedGraph.View {
+    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(parent);v.reference(step);}
     static <S,M,V> MoveWitnessPath<S,M,V> root() { return new MoveWitnessPath<>(null,null); }
     private final MoveWitnessPath<S,M,V> parent;
     private final SearchExecution.Step<S,M,V> step;

@@ -17,7 +17,8 @@ public final class RetainedGraph {
     private RetainedGraph() {}
     public interface View { void retainedReferences(Visitor visitor); }
     public interface Visitor { void reference(Object value); }
-    public record Usage(long nodes,long characters,long references) {
+    public record Usage(long nodes,long characters,long references) implements View {
+        @Override public void retainedReferences(Visitor visitor) {}
         public Usage { if(nodes<0 || characters<0 || references<0)throw new IllegalArgumentException("negative retention"); }
         public Usage maximum(Usage other){return new Usage(Math.max(nodes,other.nodes),Math.max(characters,other.characters),Math.max(references,other.references));}
     }
@@ -90,6 +91,7 @@ public final class RetainedGraph {
                     for(Object entry:collection)reference(entry);
                 }
                 case Object[] array -> { for(Object entry:array)reference(entry); }
+                case long[] array -> { for(int i=0;i<array.length;i++)reference(null); }
                 case byte[] array -> characters=Math.addExact(characters,array.length);
                 case char[] array -> characters=Math.addExact(characters,array.length);
                 default -> throw new Unmeasured(value,observation());

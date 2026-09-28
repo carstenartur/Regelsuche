@@ -16,7 +16,8 @@ public final class MoveSearch {
     public enum Scheduling { EAGER_CONTROL, STAGED, INCREMENTAL_NATIVE_ORDER, STAGED_INCREMENTAL }
     public enum Outcome { TARGET_REACHED, BOUNDED_EXHAUSTED, INCONCLUSIVE, WORK_EXHAUSTED, STATE_LIMIT, QUALITY_REACHED }
     public enum Decision { ENQUEUED, DUPLICATE, PATH_BOUND, ASSUMPTION_REJECTED, PROOF_REJECTED, COMPLEXITY_BOUND, WORK_LIMIT, DOMINATED }
-    public record Budget(int maxPrimitiveSteps, int maxSearchDepth, long maxTheoryWork, int maxStates, long totalWork, int maxComplexityDebt) {
+    public record Budget(int maxPrimitiveSteps, int maxSearchDepth, long maxTheoryWork, int maxStates, long totalWork, int maxComplexityDebt) implements de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v) {}
         public Budget(int primitive, int depth, long theory, int states, long work) { this(primitive, depth, theory, states, work, Integer.MAX_VALUE); }
         public Budget {
             if (maxPrimitiveSteps < 0 || maxSearchDepth < 0 || maxTheoryWork < 0 || maxStates < 1 || totalWork < 1 || maxComplexityDebt < 0)
@@ -61,8 +62,9 @@ public final class MoveSearch {
     public record WitnessStep(MoveState source, MoveState target, SearchMove move, MoveVerifier.Verification verification) {}
     public record Metrics(long generatedSuccessors, long consumedSuccessors, long discardedSuccessors, long unconsumedSuccessors,
             long duplicates, long deadEnds, long exploredStates, long expandedStates, long primitiveWork, long searchWork,
-            long verificationWork, int firstHitDepth, int firstHitPrimitiveDepth, Map<String, Long> familyMatches) {
-        public Metrics { familyMatches = java.util.Collections.unmodifiableMap(new TreeMap<>(familyMatches)); }
+            long verificationWork, int firstHitDepth, int firstHitPrimitiveDepth, Map<String, Long> familyMatches) implements de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(familyMatches);}
+        public Metrics { familyMatches = de.regelsuche.retention.RetainedSortedMap.copyOf(familyMatches); }
         public long totalWork() { return Math.addExact(Math.addExact(primitiveWork, searchWork), verificationWork); }
         /** Explicit nonoverlapping charged dimensions; historical totals and serializers are unchanged. */
         public Map<String, Long> chargedComponents() {

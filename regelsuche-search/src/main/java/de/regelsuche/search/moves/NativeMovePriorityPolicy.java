@@ -9,5 +9,6 @@ public interface NativeMovePriorityPolicy {
     }
     default double providerScore(MoveProvider.Descriptor provider,TypedMoveSearch.State state,TypedMoveSearch.Context context){return 0;}
     default long contextWork(TypedMoveSearch.State state,TypedMoveSearch.Context context){return 0;}
-    NativeMovePriorityPolicy INVENTORY_ORDER=(move,state,context)->0;
+    enum InventoryOrder implements NativeMovePriorityPolicy { INSTANCE; @Override public double score(NativeSearchMove move,TypedMoveSearch.State state,TypedMoveSearch.Context context){return 0;} }
+    NativeMovePriorityPolicy INVENTORY_ORDER=InventoryOrder.INSTANCE;
 }

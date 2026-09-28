@@ -10,8 +10,10 @@ import java.util.Set;
 import java.util.function.LongConsumer;
 
 /** Per-search admitted labels. A proposal enters this index only after successful admission. */
-final class MoveSearchVisits<S extends SearchExecution.Position<?>> {
-    private record Label<S extends SearchExecution.Position<?>>(S state, long theoryWork) {
+final class MoveSearchVisits<S extends SearchExecution.Position<?>> implements de.regelsuche.retention.RetainedGraph.View {
+    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(live);v.reference(positions);v.reference(charge);}
+    private record Label<S extends SearchExecution.Position<?>>(S state, long theoryWork) implements de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(state);}
         boolean noMoreExpensiveThan(Label<S> other) {
             return state.searchDepth() <= other.state.searchDepth()
                 && state.primitiveDepth() <= other.state.primitiveDepth()
@@ -19,7 +21,8 @@ final class MoveSearchVisits<S extends SearchExecution.Position<?>> {
                 && state.complexityDebt() <= other.state.complexityDebt();
         }
     }
-    private record Position(Object expression, List<String> assumptions, Set<String> capabilities) {
+    private record Position(Object expression, List<String> assumptions, Set<String> capabilities) implements de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(expression);v.reference(assumptions);v.reference(capabilities);}
         static Position of(SearchExecution.Position<?> state) {
             return new Position(state.expression(), state.assumptions(), state.capabilities());
         }
