@@ -32,56 +32,42 @@ public final class ExpressionFormatter {
     public static String formatMeasured(Expr expr, java.util.function.LongConsumer emittedCodeUnits) {
         Objects.requireNonNull(expr, "expr");
         Objects.requireNonNull(emittedCodeUnits, "emittedCodeUnits");
-        try (var input = RetainedOperation.retain(expr, emittedCodeUnits)) {
-            if (expr instanceof VariableExpr variable) {
+        if (expr instanceof VariableExpr variable) {
+            try (var input = RetainedOperation.retain(expr, emittedCodeUnits)) {
                 emittedCodeUnits.accept(variable.name().length());
                 RetainedOperation.work(1);
                 return variable.name();
             }
-            Output builder = new Output(emittedCodeUnits);
-            try (var output = RetainedOperation.retain(builder)) {
-                append(expr, 0, builder);
-                return builder.value();
-            }
+        }
+        Output builder = new Output(expr, emittedCodeUnits);
+        try (var output = RetainedOperation.retain(builder)) {
+            append(builder);
+            return builder.value();
         }
     }
 
     public static String format(Equation equation) {
         Objects.requireNonNull(equation, "equation");
-        try (var input = RetainedOperation.retain(equation)) {
-            Output builder = new Output(NativeEmission.INSTANCE);
-            try (var output = RetainedOperation.retain(builder)) {
-                append(equation.left(), 0, builder);
-                builder.append(" = ");
-                append(equation.right(), 0, builder);
-                return builder.value();
-            }
+        Output builder = new Output(equation, NativeEmission.INSTANCE);
+        try (var output = RetainedOperation.retain(builder)) {
+            append(builder);
+            return builder.value();
         }
     }
 
-    private static void append(
-        Expr expression,
-        int parentPrecedence,
-        Output builder
-    ) {
-        Deque<Action> pending = new ArrayDeque<>();
-        Object[] current = new Object[1];
-        RetainedOperation.work(2);
-        push(pending, new FormatExpression(expression, parentPrecedence));
-        try (var workspace = RetainedOperation.retain(pending, current)) {
-            while (!pending.isEmpty()) {
-                Action action = pending.pop();
-                current[0] = action;
-                RetainedOperation.work(2);
-                if (action instanceof AppendText text) {
-                    builder.append(text.value());
-                } else {
-                    FormatExpression format = (FormatExpression) action;
-                    schedule(format.expression(), format.parentPrecedence(), pending, builder);
-                }
-                current[0] = null;
-                RetainedOperation.work(1);
+    private static void append(Output builder) {
+        while (!builder.pending.isEmpty()) {
+            Action action = builder.pending.pop();
+            builder.current = action;
+            RetainedOperation.work(2);
+            if (action instanceof AppendText text) {
+                builder.append(text.value());
+            } else {
+                FormatExpression format = (FormatExpression) action;
+                schedule(format.expression(), format.parentPrecedence(), builder.pending, builder);
             }
+            builder.current = null;
+            RetainedOperation.work(1);
         }
     }
 
@@ -227,23 +213,41 @@ public final class ExpressionFormatter {
     }
 
     private static final class Output implements RetainedGraph.View {
+        private final Object input;
         private char[] text = new char[16];
         private int size;
+        private final Deque<Action> pending = new ArrayDeque<>();
+        private Action current;
+        private String fragment;
         private final java.util.function.LongConsumer emittedCodeUnits;
 
-        private Output(java.util.function.LongConsumer emittedCodeUnits) {
+        private Output(Object input, java.util.function.LongConsumer emittedCodeUnits) {
+            this.input = input;
             this.emittedCodeUnits = Objects.requireNonNull(emittedCodeUnits, "emittedCodeUnits");
-            RetainedOperation.work(17);
+            RetainedOperation.work(19);
+            if (input instanceof Expr expression) {
+                push(pending, new FormatExpression(expression, 0));
+            } else {
+                Equation equation = (Equation) input;
+                push(pending, new FormatExpression(equation.right(), 0));
+                push(pending, new AppendText(" = "));
+                push(pending, new FormatExpression(equation.left(), 0));
+            }
         }
 
         private Output append(String value) {
-            try (var fragment = RetainedOperation.retain(value)) {
+            fragment = value;
+            RetainedOperation.work(1);
+            try {
+                RetainedOperation.checkpoint();
                 emittedCodeUnits.accept(value.length());
                 ensureCapacity(value.length());
                 value.getChars(0, value.length(), text, size);
                 size += value.length();
                 RetainedOperation.work(1);
-                RetainedOperation.checkpoint();
+            } finally {
+                fragment = null;
+                RetainedOperation.work(1);
             }
             return this;
         }
@@ -253,7 +257,6 @@ public final class ExpressionFormatter {
             ensureCapacity(1);
             text[size++] = value;
             RetainedOperation.work(1);
-            RetainedOperation.checkpoint();
             return this;
         }
 
@@ -276,8 +279,12 @@ public final class ExpressionFormatter {
         }
 
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(input);
             visitor.reference(text);
             visitor.reference(emittedCodeUnits);
+            visitor.reference(pending);
+            visitor.reference(current);
+            visitor.reference(fragment);
         }
     }
 
