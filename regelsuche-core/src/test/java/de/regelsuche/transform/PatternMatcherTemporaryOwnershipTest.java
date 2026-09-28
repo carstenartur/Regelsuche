@@ -15,7 +15,7 @@ class PatternMatcherTemporaryOwnershipTest {
         RetainedOperation scope;
         Expr input;
         long work;
-        int alternatives, tasks;
+        int alternatives, tasks, mutableBindingMaps;
         boolean inputMissing, sawBoundChoice, abortBoundChoice;
         @Override public void executionWork(long units) { work = Math.addExact(work, units); }
         @Override public void validationWork(long units) { executionWork(units); }
@@ -29,7 +29,7 @@ class PatternMatcherTemporaryOwnershipTest {
                 @Override public void requireExact(Object value, Class<?> type) { assertEquals(type,value.getClass()); }
             };
             visitor.reference(scope);
-            int currentAlternatives = 0, currentTasks = 0;
+            int currentAlternatives = 0, currentTasks = 0, currentMutableBindingMaps = 0;
             boolean bound = false;
             while (!pending.isEmpty()) {
                 Object value = pending.remove();
@@ -42,6 +42,7 @@ class PatternMatcherTemporaryOwnershipTest {
                 else if (value instanceof Object[] array) for (var item : array) visitor.reference(item);
                 else if (value instanceof Collection<?> values) values.forEach(visitor::reference);
                 else if (value instanceof Map<?,?> map) {
+                    if (value instanceof HashMap<?,?>) currentMutableBindingMaps++;
                     bound |= map.containsKey("A");
                     map.forEach((key,item) -> { visitor.reference(key); visitor.reference(item); });
                 } else if (value instanceof BinaryExpr binary) {
@@ -50,6 +51,7 @@ class PatternMatcherTemporaryOwnershipTest {
             }
             alternatives = Math.max(alternatives,currentAlternatives);
             tasks = Math.max(tasks,currentTasks);
+            mutableBindingMaps = Math.max(mutableBindingMaps,currentMutableBindingMaps);
             inputMissing |= !seen.contains(input);
             sawBoundChoice |= bound && currentAlternatives >= 1;
             if (abortBoundChoice && bound && currentAlternatives >= 1) throw new MatchAbort();
@@ -58,6 +60,26 @@ class PatternMatcherTemporaryOwnershipTest {
 
     private static PatternExpr pattern() {
         return PatternExpr.fn("f",PatternExpr.op(ADD,PatternExpr.var("A"),PatternExpr.var("B")),PatternExpr.var("A"));
+    }
+
+    @Test void aStraightMatchUsesOnePrivateBindingMapWithoutASavedChoice() {
+        Expr input = new VariableExpr("x");
+        var initial = Map.<String,Expr>of("seed",input);
+        var observation = new Observation(); observation.input = input;
+        EquivalenceAwarePatternMatcher.MatchAttempt result;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            result = EquivalenceAwarePatternMatcher.matchDetailed(
+                PatternExpr.var("A"),input,initial,RecognitionProfile.arithmeticAc());
+        }
+        assertTrue(result.matched());
+        assertEquals(Map.of("seed",input,"A",input),result.bindings());
+        assertEquals(Map.of("seed",input),initial);
+        assertEquals(0,result.visitedBranches());
+        assertEquals(0,observation.alternatives,"only a real deferred choice needs an alternative");
+        assertEquals(1,observation.mutableBindingMaps,"the invocation already owns a private working map");
+        assertFalse(observation.inputMissing);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
 
     @Test void actualBacktrackingContinuationAndBindingCopiesRemainOwned() {
