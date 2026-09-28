@@ -4,7 +4,7 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.retention.RetainedGraph;
 import de.regelsuche.search.program.AstExpressionValidation;
 
-/** One run's paid ownership observations; its bounded immutable inventory is released at handoff. */
+/** One run's paid ownership observations; the uneconomic inventory prototype remains opt-in. */
 final class NativeRetentionSession implements de.regelsuche.retention.RetainedOperation.Sink {
     private final NativeMoveSearch.Problem problem;
     private final SearchExpressionStore store;
@@ -20,11 +20,14 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
     private boolean complete=true;
     private String detail="";
     NativeRetentionSession(NativeMoveSearch.Problem problem,SearchExpressionStore store,SearchExpressionStore.Limits limits){
+        this(problem,store,limits,false);
+    }
+    /** Package-local prototype control; ordinary native searches use the paid fresh scanner. */
+    NativeRetentionSession(NativeMoveSearch.Problem problem,SearchExpressionStore store,SearchExpressionStore.Limits limits,boolean useInventory){
         this.problem=problem;this.store=store;this.limits=limits;
-        inventory=new RetainedGraph.Inventory();
-        inventoryLimits=new RetainedGraph.Usage(limits.nodes(),limits.characters(),limits.references());
-        retentionWork=6; // inventory/backend/map/backing/list and the immutable limit value
-
+        inventory=useInventory?new RetainedGraph.Inventory():null;
+        inventoryLimits=useInventory?new RetainedGraph.Usage(limits.nodes(),limits.characters(),limits.references()):null;
+        retentionWork=useInventory?6:0; // actual inventory/backend/containers and limit value only
     }
     @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(problem);v.reference(store);v.reference(limits);v.reference(kernel);v.reference(detail);v.reference(operation);v.reference(externalObjective);v.reference(inventory);v.reference(inventoryLimits);}
     void externalObjective(TypedSourceOnlySearch.Objective objective){executionWork(1);externalObjective=objective;}
@@ -70,8 +73,10 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
         var receipt=new NativeMoveSearch.Accounting();result.accounting=receipt;
         update(receipt,0,0,0);
         observe(new Handoff(this,output),false);
-        retentionWork=Math.addExact(retentionWork,inventory.close());inventory=null;
-        retentionWork=Math.addExact(retentionWork,1);
+        if(inventory!=null){
+            retentionWork=Math.addExact(retentionWork,inventory.close());inventory=null;
+            retentionWork=Math.addExact(retentionWork,1);
+        }
         store.close();kernel=null;
         if(operation!=null)operation.close();operation=null;executionWork(2);
         executionWork(7);

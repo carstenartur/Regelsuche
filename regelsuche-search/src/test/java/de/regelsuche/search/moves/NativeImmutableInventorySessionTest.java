@@ -8,13 +8,32 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NativeImmutableInventorySessionTest {
+    @Test void ordinarySessionPaysFreshInspectionWithoutOpeningTheLosingPrototype(){
+        var source=new VariableExpr("x");
+        var problem=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.frozen(source),List.of(),
+            MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(1,1,0,10,1_000_000));
+        try(var store=new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)){
+            var session=new NativeRetentionSession(problem,store,SearchExpressionStore.Limits.DEFAULT);
+            session.retainedReferences(new RetainedGraph.Visitor(){
+                @Override public void reference(Object value){assertFalse(value instanceof RetainedGraph.Inventory);}
+                @Override public void requireExact(Object value,Class<?> type){assertEquals(type,value.getClass());}
+            });
+            try(var scope=RetainedOperation.open(session)){
+                session.operation(scope);
+                long expected=RetainedGraph.measure(session).work(),before=session.work();
+                session.checkpoint();
+                assertEquals(expected,session.work()-before,"ordinary inspection still pays the complete independent fresh scan");
+            }
+        }
+        assertEquals(0,RetainedOperation.observedWork());
+    }
     @Test void actualSessionOwnsItsInventoryUntilHandoffThenPaysAndReleasesIt(){
         var source=new VariableExpr("x");
         var problem=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.frozen(source),List.of(),
             MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(1,1,0,10,1_000_000));
         var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE);
         try(var store=new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)){
-            var session=new NativeRetentionSession(problem,store,SearchExpressionStore.Limits.DEFAULT);
+            var session=new NativeRetentionSession(problem,store,SearchExpressionStore.Limits.DEFAULT,true);
             var owned=new RetainedGraph.Inventory[1];
             session.retainedReferences(new RetainedGraph.Visitor(){
                 @Override public void reference(Object value){if(value instanceof RetainedGraph.Inventory inventory)owned[0]=inventory;}
