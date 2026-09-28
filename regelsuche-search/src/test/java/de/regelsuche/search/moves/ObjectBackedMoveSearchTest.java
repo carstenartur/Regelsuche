@@ -28,6 +28,19 @@ class ObjectBackedMoveSearchTest {
                 return new NativeVerification(true,1,move.proof(),move.ruleId(),"self-asserted accepted");
             }
         };
+        var state=new TypedMoveSearch.State(source,0,0,"",List.of(),java.util.Set.of(),0);
+        var context=TypedMoveSearch.Context.frozen(new VariableExpr("x"));
+        var original=real.candidates(state,context).moves().getFirst();
+        var step=((NativeMoveProof.Primitive)original.proof()).step();
+        var forgedStep=new AstRewriteTransport.Step(step.source(),new VariableExpr("forged"),step.rule(),step.kind(),
+            step.mayIncreaseComplexity(),step.estimatedCostDelta(),step.equivalencePreservingByConstruction(),step.assumptions(),step.packId(),step.license());
+        var forged=new NativeSearchMove(forgedStep,descriptor,original.generationCost(),java.util.Set.of());
+        assertTrue(selfAuthorizing.verify(state,forged,context).accepted());
+        var checked=NativeVerifier.registered(List.of(real)).verify(state,forged,context);
+        assertFalse(checked.accepted());assertTrue(checked.work()>1);
+        assertEquals("TYPED_PRIMITIVE_REPLAY_REJECTED",checked.reason());
+        var wrongSource=new TypedMoveSearch.State(new VariableExpr("other"),0,0,"",List.of(),java.util.Set.of(),0);
+        assertFalse(NativeVerifier.registered(List.of(real)).verify(wrongSource,original,context).accepted());
         assertThrows(IllegalArgumentException.class,()->new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,
             TypedMoveSearch.Context.frozen(new VariableExpr("x")),List.of(selfAuthorizing),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,
             new MoveSearch.Budget(2,2,0,10,1000)),SearchContinuationContract.PATH_SENSITIVE));

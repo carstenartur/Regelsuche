@@ -16,6 +16,7 @@ public interface NativeMoveProvider {
     default Batch candidates(TypedMoveSearch.State source,TypedMoveSearch.Context context) {
         throw new UnsupportedOperationException("native provider generation is not implemented");
     }
+    /** Convenience for trusted built-in checkers; an arbitrary provider implementation is never default authority. */
     default NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove move,TypedMoveSearch.Context context) {
         throw new UnsupportedOperationException("native provider verification is not implemented");
     }

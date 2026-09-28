@@ -20,7 +20,7 @@ public final class NativeMoveSearch {
                 work.withCandidateWork(new ExecutionWork(steps.size(),0,0)),false);
         }
         @Override public NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove move,TypedMoveSearch.Context context){
-            if(!NativeMoveProvider.carries(move.assumptions(),source,context))return new NativeVerification(false,1,null,null,"TYPED_PRIMITIVE_ASSUMPTIONS_MISSING");
+            if(!NativeMoveProvider.carries(move.assumptions(),source,context) || !NativeMoveProvider.carries(descriptor.requiredAssumptions(),source,context))return new NativeVerification(false,1,null,null,"TYPED_PRIMITIVE_ASSUMPTIONS_MISSING");
             var generated=transport.generate(source.expression());
             boolean accepted=descriptor.equals(move.descriptor()) && source.expression().equals(move.sourceExpression())
                 && move.proof() instanceof NativeMoveProof.Primitive proof && generated.contains(proof.step());
@@ -30,14 +30,18 @@ public final class NativeMoveSearch {
     }
     public record Problem(Expr source, TypedMoveSearch.Context context, List<NativeMoveProvider> providers,
             MoveSearch.Mode mode, MoveSearch.Scheduling scheduling, MoveSearch.Budget budget,
-            NativeMovePriorityPolicy policy,java.util.function.ToDoubleFunction<TypedMoveSearch.State> stateScore,NativeStateValue stateValue) {
+            NativeMovePriorityPolicy policy,java.util.function.ToDoubleFunction<TypedMoveSearch.State> stateScore,NativeStateValue stateValue,NativeVerifier verifier) {
         public Problem(Expr source,TypedMoveSearch.Context context,List<NativeMoveProvider> providers,MoveSearch.Mode mode,MoveSearch.Scheduling scheduling,MoveSearch.Budget budget){
-            this(source,context,providers,mode,scheduling,budget,NativeMovePriorityPolicy.INVENTORY_ORDER,state->0,NativeStateValue.NONE);
+            this(source,context,providers,mode,scheduling,budget,NativeMovePriorityPolicy.INVENTORY_ORDER,state->0,NativeStateValue.NONE,NativeVerifier.registered(providers));
+        }
+        public Problem(Expr source,TypedMoveSearch.Context context,List<NativeMoveProvider> providers,MoveSearch.Mode mode,MoveSearch.Scheduling scheduling,MoveSearch.Budget budget,
+                NativeMovePriorityPolicy policy,java.util.function.ToDoubleFunction<TypedMoveSearch.State> stateScore,NativeStateValue stateValue){
+            this(source,context,providers,mode,scheduling,budget,policy,stateScore,stateValue,NativeVerifier.registered(providers));
         }
         public Problem {
             Objects.requireNonNull(source);Objects.requireNonNull(context);providers=List.copyOf(providers);
             Objects.requireNonNull(mode);Objects.requireNonNull(scheduling);Objects.requireNonNull(budget);
-            Objects.requireNonNull(policy);Objects.requireNonNull(stateScore);Objects.requireNonNull(stateValue);
+            Objects.requireNonNull(policy);Objects.requireNonNull(stateScore);Objects.requireNonNull(stateValue);Objects.requireNonNull(verifier);
             if(context.phase()==MoveContext.Phase.PRODUCTION)throw new IllegalArgumentException("experimental scheduling is not production-qualified (#745)");
             if(scheduling!=MoveSearch.Scheduling.STAGED && scheduling!=MoveSearch.Scheduling.EAGER_CONTROL)
                 throw new IllegalArgumentException("native provider does not implement this scheduling contract");
@@ -139,9 +143,7 @@ public final class NativeMoveSearch {
             var available=new HashSet<>(initialAssumptions());available.addAll(state.assumptions());return available.containsAll(assumptions);
         }
         @Override public NativeVerification verify(TypedMoveSearch.State state,NativeSearchMove move){
-            var provider=problem.providers().stream().filter(p->p.descriptor().equals(move.descriptor())).findFirst();
-            return provider.isEmpty()?new NativeVerification(false,1,null,null,"UNREGISTERED_NATIVE_PROVIDER")
-                :provider.orElseThrow().verify(state,move,problem.context());
+            return problem.verifier().verify(state,move,problem.context());
         }
         @Override public SearchExecution.Picker<NativeSearchMove> picker(TypedMoveSearch.State state){
             var providers=problem.providers().stream().<SearchBatches.Provider<NativeSearchMove>>map(p->new SearchBatches.Provider<>() {
