@@ -54,6 +54,23 @@ class CheckedSchemaCursorTest {
         assertEquals(paid,cursor.snapshot().work().metrics().totalWorkUnitsV2());
     }
 
+    @Test void closingNativeSuspensionAbandonsItsTicketWithoutRefundOrIssuingProof() {
+        var provider=plan(model).nativeProvider();
+        var state=new TypedMoveSearch.State(parse(PAIR),0,0,"",List.of(),Set.of(),0);
+        var cursor=provider.openSession(state,TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION));
+        assertTrue(cursor.next(0).isEmpty());assertEquals(0,cursor.snapshot().work().metrics().totalWorkUnitsV2());
+        for(int i=0;i<1000 && cursor.snapshot().work().prepaidApplications().openApplications()==0;i++)assertTrue(cursor.next(2).isEmpty());
+        var before=cursor.snapshot();assertEquals(1,before.work().prepaidApplications().openApplications());
+        assertTrue(before.work().prepaidApplications().chargedUnits()>0);
+        cursor.close();var after=cursor.snapshot();
+        assertTrue(after.closed());assertEquals(0,after.work().prepaidApplications().openApplications());
+        assertEquals(1,after.work().prepaidApplications().abandonedApplications());
+        assertEquals(before.work().prepaidApplications().chargedUnits(),after.work().prepaidApplications().chargedUnits());
+        assertEquals(before.work().prepaidApplications().phaseCalls(),after.work().prepaidApplications().phaseCalls());
+        assertEquals(before.work().metrics().totalWorkUnitsV2()+1,after.work().metrics().totalWorkUnitsV2());
+        assertEquals(0,after.work().mathematics().exactTheorySteps());assertTrue(cursor.next(10000).isEmpty());
+    }
+
     @Test void firstPullDoesNotInstantiateTheSecondRealLearnedOccurrence() {
         var eager = eager(PAIR);
         assertEquals(2, eager.moves().size(), "the real learned schema has two distinct application sites");

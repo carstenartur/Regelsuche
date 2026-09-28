@@ -4,6 +4,11 @@ import static de.regelsuche.evolution.CheckedSchemaSupport.*;
 import de.regelsuche.search.moves.IncrementalProviderContract.Meter;
 import de.regelsuche.search.moves.IncrementalProviderContract.Operation;
 import de.regelsuche.search.moves.IncrementalProviderContract.Source;
+import de.regelsuche.search.moves.IncrementalProviderContract.ObjectSource;
+import de.regelsuche.search.moves.NativeMoveProof;
+import de.regelsuche.search.program.AstExpressionValidation;
+import de.regelsuche.transform.ExecutionWork;
+import java.util.function.Function;
 import de.regelsuche.search.moves.IncrementalProviderContract.Status;
 import de.regelsuche.search.moves.IncrementalProviderContract.PrepaidApplication;
 
@@ -19,7 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /** One retained match/application at most; never traverses or instantiates later sites eagerly. */
-final class CheckedSchemaCursor implements Source {
+final class CheckedSchemaCursor<T> implements ObjectSource<T> {
     private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();
     private record Occurrence(Expr expression, List<Integer> path) {}
     private final CheckedSchemaMatcherPlan plan;
@@ -35,15 +40,30 @@ final class CheckedSchemaCursor implements Source {
     private CheckedSchemaMatcherPlan.ApplicationSteps application;
     private Work applicationWork;
     private PrepaidApplication payment;
-    private Transformation ready;
+    private T ready;
+    private final Function<CheckedSchemaMatcherPlan.ApplicationSteps,T> result;
+    private final Function<T,ExecutionWork> mathematics;
     private boolean initialized, complete;
     private Status status = Status.READY;
 
-    CheckedSchemaCursor(CheckedSchemaMatcherPlan plan, String encodedSource, Meter meter) {
-        this.plan = plan; this.encodedSource = encodedSource; this.meter = meter;
-        complete = plan.allSchemasIncluded();
+    private CheckedSchemaCursor(CheckedSchemaMatcherPlan plan,String encodedSource,Expr source,Meter meter,
+            Function<CheckedSchemaMatcherPlan.ApplicationSteps,T> result,Function<T,ExecutionWork> mathematics) {
+        this.plan=plan;this.encodedSource=encodedSource;this.source=source;this.meter=meter;
+        this.result=result;this.mathematics=mathematics;complete=plan.allSchemasIncluded();
     }
-    @Override public Optional<Transformation> next(long allowance) {
+    static Source legacy(CheckedSchemaMatcherPlan plan,String encodedSource,Meter meter) {
+        var cursor=new CheckedSchemaCursor<>(plan,encodedSource,null,meter,
+            CheckedSchemaMatcherPlan.ApplicationSteps::result,Transformation::executionWork);
+        return new Source() {
+            @Override public Optional<Transformation> next(long allowance){return cursor.next(allowance);}
+            @Override public Status status(){return cursor.status();}
+            @Override public void close(){cursor.close();}
+        };
+    }
+    static ObjectSource<NativeMoveProof> nativeSource(CheckedSchemaMatcherPlan plan,Expr source,Meter meter) {
+        return new CheckedSchemaCursor<>(plan,null,source,meter,CheckedSchemaMatcherPlan.ApplicationSteps::nativeResult,NativeMoveProof::work);
+    }
+    @Override public Optional<T> next(long allowance) {
         if (allowance < 0) throw new IllegalArgumentException("negative schema allowance");
         if (terminal()) return Optional.empty();
         long before = total();
@@ -67,8 +87,11 @@ final class CheckedSchemaCursor implements Source {
         var work = new Work();
         work.add(1);
         try {
-            if (encodedSource.length() > 262_144) throw new IllegalArgumentException("schema source transport size limit");
-            source = CODEC.decodeExpression(encodedSource);
+            if(encodedSource!=null) {
+                if(encodedSource.length()>262144)throw new IllegalArgumentException("schema source transport size limit");
+                source=CODEC.decodeExpression(encodedSource);
+            } else if(AstExpressionValidation.inspect(source).canonicalCharacters()>262144)
+                throw new IllegalArgumentException("schema source transport size limit");
             domain(source, plan.bounds(), work);
             pending.push(new Occurrence(source, List.of()));
         } catch (IllegalArgumentException unsupported) {
@@ -122,9 +145,9 @@ final class CheckedSchemaCursor implements Source {
         }
         if (failed) meter.abandon(payment);
         else if (application.done()) {
-            ready = application.result();
+            ready = result.apply(application);
             if (ready == null) meter.abandon(payment);
-            else { meter.complete(payment, ready.executionWork()); produced++; }
+            else { meter.complete(payment, mathematics.apply(ready)); produced++; }
         } else return;
         clearApplication();
     }
@@ -132,9 +155,9 @@ final class CheckedSchemaCursor implements Source {
         application = null; applicationWork = null; payment = null;
         matchedEntry = null; bindings = null;
     }
-    private Optional<Transformation> emit() {
+    private Optional<T> emit() {
         meter.charge(Operation.PULL, 1);
-        Transformation result = ready;
+        T result = ready;
         ready = null;
         return Optional.of(result);
     }

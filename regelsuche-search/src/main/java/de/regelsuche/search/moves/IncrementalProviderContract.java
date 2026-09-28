@@ -20,7 +20,7 @@ public final class IncrementalProviderContract {
     public static final String PREPAID_WORK_REVISION = "regelsuche.prepaid-application-work/v1";
     public enum ApplicationPhase { SUBSTITUTION_DOMAIN, INSTANTIATION, TARGET_DOMAIN, EVIDENCE }
     public enum Kind { NATIVE_RULES, REGISTERED_SCHEMA, TYPED_PRIMITIVE_BATCH }
-    public enum Transport { PARSER_TEXT, TYPED_AST_JSON }
+    public enum Transport { PARSER_TEXT, TYPED_AST_JSON, NATIVE_EXPR_V1 }
     public enum Mathematics { PRIMITIVE, EXACT, MIXED }
     public enum Status { OPEN, READY, EXHAUSTED, LIMIT, INCONCLUSIVE, FAILED, CLOSED }
     public enum Operation { OPEN, ADMISSION, PULL, MATCH, LOAD, ABORT, CLOSE }

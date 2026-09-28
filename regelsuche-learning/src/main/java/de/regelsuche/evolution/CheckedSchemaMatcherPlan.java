@@ -12,6 +12,7 @@ import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.search.moves.IncrementalProviderContract;
 import de.regelsuche.search.moves.MoveProvider;
+import de.regelsuche.search.moves.*;
 import de.regelsuche.search.moves.RegisteredIncrementalMoveProvider;
 import de.regelsuche.transform.ExprMatcher;
 import de.regelsuche.transform.PatternExpr;
@@ -46,6 +47,7 @@ public final class CheckedSchemaMatcherPlan {
         void advance();
         boolean done();
         Transformation result();
+        NativeMoveProof nativeResult();
     }
 
     private final CheckedLearnedSchemaModel.Bounds bounds;
@@ -56,9 +58,11 @@ public final class CheckedSchemaMatcherPlan {
     private final Application application;
     private final Definition definition;
     private final Compilation compilation;
+    private final CheckedLearnedSchemaModel model;
 
     CheckedSchemaMatcherPlan(CheckedLearnedSchemaModel model, MoveProvider.Descriptor descriptor, int maximum,
             Map<String, Double> utilities, Set<String> included, Application application) {
+        this.model=Objects.requireNonNull(model);
         this.descriptor = Objects.requireNonNull(descriptor);
         this.application = Objects.requireNonNull(application);
         bounds = model.bounds();
@@ -91,12 +95,25 @@ public final class CheckedSchemaMatcherPlan {
     public Compilation compilationReceipt() { return compilation; }
     public long compilationWork() { return compilation.workUnits(); }
     public de.regelsuche.search.moves.ExprIncrementalProvider nativeProvider() {
-        throw new UnsupportedOperationException("native prepaid schema cursor is not implemented");
+        return new NativeProvider();
     }
     public RegisteredIncrementalMoveProvider provider() {
         var registration = new Registration(definition,
-            (state, context, meter) -> new CheckedSchemaCursor(this, state.expression(), meter));
+            (state, context, meter) -> CheckedSchemaCursor.legacy(this, state.expression(), meter));
         return new RegisteredIncrementalMoveProvider(descriptor, definition, new Registry(List.of(registration)));
+    }
+    final class NativeProvider implements ExprIncrementalProvider {
+        private NativeProvider() {}
+        @Override public MoveProvider.Descriptor descriptor(){return descriptor;}
+        @Override public Definition contractDefinition(){
+            return new Definition(definition.revision(),definition.providerId(),definition.kind(),definition.modelRevision(),
+                definition.semanticsRevision()+";"+NativeMoveSearch.REVISION,Transport.NATIVE_EXPR_V1,definition.mathematics(),null);
+        }
+        @Override public IncrementalProviderContract.ObjectSource<NativeMoveProof> openSource(TypedMoveSearch.State state,
+                TypedMoveSearch.Context context,IncrementalProviderContract.Meter meter){
+            return CheckedSchemaCursor.nativeSource(CheckedSchemaMatcherPlan.this,state.expression(),meter);
+        }
+        NativeVerifier independentVerifier(){return model.nativeVerifier();}
     }
     CheckedLearnedSchemaModel.Bounds bounds() { return bounds; }
     int maximumSchemasPerOccurrence() { return maximumSchemasPerOccurrence; }

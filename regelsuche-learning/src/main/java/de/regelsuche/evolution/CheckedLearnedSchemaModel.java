@@ -508,6 +508,10 @@ public final class CheckedLearnedSchemaModel {
             if (!done) throw new IllegalStateException("partial application has no mathematical authority");
             return verified == null ? null : Transformation.exactTheory(ExactTheoryEvidence.fromVerified(verified));
         }
+        @Override public NativeMoveProof nativeResult() {
+            if(!done)throw new IllegalStateException("partial application has no mathematical authority");
+            return verified==null?null:new NativeMoveProof.Exact(NativeExactTheoryEvidence.fromVerified(verified));
+        }
     }
 
     private VerifiedApplication evidence(Schema schema,Expr source,String encodedSource,Expr target,
