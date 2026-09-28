@@ -95,6 +95,7 @@ public final class RetainedGraph {
                 case com.fasterxml.jackson.databind.node.DoubleNode valueNode when valueNode.getClass()==com.fasterxml.jackson.databind.node.DoubleNode.class -> {}
                 case com.fasterxml.jackson.databind.node.BooleanNode valueNode when valueNode.getClass()==com.fasterxml.jackson.databind.node.BooleanNode.class -> {}
                 case com.fasterxml.jackson.databind.node.NullNode valueNode when valueNode.getClass()==com.fasterxml.jackson.databind.node.NullNode.class -> {}
+                case Optional<?> optional -> reference(optional.orElse(null));
                 case String text -> characters=Math.addExact(characters,text.length());
                 case StringBuilder text -> {reference(null);characters=Math.addExact(characters,text.length());}
                 case ExactRational rational -> { reference(rational.numerator());reference(rational.denominator()); }
