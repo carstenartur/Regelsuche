@@ -10,6 +10,52 @@ class RetainedGraphImmutableInventoryTest {
     private record Root(Object value, RetainedGraph.Inventory inventory) implements RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(value);visitor.reference(inventory);}
     }
+    private static long unrelatedArrayWork(boolean history,Object array){
+        var inventory=new RetainedGraph.Inventory(256,1024,1024);
+        try {
+            if(history){
+                var leaves=new ArrayList<Expr>();
+                for(int i=0;i<32;i++)leaves.add(new VariableExpr("old"+i));
+                inventory.measure(new Root(new FunctionExpr("history",leaves),inventory));
+                assertTrue(inventory.cachedVertices()>0);
+                inventory.measure(inventory);
+                assertEquals(0,inventory.cachedVertices(),"all historical IDs remain reserved but no cached object is live");
+            }
+            var root=new Root(array,inventory);var observation=inventory.measure(root);
+            assertEquals(RetainedGraph.measure(root).retained(),observation.retained());
+            return observation.work();
+        } finally {inventory.close();}
+    }
+    @Test void unrelatedPrimitiveArraysDoNotScanDiscardedMetadataHistory(){
+        for(Object array:List.of(new int[1],new long[1])){
+            long emptyPremium=unrelatedArrayWork(false,array)-unrelatedArrayWork(false,new byte[1]);
+            long historicalPremium=unrelatedArrayWork(true,array)-unrelatedArrayWork(true,new byte[1]);
+            assertEquals(emptyPremium,historicalPremium,
+                "checking an unrelated primitive array must not walk every permanently discarded cache ID");
+        }
+    }
+    @Test void repeatedHeadMiddleAndTailPruningKeepsTheExactFreshOwnershipUnion(){
+        var inventory=new RetainedGraph.Inventory(256,1024,1024);
+        var values=new ArrayList<Expr>();
+        for(int i=0;i<12;i++)values.add(new VariableExpr("keep"+i));
+        var root=new Root(values,inventory);
+        try {
+            for(int round=0;round<12;round++){
+                var measured=inventory.measure(root);var fresh=RetainedGraph.measure(root);
+                assertEquals(fresh.retained(),measured.retained());assertEquals(fresh.objects(),measured.objects());
+                if(!values.isEmpty()){
+                    values.remove(round%3==0?0:round%3==1?values.size()/2:values.size()-1);
+                }
+                if(round%4==0)values.add(new VariableExpr("later"+round));
+            }
+            values.clear();var cleared=inventory.measure(root);
+            assertEquals(0,inventory.cachedVertices());assertEquals(0,cleared.retained().nodes());
+            values.add(new VariableExpr("after-empty"));
+            assertEquals(RetainedGraph.measure(root).retained().nodes(),inventory.measure(root).retained().nodes());
+            assertTrue(inventory.cachedVertices()>0);
+        } finally {assertTrue(inventory.close()>0);}
+        assertEquals(new RetainedGraph.Usage(0,0,2),RetainedGraph.measure(inventory).retained());
+    }
     @Test void repeatedImmutableGraphAvoidsActualRepeatedTraversalWithAllMetadataStillOwned(){
         var shared=new VariableExpr("x");Expr expression=shared;
         for(int i=0;i<12;i++)expression=new BinaryExpr(expression,BinaryOperator.ADD,shared);
