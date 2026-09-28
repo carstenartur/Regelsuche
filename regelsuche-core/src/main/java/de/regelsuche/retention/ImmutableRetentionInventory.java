@@ -206,7 +206,10 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
                 settle();
                 var metadata=new MetadataScan(inventory);var remaining=metadata.measure(owner);pay(remaining.work());
                 var retained=new RetainedGraph.Usage(unionNodes-extraNodes,unionCharacters-extraCharacters,Math.addExact(primaryReferences,remaining.retained().references()));
-                peak=peak.maximum(new RetainedGraph.Usage(retained.nodes(),retained.characters(),Math.addExact(primaryReferences,remaining.peak().references())));
+                peak=peak.maximum(new RetainedGraph.Usage(retained.nodes(),retained.characters(),Math.addExact(primaryReferences,Math.addExact(12,remaining.peak().references()))));
+                // settle empties the first scanner's map/queue and releases P/C arrays;
+                // the scanner itself is still executing: its five base ownership slots
+                // and seven additional reference fields overlap the new metadata scan.
                 long objects=seenObjectsBeforeSettle+hitObjects-extraObjects-metadataObjectsBefore+remaining.objects();
                 // The post-prune bookkeeping sweep is part of the whole inspection too.
                 // No staged entry becomes usable before that final peak has passed.
@@ -234,7 +237,11 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
     /** Paid metadata-only sweep after pruning; immutable keys are already part of the primary union. */
     private static final class MetadataScan extends RetainedGraph.Scan {
         private final ImmutableRetentionInventory inventory;
-        MetadataScan(ImmutableRetentionInventory inventory){this.inventory=inventory;}
+        MetadataScan(ImmutableRetentionInventory inventory){this.inventory=inventory;work=1;accountingPeak();}
+        @Override void accountingPeak(){
+            // Existing scanner map/queue/current/backings plus this inventory field.
+            accountingReferences=Math.max(accountingReferences,Math.addExact(6,Math.addExact(2L*seen.size(),pending.size())));
+        }
         @Override public void reference(Object value){
             references=Math.addExact(references,1);work=Math.addExact(work,2);
             if(value!=null && !inventory.index.containsKey(value))pending.addLast(value);

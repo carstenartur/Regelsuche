@@ -124,6 +124,10 @@ class RetainedGraphImmutableInventoryTest {
         // identity entries of two slots each. Their real handoff peak is 8+12+14.
         assertEquals(new RetainedGraph.Usage(0,0,8),measured.retained());
         assertEquals(34,measured.peak().references());inventory.close();
+        var direct=new RetainedGraph.Inventory(1,1,1);
+        var bounded=direct.measure(direct,new RetainedGraph.Usage(0,0,28));
+        assertEquals(32,bounded.peak().references(),"direct root drops exactly the wrapper's two field slots");
+        assertTrue(bounded.peak().references()>28);direct.close();
     }
 
 }
