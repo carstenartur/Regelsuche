@@ -31,6 +31,36 @@ class CheckedSchemaCursorTest {
                 .equals(parse("x^2"))).findFirst().orElseThrow().transformation().rule();
     }
 
+    private static final class PhaseObserver implements de.regelsuche.retention.RetainedOperation.Sink {
+        private IncrementalProviderContract.ObjectCursor<NativeMoveProof> cursor;
+        private de.regelsuche.retention.RetainedOperation operation;
+        private long paid,peakNodes;
+        private boolean evidenceObserved;
+        @Override public void executionWork(long units){paid=Math.addExact(paid,units);}
+        @Override public void validationWork(long units){paid=Math.addExact(paid,units);}
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(cursor);v.reference(operation);}
+        @Override public void checkpoint(){
+            var measured=de.regelsuche.retention.RetainedGraph.measure(this);paid=Math.addExact(paid,measured.work());
+            peakNodes=Math.max(peakNodes,measured.peak().nodes());
+            if(cursor!=null)evidenceObserved|=cursor.snapshot().work().prepaidApplications().completedMathematics().exactTheorySteps()>0;
+        }
+    }
+    @Test void completedPrepaidEvidenceIsObservedWhileItIsStillOwnedBeforeEmission() {
+        var provider=plan(model).nativeProvider();
+        var observer=new PhaseObserver();
+        try(var operation=de.regelsuche.retention.RetainedOperation.open(observer)) {
+            observer.operation=operation;
+            var cursor=provider.openSession(new TypedMoveSearch.State(parse(PAIR),0,0,"",List.of(),Set.of(),0),
+                TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION));
+            observer.cursor=cursor;
+            try {
+                assertTrue(cursor.next(100000).isPresent(),cursor.snapshot().detailCode());
+                assertTrue(observer.paid>0);assertTrue(observer.peakNodes>0);
+                assertTrue(observer.evidenceObserved,"proof ownership and settled prepaid phases must be measured before emission releases them");
+            } finally {cursor.close();}
+        }
+    }
+
     @Test void nativeSchemaSearchAccountsForTheActualProviderProofAndSuspendedCursorGraphs() {
         var selected=plan(model);Expr source=parse(PAIR);
         Expr goal=CODEC.decodeExpression(eager(PAIR).moves().getFirst().transformation().transformedExpression());
