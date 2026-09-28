@@ -46,6 +46,8 @@ public final class NativeMoveSearch {
         }
     }
     public Result search(Problem problem,SearchContinuationContract continuation){
+        de.regelsuche.search.program.AstExpressionValidation.inspect(problem.source());
+        if(problem.context().goal()!=null)de.regelsuche.search.program.AstExpressionValidation.inspect(problem.context().goal());
         try(var store=new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)) {
             return new Result(problem.source(),new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,Assessment,NativeVerification>()
                 .search(new Execution(problem,store),continuation,null));
@@ -61,6 +63,7 @@ public final class NativeMoveSearch {
         @Override public MoveSearch.Mode mode(){return problem.mode();}
         @Override public MoveSearch.Scheduling scheduling(){return problem.scheduling();}
         @Override public TypedMoveSearch.State state(Expr expression,int depth,int primitive,String previous,List<String> assumptions,Set<String> capabilities,int debt){
+            de.regelsuche.search.program.AstExpressionValidation.inspect(expression);
             return new TypedMoveSearch.State(store.dereference(store.intern(expression)),depth,primitive,previous,assumptions,capabilities,debt);
         }
         @Override public Assessment inspect(TypedMoveSearch.State state){return Assessment.EMPTY;}
