@@ -63,6 +63,7 @@ public final class RetainedGraph {
                 case String text -> characters=Math.addExact(characters,text.length());
                 case ExactRational rational -> { reference(rational.numerator());reference(rational.denominator()); }
                 case BigInteger integer -> {
+                    if(integer.getClass()!=BigInteger.class)throw new Unmeasured(integer,observation());
                     String decimal=integer.toString();int digits=decimal.length();
                     characters=Math.addExact(characters,digits);temporaryCharacters=Math.max(temporaryCharacters,digits);
                     accountingReferences=Math.max(accountingReferences,Math.addExact(6,Math.addExact(2L*seen.size(),pending.size())));
