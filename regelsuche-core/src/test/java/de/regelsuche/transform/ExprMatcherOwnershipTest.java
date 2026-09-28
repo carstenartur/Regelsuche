@@ -20,6 +20,7 @@ class ExprMatcherOwnershipTest {
         MatchAbort failure;
         boolean abortOutcome, abortClose, sawSession, inputMissing;
         int unpublishedResultScans;
+        final Set<String> patternDescriptions = Collections.newSetFromMap(new IdentityHashMap<>());
         @Override public void executionWork(long units) {
             work += units;
             if (failure != null) workAfterFailure += units;
@@ -41,6 +42,7 @@ class ExprMatcherOwnershipTest {
             boolean hasStateList = false;
             while (!pending.isEmpty()) {
                 Object value = pending.remove(); if (!seen.add(value)) continue;
+                if (value instanceof String text && text.startsWith("7:pattern")) patternDescriptions.add(text);
                 sawSession |= value.getClass().getEnclosingClass() == ExprMatcherEngine.class
                     && value.getClass().getSimpleName().equals("Session");
                 if (value instanceof ExprMatcher.MatchOutcome result) outcome = result;
@@ -119,6 +121,19 @@ class ExprMatcherOwnershipTest {
         assertEquals(0,observation.unpublishedResultScans,
             "retaining the raw/frozen states through monotone result assembly avoids an intermediate full scan");
         assertFalse(observation.inputMissing);
+    }
+
+    @Test void anExplicitPatternDescriptionPublishesItsActualOutputText() {
+        var observation = new Observation();
+        String description;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            description = matcher().canonicalDescriptor();
+        }
+        assertTrue(observation.patternDescriptions.contains(description),
+            "explicit descriptor output must be owned and charged before returning");
+        assertTrue(observation.work >= description.length());
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
 
     @Test void abortedOutcomePaysItsUnreturnedStepsAndNestedBranchCounters() {
