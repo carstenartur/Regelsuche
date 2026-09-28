@@ -90,6 +90,9 @@ public final class CheckedSchemaMatcherPlan {
     }
     public Compilation compilationReceipt() { return compilation; }
     public long compilationWork() { return compilation.workUnits(); }
+    public de.regelsuche.search.moves.ExprIncrementalProvider nativeProvider() {
+        throw new UnsupportedOperationException("native prepaid schema cursor is not implemented");
+    }
     public RegisteredIncrementalMoveProvider provider() {
         var registration = new Registration(definition,
             (state, context, meter) -> new CheckedSchemaCursor(this, state.expression(), meter));

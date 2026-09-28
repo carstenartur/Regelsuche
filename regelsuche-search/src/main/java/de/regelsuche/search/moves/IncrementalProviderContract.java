@@ -100,18 +100,20 @@ public final class IncrementalProviderContract {
             boolean accountingComplete, Work work, long emittedCandidates, String detailCode) {
         public boolean complete() { return status == Status.EXHAUSTED && accountingComplete; }
     }
-    public interface Cursor extends AutoCloseable {
+    public interface ObjectCursor<T> extends AutoCloseable {
         /** One candidate at most. LIMIT is resumable on the same cursor; all atomic overruns remain paid. */
-        Optional<Transformation> next(long allowance);
+        Optional<T> next(long allowance);
         Snapshot snapshot();
         @Override void close();
     }
+    public interface Cursor extends ObjectCursor<Transformation> {}
     /** A registered implementation must charge delegated work before returning OR throwing. */
-    public interface Source extends AutoCloseable {
-        Optional<Transformation> next(long allowance);
+    public interface ObjectSource<T> extends AutoCloseable {
+        Optional<T> next(long allowance);
         Status status();
         @Override default void close() {}
     }
+    public interface Source extends ObjectSource<Transformation> {}
     public static final class Meter {
         private final Map<String, Long> operations = new TreeMap<>();
         private ExecutionWork mathematics = ExecutionWork.ZERO;

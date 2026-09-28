@@ -30,6 +30,30 @@ class CheckedSchemaCursorTest {
                 .equals(parse("x^2"))).findFirst().orElseThrow().transformation().rule();
     }
 
+    @Test void nativeCursorSuspendsTheSamePaidPhasesAndExportsTheSameApplications() {
+        var provider=assertDoesNotThrow(()->plan(model).nativeProvider());
+        var nativeState=new TypedMoveSearch.State(parse(PAIR),0,0,"",List.of(),Set.of(),0);
+        var nativeContext=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
+        var cursor=provider.openSession(nativeState,nativeContext);
+        var applications=new ArrayList<NativeMoveProof>();boolean suspended=false;
+        for(int i=0;i<2000;i++) {
+            cursor.next(2).ifPresent(applications::add);
+            var receipt=cursor.snapshot();assertTrue(receipt.accountingComplete(),receipt.detailCode());
+            var prepaid=receipt.work().prepaidApplications();
+            if(prepaid!=null && prepaid.openApplications()>0) {
+                suspended=true;assertFalse(prepaid.phaseCalls().isEmpty());
+                assertEquals(applications.size(),receipt.work().mathematics().exactTheorySteps());
+            }
+            if(receipt.status()==IncrementalProviderContract.Status.EXHAUSTED || receipt.status()==IncrementalProviderContract.Status.INCONCLUSIVE)break;
+        }
+        assertTrue(suspended);assertEquals(2,applications.size());
+        assertEquals(eager(PAIR).moves().stream().map(SearchMove::transformation).toList(),applications.stream().map(NativeMoveProof::exportLegacy).toList());
+        assertEquals(2,cursor.snapshot().work().mathematics().exactTheorySteps());
+        assertEquals(0,cursor.snapshot().work().metrics().candidateWork().exactTheoryWorkUnits());
+        cursor.close();long paid=cursor.snapshot().work().metrics().totalWorkUnitsV2();cursor.close();
+        assertEquals(paid,cursor.snapshot().work().metrics().totalWorkUnitsV2());
+    }
+
     @Test void firstPullDoesNotInstantiateTheSecondRealLearnedOccurrence() {
         var eager = eager(PAIR);
         assertEquals(2, eager.moves().size(), "the real learned schema has two distinct application sites");
