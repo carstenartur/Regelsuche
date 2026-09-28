@@ -281,8 +281,10 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
 
         private final Map<Monomial, ExactRational> terms;
 
-        private Polynomial(Map<Monomial, ExactRational> terms) {
-            this.terms = normalizedTerms(terms);
+        /** All callers transfer a fresh private accumulator after their existing term-limit checks. */
+        private Polynomial(LinkedHashMap<Monomial, ExactRational> terms) {
+            this.terms = terms;
+            removeZeroTerms();
         }
 
         private static Polynomial constant(ExactRational value) {
@@ -302,7 +304,7 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
             ExactRational coefficient,
             Monomial monomial
         ) {
-            Map<Monomial, ExactRational> result =
+            LinkedHashMap<Monomial, ExactRational> result =
                 new LinkedHashMap<>();
             RetainedOperation.work(1);
             try(var maps=RetainedOperation.retain(monomial,coefficient,result)) {
@@ -312,7 +314,7 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
         }
 
         private Polynomial add(Polynomial other) {
-            Map<Monomial, ExactRational> result =
+            LinkedHashMap<Monomial, ExactRational> result =
                 new LinkedHashMap<>(terms);
             RetainedOperation.work(terms.size());
             RetainedOperation.work(1);
@@ -334,7 +336,7 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
         }
 
         private Polynomial multiply(Polynomial other) {
-            Map<Monomial, ExactRational> result =
+            LinkedHashMap<Monomial, ExactRational> result =
                 new LinkedHashMap<>();
             RetainedOperation.work(1);
             try(var maps=RetainedOperation.retain(this,other,result)) {
@@ -470,25 +472,24 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
             }
         }
 
-        private static Map<Monomial, ExactRational> normalizedTerms(
-            Map<Monomial, ExactRational> source
-        ) {
-            Map<Monomial, ExactRational> normalized =
-                new LinkedHashMap<>();
-            RetainedOperation.work(1);
-            try(var maps=RetainedOperation.retain(source,normalized)) {
-                for (Map.Entry<Monomial, ExactRational> entry
-                        : source.entrySet()) {
-                    RetainedOperation.work(1);
-                    if (!entry.getValue().isZero()) {
-                        normalized.put(
-                            entry.getKey(),
-                            entry.getValue());
+        private void removeZeroTerms() {
+            var entries = terms.entrySet().iterator();
+            boolean observedBeforeRemoval = false;
+            while (entries.hasNext()) {
+                var entry = entries.next();
+                RetainedOperation.work(1);
+                if (entry.getValue().isZero()) {
+                    if (!observedBeforeRemoval) {
+                        // The filled accumulator and new owner are visible before any entries disappear.
+                        RetainedOperation.produced(this);
+                        observedBeforeRemoval = true;
                     }
+                    entries.remove();
+                    RetainedOperation.work(1);
                 }
-                return RetainedOperation.produced(normalized);
             }
         }
+
     }
 
     static Expr exactRationalExpression(ExactRational value) {
