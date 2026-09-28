@@ -16,9 +16,10 @@ class MatcherDescriptorCompositionTest {
         Set<String> rules = Set.of();
         boolean abortSiblings, abortRules, sawLater, missingEarlier, sawFailedFields, sawOutput;
         DescriptionAbort failure;
-        long paidAfterFailure;
+        long paid, paidAfterFailure;
 
         @Override public void executionWork(long units) {
+            paid += units;
             if (failure != null) paidAfterFailure += units;
             else if (scope != null && (abortSiblings || abortRules)) {
                 var snapshot = snapshot();
@@ -151,6 +152,20 @@ class MatcherDescriptorCompositionTest {
             var profile = new RecognitionProfile(Set.of(ADD,MUL),Set.of(MUL,ADD),true,names,3);
             assertEquals(frame("same-as","A","B",profileText(profile)),ExprMatcher.sameAs("A","B",profile).canonicalDescriptor());
         }
+    }
+
+    @Test void numericFieldProductionIsPaidInAdditionToBufferWritesAndFinalCopy() {
+        String digits = "1" + "0".repeat(200);
+        var source = ExprMatcher.literalNumber(digits);
+        var observation = new Observation(); observation.expected = source.canonicalDescriptor();
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            assertEquals(observation.expected,source.canonicalDescriptor());
+        }
+        assertTrue(observation.sawOutput);
+        assertTrue(observation.paid >= 4L * digits.length(),
+            "numeric text production, buffer initialization, field writes and final text copy each remain paid");
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
 
     /** Independent statement of the historical framing, outside measured production. */
