@@ -23,6 +23,7 @@ class ExprMatcherOwnershipTest {
         boolean abortStateList, sawSecondBinding, sawOperationTrace;
         boolean sawRepresentativeList, sawLaterRepresentative, sawDescendantTrace;
         boolean sawPathCopy, sawPathBufferAndText, abortPathBuffer;
+        boolean sawLimitedVisitWithDiagnostic, sawEmptyRepresentativesWithDiagnostic;
         int unpublishedResultScans;
         final Set<String> patternDescriptions = Collections.newSetFromMap(new IdentityHashMap<>());
         final Set<List<?>> tracePrefixes = new HashSet<>();
@@ -50,6 +51,8 @@ class ExprMatcherOwnershipTest {
             boolean hasStateList = false;
             boolean hasMutableBinding = false, hasFrozenBinding = false;
             boolean hasMutablePath = false, hasFrozenPath = false, hasPathBuffer = false, hasPathText = false;
+            boolean hasVisit = false, hasZeroPath = false, hasEmptyRepresentativeOwner = false;
+            boolean hasLimitDiagnostic = false, hasEmptyDiagnostic = false;
             while (!pending.isEmpty()) {
                 Object value = pending.remove(); if (!seen.add(value)) continue;
                 if (value instanceof String text && text.startsWith("7:pattern")) patternDescriptions.add(text);
@@ -60,6 +63,10 @@ class ExprMatcherOwnershipTest {
                     renderedPaths.add(text); hasPathText |= text.equals("1.0");
                 }
                 if (value instanceof char[] buffer && Arrays.equals(buffer,new char[]{'1','.','0'})) hasPathBuffer = true;
+                hasVisit |= value.getClass().getEnclosingClass() == ExprMatcherEngine.class
+                    && value.getClass().getSimpleName().equals("ContainedVisit");
+                hasEmptyRepresentativeOwner |= value instanceof Object[] array && array.length == 1
+                    && array[0] instanceof ArrayList<?> list && list.isEmpty();
                 sawSession |= value.getClass().getEnclosingClass() == ExprMatcherEngine.class
                     && value.getClass().getSimpleName().equals("Session");
                 if (value.getClass().getEnclosingClass() == ExprMatcherEngine.class
@@ -68,6 +75,13 @@ class ExprMatcherOwnershipTest {
                 if (value instanceof RetainedGraph.View view) view.retainedReferences(visitor);
                 else if (value instanceof Object[] array) for (var item : array) visitor.reference(item);
                 else if (value instanceof Collection<?> values) {
+                    hasZeroPath |= values.equals(List.of(0));
+                    if (values instanceof LinkedHashSet<?>) {
+                        hasLimitDiagnostic |= values.stream().anyMatch(item -> item instanceof ExprMatcher.MatchDiagnostic d
+                            && d.code().equals("MATCH_RESULT_LIMIT"));
+                        hasEmptyDiagnostic |= values.stream().anyMatch(item -> item instanceof ExprMatcher.MatchDiagnostic d
+                            && d.code().equals("REPRESENTATIVE_PROVIDER_EMPTY"));
+                    }
                     if (values.equals(List.of(1,0))) {
                         hasMutablePath |= values instanceof ArrayList<?>;
                         hasFrozenPath |= !(values instanceof ArrayList<?>);
@@ -103,6 +117,8 @@ class ExprMatcherOwnershipTest {
             sawBindingCopy |= hasMutableBinding && hasFrozenBinding;
             sawPathCopy |= hasMutablePath && hasFrozenPath;
             sawPathBufferAndText |= hasPathBuffer && hasPathText;
+            sawLimitedVisitWithDiagnostic |= hasVisit && hasZeroPath && hasLimitDiagnostic;
+            sawEmptyRepresentativesWithDiagnostic |= hasEmptyRepresentativeOwner && hasEmptyDiagnostic;
             if (hasStateList && outcome == null) unpublishedResultScans++;
             if (abortBindingCopy && sawBindingCopy && failure == null) {
                 failure = new MatchAbort(); throw failure;
@@ -443,6 +459,43 @@ class ExprMatcherOwnershipTest {
             assertNull(observation.outcome);
             assertTrue(observation.workAfterFailure > 0);
         }
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    @Test void aLimitedDescendantRetainsItsActualPathThroughDiagnosisPublication() {
+        Expr input = new ExpressionParser().parseTerm("f(x)");
+        var observation = new Observation(); observation.input = input;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var result = ExprMatcher.contains(ExprMatcher.any()).match(input,new ExprMatcher.MatchOptions(null,1,100,100));
+            assertEquals(1,result.matches().size());
+            assertFalse(result.complete());
+        }
+        assertTrue(observation.sawLimitedVisitWithDiagnostic,
+            "the new session diagnosis must overlap its real stopped [0] visit before release");
+        assertFalse(observation.inputMissing);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    private enum EmptyRepresentatives implements EquivalentExpressionProvider, RetainedGraph.View {
+        INSTANCE;
+        @Override public List<Expr> representatives(Expr input,RecognitionProfile profile) { return new ArrayList<>(); }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }
+    }
+
+    @Test void anEmptyRepresentativeResultSurvivesUntilItsDiagnosisIsObserved() {
+        Expr input = new VariableExpr("x");
+        var observation = new Observation(); observation.input = input;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var result = ExprMatcher.equivalent(RecognitionProfile.exact(),ExprMatcher.any()).match(input,
+                ExprMatcher.MatchOptions.defaults().withRepresentativeProvider(EmptyRepresentatives.INSTANCE));
+            assertFalse(result.matched());
+            assertEquals("REPRESENTATIVE_PROVIDER_EMPTY",result.diagnostics().getFirst().code());
+        }
+        assertTrue(observation.sawEmptyRepresentativesWithDiagnostic,
+            "the session diagnosis must overlap the actual provider-result owner before release");
+        assertFalse(observation.inputMissing);
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
 
