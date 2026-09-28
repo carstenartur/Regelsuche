@@ -36,7 +36,7 @@ final class ExprMatcherEngine {
         try (var owned = RetainedOperation.retainCompleted(3,matcher,expression,session)) {
             try {
                 session.rawStates = evaluate(matcher,expression,session.initial,session,true);
-                session.states = session.limit(session.rawStates,matcher.canonicalDescriptor());
+                session.states = session.limit(session.rawStates,matcher);
                 RetainedOperation.work(2L + (session.states == session.rawStates ? 0 : session.states.size()));
                 // Keep both actual lists until publication. Root assembly only
                 // adds owners, so that observation includes its earlier peaks.
@@ -77,7 +77,10 @@ final class ExprMatcherEngine {
         Session session,
         boolean atRoot
     ) {
-        if (!session.consumeStep(matcher.canonicalDescriptor())) {
+        if (!session.consumeStep()) {
+            if (!session.stepLimitReported) {
+                session.reportStepLimit(matcher.canonicalDescriptor());
+            }
             return List.of();
         }
         if (matcher instanceof ExprMatcher.Any) {
@@ -132,7 +135,7 @@ final class ExprMatcherEngine {
                 List.of(),
                 matches
             );
-            return session.limit(matches, matcher.canonicalDescriptor());
+            return session.limit(matches, matcher);
         }
         if (matcher instanceof ExprMatcher.Equivalent equivalent) {
             return matchEquivalent(
@@ -150,7 +153,7 @@ final class ExprMatcherEngine {
             accepted.addAll(evaluateConstraint(
                 where.constraint(), candidate, session));
         }
-        return session.limit(accepted, matcher.canonicalDescriptor());
+        return session.limit(accepted, matcher);
     }
 
     private static List<State> matchPattern(
@@ -245,7 +248,7 @@ final class ExprMatcherEngine {
                     .traced("rebind:" + bind.name()));
             }
         }
-        return session.limit(bound, bind.canonicalDescriptor());
+        return session.limit(bound, bind);
     }
 
     private static List<State> matchAll(
@@ -262,7 +265,7 @@ final class ExprMatcherEngine {
                 next.addAll(evaluate(
                     matcher, expression, candidate, session, atRoot));
             }
-            current = session.limit(next, all.canonicalDescriptor());
+            current = session.limit(next, all);
             if (current.isEmpty()) {
                 break;
             }
@@ -282,7 +285,7 @@ final class ExprMatcherEngine {
             matches.addAll(evaluate(
                 matcher, expression, state, session, atRoot));
         }
-        return session.limit(matches, any.canonicalDescriptor());
+        return session.limit(matches, any);
     }
 
     private static List<State> matchNot(
@@ -318,7 +321,7 @@ final class ExprMatcherEngine {
             matches.addAll(evaluate(
                 operation.right(), binary.right(), left, session, false));
         }
-        return session.limit(matches, operation.canonicalDescriptor()).stream()
+        return session.limit(matches, operation).stream()
             .map(candidate -> candidate.traced(
                 "operation:" + operation.operator().name()))
             .toList();
@@ -348,7 +351,7 @@ final class ExprMatcherEngine {
                     false
                 ));
             }
-            current = session.limit(next, function.canonicalDescriptor());
+            current = session.limit(next, function);
             if (current.isEmpty()) {
                 return List.of();
             }
@@ -460,7 +463,7 @@ final class ExprMatcherEngine {
                     : candidate);
             }
         }
-        return session.limit(matches, equivalent.canonicalDescriptor());
+        return session.limit(matches, equivalent);
     }
 
     private static List<State> evaluateConstraint(
@@ -468,7 +471,10 @@ final class ExprMatcherEngine {
         State state,
         Session session
     ) {
-        if (!session.consumeStep(constraint.canonicalDescriptor())) {
+        if (!session.consumeStep()) {
+            if (!session.stepLimitReported) {
+                session.reportStepLimit(constraint.canonicalDescriptor());
+            }
             return List.of();
         }
         if (constraint instanceof ExprMatcher.BindingMatches bindingMatches) {
@@ -624,27 +630,28 @@ final class ExprMatcherEngine {
             this.options = options;
         }
 
-        private boolean consumeStep(String descriptor) {
+        private boolean consumeStep() {
             if (steps < options.maxSteps()) {
                 steps++;
                 return true;
             }
-            if (!stepLimitReported) {
-                diagnostic("MATCH_STEP_LIMIT", descriptor);
-                stepLimitReported = true;
-            }
             return false;
+        }
+
+        private void reportStepLimit(String descriptor) {
+            diagnostic("MATCH_STEP_LIMIT", descriptor);
+            stepLimitReported = true;
         }
 
         private void diagnostic(String code, String descriptor) {
             diagnostics.add(new ExprMatcher.MatchDiagnostic(code, descriptor));
         }
 
-        private List<State> limit(List<State> states, String descriptor) {
+        private List<State> limit(List<State> states, ExprMatcher matcher) {
             if (states.size() <= options.maxResults()) {
                 return List.copyOf(states);
             }
-            diagnostic("MATCH_RESULT_LIMIT", descriptor);
+            diagnostic("MATCH_RESULT_LIMIT", matcher.canonicalDescriptor());
             return List.copyOf(states.subList(0, options.maxResults()));
         }
     }
