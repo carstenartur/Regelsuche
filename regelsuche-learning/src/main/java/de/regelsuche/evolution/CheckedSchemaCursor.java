@@ -97,7 +97,8 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
         return Optional.empty();
     }
     private boolean terminal() { return status == Status.EXHAUSTED || status == Status.INCONCLUSIVE || status == Status.CLOSED; }
-    private long total() { return meter.work().metrics().totalWorkUnitsV2(); }
+    private long total() { return Math.addExact(meter.work().metrics().totalWorkUnitsV2(),
+        encodedSource==null?de.regelsuche.retention.RetainedOperation.observedWork():0); }
     private void initialize() {
         initialized = true;
         var work = new Work();

@@ -471,12 +471,13 @@ public record EvolutionGenome(
         }
     }
 
-    public enum EvidenceObligation {
+    public enum EvidenceObligation implements de.regelsuche.retention.RetainedGraph.View {
         SEMANTIC_VALIDATION,
         COUNTEREXAMPLE_SEARCH,
         PROOF_OR_CERTIFICATE,
         NOVELTY_REVIEW,
-        HOLDOUT_EVALUATION
+        HOLDOUT_EVALUATION;
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){}
     }
 
     public record TrainingScope(
@@ -501,7 +502,8 @@ public record EvolutionGenome(
         Assumption.Kind kind,
         String expression,
         List<String> symbols
-    ) {
+    ) implements de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(kind);v.reference(expression);v.reference(symbols);}
         public AssumptionTemplate {
             Objects.requireNonNull(kind, "kind");
             requireText(expression, "assumption expression");
@@ -533,7 +535,8 @@ public record EvolutionGenome(
         int maxAstGrowth,
         List<AssumptionTemplate> assumptions,
         List<EvidenceObligation> evidenceObligations
-    ) {
+    ) implements de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(geneId);v.reference(sourcePattern);v.reference(targetPattern);v.reference(kind);v.reference(assumptions);v.reference(evidenceObligations);}
         public RewriteGene {
             requireText(geneId, "geneId");
             geneId = geneId.trim().toLowerCase(java.util.Locale.ROOT);

@@ -8,7 +8,7 @@ import java.util.*;
 
 /** Explicit Expr execution through the same frontier and batch pickers as the historical facade. */
 public final class NativeMoveSearch {
-    public static final String REVISION = "regelsuche.native-expr-move-search/v2-final-replay";
+    public static final String REVISION = "regelsuche.native-expr-move-search/v3-audited-ownership";
     public record Primitive(MoveProvider.Descriptor descriptor, AstRewriteTransport transport) implements NativeMoveProvider,RetainedGraph.View {
     @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(descriptor);v.reference(transport);}
 
@@ -128,7 +128,7 @@ public final class NativeMoveSearch {
         public boolean withinBudget(){return search.accountingComplete() && totalWork()<=workBudget;}
     }
     public QualityResult searchUntil(Problem problem,TypedSourceOnlySearch.Objective objective,long maximumOutputScore,SearchContinuationContract continuation){
-        return select(problem,objective,maximumOutputScore,true,continuation,null);
+        return select(problem,objective,maximumOutputScore,true,continuation,SearchExpressionStore.Limits.DEFAULT);
     }
     public QualityResult searchUntil(Problem problem,TypedSourceOnlySearch.Objective objective,long maximumOutputScore,SearchContinuationContract continuation,SearchExpressionStore.Limits limits){
         return select(problem,objective,maximumOutputScore,true,continuation,Objects.requireNonNull(limits));
@@ -138,7 +138,7 @@ public final class NativeMoveSearch {
     }
     /** Best admitted incumbent under the fixed budget; does not stop at an adequate score. */
     public QualityResult searchBest(Problem problem,TypedSourceOnlySearch.Objective objective,SearchContinuationContract continuation){
-        return select(problem,objective,0,false,continuation,null);
+        return select(problem,objective,0,false,continuation,SearchExpressionStore.Limits.DEFAULT);
     }
     public static final class FinalCheckFailure extends IllegalStateException {
         private final QualityResult attempted;
@@ -162,11 +162,10 @@ public final class NativeMoveSearch {
         if(!problem.context().sourceOnly())throw new IllegalArgumentException("source-only context required");
         var selection=new MoveSearchObjective<TypedMoveSearch.State,NativeSearchMove,NativeVerification>(
             new ObjectiveAdapter(objective),maximumOutputScore,stopAtQuality);
-        try(var store=new SearchExpressionStore(limits==null?SearchExpressionStore.Limits.DEFAULT:limits)) {
-            var accounting=limits==null?null:new NativeRetentionSession(problem,store,limits);
-            try(var operation=accounting==null?null:de.regelsuche.retention.RetainedOperation.open(accounting)) {
-                if(accounting==null)validate(problem);
-                else {accounting.operation(operation);accounting.validate(problem.source());}
+        try(var store=new SearchExpressionStore(limits)) {
+            var accounting=new NativeRetentionSession(problem,store,limits);
+            try(var operation=de.regelsuche.retention.RetainedOperation.open(accounting)) {
+                accounting.operation(operation);accounting.validate(problem.source());
                 var execution=new Execution(problem,store,accounting);
                 var searched=new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
                     .search(execution,continuation,selection);
@@ -174,7 +173,7 @@ public final class NativeMoveSearch {
                     replay(execution,problem.source(),selection.incumbent().expression(),selection.witness());
                 var result=new Result(problem,searched,replay.work());
                 var quality=new QualityResult(result,selection.incumbent(),selection.inputScore(),selection.outputScore(),selection.witness(),replay.work(),problem.budget().totalWork());
-                if(accounting!=null)accounting.finish(result,quality);
+                accounting.finish(result,quality);
                 if(replay.rejected()!=null)throw new FinalCheckFailure(quality,replay.rejected());
                 return quality;
             }
@@ -198,18 +197,9 @@ public final class NativeMoveSearch {
             }
         }
     }
+    /** Default native execution includes validation, ownership observations, cleanup and fresh final replay. */
     public Result search(Problem problem,SearchContinuationContract continuation){
-        validate(problem);
-        try(var store=new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)) {
-            var execution=new Execution(problem,store);
-            var searched=new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
-                .search(execution,continuation,null);
-            var replay=searched.outcome()==MoveSearch.Outcome.TARGET_REACHED
-                ?replay(execution,problem.source(),problem.context().goal(),searched.witness()):new Replay(0,null);
-            var result=new Result(problem,searched,replay.work());
-            if(replay.rejected()!=null)throw new TargetCheckFailure(result,replay.rejected());
-            return result;
-        }
+        return search(problem,continuation,SearchExpressionStore.Limits.DEFAULT);
     }
     public static final class TargetCheckFailure extends IllegalStateException {
         private final Result attempted;private final NativeVerification rejected;
@@ -242,14 +232,9 @@ public final class NativeMoveSearch {
         if(!(cursor==null?source:cursor.expression()).equals(target))throw new IllegalStateException("native replay endpoint differs");
         return new Replay(work,null);
     }
-    private static void validate(Problem problem){
-        de.regelsuche.search.program.AstExpressionValidation.inspect(problem.source());
-        if(problem.context().goal()!=null)de.regelsuche.search.program.AstExpressionValidation.inspect(problem.context().goal());
-    }
     private static final class Execution implements SearchExecution.Environment<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>,RetainedGraph.View {
         private final Problem problem;private final SearchExpressionStore store;
         private final NativeRetentionSession accounting;
-        Execution(Problem problem,SearchExpressionStore store){this(problem,store,null);}
         Execution(Problem problem,SearchExpressionStore store,NativeRetentionSession accounting){this.problem=Objects.requireNonNull(problem);this.store=store;this.accounting=accounting;}
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(problem);v.reference(store);v.reference(accounting);}
         @Override public void ownership(RetainedGraph.View root){if(accounting!=null)accounting.ownership(root);}

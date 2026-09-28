@@ -156,20 +156,20 @@ class CheckedSchemaCursorTest {
     @Test void nativeStagedSourceOnlyFinalReplayAndPartialBudgetRetainPrepaidWork() {
         var provider=plan(model).nativeProvider();Expr source=parse(PAIR);
         var context=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
-        var verifier=NativeVerifier.registered(List.of(provider));var checks=new java.util.concurrent.atomic.AtomicInteger();
+        var verifier=NativeVerifier.registered(List.of(provider));var checks=new NativeTestObservation.Checks(verifier);
         var problem=new NativeMoveSearch.Problem(source,context,List.of(provider),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED_INCREMENTAL,
-            new MoveSearch.Budget(0,1,100000,10,1000000),NativeMovePriorityPolicy.INVENTORY_ORDER,s->0,NativeStateValue.NONE,
-            (s,m,c)->{checks.incrementAndGet();return verifier.verify(s,m,c);});
+            new MoveSearch.Budget(0,1,100000,10,1000000),NativeMovePriorityPolicy.INVENTORY_ORDER,NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE,checks);
         try(var transport=AstTransportObservation.open()) {
-        var quality=new NativeMoveSearch().searchUntil(problem,s->new TypedSourceOnlySearch.Score(s.searchDepth()==0?1:0,1),0,SearchContinuationContract.PATH_SENSITIVE);
-        assertTrue(quality.withinBudget());assertEquals(2,checks.get());assertTrue(quality.replayWork()>0);
+        var quality=new NativeMoveSearch().searchUntil(problem,NativeTestObservation.Objective.DEPTH,0,SearchContinuationContract.PATH_SENSITIVE);
+        assertTrue(quality.withinBudget());assertEquals(2,checks.calls());assertTrue(quality.replayWork()>0);
         assertTrue(quality.search().cursorReceipts().stream().allMatch(SearchExecution.Expansion::closed));
         assertEquals(0,transport.total(),"checked schema generation, selection, admission and final replay must stay native");
         }
-        boolean abandoned=false;
-        for(long budget:List.of(8L,16L,32L,64L,128L,256L,512L,1024L)) {
+        boolean abandoned=false;var observedBudgets=new ArrayList<String>();
+        for(long budget:List.of(8L,128L,1024L,2048L,4096L,8192L,16384L,32768L,65536L,131072L,262144L,524288L)) {
             var limited=new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,List.of(provider),MoveSearch.Mode.FAST,
                 MoveSearch.Scheduling.STAGED_INCREMENTAL,new MoveSearch.Budget(0,1,100000,10,budget)),SearchContinuationContract.PATH_SENSITIVE);
+            observedBudgets.add(budget+":"+limited.outcome()+":"+limited.totalWork()+":"+limited.cursorReceipts().stream().flatMap(expansion->expansion.lanes().stream()).filter(lane->lane.cursor()!=null).map(lane->lane.cursor().work().prepaidApplications().toString()).toList());
             for(var expansion:limited.cursorReceipts())for(var lane:expansion.lanes())if(lane.cursor()!=null) {
                 assertTrue(lane.cursor().closed());var prepaid=lane.cursor().work().prepaidApplications();
                 if(prepaid.abandonedApplications()>0) {
@@ -179,7 +179,7 @@ class CheckedSchemaCursorTest {
                 }
             }
         }
-        assertTrue(abandoned,"a bounded real search must expose the paid suspended phase at cleanup");
+        assertTrue(abandoned,"a bounded real search must expose the paid suspended phase at cleanup: "+observedBudgets);
     }
 
     @Test void firstPullDoesNotInstantiateTheSecondRealLearnedOccurrence() {

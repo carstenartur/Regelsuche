@@ -25,6 +25,7 @@ final class NativeRetentionSession implements de.regelsuche.retention.RetainedOp
     @Override public void validationWork(long units){if(units<0)throw new IllegalArgumentException("negative validation work");validationWork=Math.addExact(validationWork,units);}
     void validate(Expr expression){AstExpressionValidation.inspect(expression);}
     long work(){return Math.addExact(Math.addExact(Math.addExact(validationWork,executionWork),retentionWork),store.work());}
+    @Override public long observedWork(){return work();}
     boolean complete(){return complete;}
     @Override public void checkpoint(){observe(this,true);}
     void incomplete(String reason){complete=false;if(detail.isEmpty())detail=reason;}

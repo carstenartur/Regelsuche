@@ -86,7 +86,8 @@ final class ManagedProviderCursor<T> implements ObjectCursor<T>,RetainedGraph.Vi
     private boolean terminal() {
         return status == Status.EXHAUSTED || status == Status.INCONCLUSIVE || status == Status.FAILED || status == Status.CLOSED;
     }
-    private long total() { return meter.work().metrics().totalWorkUnitsV2(); }
+    private long total() { return Math.addExact(meter.work().metrics().totalWorkUnitsV2(),
+        definition.transport()==Transport.NATIVE_EXPR_V1?de.regelsuche.retention.RetainedOperation.observedWork():0); }
     private long remaining(long before, long allowance) { return Math.max(0, allowance - (total() - before)); }
     private boolean available(long before, long allowance) {
         if (remaining(before, allowance) > 0) return true;

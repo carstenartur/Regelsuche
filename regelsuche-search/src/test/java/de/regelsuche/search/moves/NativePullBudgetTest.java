@@ -54,6 +54,17 @@ class NativePullBudgetTest {
             cursor.close();assertEquals(10,paid.work-before);assertTrue(cursor.snapshot().accountingComplete());
         }
     }
+    @Test void closingAnObservationLimitedPullKeepsEveryPaidUnitWithoutIssuingMathematics() {
+        var binding=new Binding();var paid=new Paid();
+        try(var operation=RetainedOperation.open(paid)) {
+            long before=paid.work;var cursor=cursor(binding);
+            assertTrue(cursor.next(5).isEmpty());cursor.close();
+            assertEquals(10,paid.work-before);assertEquals(0,binding.pulls);
+            assertEquals(0,cursor.snapshot().work().mathematics().primitiveRewrites());
+            assertEquals(3,cursor.snapshot().work().metrics().totalWorkUnitsV2());
+            cursor.close();assertEquals(10,paid.work-before);
+        }
+    }
     @Test void withoutANativeObservationScopeTheExistingMeterAllowanceIsUnchanged() {
         var binding=new Binding();try(var cursor=cursor(binding)) {
             assertTrue(cursor.next(5).isPresent());assertEquals(2,binding.received);

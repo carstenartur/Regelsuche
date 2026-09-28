@@ -82,12 +82,12 @@ class TypedLearnedMoveInventoryTest {
             HistoryMovePolicy.typed(history.freeze(), HistoryMovePolicy.Weights.DEFAULT)).reached());
         try(var transport=AstTransportObservation.open()) {
             var context=new TypedMoveSearch.Context(goal,List.of(),MoveContext.Phase.TRAIN);
-            var budget=new MoveSearch.Budget(6,1,0,100,30_000);
+            var budget=new MoveSearch.Budget(6,1,0,100,10_000_000);
             var nativeResult=new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,
                 inventory.nativeProviders(),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,budget,
-                HistoryMovePolicy.nativePolicy(history.freeze(),HistoryMovePolicy.Weights.DEFAULT),s->0,NativeStateValue.NONE),
+                HistoryMovePolicy.nativePolicy(history.freeze(),HistoryMovePolicy.Weights.DEFAULT),NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE),
                 SearchContinuationContract.PATH_SENSITIVE);
-            assertEquals(MoveSearch.Outcome.TARGET_REACHED,nativeResult.outcome());
+            assertEquals(MoveSearch.Outcome.TARGET_REACHED,nativeResult.outcome(),nativeResult.accounting().detail());
             assertEquals(SearchMove.SourceKind.LEARNED,nativeResult.witness().getFirst().move().descriptor().sourceKind());
             assertEquals(3,nativeResult.witness().getFirst().move().primitiveStepCount());
             assertEquals(goal,nativeResult.output());

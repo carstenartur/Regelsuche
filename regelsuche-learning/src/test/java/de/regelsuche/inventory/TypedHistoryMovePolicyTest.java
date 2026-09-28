@@ -95,7 +95,7 @@ class TypedHistoryMovePolicyTest {
         assertEquals(legacy.stage(DESCRIPTOR,encoded,oldContext),nativePolicy.stage(DESCRIPTOR,state,context));
         var nativeProblem=new NativeMoveSearch.Problem(source,new TypedMoveSearch.Context(goal,List.of(),MoveContext.Phase.TRAIN),
             List.of(new NativeMoveSearch.Primitive(DESCRIPTOR,TRANSPORT)),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,
-            new MoveSearch.Budget(3,3,0,20,10000),nativePolicy,s->0,NativeStateValue.NONE);
+            new MoveSearch.Budget(3,3,0,20,1000000),nativePolicy,NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE);
         assertEquals(run(source,goal,legacy,10000).encodedResult(),new NativeMoveSearch().search(nativeProblem,SearchContinuationContract.PATH_SENSITIVE).exportLegacy());
     }
 
