@@ -9,7 +9,8 @@ import java.util.TreeMap;
 public interface NativeStateValue {
     Assessment evaluate(TypedMoveSearch.State state,TypedMoveSearch.Context context);
     record Capability(String providerId,Expr sourceExpression,String subtreePath,Expr matchedExpression,Expr rewrittenExpression)
-            implements SearchExecution.Capability<Expr> {
+            implements SearchExecution.Capability<Expr>,de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(providerId);v.reference(sourceExpression);v.reference(subtreePath);v.reference(matchedExpression);v.reference(rewrittenExpression);}
         public Capability {
             if(providerId==null || providerId.isBlank() || sourceExpression==null || subtreePath==null
                 || matchedExpression==null || rewrittenExpression==null || matchedExpression.equals(rewrittenExpression))
