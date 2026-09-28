@@ -203,11 +203,12 @@ record BoundedExactMonomial(ExactRational coefficient, Map<String, Integer> powe
     }
 
     /** Shared by every inference/pre-filter in one matcher invocation. */
-    static final class Budget {
+    static final class Budget implements de.regelsuche.retention.RetainedGraph.View {
         private static final int MAX_VISITS = 10_000;
         private static final int MAX_DEPTH = 128;
         private static final int MAX_COEFFICIENT_BITS = 4_096;
         private int remaining = MAX_VISITS;
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor visitor) { }
 
         private void visit(int depth) {
             if (depth > MAX_DEPTH || remaining-- <= 0) {

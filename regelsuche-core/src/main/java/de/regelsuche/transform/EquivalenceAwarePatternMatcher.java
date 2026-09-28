@@ -6,9 +6,10 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -85,41 +86,69 @@ public final class EquivalenceAwarePatternMatcher {
         Map<String, Expr> working = new HashMap<>(bindings);
         MatchBudget budget = new MatchBudget(
             maxBacktrackingBranches, profile.inferAlgebraicBindings());
-        try {
-            boolean matched = matchInternal(
-                pattern,
-                expression,
-                working,
-                profile,
-                budget
-            );
-            return new MatchAttempt(
-                matched ? AttemptStatus.MATCHED : AttemptStatus.NOT_MATCHED,
-                matched ? Map.copyOf(working) : original,
-                budget.usedBranches(),
-                ""
-            );
-        } catch (BoundedExactMonomial.LimitExceeded limit) {
-            return new MatchAttempt(
-                AttemptStatus.INCONCLUSIVE, original, budget.usedBranches(), limit.code);
-        } catch (MatchLimitExceeded limit) {
-            return new MatchAttempt(
-                AttemptStatus.INCONCLUSIVE,
-                original,
-                budget.usedBranches(),
-                limit.code
-            );
+        Object[] result = new Object[1];
+        long setupWork = 4L + bindings.size() + (original == bindings ? 0 : bindings.size())
+            + (profile.inferAlgebraicBindings() ? 1 : 0);
+        try (var owned = RetainedOperation.retainCompleted(setupWork,
+                pattern,expression,bindings,profile,original,working,budget,result)) {
+            try {
+                AttemptStatus status;
+                String detail = "";
+                Map<String,Expr> selected = original;
+                try {
+                    boolean matched = matchInternal(pattern,expression,working,profile,budget);
+                    status = matched ? AttemptStatus.MATCHED : AttemptStatus.NOT_MATCHED;
+                    if (matched) selected = working;
+                } catch (BoundedExactMonomial.LimitExceeded limit) {
+                    status = AttemptStatus.INCONCLUSIVE; detail = limit.code;
+                } catch (MatchLimitExceeded limit) {
+                    status = AttemptStatus.INCONCLUSIVE; detail = limit.code;
+                }
+                var outcome = new MatchAttempt(status,selected,budget.usedBranches(),detail);
+                result[0] = outcome;
+                RetainedOperation.work(2L + (outcome.bindings() == selected ? 0 : selected.size()));
+                RetainedOperation.checkpoint();
+                return outcome;
+            } catch (RuntimeException | Error failure) {
+                // A returned outcome delegates these branches to its caller. No
+                // outcome escapes this path, so its completed branch work stays here.
+                try { RetainedOperation.work(budget.usedBranches()); }
+                catch (RuntimeException | Error accounting) {
+                    if (accounting != failure) failure.addSuppressed(accounting);
+                }
+                observeFailure(failure);
+                throw failure;
+            }
         }
     }
 
-    private sealed interface MatchTask permits PairTask, PermutationTask {}
+    private static void observeFailure(Throwable failure) {
+        try { RetainedOperation.checkpoint(); }
+        catch (RuntimeException | Error observation) {
+            if (observation != failure) failure.addSuppressed(observation);
+        }
+    }
 
-    private record PairTask(PatternExpr pattern, Expr expression, MatchTask next) implements MatchTask {}
+    private sealed interface MatchTask extends RetainedGraph.View permits PairTask, PermutationTask {}
+
+    private record PairTask(PatternExpr pattern, Expr expression, MatchTask next) implements MatchTask {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(pattern); visitor.reference(expression); visitor.reference(next);
+        }
+    }
 
     private record PermutationTask(List<PatternExpr> patterns, List<Expr> expressions,
-            int patternIndex, int expressionIndex, MatchTask next) implements MatchTask {}
+            int patternIndex, int expressionIndex, MatchTask next) implements MatchTask {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(patterns); visitor.reference(expressions); visitor.reference(next);
+        }
+    }
 
-    private record Alternative(MatchTask pending, Map<String, Expr> bindings) {}
+    private record Alternative(MatchTask pending, Map<String, Expr> bindings) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(pending); visitor.reference(bindings);
+        }
+    }
 
     private static boolean matchInternal(
         PatternExpr pattern,
@@ -128,7 +157,14 @@ public final class EquivalenceAwarePatternMatcher {
         RecognitionProfile profile,
         MatchBudget budget
     ) {
-        return new MatchSearch(profile, budget).match(pattern, expression, bindings);
+        var search = new MatchSearch(profile,budget);
+        try (var owned = RetainedOperation.retainCompleted(2,search)) {
+            try { return search.match(pattern,expression,bindings); }
+            catch (RuntimeException | Error failure) {
+                observeFailure(failure);
+                throw failure;
+            }
+        }
     }
 
     /**
@@ -136,12 +172,22 @@ public final class EquivalenceAwarePatternMatcher {
      * node matching only schedules work or rejects the current alternative.
      * Bindings are published only after the whole continuation succeeds.
      */
-    private static final class MatchSearch {
+    private static final class MatchSearch implements RetainedGraph.View {
         private final RecognitionProfile profile;
         private final MatchBudget budget;
         private final ArrayDeque<Alternative> alternatives = new ArrayDeque<>();
         private MatchTask pending;
+        private MatchTask currentTask;
         private Map<String, Expr> current;
+        private Map<String, Expr> inferred;
+        private List<PatternExpr> patternOperands;
+        private List<Expr> expressionOperands;
+
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(profile); visitor.reference(budget); visitor.reference(alternatives);
+            visitor.reference(pending); visitor.reference(currentTask); visitor.reference(current);
+            visitor.reference(inferred); visitor.reference(patternOperands); visitor.reference(expressionOperands);
+        }
 
         private MatchSearch(RecognitionProfile profile, MatchBudget budget) {
             this.profile = profile;
@@ -150,15 +196,21 @@ public final class EquivalenceAwarePatternMatcher {
 
         private boolean match(PatternExpr pattern, Expr expression, Map<String, Expr> bindings) {
             alternatives.push(new Alternative(new PairTask(pattern, expression, null), new HashMap<>(bindings)));
+            RetainedOperation.work(4L + bindings.size());
             while (!alternatives.isEmpty()) {
+                RetainedOperation.checkpoint();
                 var alternative = alternatives.pop();
                 pending = alternative.pending();
                 current = alternative.bindings();
+                RetainedOperation.work(3);
                 if (!matchContinuation()) {
                     continue;
                 }
+                int priorSize = bindings.size();
                 bindings.clear();
                 bindings.putAll(current);
+                RetainedOperation.work(priorSize + current.size() + 1L);
+                RetainedOperation.checkpoint();
                 return true;
             }
             return false;
@@ -166,9 +218,14 @@ public final class EquivalenceAwarePatternMatcher {
 
         private boolean matchContinuation() {
             while (pending != null) {
-                boolean matched = pending instanceof PermutationTask permutation
+                currentTask = pending;
+                RetainedOperation.work(1);
+                boolean matched = currentTask instanceof PermutationTask permutation
                     ? matchPermutation(permutation)
-                    : matchPair((PairTask) pending);
+                    : matchPair((PairTask) currentTask);
+                RetainedOperation.checkpoint();
+                currentTask = null;
+                RetainedOperation.work(1);
                 if (!matched) {
                     return false;
                 }
@@ -182,6 +239,7 @@ public final class EquivalenceAwarePatternMatcher {
                     return false;
                 }
                 pending = permutation.next();
+                RetainedOperation.work(1);
                 return true;
             }
             PatternExpr operand = permutation.patterns().get(permutation.patternIndex());
@@ -189,6 +247,7 @@ public final class EquivalenceAwarePatternMatcher {
             while (index < permutation.expressions().size()
                     && !couldStructurallyMatch(operand, permutation.expressions().get(index), profile, budget)) {
                 index++;
+                RetainedOperation.work(1);
             }
             if (index == permutation.expressions().size()) {
                 return false;
@@ -198,6 +257,7 @@ public final class EquivalenceAwarePatternMatcher {
                 alternatives.push(new Alternative(new PermutationTask(
                     permutation.patterns(), permutation.expressions(), permutation.patternIndex(),
                     index + 1, permutation.next()), new HashMap<>(current)));
+                RetainedOperation.work(4L + current.size());
             }
             budget.consumeBranch();
             Expr candidate = permutation.expressions().get(index);
@@ -205,6 +265,8 @@ public final class EquivalenceAwarePatternMatcher {
             remaining.remove(index);
             pending = new PairTask(operand, candidate, new PermutationTask(
                 permutation.patterns(), remaining, permutation.patternIndex() + 1, 0, permutation.next()));
+            RetainedOperation.work(4L + permutation.expressions().size()
+                + permutation.expressions().size() - index);
             return true;
         }
 
@@ -212,6 +274,7 @@ public final class EquivalenceAwarePatternMatcher {
             PatternExpr node = pair.pattern();
             Expr candidate = pair.expression();
             pending = pair.next();
+            RetainedOperation.work(1);
             if (node instanceof PatternExpr.Placeholder placeholder) {
                 return matchPlaceholder(placeholder, candidate);
             }
@@ -229,8 +292,10 @@ public final class EquivalenceAwarePatternMatcher {
 
         private boolean matchPlaceholder(PatternExpr.Placeholder placeholder, Expr candidate) {
             Expr bound = current.get(placeholder.name());
+            RetainedOperation.work(1);
             if (bound == null) {
                 current.put(placeholder.name(), candidate);
+                RetainedOperation.work(1);
                 return true;
             }
             return equivalent(bound, candidate, profile, budget);
@@ -264,6 +329,7 @@ public final class EquivalenceAwarePatternMatcher {
             if (!profile.isAssociative(operation.operator())) {
                 pending = new PairTask(operation.left(), binary.left(),
                     new PairTask(operation.right(), binary.right(), pending));
+                RetainedOperation.work(3);
                 return true;
             }
             return matchAssociative(operation, binary);
@@ -274,18 +340,21 @@ public final class EquivalenceAwarePatternMatcher {
                     && equivalent(operation.instantiate(current), candidate, profile, budget)) {
                 return true;
             }
-            Map<String, Expr> inferred = new HashMap<>(current);
+            inferred = new HashMap<>(current);
+            RetainedOperation.work(current.size() + 1L);
             if (!tryInferPowerBinding(operation, candidate, inferred, profile, budget)) {
                 return false;
             }
             current = inferred;
+            RetainedOperation.work(1);
             return true;
         }
 
         private boolean matchAssociative(PatternExpr.Operation operation, BinaryExpr binary) {
-            List<PatternExpr> patternOperands = new ArrayList<>();
+            patternOperands = new ArrayList<>();
+            expressionOperands = new ArrayList<>();
+            RetainedOperation.work(2);
             flattenPattern(operation, operation.operator(), patternOperands);
-            List<Expr> expressionOperands = new ArrayList<>();
             flattenExpression(binary, operation.operator(), expressionOperands);
             if (patternOperands.size() != expressionOperands.size()) {
                 return false;
@@ -294,9 +363,12 @@ public final class EquivalenceAwarePatternMatcher {
                 if (patternOperands.size() > DEFAULT_MAX_COMMUTATIVE_OPERANDS) {
                     throw new MatchLimitExceeded("COMMUTATIVE_OPERAND_LIMIT");
                 }
-                patternOperands.sort(Comparator
-                    .comparingInt(EquivalenceAwarePatternMatcher::bindingPriority).reversed());
+                patternOperands.sort((left,right) -> {
+                    RetainedOperation.work(1);
+                    return Integer.compare(bindingPriority(right),bindingPriority(left));
+                });
                 pending = new PermutationTask(patternOperands, expressionOperands, 0, 0, pending);
+                RetainedOperation.work(2);
             } else {
                 prependPairs(patternOperands, expressionOperands);
             }
@@ -307,6 +379,7 @@ public final class EquivalenceAwarePatternMatcher {
         private void prependPairs(List<PatternExpr> patterns, List<Expr> expressions) {
             for (int index = patterns.size() - 1; index >= 0; index--) {
                 pending = new PairTask(patterns.get(index), expressions.get(index), pending);
+                RetainedOperation.work(2);
             }
         }
     }
@@ -449,12 +522,14 @@ public final class EquivalenceAwarePatternMatcher {
         BinaryOperator operator,
         List<PatternExpr> result
     ) {
+        RetainedOperation.work(1);
         if (pattern instanceof PatternExpr.Operation operation
                 && operation.operator() == operator) {
             flattenPattern(operation.left(), operator, result);
             flattenPattern(operation.right(), operator, result);
         } else {
             result.add(pattern);
+            RetainedOperation.work(1);
         }
     }
 
@@ -463,19 +538,22 @@ public final class EquivalenceAwarePatternMatcher {
         BinaryOperator operator,
         List<Expr> result
     ) {
+        RetainedOperation.work(1);
         if (expression instanceof BinaryExpr binaryExpr
                 && binaryExpr.operator() == operator) {
             flattenExpression(binaryExpr.left(), operator, result);
             flattenExpression(binaryExpr.right(), operator, result);
         } else {
             result.add(expression);
+            RetainedOperation.work(1);
         }
     }
 
-    public enum AttemptStatus {
+    public enum AttemptStatus implements RetainedGraph.View {
         MATCHED,
         NOT_MATCHED,
-        INCONCLUSIVE
+        INCONCLUSIVE;
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }
     }
 
     public record MatchAttempt(
@@ -483,7 +561,10 @@ public final class EquivalenceAwarePatternMatcher {
         Map<String, Expr> bindings,
         int visitedBranches,
         String limitCode
-    ) {
+    ) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(status); visitor.reference(bindings); visitor.reference(limitCode);
+        }
         public MatchAttempt {
             if (status == null || bindings == null || limitCode == null) {
                 throw new IllegalArgumentException(
@@ -515,10 +596,11 @@ public final class EquivalenceAwarePatternMatcher {
         }
     }
 
-    private static final class MatchBudget {
+    private static final class MatchBudget implements RetainedGraph.View {
         private final BoundedExactMonomial.Budget algebraic;
         private final int initialBranches;
         private int remainingBranches;
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(algebraic); }
 
         private MatchBudget(int remainingBranches, boolean inferAlgebraicBindings) {
             this.algebraic = inferAlgebraicBindings ? new BoundedExactMonomial.Budget() : null;

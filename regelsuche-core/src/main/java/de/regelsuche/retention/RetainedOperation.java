@@ -26,6 +26,11 @@ public final class RetainedOperation implements AutoCloseable,RetainedGraph.View
     public static Frame retain(Object... values){
         return acquire(values,0);
     }
+    /** Publish actual completed allocations before settling their work and observing the frame. */
+    public static Frame retainCompleted(long completedWork,Object... values){
+        if(completedWork<0)throw new IllegalArgumentException("negative completed work");
+        return acquire(values,completedWork);
+    }
     private static Frame acquire(Object[] values,long producedWork){
         var scope=CURRENT.get();if(scope==null)return null;
         var frame=new Frame(scope,values);scope.current=frame;
