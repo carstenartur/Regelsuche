@@ -10,6 +10,7 @@ public interface ExprIncrementalProvider extends NativeMoveProvider {
     Definition contractDefinition();
     ObjectSource<NativeMoveProof> openSource(TypedMoveSearch.State state,TypedMoveSearch.Context context,Meter meter);
     default ObjectCursor<NativeMoveProof> openSession(TypedMoveSearch.State state,TypedMoveSearch.Context context) {
+        if(contractDefinition().transport()!=Transport.NATIVE_EXPR_V1)throw new IllegalArgumentException("native cursor requires native transport");
         return new ManagedProviderCursor<>(contractDefinition(),new ManagedProviderCursor.Binding<>() {
             @Override public boolean carries(){return NativeMoveProvider.carries(descriptor().requiredAssumptions(),state,context);}
             @Override public ObjectSource<NativeMoveProof> open(Meter meter){return openSource(state,context,meter);}

@@ -17,9 +17,11 @@ public final class IncrementalProviderContract {
     private IncrementalProviderContract() {}
     public static final String REVISION = "regelsuche.incremental-provider/v2";
     public static final String PREPAID_REVISION = "regelsuche.incremental-provider/v3-prepaid";
+    public static final String NATIVE_REVISION = "regelsuche.incremental-provider/v4-native-expr";
+    public static final String NATIVE_PREPAID_REVISION = "regelsuche.incremental-provider/v4-native-expr-prepaid";
     public static final String PREPAID_WORK_REVISION = "regelsuche.prepaid-application-work/v1";
     public enum ApplicationPhase { SUBSTITUTION_DOMAIN, INSTANTIATION, TARGET_DOMAIN, EVIDENCE }
-    public enum Kind { NATIVE_RULES, REGISTERED_SCHEMA, TYPED_PRIMITIVE_BATCH }
+    public enum Kind { NATIVE_RULES, REGISTERED_SCHEMA, TYPED_PRIMITIVE_BATCH, NATIVE_BATCH }
     public enum Transport { PARSER_TEXT, TYPED_AST_JSON, NATIVE_EXPR_V1 }
     public enum Mathematics { PRIMITIVE, EXACT, MIXED }
     public enum Status { OPEN, READY, EXHAUSTED, LIMIT, INCONCLUSIVE, FAILED, CLOSED }
@@ -29,13 +31,15 @@ public final class IncrementalProviderContract {
             String semanticsRevision, Transport transport, Mathematics mathematics,
             TransformationCursor.Definition nativeDefinition) {
         public Definition {
-            if (!REVISION.equals(revision) && !PREPAID_REVISION.equals(revision)) throw new IllegalArgumentException("unsupported provider revision");
+            if (!REVISION.equals(revision) && !PREPAID_REVISION.equals(revision) && !NATIVE_REVISION.equals(revision) && !NATIVE_PREPAID_REVISION.equals(revision)) throw new IllegalArgumentException("unsupported provider revision");
             for (var text : List.of(providerId, modelRevision, semanticsRevision))
                 if (text.isBlank()) throw new IllegalArgumentException("blank provider binding");
             Objects.requireNonNull(kind); Objects.requireNonNull(transport); Objects.requireNonNull(mathematics);
+            if ((NATIVE_REVISION.equals(revision) || NATIVE_PREPAID_REVISION.equals(revision)) != (transport==Transport.NATIVE_EXPR_V1))
+                throw new IllegalArgumentException("native transport requires its explicit revision");
             if ((kind == Kind.NATIVE_RULES) != (nativeDefinition != null))
                 throw new IllegalArgumentException("only native providers carry native rule definitions");
-            if (PREPAID_REVISION.equals(revision) && (kind != Kind.REGISTERED_SCHEMA || mathematics == Mathematics.PRIMITIVE))
+            if ((PREPAID_REVISION.equals(revision) || NATIVE_PREPAID_REVISION.equals(revision)) && (kind != Kind.REGISTERED_SCHEMA || mathematics == Mathematics.PRIMITIVE))
                 throw new IllegalArgumentException("prepaid applications require registered exact mathematics");
         }
     }
@@ -125,8 +129,8 @@ public final class IncrementalProviderContract {
         private ExecutionWork prepaidCompleted = ExecutionWork.ZERO;
         public Meter() { this(REVISION); }
         public Meter(String revision) {
-            if (!REVISION.equals(revision) && !PREPAID_REVISION.equals(revision)) throw new IllegalArgumentException("unsupported meter revision");
-            prepaidSupported = PREPAID_REVISION.equals(revision);
+            if (!REVISION.equals(revision) && !PREPAID_REVISION.equals(revision) && !NATIVE_REVISION.equals(revision) && !NATIVE_PREPAID_REVISION.equals(revision)) throw new IllegalArgumentException("unsupported meter revision");
+            prepaidSupported = PREPAID_REVISION.equals(revision) || NATIVE_PREPAID_REVISION.equals(revision);
         }
         public PrepaidApplication beginPrepaidApplication() {
             if (!prepaidSupported) throw new IllegalStateException("prepaid applications require provider v3");

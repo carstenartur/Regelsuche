@@ -106,7 +106,7 @@ public final class CheckedSchemaMatcherPlan {
         private NativeProvider() {}
         @Override public MoveProvider.Descriptor descriptor(){return descriptor;}
         @Override public Definition contractDefinition(){
-            return new Definition(definition.revision(),definition.providerId(),definition.kind(),definition.modelRevision(),
+            return new Definition(IncrementalProviderContract.NATIVE_PREPAID_REVISION,definition.providerId(),definition.kind(),definition.modelRevision(),
                 definition.semanticsRevision()+";"+NativeMoveSearch.REVISION,Transport.NATIVE_EXPR_V1,definition.mathematics(),null);
         }
         @Override public IncrementalProviderContract.ObjectSource<NativeMoveProof> openSource(TypedMoveSearch.State state,

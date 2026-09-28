@@ -14,7 +14,7 @@ public final class IncrementalMovePicker implements MovePicker, AutoCloseable {
         boolean checked, rejected;
         Lane(IncrementalMoveProvider provider) { this.provider = provider; }
     }
-    private final StagedIncrementalLanes staged;
+    private final StagedIncrementalLanes<SearchMove,MoveState> staged;
     private final List<Lane> lanes;
     private final MoveState state;
     private final MoveContext context;
@@ -35,7 +35,8 @@ public final class IncrementalMovePicker implements MovePicker, AutoCloseable {
     /** Explicit staged v2 contract; the three-argument constructor stays native-only v1. */
     public IncrementalMovePicker(List<MoveProvider> providers, MovePriorityPolicy policy, MoveState state, MoveContext context) {
         this.state = state; this.context = context; lanes = List.of();
-        staged = new StagedIncrementalLanes(providers, policy, state, context);
+        staged = new StagedIncrementalLanes<>(providers.stream().map(p->StagedIncrementalSources.lane(p,state,context)).toList(),
+            SearchBatches.legacyRanking(policy,state,context),state);
     }
 
     @Override public boolean accountingComplete() {
@@ -99,7 +100,8 @@ public final class IncrementalMovePicker implements MovePicker, AutoCloseable {
     public int nextStage() { return staged == null ? 0 : staged.nextStage(); }
     public StagedIncrementalMoveExecution.Expansion stagedReceipt() {
         if (staged == null) throw new IllegalStateException("native v1 picker has no staged receipt");
-        return staged.receipt();
+        var receipt=staged.receipt();
+        return new StagedIncrementalMoveExecution.Expansion(receipt.source(),receipt.closed(),receipt.lanes());
     }
     public IncrementalMoveExecution.Expansion receipt() {
         if (staged != null) throw new IllegalStateException("staged v2 picker has no native receipt");

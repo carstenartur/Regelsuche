@@ -43,6 +43,9 @@ public final class SearchExecution {
         A inspect(S state); double score(S state); V verify(S state,M move); boolean carries(List<String> assumptions,S state);
         Picker<M> picker(S state);
     }
+    public record Expansion<S>(S source,boolean closed,List<StagedIncrementalMoveExecution.Lane> lanes) {
+        public Expansion { lanes=List.copyOf(lanes); }
+    }
     public record Step<S,M,V>(S source,S target,M move,V verification) {}
     public record Event<S,M,V>(S source,S target,M move,MoveSearch.Decision decision,V verification) {}
     record Result<S,M,V,A>(MoveSearch.Outcome outcome,List<Step<S,M,V>> witness,List<Event<S,M,V>> events,

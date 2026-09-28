@@ -89,6 +89,32 @@ class CheckedSchemaCursorTest {
         assertEquals(0,cursor.work().prepaidApplications().openApplications());
     }
 
+    @Test void nativeStagedSourceOnlyFinalReplayAndPartialBudgetRetainPrepaidWork() {
+        var provider=plan(model).nativeProvider();Expr source=parse(PAIR);
+        var context=TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION);
+        var verifier=NativeVerifier.registered(List.of(provider));var checks=new java.util.concurrent.atomic.AtomicInteger();
+        var problem=new NativeMoveSearch.Problem(source,context,List.of(provider),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED_INCREMENTAL,
+            new MoveSearch.Budget(0,1,100000,10,1000000),NativeMovePriorityPolicy.INVENTORY_ORDER,s->0,NativeStateValue.NONE,
+            (s,m,c)->{checks.incrementAndGet();return verifier.verify(s,m,c);});
+        var quality=new NativeMoveSearch().searchUntil(problem,s->new TypedSourceOnlySearch.Score(s.searchDepth()==0?1:0,1),0,SearchContinuationContract.PATH_SENSITIVE);
+        assertTrue(quality.withinBudget());assertEquals(2,checks.get());assertTrue(quality.replayWork()>0);
+        assertTrue(quality.search().cursorReceipts().stream().allMatch(SearchExecution.Expansion::closed));
+        boolean abandoned=false;
+        for(long budget:List.of(8L,16L,32L,64L,128L,256L,512L,1024L)) {
+            var limited=new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,List.of(provider),MoveSearch.Mode.FAST,
+                MoveSearch.Scheduling.STAGED_INCREMENTAL,new MoveSearch.Budget(0,1,100000,10,budget)),SearchContinuationContract.PATH_SENSITIVE);
+            for(var expansion:limited.cursorReceipts())for(var lane:expansion.lanes())if(lane.cursor()!=null) {
+                assertTrue(lane.cursor().closed());var prepaid=lane.cursor().work().prepaidApplications();
+                if(prepaid.abandonedApplications()>0) {
+                    abandoned=true;assertEquals(MoveSearch.Outcome.WORK_EXHAUSTED,limited.outcome());
+                    assertTrue(prepaid.chargedUnits()>0);assertEquals(0,prepaid.openApplications());
+                    assertTrue(limited.metrics().totalWork()>=prepaid.chargedUnits());
+                }
+            }
+        }
+        assertTrue(abandoned,"a bounded real search must expose the paid suspended phase at cleanup");
+    }
+
     @Test void firstPullDoesNotInstantiateTheSecondRealLearnedOccurrence() {
         var eager = eager(PAIR);
         assertEquals(2, eager.moves().size(), "the real learned schema has two distinct application sites");

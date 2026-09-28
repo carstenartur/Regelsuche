@@ -43,14 +43,24 @@ public final class NativeMoveSearch {
             Objects.requireNonNull(mode);Objects.requireNonNull(scheduling);Objects.requireNonNull(budget);
             Objects.requireNonNull(policy);Objects.requireNonNull(stateScore);Objects.requireNonNull(stateValue);Objects.requireNonNull(verifier);
             if(context.phase()==MoveContext.Phase.PRODUCTION)throw new IllegalArgumentException("experimental scheduling is not production-qualified (#745)");
-            if(scheduling!=MoveSearch.Scheduling.STAGED && scheduling!=MoveSearch.Scheduling.EAGER_CONTROL)
+            if(scheduling!=MoveSearch.Scheduling.STAGED && scheduling!=MoveSearch.Scheduling.EAGER_CONTROL && scheduling!=MoveSearch.Scheduling.STAGED_INCREMENTAL)
                 throw new IllegalArgumentException("native provider does not implement this scheduling contract");
         }
     }
     public static final class Result {
         private final SearchExecution.Result<TypedMoveSearch.State,NativeSearchMove,NativeVerification,NativeStateValue.Assessment> result;
         private final Expr source;
-        private Result(Expr source,SearchExecution.Result<TypedMoveSearch.State,NativeSearchMove,NativeVerification,NativeStateValue.Assessment> result){this.source=source;this.result=result;}
+        private final List<StagedIncrementalMoveExecution.Provider> incrementalProviders;
+        private Result(Problem problem,SearchExecution.Result<TypedMoveSearch.State,NativeSearchMove,NativeVerification,NativeStateValue.Assessment> result){
+            this.source=problem.source();this.result=result;
+            incrementalProviders=problem.scheduling()==MoveSearch.Scheduling.STAGED_INCREMENTAL?problem.providers().stream()
+                .map(p->new StagedIncrementalMoveExecution.Provider(p.descriptor(),NativeIncrementalSources.definition(p))).toList():null;
+        }
+        @SuppressWarnings("unchecked")
+        public List<SearchExecution.Expansion<TypedMoveSearch.State>> cursorReceipts(){
+            return result.pickerReceipts().stream().map(r->(SearchExecution.Expansion<TypedMoveSearch.State>)r).toList();
+        }
+        public boolean accountingComplete(){return cursorReceipts().stream().flatMap(r->r.lanes().stream()).allMatch(l->l.cursor()==null || l.cursor().accountingComplete());}
         public MoveSearch.Outcome outcome(){return result.outcome();}
         public Expr output(){return result.witness().isEmpty()?source:result.witness().getLast().target().expression();}
         public List<SearchExecution.Step<TypedMoveSearch.State,NativeSearchMove,NativeVerification>> witness(){return result.witness();}
@@ -61,14 +71,16 @@ public final class NativeMoveSearch {
             return new MoveSearch.Result(result.outcome(),result.witness().stream().map(s->new MoveSearch.WitnessStep(export(s.source()),export(s.target()),s.move().exportLegacy(),s.verification().exportLegacy())).toList(),
                 result.events().stream().map(e->new MoveSearch.Event(export(e.source()),export(e.target()),e.move().exportLegacy(),e.decision(),e.verification()==null?null:e.verification().exportLegacy())).toList(),
                 result.reachedStates().stream().map(NativeMoveSearch::export).collect(java.util.stream.Collectors.toSet()),
-                result.deadEndStates().stream().map(NativeMoveSearch::export).toList(),result.metrics(),result.completeBoundedRelation(),assessments);
+                result.deadEndStates().stream().map(NativeMoveSearch::export).toList(),result.metrics(),result.completeBoundedRelation(),assessments,null,incrementalProviders==null?null:
+                    new StagedIncrementalMoveExecution(REVISION,StagedIncrementalMoveExecution.ORDER_REVISION,incrementalProviders,
+                        cursorReceipts().stream().map(r->new StagedIncrementalMoveExecution.Expansion(export(r.source()),r.closed(),r.lanes())).toList()));
         }
     }
     public record QualityResult(Result search,TypedMoveSearch.State incumbent,long inputScore,long outputScore,
             List<SearchExecution.Step<TypedMoveSearch.State,NativeSearchMove,NativeVerification>> witness,long replayWork,long workBudget) {
         public QualityResult { witness=List.copyOf(witness); }
         public long totalWork(){return Math.addExact(search.metrics().totalWork(),replayWork);}
-        public boolean withinBudget(){return totalWork()<=workBudget;}
+        public boolean withinBudget(){return search.accountingComplete() && totalWork()<=workBudget;}
     }
     public QualityResult searchUntil(Problem problem,TypedSourceOnlySearch.Objective objective,long maximumOutputScore,SearchContinuationContract continuation){
         return select(problem,objective,maximumOutputScore,true,continuation);
@@ -96,7 +108,7 @@ public final class NativeMoveSearch {
         },maximumOutputScore,stopAtQuality);
         try(var store=new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)) {
             var execution=new Execution(problem,store);
-            var result=new Result(problem.source(),new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
+            var result=new Result(problem,new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
                 .search(execution,continuation,selection));
             long replayWork=0;
             TypedMoveSearch.State cursor=selection.witness().isEmpty()?selection.incumbent():selection.witness().getFirst().source();
@@ -116,7 +128,7 @@ public final class NativeMoveSearch {
     public Result search(Problem problem,SearchContinuationContract continuation){
         validate(problem);
         try(var store=new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)) {
-            return new Result(problem.source(),new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
+            return new Result(problem,new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,NativeStateValue.Assessment,NativeVerification>()
                 .search(new Execution(problem,store),continuation,null));
         }
     }
@@ -146,13 +158,6 @@ public final class NativeMoveSearch {
             return problem.verifier().verify(state,move,problem.context());
         }
         @Override public SearchExecution.Picker<NativeSearchMove> picker(TypedMoveSearch.State state){
-            var providers=problem.providers().stream().<SearchBatches.Provider<NativeSearchMove>>map(p->new SearchBatches.Provider<>() {
-                @Override public MoveProvider.Descriptor descriptor(){return p.descriptor();}
-                @Override public SearchBatches.Batch<NativeSearchMove> candidates(){
-                    var batch=p.candidates(state,problem.context());
-                    return new SearchBatches.Batch<>(batch.moves(),batch.work(),batch.complete());
-                }
-            }).toList();
             var ranking=new SearchBatches.Ranking<NativeSearchMove>() {
                 @Override public double score(NativeSearchMove move){return problem.policy().score(move,state,problem.context());}
                 @Override public int stage(MoveProvider.Descriptor descriptor){return problem.policy().stage(descriptor,state,problem.context()).ordinal();}
@@ -160,6 +165,15 @@ public final class NativeMoveSearch {
                 @Override public long contextWork(){return problem.policy().contextWork(state,problem.context());}
                 @Override public void requireSource(NativeSearchMove move){move.requireSource(state.expression());}
             };
+            if(scheduling()==MoveSearch.Scheduling.STAGED_INCREMENTAL)return new StagedIncrementalLanes<>(problem.providers().stream()
+                .map(p->NativeIncrementalSources.lane(p,state,problem.context())).toList(),ranking,state);
+            var providers=problem.providers().stream().<SearchBatches.Provider<NativeSearchMove>>map(p->new SearchBatches.Provider<>() {
+                @Override public MoveProvider.Descriptor descriptor(){return p.descriptor();}
+                @Override public SearchBatches.Batch<NativeSearchMove> candidates(){
+                    var batch=p.candidates(state,problem.context());
+                    return new SearchBatches.Batch<>(batch.moves(),batch.work(),batch.complete());
+                }
+            }).toList();
             return scheduling()==MoveSearch.Scheduling.STAGED?new StagedBatchPicker<>(providers,ranking):new EagerBatchPicker<>(providers,ranking);
         }
     }
