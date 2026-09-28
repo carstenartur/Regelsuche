@@ -105,10 +105,11 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
         int rightSign
     ) {
         Polynomial leftPolynomial = toPolynomial(left);
+        if (leftPolynomial == null) return null;
         try(var leftOwned=RetainedOperation.retain(leftPolynomial)) {
             Polynomial rightPolynomial = toPolynomial(right);
             try(var rightOwned=RetainedOperation.retain(rightPolynomial)) {
-                if (leftPolynomial == null || rightPolynomial == null) {
+                if (rightPolynomial == null) {
                     return null;
                 }
                 var scaled=rightPolynomial.scale(rightSign);
@@ -119,15 +120,14 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
 
     private Polynomial multiply(Expr left, Expr right) {
         Polynomial leftPolynomial = toPolynomial(left);
+        if (leftPolynomial == null || (!expandCompositePolynomials && !leftPolynomial.isMonomial())) return null;
         try(var leftOwned=RetainedOperation.retain(leftPolynomial)) {
             Polynomial rightPolynomial = toPolynomial(right);
             try(var rightOwned=RetainedOperation.retain(rightPolynomial)) {
-                if (leftPolynomial == null || rightPolynomial == null) {
+                if (rightPolynomial == null) {
                     return null;
                 }
-                if (!expandCompositePolynomials
-                        && (!leftPolynomial.isMonomial()
-                            || !rightPolynomial.isMonomial())) {
+                if (!expandCompositePolynomials && !rightPolynomial.isMonomial()) {
                     return null;
                 }
                 return leftPolynomial.multiply(rightPolynomial);
@@ -245,29 +245,35 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
             if (powers.isEmpty()) {
                 return RetainedOperation.produced(new NumberExpr(1));
             }
+            RetainedOperation.work(1);
+            if (powers.size() == 1) {
+                var entry = powers.entrySet().iterator().next();
+                RetainedOperation.work(1);
+                return variablePower(entry.getKey(), entry.getValue());
+            }
             List<Expr> factors = new ArrayList<>();
             RetainedOperation.work(1);
             try (var owned = RetainedOperation.retain(this, factors)) {
                 for (Map.Entry<String, Integer> entry : powers.entrySet()) {
-                    Expr variable = new VariableExpr(entry.getKey());
+                    Expr factor = variablePower(entry.getKey(), entry.getValue());
+                    factors.add(factor);
                     RetainedOperation.work(1);
-                    try (var leaf = RetainedOperation.retain(variable)) {
-                        Expr factor;
-                        if (entry.getValue() == 1) {
-                            factor = variable;
-                        } else {
-                            var exponent = new NumberExpr(entry.getValue());
-                            RetainedOperation.work(1);
-                            try (var number = RetainedOperation.retain(exponent)) {
-                                factor = RetainedOperation.produced(new BinaryExpr(variable, BinaryOperator.POW, exponent));
-                            }
-                        }
-                        factors.add(factor);
-                        RetainedOperation.work(1);
-                        RetainedOperation.checkpoint();
-                    }
+                    RetainedOperation.checkpoint();
                 }
                 return leftAssociate(factors, BinaryOperator.MUL);
+            }
+        }
+
+        private static Expr variablePower(String name, int power) {
+            Expr variable = new VariableExpr(name);
+            RetainedOperation.work(1);
+            if (power == 1) return RetainedOperation.produced(variable);
+            try (var leaf = RetainedOperation.retain(variable)) {
+                var exponent = new NumberExpr(power);
+                RetainedOperation.work(1);
+                try (var number = RetainedOperation.retain(exponent)) {
+                    return RetainedOperation.produced(new BinaryExpr(variable, BinaryOperator.POW, exponent));
+                }
             }
         }
 
@@ -514,12 +520,12 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
     }
 
     private static Expr withCoefficient(ExactRational coefficient, Expr term) {
+        RetainedOperation.work(1);
+        if (coefficient.isOne()) return term;
         try (var operands = RetainedOperation.retain(coefficient, term)) {
-            RetainedOperation.work(1);
             if (term instanceof NumberExpr number && number.value().equalsInteger(1)) {
                 return exactRationalExpression(coefficient);
             }
-            if (coefficient.isOne()) return term;
             Expr exactCoefficient = exactRationalExpression(coefficient);
             try (var leaf = RetainedOperation.retain(exactCoefficient)) {
                 return exactCoefficient == null ? null
@@ -529,6 +535,8 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
     }
 
     private static Expr leftAssociate(List<Expr> expressions, BinaryOperator operator) {
+        RetainedOperation.work(1);
+        if (expressions.size() == 1) return expressions.getFirst();
         Object[] current = {expressions.getFirst()};
         RetainedOperation.work(1);
         try (var owned = RetainedOperation.retain(expressions, current)) {
