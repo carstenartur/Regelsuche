@@ -36,19 +36,14 @@ public final class EquivalenceAwarePatternMatcher {
         Map<String, Expr> bindings,
         RecognitionProfile profile
     ) {
-        MatchAttempt attempt = matchDetailed(
+        return matchDetailed(
             pattern,
             expression,
             bindings,
             profile,
-            DEFAULT_MAX_BACKTRACKING_BRANCHES
-        );
-        if (!attempt.matched()) {
-            return false;
-        }
-        bindings.clear();
-        bindings.putAll(attempt.bindings());
-        return true;
+            DEFAULT_MAX_BACKTRACKING_BRANCHES,
+            true
+        ).matched();
     }
 
     public static MatchAttempt matchDetailed(
@@ -73,6 +68,17 @@ public final class EquivalenceAwarePatternMatcher {
         RecognitionProfile profile,
         int maxBacktrackingBranches
     ) {
+        return matchDetailed(pattern,expression,bindings,profile,maxBacktrackingBranches,false);
+    }
+
+    private static MatchAttempt matchDetailed(
+        PatternExpr pattern,
+        Expr expression,
+        Map<String, Expr> bindings,
+        RecognitionProfile profile,
+        int maxBacktrackingBranches,
+        boolean publishBindings
+    ) {
         if (pattern == null || expression == null || bindings == null
                 || profile == null) {
             throw new IllegalArgumentException(
@@ -90,6 +96,7 @@ public final class EquivalenceAwarePatternMatcher {
         var search = new MatchSearch(pattern,expression,working,profile,budget);
         long setupWork = 7L + bindings.size() + (original == bindings ? 0 : bindings.size())
             + (profile.inferAlgebraicBindings() ? 1 : 0);
+        boolean branchesSettled = false;
         try (var owned = RetainedOperation.retainCompleted(setupWork,
                 pattern,expression,bindings,profile,original,working,budget,result,search)) {
             try {
@@ -108,6 +115,18 @@ public final class EquivalenceAwarePatternMatcher {
                 var outcome = new MatchAttempt(status,selected,budget.usedBranches(),detail);
                 result[0] = outcome;
                 RetainedOperation.work(2L + (outcome.bindings() == selected ? 0 : selected.size()));
+                if (publishBindings) {
+                    // A boolean caller cannot receive the delegated branch counter.
+                    // Mark this debit before calling a sink that can itself throw.
+                    branchesSettled = true;
+                    RetainedOperation.work(budget.usedBranches());
+                    if (outcome.matched()) {
+                        int previousSize = bindings.size();
+                        bindings.clear();
+                        bindings.putAll(outcome.bindings());
+                        RetainedOperation.work(previousSize + outcome.bindings().size() + 1L);
+                    }
+                }
                 RetainedOperation.checkpoint();
                 return outcome;
             } catch (RuntimeException | Error failure) {
@@ -117,7 +136,7 @@ public final class EquivalenceAwarePatternMatcher {
         } catch (RuntimeException | Error failure) {
             // A returned outcome delegates these branches to its caller. This
             // includes failed frame closure: a staged result has not escaped yet.
-            try { RetainedOperation.work(budget.usedBranches()); }
+            try { if (!branchesSettled) RetainedOperation.work(budget.usedBranches()); }
             catch (RuntimeException | Error accounting) {
                 if (accounting != failure) failure.addSuppressed(accounting);
             }
