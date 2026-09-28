@@ -53,4 +53,16 @@ class GeometricSequenceTypedInputTest {
                 () -> GeometricSequenceDomainProvider.INPUT_CODEC.decode(invalid), invalid);
         }
     }
+
+    @Test
+    void rejectsTrailingEmptyFields() {
+        for (String invalid : List.of(
+                "observed=2,4;holdout=8;",
+                "observed=2,4;holdout=8;;",
+                PAYLOAD + ";",
+                PAYLOAD + ";;")) {
+            assertThrows(IllegalArgumentException.class,
+                () -> GeometricSequenceDomainProvider.INPUT_CODEC.decode(invalid), invalid);
+        }
+    }
 }

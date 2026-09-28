@@ -170,7 +170,7 @@ public final class GeometricSequenceDomainProvider
             java.util.Objects.requireNonNull(payload, "payload");
             Map<String, String> values = new java.util.LinkedHashMap<>();
             var knownFields = java.util.Set.of("observed", "holdout", "maxMultiplier");
-            for (String part : payload.split(";")) {
+            for (String part : payload.split(";", -1)) {
                 String[] field = part.split("=", 2);
                 String key = field[0].trim();
                 if (field.length != 2 || !knownFields.contains(key)) {
