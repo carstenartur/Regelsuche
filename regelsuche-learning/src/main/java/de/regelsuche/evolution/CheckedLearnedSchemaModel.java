@@ -1,5 +1,6 @@
 package de.regelsuche.evolution;
 
+import de.regelsuche.retention.RetainedGraph;
 import static de.regelsuche.evolution.CheckedSchemaSupport.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -47,7 +48,8 @@ import java.util.TreeMap;
  * Persisted provenance is descriptive: load re-proves every theorem and binds it to the
  * caller's expected inventory. A digest, training sample, or utility score grants no authority.
  */
-public final class CheckedLearnedSchemaModel {
+public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(inventoryHash);v.reference(inventorySemanticsHash);v.reference(originStrategyHash);v.reference(bounds);v.reference(requiredAssumptions);v.reference(schemas);v.reference(byId);v.reference(attempts);v.reference(canonicalJson);v.reference(modelHash);v.reference(descriptor);}
     public static final String REVISION = "regelsuche.checked-learned-schema-model/v1";
     public static final String CHECKER_REVISION = "regelsuche.scalar-rational-polynomial-schema-checker/v1";
     public static final String DOMAIN = "TOTAL_SCALAR_RATIONAL_POLYNOMIAL;LITERAL_NONZERO_DIVISORS;NONNEGATIVE_LITERAL_POWERS;ZERO_POWER_IS_ONE";
@@ -61,7 +63,8 @@ public final class CheckedLearnedSchemaModel {
     /** Hard limits can be tightened, never expanded by a loaded artifact. */
     public record Bounds(int maximumExpressionNodes, int maximumPatternNodes, int maximumDepth,
             int maximumCoefficientBits, int maximumExponent, int maximumExamples, int maximumPairAttempts,
-            int maximumSchemas, int maximumMatchAttempts, int maximumCandidates) {
+            int maximumSchemas, int maximumMatchAttempts, int maximumCandidates) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){}
         public static Bounds defaults() { return new Bounds(512, 128, 64, 256, 32, 128, 256, 32, 256, 32); }
         public Bounds {
             int[] values = {maximumExpressionNodes, maximumPatternNodes, maximumDepth, maximumCoefficientBits,
@@ -74,7 +77,8 @@ public final class CheckedLearnedSchemaModel {
     }
 
     /** A theorem capability is privately constructed only after symbolic verification. */
-    public static final class Schema {
+    public static final class Schema implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(id);v.reference(source);v.reference(target);v.reference(proofHash);v.reference(supportingObservationIds);}
         private final String id;
         private final PatternExpr source;
         private final PatternExpr target;
@@ -99,7 +103,8 @@ public final class CheckedLearnedSchemaModel {
     }
 
     /** Negative and exhausted attempts are retained as observations, never silently promoted. */
-    public record Attempt(List<String> observationIds, String status, String detail) {
+    public record Attempt(List<String> observationIds, String status, String detail) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(observationIds);v.reference(status);v.reference(detail);}
         public Attempt {
             observationIds = List.copyOf(observationIds);
             if (status == null || status.isBlank() || detail == null) throw new IllegalArgumentException("invalid schema attempt");
@@ -312,10 +317,17 @@ public final class CheckedLearnedSchemaModel {
     CheckedSchemaMatcherPlan prepareCursorPlan(int maximumSchemasPerOccurrence,
             Map<String, Double> utilities, Set<String> included) {
         return new CheckedSchemaMatcherPlan(this, descriptor, maximumSchemasPerOccurrence, utilities, included,
-            CheckedApplication::new);
+            new ApplicationFactory());
     }
 
-    private final class IndexedProvider implements TypedMoveSearch.TypedProvider {
+    private final class ApplicationFactory implements CheckedSchemaMatcherPlan.Application,RetainedGraph.View {
+        @Override public CheckedSchemaMatcherPlan.ApplicationSteps start(Schema schema,Expr source,String encoded,List<Integer> path,Map<String,Expr> bindings,Work work){
+            return new CheckedApplication(schema,source,encoded,path,bindings,work);
+        }
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedLearnedSchemaModel.this);}
+    }
+    private final class IndexedProvider implements TypedMoveSearch.TypedProvider,RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedLearnedSchemaModel.this);v.reference(index);}
         private final Map<String, List<Schema>> index;
         private final int maximumSchemasPerOccurrence;
         private final boolean allSchemasIncluded;
@@ -401,9 +413,12 @@ public final class CheckedLearnedSchemaModel {
         }
     }
 
-    private record ApplicationBatch(List<VerifiedApplication> applications,boolean complete) {}
+    private record ApplicationBatch(List<VerifiedApplication> applications,boolean complete)  implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(applications);}
+    }
     /** Only this final model-owned provider is recognized by the installed native checker. */
-    final class NativeProvider implements NativeMoveProvider {
+    final class NativeProvider implements NativeMoveProvider,RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedLearnedSchemaModel.this);v.reference(index);}
         private final IndexedProvider index;
         private NativeProvider(IndexedProvider index){this.index=index;}
         @Override public IncrementalProviderContract.Mathematics mathematicalKind(){return IncrementalProviderContract.Mathematics.EXACT;}
@@ -427,7 +442,9 @@ public final class CheckedLearnedSchemaModel {
         return new NativeMoveProvider.Batch(proofs.stream().map(proof->new NativeSearchMove(proof,descriptor,metrics.totalWorkUnits(),Set.of())).toList(),metrics,batch.complete());
     }
 
-    private record Occurrence(Expr expression, List<Integer> path) {}
+    private record Occurrence(Expr expression, List<Integer> path)  implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(expression);v.reference(path);}
+    }
     private static List<Integer> child(List<Integer> path, int index) {
         var copy = new ArrayList<>(path);
         copy.add(index);
@@ -441,10 +458,12 @@ public final class CheckedLearnedSchemaModel {
     /** Privately issued capability recognized by the installed SPI; public records/JSON are not accepted. */
     public record ApplicationData(String revision,String checkerRevision,String inventorySemanticsHash,String modelId,
             String schemaId,String proofHash,String domain,Expr source,Expr target,List<Integer> path,Map<String,Expr> substitutions,
-            long applicationWork,String modelHash) {
-        public ApplicationData { path=List.copyOf(path);substitutions=java.util.Collections.unmodifiableMap(new TreeMap<>(substitutions)); }
+            long applicationWork,String modelHash) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(revision);v.reference(checkerRevision);v.reference(inventorySemanticsHash);v.reference(modelId);v.reference(schemaId);v.reference(proofHash);v.reference(domain);v.reference(source);v.reference(target);v.reference(path);v.reference(substitutions);v.reference(modelHash);}
+        public ApplicationData { path=List.copyOf(path);substitutions=de.regelsuche.retention.RetainedSortedMap.copyOf(substitutions); }
     }
-    static final class VerifiedApplication {
+    static final class VerifiedApplication implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(data);v.reference(binding);}
         private final ApplicationData data;
         private final ExactTheoryEvidence.Binding binding;
         private VerifiedApplication(ApplicationData data,String encodedSource){this.data=data;binding=encodedSource==null?null:renderEvidence(data,encodedSource);}
@@ -459,13 +478,15 @@ public final class CheckedLearnedSchemaModel {
     }
 
     /** The eager provider, lazy cursor and independent concrete verifier all execute these same checks. */
-    private final class CheckedApplication implements CheckedSchemaMatcherPlan.ApplicationSteps {
+    private final class CheckedApplication implements CheckedSchemaMatcherPlan.ApplicationSteps,RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedLearnedSchemaModel.this);v.reference(schema);v.reference(source);v.reference(encodedSource);v.reference(path);v.reference(substitutions);v.reference(substitutionDomains);v.reference(work);v.reference(phase);v.reference(target);v.reference(verified);}
         private final Schema schema;
         private final Expr source;
         private final String encodedSource;
         private final List<Integer> path;
         private final Map<String, Expr> substitutions;
-        private final java.util.Iterator<Expr> substitutionDomains;
+        private final List<Expr> substitutionDomains;
+        private int substitutionIndex;
         private final Work work;
         private ApplicationPhase phase;
         private Expr target;
@@ -476,8 +497,9 @@ public final class CheckedLearnedSchemaModel {
                 Map<String, Expr> substitutions, Work work) {
             this.schema = schema; this.source = source; this.encodedSource = encodedSource;
             this.path = path; this.substitutions = substitutions; this.work = work;
-            substitutionDomains = substitutions.values().iterator();
-            phase = substitutionDomains.hasNext() ? ApplicationPhase.SUBSTITUTION_DOMAIN : ApplicationPhase.INSTANTIATION;
+            substitutionDomains = List.copyOf(substitutions.values());
+            de.regelsuche.retention.RetainedOperation.work(substitutionDomains.size()+1L);
+            phase = substitutionIndex<substitutionDomains.size() ? ApplicationPhase.SUBSTITUTION_DOMAIN : ApplicationPhase.INSTANTIATION;
         }
         @Override public ApplicationPhase phase() { return phase; }
         @Override public boolean done() { return done; }
@@ -485,8 +507,8 @@ public final class CheckedLearnedSchemaModel {
             if (done) throw new IllegalStateException("checked application already complete");
             switch (phase) {
                 case SUBSTITUTION_DOMAIN -> {
-                    domain(substitutionDomains.next(), bounds, work);
-                    if (!substitutionDomains.hasNext()) phase = ApplicationPhase.INSTANTIATION;
+                    domain(substitutionDomains.get(substitutionIndex++), bounds, work);
+                    if (substitutionIndex>=substitutionDomains.size()) phase = ApplicationPhase.INSTANTIATION;
                 }
                 case INSTANTIATION -> {
                     Expr replacement = schema.target().instantiate(substitutions);
@@ -613,8 +635,10 @@ public final class CheckedLearnedSchemaModel {
         try{return apply(schema,source,encodedSource,path,substitutions,applicationWork);}
         finally{work.add(applicationWork.units);}
     }
-    public NativeVerifier nativeVerifier() {
-        return (source,move,context)->{
+    public NativeVerifier nativeVerifier() {return new IndependentNativeVerifier();}
+    private final class IndependentNativeVerifier implements NativeVerifier,RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedLearnedSchemaModel.this);}
+        @Override public NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove move,TypedMoveSearch.Context context){
             var work=new Work();work.add(1);
             try {
                 if(!NativeMoveProvider.carries(requiredAssumptions,source,context) || !NativeMoveProvider.carries(move.assumptions(),source,context))
@@ -639,7 +663,7 @@ public final class CheckedLearnedSchemaModel {
                     accepted?"CHECKED_SCHEMA_OCCURRENCE_VERIFIED":"CHECKED_SCHEMA_TARGET_OR_EVIDENCE_MISMATCH");
             } catch(ReplayRejected rejected){return nativeRejected(work,rejected.getMessage());}
             catch(IllegalArgumentException unsupported){return nativeRejected(work,"CHECKED_SCHEMA_UNSUPPORTED_OR_MALFORMED");}
-        };
+        }
     }
     private static NativeVerification nativeRejected(Work work,String detail){return new NativeVerification(false,work.units,null,null,detail);}
     private static MoveVerifier.Verification rejected(Work work, String detail) {

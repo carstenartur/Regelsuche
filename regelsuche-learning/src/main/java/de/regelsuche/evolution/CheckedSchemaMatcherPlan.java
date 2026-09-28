@@ -1,5 +1,6 @@
 package de.regelsuche.evolution;
 
+import de.regelsuche.retention.RetainedGraph;
 import static de.regelsuche.evolution.CheckedSchemaSupport.*;
 import de.regelsuche.search.moves.IncrementalProviderContract.Definition;
 import de.regelsuche.search.moves.IncrementalProviderContract.Kind;
@@ -27,14 +28,20 @@ import java.util.Set;
 import java.util.TreeMap;
 
 /** Immutable preparation shared by cursor sessions, not an eagerly generated candidate list. */
-public final class CheckedSchemaMatcherPlan {
+public final class CheckedSchemaMatcherPlan implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(bounds);v.reference(descriptor);v.reference(index);v.reference(application);v.reference(definition);v.reference(compilation);v.reference(model);}
     public static final String REVISION = "regelsuche.checked-schema-matcher-plan/v1";
     public static final String WORK_REVISION = "regelsuche.checked-schema-cursor-work/v2-prepaid-phases";
     /** Preparation is a separate lifecycle charge; opening a cursor never rebuilds this index. */
     public record Compilation(String revision, String configurationHash, long workUnits,
-            int includedSchemas, long patternNodeVisits, long orderingComparisons) {}
-    record Entry(CheckedLearnedSchemaModel.Schema schema, ExprMatcher matcher, int reduction) {}
-    record Range(List<Entry> shaped, List<Entry> wildcard) {
+            int includedSchemas, long patternNodeVisits, long orderingComparisons)  implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(revision);v.reference(configurationHash);}
+    }
+    record Entry(CheckedLearnedSchemaModel.Schema schema, ExprMatcher matcher, int reduction)  implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(schema);v.reference(matcher);}
+    }
+    record Range(List<Entry> shaped, List<Entry> wildcard) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(shaped);v.reference(wildcard);}
         int size() { return shaped.size() + wildcard.size(); }
         Entry get(int index) { return index < shaped.size() ? shaped.get(index) : wildcard.get(index - shaped.size()); }
     }
@@ -102,7 +109,8 @@ public final class CheckedSchemaMatcherPlan {
             (state, context, meter) -> CheckedSchemaCursor.legacy(this, state.expression(), meter));
         return new RegisteredIncrementalMoveProvider(descriptor, definition, new Registry(List.of(registration)));
     }
-    final class NativeProvider implements ExprIncrementalProvider {
+    final class NativeProvider implements ExprIncrementalProvider,RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedSchemaMatcherPlan.this);}
         private NativeProvider() {}
         @Override public MoveProvider.Descriptor descriptor(){return descriptor;}
         @Override public Definition contractDefinition(){

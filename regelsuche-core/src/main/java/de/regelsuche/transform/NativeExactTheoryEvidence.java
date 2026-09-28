@@ -1,12 +1,15 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.retention.RetainedGraph;
 import de.regelsuche.ast.Expr;
 import java.util.Objects;
 import java.util.ServiceLoader;
 
 /** Privately issued installed-checker capability; its public observation cannot issue another capability. */
-public final class NativeExactTheoryEvidence {
-    public record Binding(Expr source,Expr target,String theoryStepId,long canonicalWorkUnits,Object observation) {
+public final class NativeExactTheoryEvidence implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(binding);v.reference(issued);v.reference(provider);}
+    public record Binding(Expr source,Expr target,String theoryStepId,long canonicalWorkUnits,Object observation) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(source);v.reference(target);v.reference(theoryStepId);v.reference(observation);}
         public Binding {
             Objects.requireNonNull(source);Objects.requireNonNull(target);Objects.requireNonNull(observation);
             if(source.equals(target) || theoryStepId==null || theoryStepId.isBlank() || canonicalWorkUnits<1)

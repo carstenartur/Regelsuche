@@ -1,5 +1,6 @@
 package de.regelsuche.search.moves;
 
+import de.regelsuche.retention.RetainedGraph;
 import static de.regelsuche.search.moves.IncrementalProviderContract.*;
 import de.regelsuche.transform.ExecutionWork;
 import java.util.ArrayList;
@@ -13,6 +14,7 @@ public interface ExprIncrementalProvider extends NativeMoveProvider {
     default ObjectCursor<NativeMoveProof> openSession(TypedMoveSearch.State state,TypedMoveSearch.Context context) {
         if(contractDefinition().transport()!=Transport.NATIVE_EXPR_V1)throw new IllegalArgumentException("native cursor requires native transport");
         return new ManagedProviderCursor<>(contractDefinition(),new ManagedProviderCursor.Binding<>() {
+            @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(ExprIncrementalProvider.this);v.reference(state);v.reference(context);}
             @Override public boolean carries(){return NativeMoveProvider.carries(descriptor().requiredAssumptions(),state,context);}
             @Override public ObjectSource<NativeMoveProof> open(Meter meter){return openSource(state,context,meter);}
             @Override public void requireSource(NativeMoveProof candidate){

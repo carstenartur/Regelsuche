@@ -1,5 +1,6 @@
 package de.regelsuche.evolution;
 
+import de.regelsuche.retention.RetainedGraph;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.StreamReadConstraints;
@@ -33,7 +34,8 @@ final class CheckedSchemaSupport {
 
     private CheckedSchemaSupport() {}
 
-    static final class Work {
+    static final class Work implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){}
         long units;
         void add(long count) { units = Math.addExact(units, count); }
     }

@@ -1,5 +1,6 @@
 package de.regelsuche.evolution;
 
+import de.regelsuche.retention.RetainedGraph;
 import static de.regelsuche.evolution.CheckedSchemaSupport.*;
 import de.regelsuche.search.moves.IncrementalProviderContract.Meter;
 import de.regelsuche.search.moves.IncrementalProviderContract.Operation;
@@ -24,9 +25,12 @@ import java.util.Map;
 import java.util.Optional;
 
 /** One retained match/application at most; never traverses or instantiates later sites eagerly. */
-final class CheckedSchemaCursor<T> implements ObjectSource<T> {
+final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(plan);v.reference(encodedSource);v.reference(meter);v.reference(pending);v.reference(source);v.reference(occurrence);v.reference(relevant);v.reference(matchedEntry);v.reference(bindings);v.reference(application);v.reference(applicationWork);v.reference(payment);v.reference(ready);v.reference(result);v.reference(mathematics);v.reference(status);}
     private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();
-    private record Occurrence(Expr expression, List<Integer> path) {}
+    private record Occurrence(Expr expression, List<Integer> path)  implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(expression);v.reference(path);}
+    }
     private final CheckedSchemaMatcherPlan plan;
     private final String encodedSource;
     private final Meter meter;
@@ -61,7 +65,17 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T> {
         };
     }
     static ObjectSource<NativeMoveProof> nativeSource(CheckedSchemaMatcherPlan plan,Expr source,Meter meter) {
-        return new CheckedSchemaCursor<>(plan,null,source,meter,CheckedSchemaMatcherPlan.ApplicationSteps::nativeResult,NativeMoveProof::work);
+        return new CheckedSchemaCursor<>(plan,null,source,meter,NativeResult.INSTANCE,NativeMathematics.INSTANCE);
+    }
+    private enum NativeResult implements Function<CheckedSchemaMatcherPlan.ApplicationSteps,NativeMoveProof>,RetainedGraph.View {
+        INSTANCE;
+        @Override public NativeMoveProof apply(CheckedSchemaMatcherPlan.ApplicationSteps steps){return steps.nativeResult();}
+        @Override public void retainedReferences(RetainedGraph.Visitor v){}
+    }
+    private enum NativeMathematics implements Function<NativeMoveProof,ExecutionWork>,RetainedGraph.View {
+        INSTANCE;
+        @Override public ExecutionWork apply(NativeMoveProof proof){return proof.work();}
+        @Override public void retainedReferences(RetainedGraph.Visitor v){}
     }
     @Override public Optional<T> next(long allowance) {
         if (allowance < 0) throw new IllegalArgumentException("negative schema allowance");
