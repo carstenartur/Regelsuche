@@ -128,7 +128,11 @@ public final class NativeMoveSearch {
         public List<SearchExecution.Expansion<TypedMoveSearch.State>> cursorReceipts(){
             return result.pickerReceipts().stream().map(r->(SearchExecution.Expansion<TypedMoveSearch.State>)r).toList();
         }
-        public boolean accountingComplete(){return (accounting==null || accounting.complete()) && cursorReceipts().stream().flatMap(r->r.lanes().stream()).allMatch(l->l.cursor()==null || l.cursor().accountingComplete());}
+        /** Managed cursor receipts from eager/staged batch draining; separate from lane scheduling receipts. */
+        public List<IncrementalProviderContract.Snapshot> batchCursorReceipts(){return result.batchCursorReceipts();}
+        public boolean accountingComplete(){return (accounting==null || accounting.complete())
+            && batchCursorReceipts().stream().allMatch(receipt->receipt.accountingComplete() && receipt.status()!=IncrementalProviderContract.Status.FAILED)
+            && cursorReceipts().stream().flatMap(r->r.lanes().stream()).allMatch(l->l.cursor()==null || l.cursor().accountingComplete());}
         public Accounting accounting(){if(accounting==null)throw new IllegalStateException("ownership accounting unavailable for this revision");return accounting;}
         public String workRevision(){return REVISION;}
         public long replayWork(){return replayWork;}
@@ -326,7 +330,7 @@ public final class NativeMoveSearch {
                 @Override public MoveProvider.Descriptor descriptor(){return p.descriptor();}
                 @Override public SearchBatches.Batch<NativeSearchMove> candidates(){
                     var batch=p.candidates(state,problem.context());
-                    return new SearchBatches.Batch<>(batch.moves(),batch.work(),batch.complete());
+                    return new SearchBatches.Batch<>(batch.moves(),batch.work(),batch.complete(),batch.cursorReceipts());
                 }
             }).toList();
             return scheduling()==MoveSearch.Scheduling.STAGED?new StagedBatchPicker<>(providers,ranking):new EagerBatchPicker<>(providers,ranking,false);

@@ -56,6 +56,11 @@ class NativeBatchCursorFailureTest {
         var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE);
         assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.outcome(),"failed close must survive eager draining into a batch");
         assertFalse(result.accountingComplete());assertFalse(result.withinBudget());
+        assertEquals(1,result.batchCursorReceipts().size());
+        var receipt=result.batchCursorReceipts().getFirst();
+        assertEquals(Status.FAILED,receipt.status());assertTrue(receipt.closed());assertFalse(receipt.accountingComplete());
+        assertTrue(receipt.detailCode().contains("close failed"));
+        assertThrows(UnsupportedOperationException.class,()->result.batchCursorReceipts().clear());
         assertEquals(1,result.metrics().primitiveWork());assertTrue(result.totalWork()>0);
         assertTrue(result.cursorReceipts().isEmpty(),"batch cursor receipts must not contaminate staged-lane projections");
         var control=new NativeMoveSearch().search(problem(new Provider(false),scheduling,false),SearchContinuationContract.PATH_SENSITIVE);

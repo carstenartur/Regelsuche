@@ -33,6 +33,6 @@ public interface ExprIncrementalProvider extends NativeMoveProvider {
             }
         } finally {cursor.close();}
         var receipt=cursor.snapshot();var work=receipt.work().metrics();
-        return new Batch(proofs.stream().map(proof->new NativeSearchMove(proof,descriptor(),work.totalWorkUnits(),Set.of())).toList(),work,receipt.complete());
+        return new Batch(proofs.stream().map(proof->new NativeSearchMove(proof,descriptor(),work.totalWorkUnits(),Set.of())).toList(),work,receipt.complete(),java.util.List.of(receipt));
     }
 }

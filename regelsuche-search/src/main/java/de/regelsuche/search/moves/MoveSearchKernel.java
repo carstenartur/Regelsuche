@@ -26,6 +26,7 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
         long measured;
         long measuredMathematics;
         int generated;
+        int capturedBatchReceipts;
         int enqueued;
         int pulls;
         Node(S state, long theoryWork, MoveWitnessPath<S,M,V> path, A value) { this.state = state; this.theoryWork = theoryWork; this.path = path; this.value = value; }
@@ -38,9 +39,10 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
     }
     private final class Ledger implements RetainedGraph.View {
         SearchExecution.Environment<E,S,M,A,V> workOwner;
-        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(MoveSearchKernel.this);v.reference(matches);v.reference(objective);v.reference(workOwner);}
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(MoveSearchKernel.this);v.reference(matches);v.reference(objective);v.reference(workOwner);v.reference(batchReceipts);}
         long primitive, search, verification, consumed, discarded, duplicates, deadEnds, explored, expanded, generated;
         final Map<String, Long> matches = new TreeMap<>();
+        final List<IncrementalProviderContract.Snapshot> batchReceipts=new ArrayList<>();
         MoveSearchObjective<S,M,V> objective;
         void observe(S state, MoveWitnessPath<S,M,V> path) {
             if (objective != null) search = Math.addExact(search, objective.observe(state, path));
@@ -58,6 +60,12 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
                 matches.merge(move.ruleFamily(), 1L, Long::sum); generated++;
             }
             node.generated = moves.size();
+            var receipts=node.picker.batchCursorReceipts();
+            for(int i=node.capturedBatchReceipts;i<receipts.size();i++) {
+                batchReceipts.add(receipts.get(i));
+                de.regelsuche.retention.RetainedOperation.work(1);
+            }
+            node.capturedBatchReceipts=receipts.size();
         }
     }
 
@@ -222,7 +230,8 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
             }
             if(!problem.ownershipComplete()) { stop(Outcome.INCONCLUSIVE);witness=List.of();hit=-1;primitiveHit=-1; }
             var receipts = opened.stream().map(node -> node.picker.executionReceipt()).toList();
-            boolean accountingComplete = problem.ownershipComplete() && opened.stream().allMatch(node -> node.picker.accountingComplete());
+            boolean accountingComplete = problem.ownershipComplete() && opened.stream().allMatch(node -> node.picker.accountingComplete())
+                && ledger.batchReceipts.stream().allMatch(receipt->receipt.accountingComplete() && receipt.status()!=IncrementalProviderContract.Status.FAILED);
             if (!accountingComplete && outcome != Outcome.WORK_EXHAUSTED) {
                 stop(Outcome.INCONCLUSIVE); witness = List.of(); hit = -1; primitiveHit = -1;
             }
@@ -230,7 +239,7 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
             return new SearchExecution.Result<>(outcome, witness, events, reached, deadEnds, new Metrics(ledger.generated, ledger.consumed, ledger.discarded,
                 ledger.generated - ledger.consumed, ledger.duplicates, ledger.deadEnds, ledger.explored, ledger.expanded,
                 ledger.primitive, ledger.search, ledger.verification, hit, primitiveHit, ledger.matches), complete, assessments,
-                receipts);
+                receipts,ledger.batchReceipts);
         }
     }
 

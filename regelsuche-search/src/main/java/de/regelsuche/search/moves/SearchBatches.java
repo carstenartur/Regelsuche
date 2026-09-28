@@ -8,10 +8,12 @@ import java.util.List;
 /** Representation-free batch opening/ranking; candidates retain their producer metadata. */
 final class SearchBatches {
     private SearchBatches() {}
-    record Batch<M>(List<M> moves,TransformationWorkMetrics work,boolean complete) implements RetainedGraph.View {
-    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(moves);v.reference(work);}
+    record Batch<M>(List<M> moves,TransformationWorkMetrics work,boolean complete,
+            List<IncrementalProviderContract.Snapshot> cursorReceipts) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(moves);v.reference(work);v.reference(cursorReceipts);}
 
-        Batch { moves=List.copyOf(moves); }
+        Batch(List<M> moves,TransformationWorkMetrics work,boolean complete){this(moves,work,complete,List.of());}
+        Batch { moves=List.copyOf(moves);cursorReceipts=List.copyOf(cursorReceipts); }
     }
     interface Provider<M> extends RetainedGraph.View {
         @Override default void retainedReferences(RetainedGraph.Visitor v){v.requireExact(this,Void.class);}

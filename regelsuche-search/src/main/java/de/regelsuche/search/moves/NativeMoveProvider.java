@@ -10,9 +10,11 @@ public interface NativeMoveProvider {
     default IncrementalProviderContract.Mathematics mathematicalKind(){
         throw new IllegalArgumentException("native provider requires an explicit mathematical work contract");
     }
-    record Batch(List<NativeSearchMove> moves,TransformationWorkMetrics work,boolean complete) implements de.regelsuche.retention.RetainedGraph.View {
-        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(moves);v.reference(work);}
-        public Batch { moves=List.copyOf(moves); }
+    record Batch(List<NativeSearchMove> moves,TransformationWorkMetrics work,boolean complete,
+            List<IncrementalProviderContract.Snapshot> cursorReceipts) implements de.regelsuche.retention.RetainedGraph.View {
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(moves);v.reference(work);v.reference(cursorReceipts);}
+        public Batch(List<NativeSearchMove> moves,TransformationWorkMetrics work,boolean complete){this(moves,work,complete,List.of());}
+        public Batch { moves=List.copyOf(moves);cursorReceipts=List.copyOf(cursorReceipts); }
     }
     static boolean carries(List<String> required,TypedMoveSearch.State source,TypedMoveSearch.Context context) {
         var available=new java.util.HashSet<>(context.initialAssumptions());available.addAll(source.assumptions());return available.containsAll(required);

@@ -30,6 +30,7 @@ public final class SearchExecution {
     }
     public interface Picker<M> extends AutoCloseable {
         default void initialize() {}
+        default List<IncrementalProviderContract.Snapshot> batchCursorReceipts(){return List.of();}
         Optional<M> next(); TransformationWorkMetrics workMetrics(); List<M> generatedMoves(); boolean complete();
         default Optional<M> next(long allowance) { return next(); }
         default boolean accountingComplete() { return true; }
@@ -64,11 +65,11 @@ public final class SearchExecution {
     }
     record Result<S,M,V,A>(MoveSearch.Outcome outcome,List<Step<S,M,V>> witness,List<Event<S,M,V>> events,
             Set<S> reachedStates,List<S> deadEndStates,MoveSearch.Metrics metrics,boolean completeBoundedRelation,
-            Map<S,A> stateAssessments,List<Object> pickerReceipts) implements RetainedGraph.View {
-        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(outcome);v.reference(witness);v.reference(events);v.reference(reachedStates);v.reference(deadEndStates);v.reference(metrics);v.reference(stateAssessments);v.reference(pickerReceipts);}
+            Map<S,A> stateAssessments,List<Object> pickerReceipts,List<IncrementalProviderContract.Snapshot> batchCursorReceipts) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(outcome);v.reference(witness);v.reference(events);v.reference(reachedStates);v.reference(deadEndStates);v.reference(metrics);v.reference(stateAssessments);v.reference(pickerReceipts);v.reference(batchCursorReceipts);}
         Result {
             witness=List.copyOf(witness);events=List.copyOf(events);reachedStates=Set.copyOf(reachedStates);
-            deadEndStates=List.copyOf(deadEndStates);stateAssessments=Map.copyOf(stateAssessments);pickerReceipts=List.copyOf(pickerReceipts);
+            deadEndStates=List.copyOf(deadEndStates);stateAssessments=Map.copyOf(stateAssessments);pickerReceipts=List.copyOf(pickerReceipts);batchCursorReceipts=List.copyOf(batchCursorReceipts);
         }
     }
 }

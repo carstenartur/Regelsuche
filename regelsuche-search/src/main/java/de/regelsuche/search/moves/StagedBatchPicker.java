@@ -11,9 +11,12 @@ import java.util.Optional;
 
 /** Opens provider batches on demand. Metadata ordering never invokes an engine. */
 final class StagedBatchPicker<M> implements SearchExecution.Picker<M>,RetainedGraph.View {
-    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(lanes);v.reference(primitiveLanes);v.reference(generated);v.reference(policy);v.reference(work);}
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(lanes);v.reference(primitiveLanes);v.reference(generated);v.reference(batchReceipts);v.reference(policy);v.reference(work);}
 
     private static final int EXHAUSTED_STAGE = MovePriorityPolicy.Stage.values().length;
+    private final List<IncrementalProviderContract.Snapshot> batchReceipts=new ArrayList<>();
+    @Override public List<IncrementalProviderContract.Snapshot> batchCursorReceipts(){return batchReceipts;}
+
     private record Ranked<M>(M move, double score) implements RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(move);}
     }
@@ -54,6 +57,8 @@ final class StagedBatchPicker<M> implements SearchExecution.Picker<M>,RetainedGr
             if (lane.moves == null) {
                 var batch = lane.provider.candidates();
                 work = work.plus(batch.work());
+                batchReceipts.addAll(batch.cursorReceipts());
+                de.regelsuche.retention.RetainedOperation.work(batch.cursorReceipts().size());
                 exhaustive &= batch.complete();
                 generated.addAll(batch.moves());
                 var ranked = new ArrayList<Ranked<M>>();

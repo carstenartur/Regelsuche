@@ -11,7 +11,10 @@ import java.util.Optional;
 
 /** Explicit eager control. Stable ties preserve inventory order; every score is evaluated once. */
 final class EagerBatchPicker<M> implements SearchExecution.Picker<M>,RetainedGraph.View {
-    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(generated);v.reference(work);v.reference(providers);v.reference(policy);}
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(generated);v.reference(batchReceipts);v.reference(work);v.reference(providers);v.reference(policy);}
+
+    private final List<IncrementalProviderContract.Snapshot> batchReceipts=new ArrayList<>();
+    @Override public List<IncrementalProviderContract.Snapshot> batchCursorReceipts(){return batchReceipts;}
 
     private record Ranked<M>(M move, double score) implements RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(move);}
@@ -41,6 +44,8 @@ final class EagerBatchPicker<M> implements SearchExecution.Picker<M>,RetainedGra
             for(var provider:providers) {
                 var batch=provider.candidates();
                 work=work.plus(batch.work());
+                batchReceipts.addAll(batch.cursorReceipts());
+                de.regelsuche.retention.RetainedOperation.work(batch.cursorReceipts().size());
                 generated.addAll(batch.moves());
                 exhaustive&=batch.complete();
                 try(var held=RetainedOperation.retain(batch)) {
