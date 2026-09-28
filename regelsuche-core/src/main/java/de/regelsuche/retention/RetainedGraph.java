@@ -11,10 +11,32 @@ import java.util.*;
  * collection backing storage contributes one slot. Only exact audited owning container classes are supported;
  * wrappers/views/subclasses and opaque comparators are rejected. Scalars use canonical decimal characters;
  * BigInteger conversion text is paid and overlaps the retained scalar in the peak. Null fields still occupy slots. Shared objects
- * count once by identity. Global enum constants are borrowed. No reflection or retained registry.
+ * count once by identity. Only explicitly audited stateless enum types are borrowed; enum Views are traversed. No reflection or retained registry.
  */
 public final class RetainedGraph {
     private RetainedGraph() {}
+    // Cross-module names avoid a core -> search dependency. Same-loader exact declaring types
+    // only: no package-prefix admission and no exemption for caller-defined enum callbacks.
+    private static final Set<String> STATELESS_ENUMS=Set.of(
+        "de.regelsuche.ast.BinaryOperator", "de.regelsuche.transform.RewriteKind",
+        "de.regelsuche.assumption.Assumption$Kind", "de.regelsuche.knowledge.DerivationType",
+        "de.regelsuche.knowledge.RuleStatus", "de.regelsuche.knowledge.SearchEffect",
+        "de.regelsuche.search.moves.MoveSearch$Mode", "de.regelsuche.search.moves.MoveSearch$Scheduling",
+        "de.regelsuche.search.moves.MoveSearch$Outcome", "de.regelsuche.search.moves.MoveSearch$Decision",
+        "de.regelsuche.search.moves.MoveContext$Phase", "de.regelsuche.search.moves.SearchMove$SourceKind",
+        "de.regelsuche.search.moves.SearchMove$ProofStrength", "de.regelsuche.search.moves.MovePriorityPolicy$Stage",
+        "de.regelsuche.search.moves.SearchContinuationContract", "de.regelsuche.search.moves.NativeMoveSearch$ZeroScore",
+        "de.regelsuche.search.moves.NativeMovePriorityPolicy$InventoryOrder", "de.regelsuche.search.moves.NativeStateValue$Empty",
+        "de.regelsuche.search.moves.IncrementalProviderContract$ApplicationPhase",
+        "de.regelsuche.search.moves.IncrementalProviderContract$Kind", "de.regelsuche.search.moves.IncrementalProviderContract$Transport",
+        "de.regelsuche.search.moves.IncrementalProviderContract$Mathematics", "de.regelsuche.search.moves.IncrementalProviderContract$Status",
+        "de.regelsuche.search.moves.IncrementalProviderContract$Operation");
+    private static boolean borrowedEnum(Object value){
+        if(!(value instanceof Enum<?> enumeration) || value instanceof View)return false;
+        Class<?> type=enumeration.getDeclaringClass();
+        return type.getClassLoader()==RetainedGraph.class.getClassLoader() && STATELESS_ENUMS.contains(type.getName());
+    }
+
     public interface View { void retainedReferences(Visitor visitor); }
     public interface Visitor {
         void reference(Object value);
@@ -53,7 +75,7 @@ public final class RetainedGraph {
         }
         @Override public void reference(Object value){
             references=Math.addExact(references,1);work=Math.addExact(work,1);
-            if(value!=null && !(value instanceof Enum<?>))pending.addLast(value);
+            if(value!=null && !borrowedEnum(value))pending.addLast(value);
             accountingPeak();
         }
         void accountingPeak(){
