@@ -59,6 +59,14 @@ public final class NativeMoveSearch {
                 result.deadEndStates().stream().map(NativeMoveSearch::export).toList(),result.metrics(),result.completeBoundedRelation(),assessments);
         }
     }
+    public record QualityResult(Result search,TypedMoveSearch.State incumbent,long inputScore,long outputScore,
+            long replayWork,long workBudget) {
+        public long totalWork(){return Math.addExact(search.metrics().totalWork(),replayWork);}
+        public boolean withinBudget(){return totalWork()<=workBudget;}
+    }
+    public QualityResult searchUntil(Problem problem,TypedSourceOnlySearch.Objective objective,long maximumOutputScore,SearchContinuationContract continuation){
+        throw new UnsupportedOperationException("native source-only final replay is not implemented");
+    }
     public Result search(Problem problem,SearchContinuationContract continuation){
         de.regelsuche.search.program.AstExpressionValidation.inspect(problem.source());
         if(problem.context().goal()!=null)de.regelsuche.search.program.AstExpressionValidation.inspect(problem.context().goal());
