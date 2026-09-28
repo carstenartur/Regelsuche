@@ -8,6 +8,24 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class NativeProgramMoveProviderTest {
+    @Test void nativeGenerationPreservesTheLegacyHistoryMetadataBoundary() {
+        var a=PatternExpr.var("A");
+        var zero=new PatternRewriteRule("zero",PatternExpr.op(BinaryOperator.ADD,a,PatternExpr.num(0)),a);
+        var program=new CompiledLinearRewriteEngine(new RewriteProgram.Sequence(RewriteProgram.NodeMetadata.named("p".repeat(4097)),List.of(
+            new RewriteProgram.Source(RewriteProgram.NodeMetadata.named("zero-stage"),new PreparedAstRewriteTransformationEngine(List.of(zero),64,128)))),128).compileAst();
+        var descriptor=new MoveProvider.Descriptor("cleanup","cleanup",SearchMove.SourceKind.LEARNED,SearchMove.ProofStrength.REPLAYABLE,List.of(),SearchMove.ValueEvidence.UNKNOWN,"cleanup-v1");
+        var target=new VariableExpr("x");
+        var source=new BinaryExpr(target,BinaryOperator.ADD,new NumberExpr(0));
+        var history=program.transformMeasured(source).candidates().getFirst();
+        assertThrows(IllegalArgumentException.class,()->new TypedProgramMoveProvider(descriptor,program).proposal(history));
+        var provider=new NativeProgramMoveProvider(descriptor,program);
+        var state=new TypedMoveSearch.State(source,0,0,"",List.of(),java.util.Set.of(),0);
+        try(var transport=AstTransportObservation.open()) {
+            assertThrows(IllegalArgumentException.class,()->provider.candidates(state,TypedMoveSearch.Context.frozen(target)));
+            assertEquals(0,transport.total(),"native guards must not serialize the history");
+        }
+    }
+
     @Test void registeredProgramKeepsItsProducerHistoryThroughTheSharedFrontierAndLegacyExport() {
         var a=PatternExpr.var("A");
         var zero=new PatternRewriteRule("zero",PatternExpr.op(BinaryOperator.ADD,a,PatternExpr.num(0)),a);
