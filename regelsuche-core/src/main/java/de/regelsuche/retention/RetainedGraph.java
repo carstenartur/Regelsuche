@@ -110,6 +110,7 @@ public final class RetainedGraph {
         }
         void inspect(Object value){
             switch(value) {
+                case Equation equation -> { reference(equation.left());reference(equation.right()); }
                 case BinaryExpr binary -> { node();reference(binary.left());reference(binary.operator());reference(binary.right()); }
                 case FunctionExpr function -> { node();reference(function.name());reference(function.arguments()); }
                 case VariableExpr variable -> { node();reference(variable.name());reference(variable.symbol().orElse(null)); }

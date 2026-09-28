@@ -7,6 +7,8 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
@@ -19,26 +21,42 @@ public final class ExpressionFormatter {
     }
 
     public static String format(Expr expr) {
-        return formatMeasured(expr, units -> { });
+        return formatMeasured(expr, NativeEmission.INSTANCE);
     }
 
-    /** Charges emitted code units before appending each formatter fragment. */
+    /**
+     * Delegates emitted code units before appending each fragment. Native observation
+     * additionally pays workspace, allocation and copying; it does not charge the
+     * delegated emission again. An active native scope requires an audited callback view.
+     */
     public static String formatMeasured(Expr expr, java.util.function.LongConsumer emittedCodeUnits) {
-        Output builder = new Output(emittedCodeUnits);
-        append(
-            Objects.requireNonNull(expr, "expr"),
-            0,
-            builder);
-        return builder.toString();
+        Objects.requireNonNull(expr, "expr");
+        Objects.requireNonNull(emittedCodeUnits, "emittedCodeUnits");
+        try (var input = RetainedOperation.retain(expr, emittedCodeUnits)) {
+            if (expr instanceof VariableExpr variable) {
+                emittedCodeUnits.accept(variable.name().length());
+                RetainedOperation.work(1);
+                return variable.name();
+            }
+            Output builder = new Output(emittedCodeUnits);
+            try (var output = RetainedOperation.retain(builder)) {
+                append(expr, 0, builder);
+                return builder.value();
+            }
+        }
     }
 
     public static String format(Equation equation) {
         Objects.requireNonNull(equation, "equation");
-        Output builder = new Output(units -> { });
-        append(equation.left(), 0, builder);
-        builder.append(" = ");
-        append(equation.right(), 0, builder);
-        return builder.toString();
+        try (var input = RetainedOperation.retain(equation)) {
+            Output builder = new Output(NativeEmission.INSTANCE);
+            try (var output = RetainedOperation.retain(builder)) {
+                append(equation.left(), 0, builder);
+                builder.append(" = ");
+                append(equation.right(), 0, builder);
+                return builder.value();
+            }
+        }
     }
 
     private static void append(
@@ -47,22 +65,29 @@ public final class ExpressionFormatter {
         Output builder
     ) {
         Deque<Action> pending = new ArrayDeque<>();
-        pending.push(new FormatExpression(
-            expression,
-            parentPrecedence));
-        while (!pending.isEmpty()) {
-            Action action = pending.pop();
-            if (action instanceof AppendText text) {
-                builder.append(text.value());
-            } else {
-                FormatExpression format = (FormatExpression) action;
-                schedule(
-                    format.expression(),
-                    format.parentPrecedence(),
-                    pending,
-                    builder);
+        Object[] current = new Object[1];
+        RetainedOperation.work(2);
+        push(pending, new FormatExpression(expression, parentPrecedence));
+        try (var workspace = RetainedOperation.retain(pending, current)) {
+            while (!pending.isEmpty()) {
+                Action action = pending.pop();
+                current[0] = action;
+                RetainedOperation.work(2);
+                if (action instanceof AppendText text) {
+                    builder.append(text.value());
+                } else {
+                    FormatExpression format = (FormatExpression) action;
+                    schedule(format.expression(), format.parentPrecedence(), pending, builder);
+                }
+                current[0] = null;
+                RetainedOperation.work(1);
             }
         }
+    }
+
+    private static void push(Deque<Action> pending, Action action) {
+        pending.push(action);
+        RetainedOperation.work(1);
     }
 
     private static void schedule(
@@ -81,10 +106,12 @@ public final class ExpressionFormatter {
         }
         if (expression instanceof FunctionExpr function) {
             scheduleFunction(function, pending, builder);
+            RetainedOperation.checkpoint();
             return;
         }
         if (expression instanceof BinaryExpr binary) {
             scheduleBinary(binary, parentPrecedence, pending, builder);
+            RetainedOperation.checkpoint();
             return;
         }
         throw new IllegalArgumentException(
@@ -139,15 +166,15 @@ public final class ExpressionFormatter {
         Output builder
     ) {
         builder.append(function.name()).append('(');
-        pending.push(new AppendText(")"));
+        push(pending, new AppendText(")"));
         List<Expr> arguments = function.arguments();
         for (int index = arguments.size() - 1;
                 index >= 0;
                 index--) {
             if (index < arguments.size() - 1) {
-                pending.push(new AppendText(", "));
+                push(pending, new AppendText(", "));
             }
-            pending.push(new FormatExpression(
+            push(pending, new FormatExpression(
                 arguments.get(index),
                 0));
         }
@@ -164,7 +191,7 @@ public final class ExpressionFormatter {
         boolean parenthesized = precedence < parentPrecedence;
         if (parenthesized) {
             builder.append('(');
-            pending.push(new AppendText(")"));
+            push(pending, new AppendText(")"));
         }
 
         int leftAdjust = operator == BinaryOperator.POW ? 1 : 0;
@@ -176,12 +203,14 @@ public final class ExpressionFormatter {
             case MUL -> isDivision(binary.right()) ? 1 : 0;
             default -> 0;
         };
-        pending.push(new FormatExpression(
+        push(pending, new FormatExpression(
             binary.right(),
             precedence + rightAdjust));
-        pending.push(new AppendText(
-            " " + operator.symbol() + " "));
-        pending.push(new FormatExpression(
+        push(pending, new AppendText(switch (operator) {
+            case ADD -> " + "; case SUB -> " - "; case MUL -> " * ";
+            case DIV -> " / "; case POW -> " ^ ";
+        }));
+        push(pending, new FormatExpression(
             binary.left(),
             precedence + leftAdjust));
     }
@@ -191,40 +220,77 @@ public final class ExpressionFormatter {
             && binary.operator() == BinaryOperator.DIV;
     }
 
-    private static final class Output {
-        private final StringBuilder text = new StringBuilder();
+    private enum NativeEmission implements java.util.function.LongConsumer, RetainedGraph.View {
+        INSTANCE;
+        @Override public void accept(long units) { RetainedOperation.work(units); }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { }
+    }
+
+    private static final class Output implements RetainedGraph.View {
+        private char[] text = new char[16];
+        private int size;
         private final java.util.function.LongConsumer emittedCodeUnits;
 
         private Output(java.util.function.LongConsumer emittedCodeUnits) {
             this.emittedCodeUnits = Objects.requireNonNull(emittedCodeUnits, "emittedCodeUnits");
+            RetainedOperation.work(17);
         }
 
         private Output append(String value) {
-            emittedCodeUnits.accept(value.length());
-            text.append(value);
+            try (var fragment = RetainedOperation.retain(value)) {
+                emittedCodeUnits.accept(value.length());
+                ensureCapacity(value.length());
+                value.getChars(0, value.length(), text, size);
+                size += value.length();
+                RetainedOperation.work(1);
+                RetainedOperation.checkpoint();
+            }
             return this;
         }
 
         private Output append(char value) {
             emittedCodeUnits.accept(1);
-            text.append(value);
+            ensureCapacity(1);
+            text[size++] = value;
+            RetainedOperation.work(1);
+            RetainedOperation.checkpoint();
             return this;
         }
 
-        @Override
-        public String toString() {
-            return text.toString();
+        private void ensureCapacity(int additional) {
+            int needed = Math.addExact(size, additional);
+            if (needed <= text.length) return;
+            var old = text;
+            var replacement = new char[Math.max(needed, Math.addExact(Math.multiplyExact(old.length, 2), 2))];
+            RetainedOperation.work(replacement.length);
+            try (var growth = RetainedOperation.retain(old, replacement)) {
+                System.arraycopy(old, 0, replacement, 0, size);
+                text = replacement;
+                RetainedOperation.work(size + 1L);
+            }
+        }
+
+        private String value() {
+            RetainedOperation.work(size);
+            return RetainedOperation.produced(new String(text, 0, size));
+        }
+
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(text);
+            visitor.reference(emittedCodeUnits);
         }
     }
 
-    private sealed interface Action
+    private sealed interface Action extends RetainedGraph.View
             permits AppendText, FormatExpression {
     }
 
     private record AppendText(String value) implements Action {
         private AppendText {
             Objects.requireNonNull(value, "value");
+            RetainedOperation.work(1);
         }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(value); }
     }
 
     private record FormatExpression(
@@ -233,6 +299,8 @@ public final class ExpressionFormatter {
     ) implements Action {
         private FormatExpression {
             Objects.requireNonNull(expression, "expression");
+            RetainedOperation.work(1);
         }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(expression); }
     }
 }
