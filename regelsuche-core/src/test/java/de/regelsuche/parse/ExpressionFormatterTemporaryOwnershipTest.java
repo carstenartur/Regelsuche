@@ -14,7 +14,7 @@ class ExpressionFormatterTemporaryOwnershipTest {
         RetainedOperation scope;
         Expr input;
         long work, previousWork, growthWork, peakCharacters;
-        int queuedActions;
+        int queuedActions, buffers;
         boolean inputMissing, growth, abortGrowth, unwrittenReplacement;
         @Override public void executionWork(long units) { work = Math.addExact(work, units); }
         @Override public void validationWork(long units) { executionWork(units); }
@@ -29,10 +29,12 @@ class ExpressionFormatterTemporaryOwnershipTest {
             };
             visitor.reference(scope);
             boolean oldBuffer = false, replacement = false;
+            int currentBuffers = 0;
             while (!pending.isEmpty()) {
                 var value = pending.remove();
                 if (!seen.add(value)) continue;
                 if (value instanceof char[] buffer) {
+                    currentBuffers++;
                     if (buffer.length == 16) oldBuffer = true;
                     if (buffer.length == 80) {
                         replacement = true;
@@ -51,6 +53,7 @@ class ExpressionFormatterTemporaryOwnershipTest {
                     visitor.reference(binary.left()); visitor.reference(binary.right());
                 } else if (value instanceof FunctionExpr function) visitor.reference(function.arguments());
             }
+            buffers = Math.max(buffers, currentBuffers);
             if (input != null && !seen.contains(input)) inputMissing = true;
             if (oldBuffer && replacement) {
                 growth = true;
@@ -83,7 +86,7 @@ class ExpressionFormatterTemporaryOwnershipTest {
     }
 
     @Test void allocatedGrowthIsPaidAndOwnedBeforeAnAbortingCheckpoint() {
-        var input = new VariableExpr("a".repeat(80));
+        var input = new FunctionExpr("a".repeat(80), List.of());
         var observation = new Observation(); observation.input = input; observation.abortGrowth = true;
         try (var scope = RetainedOperation.open(observation)) {
             observation.scope = scope;
@@ -94,8 +97,24 @@ class ExpressionFormatterTemporaryOwnershipTest {
             assertTrue(observation.peakCharacters >= 176, "input, old buffer and replacement overlap");
             assertFalse(observation.inputMissing);
             observation.abortGrowth = false;
-            assertEquals(input.name(), ExpressionFormatter.format(input));
+            assertEquals(input.name() + "()", ExpressionFormatter.format(input));
         }
+        assertEquals(0, RetainedGraph.measure(observation.scope).retained().characters());
+    }
+
+    @Test void singleVariableReusesItsExistingNameWithoutAFormattingBuffer() {
+        var input = new VariableExpr("a_long_variable_name");
+        var observation = new Observation(); observation.input = input;
+        var emitted = new Emission();
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            assertSame(input.name(), ExpressionFormatter.formatMeasured(input, emitted));
+        }
+        assertEquals(input.name().length(), emitted.count);
+        assertEquals(0, observation.buffers);
+        assertEquals(0, observation.queuedActions);
+        assertFalse(observation.inputMissing);
+        assertTrue(observation.work > 4, "the input and callback ownership is still paid");
         assertEquals(0, RetainedGraph.measure(observation.scope).retained().characters());
     }
 
