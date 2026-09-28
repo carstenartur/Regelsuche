@@ -90,7 +90,10 @@ public final class RetainedGraph {
         boolean standardContainer(Object value){return value.getClass().getName().startsWith("java.util.");}
         Observation observation(){
             var retained=new Usage(nodes,characters,references);
-            return new Observation(retained,new Usage(nodes,characters,Math.addExact(references,accountingReferences)),work,seen.size());
+            // Both paths leave through measure's finally. Settle each occupied identity slot and
+            // pending traversal slot before publishing the receipt; none can survive the call.
+            long settledWork=Math.addExact(work,Math.addExact(2L*seen.size(),pending.size()));
+            return new Observation(retained,new Usage(nodes,characters,Math.addExact(references,accountingReferences)),settledWork,seen.size());
         }
     }
 }
