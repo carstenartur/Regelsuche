@@ -53,7 +53,7 @@ class ExprMatcherOwnershipTest {
                 @Override public void requireExact(Object value, Class<?> type) { assertEquals(type,value.getClass()); }
             };
             visitor.reference(scope);
-            boolean hasStateList = false;
+            boolean hasSessionStateList = false;
             boolean hasMutableBinding = false, hasFrozenBinding = false;
             boolean hasMutablePath = false, hasFrozenPath = false, hasPathBuffer = false, hasPathText = false;
             boolean hasVisit = false, hasZeroPath = false, hasEmptyRepresentativeOwner = false;
@@ -83,7 +83,21 @@ class ExprMatcherOwnershipTest {
                 if (value.getClass().getEnclosingClass() == ExprMatcherEngine.class
                         && value.getClass().getSimpleName().equals("State")) states.add(value);
                 if (value instanceof ExprMatcher.MatchOutcome result) outcome = result;
-                if (value instanceof RetainedGraph.View view) view.retainedReferences(visitor);
+                if (value instanceof RetainedGraph.View view) {
+                    if (value.getClass().getEnclosingClass() == ExprMatcherEngine.class
+                            && value.getClass().getSimpleName().equals("Session")) {
+                        var references = new ArrayList<Object>();
+                        view.retainedReferences(new RetainedGraph.Visitor() {
+                            @Override public void reference(Object item) { references.add(item); }
+                            @Override public void requireExact(Object item,Class<?> type) { assertEquals(type,item.getClass()); }
+                        });
+                        hasSessionStateList |= references.stream().anyMatch(item -> item instanceof List<?> list
+                            && list.stream().anyMatch(state -> state != null
+                                && state.getClass().getEnclosingClass() == ExprMatcherEngine.class
+                                && state.getClass().getSimpleName().equals("State")));
+                    }
+                    view.retainedReferences(visitor);
+                }
                 else if (value instanceof Object[] array) for (var item : array) visitor.reference(item);
                 else if (value instanceof Collection<?> values) {
                     sawLiteralArguments |= values instanceof ArrayList<?> && !values.isEmpty()
@@ -109,9 +123,6 @@ class ExprMatcherOwnershipTest {
                         tracePrefixes.add(List.copyOf(list));
                         sawTraceCopy |= list instanceof ArrayList<?>;
                     }
-                    hasStateList |= values.stream().anyMatch(item -> item != null
-                        && item.getClass().getEnclosingClass() == ExprMatcherEngine.class
-                        && item.getClass().getSimpleName().equals("State"));
                     if (values instanceof ArrayList<?> && values.stream().anyMatch(item -> item != null
                             && item.getClass().getEnclosingClass() == ExprMatcherEngine.class
                             && item.getClass().getSimpleName().equals("State"))) mutableStateLists.add(values);
@@ -137,7 +148,7 @@ class ExprMatcherOwnershipTest {
             sawEmptyRepresentativesWithDiagnostic |= hasEmptyRepresentativeOwner && hasEmptyDiagnostic;
             traceEntries.addAll(currentTraceEntries);
             texts.removeAll(currentTraceEntries); textBeforeTrace.addAll(texts);
-            if (hasStateList && outcome == null) unpublishedResultScans++;
+            if (hasSessionStateList && outcome == null) unpublishedResultScans++;
             if (abortBindingCopy && sawBindingCopy && failure == null) {
                 failure = new MatchAbort(); throw failure;
             }
@@ -216,7 +227,7 @@ class ExprMatcherOwnershipTest {
         }
         assertNotNull(observation.outcome,"the complete result and source graph must still be observed");
         assertEquals(0,observation.unpublishedResultScans,
-            "retaining the raw/frozen states through monotone result assembly avoids an intermediate full scan");
+            "after Session owns its raw/frozen states, monotone result assembly avoids an intermediate full scan");
         assertFalse(observation.inputMissing);
     }
 

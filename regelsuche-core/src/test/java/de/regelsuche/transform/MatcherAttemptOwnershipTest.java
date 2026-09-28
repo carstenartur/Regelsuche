@@ -16,14 +16,20 @@ class MatcherAttemptOwnershipTest {
     private static final class Observation implements RetainedOperation.Sink {
         RetainedOperation scope;
         HandoffAbort failure;
-        boolean abortHandoff, sawAttemptWithTrace, sawFailedAttempt, sawOutcome;
+        boolean abortHandoff, abortResult, abortResultClose, sawAttemptWithTrace, sawFailedAttempt, sawOutcome;
+        boolean sawAttemptWithResultList, sawFailedResultList;
         String trace;
         final List<Long> failedDebits = new ArrayList<>();
 
         @Override public void executionWork(long units) {
             if (failure != null) failedDebits.add(units);
-            else if (abortHandoff && scope != null && snapshot().returnedMatch()) {
-                failure = new HandoffAbort(); throw failure;
+            else if (scope != null) {
+                var snapshot = snapshot();
+                if ((abortHandoff && snapshot.returnedMatch())
+                        || (abortResult && snapshot.returnedMatch() && snapshot.resultList())
+                        || (abortResultClose && sawAttemptWithResultList && units == 4)) {
+                    failure = new HandoffAbort(); throw failure;
+                }
             }
         }
         @Override public void validationWork(long units) { executionWork(units); }
@@ -33,7 +39,9 @@ class MatcherAttemptOwnershipTest {
             RetainedGraph.measure(scope);
             var snapshot = snapshot();
             sawAttemptWithTrace |= snapshot.returnedMatch() && snapshot.tracedState();
+            sawAttemptWithResultList |= snapshot.returnedMatch() && snapshot.resultList();
             sawFailedAttempt |= failure != null && snapshot.returnedMatch();
+            sawFailedResultList |= failure != null && snapshot.resultList();
             sawOutcome |= snapshot.outcome();
         }
 
@@ -45,7 +53,7 @@ class MatcherAttemptOwnershipTest {
                 @Override public void requireExact(Object value,Class<?> type) { assertEquals(type,value.getClass()); }
             };
             visitor.reference(scope);
-            boolean matched = false, lowLevel = false, traced = false, outcome = false;
+            boolean matched = false, lowLevel = false, traced = false, outcome = false, resultList = false;
             while (!pending.isEmpty()) {
                 Object value = pending.remove(); if (!seen.add(value)) continue;
                 matched |= value instanceof EquivalenceAwarePatternMatcher.MatchAttempt attempt && attempt.matched();
@@ -66,16 +74,21 @@ class MatcherAttemptOwnershipTest {
                     view.retainedReferences(visitor);
                 } else if (value instanceof Object[] array) {
                     for (Object item : array) visitor.reference(item);
-                } else if (value instanceof Collection<?> values) values.forEach(visitor::reference);
+                } else if (value instanceof Collection<?> values) {
+                    resultList |= values instanceof List<?> && values.stream().anyMatch(item -> item != null
+                        && item.getClass().getEnclosingClass() == ExprMatcherEngine.class
+                        && item.getClass().getSimpleName().equals("State"));
+                    values.forEach(visitor::reference);
+                }
                 else if (value instanceof Map<?,?> map) {
                     map.forEach((key,item) -> { visitor.reference(key); visitor.reference(item); });
                 }
             }
-            return new Snapshot(matched && !lowLevel,traced,outcome);
+            return new Snapshot(matched && !lowLevel,traced,outcome,resultList);
         }
     }
 
-    private record Snapshot(boolean returnedMatch,boolean tracedState,boolean outcome) { }
+    private record Snapshot(boolean returnedMatch,boolean tracedState,boolean outcome,boolean resultList) { }
 
     private static ExprMatcher matcher(boolean reorder) {
         return reorder
@@ -97,11 +110,32 @@ class MatcherAttemptOwnershipTest {
             assertEquals(expected,matcher.match(input));
         }
         assertTrue(observation.sawAttemptWithTrace,"the actual returned attempt must overlap the derived State");
+        assertTrue(observation.sawAttemptWithResultList,"the produced result list must be owned before the frame can close");
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
 
     @Test void failedExactHandoffSettlesItsCountersOnce() { verifyAbort(false); }
     @Test void failedEquivalentHandoffSettlesItsRealBranchesOnce() { verifyAbort(true); }
+
+    @Test void failedResultPublicationObservesTheProducedListBeforeRelease() { verifyResultAbort(false); }
+    @Test void failedResultFrameCloseSettlesItsCountersOnce() { verifyResultAbort(true); }
+
+    private static void verifyResultAbort(boolean close) {
+        Expr input = new ExpressionParser().parseTerm("0+x"); var matcher = matcher(true);
+        var expected = matcher.match(input);
+        var observation = new Observation(); observation.abortResult = !close; observation.abortResultClose = close;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var failure = assertThrows(HandoffAbort.class,() -> matcher.match(input));
+            assertSame(observation.failure,failure);
+            assertTrue(observation.sawAttemptWithResultList);
+            assertEquals(!close,observation.sawFailedResultList);
+            assertFalse(observation.sawOutcome);
+            long delegated = (long) expected.evaluatedSteps() + expected.patternBranches();
+            assertEquals(close ? List.of(4L,delegated) : List.of(4L,4L,delegated),observation.failedDebits);
+        }
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
 
     private static void verifyAbort(boolean reorder) {
         Expr input = new ExpressionParser().parseTerm("0+x"); var matcher = matcher(reorder);
