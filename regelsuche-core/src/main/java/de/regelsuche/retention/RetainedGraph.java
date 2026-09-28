@@ -50,7 +50,7 @@ public final class RetainedGraph {
     public record Observation(Usage retained,Usage peak,long work,long objects) {}
     public static final class Unmeasured extends IllegalArgumentException {
         private final Observation attempted;
-        private Unmeasured(Object payload,Observation attempted){super("unsupported retention payload: "+payload.getClass().getName());this.attempted=attempted;}
+        Unmeasured(Object payload,Observation attempted){super("unsupported retention payload: "+payload.getClass().getName());this.attempted=attempted;}
         public Observation attempted(){return attempted;}
     }
     /** Each invocation pays fresh traversal/index work and drops all strong bookkeeping references. */
@@ -68,25 +68,31 @@ public final class RetainedGraph {
     }
     /** Bounded per-session immutable accounting data; never mathematical verification authority. */
     public static final class Inventory implements View {
-        private final int vertexLimit, wordLimit, childLimit;
-        private boolean closed;
+        private ImmutableRetentionInventory data;
         public Inventory(int vertexLimit, int wordLimit, int childLimit) {
-            if (vertexLimit < 1 || wordLimit < 1 || childLimit < 1)
-                throw new IllegalArgumentException("nonpositive immutable inventory limit");
-            this.vertexLimit=vertexLimit;this.wordLimit=wordLimit;this.childLimit=childLimit;
+            data=new ImmutableRetentionInventory(vertexLimit,wordLimit,childLimit);
         }
         public Inventory(){this(1_024,4_096,4_096);}
+        /** The primary ownership root must contain an actual edge to this inventory. */
         public Observation measure(Object ownershipRoot) {
-            if(closed)throw new IllegalStateException("closed immutable inventory");
-            return RetainedGraph.measure(ownershipRoot);
+            return measure(ownershipRoot,new Usage(Long.MAX_VALUE,Long.MAX_VALUE,Long.MAX_VALUE));
         }
-        public int cachedVertices(){return 0;}
+        public Observation measure(Object ownershipRoot, Usage limits) {
+            if(data==null)throw new IllegalStateException("closed immutable inventory");
+            return data.measure(ownershipRoot,this,limits);
+        }
+        public int cachedVertices(){return data==null?0:data.cachedVertices();}
         /** Paid logical release; repeated close performs no additional operation. */
-        public long close(){if(closed)return 0;closed=true;return 1;}
-        @Override public void retainedReferences(Visitor visitor){}
+        public long close(){if(data==null)return 0;long work=data.close();data=null;return Math.addExact(work,1);}
+        @Override public void retainedReferences(Visitor visitor){visitor.reference(data);}
+    }
+    public static final class InventoryFailure extends IllegalArgumentException {
+        private final Observation attempted;
+        InventoryFailure(String message,Observation attempted){super(message);this.attempted=attempted;}
+        public Observation attempted(){return attempted;}
     }
 
-    private static final class Scan implements Visitor {
+    static class Scan implements Visitor {
         final IdentityHashMap<Object,Boolean> seen=new IdentityHashMap<>();
         final ArrayDeque<Object> pending=new ArrayDeque<>();
         long nodes,characters,references,work,accountingReferences=5,temporaryCharacters;

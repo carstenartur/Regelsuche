@@ -53,4 +53,36 @@ class RetainedGraphImmutableInventoryTest {
         assertThrows(RetainedGraph.Unmeasured.class,()->inventory.measure(new Root(new OpaqueInteger(),inventory)));
         assertEquals(0,inventory.cachedVertices());assertTrue(inventory.close()>0);
     }
+    @Test void failedWholeObservationCannotActivateEarlierValidStagedVertices(){
+        var inventory=new RetainedGraph.Inventory();var leaf=new VariableExpr("visited-first");
+        var rejected=assertThrows(RetainedGraph.Unmeasured.class,
+            ()->inventory.measure(new Root(List.of(leaf,new Object()),inventory)));
+        assertTrue(rejected.attempted().retained().nodes()>=1,"the real AST was visited before the unknown payload");
+        assertTrue(rejected.attempted().work()>0);assertEquals(0,inventory.cachedVertices());
+        var root=new Root(leaf,inventory);var next=inventory.measure(root);
+        assertEquals(RetainedGraph.measure(root).retained(),next.retained());inventory.close();
+    }
+    @Test void functionArgumentsAlsoOwnedOutsideTheFunctionKeepExactIdentityUnion(){
+        var x=new VariableExpr("x");var function=new FunctionExpr("f",List.of(x,x,new VariableExpr(new String("x"))));
+        for(var values:List.of(List.of(function,function.arguments()),List.of(function.arguments(),function))){
+            var inventory=new RetainedGraph.Inventory();var root=new Root(values,inventory);
+            inventory.measure(root);var warm=inventory.measure(root);
+            assertEquals(RetainedGraph.measure(root).retained(),warm.retained());inventory.close();
+        }
+    }
+    @Test void missingInventoryOwnerFailsClosedWithItsAttemptedPaidReceipt(){
+        var inventory=new RetainedGraph.Inventory();
+        var failure=assertThrows(RetainedGraph.InventoryFailure.class,()->inventory.measure(new VariableExpr("x")));
+        assertTrue(failure.attempted().work()>0);assertEquals(0,inventory.cachedVertices());
+        assertEquals(0,RetainedGraph.measure(inventory).retained().nodes());inventory.close();
+    }
+    @Test void foreignInventoryOwnershipRemainsVisibleAndCloseIsIsolated(){
+        var first=new RetainedGraph.Inventory();var second=new RetainedGraph.Inventory();
+        var leaf=new VariableExpr("shared");first.measure(new Root(leaf,first));
+        var outer=new Root(List.of(first,leaf),second);second.measure(outer);
+        assertEquals(RetainedGraph.measure(outer).retained(),second.measure(outer).retained());
+        first.close();assertEquals(RetainedGraph.measure(outer).retained(),second.measure(outer).retained());
+        second.close();
+    }
+
 }
