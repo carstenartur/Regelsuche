@@ -148,59 +148,45 @@ final class ExprMatcherEngine {
         Session session,
         boolean atRoot
     ) {
-        EquivalenceAwarePatternMatcher.MatchAttempt exact =
-            EquivalenceAwarePatternMatcher.matchDetailed(
-                matcher.pattern(),
-                expression,
-                state.bindings,
-                RecognitionProfile.exact(),
-                session.options.maxPatternBranches()
-            );
-        session.patternBranches += exact.visitedBranches();
-        if (exact.matched()) {
-            return List.of(state
-                .withBindings(exact.bindings())
-                .recognized(
-                    ExprMatcher.RecognitionStrength.EXACT,
-                    expression,
-                    0,
-                    atRoot
-                )
-                .traced("pattern:exact"));
+        var work = new PatternAttemptWork();
+        try (var owned = RetainedOperation.retainCompleted(2,matcher,expression,state,session,work)) {
+            try {
+                work.attempt = EquivalenceAwarePatternMatcher.matchDetailed(matcher.pattern(),expression,
+                    state.bindings,work.exactProfile,session.options.maxPatternBranches());
+                session.patternBranches += work.attempt.visitedBranches();
+                RetainedOperation.work(1);
+                RetainedOperation.checkpoint();
+                if (work.attempt.matched()) {
+                    return List.of(state.withBindings(work.attempt.bindings())
+                        .recognized(ExprMatcher.RecognitionStrength.EXACT,expression,0,atRoot)
+                        .traced("pattern:exact"));
+                }
+                if (work.attempt.inconclusive()) {
+                    session.diagnostic(work.attempt.limitCode(),matcher.canonicalDescriptor());
+                    return List.of();
+                }
+                if (matcher.recognitionProfile().equals(work.exactProfile)) return List.of();
+                // The conclusive failed exact attempt is no longer needed.
+                work.attempt = null;
+                RetainedOperation.work(1);
+                work.attempt = EquivalenceAwarePatternMatcher.matchDetailed(matcher.pattern(),expression,
+                    state.bindings,matcher.recognitionProfile(),session.options.maxPatternBranches());
+                // Completed returned work is delegated before the next debit.
+                session.patternBranches += work.attempt.visitedBranches();
+                RetainedOperation.work(1);
+                RetainedOperation.checkpoint();
+                if (work.attempt.inconclusive()) {
+                    session.diagnostic(work.attempt.limitCode(),matcher.canonicalDescriptor());
+                    return List.of();
+                }
+                if (!work.attempt.matched()) return List.of();
+                return List.of(state.withBindings(work.attempt.bindings())
+                    .recognized(ExprMatcher.RecognitionStrength.EQUIVALENCE_AWARE,expression,0,atRoot)
+                    .traced("pattern:equivalence-aware"));
+            } catch (RuntimeException | Error failure) {
+                observeFailure(failure); throw failure;
+            }
         }
-        if (exact.inconclusive()) {
-            session.diagnostic(exact.limitCode(), matcher.canonicalDescriptor());
-            return List.of();
-        }
-        if (matcher.recognitionProfile().equals(RecognitionProfile.exact())) {
-            return List.of();
-        }
-        EquivalenceAwarePatternMatcher.MatchAttempt equivalent =
-            EquivalenceAwarePatternMatcher.matchDetailed(
-                matcher.pattern(),
-                expression,
-                state.bindings,
-                matcher.recognitionProfile(),
-                session.options.maxPatternBranches()
-            );
-        session.patternBranches += equivalent.visitedBranches();
-        if (equivalent.inconclusive()) {
-            session.diagnostic(
-                equivalent.limitCode(), matcher.canonicalDescriptor());
-            return List.of();
-        }
-        if (!equivalent.matched()) {
-            return List.of();
-        }
-        return List.of(state
-            .withBindings(equivalent.bindings())
-            .recognized(
-                ExprMatcher.RecognitionStrength.EQUIVALENCE_AWARE,
-                expression,
-                0,
-                atRoot
-            )
-            .traced("pattern:equivalence-aware"));
     }
 
     private static List<State> matchBind(
@@ -676,6 +662,15 @@ final class ExprMatcherEngine {
         try { RetainedOperation.checkpoint(); }
         catch (RuntimeException | Error observation) {
             if (observation != failure) failure.addSuppressed(observation);
+        }
+    }
+
+    private static final class PatternAttemptWork implements RetainedGraph.View {
+        private final RecognitionProfile exactProfile = RecognitionProfile.exact();
+        private EquivalenceAwarePatternMatcher.MatchAttempt attempt;
+
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            visitor.reference(exactProfile); visitor.reference(attempt);
         }
     }
 
