@@ -31,6 +31,39 @@ class CheckedSchemaCursorTest {
                 .equals(parse("x^2"))).findFirst().orElseThrow().transformation().rule();
     }
 
+    @Test void nativeSchemaSearchAccountsForTheActualProviderProofAndSuspendedCursorGraphs() {
+        var selected=plan(model);Expr source=parse(PAIR);
+        Expr goal=CODEC.decodeExpression(eager(PAIR).moves().getFirst().transformation().transformedExpression());
+        for(var scheduling:List.of(MoveSearch.Scheduling.STAGED,MoveSearch.Scheduling.EAGER_CONTROL,MoveSearch.Scheduling.STAGED_INCREMENTAL)) {
+            var providers=scheduling==MoveSearch.Scheduling.STAGED_INCREMENTAL?List.<NativeMoveProvider>of(selected.nativeProvider()):
+                model.nativeProviders(1,Map.of(),Set.of(schemaId));
+            var problem=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.frozen(goal),providers,MoveSearch.Mode.FAST,scheduling,
+                new MoveSearch.Budget(0,1,100000,10,100000000));
+            try(var transport=AstTransportObservation.open()) {
+                var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT);
+                assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome(),result.accounting().detail());
+                assertTrue(result.accountingComplete());assertTrue(result.withinBudget());assertTrue(result.replayWork()>0);
+                assertEquals(0,transport.total());assertTrue(result.accounting().peak().nodes()>0);
+                assertTrue(result.accounting().resultRetained().nodes()>0);
+                assertEquals(new de.regelsuche.retention.RetainedGraph.Usage(0,0,0),result.accounting().live());
+                assertTrue(result.cursorReceipts().stream().allMatch(SearchExecution.Expansion::closed));
+            }
+        }
+        var cursor=selected.nativeProvider().openSession(new TypedMoveSearch.State(source,0,0,"",List.of(),Set.of(),0),
+            TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION));
+        try {
+            boolean suspended=false;
+            for(int i=0;i<1000;i++) {
+                cursor.next(2);
+                var retained=assertDoesNotThrow(()->de.regelsuche.retention.RetainedGraph.measure(cursor));
+                assertTrue(retained.retained().nodes()>0);
+                if(cursor.snapshot().work().prepaidApplications().openApplications()>0){suspended=true;break;}
+            }
+            assertTrue(suspended);
+        } finally {cursor.close();}
+        assertEquals(0,cursor.snapshot().work().prepaidApplications().openApplications());
+    }
+
     @Test void nativeCursorSuspendsTheSamePaidPhasesAndExportsTheSameApplications() {
         var provider=assertDoesNotThrow(()->plan(model).nativeProvider());
         var nativeState=new TypedMoveSearch.State(parse(PAIR),0,0,"",List.of(),Set.of(),0);
