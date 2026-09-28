@@ -276,7 +276,7 @@ public final class NativeMoveSearch {
             catch(SearchExecution.ResourceLimit exhausted) {
                 if(execution.accounting==null)throw exhausted;
                 execution.accounting.incomplete("NATIVE_RESOURCE_LIMIT");
-                return new Replay(work,null);
+                return new Replay(Math.addExact(work,exhausted.takeWork().total()),null);
             }
             work=Math.addExact(work,checked.work());
             if(!checked.accepted() || !checked.equals(step.verification()))return new Replay(work,checked);

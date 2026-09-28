@@ -94,6 +94,11 @@ final class ManagedProviderCursor<T> implements ObjectCursor<T>,RetainedGraph.Vi
         status = Status.LIMIT; return false;
     }
     private void fail(RuntimeException failure) {
+        if(failure instanceof SearchExecution.ResourceLimit exhausted) {
+            var unreturned=exhausted.takeWork();
+            meter.charge(Operation.LOAD,Math.addExact(unreturned.mechanical(),unreturned.verification()));
+            meter.charge(unreturned.mathematics());
+        }
         meter.abandonPending();
         meter.charge(Operation.ABORT, 1);
         status = Status.FAILED; accountingComplete = false;

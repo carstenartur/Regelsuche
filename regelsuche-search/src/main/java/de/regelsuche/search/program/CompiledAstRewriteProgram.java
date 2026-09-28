@@ -167,6 +167,8 @@ public final class CompiledAstRewriteProgram implements RetainedGraph.View {
             }
         }
         return RetainedOperation.produced(new Batch(current, metrics(calls, emitted, composed, duplicates)));
+        } catch(de.regelsuche.search.moves.SearchExecution.ResourceLimit exhausted) {
+            throw exhausted.paidGeneration(metrics(calls,emitted,composed,duplicates));
         }
     }
 

@@ -11,7 +11,32 @@ import java.util.Set;
 /** Representation boundary of the one frontier. Neither scheduling nor proof authority lives here. */
 public final class SearchExecution {
     private SearchExecution() {}
-    static final class ResourceLimit extends RuntimeException {}
+    /** Internal abort transport. Only completed, not-yet-transferred work; never mathematical authority. */
+    public static final class ResourceLimit extends RuntimeException {
+        private long mechanical,verification;
+        private ExecutionWork mathematics=ExecutionWork.ZERO;
+        ResourceLimit() {}
+        public ResourceLimit paidGeneration(TransformationWorkMetrics work) {
+            long updated=Math.addExact(mechanical,work.totalWorkUnits());
+            var updatedMath=mathematics.plus(work.candidateWork());
+            mechanical=updated;mathematics=updatedMath;return this;
+        }
+        ResourceLimit paidVerification(long units) {
+            if(units<0)throw new IllegalArgumentException("negative aborted verification work");
+            verification=Math.addExact(verification,units);return this;
+        }
+        ResourceLimit verificationPhase() {
+            long updated=Math.addExact(verification,Math.addExact(mechanical,mathematics.canonicalWorkUnits()));
+            verification=updated;mechanical=0;mathematics=ExecutionWork.ZERO;return this;
+        }
+        AbortedWork takeWork() {
+            var result=new AbortedWork(mechanical,mathematics,verification);
+            mechanical=0;mathematics=ExecutionWork.ZERO;verification=0;return result;
+        }
+    }
+    record AbortedWork(long mechanical,ExecutionWork mathematics,long verification) {
+        long total(){return Math.addExact(Math.addExact(mechanical,mathematics.canonicalWorkUnits()),verification);}
+    }
     public interface Position<E> {
         E expression(); int searchDepth(); int primitiveDepth(); String previousRule();
         List<String> assumptions(); Set<String> capabilities(); int complexityDebt();

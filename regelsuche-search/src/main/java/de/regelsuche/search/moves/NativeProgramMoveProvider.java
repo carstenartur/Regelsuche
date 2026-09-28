@@ -26,7 +26,7 @@ public record NativeProgramMoveProvider(MoveProvider.Descriptor descriptor,Compi
                     RetainedOperation.work(1);RetainedOperation.checkpoint();
                 }
                 return RetainedOperation.produced(new Batch(moves,batch.workMetrics(),false));
-            }
+            } catch(SearchExecution.ResourceLimit exhausted){throw exhausted.paidGeneration(batch.workMetrics());}
         } catch(CompiledAstRewriteProgram.CandidateLimitExceeded limit){return new Batch(List.of(),limit.workMetrics(),false);}
     }
     public NativeSearchMove proposal(CompiledAstRewriteProgram.Candidate history,long generationCost){
@@ -41,22 +41,26 @@ public record NativeProgramMoveProvider(MoveProvider.Descriptor descriptor,Compi
             return new NativeVerification(false,1,null,null,"TYPED_PROGRAM_ASSUMPTIONS_MISSING");
         CompiledAstRewriteProgram.Batch regenerated;
         try{regenerated=program.transformMeasured(source.expression());}
+        catch(SearchExecution.ResourceLimit exhausted){throw exhausted.verificationPhase();}
         catch(CompiledAstRewriteProgram.CandidateLimitExceeded limit){return new NativeVerification(false,verificationWork(limit.workMetrics()),null,null,"TYPED_PROGRAM_CANDIDATE_LIMIT");}
         long work=Math.addExact(verificationWork(regenerated.workMetrics()),regenerated.candidates().size());
+        long compared=0;
         try(var retained=RetainedOperation.retain(this,source,move,context,regenerated)) {
             var expected=move.withCapabilityDelta(Set.of());
             try(var expectedFrame=RetainedOperation.retain(expected)) {
                 boolean accepted=false;
                 for(var history:regenerated.candidates()) {
                     var candidate=proposal(history,move.generationCost());
-                    try(var compared=RetainedOperation.retain(candidate)) {
-                        RetainedOperation.work(1);
+                    try(var comparedFrame=RetainedOperation.retain(candidate)) {
+                        compared++;RetainedOperation.work(1);
                         if(expected.equals(candidate)){accepted=true;break;}
                     }
                 }
                 return RetainedOperation.produced(new NativeVerification(accepted,work,accepted?move.proof():null,accepted?move.ruleId():null,
                     accepted?"TYPED_PROGRAM_REPLAYED":"TYPED_PROGRAM_REPLAY_REJECTED"));
             }
+        } catch(SearchExecution.ResourceLimit exhausted) {
+            throw exhausted.paidVerification(Math.addExact(verificationWork(regenerated.workMetrics()),compared));
         }
     }
     private static long verificationWork(TransformationWorkMetrics work){return Math.addExact(work.totalWorkUnits(),work.candidateWork().canonicalWorkUnits());}

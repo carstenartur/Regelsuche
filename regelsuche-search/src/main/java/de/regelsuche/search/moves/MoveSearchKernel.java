@@ -142,7 +142,13 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
                     advance();problem.checkpoint();
                     if(!problem.ownershipComplete())stop(Outcome.INCONCLUSIVE);
                 }
-            } catch(SearchExecution.ResourceLimit exhausted) { stop(Outcome.INCONCLUSIVE); }
+            } catch(SearchExecution.ResourceLimit exhausted) {
+                var unreturned=exhausted.takeWork();
+                ledger.search=Math.addExact(ledger.search,unreturned.mechanical());
+                ledger.primitive=Math.addExact(ledger.primitive,unreturned.mathematics().canonicalWorkUnits());
+                ledger.verification=Math.addExact(ledger.verification,unreturned.verification());
+                stop(Outcome.INCONCLUSIVE);
+            }
             finally {
                 closeIncremental(opened, ledger);
                 if(active!=null && active.picker!=null && !active.picker.incremental())ledger.collect(active);

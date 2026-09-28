@@ -69,18 +69,21 @@ class NativeUnreturnedWorkTest {
             new RewriteProgram.Source(RewriteProgram.NodeMetadata.named("one-stage"),new PreparedAstRewriteTransformationEngine(List.of(one),64,128)))),128).compileAst();
         return new NativeProgramMoveProvider(new MoveProvider.Descriptor("cleanup","cleanup",SearchMove.SourceKind.LEARNED,SearchMove.ProofStrength.REPLAYABLE,List.of(),SearchMove.ValueEvidence.UNKNOWN,"cleanup"),program);
     }
-    private static NativeMoveSearch.Problem problem(NativeMoveProvider provider,NativeVerifier verifier){
+    private static NativeMoveSearch.Problem problem(NativeMoveProvider provider,NativeVerifier verifier){return problem(provider,verifier,MoveSearch.Scheduling.STAGED);}
+    private static NativeMoveSearch.Problem problem(NativeMoveProvider provider,NativeVerifier verifier,MoveSearch.Scheduling scheduling){
         var goal=new VariableExpr("x");var source=new BinaryExpr(new BinaryExpr(goal,BinaryOperator.MUL,new NumberExpr(1)),BinaryOperator.ADD,new NumberExpr(0));
-        return new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.frozen(goal),List.of(provider),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,
+        return new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.frozen(goal),List.of(provider),MoveSearch.Mode.FAST,scheduling,
             new MoveSearch.Budget(2,1,0,10,100000000),NativeMovePriorityPolicy.INVENTORY_ORDER,NativeMoveSearch.ZeroScore.INSTANCE,NativeStateValue.NONE,verifier);
     }
     @Test void completedGenerationWorkSurvivesFailureBeforeThePickerReceivesItsBatch(){
-        var delegate=provider();var problem=problem(new InterruptedProvider(delegate),NativeVerifier.registered(List.of(delegate)));
+        for(var scheduling:List.of(MoveSearch.Scheduling.STAGED,MoveSearch.Scheduling.EAGER_CONTROL,MoveSearch.Scheduling.STAGED_INCREMENTAL)) {
+        var delegate=provider();var problem=problem(new InterruptedProvider(delegate),NativeVerifier.registered(List.of(delegate)),scheduling);
         var work=delegate.program().transformMeasured(problem.source()).workMetrics();
         var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE);
         assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.outcome());
         assertEquals(work.candidateWork().canonicalWorkUnits(),result.metrics().primitiveWork(),"real completed program generation cannot disappear at its native handoff");
         assertTrue(result.metrics().searchWork()>=work.totalWorkUnits());assertEquals(0,result.metrics().consumedSuccessors());
+        }
     }
     private static void verificationFailure(int stopAt){
         var delegate=provider();var verifier=new InterruptedVerifier(delegate,stopAt);var problem=problem(delegate,verifier);
