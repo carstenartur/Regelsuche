@@ -49,6 +49,12 @@ class NativeProgramMoveProviderTest {
             assertEquals(legacy.encodedResult(),result.exportLegacy());
             assertTrue(transport.total()>0,"explicit export exercises the measured codec");
         }
+        var accountedProblem=new NativeMoveSearch.Problem(source,context,List.of(new NativeProgramMoveProvider(descriptor,program)),MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,
+            new MoveSearch.Budget(2,1,0,10,1000000));
+        var accounted=new NativeMoveSearch().search(accountedProblem,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT);
+        assertEquals(MoveSearch.Outcome.TARGET_REACHED,accounted.outcome(),accounted.accounting().detail());
+        assertTrue(accounted.accounting().validationWork()>0);assertTrue(accounted.accounting().executionWork()>0);
+        assertTrue(accounted.withinBudget());assertEquals(2,accounted.witness().getFirst().move().primitiveStepCount());
         var provider=new NativeProgramMoveProvider(descriptor,program);
         var history=program.transformMeasured(source).candidates().getFirst();
         var forged=new CompiledAstRewriteProgram.Candidate(history.programId(),List.of("foreign-stage",history.sourceIds().getLast()),history.steps());
