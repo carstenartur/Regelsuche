@@ -303,7 +303,7 @@ public sealed interface ExprMatcher extends MatcherDescriptor.Source
     record Any() implements ExprMatcher {
         @Override
         public String canonicalDescriptor() {
-            return descriptor("any");
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -314,7 +314,7 @@ public sealed interface ExprMatcher extends MatcherDescriptor.Source
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor("literal-number", value.canonicalText());
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -325,7 +325,7 @@ public sealed interface ExprMatcher extends MatcherDescriptor.Source
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor("literal-variable", name);
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -343,7 +343,7 @@ public sealed interface ExprMatcher extends MatcherDescriptor.Source
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor("number-property", kind.name());
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -360,11 +360,7 @@ public sealed interface ExprMatcher extends MatcherDescriptor.Source
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor(
-                "pattern",
-                pattern.toString(),
-                profileDescriptor(recognitionProfile)
-            );
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -383,12 +379,7 @@ public sealed interface ExprMatcher extends MatcherDescriptor.Source
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor(
-                "bind",
-                name,
-                matcher.canonicalDescriptor(),
-                profileDescriptor(equalityProfile)
-            );
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -399,7 +390,7 @@ public sealed interface ExprMatcher extends MatcherDescriptor.Source
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor("all-of", matcherDescriptors(matchers));
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -410,7 +401,7 @@ public sealed interface ExprMatcher extends MatcherDescriptor.Source
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor("any-of", matcherDescriptors(matchers));
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -421,7 +412,7 @@ public sealed interface ExprMatcher extends MatcherDescriptor.Source
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor("not", matcher.canonicalDescriptor());
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -438,12 +429,7 @@ public sealed interface ExprMatcher extends MatcherDescriptor.Source
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor(
-                "operation",
-                operator.name(),
-                left.canonicalDescriptor(),
-                right.canonicalDescriptor()
-            );
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -458,11 +444,7 @@ public sealed interface ExprMatcher extends MatcherDescriptor.Source
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor(
-                "function",
-                name,
-                matcherDescriptors(arguments)
-            );
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -473,7 +455,7 @@ public sealed interface ExprMatcher extends MatcherDescriptor.Source
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor("contains", matcher.canonicalDescriptor());
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -490,11 +472,7 @@ public sealed interface ExprMatcher extends MatcherDescriptor.Source
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor(
-                "equivalent",
-                profileDescriptor(recognitionProfile),
-                matcher.canonicalDescriptor()
-            );
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -509,11 +487,7 @@ public sealed interface ExprMatcher extends MatcherDescriptor.Source
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor(
-                "where",
-                matcher.canonicalDescriptor(),
-                constraint.canonicalDescriptor()
-            );
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -538,11 +512,7 @@ public sealed interface ExprMatcher extends MatcherDescriptor.Source
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor(
-                "binding-matches",
-                bindingName,
-                matcher.canonicalDescriptor()
-            );
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -561,12 +531,7 @@ public sealed interface ExprMatcher extends MatcherDescriptor.Source
 
         @Override
         public String canonicalDescriptor() {
-            return descriptor(
-                "same-as",
-                leftBinding,
-                rightBinding,
-                profileDescriptor(recognitionProfile)
-            );
+            return MatcherDescriptor.render(this);
         }
     }
 
@@ -581,42 +546,6 @@ public sealed interface ExprMatcher extends MatcherDescriptor.Source
         return values.stream()
             .map(value -> Objects.requireNonNull(value, field + " entry"))
             .toList();
-    }
-
-    private static String matcherDescriptors(List<ExprMatcher> matchers) {
-        return descriptor(
-            "matcher-list",
-            matchers.stream()
-                .map(ExprMatcher::canonicalDescriptor)
-                .toArray(String[]::new)
-        );
-    }
-
-    private static String profileDescriptor(RecognitionProfile profile) {
-        return descriptor(
-            "recognition-profile",
-            descriptor(
-                "associative",
-                profile.associativeOperators().stream()
-                    .map(Enum::name).sorted().toArray(String[]::new)
-            ),
-            descriptor(
-                "commutative",
-                profile.commutativeOperators().stream()
-                    .map(Enum::name).sorted().toArray(String[]::new)
-            ),
-            Boolean.toString(profile.inferAlgebraicBindings()),
-            descriptor(
-                "recognition-rules",
-                profile.recognitionRuleIds().stream()
-                    .sorted().toArray(String[]::new)
-            ),
-            Integer.toString(profile.maxEquivalenceDepth())
-        );
-    }
-
-    private static String descriptor(String type, String... fields) {
-        return MatcherDescriptor.render(requireText(type, "type"),fields);
     }
 
     private static String requireText(String value, String field) {
