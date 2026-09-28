@@ -1,11 +1,15 @@
 package de.regelsuche.inventory;
 
 import de.regelsuche.search.moves.*;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 
 /** An inspectable linear policy with fixed weights and immutable TRAIN tables. */
-public final class HistoryMovePolicy implements MovePriorityPolicy {
+public final class HistoryMovePolicy implements MovePriorityPolicy,RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(history);v.reference(weights);v.reference(contexts);}
     public record Weights(double compression, double history, double capability, double goal, double proof,
-            double branching, double failure, double verification) {
+            double branching, double failure, double verification) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){}
         public static final Weights DEFAULT = new Weights(3, 4, 6, 8, 0.25, 1, 3, 0.02);
         public Weights {
             for (double weight : new double[]{compression, history, capability, goal, proof, branching, failure, verification})
@@ -43,25 +47,34 @@ public final class HistoryMovePolicy implements MovePriorityPolicy {
             }
         };
     }
+    /** Native revision recomputes and pays each context; no caller-retained expression cache. */
     public static NativeMovePriorityPolicy nativePolicy(RuleHistoryMemory.Snapshot history,Weights weights) {
-        var policy=new HistoryMovePolicy(history,weights,true);
-        return new NativeMovePriorityPolicy() {
-            private final java.util.Map<TypedMoveSearch.State,StructuralMoveContext> contexts=new java.util.HashMap<>();
-            private StructuralMoveContext structure(TypedMoveSearch.State state){return contexts.computeIfAbsent(state,StructuralMoveContext::of);}
-            private String key(TypedMoveSearch.State state){return structure(state).typedKey();}
-            @Override public long contextWork(TypedMoveSearch.State state,TypedMoveSearch.Context context){return 2L*structure(state).visitedNodes();}
-            @Override public double score(NativeSearchMove move,TypedMoveSearch.State state,TypedMoveSearch.Context context){
-                return policy.rank(policy.features(key(state),state.previousRule(),move.ruleFamily(),move.ruleId(),
+        return new NativePolicy(new HistoryMovePolicy(history,weights,true));
+    }
+    private record NativePolicy(HistoryMovePolicy policy) implements NativeMovePriorityPolicy,RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(policy);}
+        @Override public long contextWork(TypedMoveSearch.State state,TypedMoveSearch.Context context){
+            var structure=StructuralMoveContext.of(state);
+            try(var retained=RetainedOperation.retain(structure)){return 2L*structure.visitedNodes();}
+        }
+        @Override public double score(NativeSearchMove move,TypedMoveSearch.State state,TypedMoveSearch.Context context){
+            var structure=StructuralMoveContext.of(state);
+            try(var retained=RetainedOperation.retain(structure)) {
+                return policy.rank(policy.features(structure.typedKey(),state.previousRule(),move.ruleFamily(),move.ruleId(),
                     move.descriptor().valueEvidence(),move.descriptor().proofStrength(),move.capabilityDelta().size(),
                     move.targetExpression().equals(context.goal()),move.generationCost(),move.executionWork().canonicalWorkUnits()));
             }
-            @Override public double providerScore(MoveProvider.Descriptor provider,TypedMoveSearch.State state,TypedMoveSearch.Context context){
-                return policy.providerScore(provider,key(state),state.previousRule());
+        }
+        @Override public double providerScore(MoveProvider.Descriptor provider,TypedMoveSearch.State state,TypedMoveSearch.Context context){
+            var structure=StructuralMoveContext.of(state);
+            try(var retained=RetainedOperation.retain(structure)){return policy.providerScore(provider,structure.typedKey(),state.previousRule());}
+        }
+        @Override public MovePriorityPolicy.Stage stage(MoveProvider.Descriptor provider,TypedMoveSearch.State state,TypedMoveSearch.Context context){
+            var structure=StructuralMoveContext.of(state);
+            try(var retained=RetainedOperation.retain(structure)) {
+                return policy.stage(provider,structure.typedKey(),state.previousRule(),NativeMovePriorityPolicy.super.stage(provider,state,context));
             }
-            @Override public MovePriorityPolicy.Stage stage(MoveProvider.Descriptor provider,TypedMoveSearch.State state,TypedMoveSearch.Context context){
-                return policy.stage(provider,key(state),state.previousRule(),NativeMovePriorityPolicy.super.stage(provider,state,context));
-            }
-        };
+        }
     }
     public RuleHistoryMemory.Snapshot history() { return history; }
     public Weights weights() { return weights; }

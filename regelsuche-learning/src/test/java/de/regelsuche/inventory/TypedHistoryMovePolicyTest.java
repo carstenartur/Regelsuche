@@ -110,6 +110,11 @@ class TypedHistoryMovePolicyTest {
                 var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT);
                 assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome(),result.accounting().detail());
                 assertTrue(result.withinBudget());assertTrue(result.accounting().executionWork()>0);assertEquals(0,transport.total());
+                var limited=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,
+                    new SearchExpressionStore.Limits(1000000,result.accounting().peak().characters()-1,2000000,0));
+                assertEquals(MoveSearch.Outcome.INCONCLUSIVE,limited.outcome());assertFalse(limited.withinBudget());
+                assertEquals("NATIVE_RETENTION_EXHAUSTED",limited.accounting().detail());assertTrue(limited.totalWork()>0);
+                assertEquals(new de.regelsuche.retention.RetainedGraph.Usage(0,0,0),limited.accounting().live());
             }
             assertEquals(0,de.regelsuche.retention.RetainedGraph.measure(policy).retained().nodes(),"completed runs must not accumulate caller-retained expression cache entries");
         }

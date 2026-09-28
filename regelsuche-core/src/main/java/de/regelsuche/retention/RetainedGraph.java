@@ -89,6 +89,7 @@ public final class RetainedGraph {
                 case VariableExpr variable -> { node();reference(variable.name());reference(variable.symbol().orElse(null)); }
                 case NumberExpr number -> { node();reference(number.value()); }
                 case String text -> characters=Math.addExact(characters,text.length());
+                case StringBuilder text -> {reference(null);characters=Math.addExact(characters,text.length());}
                 case ExactRational rational -> { reference(rational.numerator());reference(rational.denominator()); }
                 case BigInteger integer -> {
                     if(integer.getClass()!=BigInteger.class)throw new Unmeasured(integer,observation());
@@ -123,6 +124,7 @@ public final class RetainedGraph {
                 }
                 case Object[] array -> { for(Object entry:array)reference(entry); }
                 case long[] array -> { for(int i=0;i<array.length;i++)reference(null); }
+                case int[] array -> { for(int i=0;i<array.length;i++)reference(null); }
                 case byte[] array -> characters=Math.addExact(characters,array.length);
                 case char[] array -> characters=Math.addExact(characters,array.length);
                 default -> throw new Unmeasured(value,observation());

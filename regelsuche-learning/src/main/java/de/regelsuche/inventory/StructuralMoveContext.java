@@ -1,6 +1,8 @@
 package de.regelsuche.inventory;
 
 import de.regelsuche.ast.*;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.json.JsonWriter;
@@ -12,7 +14,8 @@ import java.util.List;
 
 /** Source structure only; unknown degree is explicit. Variable spelling is absent from the context key. */
 public record StructuralMoveContext(String rootOperator, int degree, int variables, int products, int powers,
-        int repeatedSubtrees, List<String> assumptions, List<String> capabilities, int visitedNodes) {
+        int repeatedSubtrees, List<String> assumptions, List<String> capabilities, int visitedNodes) implements RetainedGraph.View {
+    @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(rootOperator);v.reference(assumptions);v.reference(capabilities);}
     public static StructuralMoveContext of(MoveState state) {
         var root = new ExpressionParser().parse(new InputRequest(InputType.TERM, state.expression())).terms().getFirst();
         return of(root, state);
@@ -29,21 +32,35 @@ public record StructuralMoveContext(String rootOperator, int degree, int variabl
     }
     private static StructuralMoveContext of(Expr root,List<String> assumptions,java.util.Set<String> capabilities) {
         var seen = new HashMap<Expr, Integer>(); var variables = new HashSet<String>();
-        int[] counts = new int[3]; collect(root, seen, variables, counts);
+        int[] counts = new int[3];
+        RetainedOperation.work(3);
+        try(var retained=RetainedOperation.retain(root,seen,variables,counts,assumptions,capabilities)) {
+        collect(root, seen, variables, counts);
         String operator = root instanceof BinaryExpr binary ? binary.operator().name()
             : root instanceof FunctionExpr function ? "FUNCTION:" + function.name() : root instanceof VariableExpr ? "VARIABLE" : "NUMBER";
-        return new StructuralMoveContext(operator, degree(root), variables.size(), counts[1], counts[2],
+        return RetainedOperation.produced(new StructuralMoveContext(operator, degree(root), variables.size(), counts[1], counts[2],
             seen.values().stream().mapToInt(count -> Math.max(0, count - 1)).sum(), assumptions,
-            capabilities.stream().sorted().toList(), counts[0]);
+            capabilities.stream().sorted().toList(), counts[0]));
+        } finally {RetainedOperation.work(2L*seen.size()+variables.size()+3);seen.clear();variables.clear();}
     }
     public String key() {
-        return new JsonWriter().beginObject().property("root", rootOperator).property("degree", degree).property("variables", variables)
+        var writer=new JsonWriter();
+        try(var retained=RetainedOperation.retain(this,writer)) {
+        String result=writer.beginObject().property("root", rootOperator).property("degree", degree).property("variables", variables)
             .property("products", products).property("powers", powers).property("repeated", repeatedSubtrees)
             .stringArray("assumptions", assumptions).stringArray("capabilities", capabilities).endObject().toString();
+        RetainedOperation.work(result.length());return RetainedOperation.produced(result);
+        }
     }
     /** Prevents typed observations from silently changing frozen historical feature tables. */
-    public String typedKey() { return "regelsuche.typed-structural-context/v1:" + key(); }
+    public String typedKey() {
+        String key=key();try(var retained=RetainedOperation.retain(key)){
+            String result="regelsuche.typed-structural-context/v1:"+key;
+            RetainedOperation.work(result.length());return RetainedOperation.produced(result);
+        }
+    }
     private static void collect(Expr expr, HashMap<Expr, Integer> seen, HashSet<String> variables, int[] counts) {
+        RetainedOperation.work(3);
         counts[0]++; seen.merge(expr, 1, Integer::sum);
         if (expr instanceof VariableExpr variable) variables.add(variable.name());
         else if (expr instanceof BinaryExpr binary) {
@@ -53,6 +70,7 @@ public record StructuralMoveContext(String rootOperator, int degree, int variabl
         } else if (expr instanceof FunctionExpr function) for (var argument : function.arguments()) collect(argument, seen, variables, counts);
     }
     private static int degree(Expr expr) {
+        RetainedOperation.work(1);
         if (expr instanceof VariableExpr) return 1;
         if (expr instanceof NumberExpr) return 0;
         if (!(expr instanceof BinaryExpr binary)) return -1;

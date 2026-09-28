@@ -16,7 +16,8 @@ import java.util.function.Consumer;
  * export consistent (escaping, comma handling, ordering) without pulling in a
  * large external dependency.</p>
  */
-public final class JsonWriter {
+public final class JsonWriter implements de.regelsuche.retention.RetainedGraph.View {
+    @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(builder);v.reference(firstEntry);v.reference(sink);}
     private final StringBuilder builder = new StringBuilder();
     private final Deque<Boolean> firstEntry = new ArrayDeque<>();
     private static final int STREAM_BUFFER_SIZE = 8192;

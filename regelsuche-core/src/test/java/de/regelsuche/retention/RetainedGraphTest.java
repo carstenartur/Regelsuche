@@ -20,6 +20,15 @@ class RetainedGraphTest {
         } finally {DescribedEnum.VALUE.values.clear();}
     }
 
+    @Test void nativeFeatureTextBuildersAndScalarCountersExposeTheirLogicalStorage() {
+        var text=new StringBuilder("abc");
+        var first=RetainedGraph.measure(text);
+        assertEquals(new RetainedGraph.Usage(0,3,2),first.retained());assertEquals(6,first.work());
+        text.append("def");assertEquals(new RetainedGraph.Usage(0,6,2),RetainedGraph.measure(text).retained());
+        var counters=RetainedGraph.measure(new int[3]);
+        assertEquals(new RetainedGraph.Usage(0,0,4),counters.retained());assertEquals(8,counters.work());
+    }
+
     @Test void sharedObjectsCountOnceWhileEveryRetainedReferenceCountsAndReleasedGraphsDisappear() {
         var leaf=new VariableExpr("x");var binary=new BinaryExpr(leaf,BinaryOperator.ADD,leaf);
         var roots=new ArrayList<Object>();roots.add(binary);roots.add(leaf);
