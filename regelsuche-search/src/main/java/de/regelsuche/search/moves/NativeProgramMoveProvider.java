@@ -21,6 +21,7 @@ public record NativeProgramMoveProvider(MoveProvider.Descriptor descriptor,Compi
         } catch(CompiledAstRewriteProgram.CandidateLimitExceeded limit){return new Batch(List.of(),limit.workMetrics(),false);}
     }
     public NativeSearchMove proposal(CompiledAstRewriteProgram.Candidate history,long generationCost){
+        de.regelsuche.search.program.AstExpressionValidation.inspectHistory(history);
         return new NativeSearchMove(new NativeMoveProof.Program(history),descriptor,generationCost,Set.of());
     }
     @Override public NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove move,TypedMoveSearch.Context context){

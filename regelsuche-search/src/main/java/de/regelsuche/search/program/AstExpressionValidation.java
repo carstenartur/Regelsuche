@@ -16,8 +16,44 @@ public final class AstExpressionValidation {
         if (bytes > CompiledAstReplayCodec.MAXIMUM_BYTES) throw new IllegalArgumentException("invalid AST replay byte length");
         return new Inspection(counter.nodes, counter.characters, bytes,bytes-counter.extraUtf8Bytes);
     }
+    /** Same per-state and cumulative history limits as encode, including unexported intermediate states. */
+    public static Inspection inspectHistory(CompiledAstRewriteProgram.Candidate history) {
+        Objects.requireNonNull(history);
+        var counter = new Counter();
+        counter.byteGenerator = true;
+        long bytes = "{\"schema\":\"\",\"backend\":\"\",\"program\":\"\",\"sourceIds\":[],\"states\":[],\"steps\":[]}".length()
+            + CompiledAstReplayCodec.SCHEMA.length() + CompiledAstRewriteProgram.REVISION.length() + counter.text(history.programId());
+        for (int i = 0; i < history.sourceIds().size(); i++)
+            bytes = Math.addExact(bytes, 2 + counter.text(history.sourceIds().get(i)) + (i == 0 ? 0 : 1));
+        long nodes = 0;
+        for (int i = 0; i <= history.steps().size(); i++) {
+            counter.nodes = 0;
+            bytes = Math.addExact(bytes, counter.expression(i == 0 ? history.source() : history.steps().get(i - 1).target(), 0) + (i == 0 ? 0 : 1));
+            nodes = Math.addExact(nodes, counter.nodes);
+        }
+        for (int i = 0; i < history.steps().size(); i++) {
+            var step = history.steps().get(i);
+            if (step.assumptions().size() > CompiledAstReplayCodec.MAXIMUM_ASSUMPTIONS)
+                throw new IllegalArgumentException("too many AST replay assumptions");
+            bytes = Math.addExact(bytes, "{\"rule\":\"\",\"kind\":\"\",\"mayIncreaseComplexity\":,\"estimatedCostDelta\":,\"equivalencePreservingByConstruction\":,\"assumptions\":[],\"packId\":\"\",\"license\":\"\"}".length()
+                + counter.text(step.rule()) + step.kind().name().length() + (step.mayIncreaseComplexity() ? 4 : 5)
+                + integerCharacters(step.estimatedCostDelta()) + (step.equivalencePreservingByConstruction() ? 4 : 5)
+                + counter.text(step.packId()) + counter.text(step.license()) + (i == 0 ? 0 : 1));
+            for (int j = 0; j < step.assumptions().size(); j++)
+                bytes = Math.addExact(bytes, 2 + counter.text(step.assumptions().get(j)) + (j == 0 ? 0 : 1));
+        }
+        if (bytes > CompiledAstReplayCodec.MAXIMUM_BYTES) throw new IllegalArgumentException("invalid AST replay byte length");
+        return new Inspection(nodes, counter.characters, bytes, bytes - counter.extraUtf8Bytes);
+    }
+    private static int integerCharacters(int value) {
+        long magnitude = Math.abs((long) value);
+        int count = value < 0 ? 2 : 1;
+        while (magnitude >= 10) { magnitude /= 10; count++; }
+        return count;
+    }
     private static final class Counter {
         long nodes, characters,extraUtf8Bytes;
+        boolean byteGenerator;
         long expression(Expr expression, int depth) {
             Objects.requireNonNull(expression);
             if (++nodes > AstRewriteTransport.MAXIMUM_NODES || depth > AstRewriteTransport.MAXIMUM_DEPTH)
@@ -53,7 +89,9 @@ public final class AstExpressionValidation {
                 char c = value.charAt(i);
                 if (Character.isHighSurrogate(c)) {
                     if (++i == value.length() || !Character.isLowSurrogate(value.charAt(i))) throw new IllegalArgumentException("unpaired Unicode surrogate");
-                    bytes += 4;extraUtf8Bytes+=2;
+                    // Jackson byte output escapes each supplementary UTF-16 code unit; String output retains the pair.
+                    if (byteGenerator) bytes += 12;
+                    else { bytes += 4; extraUtf8Bytes += 2; }
                 } else if (Character.isLowSurrogate(c)) throw new IllegalArgumentException("unpaired Unicode surrogate");
                 else if (c == '"' || c == '\\' || c == '\n' || c == '\r' || c == '\t' || c == '\b' || c == '\f') bytes += 2;
                 else if (c < 32) bytes += 6;
