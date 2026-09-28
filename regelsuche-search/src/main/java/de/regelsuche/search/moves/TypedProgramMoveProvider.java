@@ -33,6 +33,9 @@ public final class TypedProgramMoveProvider implements TypedMoveSearch.TypedProv
         }
     }
 
+    /** Same compiled interpreter and descriptor, with native proposal transport. */
+    public NativeProgramMoveProvider nativeProvider() { return new NativeProgramMoveProvider(descriptor, program); }
+
     @Override public Descriptor descriptor() { return descriptor; }
 
     @Override public Batch candidates(MoveState state, MoveContext context) {
