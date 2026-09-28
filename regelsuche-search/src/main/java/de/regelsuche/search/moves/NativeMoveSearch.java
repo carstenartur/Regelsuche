@@ -125,6 +125,12 @@ public final class NativeMoveSearch {
     public QualityResult searchUntil(Problem problem,TypedSourceOnlySearch.Objective objective,long maximumOutputScore,SearchContinuationContract continuation){
         return select(problem,objective,maximumOutputScore,true,continuation);
     }
+    public QualityResult searchUntil(Problem problem,TypedSourceOnlySearch.Objective objective,long maximumOutputScore,SearchContinuationContract continuation,SearchExpressionStore.Limits limits){
+        Objects.requireNonNull(limits);return select(problem,objective,maximumOutputScore,true,continuation);
+    }
+    public QualityResult searchBest(Problem problem,TypedSourceOnlySearch.Objective objective,SearchContinuationContract continuation,SearchExpressionStore.Limits limits){
+        Objects.requireNonNull(limits);return select(problem,objective,0,false,continuation);
+    }
     /** Best admitted incumbent under the fixed budget; does not stop at an adequate score. */
     public QualityResult searchBest(Problem problem,TypedSourceOnlySearch.Objective objective,SearchContinuationContract continuation){
         return select(problem,objective,0,false,continuation);

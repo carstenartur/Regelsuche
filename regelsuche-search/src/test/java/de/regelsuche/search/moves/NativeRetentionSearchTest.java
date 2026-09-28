@@ -29,6 +29,33 @@ class NativeRetentionSearchTest {
             return verifier.verify(source,move,context);
         }
     }
+    private enum DepthObjective implements TypedSourceOnlySearch.Objective,RetainedGraph.View {
+        INSTANCE;
+        @Override public TypedSourceOnlySearch.Score evaluate(TypedMoveSearch.State state){return new TypedSourceOnlySearch.Score(state.searchDepth()==0?1:0,1);}
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor){}
+    }
+    @Test void sourceOnlyQualityAndBestSelectionKeepTheSameTotalOwnershipAndReplayReceipt() {
+        var a=de.regelsuche.transform.PatternExpr.var("A");
+        var rule=new de.regelsuche.transform.PatternRewriteRule("zero",de.regelsuche.transform.PatternExpr.op(
+            de.regelsuche.ast.BinaryOperator.ADD,a,de.regelsuche.transform.PatternExpr.num(0)),a);
+        var target=new VariableExpr("x");
+        var source=new de.regelsuche.ast.BinaryExpr(target,de.regelsuche.ast.BinaryOperator.ADD,new de.regelsuche.ast.NumberExpr(0));
+        var descriptor=new MoveProvider.Descriptor("zero","zero",SearchMove.SourceKind.PRIMITIVE,SearchMove.ProofStrength.REPLAYABLE,List.of(),SearchMove.ValueEvidence.UNKNOWN,"zero-v1");
+        var provider=new NativeMoveSearch.Primitive(descriptor,new de.regelsuche.transform.AstRewriteTransport(List.of(rule),64,128));
+        var problem=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION),List.of(provider),MoveSearch.Mode.FAST,
+            MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(1,1,0,10,1000000));
+        var engine=new NativeMoveSearch();
+        for(var result:List.of(engine.searchUntil(problem,DepthObjective.INSTANCE,0,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT),
+                engine.searchBest(problem,DepthObjective.INSTANCE,SearchContinuationContract.PATH_SENSITIVE,SearchExpressionStore.Limits.DEFAULT))) {
+            assertSame(target,result.incumbent().expression());assertEquals(1,result.witness().size());assertTrue(result.replayWork()>0);
+            var accounting=assertDoesNotThrow(()->result.search().accounting());
+            assertTrue(accounting.validationWork()>0);assertTrue(accounting.executionWork()>0);assertTrue(accounting.retentionWork()>0);
+            assertEquals(result.search().metrics().totalWork()+result.replayWork()+accounting.validationWork()+accounting.executionWork()+accounting.storageWork()+accounting.retentionWork(),result.totalWork());
+            assertEquals(new RetainedGraph.Usage(0,0,0),accounting.live());assertTrue(accounting.resultRetained().nodes()>=3);
+            assertTrue(result.withinBudget());
+        }
+    }
+
     @Test void finalIndependentReplayReturnsItsPaidResourceFailureInsteadOfLosingTheResult() {
         var a=de.regelsuche.transform.PatternExpr.var("A");
         var rule=new de.regelsuche.transform.PatternRewriteRule("zero",de.regelsuche.transform.PatternExpr.op(
