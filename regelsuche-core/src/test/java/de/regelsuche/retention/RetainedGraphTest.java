@@ -56,6 +56,16 @@ class RetainedGraphTest {
         assertThrows(UnsupportedOperationException.class,()->map.entrySet().iterator().next().setValue(new VariableExpr("changed")));
         assertEquals(2,RetainedGraph.measure(map).retained().nodes());
     }
+    @Test void opaqueBigIntegerSubclassCannotHideAnOwnedExpressionGraph() {
+        class CapturingInteger extends java.math.BigInteger {
+            final Expr retained;
+            CapturingInteger(Expr retained){super("1");this.retained=retained;}
+        }
+        var leaf=new VariableExpr("captured");
+        var scalar=new CapturingInteger(new BinaryExpr(leaf,BinaryOperator.ADD,leaf));
+        var rejected=assertThrows(RetainedGraph.Unmeasured.class,()->RetainedGraph.measure(scalar));
+        assertTrue(rejected.attempted().work()>0);
+    }
     @Test void undescribedPayloadCannotPretendToHaveZeroRetention() {
         var rejected=assertThrows(RetainedGraph.Unmeasured.class,()->RetainedGraph.measure(new Object()));
         assertEquals(5,rejected.attempted().work(),"failed admission retains performed audit work");
