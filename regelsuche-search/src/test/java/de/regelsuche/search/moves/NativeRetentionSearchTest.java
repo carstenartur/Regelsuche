@@ -34,6 +34,25 @@ class NativeRetentionSearchTest {
         @Override public TypedSourceOnlySearch.Score evaluate(TypedMoveSearch.State state){return new TypedSourceOnlySearch.Score(state.searchDepth()==0?1:0,1);}
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){}
     }
+    @Test void defaultNativeEntriesUseTheSameExplicitOwnershipRevisionAndRejectOpaqueCaptures() {
+        var source=new VariableExpr("x");
+        var target=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.frozen(source),List.of(),MoveSearch.Mode.FAST,
+            MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(1,1,0,10,1000000));
+        var engine=new NativeMoveSearch();var result=engine.search(target,SearchContinuationContract.PATH_SENSITIVE);
+        assertTrue(assertDoesNotThrow(result::accounting).complete());assertEquals("regelsuche.native-expr-move-search/v3-audited-ownership",result.workRevision());
+        var problem=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.sourceOnly(List.of(),MoveContext.Phase.FROZEN_EVALUATION),List.of(),
+            target.mode(),target.scheduling(),target.budget());
+        for(var quality:List.of(engine.searchUntil(problem,DepthObjective.INSTANCE,1,SearchContinuationContract.PATH_SENSITIVE),
+                engine.searchBest(problem,DepthObjective.INSTANCE,SearchContinuationContract.PATH_SENSITIVE))) {
+            assertTrue(assertDoesNotThrow(quality.search()::accounting).complete());assertEquals(result.workRevision(),quality.search().workRevision());
+            assertTrue(quality.totalWork()>quality.search().metrics().totalWork());
+        }
+        var unsupported=engine.searchUntil(problem,state->new TypedSourceOnlySearch.Score(0,0),0,SearchContinuationContract.PATH_SENSITIVE);
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,unsupported.search().outcome());assertFalse(unsupported.hasIncumbent());
+        assertFalse(unsupported.withinBudget());assertTrue(unsupported.totalWork()>0);
+        assertTrue(unsupported.search().accounting().detail().startsWith("NATIVE_RETENTION_UNSUPPORTED:"));
+    }
+
     @Test void handingOffAResultCountsItsOverlapWithTheStillOwnedSessionGraph() {
         var source=new VariableExpr("source");
         var problem=new NativeMoveSearch.Problem(source,TypedMoveSearch.Context.frozen(source),List.of(),MoveSearch.Mode.FAST,

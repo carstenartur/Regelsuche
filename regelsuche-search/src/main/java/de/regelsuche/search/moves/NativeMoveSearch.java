@@ -96,6 +96,7 @@ public final class NativeMoveSearch {
         }
         public boolean accountingComplete(){return (accounting==null || accounting.complete()) && cursorReceipts().stream().flatMap(r->r.lanes().stream()).allMatch(l->l.cursor()==null || l.cursor().accountingComplete());}
         public Accounting accounting(){if(accounting==null)throw new IllegalStateException("ownership accounting unavailable for this revision");return accounting;}
+        public String workRevision(){return REVISION;}
         public long replayWork(){return replayWork;}
         public long totalWork(){return Math.addExact(Math.addExact(metrics().totalWork(),replayWork),accounting==null?0:accounting.work());}
         public boolean withinBudget(){return accountingComplete() && totalWork()<=workBudget;}
