@@ -111,15 +111,17 @@ public final class EquivalenceAwarePatternMatcher {
                 RetainedOperation.checkpoint();
                 return outcome;
             } catch (RuntimeException | Error failure) {
-                // A returned outcome delegates these branches to its caller. No
-                // outcome escapes this path, so its completed branch work stays here.
-                try { RetainedOperation.work(budget.usedBranches()); }
-                catch (RuntimeException | Error accounting) {
-                    if (accounting != failure) failure.addSuppressed(accounting);
-                }
                 observeFailure(failure);
                 throw failure;
             }
+        } catch (RuntimeException | Error failure) {
+            // A returned outcome delegates these branches to its caller. This
+            // includes failed frame closure: a staged result has not escaped yet.
+            try { RetainedOperation.work(budget.usedBranches()); }
+            catch (RuntimeException | Error accounting) {
+                if (accounting != failure) failure.addSuppressed(accounting);
+            }
+            throw failure;
         }
     }
 
