@@ -264,11 +264,20 @@ public final class ExpressionFormatter {
                 size += value.length();
                 RetainedOperation.work(1);
                 if (parenthesized) append(')');
-            } finally {
-                fragment = null;
-                RetainedOperation.work(1);
+            } catch (RuntimeException | Error failure) {
+                try { clearFragment(); }
+                catch (RuntimeException | Error cleanup) {
+                    if (cleanup != failure) failure.addSuppressed(cleanup);
+                }
+                throw failure;
             }
+            clearFragment();
             return this;
+        }
+
+        private void clearFragment() {
+            fragment = null;
+            RetainedOperation.work(1);
         }
 
         private Output append(char value) {
