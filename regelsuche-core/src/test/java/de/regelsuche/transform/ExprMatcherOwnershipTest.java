@@ -164,6 +164,54 @@ class ExprMatcherOwnershipTest {
         assertFalse(observation.inputMissing);
     }
 
+    @Test void anExhaustedSiblingDoesNotRenderAnotherStepLimitDescription() {
+        Expr input = new VariableExpr("x"); var pattern = matcher();
+        var expected = new ExprMatcher.MatchDiagnostic("MATCH_STEP_LIMIT",pattern.canonicalDescriptor());
+        var observation = new Observation(); observation.input = input;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var result = ExprMatcher.anyOf(pattern,pattern).match(input,
+                new ExprMatcher.MatchOptions(null,64,1,1000));
+            assertFalse(result.matched()); assertEquals(1,result.evaluatedSteps());
+            assertEquals(List.of(expected),result.diagnostics());
+        }
+        assertEquals(1,observation.patternDescriptions.size(),
+            "after the first step-limit diagnostic, exhausted siblings need no new descriptions");
+    }
+
+    @Test void aConstraintStepLimitKeepsItsOwnDescription() {
+        Expr input = new VariableExpr("x");
+        var constraint = ExprMatcher.bindingMatches("missing",matcher());
+        var expected = new ExprMatcher.MatchDiagnostic("MATCH_STEP_LIMIT",constraint.canonicalDescriptor());
+        var observation = new Observation(); observation.input = input;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var result = ExprMatcher.where(ExprMatcher.any(),constraint).match(input,
+                new ExprMatcher.MatchOptions(null,64,2,1000));
+            assertFalse(result.matched()); assertEquals(2,result.evaluatedSteps());
+            assertEquals(List.of(expected),result.diagnostics());
+        }
+        assertEquals(1,observation.patternDescriptions.size());
+    }
+
+    @Test void aRealResultLimitKeepsTheFirstResultAndItsExactDescription() {
+        Expr input = new ExpressionParser().parseTerm("f(x+y,y)");
+        var limited = ExprMatcher.anyOf(matcher(),matcher());
+        var expected = new ExprMatcher.MatchDiagnostic("MATCH_RESULT_LIMIT",limited.canonicalDescriptor());
+        var first = matcher().match(input).matches().getFirst();
+        var observation = new Observation(); observation.input = input;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var result = limited.match(input,new ExprMatcher.MatchOptions(null,1,64,1000));
+            assertEquals(List.of(first),result.matches());
+            assertEquals(List.of(expected),result.diagnostics());
+            assertFalse(result.complete());
+        }
+        assertEquals(2,observation.patternDescriptions.size(),
+            "the actual result-limit description contains both children, each rendered once");
+        assertFalse(observation.inputMissing);
+    }
+
     @Test void abortedOutcomePaysItsUnreturnedStepsAndNestedBranchCounters() {
         verifyFailedHandoff(false);
     }
