@@ -1,6 +1,7 @@
 package de.regelsuche.search.moves;
 
 import de.regelsuche.search.program.CompiledAstRewriteProgram;
+import de.regelsuche.retention.RetainedOperation;
 import de.regelsuche.transform.TransformationWorkMetrics;
 import java.util.*;
 
@@ -18,12 +19,22 @@ public record NativeProgramMoveProvider(MoveProvider.Descriptor descriptor,Compi
         if(!NativeMoveProvider.carries(descriptor.requiredAssumptions(),source,context))return NativeMoveProvider.rejectedAssumptions();
         try {
             var batch=program.transformMeasured(source.expression());
-            return new Batch(batch.candidates().stream().map(history->proposal(history,batch.workMetrics().totalWorkUnits())).toList(),batch.workMetrics(),false);
+            var moves=new ArrayList<NativeSearchMove>();
+            try(var retained=RetainedOperation.retain(this,source,context,batch,moves)) {
+                for(var history:batch.candidates()) {
+                    moves.add(proposal(history,batch.workMetrics().totalWorkUnits()));
+                    RetainedOperation.work(1);RetainedOperation.checkpoint();
+                }
+                return RetainedOperation.produced(new Batch(moves,batch.workMetrics(),false));
+            }
         } catch(CompiledAstRewriteProgram.CandidateLimitExceeded limit){return new Batch(List.of(),limit.workMetrics(),false);}
     }
     public NativeSearchMove proposal(CompiledAstRewriteProgram.Candidate history,long generationCost){
-        de.regelsuche.search.program.AstExpressionValidation.inspectHistory(history);
-        return new NativeSearchMove(new NativeMoveProof.Program(history),descriptor,generationCost,Set.of());
+        try(var retained=RetainedOperation.retain(this,history)) {
+            de.regelsuche.search.program.AstExpressionValidation.inspectHistory(history);
+            RetainedOperation.work(2);
+            return RetainedOperation.produced(new NativeSearchMove(new NativeMoveProof.Program(history),descriptor,generationCost,Set.of()));
+        }
     }
     @Override public NativeVerification verify(TypedMoveSearch.State source,NativeSearchMove move,TypedMoveSearch.Context context){
         if(!NativeMoveProvider.carries(move.assumptions(),source,context) || !NativeMoveProvider.carries(descriptor.requiredAssumptions(),source,context))
@@ -32,9 +43,21 @@ public record NativeProgramMoveProvider(MoveProvider.Descriptor descriptor,Compi
         try{regenerated=program.transformMeasured(source.expression());}
         catch(CompiledAstRewriteProgram.CandidateLimitExceeded limit){return new NativeVerification(false,verificationWork(limit.workMetrics()),null,null,"TYPED_PROGRAM_CANDIDATE_LIMIT");}
         long work=Math.addExact(verificationWork(regenerated.workMetrics()),regenerated.candidates().size());
-        boolean accepted=regenerated.candidates().stream().map(history->proposal(history,move.generationCost())).anyMatch(move.withCapabilityDelta(Set.of())::equals);
-        return new NativeVerification(accepted,work,accepted?move.proof():null,accepted?move.ruleId():null,
-            accepted?"TYPED_PROGRAM_REPLAYED":"TYPED_PROGRAM_REPLAY_REJECTED");
+        try(var retained=RetainedOperation.retain(this,source,move,context,regenerated)) {
+            var expected=move.withCapabilityDelta(Set.of());
+            try(var expectedFrame=RetainedOperation.retain(expected)) {
+                boolean accepted=false;
+                for(var history:regenerated.candidates()) {
+                    var candidate=proposal(history,move.generationCost());
+                    try(var compared=RetainedOperation.retain(candidate)) {
+                        RetainedOperation.work(1);
+                        if(expected.equals(candidate)){accepted=true;break;}
+                    }
+                }
+                return RetainedOperation.produced(new NativeVerification(accepted,work,accepted?move.proof():null,accepted?move.ruleId():null,
+                    accepted?"TYPED_PROGRAM_REPLAYED":"TYPED_PROGRAM_REPLAY_REJECTED"));
+            }
+        }
     }
     private static long verificationWork(TransformationWorkMetrics work){return Math.addExact(work.totalWorkUnits(),work.candidateWork().canonicalWorkUnits());}
 }
