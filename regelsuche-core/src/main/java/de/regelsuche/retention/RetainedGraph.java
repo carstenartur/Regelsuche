@@ -66,6 +66,26 @@ public final class RetainedGraph {
             return scan.observation();
         } finally { scan.pending.clear();scan.seen.clear(); }
     }
+    /** Bounded per-session immutable accounting data; never mathematical verification authority. */
+    public static final class Inventory implements View {
+        private final int vertexLimit, wordLimit, childLimit;
+        private boolean closed;
+        public Inventory(int vertexLimit, int wordLimit, int childLimit) {
+            if (vertexLimit < 1 || wordLimit < 1 || childLimit < 1)
+                throw new IllegalArgumentException("nonpositive immutable inventory limit");
+            this.vertexLimit=vertexLimit;this.wordLimit=wordLimit;this.childLimit=childLimit;
+        }
+        public Inventory(){this(1_024,4_096,4_096);}
+        public Observation measure(Object ownershipRoot) {
+            if(closed)throw new IllegalStateException("closed immutable inventory");
+            return RetainedGraph.measure(ownershipRoot);
+        }
+        public int cachedVertices(){return 0;}
+        /** Paid logical release; repeated close performs no additional operation. */
+        public long close(){if(closed)return 0;closed=true;return 1;}
+        @Override public void retainedReferences(Visitor visitor){}
+    }
+
     private static final class Scan implements Visitor {
         final IdentityHashMap<Object,Boolean> seen=new IdentityHashMap<>();
         final ArrayDeque<Object> pending=new ArrayDeque<>();

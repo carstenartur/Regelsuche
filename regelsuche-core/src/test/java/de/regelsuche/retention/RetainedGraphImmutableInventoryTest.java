@@ -1,0 +1,56 @@
+package de.regelsuche.retention;
+
+import static org.junit.jupiter.api.Assertions.*;
+import de.regelsuche.ast.*;
+import de.regelsuche.symbol.SymbolId;
+import java.util.*;
+import org.junit.jupiter.api.Test;
+
+class RetainedGraphImmutableInventoryTest {
+    private record Root(Object value, RetainedGraph.Inventory inventory) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(value);visitor.reference(inventory);}
+    }
+    @Test void repeatedImmutableGraphAvoidsActualRepeatedTraversalWithAllMetadataStillOwned(){
+        var shared=new VariableExpr("x");Expr expression=shared;
+        for(int i=0;i<12;i++)expression=new BinaryExpr(expression,BinaryOperator.ADD,shared);
+        var inventory=new RetainedGraph.Inventory();var root=new Root(expression,inventory);
+        var first=inventory.measure(root);var second=inventory.measure(root);
+        assertEquals(RetainedGraph.measure(root).retained(),second.retained(),"the independent fresh scanner includes actual inventory metadata and alias union");
+        assertTrue(first.work()>0 && second.work()>0);
+        assertTrue(second.work()<first.work(),"a real warm lookup removes repeated immutable traversal; its index and cleanup are still paid");
+        assertTrue(inventory.cachedVertices()>0);
+        assertTrue(inventory.close()>0);assertEquals(0,inventory.close());
+        assertEquals(0,RetainedGraph.measure(inventory).retained().nodes());
+    }
+    @Test void mutableOwnerChangesAndEqualButDistinctIdentitiesRemainVisible(){
+        String name=new String("shared");
+        var symbol=new SymbolId(new UUID(1,2),1);
+        var values=new ArrayList<Object>(List.of(new VariableExpr(name),new VariableExpr(name),
+            new VariableExpr(new String("shared")),VariableExpr.scoped(symbol),VariableExpr.scoped(symbol)));
+        var inventory=new RetainedGraph.Inventory();var root=new Root(values,inventory);
+        inventory.measure(root);
+        values.removeFirst();values.add(new FunctionExpr("f",List.of(new VariableExpr("later"))));
+        var changed=inventory.measure(root);
+        assertEquals(RetainedGraph.measure(root).retained(),changed.retained());
+        values.clear();var cleared=inventory.measure(root);
+        assertEquals(RetainedGraph.measure(root).retained(),cleared.retained());
+        assertEquals(0,cleared.retained().nodes(),"cache-only reachability does not preserve primary liveness after pruning");
+        inventory.close();
+    }
+    @Test void capacityFallbackAndSessionCloseCannotChangeAnotherOwner(){
+        var leaf=new VariableExpr("x");var limited=new RetainedGraph.Inventory(1,1,1);
+        var other=new RetainedGraph.Inventory();var root=new Root(leaf,limited);var otherRoot=new Root(leaf,other);
+        var first=limited.measure(root);other.measure(otherRoot);
+        assertEquals(RetainedGraph.measure(root).retained(),first.retained());assertTrue(limited.cachedVertices()<=1);
+        limited.close();assertThrows(IllegalStateException.class,()->limited.measure(root));
+        assertEquals(RetainedGraph.measure(otherRoot).retained(),other.measure(otherRoot).retained());
+        other.close();
+    }
+    @Test void unknownPayloadAndBigIntegerSubtypeCannotGainAnImmutableCapability(){
+        class OpaqueInteger extends java.math.BigInteger {final Expr capture=new VariableExpr("hidden");OpaqueInteger(){super("1");}}
+        var inventory=new RetainedGraph.Inventory();
+        assertThrows(RetainedGraph.Unmeasured.class,()->inventory.measure(new Root(new Object(),inventory)));
+        assertThrows(RetainedGraph.Unmeasured.class,()->inventory.measure(new Root(new OpaqueInteger(),inventory)));
+        assertEquals(0,inventory.cachedVertices());assertTrue(inventory.close()>0);
+    }
+}
