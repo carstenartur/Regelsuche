@@ -8,6 +8,7 @@ import java.util.Set;
 /** Explicit native expression continuation, using the same managed P02/P03 contract. */
 public interface ExprIncrementalProvider extends NativeMoveProvider {
     Definition contractDefinition();
+    @Override default Mathematics mathematicalKind(){return contractDefinition().mathematics();}
     ObjectSource<NativeMoveProof> openSource(TypedMoveSearch.State state,TypedMoveSearch.Context context,Meter meter);
     default ObjectCursor<NativeMoveProof> openSession(TypedMoveSearch.State state,TypedMoveSearch.Context context) {
         if(contractDefinition().transport()!=Transport.NATIVE_EXPR_V1)throw new IllegalArgumentException("native cursor requires native transport");

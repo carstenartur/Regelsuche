@@ -12,6 +12,7 @@ public record NativeProgramMoveProvider(MoveProvider.Descriptor descriptor,Compi
                 || descriptor.proofStrength()!=SearchMove.ProofStrength.REPLAYABLE)
             throw new IllegalArgumentException("compiled regeneration requires a replayable learned/expert program");
     }
+    @Override public IncrementalProviderContract.Mathematics mathematicalKind(){return IncrementalProviderContract.Mathematics.PRIMITIVE;}
     @Override public Batch candidates(TypedMoveSearch.State source,TypedMoveSearch.Context context) {
         if(!NativeMoveProvider.carries(descriptor.requiredAssumptions(),source,context))return NativeMoveProvider.rejectedAssumptions();
         try {

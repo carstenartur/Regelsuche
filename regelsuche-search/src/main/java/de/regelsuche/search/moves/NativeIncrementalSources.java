@@ -15,7 +15,7 @@ final class NativeIncrementalSources {
         if(provider instanceof ExprIncrementalProvider incremental)return incremental.contractDefinition();
         return new Definition(NATIVE_REVISION,provider.descriptor().id(),Kind.NATIVE_BATCH,provider.descriptor().provenanceId(),
             NativeMoveSearch.REVISION,Transport.NATIVE_EXPR_V1,
-            provider.descriptor().proofStrength()==SearchMove.ProofStrength.VERIFIED?Mathematics.EXACT:Mathematics.PRIMITIVE,null);
+            provider.mathematicalKind(),null);
     }
     static StagedIncrementalLanes.Source<NativeSearchMove> lane(NativeMoveProvider provider,TypedMoveSearch.State state,TypedMoveSearch.Context context) {
         return new StagedIncrementalLanes.Source<>() {

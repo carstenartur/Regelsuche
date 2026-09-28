@@ -6,6 +6,10 @@ import java.util.List;
 /** Explicit object transport. Legacy marker interfaces do not imply this contract. */
 public interface NativeMoveProvider {
     MoveProvider.Descriptor descriptor();
+    /** Execution dimension, independent of evidence strength; required for managed native batches. */
+    default IncrementalProviderContract.Mathematics mathematicalKind(){
+        throw new IllegalArgumentException("native provider requires an explicit mathematical work contract");
+    }
     record Batch(List<NativeSearchMove> moves,TransformationWorkMetrics work,boolean complete) {
         public Batch { moves=List.copyOf(moves); }
     }

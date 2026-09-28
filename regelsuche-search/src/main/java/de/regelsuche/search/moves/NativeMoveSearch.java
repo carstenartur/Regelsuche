@@ -14,6 +14,7 @@ public final class NativeMoveSearch {
             Objects.requireNonNull(descriptor);Objects.requireNonNull(transport);
             if(descriptor.sourceKind()!=SearchMove.SourceKind.PRIMITIVE)throw new IllegalArgumentException("primitive native provider required");
         }
+        @Override public IncrementalProviderContract.Mathematics mathematicalKind(){return IncrementalProviderContract.Mathematics.PRIMITIVE;}
         @Override public Batch candidates(TypedMoveSearch.State source,TypedMoveSearch.Context context){
             if(!NativeMoveProvider.carries(descriptor.requiredAssumptions(),source,context))return NativeMoveProvider.rejectedAssumptions();
             var steps=transport.generate(source.expression());var work=TransformationWorkMetrics.flatEngine(steps.size());

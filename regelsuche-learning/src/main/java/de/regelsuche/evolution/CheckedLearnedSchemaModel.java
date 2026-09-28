@@ -406,6 +406,7 @@ public final class CheckedLearnedSchemaModel {
     final class NativeProvider implements NativeMoveProvider {
         private final IndexedProvider index;
         private NativeProvider(IndexedProvider index){this.index=index;}
+        @Override public IncrementalProviderContract.Mathematics mathematicalKind(){return IncrementalProviderContract.Mathematics.EXACT;}
         @Override public MoveProvider.Descriptor descriptor(){return descriptor;}
         @Override public Batch candidates(TypedMoveSearch.State state,TypedMoveSearch.Context context) {
             var work=new Work();work.add(1);
