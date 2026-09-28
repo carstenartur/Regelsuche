@@ -47,6 +47,19 @@ class NativeSourceOnlySearchTest {
             s->new TypedSourceOnlySearch.Score(s.expression() instanceof BinaryExpr?3:1,1),1,SearchContinuationContract.PATH_SENSITIVE));
         assertEquals(1001,overrun.attempted().replayWork());assertFalse(overrun.attempted().withinBudget());
     }
+    @Test void targetSearchAlsoRunsAFreshIndependentFinalReplay() {
+        var checks=new AtomicInteger();var sourceOnly=problem(checks,false,10000);
+        var goal=((BinaryExpr)sourceOnly.source()).left();
+        var target=new NativeMoveSearch.Problem(sourceOnly.source(),TypedMoveSearch.Context.frozen(goal),
+            sourceOnly.providers(),sourceOnly.mode(),sourceOnly.scheduling(),sourceOnly.budget(),
+            sourceOnly.policy(),sourceOnly.stateScore(),sourceOnly.stateValue(),sourceOnly.verifier());
+        try(var transport=AstTransportObservation.open()) {
+            var result=new NativeMoveSearch().search(target,SearchContinuationContract.PATH_SENSITIVE);
+            assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome());assertEquals(goal,result.output());
+            assertEquals(2,checks.get(),"target witnesses require fresh independent replay as source-only incumbents do");
+            assertEquals(0,transport.total());
+        }
+    }
     @Test void bestBudgetUsesTheSameObjectiveWithoutEarlyQualityStop() {
         var checks=new AtomicInteger();
         var result=new NativeMoveSearch().searchBest(problem(checks,false,10000),
