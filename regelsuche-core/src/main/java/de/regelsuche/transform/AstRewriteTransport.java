@@ -1,6 +1,7 @@
 package de.regelsuche.transform;
 
 import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.retention.RetainedOperation;
 
 import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.ast.BinaryExpr;
@@ -75,27 +76,35 @@ public final class AstRewriteTransport implements RetainedGraph.View {
         return current;
     }
 
-    private record Node(Expr expression, int depth) {}
+    private record Node(Expr expression, int depth) implements RetainedGraph.View {
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(expression);}
+    }
 
     static void requireBounded(Expr root) {
         Objects.requireNonNull(root, "expression");
         var pending = new ArrayDeque<Node>();
-        pending.push(new Node(root, 0));
+        try(var retained=RetainedOperation.retain(root,pending)) {
+        pending.push(new Node(root, 0));RetainedOperation.work(1);RetainedOperation.checkpoint();
         int nodes = 0;
         while (!pending.isEmpty()) {
-            var node = pending.pop();
+            var node = pending.pop();RetainedOperation.work(1);
+            try(var visiting=RetainedOperation.retain(node)) {
+            RetainedOperation.validation(1);
             if (++nodes > MAXIMUM_NODES || node.depth() > MAXIMUM_DEPTH) {
                 throw new IllegalArgumentException("AST transport structural limit exceeded");
             }
             if (node.expression() instanceof BinaryExpr binary) {
                 pending.push(new Node(binary.right(), node.depth() + 1));
-                pending.push(new Node(binary.left(), node.depth() + 1));
+                pending.push(new Node(binary.left(), node.depth() + 1));RetainedOperation.work(2);
             } else if (node.expression() instanceof FunctionExpr function) {
                 if (function.arguments().size() > MAXIMUM_NODES - nodes) {
                     throw new IllegalArgumentException("AST transport argument limit exceeded");
                 }
-                for (var argument : function.arguments()) pending.push(new Node(argument, node.depth() + 1));
+                for (var argument : function.arguments()) {pending.push(new Node(argument, node.depth() + 1));RetainedOperation.work(1);}
             }
+            RetainedOperation.checkpoint();
+            }
+        }
         }
     }
 }

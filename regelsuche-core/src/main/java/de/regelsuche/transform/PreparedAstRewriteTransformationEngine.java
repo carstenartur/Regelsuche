@@ -227,8 +227,9 @@ public final class PreparedAstRewriteTransformationEngine
         }
 
         if (subtree instanceof BinaryExpr binaryExpr) {
-            for (RewriteResult leftRewrite :
-                    rewriteEverywhere(binaryExpr.left(), retainLegacyHash)) {
+            var leftRewrites=rewriteEverywhere(binaryExpr.left(), retainLegacyHash);
+            try(var child=retainLegacyHash?null:RetainedOperation.retain(leftRewrites)) {
+            for (RewriteResult leftRewrite : leftRewrites) {
                 results.add(new RewriteResult(
                     leftRewrite.rule(),
                     new BinaryExpr(
@@ -239,9 +240,12 @@ public final class PreparedAstRewriteTransformationEngine
                     leftRewrite.sourceSubtreeHash(),
                     leftRewrite.assumptions()
                 ));
+                if(!retainLegacyHash){RetainedOperation.work(2);RetainedOperation.checkpoint();}
             }
-            for (RewriteResult rightRewrite :
-                    rewriteEverywhere(binaryExpr.right(), retainLegacyHash)) {
+            }
+            var rightRewrites=rewriteEverywhere(binaryExpr.right(), retainLegacyHash);
+            try(var child=retainLegacyHash?null:RetainedOperation.retain(rightRewrites)) {
+            for (RewriteResult rightRewrite : rightRewrites) {
                 results.add(new RewriteResult(
                     rightRewrite.rule(),
                     new BinaryExpr(
@@ -252,21 +256,29 @@ public final class PreparedAstRewriteTransformationEngine
                     rightRewrite.sourceSubtreeHash(),
                     rightRewrite.assumptions()
                 ));
+                if(!retainLegacyHash){RetainedOperation.work(2);RetainedOperation.checkpoint();}
+            }
             }
         } else if (subtree instanceof FunctionExpr functionExpr) {
             List<Expr> arguments = functionExpr.arguments();
             for (int index = 0; index < arguments.size(); index++) {
                 final int position = index;
-                for (RewriteResult argumentRewrite :
-                        rewriteEverywhere(arguments.get(index), retainLegacyHash)) {
+                var argumentRewrites=rewriteEverywhere(arguments.get(index), retainLegacyHash);
+                try(var child=retainLegacyHash?null:RetainedOperation.retain(argumentRewrites)) {
+                for (RewriteResult argumentRewrite : argumentRewrites) {
                     List<Expr> replaced = new ArrayList<>(arguments);
+                    try(var argumentsHeld=retainLegacyHash?null:RetainedOperation.retain(replaced)) {
                     replaced.set(position, argumentRewrite.expression());
+                    if(!retainLegacyHash)RetainedOperation.work(arguments.size()+1L);
                     results.add(new RewriteResult(
                         argumentRewrite.rule(),
                         new FunctionExpr(functionExpr.name(), replaced),
                         argumentRewrite.sourceSubtreeHash(),
                         argumentRewrite.assumptions()
                     ));
+                    if(!retainLegacyHash){RetainedOperation.work(replaced.size()+2L);RetainedOperation.checkpoint();}
+                    }
+                }
                 }
             }
         }
@@ -298,10 +310,12 @@ public final class PreparedAstRewriteTransformationEngine
     }
 
     int canonicalAstNodeCount(Expr expression) {
-        return count(canonicalizer.canonicalize(expression));
+        var canonical=canonicalizer.canonicalize(expression);
+        try(var retained=RetainedOperation.retain(expression,canonical)){return count(canonical);}
     }
 
     private static int count(Expr expression) {
+        RetainedOperation.validation(1);
         if (expression instanceof BinaryExpr binaryExpr) {
             return 1 + count(binaryExpr.left()) + count(binaryExpr.right());
         }
