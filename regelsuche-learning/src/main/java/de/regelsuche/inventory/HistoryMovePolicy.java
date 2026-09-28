@@ -43,6 +43,9 @@ public final class HistoryMovePolicy implements MovePriorityPolicy {
             }
         };
     }
+    public static NativeMovePriorityPolicy nativePolicy(RuleHistoryMemory.Snapshot history,Weights weights) {
+        throw new UnsupportedOperationException("native history policy is not implemented");
+    }
     public RuleHistoryMemory.Snapshot history() { return history; }
     public Weights weights() { return weights; }
     private StructuralMoveContext context(MoveState state) {

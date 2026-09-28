@@ -79,6 +79,22 @@ class TypedHistoryMovePolicyTest {
             > run(source, goal, MovePriorityPolicy.INVENTORY_ORDER, 1000).metrics().searchWork());
     }
 
+    @Test void nativeRankingConsumesTheSameFrozenFeaturesWithoutExpressionTransport() {
+        Expr goal=NumberExpr.exact("1/3");Expr source=new BinaryExpr(goal,ADD,new NumberExpr(0));
+        var snapshot=new RuleHistoryMemory().freeze();
+        var legacy=HistoryMovePolicy.typed(snapshot,HistoryMovePolicy.Weights.DEFAULT);
+        var nativePolicy=assertDoesNotThrow(()->HistoryMovePolicy.nativePolicy(snapshot,HistoryMovePolicy.Weights.DEFAULT));
+        var state=new TypedMoveSearch.State(source,0,0,"",List.of(),Set.of(),0);
+        var context=TypedMoveSearch.Context.frozen(goal);
+        var move=new NativeMoveSearch.Primitive(DESCRIPTOR,TRANSPORT).candidates(state,context).moves().getFirst();
+        var encoded=new MoveState(CODEC.encodeExpression(source),0,0,"",List.of(),Set.of(),0);
+        var oldContext=MoveContext.frozen(CODEC.encodeExpression(goal));
+        assertEquals(legacy.contextWork(encoded,oldContext),nativePolicy.contextWork(state,context));
+        assertEquals(legacy.score(move.exportLegacy(),encoded,oldContext),nativePolicy.score(move,state,context));
+        assertEquals(legacy.providerScore(DESCRIPTOR,encoded,oldContext),nativePolicy.providerScore(DESCRIPTOR,state,context));
+        assertEquals(legacy.stage(DESCRIPTOR,encoded,oldContext),nativePolicy.stage(DESCRIPTOR,state,context));
+    }
+
     private static TypedMoveSearch.Result run(Expr source, Expr goal, MovePriorityPolicy policy, long work) {
         return new TypedMoveSearch().search(new TypedMoveSearch.Problem(source,
             new TypedMoveSearch.Context(goal, List.of(), MoveContext.Phase.TRAIN),
