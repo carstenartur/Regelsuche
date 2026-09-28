@@ -10,7 +10,7 @@ class RewriteTemporaryOwnershipTest {
     /** Walks only audited references, never private fields or a second rewrite implementation. */
     private static final class Observation implements RetainedOperation.Sink {
         RetainedOperation scope;long execution,validation;int queueWidth,simultaneousResults,checkpoints;
-        boolean canonicalThree,replacedArguments;
+        boolean canonicalThree,replacedArguments,emptyMutableBatch;
         List<Expr> abortAtCopiedArguments;List<?> abortedArguments;long previousCheckpointWork,copyCheckpointWork;
         @Override public void executionWork(long units){execution=Math.addExact(execution,units);}
         @Override public void validationWork(long units){validation=Math.addExact(validation,units);}
@@ -27,6 +27,7 @@ class RewriteTemporaryOwnershipTest {
             visitor.reference(scope);
             while(!pending.isEmpty()){
                 var value=pending.removeFirst();if(!seen.add(value))continue;
+                if(value instanceof ArrayList<?> list && list.isEmpty())emptyMutableBatch=true;
                 if(value instanceof NumberExpr number && number.equals(new NumberExpr(3)))canonicalThree=true;
                 if(value instanceof ArrayDeque<?> queue && queue.stream().allMatch(RetainedGraph.View.class::isInstance))queueWidth=Math.max(queueWidth,queue.size());
                 if(value instanceof ArrayList<?> list && !list.isEmpty() && list.stream().allMatch(Expr.class::isInstance))argumentLists.add(list);
@@ -118,6 +119,15 @@ class RewriteTemporaryOwnershipTest {
         assertEquals(4,observation.validation,"all four occurrences are inspected despite shared identity");
         assertEquals(3,observation.queueWidth,"actual simultaneous pending children stay observable");
         assertEquals(3,observation.checkpoints,"initial frame, initial root Node and actual child expansion; leaf visits do not grow ownership");
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+
+    @Test void emptyNativeRewriteDoesNotAllocateAMutableCandidateBatch(){
+        var source=new VariableExpr("x");var observation=new Observation();
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;assertTrue(new AstRewriteTransport(List.of(),32,32).generate(source).isEmpty());
+        }
+        assertFalse(observation.emptyMutableBatch,"a no-candidate leaf returns the shared empty batch without allocating an ArrayList");
         assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
 
