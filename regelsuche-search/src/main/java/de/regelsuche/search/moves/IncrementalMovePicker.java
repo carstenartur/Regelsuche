@@ -38,6 +38,11 @@ public final class IncrementalMovePicker implements MovePicker, AutoCloseable {
         staged = new StagedIncrementalLanes(providers, policy, state, context);
     }
 
+    @Override public boolean accountingComplete() {
+        return staged == null || stagedReceipt().lanes().stream().allMatch(lane -> lane.cursor()==null || lane.cursor().accountingComplete());
+    }
+    @Override public boolean incremental() { return true; }
+    @Override public Object executionReceipt() { return staged == null ? receipt() : stagedReceipt(); }
     @Override public Optional<SearchMove> next() { return next(Long.MAX_VALUE); }
 
     public Optional<SearchMove> next(long allowance) {

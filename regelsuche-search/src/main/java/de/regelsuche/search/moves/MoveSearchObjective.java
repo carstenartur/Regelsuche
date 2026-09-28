@@ -4,22 +4,22 @@ import java.util.List;
 import java.util.Objects;
 
 /** A per-run incumbent, updated only for the trusted input and mathematically admitted edges. */
-final class MoveSearchObjective {
-    private final MoveSearch.Objective objective;
+final class MoveSearchObjective<S,M,V> {
+    private final java.util.function.Function<S,MoveSearch.ObjectiveScore> objective;
     private final long maximumOutputScore;
-    private MoveState incumbent;
-    private MoveWitnessPath path = MoveWitnessPath.ROOT;
+    private S incumbent;
+    private MoveWitnessPath<S,M,V> path = MoveWitnessPath.root();
     private long inputScore;
     private long outputScore;
     private long objectiveWork;
-    private List<MoveSearch.WitnessStep> witness = List.of();
+    private List<SearchExecution.Step<S,M,V>> witness = List.of();
 
-    MoveSearchObjective(MoveSearch.Objective objective, long maximumOutputScore) {
+    MoveSearchObjective(java.util.function.Function<S,MoveSearch.ObjectiveScore> objective, long maximumOutputScore) {
         this.objective = Objects.requireNonNull(objective, "objective");
         this.maximumOutputScore = maximumOutputScore;
     }
-    long observe(MoveState state, MoveWitnessPath candidatePath) {
-        var assessment = Objects.requireNonNull(objective.evaluate(state), "objective assessment");
+    long observe(S state, MoveWitnessPath<S,M,V> candidatePath) {
+        var assessment = Objects.requireNonNull(objective.apply(state), "objective assessment");
         objectiveWork = Math.addExact(objectiveWork, assessment.work());
         if (incumbent == null) inputScore = assessment.value();
         if (incumbent == null || assessment.value() < outputScore) {
@@ -34,9 +34,9 @@ final class MoveSearchObjective {
         witness = path.steps();
         return witness.size() + 1L;
     }
-    MoveState incumbent() { return incumbent; }
+    S incumbent() { return incumbent; }
     long inputScore() { return inputScore; }
     long outputScore() { return outputScore; }
     long objectiveWork() { return objectiveWork; }
-    List<MoveSearch.WitnessStep> witness() { return witness; }
+    List<SearchExecution.Step<S,M,V>> witness() { return witness; }
 }

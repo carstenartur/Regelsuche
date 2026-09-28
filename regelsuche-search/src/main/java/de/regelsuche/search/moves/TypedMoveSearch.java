@@ -66,7 +66,7 @@ public final class TypedMoveSearch {
     }
 
     public record State(Expr expression, int searchDepth, int primitiveDepth, String previousRule,
-            List<String> assumptions, Set<String> capabilities, int complexityDebt) {
+            List<String> assumptions, Set<String> capabilities, int complexityDebt) implements SearchExecution.Position<Expr> {
         public State {
             Objects.requireNonNull(expression, "expression");
             assumptions = List.copyOf(assumptions);

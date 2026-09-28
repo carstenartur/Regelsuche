@@ -6,7 +6,7 @@ import java.util.Set;
 
 /** Source-only search position, independent of any learning implementation. */
 public record MoveState(String expression, int searchDepth, int primitiveDepth, String previousRule,
-                        List<String> assumptions, Set<String> capabilities, int complexityDebt) {
+                        List<String> assumptions, Set<String> capabilities, int complexityDebt) implements SearchExecution.Position<String> {
     public MoveState {
         if (expression == null || expression.isBlank() || previousRule == null
                 || searchDepth < 0 || primitiveDepth < 0 || complexityDebt < 0) {

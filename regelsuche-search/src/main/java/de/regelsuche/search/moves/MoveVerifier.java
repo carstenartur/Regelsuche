@@ -6,7 +6,7 @@ import java.util.List;
 @FunctionalInterface
 public interface MoveVerifier {
     Verification verify(MoveState source, SearchMove move, MoveContext context);
-    record Verification(boolean accepted, long work, List<String> receipts, String reason) {
+    record Verification(boolean accepted, long work, List<String> receipts, String reason) implements SearchExecution.Verification {
         public Verification {
             if (work < 0 || reason == null || (accepted && receipts.isEmpty())) throw new IllegalArgumentException("invalid verification receipt");
             receipts = List.copyOf(receipts);

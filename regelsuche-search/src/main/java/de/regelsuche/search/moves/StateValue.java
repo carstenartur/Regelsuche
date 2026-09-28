@@ -7,14 +7,14 @@ import java.util.TreeMap;
 @FunctionalInterface
 public interface StateValue {
     Assessment evaluate(MoveState state, MoveContext context);
-    record Capability(String providerId, String sourceExpression, String subtreePath, String matchedExpression, String rewrittenExpression) {
+    record Capability(String providerId, String sourceExpression, String subtreePath, String matchedExpression, String rewrittenExpression) implements SearchExecution.Capability<String> {
         public Capability {
             if (providerId == null || providerId.isBlank() || sourceExpression == null || subtreePath == null
                     || matchedExpression == null || rewrittenExpression == null || matchedExpression.equals(rewrittenExpression))
                 throw new IllegalArgumentException("capability requires an executable non-identity witness");
         }
     }
-    record Assessment(int complexity, double value, long searchWork, long primitiveWork, Map<String, Capability> capabilities) {
+    record Assessment(int complexity, double value, long searchWork, long primitiveWork, Map<String, Capability> capabilities) implements SearchExecution.Assessment<String> {
         public static final Assessment EMPTY = new Assessment(0, 0, 0, 0, Map.of());
         public Assessment {
             if (complexity < 0 || !Double.isFinite(value) || searchWork < 0 || primitiveWork < 0 || capabilities == null
