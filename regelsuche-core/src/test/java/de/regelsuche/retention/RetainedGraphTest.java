@@ -33,6 +33,22 @@ class RetainedGraphTest {
         assertEquals(new RetainedGraph.Usage(0,0,2),cycle.retained());
         assertEquals(1,cycle.objects());assertEquals(7,cycle.work());
     }
+    @Test void containerViewsAndComparatorsCannotHideTheirBackingOwners() {
+        var backing=new ArrayList<Object>();backing.add(new VariableExpr("retained outside visible range"));
+        assertThrows(RetainedGraph.Unmeasured.class,()->RetainedGraph.measure(backing.subList(0,0)));
+        var map=new java.util.HashMap<String,Object>();map.put("key",backing);
+        assertThrows(RetainedGraph.Unmeasured.class,()->RetainedGraph.measure(map.keySet()));
+        assertThrows(RetainedGraph.Unmeasured.class,()->RetainedGraph.measure(java.util.Collections.unmodifiableMap(map)));
+        var sorted=new java.util.TreeMap<String,Object>((a,b)->Integer.compare(a.length()+backing.size(),b.length()));
+        assertThrows(RetainedGraph.Unmeasured.class,()->RetainedGraph.measure(sorted));
+    }
+    @Test void numericConversionPaysAndObservesItsTemporaryText() {
+        var integer=new java.math.BigInteger("123456789012345678901234567890");
+        var measured=RetainedGraph.measure(integer);
+        assertEquals(30,measured.retained().characters());
+        assertEquals(60,measured.peak().characters(),"retained scalar and live decimal conversion overlap");
+        assertTrue(measured.work()>=30);
+    }
     @Test void undescribedPayloadCannotPretendToHaveZeroRetention() {
         var rejected=assertThrows(RetainedGraph.Unmeasured.class,()->RetainedGraph.measure(new Object()));
         assertEquals(5,rejected.attempted().work(),"failed admission retains performed audit work");
