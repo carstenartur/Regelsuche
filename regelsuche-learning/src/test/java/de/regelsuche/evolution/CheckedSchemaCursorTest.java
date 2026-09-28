@@ -71,6 +71,24 @@ class CheckedSchemaCursorTest {
         assertEquals(0,after.work().mathematics().exactTheorySteps());assertTrue(cursor.next(10000).isEmpty());
     }
 
+    @Test void nativeStagedFrontierUsesTheSameCursorOrderingAndClosesItsReceipts() {
+        var selected=plan(model);Expr source=parse(PAIR);
+        Expr goal=CODEC.decodeExpression(eager(PAIR).moves().getFirst().transformation().transformedExpression());
+        var context=TypedMoveSearch.Context.frozen(goal);var budget=new MoveSearch.Budget(0,1,100000,10,1000000);
+        var legacy=new TypedMoveSearch().search(new TypedMoveSearch.Problem(source,context,List.of(selected.provider()),
+            MovePriorityPolicy.INVENTORY_ORDER,model.verifier(),s->0,MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED_INCREMENTAL,budget));
+        var result=assertDoesNotThrow(()->new NativeMoveSearch().search(new NativeMoveSearch.Problem(source,context,List.of(selected.nativeProvider()),
+            MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED_INCREMENTAL,budget),SearchContinuationContract.PATH_SENSITIVE));
+        var projection=result.exportLegacy();assertEquals(MoveSearch.Outcome.TARGET_REACHED,result.outcome());
+        assertEquals(legacy.encodedResult().witness(),projection.witness());assertEquals(legacy.encodedResult().events(),projection.events());
+        assertEquals(legacy.metrics(),result.metrics());
+        var receipts=projection.stagedIncrementalExecution();assertNotNull(receipts);assertTrue(receipts.accountingComplete());
+        assertTrue(receipts.expansions().stream().allMatch(StagedIncrementalMoveExecution.Expansion::closed));
+        var cursor=receipts.expansions().getFirst().lanes().getFirst().cursor();
+        assertTrue(cursor.closed());assertEquals(1,cursor.work().mathematics().exactTheorySteps());
+        assertEquals(0,cursor.work().prepaidApplications().openApplications());
+    }
+
     @Test void firstPullDoesNotInstantiateTheSecondRealLearnedOccurrence() {
         var eager = eager(PAIR);
         assertEquals(2, eager.moves().size(), "the real learned schema has two distinct application sites");
