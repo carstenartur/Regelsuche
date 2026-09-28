@@ -38,6 +38,15 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
         return value instanceof Expr || value instanceof ExactRational || value instanceof String
             || value!=null && value.getClass()==BigInteger.class || value instanceof SymbolId || value instanceof UUID;
     }
+    private boolean ownsMetadata(Object value,InventoryScan scan){
+        scan.pay(1);
+        if(value==this || value==index || value==rows)return true;
+        if(value instanceof Vertex vertex){scan.pay(1);return vertex.id<rows.size() && rows.get(vertex.id)==vertex;}
+        if(value instanceof int[] || value instanceof long[]){
+            for(var row:rows){scan.pay(1);if(row!=null && (value==row.children || value==row.mask))return true;}
+        }
+        return false;
+    }
     private boolean eligible(Object value,InventoryScan scan){
         if(known(value))return true;
         scan.pay(1);var vertex=index.get(value);return vertex!=null && vertex.key instanceof List<?>;
@@ -113,10 +122,10 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
     private long metadataReferences(){return Math.addExact(5L,Math.addExact(2L*index.size()+rows.size(),3L*liveRows+childSlots+words));}
     private static boolean marked(long[] mask,int id){return (id>>>6)<mask.length && (mask[id>>>6]&(1L<<(id&63)))!=0;}
 
-    private static final class InventoryScan extends RetainedGraph.Scan {
+    private static final class InventoryScan extends RetainedGraph.Scan implements RetainedGraph.View {
         final ImmutableRetentionInventory inventory;final RetainedGraph.Inventory owner;final RetainedGraph.Usage limits;
-        long[] primary,cacheOnly;boolean cachePhase,ownerReached,settled,finished;
-        ArrayList<Object> capture;long temporarySlots,closureSlots,combinedAuxiliaryPeak;
+        long[] primary,cacheOnly;boolean cachePhase,ownerReached,settled,finished,metadataAlias;
+        ArrayList<Object> capture;long temporarySlots,closureSlots,combinedAuxiliaryPeak,scratchPeak;
         long extraNodes,extraCharacters,extraReferences,extraObjects,hitObjects;
         long metadataReferencesBefore,metadataObjectsBefore;
         Object rejected;boolean failed;
@@ -128,8 +137,11 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
         void markPrimary(int id){primary[id>>>6]|=1L<<(id&63);pay(1);}
         @Override void accountingPeak(){
             super.accountingPeak();
-            if(inventory!=null && primary!=null)combinedAuxiliaryPeak=Math.max(combinedAuxiliaryPeak,
+            if(inventory!=null && primary!=null){
+                scratchPeak=Math.max(scratchPeak,accountingReferences+7L+primary.length+cacheOnly.length+temporarySlots+closureSlots);
+                combinedAuxiliaryPeak=Math.max(combinedAuxiliaryPeak,
                 Math.addExact(inventory.metadataReferences(),Math.addExact(accountingReferences,7L+primary.length+cacheOnly.length+temporarySlots+closureSlots)));
+            }
         }
         @Override public void reference(Object value){
             if(capture!=null && value!=null && !(value instanceof Enum<?>)){
@@ -175,11 +187,12 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
                     if(seen.put(value,Boolean.TRUE)==null)pay(1);
                     accountingPeak();continue;
                 }
+                if(!cachePhase && inventory.ownsMetadata(value,this))metadataAlias=true;
                 if(hit(value))continue;
                 if(seen.put(value,Boolean.TRUE)!=null)continue;
                 pay(1);accountingPeak();
                 long beforeNodes=nodes,beforeCharacters=characters,beforeReferences=references;
-                boolean staged=!cachePhase && inventory.eligible(value,this);
+                boolean staged=!cachePhase && !metadataAlias && inventory.eligible(value,this);
                 if(staged){capture=new ArrayList<>();pay(1);temporarySlots=1;accountingPeak();}
                 try {
                     inspect(value);
@@ -192,6 +205,7 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
         RetainedGraph.Observation measure(Object root){
             try {
                 reference(root);drain();
+                if(metadataAlias)return freshAliasFallback(root);
                 if(!ownerReached)failed=true;
                 if(!failed)inventory.prepare(this);
                 cachePhase=true;
@@ -228,6 +242,35 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
                 if(!finished)pay(inventory.prune(null,false));
                 if(!settled)settle();
             }
+        }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor){
+            visitor.reference(seen);visitor.reference(pending);visitor.reference(null); // base current-object slot
+            visitor.reference(inventory);visitor.reference(owner);visitor.reference(limits);
+            visitor.reference(primary);visitor.reference(cacheOnly);visitor.reference(capture);visitor.reference(rejected);
+        }
+        private record AliasUnion(Object root,RetainedGraph.Inventory owner,InventoryScan scanner) implements RetainedGraph.View {
+            @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(root);visitor.reference(owner);visitor.reference(scanner);}
+        }
+        private RetainedGraph.Observation fresh(Object root){
+            try{return RetainedGraph.measure(root);}
+            catch(RetainedGraph.Unmeasured unknown){failed=true;return unknown.attempted();}
+        }
+        /** Rare public metadata aliases use the unchanged reference scanner, including its real extra cost. */
+        private RetainedGraph.Observation freshAliasFallback(Object root){
+            pay(4);var union=fresh(new AliasUnion(root,owner,this));pay(union.work());
+            long currentScratch=12L+2L*seen.size()+pending.size()+primary.length+cacheOnly.length;
+            var peak=union.peak().maximum(new RetainedGraph.Usage(union.retained().nodes(),union.retained().characters(),
+                Math.addExact(Math.max(0,union.retained().references()-currentScratch),scratchPeak)));
+            union=null;pay(1);
+            pay(inventory.prune(null,false));settle();
+            var remaining=fresh(root);pay(remaining.work());
+            // The first scanner's empty map/queue/backings and seven fields still exist.
+            peak=peak.maximum(new RetainedGraph.Usage(remaining.peak().nodes(),remaining.peak().characters(),Math.addExact(12,remaining.peak().references())));
+            var result=new RetainedGraph.Observation(remaining.retained(),peak,work,remaining.objects());finished=true;
+            if(rejected!=null)throw new RetainedGraph.Unmeasured(rejected,result);
+            if(!ownerReached)throw new RetainedGraph.InventoryFailure("ownership root must reference its immutable inventory",result);
+            if(failed)throw new RetainedGraph.InventoryFailure("unsupported payload during fresh metadata-alias observation",result);
+            return result;
         }
         long seenObjectsBeforeSettle;
         private void settle(){

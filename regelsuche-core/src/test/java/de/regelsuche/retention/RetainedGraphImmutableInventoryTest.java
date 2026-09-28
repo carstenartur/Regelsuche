@@ -143,4 +143,42 @@ class RetainedGraphImmutableInventoryTest {
         inventory.close();
     }
 
+    @Test void nonemptyPublicMetadataAndArrayAliasesUsePaidFreshFallbackWithoutClosingSession(){
+        for(boolean arrayAlias:List.of(false,true)){
+            var inventory=new RetainedGraph.Inventory();var leaf=new VariableExpr("x");
+            inventory.measure(new Root(leaf,inventory));
+            var objects=metadataObjects(inventory);
+            Object alias=arrayAlias?objects.stream().filter(value->value instanceof int[] ids && ids.length>0).findFirst().orElseThrow():objects.get(1);
+            var root=new Root(List.of(leaf,alias),inventory);var measured=inventory.measure(root);
+            var reference=RetainedGraph.measure(root);
+            assertEquals(reference.retained(),measured.retained());assertEquals(reference.objects(),measured.objects());
+            assertTrue(measured.work()>reference.work());assertEquals(0,inventory.cachedVertices());
+            var laterRoot=new Root(leaf,inventory);var later=inventory.measure(laterRoot);
+            assertEquals(RetainedGraph.measure(laterRoot).retained(),later.retained());
+            assertTrue(inventory.cachedVertices()>0,"fallback prunes but does not close the inventory");inventory.close();
+        }
+    }
+    @Test void aliasedMetadataFailureKeepsPaidWorkAndCannotLeaveReusableEntries(){
+        var inventory=new RetainedGraph.Inventory();var leaf=new VariableExpr("x");inventory.measure(new Root(leaf,inventory));
+        Object data=metadataObjects(inventory).get(1);
+        var failure=assertThrows(RetainedGraph.Unmeasured.class,()->inventory.measure(new Object[]{inventory,data,leaf,new Object()}));
+        assertTrue(failure.attempted().work()>0);assertEquals(0,inventory.cachedVertices());
+        var valid=new Root(leaf,inventory);assertEquals(RetainedGraph.measure(valid).retained().nodes(),inventory.measure(valid).retained().nodes());inventory.close();
+    }
+    private static List<Object> metadataObjects(RetainedGraph.Inventory inventory){
+        var pending=new ArrayDeque<Object>();var seen=Collections.newSetFromMap(new IdentityHashMap<Object,Boolean>());var result=new ArrayList<Object>();
+        var visitor=new RetainedGraph.Visitor(){
+            @Override public void reference(Object value){if(value!=null)pending.addLast(value);}
+            @Override public void requireExact(Object value,Class<?> type){assertEquals(type,value.getClass());}
+        };
+        pending.add(inventory);
+        while(!pending.isEmpty()){
+            Object value=pending.removeFirst();if(!seen.add(value))continue;result.add(value);
+            if(value instanceof RetainedGraph.View view)view.retainedReferences(visitor);
+            else if(value instanceof Map<?,?> map)map.forEach((key,item)->{visitor.reference(key);visitor.reference(item);});
+            else if(value instanceof Collection<?> collection)collection.forEach(visitor::reference);
+        }
+        return result;
+    }
+
 }
