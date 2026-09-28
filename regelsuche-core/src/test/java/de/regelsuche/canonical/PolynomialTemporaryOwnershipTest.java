@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 class PolynomialTemporaryOwnershipTest {
     private static final class Observation implements RetainedOperation.Sink {
-        RetainedOperation scope;long work;int simultaneousTerms;boolean rejectedCoefficient;int renderedFactors;boolean optionalEnvelope;Expr inputRoot;boolean missingInput,abortAtCoefficient;int sourceOnlyFrames;boolean zeroTerms,abortAtZeroTerms;
+        RetainedOperation scope;long work;int simultaneousTerms;boolean rejectedCoefficient;int renderedFactors;boolean optionalEnvelope;Expr inputRoot;boolean missingInput,abortAtCoefficient;int sourceOnlyFrames,simultaneousPowers;boolean zeroTerms,abortAtZeroTerms;
         Set<Expr> inputNodes=Collections.newSetFromMap(new IdentityHashMap<>());
         @Override public void executionWork(long units){work=Math.addExact(work,units);}
         @Override public void validationWork(long units){work=Math.addExact(work,units);}
@@ -21,7 +21,7 @@ class PolynomialTemporaryOwnershipTest {
                 @Override public void reference(Object value){if(value!=null)pending.addLast(value);}
                 @Override public void requireExact(Object value,Class<?> type){assertEquals(type,value.getClass());}
             };
-            visitor.reference(scope);int terms=0,sourceFrames=0;
+            visitor.reference(scope);int terms=0,sourceFrames=0,powers=0;
             while(!pending.isEmpty()){
                 var value=pending.removeFirst();if(!seen.add(value))continue;
                 if(value instanceof Object[] array && array.length==1 && array[0] instanceof Expr expression && inputNodes.contains(expression))sourceFrames++;
@@ -36,12 +36,14 @@ class PolynomialTemporaryOwnershipTest {
                         if(map.values().stream().anyMatch(valueEntry->((ExactRational)valueEntry).isZero()))zeroTerms=true;
                     }
                     map.forEach((key,item)->{visitor.reference(key);visitor.reference(item);});
+                                    if(!map.isEmpty() && map.keySet().stream().allMatch(String.class::isInstance) && map.values().stream().allMatch(Integer.class::isInstance))powers++;
                 }else if(value instanceof Collection<?> collection)collection.forEach(visitor::reference);
                 else if(value instanceof Object[] array)for(var item:array)visitor.reference(item);
                 else if(value instanceof NumberExpr number)visitor.reference(number.value());
                 else if(value instanceof BinaryExpr binary){visitor.reference(binary.left());visitor.reference(binary.right());}
             }
             simultaneousTerms=Math.max(simultaneousTerms,terms);
+            simultaneousPowers=Math.max(simultaneousPowers,powers);
             sourceOnlyFrames=Math.max(sourceOnlyFrames,sourceFrames);
             if(inputRoot!=null && !seen.contains(inputRoot))missingInput=true;
             if(abortAtCoefficient && rejectedCoefficient)throw new CoefficientLimit();
@@ -150,6 +152,30 @@ class PolynomialTemporaryOwnershipTest {
         assertTrue(observation.zeroTerms);assertFalse(observation.missingInput);
         assertTrue(observation.work>4);assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
         assertEquals(Optional.of(source),new PolynomialNormalizer().normalize(source));
+    }
+
+    @Test void singletonMonomialTakesItsImmutablePowersWithoutACopy(){
+        var source=new VariableExpr("x");var observation=sourceObservation(source);
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;assertEquals(Optional.of(source),new PolynomialNormalizer().normalize(source));
+        }
+        assertEquals(1,observation.simultaneousPowers,"the private monomial keeps its original immutable singleton powers");
+        assertFalse(observation.missingInput);assertTrue(observation.optionalEnvelope);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
+    }
+    @Test void multipliedPowersPreserveBothOperandsAndNaturalVariableOrder(){
+        var x=new VariableExpr("x");var y=new VariableExpr("y");
+        var xy=new BinaryExpr(y,BinaryOperator.MUL,x);
+        var source=new BinaryExpr(xy,BinaryOperator.MUL,xy);
+        var expected=new BinaryExpr(new BinaryExpr(x,BinaryOperator.POW,new NumberExpr(2)),BinaryOperator.MUL,
+            new BinaryExpr(y,BinaryOperator.POW,new NumberExpr(2)));
+        var normalizer=new PolynomialNormalizer();var observation=sourceObservation(source);
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;assertEquals(Optional.of(expected),normalizer.normalize(source));
+        }
+        assertTrue(observation.simultaneousPowers>=3,"both operand powers and a distinct accumulation map remain owned");
+        assertEquals(Optional.of(new BinaryExpr(x,BinaryOperator.MUL,y)),normalizer.normalize(xy));
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
 
 }
