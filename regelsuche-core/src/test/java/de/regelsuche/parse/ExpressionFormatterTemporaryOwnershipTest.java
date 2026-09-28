@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 class ExpressionFormatterTemporaryOwnershipTest {
     private static final class GrowthLimit extends RuntimeException { }
     private static final class CallbackFailure extends RuntimeException { }
+    private static final class CleanupFailure extends RuntimeException { }
     private static final class Observation implements RetainedOperation.Sink {
         RetainedOperation scope;
         Expr input;
@@ -21,7 +22,14 @@ class ExpressionFormatterTemporaryOwnershipTest {
         String renderedNumber;
         String expectedOutput;
         boolean actualResultCopyOwned;
-        @Override public void executionWork(long units) { work = Math.addExact(work, units); }
+        boolean throwCleanupAfterCallback, callbackStateObserved;
+        @Override public void executionWork(long units) {
+            if (throwCleanupAfterCallback && callbackStateObserved && units == 1) {
+                throwCleanupAfterCallback = false;
+                throw new CleanupFailure();
+            }
+            work = Math.addExact(work, units);
+        }
         @Override public void validationWork(long units) { executionWork(units); }
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(scope); }
         @Override public void checkpoint() {
@@ -75,6 +83,7 @@ class ExpressionFormatterTemporaryOwnershipTest {
                 if (abortGrowth) throw new GrowthLimit();
             }
             previousWork = work;
+            if (peakCharacters >= 1_000) callbackStateObserved = true;
             if (peakCharacters >= abortCharactersAt) throw new GrowthLimit();
         }
     }
@@ -137,6 +146,21 @@ class ExpressionFormatterTemporaryOwnershipTest {
             }
             assertEquals(0, RetainedGraph.measure(observation.scope).retained().characters());
         }
+    }
+
+    @Test void failedFragmentCleanupCannotReplaceTheOriginalCallbackFailure() {
+        var input = new FunctionExpr("f", List.of());
+        var observation = new Observation(); observation.throwCleanupAfterCallback = true;
+        var emitted = new AllocatingEmission(); emitted.fail = true;
+        try (var scope = RetainedOperation.open(observation)) {
+            observation.scope = scope;
+            var failure = assertThrows(CallbackFailure.class, () -> ExpressionFormatter.formatMeasured(input, emitted));
+            assertEquals(1, failure.getSuppressed().length);
+            assertInstanceOf(CleanupFailure.class, failure.getSuppressed()[0]);
+            assertTrue(observation.callbackStateObserved);
+            assertTrue(observation.work >= 1_000);
+        }
+        assertEquals(0, RetainedGraph.measure(observation.scope).retained().characters());
     }
     private static final class Emission implements LongConsumer, RetainedGraph.View {
         long count;
