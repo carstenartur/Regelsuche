@@ -65,28 +65,28 @@ public final class PolynomialNormalizer implements RetainedGraph.View {
     }
 
     private Polynomial toPolynomial(Expr expression) {
-        try(var owned=RetainedOperation.retain(expression)) {
-            RetainedOperation.work(1);
-            if (expression instanceof NumberExpr number) {
-                return Polynomial.constant(number.value());
-            }
-            if (expression instanceof VariableExpr variable) {
-                return Polynomial.monomial(
-                    1,
-                    Monomial.variable(variable.name()));
-            }
-            if (!(expression instanceof BinaryExpr binary)) {
-                return null;
-            }
-            return switch (binary.operator()) {
-                case ADD -> combine(binary.left(), binary.right(), 1);
-                case SUB -> combine(binary.left(), binary.right(), -1);
-                case MUL -> multiply(binary.left(), binary.right());
-                case POW -> power(binary.left(), binary.right());
-                case DIV -> null;
-            };
+        // normalize owns the complete immutable input throughout this private recursion.
+        RetainedOperation.work(1);
+        if (expression instanceof NumberExpr number) {
+            return Polynomial.constant(number.value());
         }
+        if (expression instanceof VariableExpr variable) {
+            return Polynomial.monomial(
+                1,
+                Monomial.variable(variable.name()));
+        }
+        if (!(expression instanceof BinaryExpr binary)) {
+            return null;
+        }
+        return switch (binary.operator()) {
+            case ADD -> combine(binary.left(), binary.right(), 1);
+            case SUB -> combine(binary.left(), binary.right(), -1);
+            case MUL -> multiply(binary.left(), binary.right());
+            case POW -> power(binary.left(), binary.right());
+            case DIV -> null;
+        };
     }
+
 
     private Polynomial combine(
         Expr left,
