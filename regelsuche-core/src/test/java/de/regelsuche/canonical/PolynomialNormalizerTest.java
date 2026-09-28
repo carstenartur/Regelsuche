@@ -3,10 +3,17 @@ package de.regelsuche.canonical;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import de.regelsuche.assumption.Assumption;
 import de.regelsuche.assumption.AssumptionContext;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.symbol.SymbolId;
+import java.util.UUID;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionFormatter;
@@ -18,6 +25,28 @@ import org.junit.jupiter.api.Timeout;
 class PolynomialNormalizerTest {
     private final ExpressionParser parser = new ExpressionParser();
     private final PolynomialNormalizer normalizer = new PolynomialNormalizer();
+
+    @Test void alreadyNormalVariablePowersReuseTheirImmutableProducerTree(){
+        var scoped=VariableExpr.scoped(new SymbolId(new UUID(3,7),11));
+        for(var variable:List.of(new VariableExpr("x"),scoped))
+            for(int exponent:List.of(2,3,17,31,Integer.MAX_VALUE)){
+                var expression=new BinaryExpr(variable,BinaryOperator.POW,new NumberExpr(exponent));
+                for(var service:List.of(normalizer,PolynomialNormalizer.monomialOnly())){
+                    var result=service.normalize(expression).orElseThrow();
+                    assertEquals(expression,result);
+                    assertSame(expression,result,"an already normal variable power needs no rebuilt AST or polynomial workspace");
+                }
+            }
+    }
+    @Test void unitPowerReusesItsVariableWithoutAdmittingOtherExponentDomains(){
+        var x=new VariableExpr("x");
+        assertSame(x,normalizer.normalize(new BinaryExpr(x,BinaryOperator.POW,new NumberExpr(1))).orElseThrow());
+        for(String exponent:List.of("0","-1","1/2","2147483648"))
+            assertTrue(normalizer.normalize(new BinaryExpr(x,BinaryOperator.POW,NumberExpr.exact(exponent))).isEmpty(),exponent);
+        assertEquals(parse("4"),normalizer.normalize(parse("2^2")).orElseThrow());
+        assertTrue(normalizer.normalize(parse("sin(x)^2")).isEmpty());
+        assertEquals(parse("x^4"),normalizer.normalize(parse("(x^2)^2")).orElseThrow());
+    }
 
     @Test
     void collectsGlobalLikeTermsAfterExpansion() {

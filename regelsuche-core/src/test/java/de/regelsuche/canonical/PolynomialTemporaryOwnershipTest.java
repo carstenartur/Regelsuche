@@ -10,12 +10,12 @@ import org.junit.jupiter.api.Test;
 class PolynomialTemporaryOwnershipTest {
     private static final class Observation implements RetainedOperation.Sink {
         RetainedOperation scope;long work;int simultaneousTerms;boolean rejectedCoefficient;int renderedFactors;boolean optionalEnvelope;Expr inputRoot;boolean missingInput,abortAtCoefficient;int sourceOnlyFrames,simultaneousPowers;boolean zeroTerms,abortAtZeroTerms;
-        Set<Expr> inputNodes=Collections.newSetFromMap(new IdentityHashMap<>());
+        Set<Expr> inputNodes=Collections.newSetFromMap(new IdentityHashMap<>());long peakNodes;
         @Override public void executionWork(long units){work=Math.addExact(work,units);}
         @Override public void validationWork(long units){work=Math.addExact(work,units);}
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(scope);}
         @Override public void checkpoint(){
-            RetainedGraph.measure(scope);
+            peakNodes=Math.max(peakNodes,RetainedGraph.measure(scope).retained().nodes());
             var pending=new ArrayDeque<Object>();var seen=Collections.newSetFromMap(new IdentityHashMap<Object,Boolean>());
             var visitor=new RetainedGraph.Visitor(){
                 @Override public void reference(Object value){if(value!=null)pending.addLast(value);}
@@ -49,6 +49,18 @@ class PolynomialTemporaryOwnershipTest {
             if(abortAtCoefficient && rejectedCoefficient)throw new CoefficientLimit();
             if(abortAtZeroTerms && zeroTerms)throw new CoefficientLimit();
         }
+    }
+    @Test void reusedVariablePowerStillPaysAndOwnsItsInputAndOptionalHandoff(){
+        var source=new BinaryExpr(new VariableExpr("x"),BinaryOperator.POW,new NumberExpr(2));
+        var observation=sourceObservation(source);
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;
+            assertSame(source,new PolynomialNormalizer().normalize(source).orElseThrow());
+        }
+        assertTrue(observation.work>0);assertFalse(observation.missingInput);
+        assertTrue(observation.optionalEnvelope);
+        assertEquals(3,observation.peakNodes,"only the original three AST nodes are needed throughout this normalization");
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().nodes());
     }
     @Test void realPolynomialMultiplicationRetainsBothOperandsAndAccumulatingTerms(){
         var sum=new BinaryExpr(new VariableExpr("x"),BinaryOperator.ADD,new VariableExpr("y"));
