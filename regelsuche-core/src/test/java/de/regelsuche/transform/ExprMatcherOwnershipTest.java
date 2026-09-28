@@ -42,6 +42,7 @@ class ExprMatcherOwnershipTest {
             };
             visitor.reference(scope);
             boolean hasStateList = false;
+            boolean hasMutableBinding = false, hasFrozenBinding = false;
             while (!pending.isEmpty()) {
                 Object value = pending.remove(); if (!seen.add(value)) continue;
                 if (value instanceof String text && text.startsWith("7:pattern")) patternDescriptions.add(text);
@@ -61,7 +62,10 @@ class ExprMatcherOwnershipTest {
                     values.forEach(visitor::reference);
                 }
                 else if (value instanceof Map<?,?> map) {
-                    sawBindingCopy |= map instanceof HashMap<?,?> && map.get("A") == input;
+                    if (map.get("A") == input) {
+                        hasMutableBinding |= map instanceof HashMap<?,?>;
+                        hasFrozenBinding |= !(map instanceof HashMap<?,?>);
+                    }
                     map.forEach((key,item) -> { visitor.reference(key); visitor.reference(item); });
                 }
                 else if (value instanceof BinaryExpr binary) {
@@ -69,6 +73,7 @@ class ExprMatcherOwnershipTest {
                 } else if (value instanceof FunctionExpr function) visitor.reference(function.arguments());
             }
             inputMissing |= !seen.contains(input);
+            sawBindingCopy |= hasMutableBinding && hasFrozenBinding;
             if (hasStateList && outcome == null) unpublishedResultScans++;
             if (abortBindingCopy && sawBindingCopy && failure == null) {
                 failure = new MatchAbort(); throw failure;

@@ -677,31 +677,34 @@ final class ExprMatcherEngine {
         }
 
         private State withBindings(Map<String, Expr> replacements) {
-            return new State(
+            return updated(
                 replacements,
                 representative,
                 representativeIndex,
                 recognitionStrength,
-                trace
+                trace,
+                0
             );
         }
 
         private State withBinding(String name, Expr expression) {
             Map<String, Expr> updated = new HashMap<>(bindings);
             updated.put(name, expression);
-            return withBindings(updated);
+            return updated(updated,representative,representativeIndex,recognitionStrength,trace,
+                3L + bindings.size());
         }
 
         private State withStrength(
             ExprMatcher.RecognitionStrength strength
         ) {
-            return new State(
+            return updated(
                 bindings,
                 representative,
                 representativeIndex,
                 ExprMatcher.RecognitionStrength.strongest(
                     recognitionStrength, strength),
-                trace
+                trace,
+                0
             );
         }
 
@@ -711,7 +714,7 @@ final class ExprMatcherEngine {
             int matchedRepresentativeIndex,
             boolean replaceRootRepresentative
         ) {
-            return new State(
+            return updated(
                 bindings,
                 replaceRootRepresentative
                     ? matchedRepresentative
@@ -721,7 +724,8 @@ final class ExprMatcherEngine {
                     : representativeIndex,
                 ExprMatcher.RecognitionStrength.strongest(
                     recognitionStrength, strength),
-                trace
+                trace,
+                0
             );
         }
 
@@ -729,13 +733,34 @@ final class ExprMatcherEngine {
             List<String> updated = new ArrayList<>(trace.size() + 1);
             updated.addAll(trace);
             updated.add(entry);
-            return new State(
+            return updated(
                 bindings,
                 representative,
                 representativeIndex,
                 recognitionStrength,
-                updated
+                updated,
+                3L + trace.size()
             );
+        }
+
+        private State updated(
+            Map<String, Expr> nextBindings,
+            Expr nextRepresentative,
+            int nextRepresentativeIndex,
+            ExprMatcher.RecognitionStrength nextStrength,
+            List<String> nextTrace,
+            long assemblyWork
+        ) {
+            State result = new State(nextBindings,nextRepresentative,nextRepresentativeIndex,nextStrength,nextTrace);
+            // State construction and both immutable-copy operations. Charge
+            // additional copied entries only when the returned owners differ.
+            long freezingWork = 3;
+            if (result.bindings != nextBindings) freezingWork += 2L + nextBindings.size();
+            if (result.trace != nextTrace) freezingWork += 2L + nextTrace.size();
+            try (var owned = RetainedOperation.retainCompleted(assemblyWork + freezingWork,
+                    this,nextBindings,nextTrace,result)) {
+                return result;
+            }
         }
 
         private ExprMatcher.MatchResult toResult() {
