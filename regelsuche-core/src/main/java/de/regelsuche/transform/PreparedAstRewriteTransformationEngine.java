@@ -267,9 +267,10 @@ public final class PreparedAstRewriteTransformationEngine
                 try(var child=retainLegacyHash?null:RetainedOperation.retain(argumentRewrites)) {
                 for (RewriteResult argumentRewrite : argumentRewrites) {
                     List<Expr> replaced = new ArrayList<>(arguments);
+                    if(!retainLegacyHash)RetainedOperation.work(arguments.size());
                     try(var argumentsHeld=retainLegacyHash?null:RetainedOperation.retain(replaced)) {
                     replaced.set(position, argumentRewrite.expression());
-                    if(!retainLegacyHash)RetainedOperation.work(arguments.size()+1L);
+                    if(!retainLegacyHash)RetainedOperation.work(1);
                     results.add(new RewriteResult(
                         argumentRewrite.rule(),
                         new FunctionExpr(functionExpr.name(), replaced),
