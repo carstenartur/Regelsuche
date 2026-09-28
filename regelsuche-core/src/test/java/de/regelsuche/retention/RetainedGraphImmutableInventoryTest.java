@@ -15,7 +15,9 @@ class RetainedGraphImmutableInventoryTest {
         for(int i=0;i<12;i++)expression=new BinaryExpr(expression,BinaryOperator.ADD,shared);
         var inventory=new RetainedGraph.Inventory();var root=new Root(expression,inventory);
         var first=inventory.measure(root);var second=inventory.measure(root);
-        assertEquals(RetainedGraph.measure(root).retained(),second.retained(),"the independent fresh scanner includes actual inventory metadata and alias union");
+        var reference=RetainedGraph.measure(root);
+        assertEquals(reference.retained(),second.retained(),"the independent fresh scanner includes actual inventory metadata and alias union");
+        assertEquals(reference.objects(),second.objects());
         assertTrue(first.work()>0 && second.work()>0);
         assertTrue(second.work()<first.work(),"a real warm lookup removes repeated immutable traversal; its index and cleanup are still paid");
         assertTrue(inventory.cachedVertices()>0);
@@ -83,6 +85,34 @@ class RetainedGraphImmutableInventoryTest {
         assertEquals(RetainedGraph.measure(outer).retained(),second.measure(outer).retained());
         first.close();assertEquals(RetainedGraph.measure(outer).retained(),second.measure(outer).retained());
         second.close();
+    }
+
+    @Test void failedPeakCannotActivateStagedEntriesAndStillChargesTheirBuildAndRelease(){
+        var leaf=new VariableExpr("x");var inventory=new RetainedGraph.Inventory();var root=new Root(leaf,inventory);
+        var attempted=inventory.measure(root,new RetainedGraph.Usage(0,100,100_000));
+        assertEquals(1,attempted.peak().nodes());assertTrue(attempted.work()>0);
+        assertEquals(0,inventory.cachedVertices());
+        assertEquals(RetainedGraph.measure(root).retained(),attempted.retained());
+        var retry=inventory.measure(root);assertEquals(RetainedGraph.measure(root).retained(),retry.retained());
+        assertTrue(inventory.cachedVertices()>0);inventory.close();
+    }
+    @Test void cacheOnlyGraphOverlapsBeforePruningAndNeverBecomesPrimaryAgain(){
+        var values=new ArrayList<Expr>();values.add(new BinaryExpr(new VariableExpr("x"),BinaryOperator.ADD,new VariableExpr("y")));
+        var inventory=new RetainedGraph.Inventory();var root=new Root(values,inventory);inventory.measure(root);
+        values.clear();var released=inventory.measure(root,new RetainedGraph.Usage(1,100,100_000));
+        assertEquals(3,released.peak().nodes(),"the still-owned cache graph exists before pruning");
+        assertEquals(0,released.retained().nodes());assertEquals(0,inventory.cachedVertices());
+        assertEquals(RetainedGraph.measure(root).retained(),released.retained());inventory.close();
+    }
+    @Test void idsAreNotReusedAfterPruneAndClosedBookkeepingIsActuallyReleased(){
+        var values=new ArrayList<Object>(List.of(new VariableExpr("x")));
+        var inventory=new RetainedGraph.Inventory(2,2,2);var root=new Root(values,inventory);
+        inventory.measure(root);assertEquals(2,inventory.cachedVertices());values.clear();inventory.measure(root);
+        values.add(new VariableExpr("y"));var fallback=inventory.measure(root);
+        assertEquals(0,inventory.cachedVertices(),"both monotone IDs remain tombstones; later objects use fresh traversal");
+        assertEquals(RetainedGraph.measure(root).retained(),fallback.retained());
+        assertTrue(inventory.close()>0);
+        assertEquals(new RetainedGraph.Usage(0,0,2),RetainedGraph.measure(inventory).retained());
     }
 
 }

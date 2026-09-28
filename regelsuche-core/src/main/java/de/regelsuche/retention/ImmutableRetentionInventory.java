@@ -38,9 +38,9 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
         return value instanceof Expr || value instanceof ExactRational || value instanceof String
             || value!=null && value.getClass()==BigInteger.class || value instanceof SymbolId || value instanceof UUID;
     }
-    private boolean eligible(Object value){
+    private boolean eligible(Object value,InventoryScan scan){
         if(known(value))return true;
-        var vertex=index.get(value);return vertex!=null && vertex.key instanceof List<?>;
+        scan.pay(1);var vertex=index.get(value);return vertex!=null && vertex.key instanceof List<?>;
     }
     private void stage(Object value,ArrayList<Object> children,long nodes,long characters,long references,InventoryScan scan){
         var vertex=reserve(value,scan);if(vertex==null || vertex.ready)return;
@@ -61,7 +61,7 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
         if(vertex==null || !vertex.ready)return false;
         if(vertex.mask!=null)return true;
         if(vertex.building)return false;
-        vertex.building=true;scan.pay(1);
+        vertex.building=true;scan.closureSlots+=3;scan.pay(4);scan.accountingPeak();
         try {
             int first=vertex.id>>>6,last=first;
             for(int child:vertex.children){
@@ -86,7 +86,7 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
                 }
             }
             return true;
-        } finally {vertex.building=false;scan.pay(1);}
+        } finally {vertex.building=false;scan.closureSlots-=3;scan.pay(4);}
     }
     private void prepare(InventoryScan scan){for(var row:rows){scan.pay(1);if(row!=null && !row.active)closure(row,scan);}}
     private long remove(int id){
@@ -116,7 +116,7 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
     private static final class InventoryScan extends RetainedGraph.Scan {
         final ImmutableRetentionInventory inventory;final RetainedGraph.Inventory owner;final RetainedGraph.Usage limits;
         long[] primary,cacheOnly;boolean cachePhase,ownerReached,settled,finished;
-        ArrayList<Object> capture;long temporarySlots,combinedAuxiliaryPeak;
+        ArrayList<Object> capture;long temporarySlots,closureSlots,combinedAuxiliaryPeak;
         long extraNodes,extraCharacters,extraReferences,extraObjects,hitObjects;
         long metadataReferencesBefore,metadataObjectsBefore;
         Object rejected;boolean failed;
@@ -129,7 +129,7 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
         @Override void accountingPeak(){
             super.accountingPeak();
             if(inventory!=null && primary!=null)combinedAuxiliaryPeak=Math.max(combinedAuxiliaryPeak,
-                Math.addExact(inventory.metadataReferences(),Math.addExact(accountingReferences,7L+primary.length+cacheOnly.length+temporarySlots)));
+                Math.addExact(inventory.metadataReferences(),Math.addExact(accountingReferences,7L+primary.length+cacheOnly.length+temporarySlots+closureSlots)));
         }
         @Override public void reference(Object value){
             if(capture!=null && value!=null && !(value instanceof Enum<?>)){
@@ -179,7 +179,7 @@ final class ImmutableRetentionInventory implements RetainedGraph.View {
                 if(seen.put(value,Boolean.TRUE)!=null)continue;
                 pay(1);accountingPeak();
                 long beforeNodes=nodes,beforeCharacters=characters,beforeReferences=references;
-                boolean staged=!cachePhase && inventory.eligible(value);
+                boolean staged=!cachePhase && inventory.eligible(value,this);
                 if(staged){capture=new ArrayList<>();pay(1);temporarySlots=1;accountingPeak();}
                 try {
                     inspect(value);
