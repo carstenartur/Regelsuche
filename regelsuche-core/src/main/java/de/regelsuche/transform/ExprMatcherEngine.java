@@ -146,14 +146,7 @@ final class ExprMatcherEngine {
                 atRoot
             );
         }
-        ExprMatcher.Where where = (ExprMatcher.Where) matcher;
-        List<State> accepted = new ArrayList<>();
-        for (State candidate : evaluate(
-                where.matcher(), expression, state, session, atRoot)) {
-            accepted.addAll(evaluateConstraint(
-                where.constraint(), candidate, session));
-        }
-        return session.limit(accepted, matcher);
+        return matchWhere((ExprMatcher.Where) matcher,expression,state,session,atRoot);
     }
 
     private static List<State> matchPattern(
@@ -225,30 +218,54 @@ final class ExprMatcherEngine {
         Session session,
         boolean atRoot
     ) {
-        List<State> bound = new ArrayList<>();
-        for (State candidate : evaluate(
-                bind.matcher(), expression, state, session, atRoot)) {
-            Expr previous = candidate.bindings.get(bind.name());
-            if (previous == null) {
-                bound.add(candidate
-                    .withBinding(bind.name(), expression)
-                    .traced("bind:" + bind.name()));
-                continue;
-            }
-            Comparison comparison = compare(
-                previous,
-                expression,
-                bind.equalityProfile(),
-                session,
-                bind.canonicalDescriptor()
-            );
-            if (comparison.matched) {
-                bound.add(candidate
-                    .withStrength(comparison.strength)
-                    .traced("rebind:" + bind.name()));
+        var lists = new StateLists();
+        try (var owned = RetainedOperation.retainCompleted(1,bind,expression,state,session,lists)) {
+            try {
+                lists.begin();
+                lists.current = evaluate(bind.matcher(),expression,state,session,atRoot);
+                RetainedOperation.work(1);
+                for (State candidate : lists.current) {
+                    Expr previous = candidate.bindings.get(bind.name());
+                    if (previous == null) {
+                        lists.add(candidate.withBinding(bind.name(),expression).traced("bind:" + bind.name()));
+                        continue;
+                    }
+                    Comparison comparison = compare(previous,expression,bind.equalityProfile(),session,
+                        bind.canonicalDescriptor());
+                    if (comparison.matched) {
+                        lists.add(candidate.withStrength(comparison.strength).traced("rebind:" + bind.name()));
+                    }
+                }
+                lists.freeze(session,bind);
+                return lists.result;
+            } catch (RuntimeException | Error failure) {
+                observeFailure(failure); throw failure;
             }
         }
-        return session.limit(bound, bind);
+    }
+
+    private static List<State> matchWhere(
+        ExprMatcher.Where where,
+        Expr expression,
+        State state,
+        Session session,
+        boolean atRoot
+    ) {
+        var lists = new StateLists();
+        try (var owned = RetainedOperation.retainCompleted(1,where,expression,state,session,lists)) {
+            try {
+                lists.begin();
+                lists.current = evaluate(where.matcher(),expression,state,session,atRoot);
+                RetainedOperation.work(1);
+                for (State candidate : lists.current) {
+                    lists.add(evaluateConstraint(where.constraint(),candidate,session));
+                }
+                lists.freeze(session,where);
+                return lists.result;
+            } catch (RuntimeException | Error failure) {
+                observeFailure(failure); throw failure;
+            }
+        }
     }
 
     private static List<State> matchAll(
@@ -326,16 +343,27 @@ final class ExprMatcherEngine {
                 || binary.operator() != operation.operator()) {
             return List.of();
         }
-        List<State> matches = new ArrayList<>();
-        for (State left : evaluate(
-                operation.left(), binary.left(), state, session, false)) {
-            matches.addAll(evaluate(
-                operation.right(), binary.right(), left, session, false));
+        var lists = new StateLists();
+        try (var owned = RetainedOperation.retainCompleted(1,operation,expression,state,session,lists)) {
+            try {
+                lists.begin();
+                lists.current = evaluate(operation.left(),binary.left(),state,session,false);
+                RetainedOperation.work(1);
+                for (State left : lists.current) {
+                    lists.add(evaluate(operation.right(),binary.right(),left,session,false));
+                }
+                lists.freeze(session,operation);
+                lists.advance();
+                lists.begin();
+                for (State candidate : lists.current) {
+                    lists.add(candidate.traced("operation:" + operation.operator().name()));
+                }
+                lists.freeze();
+                return lists.result;
+            } catch (RuntimeException | Error failure) {
+                observeFailure(failure); throw failure;
+            }
         }
-        return session.limit(matches, operation).stream()
-            .map(candidate -> candidate.traced(
-                "operation:" + operation.operator().name()))
-            .toList();
     }
 
     private static List<State> matchFunction(
