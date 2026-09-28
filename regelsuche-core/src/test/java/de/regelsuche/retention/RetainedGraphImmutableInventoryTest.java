@@ -115,4 +115,15 @@ class RetainedGraphImmutableInventoryTest {
         assertEquals(new RetainedGraph.Usage(0,0,2),RetainedGraph.measure(inventory).retained());
     }
 
+    @Test void finalMetadataSweepStillOverlapsTheFirstScannersEmptyOwnedStructures(){
+        var inventory=new RetainedGraph.Inventory(1,1,1);var root=new Root(null,inventory);
+        var measured=inventory.measure(root);
+        // Root/owner/backend and empty containers: 8 slots. The first scanner remains
+        // on the stack: map, queue, current, two backings + seven own fields = 12.
+        // The second scanner owns six slots (including inventory), plus four seen
+        // identity entries of two slots each. Their real handoff peak is 8+12+14.
+        assertEquals(new RetainedGraph.Usage(0,0,8),measured.retained());
+        assertEquals(34,measured.peak().references());inventory.close();
+    }
+
 }
