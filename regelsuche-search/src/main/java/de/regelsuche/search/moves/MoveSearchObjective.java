@@ -7,6 +7,7 @@ import java.util.Objects;
 final class MoveSearchObjective<S,M,V> {
     private final java.util.function.Function<S,MoveSearch.ObjectiveScore> objective;
     private final long maximumOutputScore;
+    private final boolean stopAtQuality;
     private S incumbent;
     private MoveWitnessPath<S,M,V> path = MoveWitnessPath.root();
     private long inputScore;
@@ -15,6 +16,10 @@ final class MoveSearchObjective<S,M,V> {
     private List<SearchExecution.Step<S,M,V>> witness = List.of();
 
     MoveSearchObjective(java.util.function.Function<S,MoveSearch.ObjectiveScore> objective, long maximumOutputScore) {
+        this(objective,maximumOutputScore,true);
+    }
+    MoveSearchObjective(java.util.function.Function<S,MoveSearch.ObjectiveScore> objective,long maximumOutputScore,boolean stopAtQuality) {
+        this.stopAtQuality=stopAtQuality;
         this.objective = Objects.requireNonNull(objective, "objective");
         this.maximumOutputScore = maximumOutputScore;
     }
@@ -29,7 +34,7 @@ final class MoveSearchObjective<S,M,V> {
         }
         return assessment.work();
     }
-    boolean satisfied() { return incumbent != null && outputScore <= maximumOutputScore; }
+    boolean satisfied() { return stopAtQuality && incumbent != null && outputScore <= maximumOutputScore; }
     long finish() {
         witness = path.steps();
         return witness.size() + 1L;

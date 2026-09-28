@@ -60,20 +60,64 @@ public final class NativeMoveSearch {
         }
     }
     public record QualityResult(Result search,TypedMoveSearch.State incumbent,long inputScore,long outputScore,
-            long replayWork,long workBudget) {
+            List<SearchExecution.Step<TypedMoveSearch.State,NativeSearchMove,NativeVerification>> witness,long replayWork,long workBudget) {
+        public QualityResult { witness=List.copyOf(witness); }
         public long totalWork(){return Math.addExact(search.metrics().totalWork(),replayWork);}
         public boolean withinBudget(){return totalWork()<=workBudget;}
     }
     public QualityResult searchUntil(Problem problem,TypedSourceOnlySearch.Objective objective,long maximumOutputScore,SearchContinuationContract continuation){
-        throw new UnsupportedOperationException("native source-only final replay is not implemented");
+        return select(problem,objective,maximumOutputScore,true,continuation);
+    }
+    /** Best admitted incumbent under the fixed budget; does not stop at an adequate score. */
+    public QualityResult searchBest(Problem problem,TypedSourceOnlySearch.Objective objective,SearchContinuationContract continuation){
+        return select(problem,objective,0,false,continuation);
+    }
+    public static final class FinalCheckFailure extends IllegalStateException {
+        private final QualityResult attempted;
+        private final NativeVerification rejected;
+        private FinalCheckFailure(QualityResult attempted,NativeVerification rejected){
+            super("independent native selected-path replay differs");this.attempted=attempted;this.rejected=rejected;
+        }
+        public QualityResult attempted(){return attempted;}
+        public NativeVerification rejected(){return rejected;}
+    }
+    private QualityResult select(Problem problem,TypedSourceOnlySearch.Objective objective,long maximumOutputScore,
+            boolean stopAtQuality,SearchContinuationContract continuation){
+        Objects.requireNonNull(objective);
+        if(!problem.context().sourceOnly())throw new IllegalArgumentException("source-only context required");
+        validate(problem);
+        var selection=new MoveSearchObjective<TypedMoveSearch.State,NativeSearchMove,NativeVerification>(state->{
+            var score=objective.evaluate(state);return new MoveSearch.ObjectiveScore(score.value(),score.work());
+        },maximumOutputScore,stopAtQuality);
+        try(var store=new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)) {
+            var execution=new Execution(problem,store);
+            var result=new Result(problem.source(),new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,Assessment,NativeVerification>()
+                .search(execution,continuation,selection));
+            long replayWork=0;
+            TypedMoveSearch.State cursor=selection.witness().isEmpty()?selection.incumbent():selection.witness().getFirst().source();
+            if(!cursor.expression().equals(problem.source()) || cursor.searchDepth()!=0)throw new IllegalStateException("native replay root differs");
+            for(var step:selection.witness()) {
+                if(!cursor.equals(step.source()))throw new IllegalStateException("broken native incumbent lineage");
+                var checked=execution.verify(cursor,step.move());
+                replayWork=Math.addExact(replayWork,checked.work());
+                if(!checked.accepted() || !checked.equals(step.verification()))throw new FinalCheckFailure(
+                    new QualityResult(result,selection.incumbent(),selection.inputScore(),selection.outputScore(),selection.witness(),replayWork,problem.budget().totalWork()),checked);
+                cursor=step.target();
+            }
+            if(!cursor.equals(selection.incumbent()))throw new IllegalStateException("native replay endpoint differs");
+            return new QualityResult(result,selection.incumbent(),selection.inputScore(),selection.outputScore(),selection.witness(),replayWork,problem.budget().totalWork());
+        }
     }
     public Result search(Problem problem,SearchContinuationContract continuation){
-        de.regelsuche.search.program.AstExpressionValidation.inspect(problem.source());
-        if(problem.context().goal()!=null)de.regelsuche.search.program.AstExpressionValidation.inspect(problem.context().goal());
+        validate(problem);
         try(var store=new SearchExpressionStore(SearchExpressionStore.Limits.DEFAULT)) {
             return new Result(problem.source(),new MoveSearchKernel<Expr,TypedMoveSearch.State,NativeSearchMove,Assessment,NativeVerification>()
                 .search(new Execution(problem,store),continuation,null));
         }
+    }
+    private static void validate(Problem problem){
+        de.regelsuche.search.program.AstExpressionValidation.inspect(problem.source());
+        if(problem.context().goal()!=null)de.regelsuche.search.program.AstExpressionValidation.inspect(problem.context().goal());
     }
     private static final class Execution implements SearchExecution.Environment<Expr,TypedMoveSearch.State,NativeSearchMove,Assessment,NativeVerification> {
         private final Problem problem;private final SearchExpressionStore store;
