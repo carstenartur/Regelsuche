@@ -7,6 +7,22 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NativeRetentionSearchTest {
+    @Test void discardedAtomicRewriteStillConsumesRetentionAndWork() {
+        var arguments=new de.regelsuche.transform.PatternExpr[20];
+        java.util.Arrays.fill(arguments,de.regelsuche.transform.PatternExpr.num(1));
+        var rule=new de.regelsuche.transform.PatternRewriteRule("large",de.regelsuche.transform.PatternExpr.var("A"),
+            de.regelsuche.transform.PatternExpr.fn("large",arguments));
+        var descriptor=new MoveProvider.Descriptor("large","large",SearchMove.SourceKind.PRIMITIVE,SearchMove.ProofStrength.REPLAYABLE,List.of(),SearchMove.ValueEvidence.UNKNOWN,"large-v1");
+        var provider=new NativeMoveSearch.Primitive(descriptor,new de.regelsuche.transform.AstRewriteTransport(List.of(rule),0,128));
+        var problem=new NativeMoveSearch.Problem(new VariableExpr("x"),TypedMoveSearch.Context.frozen(new VariableExpr("y")),List.of(provider),
+            MoveSearch.Mode.FAST,MoveSearch.Scheduling.STAGED,new MoveSearch.Budget(2,1,0,10,1000000));
+        var result=new NativeMoveSearch().search(problem,SearchContinuationContract.PATH_SENSITIVE,new SearchExpressionStore.Limits(10,1000000,1000000,0));
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE,result.outcome(),"the generated AST is rejected by growth before any batch is emitted, but still occupies memory");
+        assertEquals("NATIVE_RETENTION_EXHAUSTED",result.accounting().detail());
+        assertTrue(result.accounting().peak().nodes()>10);assertTrue(result.totalWork()>0);
+        assertTrue(result.witness().isEmpty());
+    }
+
     @Test void registeredPrimitivePathOwnsItsProvidersPickerProposalsAndCheckedResult() {
         var a=de.regelsuche.transform.PatternExpr.var("A");
         var rule=new de.regelsuche.transform.PatternRewriteRule("zero",de.regelsuche.transform.PatternExpr.op(
