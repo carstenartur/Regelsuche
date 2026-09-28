@@ -18,6 +18,7 @@ final class StagedIncrementalLanes<M,S> implements SearchExecution.Picker<M>,Ret
         @Override default void retainedReferences(RetainedGraph.Visitor v){v.requireExact(this,Void.class);}
         MoveProvider.Descriptor descriptor();
         boolean batch();
+        default boolean nativeTransport(){return false;}
         ObjectCursor<M> open(java.util.function.Consumer<List<M>> generated,java.util.function.LongSupplier totalWork);
     }
     private final class Lane implements RetainedGraph.View {
@@ -41,9 +42,11 @@ final class StagedIncrementalLanes<M,S> implements SearchExecution.Picker<M>,Ret
     private final TransformationWorkMetrics ordering;
     private int learnedBurst;
     private boolean closed, workExhausted;
+    private final boolean nativeObservation;
 
     StagedIncrementalLanes(List<Source<M>> providers,SearchBatches.Ranking<M> ranking,S state) {
         this.state=state;
+        nativeObservation=providers.stream().anyMatch(Source::nativeTransport);
         var inventory = List.copyOf(providers);
         for (int i = 0; i < inventory.size(); i++) {
             var provider = inventory.get(i);
@@ -62,9 +65,9 @@ final class StagedIncrementalLanes<M,S> implements SearchExecution.Picker<M>,Ret
         if (allowance < 0) throw new IllegalArgumentException("negative move allowance");
         if (closed) return Optional.empty();
         workExhausted = false;
-        long before = workMetrics().totalWorkUnitsV2();
+        long before = pullWork();
         for (Lane lane = selected(); lane != null; lane = selected()) {
-            long remaining = Math.max(0, allowance - (workMetrics().totalWorkUnitsV2() - before));
+            long remaining = Math.max(0, allowance - (pullWork() - before));
             if (remaining == 0) { workExhausted = true; return Optional.empty(); }
             if (lane.cursor == null) open(lane);
             var candidate = lane.cursor.next(remaining);
@@ -92,13 +95,19 @@ final class StagedIncrementalLanes<M,S> implements SearchExecution.Picker<M>,Ret
         else if(lane.provider.descriptor().sourceKind()==SearchMove.SourceKind.PRIMITIVE)learnedBurst=0;
         return Optional.of(move);
     }
+    private long pullWork() {
+        return Math.addExact(workMetrics().totalWorkUnitsV2(),
+            nativeObservation?de.regelsuche.retention.RetainedOperation.observedWork():0);
+    }
     private Lane selected() {
-        var active = lanes.stream().filter(lane -> !lane.finished).toList();
-        if (learnedBurst >= 2) {
-            var primitive = active.stream().filter(lane -> lane.provider.descriptor().sourceKind() == SearchMove.SourceKind.PRIMITIVE).findFirst();
-            if (primitive.isPresent()) return primitive.orElseThrow();
+        Lane first=null;
+        for(var lane:lanes) {
+            if(lane.finished)continue;
+            if(first==null)first=lane;
+            if(learnedBurst<2)return first;
+            if(lane.provider.descriptor().sourceKind()==SearchMove.SourceKind.PRIMITIVE)return lane;
         }
-        return active.isEmpty() ? null : active.getFirst();
+        return first;
     }
     public int nextStage() { var lane = selected(); return lane == null ? MovePriorityPolicy.Stage.values().length : lane.stage; }
     public TransformationWorkMetrics workMetrics() {

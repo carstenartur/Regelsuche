@@ -53,7 +53,7 @@ final class StagedBatchPicker<M> implements SearchExecution.Picker<M>,RetainedGr
                 : lanes.getFirst();
             if (lane.moves == null) {
                 var batch = lane.provider.candidates();
-                work = work.plus(batch.work()).plus(ordering(batch.moves().size()));
+                work = work.plus(batch.work());
                 exhaustive &= batch.complete();
                 generated.addAll(batch.moves());
                 var ranked = new ArrayList<Ranked<M>>();
@@ -61,6 +61,7 @@ final class StagedBatchPicker<M> implements SearchExecution.Picker<M>,RetainedGr
                 RetainedOperation.work(batch.moves().size());
                 for (var move : batch.moves()) {
                     policy.requireSource(move);
+                    work=work.plus(ordering(1));
                     ranked.add(new Ranked<>(move, finite(policy.score(move))));
                     RetainedOperation.work(2);RetainedOperation.checkpoint();
                 }

@@ -77,6 +77,7 @@ class NativePullBudgetTest {
         EmptyLane(String id,long closingWork){this.id=id;this.closingWork=closingWork;}
         @Override public MoveProvider.Descriptor descriptor(){return new MoveProvider.Descriptor(id,id,SearchMove.SourceKind.PRIMITIVE,SearchMove.ProofStrength.REPLAYABLE,List.of(),SearchMove.ValueEvidence.UNKNOWN,id);}
         @Override public boolean batch(){return false;}
+        @Override public boolean nativeTransport(){return true;}
         @Override public ObjectCursor<NativeMoveProof> open(java.util.function.Consumer<List<NativeMoveProof>> generated,java.util.function.LongSupplier totalWork){
             return new ManagedProviderCursor<>(new Definition(NATIVE_REVISION,id,Kind.REGISTERED_SCHEMA,"model","semantics",Transport.NATIVE_EXPR_V1,Mathematics.PRIMITIVE,null),this);
         }

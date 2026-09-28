@@ -25,6 +25,7 @@ final class NativeIncrementalSources {
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(provider);v.reference(state);v.reference(context);}
         @Override public MoveProvider.Descriptor descriptor(){return provider.descriptor();}
         @Override public boolean batch(){return !(provider instanceof ExprIncrementalProvider);}
+        @Override public boolean nativeTransport(){return true;}
         @Override public ObjectCursor<NativeSearchMove> open(Consumer<List<NativeSearchMove>> generated,LongSupplier totalWork) {
             if(provider instanceof ExprIncrementalProvider incremental)
                 return new ProofCursor(incremental.openSession(state,context),descriptor(),totalWork);
