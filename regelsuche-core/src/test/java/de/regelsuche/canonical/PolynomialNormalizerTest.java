@@ -26,6 +26,19 @@ class PolynomialNormalizerTest {
     private final ExpressionParser parser = new ExpressionParser();
     private final PolynomialNormalizer normalizer = new PolynomialNormalizer();
 
+    @Test void equalDegreeTermsKeepTheExistingLexicalKeyOrderForPrefixesAndLargePowers(){
+        assertEquals("a * z + aa * y",normalize("aa*y+a*z"));
+        assertEquals("x ^ 10 * y ^ 2 + x ^ 2 * y ^ 10",normalize("x^2*y^10+x^10*y^2"));
+        assertEquals("a * b ^ 2147483647 + a ^ 2147483647 * b",
+            normalize("a^2147483647*b+a*b^2147483647"));
+        var first=VariableExpr.scoped(new SymbolId(new UUID(0,17),1));
+        var second=VariableExpr.scoped(new SymbolId(new UUID(0,17),2));
+        var product=new BinaryExpr(first,BinaryOperator.MUL,second);
+        var square=new BinaryExpr(first,BinaryOperator.POW,new NumberExpr(2));
+        assertEquals(new BinaryExpr(product,BinaryOperator.ADD,square),
+            normalizer.normalize(new BinaryExpr(square,BinaryOperator.ADD,product)).orElseThrow());
+    }
+
     @Test void alreadyNormalVariablePowersReuseTheirImmutableProducerTree(){
         var scoped=VariableExpr.scoped(new SymbolId(new UUID(3,7),11));
         for(var variable:List.of(new VariableExpr("x"),scoped))

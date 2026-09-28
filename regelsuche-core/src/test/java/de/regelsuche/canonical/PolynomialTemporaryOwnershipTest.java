@@ -12,6 +12,8 @@ class PolynomialTemporaryOwnershipTest {
         RetainedOperation scope;long work;int simultaneousTerms;boolean rejectedCoefficient;int renderedFactors;boolean optionalEnvelope;Expr inputRoot;boolean missingInput,abortAtCoefficient;int sourceOnlyFrames,simultaneousPowers;boolean zeroTerms,abortAtZeroTerms;
         Set<Expr> inputNodes=Collections.newSetFromMap(new IdentityHashMap<>());long peakNodes;
         Set<String> normalizedVariables=new HashSet<>();
+        Set<String> wantedSortKeys=Set.of();
+        boolean sawSortKeys, sortCopiesOverlap, abortAtSortKeys;
         @Override public void executionWork(long units){work=Math.addExact(work,units);}
         @Override public void validationWork(long units){work=Math.addExact(work,units);}
         @Override public void retainedReferences(RetainedGraph.Visitor visitor){visitor.reference(scope);}
@@ -49,9 +51,42 @@ class PolynomialTemporaryOwnershipTest {
             simultaneousPowers=Math.max(simultaneousPowers,powers);
             sourceOnlyFrames=Math.max(sourceOnlyFrames,sourceFrames);
             if(inputRoot!=null && !seen.contains(inputRoot))missingInput=true;
+            if(!wantedSortKeys.isEmpty() && wantedSortKeys.stream().allMatch(key->seen.stream().anyMatch(key::equals))){
+                sawSortKeys=true;
+                sortCopiesOverlap=wantedSortKeys.stream().allMatch(key->seen.stream().anyMatch(
+                    value->value instanceof char[] buffer && key.equals(new String(buffer))));
+                if(abortAtSortKeys)throw new CoefficientLimit();
+            }
             if(abortAtCoefficient && rejectedCoefficient)throw new CoefficientLimit();
             if(abortAtZeroTerms && zeroTerms)throw new CoefficientLimit();
         }
+    }
+    @Test void sortingOwnsBothProducedKeysAndTheirActualTextBuffers(){
+        var parser=new de.regelsuche.parse.ExpressionParser();
+        var source=parser.parseTerm("x*y+u*v");var observation=sourceObservation(source);
+        observation.wantedSortKeys=Set.of("u*v","x*y");
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;
+            assertEquals(parser.parseTerm("u*v+x*y"),new PolynomialNormalizer().normalize(source).orElseThrow());
+        }
+        assertTrue(observation.sawSortKeys,"both real comparator keys overlap, including the first while building the second");
+        assertTrue(observation.sortCopiesOverlap,"finished key Strings overlap their actual populated buffers");
+        assertFalse(observation.missingInput);assertTrue(observation.work>12);
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().characters());
+    }
+    @Test void sortingCanAbortAfterProducingKeysWithoutLosingTheirWorkOrOwners(){
+        var parser=new de.regelsuche.parse.ExpressionParser();
+        var source=parser.parseTerm("x*y+u*v");var observation=sourceObservation(source);
+        observation.wantedSortKeys=Set.of("u*v","x*y");observation.abortAtSortKeys=true;
+        try(var scope=RetainedOperation.open(observation)){
+            observation.scope=scope;
+            assertThrows(CoefficientLimit.class,()->new PolynomialNormalizer().normalize(source));
+            assertTrue(observation.sawSortKeys);assertTrue(observation.sortCopiesOverlap);
+            assertFalse(observation.missingInput);assertTrue(observation.work>12);
+            observation.abortAtSortKeys=false;
+            assertEquals(parser.parseTerm("u*v+x*y"),new PolynomialNormalizer().normalize(source).orElseThrow());
+        }
+        assertEquals(0,RetainedGraph.measure(observation.scope).retained().characters());
     }
     @Test void reusedVariablePowerStillPaysAndOwnsItsInputAndOptionalHandoff(){
         var source=new BinaryExpr(new VariableExpr("x"),BinaryOperator.POW,new NumberExpr(2));
